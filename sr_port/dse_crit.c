@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,8 +94,8 @@ void dse_crit(void)
 		if (gv_cur_region->read_only)
 			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		cs_addrs->hdr->image_count = 0;
-		UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, crash);)
-		VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, crash);)
+		UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(cs_addrs->hdr), crash));
+		VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY(cs_addrs->hdr), crash));
 		cs_addrs->nl->in_crit = 0;
 		cs_addrs->now_crit = FALSE;
 		util_out_print("!/Reinitialized critical section.!/", TRUE);

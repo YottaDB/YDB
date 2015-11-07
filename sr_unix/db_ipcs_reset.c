@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		return FALSE;
 	}
 	assert((udi->semid == csd->semid) || (INVALID_SEMID == csd->semid));
-	semval = semctl(udi->semid, 1, GETVAL);	/* Get the counter semaphore's value */
+	semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL);	/* Get the counter semaphore's value */
 	assert(1 <= semval);
 	if (1 < semval)
 	{
@@ -114,14 +114,14 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		assert(!reg->read_only); /* ONLINE ROLLBACK must be a read/write process */
 		if (!reg->read_only)
 		{
-			if (0 != (save_errno = do_semop(udi->semid, 1, -1, SEM_UNDO)))
+			if (0 != (save_errno = do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO)))
 			{
 				gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 						RTS_ERROR_TEXT("db_ipcs_reset - write semaphore release"), save_errno);
 				return FALSE;
 			}
-			assert(1 == (semval = semctl(udi->semid, 0, GETVAL)));
-			if (0 != (save_errno = do_semop(udi->semid, 0, -1, SEM_UNDO)))
+			assert(1 == (semval = semctl(udi->semid, DB_CONTROL_SEM, GETVAL)));
+			if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
 			{
 				gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 						RTS_ERROR_TEXT("db_ipcs_reset - access control semaphore release"), save_errno);
@@ -185,6 +185,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		}
 	}
 	udi->grabbed_access_sem = FALSE;
+	udi->counter_acc_incremented = FALSE;
 	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 	if (0 != status)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);

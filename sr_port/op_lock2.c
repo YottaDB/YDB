@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,7 @@ error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
 
 #define LOCKTIMESTR "LOCK time too long"
+#define ZALLOCTIMESTR "ZALLOCATE time too long"
 
 /* We made this a error seperate function because we did not wanted to do the MAXSTR_BUFF_DECL(buff) declartion in op_lock2,
  * because  MAXSTR_BUFF_DECL macro would allocate a huge stack every time op_lock2 is called.
@@ -96,7 +97,6 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 
 /*
  * -----------------------------------------------
- * Maintain in parallel with op_zalloc2
  * Arguments:
  *	timeout	- max. time to wait for locks before giving up
  *      laflag - passed to gvcmx* routines as "laflag" argument;
@@ -124,7 +124,6 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	unsigned char	action;
 	ABS_TIME	cur_time, end_time, remain_time;
 	mv_stent	*mv_zintcmd;
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -134,7 +133,12 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	if (timeout < 0)
 		timeout = 0;
 	else if (TREF(tpnotacidtime) < timeout)
-		TPNOTACID_CHECK(LOCKTIMESTR);
+	{
+		if (CM_ZALLOCATES == cm_action)
+			TPNOTACID_CHECK(ZALLOCTIMESTR)
+		else
+			TPNOTACID_CHECK(LOCKTIMESTR)
+	}
 	if (!(timer_on = (NO_M_TIMEOUT != timeout)))	/* NOTE assignment */
 		msec_timeout = NO_M_TIMEOUT;
 	else
@@ -219,6 +223,9 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 					else
 						level_err(pvt_ptr1);
 					break;
+				case CM_ZALLOCATES:
+					pvt_ptr1->zalloc = TRUE;
+					break;
 				default:
 					GTMASSERT;
 					break;
@@ -241,7 +248,8 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			action = LOCKED;
 			break;
 		case INCREMENTAL:
-			action = INCREMENTAL;
+		case CM_ZALLOCATES:
+			action = cm_action;
 			break;
 		default:
 			GTMASSERT;
@@ -256,7 +264,10 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
 		{	/* upper TPNOTACID_CHECK conditioned on no short timeout; this one rel_crits to avoid potential deadlock */
 			assert(TREF(tpnotacidtime) >= timeout);
-			TPNOTACID_CHECK(LOCKTIMESTR);
+			if (CM_ZALLOCATES == action)
+				TPNOTACID_CHECK(ZALLOCTIMESTR)
+			else
+				TPNOTACID_CHECK(LOCKTIMESTR)
 		}
 		for (;;)
 		{

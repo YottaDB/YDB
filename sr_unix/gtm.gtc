@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc       #
+#       Copyright 2010,2013 Fidelity Information Services, Inc  #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -19,6 +19,10 @@ else
 	find . -name \*.mjl_\* -mtime +$gtm_retention -exec rm -vf {} \; )
     if [ 0 = $# ] ; then
 	$gtm_dist/mumps -direct
+    elif [ "-help" = "$1" -o "-h" = "$1" -o "-?" = "$1" ] ; then
+	echo "gtm -dir[ect] to enter direct mode (halt returns to shell)"
+	echo "gtm -run <entryref> to start executing at an entryref"
+	echo "gtm -help / gtm -h / gtm -? to display this text"
     else
 	$gtm_dist/mumps $*
     fi

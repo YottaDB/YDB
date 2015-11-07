@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -230,9 +230,7 @@ void dse_dmp_fhead (void)
 		/* Mutex Stuff */
 		util_out_print("  Mutex Hard Spin Count !19UL", FALSE, csd->mutex_spin_parms.mutex_hard_spin_count);
 		util_out_print("  Mutex Sleep Spin Count!12UL", TRUE, csd->mutex_spin_parms.mutex_sleep_spin_count);
-		util_out_print("  Mutex Spin Sleep Time !19UL", FALSE,
-			(csd->mutex_spin_parms.mutex_spin_sleep_mask == 0) ?
-				0 : (csd->mutex_spin_parms.mutex_spin_sleep_mask + 1));
+		util_out_print("  Mutex Queue Slots     !19UL", FALSE, NUM_CRIT_ENTRY(csd));
 		util_out_print("  KILLs in progress     !12UL", TRUE, (csd->kill_in_prog + csd->abandoned_kills));
 		util_out_print("  Replication State           !AD", FALSE, 13,
 			(csd->repl_state == repl_closed ? "          OFF"

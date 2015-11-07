@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -144,7 +144,10 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 		SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, TRUE, (SEM_UNDO | IPC_NOWAIT)); /* First try is always IPC_NOWAIT */
 		SEMOP(ftokid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
 		if (-1 != status)
+		{
+			udi->counter_ftok_incremented = TRUE;
 			RETURN_SUCCESS(reg);
+		}
 		assert(EINTR != errno);
 		save_errno = errno;
 		if (EAGAIN == save_errno)
@@ -158,8 +161,10 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, start_hrtbt_cntr, retstat, reg, bypass))
 			{
 				if (*bypass)
+				{
+					udi->counter_ftok_incremented = TRUE;
 					return TRUE;
-				else
+				} else
 					RETURN_SUCCESS(reg);
 			} else if (!SEM_REMOVED(retstat->save_errno))
 				return FALSE; /* retstat will already have the necessary error information */
@@ -250,6 +255,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 		if (-1 != status)
 		{
 			SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
+			udi->counter_ftok_incremented = incr_cnt;
 			RETURN_SUCCESS(reg);
 		}
 		save_errno = errno;
@@ -257,7 +263,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 		if (EAGAIN == save_errno)
 		{	/* Someone else is holding it */
-			sem_pid = semctl(udi->ftok_semid, 0, GETPID);
+			sem_pid = semctl(udi->ftok_semid, DB_CONTROL_SEM, GETPID);
 			if (-1 != sem_pid)
 			{
 				ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO; /* blocking calls */
@@ -274,13 +280,14 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 					if (-1 != status) /* success ? */
 					{
 						SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
+						udi->counter_ftok_incremented = incr_cnt;
 						CANCEL_TIMER_AND_RETURN_SUCCESS(reg);
 					}
 					save_errno = errno;
 					if (EINTR == save_errno)
 					{	/* Timer popped. If not, we would have continued in the do..while loop */
 						assert(TREF(semwait2long));
-						sem_pid = semctl(udi->ftok_semid, 0, GETPID);
+						sem_pid = semctl(udi->ftok_semid, DB_CONTROL_SEM, GETPID);
 						if (-1 != sem_pid)
 						{
 							stuck_cnt++;
@@ -354,11 +361,11 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	assert(!csa->now_crit);
-	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.
-	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
-	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the process_exiting check below.
-	 * In the pro version, we will do the right thing by returning TRUE right away if udi->grabbed_ftok_sem is TRUE.
-	 * 	This is because incr_cnt is FALSE always (asserted below too).
+	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.  The only
+	 * exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we came to rundown code
+	 * that invoked ftok_sem_lock() on a different region. Hence the process_exiting check below.  In the pro version, we will
+	 * do the right thing by returning TRUE right away if udi->grabbed_ftok_sem is TRUE. This is
+	 * because incr_cnt is FALSE always (asserted below too).
 	 */
 	assert(!udi->grabbed_ftok_sem || (FALSE != process_exiting));
 	assert((NULL == ftok_sem_reg) || (FALSE != process_exiting));
@@ -367,14 +374,14 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	ftok_sopcnt = 0;
 	if (!udi->grabbed_ftok_sem)
 	{	/* Guarantee no one else accesses database file header while we update semid/shmid fields in the file header */
-		ftok_sop[0].sem_num = 0; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
-		ftok_sop[1].sem_num = 0; ftok_sop[1].sem_op = 1;	/* Then lock it */
+		ftok_sop[0].sem_num = DB_CONTROL_SEM; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
+		ftok_sop[1].sem_num = DB_CONTROL_SEM; ftok_sop[1].sem_op = 1;	/* Then lock it */
 		ftok_sopcnt = 2;
 	} else if (!incr_cnt)
 		return TRUE;
 	if (incr_cnt)
 	{
-		ftok_sop[ftok_sopcnt].sem_num = 1; ftok_sop[ftok_sopcnt].sem_op = 1; /* increment counter */
+		ftok_sop[ftok_sopcnt].sem_num = DB_COUNTER_SEM; ftok_sop[ftok_sopcnt].sem_op = 1; /* increment counter */
 		ftok_sopcnt++;
 	}
 	ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
@@ -405,9 +412,8 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 		}
 	}
-	udi->grabbed_ftok_sem = TRUE;
-	ftok_sem_reg = reg;
-	return TRUE;
+	udi->counter_ftok_incremented = TRUE;
+	RETURN_SUCCESS(reg);
 }
 
 /*
@@ -420,11 +426,10 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
  */
 boolean_t ftok_sem_incrcnt(gd_region *reg)
 {
-	int			semflag, save_errno, status;
+	int			save_errno, status;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
-	struct sembuf		ftok_sop[3];
-	int			ftok_sopcnt;
+	struct sembuf		ftok_sop;
 
 	assert(NULL != reg);
 	assert(NULL == ftok_sem_reg);	/* assert that we never hold more than one FTOK semaphore at any point in time */
@@ -432,18 +437,16 @@ boolean_t ftok_sem_incrcnt(gd_region *reg)
 	csa = &udi->s_addrs;
 	assert(!csa->now_crit);
 	assert(INVALID_SEMID != udi->ftok_semid);
-	semflag = SEM_UNDO;
-	ftok_sopcnt = 0;
-	ftok_sop[ftok_sopcnt].sem_num = 1;
-	ftok_sop[ftok_sopcnt].sem_op = 1; /* increment counter */
-	ftok_sop[ftok_sopcnt].sem_flg = SEM_UNDO;
-	ftok_sopcnt++;
-	SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
+	ftok_sop.sem_num = DB_COUNTER_SEM;
+	ftok_sop.sem_op = 1; /* increment counter */
+	ftok_sop.sem_flg = SEM_UNDO;
+	SEMOP(udi->ftok_semid, (&ftok_sop), 1, status, NO_WAIT);
 	if (-1 == status)	/* We couldn't get it in one shot -- see if we already have it */
 	{
 		save_errno = errno;
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 	}
+	udi->counter_ftok_incremented = TRUE;
 	return TRUE;
 }
 
@@ -482,7 +485,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 	semflag = SEM_UNDO | (immediate ? IPC_NOWAIT : 0);
 	if (decr_cnt)
 	{
-		if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
+		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
 		{
 			save_errno = errno;
 			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
@@ -499,15 +502,17 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 			udi->ftok_semid = INVALID_SEMID;
 			ftok_sem_reg = NULL;
 			udi->grabbed_ftok_sem = FALSE;
+			udi->counter_ftok_incremented = FALSE;
 			return TRUE;
 		}
-		if (0 != (save_errno = do_semop(udi->ftok_semid, 1, -1, semflag)))
+		if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -1, semflag)))
 		{
 			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 		}
+		udi->counter_ftok_incremented = FALSE;
 	}
-	if (0 != (save_errno = do_semop(udi->ftok_semid, 0, -1, semflag)))
+	if (0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))
 	{
 		GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);

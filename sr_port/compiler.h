@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -383,7 +383,7 @@ typedef struct
 		TREF(saw_side_effect) = TRUE;								\
 		if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))				\
 		{	/* warnings requested by by gtm_fullbool and enabled by eval_expr */		\
-			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);		\
+			show_source_line(TRUE);								\
 			dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);					\
 		}											\
 	}												\
@@ -394,7 +394,7 @@ typedef struct
 #define ISSUE_SIDEEFFECTEVAL_WARNING(COLUMN)						\
 {											\
 	TREF(last_source_column) = (COLUMN);						\
-	show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);		\
+	show_source_line(TRUE);								\
 	dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);					\
 }
 
@@ -447,7 +447,6 @@ typedef struct
 #define SUBS_ARRAY_2_TRIPLES(REF1, SB1, SB2, SUBSCRIPTS, XTRA)									\
 {																\
 	boolean_t	PROTECT_LVN, SE_NOTIFY;											\
-	char		SOURCE_LINE_BUFF[MAX_SRCLINE + SIZEOF(ARROW)];								\
 	triple 		*REF2;													\
 																\
 	if (PROTECT_LVN = (TREF(side_effect_base))[TREF(expr_depth)])	/* NOTE assignment */					\
@@ -462,11 +461,7 @@ typedef struct
 			REF2->operand[0] = *SB2;										\
 			dqins(SB2->oprval.tref, exorder, REF2); 		/* NOTE:this violates information hiding */	\
 			if (SE_NOTIFY)												\
-			{													\
-				TREF(last_source_column) = SB2->oprval.tref->src.column + 1;					\
-				show_source_line(SOURCE_LINE_BUFF, SIZEOF(SOURCE_LINE_BUFF), TRUE);				\
-				dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);							\
-			}													\
+				ISSUE_SIDEEFFECTEVAL_WARNING(SB2->oprval.tref->src.column + 1);					\
 			*SB2 = put_tref(REF2);											\
 		}														\
 		REF2 = newtriple(OC_PARAMETER);											\
@@ -575,6 +570,7 @@ int		f_zechar(oprtype *a, opctype op);
 int		f_zgetsyi(oprtype *a, opctype op);
 int		f_zjobexam(oprtype *a, opctype op);
 int		f_zparse(oprtype *a, opctype op);
+int		f_zpeek(oprtype *a, opctype op);
 int		f_zprevious(oprtype *a, opctype op);
 int		f_zqgblmod(oprtype *a, opctype op);
 int		f_zsearch(oprtype *a, opctype op);

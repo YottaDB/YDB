@@ -1,0 +1,136 @@
+	.title	fgncal_rtn dummy routine header for gtm$xecute
+
+	G_MSF
+
+
+;	The code PSECT must have the MIX attribute in order to contain data.
+$CODE$	=	"FGNCAL_RTN,QUAD,PIC,CON,REL,LCL,SHR,EXE,RD,MIX,NOWRT"
+
+	$routine	name=fgncal_rtn, entry=fgncal_rtn_ca, kind=stack, -
+			saved_regs=<r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, fp>, -
+			standard_prologue=false, data_section_pointer=true
+
+	$linkage_section
+L_ERR_GTMCHECK:	.long	ERR_GTMCHECK
+
+	$data_section
+literal_table:	.asciz	"$FGNXEC"
+
+	$code_section
+
+;	This is a dummy GT.M routine header so this routine can be treated as if
+;	it had been produced by the GT.M compiler (see rtnhdr.h).
+
+jsb:	; There should be no way to enter this code via the procedure descriptor
+	; but use the jsb field to handle that if it happens.
+	lda	sp, -$SIZE(sp)
+	stq	r27, (sp)
+	br	check		; jsb field full; finish this later
+
+	.if	ne,<.-jsb>,mrt$src_len
+	.error	"The dummy routine header jsb size is incorrect; please check it against g_msf.max."
+	.endc
+
+src_full_name:
+	.long		0			; source file name length
+	address_32	0			; source file name
+routine_name:
+	.long		7			; routine name length (sizeof("$FGNXEC") - 1)
+	address_32	$ds			; routine name (dummy)
+vartab_ptr:
+	.long		label_table - $cs	; variable table
+vartab_len:
+	.word		0			; variable table length
+	.word		0			; padding
+labtab_ptr:
+	.long		label_table - $cs	; label table
+labtab_len:
+	.word		2			; label table length
+	.word		0			; padding
+lnrtab_ptr:
+	.long		line_table - $cs	; line table
+lnrtab_len:
+	.word		1			; line table length
+	.word		0			; padding
+ptext_ptr:
+	.long		fgncal_rtn_code - $cs	; pointer to start of actual code
+checksum:
+	.long		0
+compiler_qlf:
+	.long		0
+old_rhead_ptr:
+	address_32	0
+current_rhead_ptr:
+	address_32	0
+temp_mvals:
+	.word		0
+temp_size:
+	.word		0
+linkage_ptr:
+	address_32	$ls
+literal_ptr:
+	address_32	$ds
+
+;	End of GT.M routine header.
+	.if	ne,<.-jsb>,mrt$hdr_size
+	.error	"The dummy routine header size is incorrect; please check it against g_msf.max."
+	.endc
+
+
+fgncal_rtn_code:
+	.base	r13, $ls	; should be set up by getframe
+	$call	opp_ret
+
+;	opp_ret shouldn't return; if it does, we have an error
+	br	check2		; skip pseudo prologue
+
+check:	; It should never EVER be possible to execute this from the top (jsb).
+
+	; First, finish the prologue begun in the jsb field (for debugging purposes)
+	stq	r26, $RSA_OFFSET(sp)
+	stq	r2, $RSA_OFFSET+8(sp)
+	stq	r3, $RSA_OFFSET+16(sp)
+	stq	r4, $RSA_OFFSET+24(sp)
+	stq	r5, $RSA_OFFSET+32(sp)
+	stq	r6, $RSA_OFFSET+48(sp)
+	stq	r7, $RSA_OFFSET+56(sp)
+	stq	r8, $RSA_OFFSET+64(sp)
+	stq	r9, $RSA_OFFSET+72(sp)
+	stq	r10, $RSA_OFFSET+80(sp)
+	stq	r11, $RSA_OFFSET+88(sp)
+	stq	r12, $RSA_OFFSET+96(sp)
+	stq	r13, $RSA_OFFSET+104(sp)
+	stq	r14, $RSA_OFFSET+112(sp)
+	stq	r15, $RSA_OFFSET+120(sp)
+	stq	fp, $RSA_OFFSET+128(sp)
+	mov	sp, fp
+	$end_prologue
+
+;	Set up base register r13 for either path to lib$signal call.
+	mov	r27, r13
+	.base	r13, $ls
+
+;	Next, complain bitterly about the invalid invocation.
+check2:	$call	lib$signal, args=<L_ERR_GTMCHECK/L>
+
+;	lib$signal should never return, but if it does, don't execute data:
+	$return
+
+
+;	Standard variable (null), label, and line tables for end of GT.M object module.
+
+
+;	Variable table would go here if there were one.
+
+label_table:	; initialize the lab_tabent entry
+	.long		0
+	address_32	0
+	.long		lte - fgncal_rtn_ca
+
+line_table:
+	.long	fgncal_rtn_code - fgncal_rtn_ca	; line 0
+lte:	.long	fgncal_rtn_code - fgncal_rtn_ca	; line 1
+
+	$end_routine	name=fgncal_rtn
+
+	.end

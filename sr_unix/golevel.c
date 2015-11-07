@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,9 @@
 
 GBLREF	stack_frame	*frame_pointer;
 
+error_def(ERR_ZGOTOTOOBIG);
+error_def(ERR_ZGOTOLTZERO);
+
 #ifdef GTM_TRIGGER
 void	golevel(int4 level, boolean_t unwtrigrframe)
 #else
@@ -31,15 +34,12 @@ void	golevel(int4 level)
         stack_frame     *fp, *fpprev;
         int4            unwframes, unwlevels, prevlvl;
 
-        error_def(ERR_ZGOTOTOOBIG);
-        error_def(ERR_ZGOTOLTZERO);
-
         if (0 > level)
-                rts_error(VARLSTCNT(1) ERR_ZGOTOLTZERO);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
 	unwlevels = dollar_zlevel() - level;
         if (0 > unwlevels)
 		/* Couldn't get to the level we were trying to unwind to */
-                rts_error(VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	unwframes = 0;
         for (fp = frame_pointer; NULL != fp; fp = fpprev)
         {
@@ -60,7 +60,7 @@ void	golevel(int4 level)
 		}
 		unwframes++;
 		if (SFT_TRIGR & fp->type)
-		{	/* Unwinding a trigger base frame leave a null frame_pointer so allow us to jump over the
+		{	/* Unwinding a trigger base frame leaves a null frame_pointer so allow us to jump over the
 			 * base frame to the rich stack beneath..
 			 */
 			assert(NULL == fpprev);

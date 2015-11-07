@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,6 +95,13 @@ GBLREF	boolean_t		mupip_jnl_recover;
 	(first_tp_srch_status)->cycle = (newcycle);							\
 	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);
 
+#define REL_CRIT_IF_NEEDED(CSA, REG, WAS_CRIT, HOLD_ONTO_CRIT)						\
+{	/* If currently have crit, but didn't have it upon entering, release crit now. */		\
+	assert(!WAS_CRIT || CSA->now_crit);								\
+	if ((WAS_CRIT != CSA->now_crit) && !HOLD_ONTO_CRIT)						\
+		rel_crit(REG);										\
+}
+
 error_def(ERR_BUFOWNERSTUCK);
 error_def(ERR_CRYPTBADCONFIG);
 error_def(ERR_DBFILERR);
@@ -127,7 +134,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 #	ifdef GTM_CRYPT
 	gd_segment		*seg;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	lcl_blk_free = block_is_free;
 	block_is_free = FALSE;	/* Reset to FALSE so that if t_qread fails below, we don't have an incorrect state of this var */
 	first_tp_srch_status = NULL;
@@ -386,7 +395,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						if (was_crit)
 						{
 							assert(FALSE);
-							rts_error(VARLSTCNT(5) status, 3, blk, DB_LEN_STR(gv_cur_region));
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, blk,
+									DB_LEN_STR(gv_cur_region));
 						} else
 						{
 							rdfail_detail = cdb_sc_lostcr;
@@ -408,7 +418,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					}
 #					endif
 					else
-						rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
+								status);
 				}
 				disk_blk_read = TRUE;
 				assert(0 <= cr->read_in_progress);
@@ -484,8 +495,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				)
 				if (cr->blk != blk)
 					break;
-				if ((was_crit != csa->now_crit) && !hold_onto_crit)
-					rel_crit(gv_cur_region);
+				REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
 				assert(was_crit == csa->now_crit);
 				/* Check if "cr" is locked for phase2 update by a concurrent process. Before doing so, need to
 				 * do a read memory barrier to ensure we read a consistent state. Otherwise, we could see
@@ -540,10 +550,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							blocking_pid = 0;	/* do not sleep in the for loop below */
 						}
 					}
-					if (blocking_pid && !wcs_phase2_commit_wait(csa, cr))
-					{	/* Timed out waiting for cr->in_tend to become non-zero. Restart. */
-						rdfail_detail = cdb_sc_phase2waitfail;
-						return NULL;
+					if (blocking_pid)
+					{
+						if (TREF(tqread_nowait) && ((sm_int_ptr_t)&gv_target->hist.h[0].cycle == cycle))
+						{	/* We're an update helper. Don't waste time waiting on a leaf blk */
+							rdfail_detail = cdb_sc_tqreadnowait;
+							return (sm_uc_ptr_t)NULL;
+						}
+						if (!wcs_phase2_commit_wait(csa, cr))
+						{	/* Timed out waiting for cr->in_tend to become non-zero. Restart. */
+							rdfail_detail = cdb_sc_phase2waitfail;
+							return (sm_uc_ptr_t)NULL;
+						}
 					}
 				}
 				if (reset_first_tp_srch_status)
@@ -596,10 +614,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						{
 							if (!hold_onto_crit)
 								rel_crit(gv_cur_region);
-							send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));
-							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
-								 cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
-								 cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
+									DB_LEN_STR(gv_cur_region));
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id,
+									blocking_pid, cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
+								 	cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
 							stuck_cnt++;
 							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK", process_id, blocking_pid,
 										stuck_cnt);
@@ -630,10 +649,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							LOCK_BUFF_FOR_READ(cr, dummy);
 					}
 				}
-				if ((was_crit != csa->now_crit) && !hold_onto_crit)
-					rel_crit(gv_cur_region);
+				REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
 			} else
 			{
+				if (TREF(tqread_nowait) && ((sm_int_ptr_t)&gv_target->hist.h[0].cycle == cycle))
+				{	/* We're an update helper. Don't waste time waiting on a leaf blk; move on to useful work */
+					REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
+					rdfail_detail = cdb_sc_tqreadnowait;
+					return (sm_uc_ptr_t)NULL;
+				}
 				BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_cnt);
 				if (!sleep_invoked)	/* Count # of blks for which we ended up sleeping on the read */
 					BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_nblks);
@@ -659,8 +683,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	} while (TRUE);
 	assert(set_wc_blocked && (cnl->wc_blocked || !csa->now_crit));
 	SET_CACHE_FAIL_STATUS(rdfail_detail, csd);
-	if ((was_crit != csa->now_crit) && !hold_onto_crit)
-		rel_crit(gv_cur_region);
+	REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
 	assert(was_crit == csa->now_crit);
 	return (sm_uc_ptr_t)NULL;
 }

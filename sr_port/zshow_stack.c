@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,8 +60,10 @@ void zshow_stack(zshow_out *output)
 #		endif
 				break;	/* Endpoint.. */
 		}
-		if (!(fp->type & SFT_COUNT) || (fp->type & SFT_ZINTR))
-		{
+		if (!(fp->type & SFT_COUNT) || ((fp->type & SFT_ZINTR) && (fp->flags & SFF_INDCE)))
+		{	/* SFT_ZINTR is normally indirect but if the frame has been replaced by non-indirect frame via ZGOTO or GOTO
+			 * then do not include it in the indirect list here.
+			 */
 			if (nfp < &nocount_frames[MAX_INDR_PER_COUNTED])
 				/* If room in array, save indirect frame type */
 				*nfp++ = fp->type;

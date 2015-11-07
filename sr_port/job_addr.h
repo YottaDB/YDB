@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __JOB_ADDR_H_
 #define __JOB_ADDR_H_
 
-void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr);
+boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr);
 
 #endif

@@ -1,0 +1,15 @@
+;	Save registers into current GT.M MUMPS stack frame
+;	Note: this macro requires a scratch register; you may specify one or it will default to r0.
+
+	.macro	putframe	reg=r0
+
+	; A_frame_pointer must be address of quadword containing the address of frame_pointer
+	ldq	reg, A_frame_pointer
+	ldl	reg, (reg)
+	stl	r8,  msf$l_symtab_off(reg)
+	stl	r9,  msf$temps_ptr_off(reg)
+	stl	r13, msf$ctxt_off(reg)
+	stl	r14, msf$literal_ptr_off(reg)
+	stl	r26, msf$mpc_off(reg)
+
+	.endm

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@ error_def(ERR_VAREXPECTED);
 int f_get(oprtype *a, opctype op)
 {
 	boolean_t	ok, used_glvn_slot;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	oprtype		control_slot, def_opr, *def_oprptr, indir;
 	short int	column;
 	triple		*oldchain, *opptr, *r, *triptr;
@@ -56,23 +55,24 @@ int f_get(oprtype *a, opctype op)
 		r->opcode = OC_INDGET2;
 		if (SHIFT_SIDE_EFFECTS)
 			START_GVBIND_CHAIN(&save_state, oldchain);
-		if (!indirection(&indir))
+		if (ok = indirection(&indir))	/* NOTE: assignment */
 		{
-			if (NULL != oldchain)
-				setcurtchain(oldchain);
-			return FALSE;
+			used_glvn_slot = TRUE;
+			INSERT_INDSAVGLVN(control_slot, indir, ANY_SLOT, 1);
+			r->operand[0] = control_slot;
 		}
-		ok = TRUE;
-		used_glvn_slot = TRUE;
-		INSERT_INDSAVGLVN(control_slot, indir, ANY_SLOT, 1);
-		r->operand[0] = control_slot;
 		break;
 	default:
 		ok = FALSE;
 		break;
 	}
 	if (!ok)
+	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);
+		stx_error(ERR_VAREXPECTED);
 		return FALSE;
+	}
 	opptr = r;
 	ins_triple(r);
 	if (used_glvn_slot)

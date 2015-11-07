@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gd_addr			*gd_header;
 GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	boolean_t		unhandled_stale_timer_pop;
-GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	cw_set_element		cw_set[];
 
 error_def(ERR_DSEBLKRDFAIL);
@@ -176,7 +175,7 @@ void dse_chng_bhead(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, csa->ti->curr_tn);
+		BUILD_AIMG_IF_JNL_ENABLED(csd, csa->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	}
 	if (cli_present("TN") == CLI_PRESENT)
@@ -203,7 +202,7 @@ void dse_chng_bhead(void)
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		/* Pass the desired tn as argument to bg_update/mm_update below */
-		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, tn);
+		BUILD_AIMG_IF_JNL_ENABLED(csd, tn);
 		was_hold_onto_crit = csa->hold_onto_crit;
 		csa->hold_onto_crit = TRUE; /* need this so t_end doesn't release crit (see below comment for why) */
 		t_end(&dummy_hist, NULL, tn);

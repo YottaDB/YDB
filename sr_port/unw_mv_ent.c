@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -366,7 +366,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
 						rm_ptr = (d_rm_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
-						assert(rm_ptr->pipe || rm_ptr->fifo);
+						assert(rm_ptr->pipe || rm_ptr->fifo || rm_ptr->follow);
 						rm_ptr->mupintr = FALSE;
 						rm_ptr->pipe_save_state.who_saved = pipewhich_invalid;
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,11 @@ boolean_t trigger_read_name_entry(mident *trig_name, mval *val)
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-	assert(0 != gv_target->root);
+	if (0 == gv_target->root)
+	{
+		RESTORE_TRIGGER_REGION_INFO;
+		return FALSE;
+	}
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name->addr, trig_name->len - 1);
 	status = gvcst_get(val);
 	RESTORE_TRIGGER_REGION_INFO;

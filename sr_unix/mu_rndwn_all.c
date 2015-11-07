@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -243,7 +243,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		return FALSE;
 	/* check for the bare minimum size of the shared memory segment that we expect
 	 * (with no fileheader related information at hand) */
-	if (NODE_LOCAL_SPACE + SHMPOOL_SECTION_SIZE > parm_buff->sgmnt_siz)
+	if (MIN_NODE_LOCAL_SPACE + SHMPOOL_SECTION_SIZE > parm_buff->sgmnt_siz)
 		return FALSE;
 	if (IPC_PRIVATE != parm_buff->key)
 		return FALSE;
@@ -596,11 +596,14 @@ char *parse_shm_entry(char *entry, int which_field)
 
 	for(iter = 1; iter < which_field; iter++)
 	{
+		/* Strip leading spaces */
 		while(entry[indx1] == ' ')
 			indx1++;
+		/* Accept until spaces or NULL */
 		while(entry[indx1] && entry[indx1] != ' ')
 			indx1++;
 	}
+	/* Strip leading spaces */
 	while(entry[indx1] == ' ')
 		indx1++;
 	if ('\0' == entry[indx1])
@@ -609,8 +612,8 @@ char *parse_shm_entry(char *entry, int which_field)
 		return NULL;
 	}
 	parm = (char *)malloc(MAX_PARM_LEN);
-	memset(parm, 0, MAX_PARM_LEN);
-	while(entry[indx1] && entry[indx1] != ' ')
+	/* Copy value from entry until NULL or a space character */
+	while(entry[indx1] && (entry[indx1] != ' ') && (indx2 < (MAX_PARM_LEN - 1)))
 		parm[indx2++] = entry[indx1++];
 	parm[indx2] = '\0';
 

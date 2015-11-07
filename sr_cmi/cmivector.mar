@@ -1,0 +1,23 @@
+	.title	cmivector - transfer vectors for shared images
+	.psect	cmivector,page,con,exe,pic,nowrt,shr,gbl
+
+cmivector_size = 16	;total of 16 transfer vectors
+
+	.macro	xfer	a
+	.transfer	a
+	.mask	a
+	jmp	l^a+2
+	.endm
+
+cmivector::
+	xfer	cmi_close
+	xfer	cmi_init
+	xfer	cmi_open
+	xfer	cmi_read
+	xfer	cmi_write
+	xfer	cmi_write_int
+	xfer	cmu_makclb
+	xfer	cmu_getclb
+	xfer	cmu_ntdroot
+	.blkq	cmivector_size - <<. - cmivector> / 8>
+	.end

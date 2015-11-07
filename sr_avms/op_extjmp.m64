@@ -1,0 +1,115 @@
+	.title	op_extjmp - jump to a label in an external (MUMPS) routine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2005, 2012 Fidelity Information Services, Inc	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+; 	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	G_MSF
+	PROCDESC
+
+;	op_extjmp transfers control to a label in an external MUMPS module.  If the routine
+;	has not yet been linked into the current image, op_extjmp will first link it by
+;	invoking the auto-ZLINK function.
+;
+;	Args:
+;		procdsc - address of procedure descriptor of routine containing the label
+;		labaddr - address of offset into routine to which to transfer control
+
+	$routine	name=op_extjmp, entry=op_extjmp_ca, kind=stack, saved_regs=<r13, fp>, -
+			data_section_pointer=true
+
+	$linkage_section
+
+A_frame_pointer:	.address	frame_pointer
+
+L_ERR_GTMCHECK:		.long		ERR_GTMCHECK
+L_ERR_LABELUNKNOWN:	.long		ERR_LABELUNKNOWN
+
+
+	$data_section
+
+PDSC_FLAGS:
+	.long	GTM_PD_FLAGS
+
+
+	$code_section
+
+	.base	r27, $ls
+	ldq	r22, $dp
+	.base	r22, $ds
+
+	putframe	r12
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	beq	r16, L20		; if procdsc == 0, this routine has not yet been linked into current image
+	beq	r17, L40		; if labaddr == 0 (and procdsc != 0), there is some interal error
+
+;	Check whether first argument is a procedure descriptor or routine header.
+	ldl	r28, PDSC_FLAGS
+	ldl	r0,  (r16)
+	xor	r28, r0, r28
+	bne	r28, L10		; if not procedure descriptor, it must be a routine header
+
+	ldq	r16, 8(r16)		; rhdaddr = procdsc->entry_point	; entry point address is address of routine header
+L10:	ldl	r17, (r17)		; *lab_ln_ptr
+	beq	r17, L40
+	ldl	r28, mrt$curr_ptr(r16)
+	addl	r17, r28, r17
+	addl	r17, r16, r17		; rhdaddr + *lab_ln_ptr
+	ldl	r17, (r17)		; *labaddr
+	ldl	r28, mrt$curr_ptr(r16)	; rhdaddr->current_rhead_ptr
+	addl	r16, r28, r18		; rhdaddr + rhdaddr->current_rhead_ptr
+	addl	r17, r18, r18		; rhdaddr + rhdaddr->current_rhead_ptr + *labaddr
+	$call	flush_jmp, args=<r16, mrt$lnk_ptr(r16)/L, r18>, set_arg_info=false
+
+	$begin_epilogue
+	getframe
+	imb
+	mov	fp,  sp
+	ldq	fp,  $RSA_OFFSET+16(sp)
+	lda	sp,  $SIZE(sp)
+	ret	r26
+	$end_epilogue
+
+L20:	bne	r17, L40		; if labaddr != 0 (and procdsc == 0), there is some internal error
+	lda	sp,  -8(sp)		; auto_zlink will put value here
+	stq	r31, (sp)
+	$call	auto_zlink, args=<msf$mpc_off(r12)/L, sp>, set_arg_info=false
+	beq	r0,  L30
+	mov	r0,  r16		; rhdaddr of newly-ZLINK'ed routine
+	ldq	r17, (sp)		; new labaddr
+	lda	sp,  8(sp)
+	beq	r17, L40
+	br	L10			; auto_zlink returns pointer to a routine header, not a procedure descriptor
+
+L30:	$call	lib$signal, args=<L_ERR_GTMCHECK/L>
+	$begin_epilogue
+	getframe
+	imb
+	mov	fp,  sp
+	ldq	fp,  $RSA_OFFSET+16(sp)
+	lda	sp,  $SIZE(sp)
+	ret	r26
+	$end_epilogue
+
+L40:	$call	lib$signal, args=<L_ERR_LABELUNKNOWN/L>
+	$begin_epilogue
+	getframe
+	imb
+	mov	fp,  sp
+	ldq	fp,  $RSA_OFFSET+16(sp)
+	lda	sp,  $SIZE(sp)
+	ret	r26
+	$end_epilogue
+
+	$end_routine	name=op_extjmp
+
+	.end

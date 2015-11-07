@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,6 @@ void op_halt(void)
 			 0, zposition.str.len, zposition.str.addr);
 	}
 #	endif
-	exit(0);
+	exit(EXIT_SUCCESS);
 #endif
 }

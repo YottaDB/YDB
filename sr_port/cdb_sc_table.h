@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2003, 2012 Fidelity Information Services, Inc        *
+ *      Copyright 2003, 2013 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -117,3 +117,4 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_instancefreeze,   FALSE, 's') /* 's'  instance freeze 
 CDB_SC_LCHAR_ENTRY(cdb_sc_gvtrootmod2,      FALSE, 't') /* 't'  t_end/tp_tend detected root blocks moved by reorg */
 CDB_SC_LCHAR_ENTRY(cdb_sc_spansize,         FALSE, 'u') /* 'u'  chunks of spanning node don't add up */
 CDB_SC_LCHAR_ENTRY(cdb_sc_restarted,        FALSE, 'v') /* 'v'  return value indicating t_retry has already happened */
+CDB_SC_LCHAR_ENTRY(cdb_sc_tqreadnowait,     FALSE, 'w') /* 'w'  update helper returning from t_qread instead of sleeping */

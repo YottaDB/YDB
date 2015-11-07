@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #include "gtmrecv.h"
 #include "deferred_signal_handler.h"
 #include "repl_instance.h"
+#include "format_targ_key.h"
 #endif
 
 /* Include prototypes */
@@ -131,6 +132,7 @@ GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl r
 GBLREF	boolean_t		block_is_free;
 GBLREF	boolean_t		gv_play_duplicate_kills;
 GBLREF	boolean_t		pool_init;
+GBLREF	gv_key			*gv_currkey;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 #endif
@@ -142,6 +144,7 @@ GBLREF	int4			strm_index;
 GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
+error_def(ERR_GBLOFLOW);
 error_def(ERR_GVKILLFAIL);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_JNLFILOPN);
@@ -206,7 +209,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
 	trans_num		valid_thru, oldest_hist_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
-	unsigned char		cw_depth, cw_bmp_depth;
+	unsigned char		cw_depth, cw_bmp_depth, buff[MAX_ZWR_KEY_SZ], *end;
 	jnldata_hdr_ptr_t	jnl_header;
 	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth, prev_cw_set_depth;
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
@@ -297,8 +300,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert(!gv_cur_region->read_only || !update_trans);
 	cr_array_index = 0;	/* be safe and reset it in PRO even if it is not zero */
 	if (cnl->wc_blocked || (is_mm && (csa->total_blks != csa->ti->total_blks)))
-	{ /* If blocked, or we have MM and file has been extended, force repair */
+	{	/* If blocked, or we have MM and file has been extended, force repair */
 		status = cdb_sc_helpedout;	/* force retry with special status so philanthropy isn't punished */
+		assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == csa->ti->total_blks));
 		goto failed_skip_revert;
 	} else
 	{
@@ -425,9 +429,23 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					} else
 					{
 						GET_CDB_SC_CODE(cs->blk, status);	/* code is set in status */
+#						ifdef UNIX
+						if (is_mm && (cdb_sc_gbloflow == status))
+						{
+							assert(NULL != gv_currkey);
+							if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+								end = &buff[MAX_ZWR_KEY_SZ - 1];
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
+									ERR_GVIS, 2, end - buff, buff);
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
+									ERR_GVIS, 2, end - buff, buff);
+						}
+#						endif
 					}
 					goto failed_skip_revert;
 				}
+				assert(!is_mm || (cs->blk < csa->total_blks));
+				assert((CDB_STAGNATE > t_tries) || (cs->blk < csa->ti->total_blks));
 				blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cs->blk_prior_state)
 					 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cs->blk_prior_state);
 				BEFORE_IMAGE_NEEDED(read_before_image, cs, csa, csd, cs->blk, before_image_needed);
@@ -443,6 +461,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						status = (enum cdb_sc)rdfail_detail;
 						goto failed_skip_revert;
 					}
+					ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)cs->old_block, csa);
 					if (!WAS_FREE(cs->blk_prior_state) && (NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
 					{	/* Compute CHECKSUM for writing PBLK record before getting crit.
 						 * It is possible that we are reading a block that is actually marked free in
@@ -490,6 +509,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						status = (enum cdb_sc)rdfail_detail;
 						goto failed_skip_revert;
 					}
+					ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)cs->old_block, csa);
 				}
 			}
 		}
@@ -502,19 +522,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		tmp_cw_set_depth = cw_map_depth ? cw_map_depth : cw_set_depth;
 		TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth);
 		/* For a non-tp update maximum journal space we may need is total size of
-		 * 	1) space for maximum CDB_CW_SET_SIZE PBLKs, that is, MAX_JNL_REC_SIZE * CDB_CW_SET_SIZE
+		 * 	1) space for maximum CDB_CW_SET_SIZE PBLKs, that is, MAX_MAX_NONTP_JNL_REC_SIZE * CDB_CW_SET_SIZE
 		 *	2) space for a logical record itself, that is, MAX_LOGI_JNL_REC_SIZE and
 		 * 	3) overhead records (MIN_TOTAL_NONTPJNL_REC_SIZE + JNL_FILE_TAIL_PRESERVE)
 		 * This requirement is less than the minimum autoswitchlimit size (JNL_AUTOSWITCHLIMIT_MIN) as asserted below.
 		 * Therefore we do not need any check to issue JNLTRANS2BIG error like is being done in tp_tend.c
 		 */
-#		ifdef UNIX
-		assert((CDB_CW_SET_SIZE * MAX_PHY_JNL_REC_SIZE(csd) + MAX_LOGI_JNL_REC_SIZE +
+		assert((CDB_CW_SET_SIZE * MAX_MAX_NONTP_JNL_REC_SIZE + MAX_LOGI_JNL_REC_SIZE +
 			MIN_TOTAL_NONTPJNL_REC_SIZE + JNL_FILE_TAIL_PRESERVE) <= (JNL_AUTOSWITCHLIMIT_MIN * DISK_BLOCK_SIZE));
-#		else
-		assert((CDB_CW_SET_SIZE * MAX_JNL_REC_SIZE + MAX_LOGI_JNL_REC_SIZE +
-			MIN_TOTAL_NONTPJNL_REC_SIZE + JNL_FILE_TAIL_PRESERVE) <= (JNL_AUTOSWITCHLIMIT_MIN * DISK_BLOCK_SIZE));
-#		endif
 		DEBUG_ONLY(tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
 		assert(tot_jrec_size <= csd->autoswitchlimit);
 		/* The SET_GBL_JREC_TIME done below should be done before any journal writing activity
@@ -1229,7 +1244,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					 * across multiple generation journal files. */
 					if (SS_NORMAL != (jnl_status = jnl_flush(jpc->region)))
 					{
-						send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
 							ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during t_end"),
 							jnl_status);
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
@@ -1274,10 +1289,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			} else
 			{
 				if (SS_NORMAL != jpc->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
-						jpc->status);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region), jpc->status);
 				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region));
 			}
 		}
 		assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
@@ -1765,7 +1781,7 @@ skip_cr_array:
 		if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)
 		{
 			temp_tn = dbtn + 1;
-			send_msg(VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);
 		}
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readwrite, 1);
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
@@ -1802,21 +1818,21 @@ failed_skip_revert:
 		gvnh->clue.end = 0;
 	if ((NULL != hist2) && (NULL != (gvnh = hist2->h[0].blk_num ? hist2->h[0].blk_target : NULL)))
 		gvnh->clue.end = 0;
-	DEBUG_ONLY(
-		/* Ensure we dont have t1->cse set for any gv_targets that also have their clue non-zero.
-		 * As this can cause following transactions to rely on out-of-date information and do wrong things.
-		 * (e.g. in t_end of the following transaction, we will see t1->cse non-NULL and conclude the buffer
-		 * needs to be pinned when actually it is not necessary).
-		 */
-		for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+#	ifdef DEBUG
+	/* Ensure we dont have t1->cse set for any gv_targets that also have their clue non-zero.
+	 * As this can cause following transactions to rely on out-of-date information and do wrong things.
+	 * (e.g. in t_end of the following transaction, we will see t1->cse non-NULL and conclude the buffer
+	 * needs to be pinned when actually it is not necessary).
+	 */
+	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+	{
+		if (gvnh->clue.end)
 		{
-			if (gvnh->clue.end)
-			{
-				for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
-					assert(NULL == t1->cse);
-			}
+			for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
+				assert(NULL == t1->cse);
 		}
-	)
+	}
+#	endif
 	/* t_commit_cleanup releases crit as long as the transition is from 2nd to 3rd retry or 3rd to 3rd retry. The only exception
 	 * is if hold_onto_crit is set to TRUE in which case t_commit_cleanup honors it. Assert accordingly.
 	 */

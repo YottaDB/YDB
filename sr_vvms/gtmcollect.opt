@@ -1,0 +1,41 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2002 Sanchez Computer Associates, Inc.	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! gtmcollect.opt
+!
+! This is a linker options file which contains cluster commands
+! that set the pfc (page fault cluster size) to 12 for the code
+! section and 20 for the literal constants section.
+!
+! The page fault cluster size is the number of pages which are
+! transferred to memory as the result of a page fault.
+! Normally it is controlled is by a SYSGEN parameter
+! (PFCDEFAULT) for all image sections which do not otherwise
+! specify a PFC.  The default is generally set to 64 pages by
+! AUTOGEN.  64 seems to be a good size for DEC utilities but
+! it is generally significantly larger than optimal for MUMPS
+! programs in GT.M.  You may wish to experiment to find the
+! best size for you image(s).
+!
+! Exact spelling of "gtm$code" and "gtm$literals" is essential
+! as any psect name will be accepted without error.
+!
+! If you wish to use your own options just include the cluster
+! options at the FIRST appropriate opportunity, in your file,
+! and the collect options near the end.
+! Otherwise you may use this as your options file and specify
+! "gtmcollect/option" in the list of files for your link command.
+!
+cluster=code,,12,
+cluster=lits,,20,
+collect=code,gtm$code
+collect=lits,gtm$literals
+!

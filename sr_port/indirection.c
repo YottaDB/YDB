@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,11 @@
 GBLREF	boolean_t	run_time;
 GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
+GBLREF	unsigned char	*source_buffer;
 GBLREF	short int	source_column;
 
 error_def(ERR_BOOLSIDEFFECT);
+error_def(ERR_EXPR);
 error_def(ERR_LPARENMISSING);
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_RPARENMISSING);
@@ -33,7 +35,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 
 int indirection(oprtype *a)
 {
-	char		c, source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	char		c;
 	oprtype		*sb1, *sb2, subs[MAX_INDSUBSCRIPTS], x;
 	triple		*next, *ref;
 	int		parens, oldlen, len;
@@ -49,6 +51,7 @@ int indirection(oprtype *a)
 	if (!expratom(a))
 	{
 		DECREMENT_EXPR_DEPTH;
+		stx_error(ERR_EXPR);
 		return FALSE;
 	}
 	coerce(a, OCT_MVAL);
@@ -67,22 +70,14 @@ int indirection(oprtype *a)
 				stx_error(ERR_LPARENMISSING);
 				return FALSE;
 			}
-			for (parens = 1; (0 != parens) && (TK_EOL != TREF(window_token)); )
-			{
-				advancewindow();
-				if (TK_LPAREN == TREF(window_token))
-					parens++;
-				else if (TK_RPAREN == TREF(window_token))
-					parens--;
-			}
-			if (0 != parens)
+			advancewindow();
+			if (!parse_until_rparen_or_space() || (TK_RPAREN != TREF(window_token)))
 			{
 				stx_error(ERR_RPARENMISSING);
 				return FALSE;
 			}
-			for (end = lexical_ptr - 1; *end != ')'; )
-				end--;
-			len = INTCAST(end - start) + 1;
+			end = (char *)source_buffer + (INTPTR_T)source_column - 1;	/* lexical_ptr before last advancewindow */
+			len = INTCAST(end - start);
 			oldlen = (TREF(indirection_mval)).str.len;
 			ENSURE_STP_FREE_SPACE(oldlen + len);
 			/* Ok to copy from beginning each iteration because we generally expect no more than two iterations,

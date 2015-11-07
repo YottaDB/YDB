@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@ error_def(ERR_VAREXPECTED);
 int f_name(oprtype *a, opctype op)
 {
 	boolean_t	gbl;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	oprtype		*depth;
 	short int	column;
 	triple		*r, *s;
@@ -78,11 +77,7 @@ int f_name(oprtype *a, opctype op)
 		if (EXPR_FAIL == expr(depth, MUMPS_STR))
 			return FALSE;
 		if (!run_time && (OC_INDFNNAME2 == r->opcode) && (SE_WARN == TREF(side_effect_handling)))
-		{
-			TREF(last_source_column) = column - 1;
-			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-			dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
-		}
+			ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);
 	}
 	coerce(depth, OCT_MVAL);
 	ins_triple(r);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +35,14 @@ GBLREF	bool			caller_id_flag;
 GBLREF	volatile int4		exit_state;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnlpool_addrs		jnlpool;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;
 #endif
+
+void send_msg_va(void *csa, int arg_count, va_list var);
 
 /*
 **  WARNING:    For chained error messages, all messages MUST be followed by an fao count;
@@ -50,6 +54,27 @@ static uint4		nesting_level = 0;
 void send_msg(int arg_count, ...)
 {
         va_list		var;
+	sgmnt_addrs	*csa;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	csa = (ANTICIPATORY_FREEZE_AVAILABLE && jnlpool.jnlpool_ctl) ? REG2CSA(gv_cur_region) : NULL;
+        VAR_START(var, arg_count);
+	send_msg_va(csa, arg_count, var);
+	va_end(var);
+}
+
+void send_msg_csa(void *csa, int arg_count, ...)
+{
+	va_list		var;
+
+        VAR_START(var, arg_count);
+	send_msg_va(csa, arg_count, var);
+	va_end(var);
+}
+
+void send_msg_va(void *csa, int arg_count, va_list var)
+{
         int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[1024];
         mstr    	msg_string;
@@ -68,7 +93,6 @@ void send_msg(int arg_count, ...)
 	 */
 	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler) || (EXIT_IMMED == exit_state));
 	DEBUG_ONLY(nesting_level++;)
-        VAR_START(var, arg_count);
         assert(arg_count > 0);
 	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 	{
@@ -78,7 +102,7 @@ void send_msg(int arg_count, ...)
         for (;;)
         {
                 msg_id = (int) va_arg(var, VA_ARG_TYPE);
-		CHECK_IF_FREEZE_ON_ERROR_NEEDED(msg_id, freeze_needed, freeze_msg_id);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id);
                 --arg_count;
                 msg_string.addr = msg_buffer;
                 msg_string.len = SIZEOF(msg_buffer);
@@ -109,12 +133,11 @@ void send_msg(int arg_count, ...)
                 }
                 util_out_print("!/", NOFLUSH);
         }
-	va_end(var);
         util_out_print(NULL, OPER);
 	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
         /* it has been suggested that this would be a place to check a view_debugN
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
 	DEBUG_ONLY(nesting_level--;)
-	FREEZE_INSTANCE_IF_NEEDED(freeze_needed, freeze_msg_id);
+	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id);
 }

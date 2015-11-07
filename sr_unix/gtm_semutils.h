@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,9 @@
 #define MAX_BYPASS_WAIT_SEC		3
 
 #define MAX_C_STACK_TRACES_FOR_SEMWAIT	2
+
+#define DB_CONTROL_SEM	0
+#define DB_COUNTER_SEM	1
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILERR);
@@ -158,11 +161,11 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	/* Typically, multiple statements are not specified in a single line. However, each of the 2 lines below represent	\
 	 * "one" semaphore operation and hence an acceptible exception to the coding guidelines.				\
 	 */															\
-	SOP[0].sem_num = 0; SOP[0].sem_op = 0;	/* Wait for 0 (unlocked) */							\
-	SOP[1].sem_num = 0; SOP[1].sem_op = 1;	/* Then lock it */								\
+	SOP[0].sem_num = DB_CONTROL_SEM; SOP[0].sem_op = 0;	/* Wait for 0 (unlocked) */					\
+	SOP[1].sem_num = DB_CONTROL_SEM; SOP[1].sem_op = 1;	/* Then lock it */						\
 	if (INCR_CNT)														\
 	{															\
-		SOP[2].sem_num = 1; SOP[2].sem_op = 1;	/* Increment counter semaphore */					\
+		SOP[2].sem_num = DB_COUNTER_SEM; SOP[2].sem_op = 1;	/* Increment counter semaphore */			\
 		SOPCNT = 3;													\
 	} else															\
 		SOPCNT = 2;													\

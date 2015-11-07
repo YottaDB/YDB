@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +88,7 @@
 # include "gtm_utf8.h"
 #endif
 #include "continue_handler.h"
+#include "have_crit.h"
 
 #ifdef __osf__
 # pragma pointer_size (save)

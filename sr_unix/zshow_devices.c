@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -312,7 +312,13 @@ void zshow_devices(zshow_out *output)
 						if (rm_ptr->fifo)
 							ZS_STR_OUT(&v,fifo_text);
 						else if (!rm_ptr->pipe)
+						{
 							ZS_STR_OUT(&v,rmsfile_text);
+							if (rm_ptr->follow)
+							{
+								ZS_PARM_SP(&v, zshow_follow);
+							}
+						}
 						else
 						{
 							ZS_STR_OUT(&v,pipe_text);

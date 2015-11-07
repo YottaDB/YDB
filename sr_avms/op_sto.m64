@@ -1,0 +1,67 @@
+;#################################################################
+;#								 #
+;#	Copyright 2006, 2012 Fidelity Information Services, Inc	 #
+;#								 #
+;#	This source code contains the intellectual property	 #
+;#	of its copyright holder(s), and is made available	 #
+;#	under a license.  If you do not know the terms of	 #
+;# 	the license, please stop and do not read further.	 #
+;#								 #
+;#################################################################
+	.title	OP_STO
+
+	mval$def
+
+
+	$linkage_section
+
+a_literal_null:
+	.address literal_null
+
+a_undef_inhibit:
+	.address undef_inhibit
+
+l_underr:
+	.linkage_pair underr
+
+
+	$code_section
+
+	$routine OP_STO, entry=OP_STO_CA, kind=null
+	.base	r27, $ls
+
+	mv_if_notdefined (r1), 10$
+
+; Copy the mval pointed to by r1 to the mval pointed to by r0
+; (mval's are longword-aligned, and are 5 longwords long [mval$size = 20]):
+5$:	mov	mval$m_aliascont, r24
+	ldl	r16, (r1)
+	ldl	r17, 4(r1)
+	bic	r16, r24, r16		; don't allow propagation of alias container flag
+	ldl	r18, 8(r1)
+	ldl	r19, 12(r1)
+	ldl	r20, 16(r1)
+	stl	r16, (r0)
+	stl	r17, 4(r0)
+	stl	r18, 8(r0)
+	stl	r19, 12(r0)
+	stl	r20, 16(r0)
+	ret	r26
+
+10$:	ldq	r28, a_undef_inhibit
+	ldq_u	r24, (r28)
+	extbl	r24, r28, r24
+	beq	r24, 20$
+	ldq	r1, a_literal_null
+	br	5$
+
+; "Call" UNDERR;  it will return to our caller, since we haven't changed r26:
+20$:	mov	r1, r16
+	mov	^x1, r25	; UNDEF here is never subscripted - use arg cnt 1
+	ldq	r28, l_underr
+	ldq	r27, l_underr+8
+	jmp	r28
+
+	$end_routine
+
+	.end

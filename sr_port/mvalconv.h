@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,13 +19,14 @@
 void		i2smval(mval *v, uint4 i);
 void		i2usmval(mval *v, unsigned int i);
 void		i2mval(mval *v, int i);
-#ifdef GTM64
-void		ul2mval(mval *v, unsigned long i);
-void		l2mval(mval *v, long i);
-#endif
+void		ui82mval(mval *v, gtm_uint64_t i);
+void		i82mval(mval *v, gtm_int64_t i);
+void		float2mval(mval *dst, float src);
 void		double2mval(mval *dst, double src);
 double		mval2double(mval *v);
 int4		mval2i(mval *v);
+gtm_int64_t	mval2i8(mval *v);
+gtm_uint64_t	mval2ui8(mval *v);
 uint4		mval2ui(mval *v);
 boolean_t	isint (mval *v, int4 *intval);
 

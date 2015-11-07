@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,16 +93,15 @@ bool	mubfilcpy (backup_reg_list *list)
 	mstr			*file, tempfile;
 	unsigned char		cmdarray[COMMAND_ARRAY_SIZE], *command = &cmdarray[0];
 	sgmnt_data_ptr_t	header_cpy;
-	int4			backup_fd = FD_INVALID, size, vbn, counter, hdrsize, rsize, ntries;
+	int4			backup_fd = FD_INVALID, counter, hdrsize, rsize, ntries;
 	ssize_t                 status;
-	int4			adjust, blk_num, cmdlen, rv, save_errno, temp, tempfilelen, tmplen;
+	int4			blk_num, cmdlen, rv, save_errno, tempfilelen, tmplen;
 	struct stat		stat_buf;
-	off_t			filesize, handled, offset;
+	off_t			filesize, offset;
 	char 			*inbuf, *zero_blk, *ptr, *errptr;
-	boolean_t		done;
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	int                     fstat_res;
-	uint4			ustatus;
+	uint4			ustatus, size;
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	ZOS_ONLY(int		realfiletag;)
 	int			group_id;
@@ -158,11 +157,12 @@ bool	mubfilcpy (backup_reg_list *list)
 		    (ntries > MAX_TEMP_OPEN_TRY))
 		{
 			if (FILE_STAT_ERROR != fstat_res)
-				gtm_putmsg(VARLSTCNT(8) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr,
 					   ERR_TEXT, 2, LEN_AND_LIT("Tried a maximum number of times, clean-up temporary files " \
 								    "in backup directory and retry."));
 			else
-				gtm_putmsg(VARLSTCNT(5) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr, ustatus);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr,
+						ustatus);
 			return FALSE;
 		}
 		ntries++;
@@ -217,11 +217,11 @@ bool	mubfilcpy (backup_reg_list *list)
 	if (-1 != fstat_res)
 		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
 		{
-			send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
 				PERMGENDIAG_ARGS(pdd));
-			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
 				PERMGENDIAG_ARGS(pdd));
@@ -252,7 +252,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		{	/* A concurrent online rollback happened since we did the gvcst_init. The backup is not reliable.
 			 * Cleanup and exit
 			 */
-			gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 			CLEANUP_AND_RETURN_FALSE;
 		}
 		/* if there has been an extend, truncate it */
@@ -309,7 +309,7 @@ bool	mubfilcpy (backup_reg_list *list)
 			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
 			{
 				assert(FALSE);
-				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
 					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
 				rel_crit(gv_cur_region);
 				CLEANUP_AND_RETURN_FALSE;
@@ -327,7 +327,7 @@ bool	mubfilcpy (backup_reg_list *list)
 			backup_buffer_flush(gv_cur_region);
 			if (++counter > MAX_BACKUP_FLUSH_TRY)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_BCKUPBUFLUSH);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_BCKUPBUFLUSH);
 				CLEANUP_AND_RETURN_FALSE;
 			}
 			if (counter & 0xF)
@@ -337,7 +337,7 @@ bool	mubfilcpy (backup_reg_list *list)
 				if (FALSE == shmpool_lock_hdr(gv_cur_region))
 				{
 					assert(FALSE);
-					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
 					CLEANUP_AND_RETURN_FALSE;
 				}
@@ -351,7 +351,7 @@ bool	mubfilcpy (backup_reg_list *list)
 			assert(EACCES == cs_addrs->shmpool_buffer->backup_errno);
 			util_out_print("Process !UL encountered the following error.", TRUE, cs_addrs->shmpool_buffer->failed);
 			if (0 != cs_addrs->shmpool_buffer->backup_errno)
-				gtm_putmsg(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
 		}
@@ -418,8 +418,8 @@ bool	mubfilcpy (backup_reg_list *list)
 						size = (((blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
 
 					if (cs_addrs->do_fullblockwrites)
-						size = (int4)ROUND_UP(size, cs_addrs->fullblockwrite_len);
-					assert(cs_addrs->hdr->blk_size >= size);
+						size = ROUND_UP(size, cs_addrs->fullblockwrite_len);
+					assert((uint4)cs_addrs->hdr->blk_size >= size);
 					offset = (header_cpy->start_vbn - 1) * DISK_BLOCK_SIZE
 						+ ((off_t)header_cpy->blk_size * blk_num);
 					LSEEKWRITE(backup_fd,

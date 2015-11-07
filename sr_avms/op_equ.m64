@@ -1,0 +1,32 @@
+	.title	op_equ	determine whether two mvals are equal
+
+;	op_equ
+;
+;	op_equ calls is_equ to compare two mval operands to determine
+;	whether they are equal.  The actual comparison is performed by
+;	the C-callable routine is_equ; op_equ is needed as an interlude
+;	between generated GT.M code that passes the arguments in r0
+;	and r0 instead of in the argument registers.
+;
+;	entry
+;		r0, r1	contain addresses of mval's to be compared
+;
+;	return
+;		r0	1, if the two mval's are equal
+;			0, if they're not equal
+
+	$routine	name=op_equ,entry=op_equ_ca,kind=stack, -
+			base_reg_is_fp=true,rsa_offset=24,saved_regs=<fp>
+
+	.base	r27, $ls
+
+	mov	r0, r16
+	mov	r1, r17
+	$call	is_equ, args=<r16,r17>, set_arg_info=false
+	mov	r0, r24			; copy is_equ's return value to GT.M's condition code register
+
+	$return
+
+	$end_routine	name=op_equ
+
+	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,8 +111,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int4			status1;
 	int			glbl_buff_status, defer_status, rsrvd_bytes_status,
 				extn_count_status, lock_space_status, disk_wait_status,
-				inst_freeze_on_error_status, qdbrundown_status;
-	int4			new_disk_wait, new_cache_size, new_extn_count, new_lock_space, reserved_bytes, defer_time;
+				inst_freeze_on_error_status, qdbrundown_status, mutex_space_status;
+	int4			new_disk_wait, new_cache_size, new_extn_count, new_lock_space, reserved_bytes, defer_time,
+				new_mutex_space;
 	int			key_size_status, rec_size_status;
 	int4			new_key_size, new_rec_size;
 	sgmnt_data_ptr_t	csd;
@@ -219,6 +220,28 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{
 			util_out_print("Error getting LOCK_SPACE qualifier value", TRUE);
+			return (int4)ERR_WCWRNNOTCHG;
+		}
+		need_standalone = TRUE;
+	}
+	if (mutex_space_status = cli_present("MUTEX_SLOTS"))
+	{
+		if (cli_get_int("MUTEX_SLOTS", &new_mutex_space))
+		{
+			if (new_mutex_space > MAX_CRIT_ENTRY)
+			{
+				util_out_print("!UL too large, maximum number of mutex slots allowed is !UL", TRUE,
+						new_mutex_space, MAX_CRIT_ENTRY);
+				return (int4)ERR_WCWRNNOTCHG;
+			} else if (new_mutex_space < MIN_CRIT_ENTRY)
+			{
+				util_out_print("!UL too small, minimum number of mutex slots allowed is !UL", TRUE,
+						new_mutex_space, MIN_CRIT_ENTRY);
+				return (int4)ERR_WCWRNNOTCHG;
+			}
+		} else
+		{
+			util_out_print("Error getting MUTEX_SPACE qualifier value", TRUE);
 			return (int4)ERR_WCWRNNOTCHG;
 		}
 		need_standalone = TRUE;
@@ -509,6 +532,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->extension_size = (uint4)new_extn_count;
 			if (lock_space_status)
 				csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
+			if (mutex_space_status)
+				NUM_CRIT_ENTRY(csd) = new_mutex_space;
 			if (qdbrundown_status)
 				csd->mumps_can_bypass = CLI_PRESENT == qdbrundown_status;
 			if (bypass_partial_recov)
@@ -608,6 +633,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (lock_space_status)
 				util_out_print("Database file !AD now has lock space !UL pages",
 						TRUE, fn_len, fn, csd->lock_space_size/OS_PAGELET_SIZE);
+			if (mutex_space_status)
+				util_out_print("Database file !AD now has !UL mutex queue slots",
+						TRUE, fn_len, fn, NUM_CRIT_ENTRY(csd));
 			if (qdbrundown_status)
 				util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
 					       fn_len, fn, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));

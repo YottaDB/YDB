@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,18 +66,18 @@
 #endif
 #include "interlock.h"
 
-#define WARN_STATUS(jctl)									\
-if (SS_NORMAL != jctl->status)									\
-{												\
-	assert(FALSE);										\
-	if (SS_NORMAL != jctl->status2)								\
-		gtm_putmsg(VARLSTCNT1(6) ERR_JNLWRERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,	\
-			jctl->status, PUT_SYS_ERRNO(jctl->status2));				\
-	else											\
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLWRERR,						\
-			2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);			\
-	wrn_count++;										\
-}												\
+#define WARN_STATUS(jctl)											\
+if (SS_NORMAL != jctl->status)											\
+{														\
+	assert(FALSE);												\
+	if (SS_NORMAL != jctl->status2)										\
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT1(6) ERR_JNLWRERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,	\
+			jctl->status, PUT_SYS_ERRNO(jctl->status2));						\
+	else													\
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR,						\
+			2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);					\
+	wrn_count++;												\
+}														\
 
 GBLREF	void			(*call_on_signal)();
 GBLREF	jnl_gbls_t		jgbl;
@@ -103,7 +103,6 @@ error_def(ERR_JNLACTINCMPLT);
 error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLREAD);
 error_def(ERR_JNLSTATE);
-error_def(ERR_JNLSTRESTFL);
 error_def(ERR_JNLSUCCESS);
 error_def(ERR_JNLWRERR);
 error_def(ERR_MUJNLSTAT);
@@ -120,8 +119,7 @@ UNIX_ONLY(error_def(ERR_REPLFTOKSEM);)
 UNIX_ONLY(error_def(ERR_RLBKSTRMSEQ);)
 VMS_ONLY(error_def(ERR_SETREG2RESYNC);)
 
-
-void	mur_close_files(void)
+boolean_t mur_close_files(void)
 {
 	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN];
 	int			head_jnl_fn_len, wrn_count = 0, rename_fn_len;
@@ -158,7 +156,7 @@ void	mur_close_files(void)
 	if (mur_close_files_done)
 	{
 		assert(mupip_exit_status_displayed);
-		return;
+		return TRUE;
 	}
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
 	SET_PROCESS_EXITING_TRUE;	/* In case the database is encrypted, this value is used to avoid using
@@ -308,11 +306,13 @@ void	mur_close_files(void)
 							csa->repl_state = csd->repl_state = rctl->repl_state;
 						/* After recover replication state is always closed */
 						if (rctl->repl_state != csd->repl_state)
-							gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATE, 6, LEN_AND_LIT(FILE_STR),
-								DB_LEN_STR(reg), LEN_AND_STR(repl_state_lit[csd->repl_state]));
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_REPLSTATE, 6,
+								LEN_AND_LIT(FILE_STR), DB_LEN_STR(reg),
+								LEN_AND_STR(repl_state_lit[csd->repl_state]));
 						if (rctl->jnl_state != csd->jnl_state)
-							gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6, LEN_AND_LIT(FILE_STR),
-								DB_LEN_STR(reg), LEN_AND_STR(jnl_state_lit[csd->jnl_state]));
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_JNLSTATE, 6,
+								LEN_AND_LIT(FILE_STR), DB_LEN_STR(reg),
+								LEN_AND_STR(jnl_state_lit[csd->jnl_state]));
 #						ifdef UNIX
 						if ((NULL != rctl->jctl) && !mur_options.rollback_losttnonly)
 						{
@@ -364,8 +364,9 @@ void	mur_close_files(void)
 							{
 								csd->resync_seqno = csd->reg_seqno;
 								if (mur_options.verbose)
-									gtm_putmsg(VARLSTCNT(6) ERR_SETREG2RESYNC, 4,
-									&csd->resync_seqno, &csd->reg_seqno, DB_LEN_STR(reg));
+									gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_SETREG2RESYNC,
+										4, &csd->resync_seqno, &csd->reg_seqno,
+										DB_LEN_STR(reg));
 							}
 							csd->reg_seqno = murgbl.consist_jnl_seqno;
 							if (csd->resync_seqno > murgbl.consist_jnl_seqno)
@@ -525,11 +526,11 @@ void	mur_close_files(void)
 					if (SS_NORMAL == gtm_rename((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
 									rename_fn, rename_fn_len, &ustatus))
 					{
-						gtm_putmsg(VARLSTCNT (6) ERR_FILERENAME, 4, end_jctl->jnl_fn_len,
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, end_jctl->jnl_fn_len,
 							end_jctl->jnl_fn, rename_fn_len, rename_fn);
 					} else
 					{
-						gtm_putmsg(VARLSTCNT(6) ERR_RENAMEFAIL, 4,
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4,
 							end_jctl->jnl_fn_len, end_jctl->jnl_fn, rename_fn_len, rename_fn);
 						wrn_count++;
 					}
@@ -587,7 +588,7 @@ void	mur_close_files(void)
 					if (this_strm_seqno)
 					{
 						assert(0 == GET_STRM_INDEX(this_strm_seqno));
-						gtm_putmsg(VARLSTCNT(5) ERR_RLBKSTRMSEQ, 3, idx,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLBKSTRMSEQ, 3, idx,
 									&this_strm_seqno, &this_strm_seqno);
 					}
 				}
@@ -711,15 +712,17 @@ void	mur_close_files(void)
 			UNIX_ONLY(rundown_status =) gds_rundown(); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
 				wrn_count++;
-			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
+			assert((EXIT_NRM != rundown_status) || !rctl->standalone
+			       || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
 			assert(!cs_addrs->now_crit && !cs_addrs->hold_onto_crit);
 		}
 		/* If this was a RECOVER/ROLLBACK and rctl->standalone is FALSE, then gvcst_init/mu_rndwn_file did not happen in
 		 * successfully for this region. Increment wrn_count in this case
 		 */
 		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
-		if (rctl->standalone && !db_ipcs_reset(reg))
-			wrn_count++;
+		if (rctl->standalone UNIX_ONLY(&& EXIT_NRM == rundown_status))
+			if (!db_ipcs_reset(reg))
+				wrn_count++;
 		rctl->standalone = FALSE;
 		rctl->gd = NULL;
 		rctl->csa = NULL;
@@ -798,7 +801,8 @@ void	mur_close_files(void)
 				}
 				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, repl_instance.jnlpool_shmid);
 				*ipcs_ptr = '\0';
-				gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(udi->fn));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
+						LEN_AND_STR(udi->fn));
 				/* Now that the journal pool shared memory is removed, go ahead and invalidate it in the file
 				 * header
 				 */
@@ -851,17 +855,17 @@ void	mur_close_files(void)
 		{	/* If inst_hdr is NULL, it means we exited even before getting standalone access on the journal pool.
 			 * No point issuing the ORLBKCMPLT or ORLBKTERMNTD message because ORLBKSTART will not even be issued.
 			 */
-			gtm_putmsg(VARLSTCNT(6) finish_err_code, 4, LEN_AND_STR(inst_hdr->inst_info.this_instname),
-					LEN_AND_STR(udi->fn));
-			send_msg(VARLSTCNT(6) finish_err_code, 4, LEN_AND_STR(inst_hdr->inst_info.this_instname),
-					LEN_AND_STR(udi->fn));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,
+					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,
+					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		}
 	}
 #	endif
 	mur_close_file_extfmt();
 	mur_free();	/* free up whatever was allocated by "mur_init" */
 	if (wrn_count)
-		gtm_putmsg(VARLSTCNT (1) ERR_JNLACTINCMPLT);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
 	else if (!mupip_exit_status_displayed)
 	{	/* This exit path is not coming through "mupip_exit". Print an error message indicating incomplete recovery.
 		 * The || in the assert below is to take care of a white-box test that primarily tests the
@@ -873,15 +877,21 @@ void	mur_close_files(void)
 			&& ((WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)
 				|| (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)
 				|| (WBTEST_JNL_FILE_OPEN_FAIL == gtm_white_box_test_case_number)
-				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
+				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)
+				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)));
 		assert(!murgbl.clean_exit);
 		if (murgbl.wrn_count)
-			gtm_putmsg(VARLSTCNT (1) ERR_JNLACTINCMPLT);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
 		else
-			gtm_putmsg(VARLSTCNT (1) ERR_MUNOACTION);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_MUNOACTION);
 	} else if (murgbl.clean_exit && !murgbl.wrn_count)
 		JNL_SUCCESS_MSG(mur_options);
  	JNL_PUT_MSG_PROGRESS("End processing");
 	mupip_exit_status_displayed = TRUE;
 	mur_close_files_done = TRUE;
+#	if defined(UNIX) && defined(DEBUG)
+	if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC) && (0 == gtm_white_box_test_case_count))
+		util_out_print("Total number of writes !UL",TRUE, gtm_wbox_input_test_case_count);
+#	endif
+	return (0 == wrn_count);
 }

@@ -557,7 +557,7 @@ if ($buildaux_gtmcrypt == 1) then
 		# build maskpass with libgcrypt dependency rather than libcrypto dependency on non-AIX platforms.
 		if ($HOSTOS != "AIX") then
 			set supported_list_reorder = `echo $supported_list | sed 's/gcrypt//;s/$/ gcrypt/'`
-			set supported_list = "$supported_list_reorder"
+			set supported_list = `echo $supported_list_reorder`
 		endif
 		# Build all possible encryption libraries based on what encryption libraries are supported in this platform.
 		foreach supported_lib ($supported_list)
@@ -588,13 +588,14 @@ if ($buildaux_gtmcrypt == 1) then
 			# third-party library and algorithm) randomly and install that.
 			set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random('$#supported_list')'`
 			set encryption_lib = $supported_list[$rand]
-			if (("gcrypt" == "$encryption_lib") || ("AIX" != $HOSTOS)) then
-				# Force AES as long as the plugin is linked against libgcrypt OR this is a non-AIX platform
+			if ("gcrypt" == "$encryption_lib") then
+				# Force AES as long as the plugin is linked against libgcrypt
 				set algorithm = "AES256CFB"
 			else
-				# OpenSSL, V9* build and AIX. Go ahead and randomize the algorithm
-				set algorithms = ("AES256CFB" "BLOWFISHCFB")
-				set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random(2)'`
+				# OpenSSL, V9* build. Go ahead and randomize the algorithm
+				# increase probability of AES256CFB, the industry standard and the one we officially support
+				set algorithms = ("AES256CFB" "AES256CFB" "BLOWFISHCFB")
+				set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random('$#algorithms')'`
 				set algorithm = $algorithms[$rand]
 			endif
 		endif

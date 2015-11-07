@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,7 +101,6 @@
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
 #include "preemptive_db_clnup.h"
 
-#define	MAX_IDLE_HARD_SPINS		1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 #define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
 #define UPDPROC_WAIT_FOR_STARTJNLSEQNO	100	/* ms */
 
@@ -549,9 +548,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg;
-	int4			wtstart_errno;
-	boolean_t		buffers_flushed;
-	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
 	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
 	UNIX_ONLY(
 		repl_histinfo			histinfo;
@@ -673,53 +669,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 */
 			assert((0 == recvpool.recvpool_ctl->jnl_seqno) || (jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno));
 				/* the 0 == check takes care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
-			/* If any dirty buffers, write them out since nothing else is happening now.
-			 * wcs_wtstart only writes a few buffer a call and putting the call in a loop would flush the
-			 * entire dirty buffer set, but there is no need for a loop around the call since we're already in
-			 * the main updproc loop and this is the only place it really sleeps. */
-			save_reg = gv_cur_region;
-			/* Make sure cs_addrs and cs_data are in sync with gv_cur_region before TP_CHANGE_REG changes them */
-			assert((NULL == gv_cur_region) || (cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs));
-			assert((NULL == gv_cur_region) || (cs_data == cs_addrs->hdr));
-			buffers_flushed = FALSE;
-			for (curr = gld_db_files; NULL != curr; curr = curr->next)
-			{
-				TP_CHANGE_REG(curr->gd);
-				if (cs_addrs->nl->wcs_active_lvl && (FALSE == gv_cur_region->read_only))
-				{
-					DCLAST_WCS_WTSTART(gv_cur_region, 0, wtstart_errno);
-					/* DCLAST_WCS_WTSTART macro does not set the wtstart_errno variable in VMS. But in
-					 * any case, we do not support database file extensions with MM on VMS. So we could
-					 * never get a ERR_GBLOFLOW error there.  Therefore the file extension check below is
-					 * done only in Unix.
-					 */
-#					ifdef UNIX
-					if ((dba_mm == cs_data->acc_meth) && (ERR_GBLOFLOW == wtstart_errno))
-					{
-						assert(!cs_addrs->hold_onto_crit);
-						grab_crit(gv_cur_region);
-						if (cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
-							UPDPROC_ONLN_RLBK_CLNUP(gv_cur_region); /* No return */
-						wcs_recover(gv_cur_region);
-						rel_crit(gv_cur_region);
-					}
-#					endif
-					buffers_flushed = TRUE;
-				}
-			}
-			TP_CHANGE_REG(save_reg);
-			/* To avoid a potential infinite cpu-bound loop if the wcs_active_lvl field is bogus and wcs_wtstart()
-			 * returns immediately, we count the number of times a buffer flush has (potentially) occurred.  When
-			 * this count gets to an arbitrarily "large" value or there were no buffers to flush, we will sleep
-			 * and start the count over again.  If there are more than the "large" number of dirty buffers to flush,
-			 * this logic only causes an extra benign sleep whenever the count is "large". */
-			if (buffers_flushed && (MAX_IDLE_HARD_SPINS > idle_flush_count))
-				idle_flush_count++;
-			else
-			{
-				idle_flush_count = 0;
-				SHORT_SLEEP(10);
-			}
+			SHORT_SLEEP(10);
 #			ifdef UNIX
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
@@ -729,7 +679,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 #			endif
 			continue;
 		}
-		idle_flush_count = 0;
 		/* The update process reads "recvpool_ctl->write" first and assumes that all data in the receive pool
 		 * that it then reads (upto the "write" offset) is valid. In order for this assumption to hold good, the
 		 * receiver server needs to do a write memory barrier after updating the receive pool data but before

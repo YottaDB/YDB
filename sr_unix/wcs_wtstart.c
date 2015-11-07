@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,9 +108,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 {
 	blk_hdr_ptr_t		bp, save_bp;
 	boolean_t               need_jnl_sync, queue_empty, got_lock, bmp_status;
-	cache_que_head_ptr_t	ahead;		/* serves dual purpose since cache_que_head = mmblk_que_head */
-	cache_state_rec_ptr_t	csr, csrfirst;	/* serves dual purpose for MM and BG */
-						/* since mmblk_state_rec is equal to the top of cache_state_rec */
+	cache_que_head_ptr_t	ahead;
+	cache_state_rec_ptr_t	csr, csrfirst;
 	int4                    err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
         size_t                  size ;
 	jnl_buffer_ptr_t        jb;
@@ -125,7 +124,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	cache_rec_ptr_t		cr, cr_lo, cr_hi;
 	static	int4		error_message_loop_count = 0;
 	uint4			index;
-	boolean_t		is_mm;
+	boolean_t		is_mm, was_crit;
 	uint4			curr_wbox_seq_num;
 	int			try_sleep, rc;
 	gd_region		*sav_cur_region;
@@ -147,12 +146,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);
 	assert(is_mm || (dba_bg == csd->acc_meth));
-
-	/* you don't enter this routine if this has been compiled with #define UNTARGETED_MSYNC and it is MM mode */
-#	if defined(UNTARGETED_MSYNC)
-	assert(!is_mm);
-#	endif
-
 	BG_TRACE_ANY(csa, wrt_calls);	/* Calls to wcs_wtstart */
 	/* If *this* process is already in wtstart, we won't interrupt it do it again */
 	if (csa->in_wtstart)
@@ -199,34 +192,34 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		cr_hi = cr_lo + csd->n_bts;
 	} else
 	{
-		ahead = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
-		if (cnl->mm_extender_pid == process_id)
-			max_writes = max_ent;		/* allow file extender or rundown to write everything out */
-		DEBUG_ONLY(cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets));
-		DEBUG_ONLY(cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts));
+		queue_empty = TRUE;
+		n1 = 1; /* set to a non-zero value so dbsync timer canceling (if needed) can happen */
+		goto writes_completed; /* to avoid unnecessary IF checks in the more common case (BG) */
 	}
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
 	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
+	was_crit = csa->now_crit;
 	for (n1 = n2 = 0, csrfirst = NULL; (n1 < max_ent) && (n2 < max_writes) && !cnl->wc_blocked; ++n1)
-	{
-		csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
-		if (INTERLOCK_FAIL == (INTPTR_T)csr)
+	{	/* If not-crit, avoid REMQHI by peeking at the active queue and if it is found to have a 0 fl link, assume
+		 * there is nothing to flush and break out of the loop. This avoids unnecessary interlock usage (GTM-7635).
+		 * If holding crit, we cannot safely avoid the REMQHI so interlock usage is avoided only in the no-crit case.
+		 */
+		if (!was_crit && (0 == ahead->fl))
+			csr = NULL;
+		else
 		{
-			assert(FALSE);
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-			BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
-			break;
+			csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
+			if (INTERLOCK_FAIL == (INTPTR_T)csr)
+			{
+				assert(FALSE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
+				break;
+			}
 		}
 		if (NULL == csr)
-		{
-			NO_MSYNC_ONLY(
-				/* NO_MSYNC doesn't sync db, make sure it syncs the journal file */
-				if (is_mm)
-					queue_empty = TRUE;
-			)
 			break;				/* the queue is empty */
-		}
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -282,7 +275,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						if (-1 == rc)
 						{
 							assert(FALSE);
-							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 								 ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 							REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
@@ -385,40 +378,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					/* allow interrupts now that we are done using the reformat buffer */
 					ENABLE_INTERRUPTS(INTRPT_IN_REFORMAT_BUFFER_USE);
 				}
-			} else
-			{
-#				if defined(TARGETED_MSYNC)
-			        bp = (blk_hdr_ptr_t)(csa->db_addrs[0] + (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
-				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
-					save_errno = ERR_GBLOFLOW;
-				else
-				{
-					size = MSYNC_ADDR_INCS;
-					save_errno = 0;			/* Assume all will work well */
-					if (-1 == msync((caddr_t)bp, MSYNC_ADDR_INCS, MS_ASYNC))
-						save_errno = errno;
-				}
-#				elif !defined(NO_MSYNC)
-				bp = (blk_hdr_ptr_t)(csa->acc_meth.mm.base_addr + (sm_off_t)csr->blk * csd->blk_size);
-				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
-					save_errno = ERR_GBLOFLOW;
-				else
-				{
-					size = bp->bsiz;
-					if (csa->do_fullblockwrites)
-						size = ROUND_UP(size, csa->fullblockwrite_len);
-					assert(size <= csd->blk_size);
-					offset = (off_t)((sm_uc_ptr_t)bp - (sm_uc_ptr_t)csd);
-					INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
-					/* Do db write without timer protect (not needed --  wtstart not reenterable in one task) */
-					DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, bp, size, save_errno);
-				}
-#				endif
 			}
-#			ifdef DEBUG
 			/* Trigger I/O error if white box test case is turned on */
 			GTM_WHITE_BOX_TEST(WBTEST_WCS_WTSTART_IOERR, save_errno, ENOENT);
-#			endif
 			if (0 != save_errno)
 			{
 				assert(ERR_ENOSPCQIODEFER != save_errno || !csa->now_crit);
@@ -440,11 +402,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						 * (see mutex.c)
 						 * Also, may be DBFILERR should be replaced with DBIOERR for specificity.
 						 */
-						send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 							 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 						if (!IS_GTM_IMAGE)
 						{
-							gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region), ERR_TEXT, 2,
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2,
+									DB_LEN_STR(region), ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error during flush write"), save_errno);
 						}
 						save_dskspace_msg_counter = dskspace_msg_counter;
@@ -461,8 +424,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						 * processes issuing the below send_msg should be relatively small even if there
 						 * are 1000s of processes.
 						 */
-						send_msg(VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(region), DB_LEN_STR(region),
-								save_errno);
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(region),
+								DB_LEN_STR(region), save_errno);
 					}
 				}
 				/* if (ERR_ENOSPCQIODEFER == save_errno): DB_LSEEKWRITE above encountered ENOSPC but couldn't
@@ -497,6 +460,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		}
 	}
 	csa->wbuf_dqd--;
+writes_completed:
 	DEBUG_ONLY(
 		if (0 == n2)
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);

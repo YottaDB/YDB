@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,12 +39,11 @@ GBLREF	boolean_t	donot_fflush_NULL;
  * ----------------------------------------------------------------------------------------
  */
 
-void gtm_putmsg_list(int arg_count, va_list var)
+void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
 	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
 	char		msg_buffer[1024];
 	mstr		msg_string;
-	boolean_t	first_error;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 	boolean_t	freeze_needed = FALSE;
@@ -64,22 +63,15 @@ void gtm_putmsg_list(int arg_count, va_list var)
 		flush_pio();
 	}
 	assert(0 < arg_count);
-	first_error = TRUE;
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);
-		CHECK_IF_FREEZE_ON_ERROR_NEEDED(msg_id, freeze_needed, freeze_msg_id);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id);
 		--arg_count;
 		if (NULL == (ctl = err_check(msg_id)))
 			msg = NULL;
 		else
 			GET_MSG_INFO(msg_id, ctl, msg);
-		if (first_error)
-		{
-			first_error = FALSE;
-			error_condition = msg_id;
-			severity = NULL == msg ? ERROR : SEVMASK(msg_id);
-		}
 		msg_string.addr = msg_buffer;
 		msg_string.len = sizeof msg_buffer;
 		gtm_getmsg(msg_id, &msg_string);
@@ -134,5 +126,5 @@ void gtm_putmsg_list(int arg_count, va_list var)
 		if (!IS_GTMSECSHR_IMAGE)
 			util_out_print("!/", NOFLUSH);
 	}
-	FREEZE_INSTANCE_IF_NEEDED(freeze_needed, freeze_msg_id);
+	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id);
 }

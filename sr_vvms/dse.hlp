@@ -1,0 +1,1158 @@
+
+1 Overview
+  Overview
+   The  GT.M  Database  Structure   Editor,   DSE,   examines   and   repairs
+   Greystone Technology  Database  Structure  (GDS)  database(s).  GT.M  uses
+   Buffered Global (BG)  and  Mapped  Memory  (MM)  access  methods  for  GDS
+   files. For more information on  GDS,  refer  to  the  "Greystone  Database
+   Structure" chapter  in  the  GT.M  Administration  and  Operations  Guide.
+   MUPIP  INTEG  provides  comprehensive  error  checking,  which  serves  to
+   verify  the  results  of   repairs   undertaken   with   DSE.   For   more
+   information on MUPIP INTEG, refer to  the  "MUMPS  Peripheral  Interchange
+   Program" chapter in the GT.M  Administration  and  Operations  Guide.  For
+   more information on the use of DSE, refer  to  the  "Maintaining  Database
+   Integrity" chapter in the GT.M Administration and Operations Guide.
+
+1 DSE_Functions
+  Functions of DSE
+   DSE is primarily a database repair utility.
+
+   Use DSE to:
+
+   o  Dump parts of the database for troubleshooting database errors
+
+   o  Add or delete a record in a block
+
+   o  Update file, block or record header information
+
+   o  Update bit maps
+
+   o  Save  copies   of   database   fragments   for   analysis,   audit   or
+      restoration.
+
+   When GT.CX is installed,  DSE  may  report  DSEBLKRDFAIL,  Failed  attempt
+   to read block. Use  the  command  CRITICAL  /SEIZE  followed  by  CRITICAL
+   /RELEASE to clear this error.
+
+   Use the DSE EXIT command to leave DSE.
+
+1 Command_Syntax
+  Command Syntax
+   The format for DSE commands is:
+
+     Command  qualifier
+
+   DSE  interprets  all  numeric  input  as  hexadecimal,  except  for   time
+   values,     the     /BLK_SIZE=,     /KEY_MAX_SIZE=,     /RECORD_MAX_SIZE=,
+   /REFERENCE_COUNT=,  /TIMERS_PENDING=  and  /WRITES_PER_FLUSH=  on   CHANGE
+   /FILEHEADER, and /VERSION=  on  the  REMOVE  and  RESTORE  commands.  This
+   convention corresponds to the  displays  provided  by  DSE  and  by  MUPIP
+   INTEG.
+
+1 ADD
+  AD[D]
+   The ADD command adds a record to a block.
+
+   The format of the ADD command is:
+
+   AD[D] [/B[LOCK]=block]
+
+   For greater than level 0 blocks add:
+
+   /STAR /POINTER=block
+
+   or
+
+   /OFFSET=offset|/RECORD=record /KEY=key /POINTER=block
+
+   For level 0 blocks add:
+
+   /OFFSET=offset|/RECORD=record /KEY=key /D[ATA]=string
+
+   The ADD command requires  either  the  /OFFSET  or  /RECORD  qualifier  to
+   position the record in  the  block  and  either  the  /KEY  or  the  /STAR
+   qualifier to define the key for the block.
+
+   The /STAR qualifier is not valid at level 0  (i.e.,  for  a  data  block).
+   The  ADD  command  requires  the  /DATA  qualifier  at  level  0  or   the
+   /POINTER qualifier at any other  level  to  provide  the  content  of  the
+   record.
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the block to receive the new record.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+/DATA
+  /D[ATA]=string
+   Specifies the data field for  records  added  to  a  data  block.  Use
+   quotes around  string  and  escape  codes  of  the  form  \a  or  \ab,
+   where  a  and  b  are  hexadecimal  digits  representing  non-printing
+   characters.  \\  translates  to  a   single   backslash.   The   /DATA
+   qualifier only applies  at  level  0  and  is  incompatible  with  the
+   /STAR and /POINTER qualifiers.
+
+/KEY
+  /K[EY]=key
+   Specifies the key  of  the  new  record.  Enclose  MUMPS-style  global
+   references  in  quotes  ("").  The  /KEY  qualifier  is   incompatible
+   with the /STAR qualifier.
+
+/OFFSET
+  /O[FFSET]=offset
+   Adds  the  new  record  at  the  next  record   boundary   after   the
+   specified offset. The  /OFFSET  qualifier  is  incompatible  with  the
+   /RECORD and /STAR qualifiers.
+
+/POINTER
+  /P[OINTER]=pointer
+   Specifies the block pointer  field  for  records  added  to  an  index
+   block.  The  /POINTER  qualifier  is  incompatible  with   the   /DATA
+   qualifier and cannot  be used at level 0.
+
+/RECORD
+  /R[ECORD]=record_number
+   Specifies  a  record  number  of   the   new   record.   The   /RECORD
+   qualifier is incompatible with the /OFFSET and /STAR qualifiers.
+
+/STAR
+  /S[TAR]
+   Adds  a  star  record  (i.e.,  a  record  that  identifies  the   last
+   record in an indexed  block)  at  the  end  of  the  specified  block.
+   The  /STAR  qualifier  is  incompatible  with  all  qualifiers  except
+   /BLOCK and /POINTER and cannot be used at level 0.
+
+1 ALL
+  AL[L]
+   The ALL command applies action(s) specified by  a  qualifier  to  all  GDS
+   regions  defined  by  the  current  Global  Directory.  This  is  a   very
+   powerful command; use caution.  Be  especially  careful  if  you  have  an
+   overlapping  database  structure  (e.g.,  overlapping   regions   accessed
+   from separate application global  directories).
+
+2 Qualifiers
+/BUFFER_FLUSH
+  /B[UFFER_FLUSH]
+   Flushes  to  disk  buffers  all  regions  specified  by  the   current
+   Global  Directory.  The  /BUFFER_FLUSH   qualifier   is   incompatible
+   with the /RENEW qualifier.
+
+/CRITINIT
+  /C[RITINIT]
+   Initializes  critical  sections  for  all  regions  specified  by  the
+   current    Global    Directory.    The    /CRITINIT    qualifier    is
+   incompatible with the /RENEW, /RELEASE and /SEIZE qualifiers.
+
+/FREEZE
+  /[NO]F[REEZE]
+   Prevents  updates  to  all  GDS  regions  specified  by  the   current
+   Global  Directory.  The  /NOFREEZE   allows   updates   to   all   GDS
+   regions  specified  by  the  current  Global  Directory.  The  /FREEZE
+   qualifier is incompatible with the /RENEW qualifier.
+
+   DSE releases /FREEZE when it  EXITs.  To  hold  all  databases,  enter
+   ALL /FREEZE=TRUE and then SPAWN to perform other operations.
+
+/REFERENCE
+  /REF[ERENCE]
+   Resets reference  counts  to  1  for  all  regions  specified  by  the
+   current   Global    Directory.    The    /REFERENCE    qualifier    is
+   incompatible with the /RENEW qualifier.
+
+/RELEASE
+  /REL[EASE]
+   Releases  critical  sections  for  all  regions   specified   by   the
+   current Global  Directory.  The  /RELEASE  qualifier  is  incompatible
+   with the /CRITINIT, /RENEW and /SEIZE qualifiers.
+
+/RENEW
+  /REN[EW]
+   Reinitializes    critical    sections    (/CRITICAL)    and    buffers
+   (/WCINIT),  resets  reference  counts  to  1  (/REFERENCE_COUNT)   and
+   clears freeze  flags  for  all    regions  specified  by  the  current
+   Global  Directory  (/NOFREEZE).  /RENEW  requires  confirmation.   The
+   /RENEW qualifier is incompatible with all other qualifiers.
+
+/SEIZE
+  /S[EIZE]
+   Seizes  the  critical  section  for  all  regions  specified  by   the
+   current  Global  Directory.  The  /SEIZE  qualifier  is   incompatible
+   with the /CRITINIT, /RELEASE and /RENEW qualifiers.
+
+   The  SEIZE  qualifier   can   be   useful   when   you   encounter   a
+   DSEBLKRDFAIL error, generated when DSE  is  unable  to  read  a  block
+   from  the  database.  If  you  encounter  this  error  when  accessing
+   data on  a  cluster  using  GT.CX,  SEIZE  and  RELEASE  the  critical
+   section; this may solve the problem.
+
+/WCINIT
+  /W[CINIT]
+   Reinitializes  buffers  for  all  regions  specified  by  the  current
+   Global  Directory.  /WCINIT   requires   confirmation.   The   /WCINIT
+   qualifier is incompatible with the /RENEW qualifier.
+
+1 BUFFER_FLUSH
+  B[UFFER_FLUSH]
+   The BUFFER_FLUSH command flushes the current region's buffers to disk.
+
+
+   The format of the BUFFER_FLUSH command is:
+
+   B[UFFER_FLUSH]
+
+   The BUFFER_FLUSH command has no qualifiers.
+
+1 CHANGE
+  CH[ANGE]
+   The CHANGE command changes fields of  a  file,  block,  or  record  header
+   and the bit map.
+
+   The CHANGE command either has  a  /FILEHEADER  qualifier  or  an  implicit
+   or explicit  /BLOCK  qualifier  plus  one  or  more  of  their  associated
+   qualifiers to define the target of the change.
+
+2 Block_qualifiers
+/BLOCK
+  /BL[OCK]=block_number
+   Specifies   the   block   to   modify.   The   /BLOCK   qualifier   is
+   incompatible  with  the  /FILEHEADER  qualifier  and  all   qualifiers
+   related to /FILEHEADER.
+
+   /BLOCK  is  the  default  qualifier.  On  commands  with   neither   a
+   /BLOCK  nor  a  /FILEHEADER  qualifier,  DSE  uses  the   last   block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, that is, on  the  first  block-oriented  command,  DSE  uses
+   block one (1).
+
+/BSIZ
+  /BS[IZ]=block_size
+   Changes the block  size  field  of  the  specified  block.  Decreasing
+   the block size  can  result  in  loss  of  existing  data.  The  /BSIZ
+   qualifier  is  incompatible  with  all   qualifiers   except   /BLOCK,
+   /LEVEL and /TN.
+
+/LEVEL
+  /L[EVEL]=level
+   Changes  the  level  field  for  the  specified  block.   The   /LEVEL
+   qualifier  is  incompatible  with  all   qualifiers   except   /BLOCK,
+   /BSIZ and /TN.
+
+/TN
+  /TN[=transaction_number]
+   Changes  the  transaction  number  for  the  current  block.  When   a
+   CHANGE command does not include  a  /TN=,  DSE  sets  the  transaction
+   number  to  the  current  transaction  number.  Manipulation  of   the
+   block  transaction  number  affects  MUPIP  BACKUP  /INCREMENTAL.  The
+   /TN qualifier is  incompatible  with  all  qualifiers  except  /BLOCK,
+   /BSIZ and /LEVEL.
+
+/OFFSET
+  /OF[FSET]=offset
+   Specifies the offset within  the  block  of  the  target  record.  The
+   /OFFSET  qualifier  is  incompatible  with   all   qualifiers   except
+   /BLOCK, /CMPC and /RSIZ.
+
+/RECORD
+  /RE[CORD]=record_number
+   Specifies  the  record  number  of  the  target  record.  The  /RECORD
+   qualifier  is  incompatible  with  all   qualifiers   except   /BLOCK,
+   /CMPC and /RSIZ.
+
+/CMPC
+  /CM[PC]=compression_count
+   Changes the compression count  field  of  the  specified  record.  The
+   /CMPC  qualifier  is   incompatible   with   all   qualifiers   except
+   /BLOCK, /OFFSET, and /RECORD.
+
+/RSIZ
+  /RS[IZ]=record_size
+   Changes the record size field  of  the  specified  record.  The  /RSIZ
+   qualifier is incompatible  with  all  qualifiers  except  /OFFSET  and
+   /RECORD.
+
+2 File_header_qualifiers
+/FILEHEADER
+  /FI[LEHEADER]
+   Enables modification of  specific  fields  in  the  file  header.  The
+   /FILEHEADER qualifier  is  incompatible  with  the  /BLOCK  and    all
+   qualifiers  related   to   /BLOCK   (i.e.,   /BSIZ,   /CMPC,   /LEVEL,
+   /OFFSET,  /RECORD, /RSIZ and /TN qualifiers).
+
+/BLK_SIZE
+  /BLK[_SIZE]=block_size
+   Changes the  decimal  block  size  field  of  the  current  file.  Use
+   the /BLK_SIZE qualifier  only  in  conjunction  with  the  /FILEHEADER
+   qualifier.   Do   not   use   this   CHANGE   qualifier   except    on
+   instructions from Greystone.
+
+/BLOCKS_FREE
+  /BLO[CKS_FREE]=free blocks
+   Changes  the  free  blocks  field  of  the  current  file.   Use   the
+   /BLOCK_FREE  qualifier  only  in  conjunction  with  the   /FILEHEADER
+   qualifier.  Database  operations   maintain   this   field   for   the
+   user's  convenience.  The  field  does  not   control   any   database
+   operations.
+
+/B_COMPREHENSIVE
+  /B_C[OMPREHENSIVE]=transaction_number
+   Changes  the  transaction  number  in  the  fileheader  of  the   last
+   comprehensive backup  to  the  value  specified.  Use  this  qualifier
+   only in conjunction with the /FILEHEADER qualifier.
+
+/B_INCREMENTAL
+  /B_I[NCREMENTAL]=transaction_number
+   Changes  the  transaction  number  in  the  fileheader  of  the   last
+   incremental  backup  to  the  value  specified.  Use  this   qualifier
+   only in conjunction with the /FILEHEADER qualifier.
+
+/B_RECORD
+  /B_R[ECORD]=transaction_number
+   Changes  the  transaction  number  in  the  fileheader  of  the   last
+   /RECORD backup  to  the  value  specified.  Use  this  qualifier  only
+   in conjunction with the /FILEHEADER qualifier.
+
+/CORRUPT_FILE
+  /CO[RRUPT_FILE]=value
+   Sets the file_corrupt  field  in  the  file  header.  Possible  values
+   are:  TRUE,  FALSE  and  NOCHANGE.  Use  the  /CORRUPT_FILE  qualifier
+   only in conjunction with the /FILEHEADER qualifier.
+
+   WARNING: when DSE  EXITs  after  a  CHANGE  /FILEHEADER  /CORRUPT=TRUE
+   without  a  matching  CHANGE  /FILEHEADER  /CORRUPT=FALSE,  the   file
+   becomes unavailable to all future access.
+
+/CURRENT_TN
+  /CU[RRENT_TN]=transaction_number
+   Changes  the  current  transaction  number  for  the  current  region.
+   Use  the  /CURRENT_TN  qualifier  only   in   conjunction   with   the
+   /FILEHEADER  qualifier.  This  qualifier  has  implications  only  for
+   MUPIP  BACKUP   /INCREMENTAL.   Raising   the   /CURRENT_TN   corrects
+   block transaction number too large errors.
+
+/FLUSH_TIME
+  /FL[USH_TIME][=delta_time]
+   Changes  the  flush_time  default  interval   (in   delta_time).   The
+   time entered must be between 0 and 1 hour.
+
+   Use  the  /FLUSH_TIME  qualifier  only   in   conjunction   with   the
+   /FILEHEADER  qualifier.  Do  not  use  this  CHANGE  qualifier  except
+   on  instructions  from  Greystone.  A  /FLUSH_TIME   with   no   value
+   resets   the   /FLUSH_TIME   to   the   default   value.   Input    is
+   interpreted as decimal.
+
+/FREEZE
+  /FR[EEZE]=value
+   Sets availability of the  region  for  update.  Possible  values  are:
+   TRUE,  FALSE  and  NOCHANGE.  Use  to   "freeze"   (disable   database
+   writes)  or  "unfreeze"  the  database.  Use  the  /FREEZE   qualifier
+   only in conjunction with the /FILEHEADER qualifier.
+
+   DSE  releases  /FREEZE  when  it  EXITs.  To  hold  the   database(s),
+   CHANGE /FILEHEADER  /FREEZE=TRUE  and  then  SPAWN  to  perform  other
+   operations.
+
+/KEY_MAX_SIZE
+  /K[EY_MAX_SIZE]=key_max_size
+   Changes  the  decimal  value  for  the  maximum  allowable  key  size.
+   Use  the  /KEY_MAX_SIZE  qualifier  only  in  conjunction   with   the
+   /FILEHEADER  qualifier.  Reducing  KEY_MAX_SIZE  can  restrict  access
+   to existing data  and  cause  GT.M-generated  errors.  Do  not  create
+   incompatible  key  and  record  sizes.  If  you   make   a   permanent
+   change to the key  size  using  DSE,  use  GDE  to  check  that    the
+   appropriate Global Directory  contains  the  same  key  size  for  the
+   region. For more  information  on  key  and  record  sizes,  refer  to
+   the "Global Directory  Editor"  chapter  in  the  GT.M  Administration
+   and Operations Guide.
+
+/NULL_SUBSCRIPTS
+  /N[ULL_SUBSCRIPTS]=value
+   Sets  the  acceptability  of  null  subscripts   in   database   keys.
+   Possible   values   are:   TRUE,   FALSE   and   NOCHANGE.   Use   the
+   /NULL_SUBSCRIPTS   qualifier   only   in    conjunction    with    the
+   /FILEHEADER  qualifier.  Prohibiting  null-subscripts   can   restrict
+   access to existing data and cause GT.M generated errors.
+
+/QUANTUM_INTERVAL
+  /Q[UANTUM_INTERVAL][=delta_time]
+   Changes  the  amount  of  time  a  single  system  holds  control   of
+   writes to the database file.  The  time  entered  must  be  between  0
+   and 1 hour.
+
+   Use the /QUANTUM_INTERVAL  qualifier  only  in  conjunction  with  the
+   /FILEHEADER  qualifier.  This  field   applies   only   to   clustered
+   databases.   Do   not   use   this   CHANGE   qualifier   except    on
+   instructions  from  Greystone.  A  /QUANTUM_INTERVAL  with  no   value
+   resets  the  /QUANTUM_INTERVAL  to  the  default   value.   Input   is
+   interpreted as decimal.
+
+/RECORD_MAX_SIZE
+  /REC[ORD_MAX_SIZE]=record_max_size
+   Changes the decimal value  for  the  maximum  allowable  record  size.
+   Use the  /RECORD_MAX_SIZE  qualifier  only  in  conjunction  with  the
+   /FILEHEADER  qualifier.  Reducing  the  RECORD_MAX_SIZE  can  restrict
+   access to existing  data  and  cause  GT.M-generated  errors.  Do  not
+   create  incompatible  key  and   record   sizes.   If   you   make   a
+   permanent  change  to  the  record  size  using  DSE,  make  sure  GDE
+   contains  the  same   record   size   for   the   appropriate   Global
+   Directory. For  more  information  on  key  and  record  sizes,  refer
+   to "Global  Directory  Editor"  chapter  in  GT.M  Administration  and
+   Operations Guide.
+
+/REFERENCE_COUNT
+  /REF[ERENCE_COUNT]=reference_count
+   Sets a field that  tracks  how  many  processes  are  accessing    the
+   database from the current  node.  MUPIP  INTEG  and  DSE  use  decimal
+   numbers  for  /REFERENCE_COUNT.  Use  the  /REFERENCE_COUNT  qualifier
+   only  in  conjunction  with  the    /FILEHEADER  qualifier.   Restrict
+   CHANGE  /FILEHEADER   /REFERENCE_COUNT   to   the   case   where   the
+   process  running  DSE  has  exclusive  (stand-alone)  access  to   the
+   database file. When DSE has sole  access  to  a  database  file    the
+   /REFERENCE_COUNT should be 1.  This  is  an  informational  field  and
+   does not have any effect on processing.
+
+/RESPONSE_INTERVAL
+  /[NO]RES[PONSE_INTERVAL][=delta_time]
+   Changes the  time  that  processes  trying  to  access  the  clustered
+   database  wait  before  returning   an   error.   /NORESPONSE_INTERVAL
+   prevents  the  system  from  reporting  cluster  access  timeouts   as
+   errors. The time entered must be between 0 and 1 hour.
+
+   A  large  /RESPONSE_INTERVAL   or   /NORESPONSE_INTERVAL   effectively
+   hangs processes when  a  cluster  problem  occurs.  When  an  operator
+   action   clears   the   problem,   processing   resumes.    A    small
+   /RESPONSE_INTERVAL  causes  GT.M  processes  to  generate   an   error
+   when a  cluster  problem  occurs.  The  /RESPONSE_INTERVAL  should  be
+   set to at least  the  /QUANTUM_INTERVAL  times  twice  the  number  of
+   systems in the cluster running GT.CX.
+
+   Use  the  /RESPONSE_INTERVAL  qualifier  only  in   conjunction   with
+   the /FILEHEADER  qualifier.  This  field  applies  only  to  clustered
+   databases.   Do   not   use   this   CHANGE   qualifier   except    on
+   instructions  from  Greystone.  A  /RESPONSE_INTERVAL  with  no  value
+   resets  the  /RESPONSE_INTERVAL  to  the  default  value.   Input   is
+   interpreted as decimal.
+
+/STALENESS_TIMER
+  /[NO]S[TALENESS_TIMER][=delta_time]
+   Changes the amount of  time  a  system  reading  the  database  allows
+   to    pass    before    resynchronizing     with     the     database.
+   /NOSTALENESS_TIMER  prevents  the  system  from  enforcing  this  type
+   of  synchronization.  The  time  entered  must  be  between  0  and  1
+   hour.
+
+   {/\-}~STALENESS_TIMER limits how long  old  blocks  can  be  in  cache
+   memory   before   they   are   refreshed.    A    node    synchronizes
+   automatically when it writes or when  it  reads  a    new  block  from
+   disk    that    shows     synchronization     is     required.     The
+   /STALENESS_TIMER    should    be    set    to     at     least     the
+   /QUANTUM_INTERVAL    times    twice    the    number    of    systems.
+   Use the  /STALENESS_TIMER  qualifier  only  in  conjunction  with  the
+   /FILEHEADER  qualifier.  This  field   applies   only   to   clustered
+   databases.   Do   not   use   this   CHANGE   qualifier   except    on
+   instructions  from  Greystone.  A  /STALENESS_TIMER  with   no   value
+   resets  the  /STALENESS_TIMER  to  the   default   value.   Input   is
+   interpreted as decimal.
+
+/TICK_INTERVAL
+  /TIC[K_INTERVAL][=delta_time]
+   Changes  the  time  a  system   controlling   writes   continues   its
+   /QUANTUM_INTERVAL  when  it  has  no  writes  to  perform  and   other
+   systems have writes pending.  The  time  entered  must  be  between  0
+   and 1 hour.
+
+   If /TICK_INTERVAL  is  equal  to  or  larger  than  /QUANTUM_INTERVAL,
+   it   is   effectively   disabled.   For    the    best    performance,
+   /TICK_INTERVAL should generally be small.
+
+   Use  the  /TICK_INTERVAL  qualifier  only  in  conjunction  with   the
+   /FILEHEADER    qualifier.  This  field  applies  only   to   clustered
+   databases.   Do   not   use   this   CHANGE   qualifier   except    on
+   instructions  from  Greystone.  A   /TICK_INTERVAL   with   no   value
+   resets  the  /TICK_INTERVAL   to   the   default   value.   Input   is
+   interpreted as decimal.
+
+/TIMERS_PENDING
+  /TI[MERS_PENDING]=timers_pending
+   Sets  field  that  tracks  the  number  of  processes  considering   a
+   timed   flush.   Use   the   /TIMERS_PENDING   qualifier    only    in
+   conjunction with the  /FILEHEADER  qualifier.  Proper  values  are  0,
+   1,  and  2.   Do   not   use   this   CHANGE   qualifier   except   on
+   instructions from Greystone.
+
+/TOTAL_BLKS
+  /TO[TAL_BLKS]=total_blocks
+   Changes  the  total  blocks  field  of  the  current  file.  Use   the
+   /TOTAL_BLKS  qualifier  only  in  conjunction  with  the   /FILEHEADER
+   qualifier.
+
+   WARNING: The total blocks  field  should  always  reflect  the  actual
+   size of  the  database.  Change  this  field  only  if  it  no  longer
+   reflects the size of the database.
+
+/TRIGGER_FLUSH
+  /TR[IGGER_FLUSH]=trigger_flush
+   Sets the decimal value  for  the  triggering  threshold,  in  buffers,
+   for  flushing  the  cache  modified  queue.  Use  the   /TRIGGER_FLUSH
+   qualifier only in  conjunction  with  the  /FILEHEADER  qualifier.  Do
+   not  use  this  CHANGE   qualifier   except   on   instructions   from
+   Greystone.
+
+/WRITES_PER_FLUSH
+  /WR[ITES_PER_FLUSH]=writes_per_flush
+   Sets the decimal  number  of  blocks  to  write  in  each  flush.  Use
+   the  /WRITES_PER_FLUSH  qualifier  only  in   conjunction   with   the
+   /FILEHEADER  qualifier.  Do  not  use  this  CHANGE  qualifier  except
+   on instructions from Greystone.
+
+1 CLOSE
+  CL[OSE]
+   The CLOSE command closes the currently open  output  file.  Use  to  close
+   the opened dump file.
+
+   The format of the CLOSE command is:
+
+   CL[OSE]
+
+   The CLOSE command has no qualifiers.
+
+1 CRITICAL
+  CR[ITICAL]
+   The  CRITICAL  command  along  with   its   qualifiers   displays   and/or
+   modifies  the  status  and  contents  of  the  critical  section  for  the
+   current  region.  The  critical  section  provides  a  control  mechanism.
+   This  field  identifies,  by  its  PID,  the  process  presently  managing
+   updates to database.
+
+   The format of the CRITICAL command is:
+
+   CR[ITICAL]       /I[NIT]
+        /O[WNER]
+        /REL[EASE]
+        /REM[OVE]
+        /RES[ET]
+        /S[EIZE]
+
+   By default, the CRITICAL  command  assumes  the  /OWNER  qualifier,  which
+   displays the status of the critical section.
+
+2 Qualifiers
+/INIT
+  /I[NIT]
+   Reinitializes  the  critical  section.  The  /RESET  qualifier  causes
+   all processes actively accessing  that  database  file  to  signal  an
+   error. Do not use  /INIT  without  the  /RESET  parameter  when  other
+   processes are accessing the region.
+
+   CAUTION: Using CRITICAL /INIT when  the  write  owner  of  a  critical
+   section is an  active  GT.M  process  may  cause  structural  database
+   damage.
+
+/OWNER
+  /O[WNER]
+   Displays  the  ID  of  the  process  at  the  head  of  the   critical
+   section,  the  ID  of  the  process  running  DSE  and  the  count  of
+   critical read owners. When  the  current  process  owns  the  critical
+   section, DSE displays a  warning  message.  The  /OWNER  qualifier  is
+   incompatible with other qualifiers.
+
+   Example:
+
+   DSE> critical/owner
+
+   Write critical section is currently unowned
+
+/RELEASE
+  /REL[EASE]
+   Releases  the  critical  section  if  the  process  running  DSE  owns
+   the  section.  The  /RELEASE  qualifier  is  incompatible  with  other
+   qualifiers.
+
+/REMOVE
+  /REM[OVE]
+   Terminates any write ownership  of  the  critical  section.  Use  this
+   when  the  critical  section  is  owned   by   a   process   that   is
+   nonexistent or is  known  to  no  longer  be  running  a  GT.M  image.
+   The /REMOVE qualifier is incompatible with other qualifiers.
+
+   CAUTION:  Using  CRITICAL/REMOVE   when   the   write   owner   of   a
+   critical section is an active  GT.M  process    may  cause  structural
+   database damage.
+
+/RESET
+  /RES[ET]
+   Displays  the  number  of  times  the  critical   section   has   been
+   through an online reinitialization.
+
+   /RESET when used  with  /INIT  causes  an  error  for  processes  that
+   are attempting  to  get  the  critical  section  of  the  region.  Use
+   /RESET normally or  if  the  write  ownership  belongs  to  an  active
+   GT.M process that does  not  respond  to  a  MUPIP  STOP.  The  /RESET
+   qualifier is only compatible with the /INIT qualifier.
+
+/SEIZE
+  /S[EIZE]
+   Seizes  the  critical  section  if  the  section  is  available.   The
+   /SEIZE qualifier is incompatible with other qualifiers.
+
+1 DUMP
+  D[UMP]
+   The DUMP command displays blocks, records or  file  headers.  DUMP  serves
+   as one of the primary DSE examination commands.  Use  the  error  messages
+   reported by MUPIP INTEG to determine what to DUMP  and  examine  from  the
+   database. DUMP also transfers records to  a  sequential  file  for  future
+   study and/or for input to MUPIP LOAD.
+
+   The  DUMP  command  requires  specification  of  either  /BLOCK,  /HEADER,
+   /RECORD or  /FILEHEADER.
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the  starting  block  of  the  dump.  The  /BLOCK  qualifier
+   is incompatible with the /FILEHEADER qualifier.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+   Example:
+
+   DSE> dump/block=2
+
+   Block 2   Size 1B   Level 0   TN 2
+   Rec:1  Blk 2  Off 7  Size A  Cmpc 0  Ptr 8  Key ^a
+         7 : |  A  0  0 61  0  0  8  0  0  0
+              |  .  .  .  a  .  .  .  .  .  .
+
+   Rec:2  Blk 2  Off 11  Size A  Cmpc 0  Ptr B  Key ^b
+         11 : |  A  0  0 62  0  0  B  0  0  0
+              |  .  .  .  b  .  .  .  .  .  .
+
+   
+/COUNT
+  /C[OUNT]=count
+   Specifies the  number  of  block  headers  or  records  to  DUMP.  The
+   /COUNT qualifier is incompatible with the /FILEHEADER qualifier.
+
+/FILEHEADER
+  /F[ILEHEADER]
+   Dumps  file  header  information.   The   /FILEHEADER   qualifier   is
+   incompatible with all other qualifiers.
+
+/GLO
+  /G[LO]
+   Dumps  the  specified  record  or  blocks  into  the  current   output
+   file  in  Global  Output  (GO)   format.   The   /GLO   qualifier   is
+   incompatible with the /HEADER and /FILEHEADER qualifiers.
+
+/HEADER
+  /[NO]H[EADER]
+   Specifies whether the dump of  the  specified  blocks  or  records  is
+   restricted  to,  or  excludes,  headers.  The  /HEADER  qualifier   is
+   incompatible with the /GLO and /FILEHEADER qualifiers.
+
+   By default, DUMP displays all information in a block or record.
+
+/OFFSET
+  /O[FFSET]=offset
+   Specifies the offset of the starting  record  for  the  dump.  If  the
+   offset does not point  to  the  beginning  of  a  record,  DSE  rounds
+   down to the last valid  record  start  (e.g.,  DUMP/OFF=10  starts  at
+   /OFF=A if  that  was  the  last  record).  The  /OFFSET  qualifier  is
+   incompatible with the /RECORD and  /FILEHEADER qualifiers.
+
+/RECORD
+  /R[ECORD]=record_number
+   Specifies the record number  of  the  starting  record  of  the  dump.
+   The  /RECORD  qualifier  is  incompatible   with   the   /OFFSET   and
+   /FILEHEADER qualifiers.
+
+1 EVALUATE
+  EV[ALUATE]
+   The  EVALUATE  command  displays  a  number  in   both   hexadecimal   and
+   decimal. Use it to translate a hexadecimal  number  to  decimal  and  vice
+   versa. The /DECIMAL and /HEXADECIMAL qualifiers  specify  the  input  base
+   for  the number.
+
+   The format of the EVALUATE command is:
+
+   EV[ALUATE]       /D[ECIMAL]
+        /H[EXADECIMAL]
+        /N[UMBER]=number
+
+   The /NUMBER qualifier is required.
+
+   By default, EVALUATE treats the number as having a hexadecimal base.
+
+2 Qualifiers
+/DECIMAL
+  /D[ECIMAL]
+   Specifies that the input number  has  a  decimal  base.  The  /DECIMAL
+   qualifier is incompatible with the /HEXADECIMAL qualifier
+
+/HEXADECIMAL
+  /H[EXADECIMAL]
+   Specifies  that  the  input  number  has  a  hexadecimal   base.   The
+   /HEXADECIMAL   qualifier   is   incompatible   with    the    /DECIMAL
+   qualifier.
+
+/NUMBER
+  /N[UMBER]=number
+   Specifies the number to evaluate. This qualifier is required.
+
+   Example:
+
+   DSE> evaluate/number=61
+
+    Hex:  61   Dec:  97
+
+
+1 EXIT
+  EX[IT]
+   The EXIT command ends a DSE session.
+
+   The format of the EXIT command is:
+
+   EX[IT]
+
+   The EXIT command has no qualifiers.
+
+1 FIND
+  F[IND]
+   The FIND  command  directs  DSE  to  a  given  block  or  region.  At  the
+   beginning of a DSE session, use the FIND /REGION  command  to  select  the
+   target region.
+
+   The FIND command, except  with  the  /FREEBLOCK  and  /REGION  qualifiers,
+   uses the index  tree  to  locate  blocks.  FIND  can  locate  blocks  only
+   within  the  index  tree  structure.  If   you   need   to   locate   keys
+   independent of their attachment to the tree, use the RANGE command.
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies   the   block   to   find.   The   /BLOCK    qualifier    is
+   incompatible with the /KEY and /REGION qualifiers.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+/EXHAUSTIVE
+  /E[XHAUSTIVE]
+   Instructs  DSE  to  search  the  entire  index   structure   for   the
+   desired path or siblings.  FIND  /EXHAUSTIVE  is  useful  in  locating
+   blocks  that  are  in  the  tree  but  not  indexed   correctly.   The
+   /EXHAUSTIVE  qualifier  is  incompatible  with  the  /FREEBLOCK,  /KEY
+   and /REGION qualifiers.
+
+/FREEBLOCK
+  /F[REEBLOCK]
+   Finds the  nearest  free  block  to  the  block  specified  by  /HINT.
+   The   /FREEBLOCK   qualifier   is   incompatible   with   all    other
+   qualifiers  except  /BLOCK  and  /HINT.   The   /HINT   qualifier   is
+   required with the /FREEBLOCK qualifier.
+
+/HINT
+  /H[INT]=block_number
+   Designates the starting  point  of  a  /FREEBLOCK  search.  The  /HINT
+   qualifier  can  be  used  only  in  conjunction  with  the  /FREEBLOCK
+   qualifier.
+
+/KEY
+  /K[EY]=key
+   Searches  the  database  for  the  block  containing   the   specified
+   key.  Enclose  a  MUMPS  style  key   in   quotes   ("").   The   /KEY
+   qualifier is incompatible with all other qualifiers.
+
+/REGION
+  /R[EGION][=region]
+   Switches  to  the  named  Global   Directory   region.   The   /REGION
+   qualifier is incompatible with all other qualifiers.
+
+   /REGION  without  a  specified  region,  or  /REGION=*,  displays  all
+   existing regions in the database.
+
+/SIBLINGS
+  /S[IBLINGS]
+   Displays  the  block  numbers  of  the   logical   siblings   of   the
+   specified  block.  The  logical   siblings   are   the   blocks   that
+   logically exist to the right and  left  of  the  given  block  in  the
+   database tree  structure.  The  /SIBLINGS  qualifier  is  incompatible
+   with the /FREEBLOCK, /KEY and /REGION qualifiers.
+
+1 HELP
+  H[ELP]
+   The HELP command explains DSE commands.  The  HELP  command  uses  similar
+   conventions to the VAX/VMS help facility.
+
+   The format of the HELP command is:
+
+   H[ELP] [item]
+
+   Item tells HELP which  information  to  display.  Enter  the  DSE  command
+   (item) after the HELP command or at the  Topic  prompt.  Use  <RETURN>  or
+   <CTRL Z> to return to the DSE prompt.
+
+1 INTEGRIT
+  I[NTEGRIT]
+   The INTEGRIT command checks  the  internal  consistency  of  a  non-bitmap
+   block. INTEG reports errors in hexadecimal notation.
+
+   The format of the INTEGRIT command is:
+
+   I[NTEGRIT] /B[LOCK]=block_number
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the block for DSE to check.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+1 MAPS
+  M[APS]
+   The MAPS command examines or updates bit maps.
+
+   MAPS  forces  blocks  either  /BUSY  or  /FREE.  The   /MASTER   qualifier
+   reflects the current status of a  local  bit  map  back  into  the  master
+   map. The /RESTORE qualifier rebuilds all maps  and  should  be  used  with
+   a great deal of caution as it can destroy important information.
+
+   By default, MAPS shows the  status  of  the  bit  map  for  the  specified
+   block.
+
+2 Qualifiers
+/BLOCK
+  /BL[OCK]=block_number
+   Specifies  the  target  block  for  MAPS.  The  /BLOCK  qualifier   is
+   incompatible with the /RESTORE_ALL qualifier.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed,  .i.e.,  on  the  first  block-oriented  command,  DSE  uses
+   block one (1).
+
+/BUSY
+  /BU[SY]
+   Marks  the  current  block  busy  in  the  block's   local   map   and
+   appropriately updates the master  bit  map.  The  /BUSY  qualifier  is
+   incompatible with all qualifiers except /BLOCK.
+
+/FREE
+  /F[REE]
+   Marks  the  current  block  free  in  the  block's   local   map   and
+   appropriately updates the master  bit  map.  The  /FREE  qualifier  is
+   incompatible with all qualifiers except /BLOCK.
+
+/MASTER
+  /M[ASTER]
+   Sets the master bit  map  bit  associated  with  the  current  block's
+   local map according  to  whether  that  local  map  is  full  or  not.
+   The /MASTER qualifier  is  incompatible  with  all  qualifiers  except
+   /BLOCK.
+
+/RESTORE_ALL
+  /R[ESTORE_ALL]
+   Sets all local bit  maps  and  the  master  bit  map  to  reflect  the
+   blocks used  in  the  database  file.  Use  RESTORE_ALL  only  if  the
+   database contents are known to be  correct,  but  a  large  number  of
+   the  bit  maps  require  correction.  The  /RESTORE_ALL  qualifier  is
+   incompatible with all other qualifiers.
+
+1 OPEN
+  OP[EN]
+   The OPEN command opens a file for sequential  output  of  global  variable
+   data. OPEN a file to which you want to "dump" information.
+
+   The format of the OPEN command is:
+
+   OP[EN] /F[ILE]=file
+
+   If an OPEN command does not  have  a  /FILE  qualifier,  DSE  reports  the
+   name of the current output file.
+
+2 Qualifiers
+/F[ILE]
+  /F[ILE]=file
+   Specifies the file to open.
+
+1 OVERWRITE
+  OV[ERWRITE]
+   The OVERWRITE command overwrites  the  specified  string  onto  the  given
+   offset  in  the  current  block.  Use  extreme  caution  when  using  this
+   command.
+
+   The format of the OVERWRITE command is:
+
+   OV[ERWRITE]      /D[ATA]=string
+        /O[FFSET]=offset
+
+2 Qualifiers
+/D[ATA]
+  /D[ATA]=string
+   Specifies the data  to  be  written.  Use  quotes  around  string  and
+   escape  codes  of  the  form  \a  or  \ab,   where   a   and   b   are
+   hexadecimal  digits,  for  non-printing  characters.   \\   translates
+   to a single backslash.
+
+/O[FFSET]
+  /O[FFSET]=offset
+   Specifies  the  offset  in  the  current  block  where  the  overwrite
+   should begin.
+
+1 PAGE
+  P[AGE]
+   The PAGE command sends one form feed to the output  device.  Use  PAGE  to
+   add form feeds to  a  dump  file,  making  the  hardcopy  file  easier  to
+   read. If you plan to use the  dump  file  with  MUPIP  LOAD,  do  not  use
+   PAGE.
+
+   The format of the PAGE command is:
+
+   P[AGE]
+
+   The PAGE command has no qualifiers.
+
+1 RANGE
+  RA[NGE]
+   The RANGE command finds  all  blocks  in  the  database  whose  first  key
+   falls in the specified range  of  keys.  The  RANGE  command  may  take  a
+   very long time unless the range  specified  by  /FROM  and  /TO  is  close
+   together. Use FIND /KEY first to determine  whether  the  key  appears  in
+   the tree.
+
+   The format of the RANGE command is:
+
+   RA[NGE]    /F[ROM]=block
+      /T[O]=block
+      /L[OWER]=key
+      /U[PPER]=key
+
+2 Qualifiers
+/FROM
+  /F[ROM]=block_number
+   Specifies a starting block number for the range search.
+
+   By  default,  RANGE  starts  processing  at  the  beginning   of   the
+   file.
+
+/TO
+  /T[O]=block_number
+   Specifies an ending block number for the range search.
+
+   By default, RANGE stops processing at the end of the file.
+
+/LOWER
+  /L[OWER]=key
+   Specifies the lower bound for the key range.
+
+/UPPER
+  /U[PPER]=key
+   Specifies the upper bound for the key range.
+
+1 REMOVE
+  REM[OVE]
+   The REMOVE command removes one or more records or a save buffer.
+
+   The format of the REMOVE command is:
+
+   REM[OVE]   /B[LOCK]=block_number
+        /C[OUNT]=count
+        /O[FFSET]
+        /R[ECORD]=record_number
+        /V[ERSION]=version_number
+
+   The version number is specified in decimal.
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the  block  associated  with  the  record  or  buffer  being
+   deleted.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+/COUNT
+  /C[OUNT]=count
+   Specifies the number  of  records  to  remove.  The  /COUNT  qualifier
+   is incompatible with the /VERSION qualifier.
+
+   By default, REMOVE deletes a single record.
+
+/OFFSET
+  /O[FFSET]=offset
+   Specifies  the  offset  of  the  record   to   remove.   The   /OFFSET
+   qualifier   is   incompatible   with   the   /RECORD   and    /VERSION
+   qualifiers.
+
+/RECORD
+  /R[ECORD]=record_number
+   Specifies the record number of  the  record  to  remove.  The  /RECORD
+   qualifier   is   incompatible   with   the   /OFFSET   and    /VERSION
+   qualifiers.
+
+/VERSION
+  /V[ERSION]=version_number
+   Specifies  the  decimal  version  number  in  decimal  of   the   save
+   buffer to remove. /VERSION  is  required  to  REMOVE  a  SAVE  buffer.
+   /VERSION is incompatible with all qualifiers except /BLOCK.
+
+1 RESTORE
+  RES[TORE]
+   The RESTORE command restores saved versions of blocks.
+
+   The format of the RESTORE command is:
+
+   RES[TORE]  /B[LOCK]=block_number
+        /F[ROM]=from
+        /R[EGION]=region
+        /V[ERSION]=version_number
+
+   The version number is specified in decimal.
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the block to restore.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed, .i.e.,  on  the  first  block  oriented  command,  DSE  uses
+   block one (1).
+
+/FROM
+  /F[ROM]=block_number
+   Specifies the block number of the save buffer to restore.
+
+   By  default,  RESTORE  uses  the  target  block  number  as  the  SAVE
+   block number.
+
+/REGION
+  /R[EGION]=region_number
+   Specifies the region of the saved buffer to restore.
+
+   By default, RESTORE uses SAVE buffers from the current region.
+
+/VERSION
+  /V[ERSION]=version_number
+   Specifies  the  decimal  version  number  of  the  block  to  restore.
+   The version number is required.
+
+1 SAVE
+  SA[VE]
+   The SAVE command saves  versions  of  blocks  or  displays  a  listing  of
+   saved versions. Saved information is lost when DSE  EXITs.  Use  with  the
+   RESTORE command  to  move  blocks.  As  a  safety  feature,  use  SAVE  to
+   retain fallback copies of database blocks before changing them.
+
+   The format of the SAVE command is:
+
+   SA[VE]     /B[LOCK]=block_number
+      /C[OMMENT]=string
+      /L[IST]
+
+2 Qualifiers
+/BLOCK
+  /B[LOCK]=block_number
+   Specifies the block to save.
+
+   On commands with  no  /BLOCK=  qualifier,  DSE  uses  the  last  block
+   handled by a DSE operation. In this  case,  when  no  block  has  been
+   accessed,  .i.e.,  on  the  first  block-oriented  command,  DSE  uses
+   block one (1).
+
+/COMMENT
+  /C[OMMENT]=string
+   Specifies a comment to save with  the  block.  Enclose  the    comment
+   in quotes ("").  The  /COMMENT  qualifier  is  incompatible  with  the
+   /LIST qualifier.
+
+/LIST
+  /L[IST]
+   Lists saved versions of  specified  blocks.  The  /LIST  qualifier  is
+   incompatible with the /COMMENT qualifier.
+
+   By default, SAVE /LIST provides a directory of all SAVEd blocks.
+
+1 SHIFT
+  SH[IFT]
+   The SHIFT command shifts data in a block, filling  the  block  with  zeros
+   or shortening the block. The format of the SHIFT command is:
+
+   SH[IFT]    /B[ACKWARD]=shift
+      /F[ORWARD]=shift
+      /O[FFSET]=offset
+
+2 Qualifiers
+/BACKWARD
+  /B[ACKWARD]=shift
+   Specifies  the  extent  to  which  DSE  should  shift  data  backwards
+   towards   the   block   header.    The    /BACKWARD    qualifier    is
+   incompatible with the /FORWARD qualifier.
+
+/FORWARD
+  /F[ORWARD]=shift
+   Specifies  the  extent  to  which  DSE  should  shift   data   forward
+   towards  the  end  of   the   block.   The   /FORWARD   qualifier   is
+   incompatible with the /BACKWARD qualifier.
+
+/OFFSET
+  /O[FFSET]=offset
+   Specifies  the  starting  offset  of  the  portion  of  the  block  to
+   shift.
+
+1 SPAWN
+  SP[AWN]
+   The SPAWN command creates a subprocess  for  access  to  the  VMS  Command
+   Language  Interpreter  (CLI),  usually  DCL,   without   terminating   the
+   current DSE environment. Use  the  SPAWN  command  to  suspend  a  session
+   and issue DCL commands such as MUPIP  INTEG  /REGION  or  GDE.  The  SPAWN
+   command spawns a subprocess with  an  optional  command  string.  A  SPAWN
+   with no command  string  parameter  leaves  your  terminal  at  the  input
+   prompt of the CLI of the spawned process.
+
+   The format of the SPAWN command is:
+
+   SP[AWN] [command]
+
+   The SPAWN command has no qualifiers.
+
+1 WCINIT
+  W[CINIT]
+   The WCINIT  command  reinitializes  the  global  buffers  of  the  current
+   region. Because it cleans out  the  cache,  WCINIT  is  a  very  dangerous
+   command  and  therefore  should  not  be  used  except   under   Greystone
+   supervision.
+
+   WARNING: A WCINIT command issued  while  normal  database  operations  are
+   in progress can cause catastrophic damage to the database.
+
+   The format of the WCINIT command is:
+
+   W[CINIT]
+
+   The WCINIT command has no qualifiers.
+
+   When  you  issue  the  WCINIT  command,  DSE  issues   the   CONFIRMATION:
+   prompt. You must verify the WCINIT command by responding with a "YES."
+
+   If you do not confirm the WCINIT, DSE issues the message:
+
+   No action taken, enter  yes  at  the  CONFIRMATION  prompt  to  initialize
+   global buffers.
+
+

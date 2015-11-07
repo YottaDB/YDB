@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,14 @@ boolean_t compiler_startup(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(NULL == complits_hashtab || NULL == complits_hashtab->base);
+	/* Although we have an invocation of compiler cleanups at the end of this module, there exist ways to avoid this
+	 * cleanup by working in direct mode, getting certain types of errors combined with an argumentless ZGOTO that unwinds
+	 * pretty much everything that can bypass that cleanup. So do a quick check if it is needed and if so, git-r-done
+	 * (test is part of the macro invocation). Note this is the easiest place to make this check rather than complicating
+	 * error handling to provide a similar effect.
+	 */
+	COMPILE_HASHTAB_CLEANUP;
+	reinit_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
 	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based

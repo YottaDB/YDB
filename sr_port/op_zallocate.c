@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 #include "op.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
+#include "cmidefsp.h"		/* needed for cmmdef.h */
+#include "cmmdef.h"
 /*
  * -----------------------------------------------
  * This routine is a one-argument front-end for op_zallocate
@@ -32,5 +35,5 @@
 int op_zallocate(int timeout)
 {
 
-	return (op_zalloc2(timeout,0));
+	return op_lock2(timeout, CM_ZALLOCATES);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,8 @@
 {															\
 	if (0 != save_errno)												\
 	{														\
-		send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);					\
-		rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);					\
+		send_msg_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);	\
+		rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);	\
 		assert(FALSE);	/* should not come here as the rts_error above should not return */			\
 		rel_crit(reg);												\
 		return FALSE;												\

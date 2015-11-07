@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -231,8 +231,8 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 			else
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
-					LEN_AND_LIT("\"#LABEL\""));
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
 			}
 		}
 		skip_chars = 1;
@@ -253,8 +253,8 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 			else
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
-					LEN_AND_LIT("\"#CYCLE\""));
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 			}
 		}
 		assert(MAX_DIGITS_IN_INT >= trigger_value.str.len);

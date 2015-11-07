@@ -1,0 +1,260 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2012 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.title	OP_FORLOOP "FOR loop iteration logic"
+
+; On entry:
+;
+;	r16 -> index variable
+;	r17 -> step mval (guaranteed to be temp or lit and therefore defined as numeric)
+;	r18 -> terminator mval
+;	r19 -> return address to continue looping
+;
+; The usual return address in R26 is for loop termination.
+
+
+	G_MSF
+	mval$def
+
+
+	$linkage_section
+
+; These are read-only constants;  it's convenient to stash them in the linkage section:
+
+mant_lo_val:
+	.quad	MANT_LO
+
+mant_hi_val:
+	.quad	MANT_HI
+
+
+	$code_section
+
+	$routine OP_FORLOOP, entry=OP_FORLOOP_CA, kind=null
+	lda	sp, -40(sp)
+	stq	r2, (sp)
+	stq	r3, 8(sp)
+	stq	r4, 16(sp)
+	stq	r13, 24(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+; Save the first three arguments in non-volatile registers:
+	mov	r16, r2			; r2 -> index variable mval
+	mov	r17, r3			; r3 -> step mval
+	mov	r18, r4			; r4 -> terminator mval
+
+; Save the loop termination return address in the Mumps stack frame:
+	stl	r26, msf$mpc_off(r12)
+
+; Save the loop continuation return address on the stack:
+	stq	r19, 32(sp)
+
+	mv_force_defined_strict r2	; disregard NOUNDEF
+	mv_force_num (r2)		; make sure the index variable is numeric
+
+	mv_if_notint (r2), add_non_int	; branch if index is not int
+	mv_if_notint (r3), add_non_int	; branch if step is not int
+
+
+; Index and step are both int;  that makes it easy to compute the new index value:
+	ldl	r22, mval$l_m1(r2)	; r22 = index value
+	ldl	r23, mval$l_m1(r3)	; r23 = step value
+	addq	r22, r23, r22		; r22 = new index value [= old index + step]
+
+	mv_if_notint (r4), add		; branch if terminator is not int
+
+
+; At this point, index, step, and terminator are all int;  that makes it easy to
+; do the appropriate comparison between the new index value and the terminator:
+	ldl	r24, mval$l_m1(r4)	; r24 = terminator value
+	cmple	r31, r23, r26		; r26 = (step >= 0)
+	cmple	r22, r24, r27		; r27 = (index <= terminator)
+	and	r26, r27, r28		; r28 = (step >= 0 and index <= terminator)
+	xor	r26,   1, r26		; r26 = (step < 0)
+	cmple	r24, r22, r27		; r27 = (index >= terminator)
+	and	r26, r27, r26		; r26 = (step < 0 and index >= terminator)
+	or	r28, r26, r26		; r26 = ((step >= 0 and index <= terminator) or (step < 0 and index >= terminator))
+	beq	r26, terminate_loop	; branch if false;  loop has terminated
+
+	stl	r22, mval$l_m1(r2)	; store new index value [= old index + step]
+
+; Since index's value has changed, set its mvtype to int only
+; (i.e. clear all bits except mval$m_int):
+	ldl	r26, mval$w_mvtype(r2)
+	mskwl	r26, mval$w_mvtype, r26
+	or	r26, mval$m_int, r26
+	stl	r26, mval$w_mvtype(r2)
+
+	br	continue_loop
+
+
+; One or both of index and step are not int;  add step to index:
+add_non_int:
+	$call	ADD_MVALS, args=<r2, r3, 0/a, r2>, set_arg_info=false, nonstandard=true
+
+	br	compare
+
+; At this point, index and step are int, but terminator is not;
+; check the new index value (it's in r22):
+
+add:
+	$call	CHECK_INDEX, set_arg_info=false, nonstandard=true, local=true
+
+
+; Do the appropriate comparison between the updated index value and the terminator:
+
+compare:
+	mov	r2, r0			; r0 -> index
+	mov	r4, r1			; r1 -> terminator
+
+	mv_if_notint (r3), 15$		; branch if step is not int
+
+	ldl	r28, mval$l_m1(r3)
+	blt	r28, 20$		; branch if step's value is negative
+
+; Branch if either index or terminator is not int:
+5$:	mv_if_notint (r0), compare_non_int
+	mv_if_notint (r1), compare_non_int
+
+; Index and terminator are both int;  that makes the comparison easy:
+10$:	ldl	r0, mval$l_m1(r0)
+	ldl	r1, mval$l_m1(r1)
+	cmple	r0, r1, r0
+	blbs	r0, continue_loop
+	br	undo			; loop has terminated
+
+; Step is not int;  check the sign of its exp field:
+15$:	ldq_u	r28, mval$b_exp(r3)
+	lda	r27, mval$b_exp+1(r3)
+	extqh	r28, r27, r28
+	bge	r28, 5$			; branch if step's exp is positive
+
+; Either step's value or its exp field is negative;  swap r0 with r1:
+20$:	mov	r4, r0			; r0 -> terminator
+	mov	r2, r1			; r1 -> index
+	mv_if_notint (r0), compare_non_int
+	mv_if_int (r1), 10$
+
+
+; Neither index nor terminator is int;  use OP_NUMCMP to do the comparison:
+compare_non_int:
+	$call	OP_NUMCMP, set_arg_info=false, nonstandard=true		; args are r0 and r1
+	ble	r0, continue_loop
+
+; The FOR loop has terminated;  before returning we must subtract step from index:
+
+undo:
+	mv_if_notint (r2), sub_non_int	; branch if index is not int
+	mv_if_notint (r3), sub_non_int	; branch if step is not int
+
+	ldl	r22, mval$l_m1(r2)	; r22 = new index value
+	ldl	r23, mval$l_m1(r3)	; r23 = step value
+	subq	r22, r23, r22		; r22 = old index value [= new index - step]
+
+; Check the new (old) index value:
+	$call	CHECK_INDEX, set_arg_info=false, nonstandard=true, local=true
+
+	br	terminate_loop
+
+
+; One or both of index and step are not int;  subtract step from index:
+sub_non_int:
+	$call	ADD_MVALS, args=<r2, r3, 1/a, r2>, set_arg_info=false, nonstandard=true
+
+
+
+; The FOR loop has terminated;  return via the address saved in the Mumps stack frame:
+terminate_loop:
+	ldl	r26, msf$mpc_off(r12)
+	br	epilogue
+
+
+; The FOR loop has not yet terminated;  return via the address saved on the stack:
+continue_loop:
+	ldq	r26, 32(sp)
+
+
+epilogue:
+	ldq	r2, (sp)
+	ldq	r3, 8(sp)
+	ldq	r4, 16(sp)
+	ldq	r13, 24(sp)
+	lda	sp, 40(sp)
+
+	ret	r26
+
+	$end_routine
+
+; This is a local routine to check and update the value of the index variable.
+;
+; On entry, R22 contains the value to check, and r2 -> the mval for the index variable.
+
+
+	$routine CHECK_INDEX, entry=CHECK_INDEX_CA, local=true, kind=null
+	.base	r27, $ls
+
+	ldq	r25, mant_hi_val
+	cmplt	r22, r25, r28
+	beq	r28, 20$		; branch if index >= MANT_HI
+
+	negq	r25, r25
+	cmple	r22, r25, r28
+	bne	r28, 10$		; branch if index <= -MANT_HI
+
+; Abs(index value) < MANT_HI;  simply store it:
+	stl	r22, mval$l_m1(r2)
+
+; Since the value has changed, set mvtype to int (i.e. clear all bits except mval$m_int):
+	ldl	r24, mval$w_mvtype(r2)
+	mskwl	r24, mval$w_mvtype, r24
+	or	r24, mval$m_int, r24
+	stl	r24, mval$w_mvtype(r2)
+
+	ret	r26
+
+
+; index <= -MANT_HI:
+10$:	negq	r22, r22		; make the value positive
+	mov	^x80, r28		; set the sign bit for exp
+
+; index >= MANT_HI:
+20$:	or	r28, ^x45, r28		; exp will be ^x45 (decimal 69)
+
+; Set mvtype (to mval$m_nm) and exp:
+      	mov  	mval$m_nm, r24		; set mvtype field
+	insbl	r28, mval$b_exp, r28	; move the exp value into position in r28
+	or	r24, r28, r24		; set the new field values into r24
+	stl	r24, mval$w_mvtype(r2)	; and store them
+
+; Divide the index value (r22) by 10:
+	ldah	r24, -13107
+	negq	r22, r25
+	lda	r24, -13107(r24)
+	cmovge	r22, r22, r25
+	sll	r24, 32, r24
+	umulh	r25, r24, r25
+	srl	r25, 3, r25
+	negq	r25, r28
+	cmovge	r22, r25, r28		; r28 = index / 10
+
+	mulq	r28, 10, r24		; r24 = (index / 10) * 10
+	ldq	r25, mant_lo_val
+	subq	r22, r24, r22		; r22 = index - ((index / 10) * 10)
+	mulq	r22, r25, r22		; r22 = (index - ((index / 10) * 10)) * MANT_LO
+
+	stl	r22, mval$l_m0(r2)	; (index - ((index / 10) * 10)) * MANT_LO
+	stl	r28, mval$l_m1(r2)	; index / 10
+
+	ret	r26
+
+	$end_routine
+
+	.end

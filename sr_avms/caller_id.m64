@@ -1,0 +1,18 @@
+	.title	CALLER_ID	"Get PC of caller's caller"
+
+	$LIBICBDEF
+
+	$routine CALLER_ID, entry=CALLER_ID_CA, kind=stack, saved_regs=<r13,fp>
+	mov	r27, r13
+	.base	r13, $ls
+
+	lda	sp, -LIBICB$K_INVO_CONTEXT_BLK_SIZE(sp)	; Allocate an Invocation Context Block
+	$call	LIB$GET_CURR_INVO_CONTEXT, args=<sp>	; Get our invocation context
+	$call	LIB$GET_PREV_INVO_CONTEXT, args=<sp>	; Get our caller's invocation context
+	$call	LIB$GET_PREV_INVO_CONTEXT, args=<sp>	; Get our caller's caller's invocation context
+	ldq	r0, LIBICB$Q_PROGRAM_COUNTER(sp)	; Extract its PC
+	$return
+
+	$end_routine
+
+	.end

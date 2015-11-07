@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,10 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdarg.h>
+#ifdef GTM_PTHREAD
+#  include <pthread.h>
+#endif
+#include <signal.h>
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtmimagename.h"
@@ -88,15 +92,6 @@ int4	time();
 # endif
 #endif
 
-/* Set each timer request to go for 10ms more than requested, since the
- * interval timer alarm will sometimes go off early on many UNIX systems.
- * 10ms is more than enough for all systems tested so far (SunOS, Solaris,
- * HP/UX, NonStop/UX)
- */
-#ifndef SLACKTIME
-# define SLACKTIME		10
-#endif
-
 #define TIMER_BLOCK_SIZE	64	/* # of timer entries allocated initially as well as at every expansion */
 #define GT_TIMER_EXPAND_TRIGGER	8	/* if the # of timer entries in the free queue goes below this, allocate more */
 #define GT_TIMER_INIT_DATA_LEN	8
@@ -132,26 +127,28 @@ STATICDEF int		safe_handlers_cnt;
 STATICDEF boolean_t	stolen_timer = FALSE;	/* only complain once, used in check_for_timer_pops() */
 STATICDEF char 		*whenstolen[] = {"check_for_timer_pops", "check_for_timer_pops first time"}; /* for check_for_timer_pops */
 
-GBLREF	boolean_t	blocksig_initialized;	/* set to TRUE when blockalrm, block_ttinout and block_sigsent are initialized */
-GBLREF	sigset_t	blockalrm;
-GBLREF	sigset_t	block_ttinout;
-GBLREF	sigset_t	block_sigsent;
-GBLREF	boolean_t	heartbeat_started;
-GBLREF	void		(*heartbeat_timer_ptr)(void);	/* Initialized only in gtm_startup() */
-GBLREF	int4		error_condition;
-
 /* Flag signifying timer is active. Especially useful when the timer handlers get nested. This has not been moved to a
  * threaded framework because we do not know how timers will be used with threads.
  */
 GBLDEF	volatile boolean_t	timer_active = FALSE;
 GBLDEF	volatile int4		timer_stack_count = 0;
 GBLDEF	volatile boolean_t	timer_in_handler = FALSE;
-GBLREF	int4			outofband;
-GBLREF	int			process_exiting;
-GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used * in gt_timers.c */
-GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c */
+GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c. */
+GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c. */
 GBLDEF 	boolean_t		deferred_timers_check_needed;	/* Indicator whether check_for_deferred_timers() should be called
-								   upon leaving deferred zone */
+								 * upon leaving deferred zone. */
+
+GBLREF	boolean_t	blocksig_initialized;			/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
+								 * initialized. */
+GBLREF	sigset_t	blockalrm;
+GBLREF	sigset_t	block_ttinout;
+GBLREF	sigset_t	block_sigsent;
+GBLREF	boolean_t	heartbeat_started;
+GBLREF	void		(*heartbeat_timer_ptr)(void);		/* Initialized only in gtm_startup(). */
+GBLREF	int4		error_condition;
+GBLREF	int4		outofband;
+GBLREF	int		process_exiting;
+
 error_def(ERR_TIMERHANDLER);
 
 /* Called when a hiber_start timer pops. Set flag so a given timer will wake up (not go back to sleep). */
@@ -253,18 +250,18 @@ void prealloc_gt_timers(void)
 	 * First step, fill in the safe timers contained within this module which are always available.
 	 */
 	ADD_SAFE_HNDLR(&hiber_wake);		/* Resident in this module */
+	ADD_SAFE_HNDLR(&hiber_start_wait_any);	/* Resident in this module */
 	ADD_SAFE_HNDLR(&wake_alarm);		/* Standalone module containing on one global reference */
 }
 
 /* Get current clock time. Fill-in the structure with the absolute time of system clock.
  * Arguments:	atp - pointer to structure of absolute time
  */
-void sys_get_curr_time (ABS_TIME *atp)
+void sys_get_curr_time(ABS_TIME *atp)
 {
 #	ifdef BSD_TIMER
 	struct timeval	tv;
 	struct timezone	tz;
-	struct tm	*dtp;
 
 	/* getclock or clock_gettime perhaps to avoid tz just to ignore */
 	gettimeofday(&tv, &tz);
@@ -277,7 +274,7 @@ void sys_get_curr_time (ABS_TIME *atp)
 }
 
 /* Start hibernating by starting a timer and waiting for it. */
-void hiber_start (uint4 hiber)
+void hiber_start(uint4 hiber)
 {
 	int4		waitover;
 	int4		*waitover_addr;
@@ -289,10 +286,16 @@ void hiber_start (uint4 hiber)
 	waitover = FALSE;			/* when OUR timer pops, it will set this flag */
 	waitover_addr = &waitover;
 	tid = (TID)waitover_addr;		/* unique id of this timer */
-	start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr);
+	start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr, TRUE);
 	/* we will loop here until OUR timer pops and sets OUR flag */
 	do
 	{
+		/*
+		 * sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a memeber of
+		 * savemask, This process will never receive SIGALRM, and it will hang indefinitely. Hence following assert added to
+		 * catch such out-of-design situation.
+		 */
+		assert(!sigismember(&savemask, SIGALRM));
 		sigsuspend(&savemask);		/* unblock SIGALRM and wait for timer interrupt */
 		if (outofband)
 		{
@@ -315,10 +318,31 @@ void hiber_start_wait_any(uint4 hiber)
 	}
 	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal and set new timer */
-	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL);
-	sigsuspend(&savemask);		/* unblock SIGALRM and wait for timer interrupt */
+	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
+	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
 	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+}
+
+/* Wrapper function for start_timer() that is exposed for outside use. The function ensure that time_to_expir is positive. If
+ * negative value or 0 is passed, set time_to_expir to SLACKTIME and invoke start_timer(). The reason we have not merged this
+ * functionality with start_timer() is because there is no easy way to determine whether the function is invoked from inside
+ * GT.M or by an external routine.
+ * Arguments:	tid 		- timer id
+ *		time_to_expir	- time to expiration in msecs
+ *		handler		- pointer to handler routine
+ *      	hdata_len       - length of handler data next arg
+ *      	hdata           - data to pass to handler (if any)
+ */
+void gtm_start_timer(TID tid,
+		 int4 time_to_expir,
+		 void (*handler)(),
+		 int4 hdata_len,
+		 void *hdata)
+{
+	if (0 >= time_to_expir)
+		time_to_expir = SLACKTIME;
+	start_timer(tid, time_to_expir, handler, hdata_len, hdata);
 }
 
 /* Start the timer. If timer chain is empty or this is the first timer to expire, actually start the system timer.
@@ -334,18 +358,41 @@ void start_timer(TID tid,
 		 int4 hdata_len,
 		 void *hdata)
 {
-	sigset_t savemask;
+	sigset_t	savemask;
+	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
+	int		i;
 
 	assertpro(0 < time_to_expir);			/* Callers should verify non-zero time */
+	if (NULL == handler)
+	{
+		safe_to_add = TRUE;
+		safe_timer = TRUE;
+	} else if ((wcs_clean_dbsync_fptr == handler) || (wcs_stale_fptr == handler))
+		safe_to_add = TRUE;
+	else
+	{
+                for (i = 0; NULL != safe_handlers[i]; i++)
+                        if (safe_handlers[i] == handler)
+                        {
+				safe_to_add = TRUE;
+				safe_timer = TRUE;
+                                break;
+                        }
+	}
+	if (!safe_to_add && (process_exiting || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
+	{
+		assert(WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
+		return;
+	}
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
-	start_timer_int(tid, time_to_expir, handler, hdata_len, hdata);
+	start_timer_int(tid, time_to_expir, handler, hdata_len, hdata, safe_timer);
 	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
 }
 
 /* Internal version of start_timer that does not protect itself, assuming this has already been done.
  * Otherwise does as explained above in start_timer.
  */
-STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
+STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata, boolean_t safe_timer)
 {
 	ABS_TIME at;
 
@@ -368,7 +415,7 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 	/* Check if # of free timer slots is less than minimum threshold. If so, allocate more of those while it is safe to do so */
 	if ((GT_TIMER_EXPAND_TRIGGER > num_timers_free) && (1 > timer_stack_count))
 		gt_timers_alloc();
-	add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata);	/* Link new timer into timer chain */
+	add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata, safe_timer);	/* Put new timer in the queue. */
 	if ((timeroot->tid == tid) || !timer_active)
 		start_first_timer(&at);
 }
@@ -532,7 +579,6 @@ STATICFNDEF void timer_handler(int why)
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
 	ABS_TIME	at;
-	sigset_t	savemask;
 	int		save_errno, timer_defer_cnt, offset;
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
@@ -542,6 +588,12 @@ STATICFNDEF void timer_handler(int why)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (SIGALRM == why)
+	{	/* If why is 0, we know that timer_handler() was called directly, so no need
+		 * to check if the signal needs to be forwarded to appropriate thread.
+		 */
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
+	}
 #	ifdef DEBUG
 	if (IS_GTM_IMAGE)
 	{
@@ -568,7 +620,7 @@ STATICFNDEF void timer_handler(int why)
 		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
 		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
 		 */
-		if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) || tpop->safe)
+		if (((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting)) || (tpop->safe))
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -693,13 +745,14 @@ STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
  *		handler		- pointer to handler routine
  *      	hdata_len       - length of data to follow
  *      	hdata   	- data to pass to timer rtn if any
+ *      	safe_timer	- timer's handler is in safe_handlers array
  */
-STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
+STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+	void *hdata, boolean_t safe_timer)
 {
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
 	int4		cmp, i;
 	st_timer_alloc	*new_alloc;
-	boolean_t	safe_to_add = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -740,26 +793,13 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 	}
 	ntp->tid = tid;
 	ntp->handler = handler;
-	ntp->safe = FALSE;
-	if (NULL == handler)
+	if (safe_timer)
 	{
 		ntp->safe = TRUE;
 		safe_timer_cnt++;
 		assert(0 < safe_timer_cnt);
 	} else
-	{
-                for (i = 0; NULL != safe_handlers[i]; i++)
-                        if (safe_handlers[i] == handler)
-                        {
-                                ntp->safe = TRUE;   /* known to just set flags, etc. */
-				safe_timer_cnt++;
-                                break;
-                        }
-	}
-	if (ntp->safe || (wcs_clean_dbsync_fptr == handler) || (wcs_stale_fptr == handler))
-		safe_to_add = TRUE;
-	assertpro((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || safe_to_add);
-	assertpro(!process_exiting || safe_to_add);
+		ntp->safe = FALSE;
 	ntp->hd_len = hdata_len;
 	if (0 < hdata_len)
 		memcpy(ntp->hd_data, hdata, hdata_len);
@@ -791,7 +831,7 @@ STATICFNDEF void remove_timer(TID tid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (tp = find_timer(tid, &tprev))
+	if (tp = find_timer(tid, &tprev))		/* Warning: assignment */
 	{
 		if (tprev)
 			tprev->next = tp->next;
@@ -870,9 +910,9 @@ STATICFNDEF void init_timers()
 	    (SIG_IGN != prev_alrm_handler.sa_handler) &&	/* as set by sig_init */
 	    (SIG_DFL != prev_alrm_handler.sa_handler)) 		/* utils, compile */
 	{
-		send_msg(VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
 			LEN_AND_LIT("init_timers"));
-	    	rts_error(VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
+	    	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
 			LEN_AND_LIT("init_timers"));
 	    	assert(FALSE);
 	}
@@ -935,9 +975,9 @@ void check_for_timer_pops()
 	}
 	if (stolenwhen)
 	{
-		send_msg(VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
 			LEN_AND_STR(whenstolen[stolenwhen - 1]));
-		rts_error(VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
 			LEN_AND_STR(whenstolen[stolenwhen - 1]));
 		assert(FALSE);					/* does not return here */
 	}

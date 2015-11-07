@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,7 +95,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		while (DOT != *ptr)	/* we know journal file name alway has a DOT */
 			ptr--;
 		base_len = (int)(ptr - (char *)&jctl->jnl_fn[0]);
-		file_info = murgbl.file_info[recstat] = (void *)malloc(SIZEOF(fi_type));
+		file_info = (void *)malloc(SIZEOF(fi_type));
 		if (0 == mur_options.extr_fn_len[recstat])
 		{
 			mur_options.extr_fn[recstat] = malloc(MAX_FN_LEN);
@@ -107,6 +107,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		}
 		file_info->fn_len = mur_options.extr_fn_len[recstat];
 		file_info->fn = mur_options.extr_fn[recstat];
+		murgbl.file_info[recstat] = file_info;
 		if (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn, &rename_fn_len, &status))
 			return status;
 		op_pars.mvtype = MV_STR;

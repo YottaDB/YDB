@@ -1,0 +1,32 @@
+	.title	BIND_SYMBOL  "Utility routine for bndsym macro"
+
+	$routine BIND_SYMBOL, entry=BIND_SYMBOL_CA, kind=null
+	lda	sp, -32(sp)
+	stq	r13, 24(sp)
+	stq	r26, 16(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	stq	r18, 8(sp)	; save pointer to linkage pair
+
+	$call	LIB$FIND_IMAGE_SYMBOL, args=<r16,r17,sp>, nonstandard=true
+	blbc	r0, 10$
+
+	ldq	r18, 8(sp)	; r18 -> linkage pair
+	ldl	r28, (sp)	; r28 = procedure value returned by LIB$FIND_IMAGE_SYMBOL
+	stq	r28, 8(r18)	; store PV in 2nd quadword of linkage pair
+	ldq	r28, 8(r28)	; r28 = entry address from procedure descriptor
+	stq	r28, (r18)	; store entry in 1st quadword of linkage pair
+
+5$:	ldq	r28, 16(sp)
+	ldq	r13, 24(sp)
+	lda	sp, 32(sp)
+	ret	r28
+
+10$:	mov	r0, r16
+	$call	LIB$SIGNAL, args=<r16>, nonstandard=true
+	br	5$
+
+	$end_routine
+
+	.end

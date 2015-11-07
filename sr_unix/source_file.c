@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #include "cmd_qlf.h"
 #include "min_max.h"
 #include "cli.h"
+#include "have_crit.h"
 
 GBLREF unsigned short	source_name_len;
 GBLREF unsigned char	source_file_name[];
@@ -219,7 +220,7 @@ bool	open_source_file (void)
 	int_module_name.len = routine_name.len;
 	if ('_' == *routine_name.addr)
 		routine_name.addr[0] = '%';
-	p = (char *)GTM_CTIME(&clock);
+	GTM_CTIME(p, &clock);
 	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
 	io_curr_device = dev_in_use;	/*	set it back to make open_list_file save the device	*/
 	return TRUE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,9 @@
 #include "is_file_identical.h"
 #include "gtm_startup_chk.h"
 #include "gtmimagename.h"
+#include "have_crit.h"
 
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
 LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_DISTPATHMAX);
@@ -51,7 +53,6 @@ error_def(ERR_IMAGENAME);
 
 int gtm_chk_dist(char *image)
 {
-	char		*ptr1;
 	char		pre_buff[MAX_FBUFF];
 	char		*prefix;
 	int		prefix_len;
@@ -59,14 +60,17 @@ int gtm_chk_dist(char *image)
 	int		status;
 	char 		mbuff[MAX_FBUFF + 1];
 	parse_blk	pblk;
+	char		*dist;
 
-	if (NULL != (ptr1 = (char *)GETENV(GTM_DIST)))
+	if (NULL != (dist = (char *)GETENV(GTM_DIST)))
 	{
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		if ((GTM_PATH_MAX - 2) <= (STRLEN(ptr1) + gtmImageNames[image_type].imageNameLen))
-			rts_error(VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_PATH_MAX - gtmImageNames[image_type].imageNameLen - 2);
+		if ((GTM_PATH_MAX - 2) <= (STRLEN(dist) + gtmImageNames[image_type].imageNameLen))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1,
+					GTM_PATH_MAX - gtmImageNames[image_type].imageNameLen - 2);
 	} else
-		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+	memcpy(gtm_dist, dist, STRLEN(dist));
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = mbuff;
 	pblk.buff_size = MAX_FBUFF;
@@ -76,16 +80,16 @@ int gtm_chk_dist(char *image)
 	/*	strings returned in pblk are not null terminated 	*/
 	status = parse_file(&gtm_name, &pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, gtm_name.len, gtm_name.addr, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, gtm_name.len, gtm_name.addr, status);
 	assert(NULL != pblk.l_name);
 	if ((!(pblk.fnb & F_HAS_DIR) && !pblk.b_dir) || (DIR_SEPARATOR != pblk.l_dir[0]))
 	{
-		if (NULL == GETCWD(pre_buff, MAX_FBUFF, prefix))
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("getcwd"), CALLFROM, errno);
+		GETCWD(pre_buff, MAX_FBUFF, prefix);
+		if (NULL == prefix)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getcwd"), CALLFROM, errno);
 		prefix_len = STRLEN(prefix);
 		if (MAX_FBUFF < prefix_len + pblk.b_esl + 1)
-			rts_error(VARLSTCNT(3) ERR_MAXGTMPATH, 1, MAX_FBUFF - pblk.b_name);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXGTMPATH, 1, MAX_FBUFF - pblk.b_name);
 		if (DIR_SEPARATOR != prefix[prefix_len - 1])
 		{
 			prefix[prefix_len] = DIR_SEPARATOR;
@@ -100,6 +104,6 @@ int gtm_chk_dist(char *image)
 			prefix[pblk.b_dir] = 0;
 	}
 	if (IS_GTM_IMAGE && memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
-		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
 	return 0;
 }

@@ -193,7 +193,7 @@ const static readonly int error_ansi[] = {
 	   5,	/* TEXTARG */
 	   0,	/* TMPSTOREMAX */
 	   0,	/* VIEWCMD */
-	  12,	/* TXTNEGLIN */
+	   0,	/* JNI */
 	   0,	/* TXTSRCFMT */
 	   0,	/* UIDMSG */
 	   0,	/* UIDSND */
@@ -202,9 +202,9 @@ const static readonly int error_ansi[] = {
 	  39,	/* VAREXPECTED */
 	   0,	/* VARRECBLKSZ */
 	   0,	/* MAXARGCNT */
-	   0,	/* WCFAIL */
+	   0,	/* GTMSECSHRSEMGET */
 	   0,	/* VIEWARGCNT */
-	   0,	/* XKILLCNTEXC */
+	   0,	/* GTMSECSHRDMNSTARTED */
 	   0,	/* ZATTACHERR */
 	   0,	/* ZDATEFMT */
 	   0,	/* ZEDFILSPEC */
@@ -271,14 +271,14 @@ const static readonly int error_ansi[] = {
 	  21,	/* MULTFORMPARM */
 	  16,	/* QUITARGUSE */
 	   0,	/* NAMEEXPECTED */
-	  11,	/* UNUSEDMSG438 */
+	  11,	/* FALLINTOFLST */
 	  16,	/* NOTEXTRINSIC */
-	  11,	/* UNUSEDMSG440 */
+	   0,	/* GTMSECSHRREMSEMFAIL */
 	  20,	/* FMLLSTMISSING */
 	  58,	/* ACTLSTTOOLONG */
 	   0,	/* ACTOFFSET */
 	   0,	/* MAXACTARG */
-	   0,	/* GTMDUMPFAIL */
+	   0,	/* GTMSECSHRREMSEM */
 	   0,	/* JNLTMQUAL2 */
 	   0,	/* GDINVALID */
 	   0,	/* ASSERT */
@@ -422,13 +422,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* BEGINST */
 	   0,	/* INVMVXSZ */
 	   0,	/* JNLWRTNOWWRTR */
-	   0,	/* MUPGDERR */
+	   0,	/* GTMSECSHRSHMCONCPROC */
 	   0,	/* JNLINVALLOC */
 	   0,	/* JNLINVEXT */
 	   0,	/* MUPCLIERR */
 	   0,	/* JNLTMQUAL4 */
-	   0,	/* UNUSEDMSG594 */
-	   0,	/* UNUSEDMSG595 */
+	   0,	/* GTMSECSHRREMSHM */
+	   0,	/* GTMSECSHRREMFILE */
 	   0,	/* MUNODBNAME */
 	   0,	/* FILECREATE */
 	   0,	/* FILENOTCREATE */
@@ -450,7 +450,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* WCWRNNOTCHG */
 	   0,	/* ZCWRONGDESC */
 	   0,	/* MUTNWARN */
-	   0,	/* JNLNAMLEN */
+	   0,	/* GTMSECSHRUPDDBHDR */
 	   0,	/* LCKSTIMOUT */
 	   0,	/* CTLMNEMAXLEN */
 	   0,	/* CTLMNEXPECTED */
@@ -586,14 +586,14 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHR */
 	   0,	/* GTMSECSHRSRVFID */
 	   0,	/* GTMSECSHRSRVFIL */
-	   0,	/* SOCKACTNA */
+	   0,	/* FREEBLKSLOW */
 	   0,	/* PROTNOTSUP */
 	   0,	/* DELIMSIZNA */
 	   0,	/* INVCTLMNE */
 	   0,	/* SOCKLISTEN */
 	   0,	/* LQLENGTHNA */
 	   0,	/* ADDRTOOLONG */
-	  76,	/* UNUSEDMSG760 */
+	   0,	/* GTMSECSHRGETSEMFAIL */
 	   0,	/* CPBEYALLOC */
 	   0,	/* DBRDONLY */
 	   0,	/* DUPTN */
@@ -614,7 +614,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOFORKCORE */
 	   0,	/* JNLREAD */
 	   0,	/* JNLMINALIGN */
-	   0,	/* JNLDSKALIGN */
+	   0,	/* UNUSEDMSG781 */
 	   0,	/* JNLPOOLSETUP */
 	   0,	/* JNLSTATEOFF */
 	   0,	/* RECVPOOLSETUP */
@@ -677,7 +677,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BUFFLUFAILED */
 	   0,	/* MUQUALINCOMP */
 	   0,	/* DISTPATHMAX */
-	   0,	/* MAXTRACEHEIGHT */
+	   0,	/* UNUSEDMSG844 */
 	   0,	/* IMAGENAME */
 	   0,	/* GTMSECSHRPERM */
 	   0,	/* GTMDISTUNDEF */
@@ -783,7 +783,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBMBPFRINT */
 	   0,	/* DBMAXKEYEXC */
 	   0,	/* DBMXRSEXCMIN */
-	   0,	/* DBMAXRSEXBL */
+	   0,	/* UNUSEDMSG950 */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
 	   0,	/* DBVERPERFWARN2 */
@@ -805,7 +805,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SEMWT2LONG */
 	   0,	/* REPLINSTOPEN */
 	   0,	/* REPLINSTCLOSE */
-	   0,	/* JNLNOTFOUND */
+	   0,	/* UNUSEDMSG972 */
 	   0,	/* DBCRERR8 */
 	   0,	/* NUMPROCESSORS */
 	   0,	/* DBADDRANGE8 */
@@ -822,16 +822,16 @@ const static readonly int error_ansi[] = {
 	   0,	/* RENAMEFAIL */
 	   0,	/* FILERENAME */
 	   0,	/* JNLBUFINFO */
-	   0,	/* JNLQIOLOCKED */
-	   0,	/* JNLEOFPREZERO */
+	   0,	/* UNUSEDMSG989 */
+	   0,	/* UNUSEDMSG990 */
 	   0,	/* TPNOTACID */
 	   0,	/* JNLSETDATA2LONG */
 	   0,	/* JNLNEWREC */
 	   0,	/* REPLFTOKSEM */
-	   0,	/* GETCWD */
+	   0,	/* UNUSEDMSG995 */
 	   0,	/* EXTRIOERR */
 	   0,	/* EXTRCLOSEERR */
-	   0,	/* TRUNCATE */
+	   0,	/* UNUSEDMSG998 */
 	   0,	/* REPLEXITERR */
 	   0,	/* MUDESTROYSUC */
 	   0,	/* DBRNDWN */
@@ -912,7 +912,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SYSTEMVALUE */
 	   0,	/* SIZENOTVALID4 */
 	   0,	/* STRNOTVALID */
-	   0,	/* RECNOCREJNL */
+	   0,	/* UNUSEDMSG1079 */
 	   0,	/* ERRWETRAP */
 	   0,	/* TRACINGON */
 	   0,	/* CITABENV */
@@ -940,9 +940,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZDIROUTOFSYNC */
 	   0,	/* GBLNOEXIST */
 	   0,	/* MAXBTLEVEL */
-	   0,	/* JNLSTRESTFL */
+	   0,	/* UNUSEDMSG1107 */
 	   0,	/* JNLALIGNSZCHG */
-	   0,	/* MAXTRACELEVEL */
+	   0,	/* UNUSEDMSG1109 */
 	   0,	/* GVFAILCORE */
 	   0,	/* DBCDBNOCERTIFY */
 	   0,	/* DBFRZRESETSUC */
@@ -1187,7 +1187,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TRIGTLVLCHNG */
 	   0,	/* TRIGNAMEUNIQ */
 	   0,	/* ZTRIGINVACT */
-	   0,	/* UNUSEDMSG1354 */
+	   0,	/* INDRCOMPFAIL */
 	   0,	/* QUITALSINV */
 	   0,	/* PROCTERM */
 	   0,	/* SRCLNNTDSP */
@@ -1200,10 +1200,10 @@ const static readonly int error_ansi[] = {
 	   0,	/* SSATTACHSHM */
 	   0,	/* TRIGDEFNOSYNC */
 	   0,	/* TRESTMAX */
-	   0,	/* TPLOCKRESTMAX */
+	   0,	/* UNUSEDMSG1367 */
 	   0,	/* GBLEXPECTED */
 	   0,	/* GVZTRIGFAIL */
-	   0,	/* UNUSEDMSG1370 */
+	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
 	   0,	/* SECNODZTRIGINTP */
@@ -1247,7 +1247,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOSUPPLSUPPL */
 	   0,	/* REPL2OLD */
 	   0,	/* EXTRFILEXISTS */
-	   0,	/* UNUSEDMSG1414 */
+	   0,	/* MUUSERECOV */
 	   0,	/* SECNOTSUPPLEMENTARY */
 	   0,	/* SUPRCVRNEEDSSUPSRC */
 	   0,	/* UNUSEDMSG1417 */
@@ -1340,4 +1340,19 @@ const static readonly int error_ansi[] = {
 	   0,	/* TPRESTNESTERR */
 	   0,	/* JNLFILRDOPN */
 	   0,	/* SEQNUMSEARCHTIMEOUT */
+	   0,	/* FTOKKEY */
+	   0,	/* SEMID */
+	   0,	/* JNLQIOSALVAGE */
+	   0,	/* FAKENOSPCLEARED */
+	   0,	/* MMFILETOOLARGE */
+	   0,	/* BADZPEEKARG */
+	   0,	/* BADZPEEKRANGE */
+	   0,	/* BADZPEEKFMT */
+	   0,	/* DBMBMINCFREFIXED */
+	   0,	/* NULLENTRYREF */
+	   0,	/* ZPEEKNORPLINFO */
+	   0,	/* MMREGNOACCESS */
+	   0,	/* MALLOCMAXUNIX */
+	   0,	/* MALLOCMAXVMS */
+	   0,	/* HOSTCONFLICT */
 	};

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "error_trap.h"
 #include "golevel.h"
 #include "cache.h"
+#include "cmd_qlf.h"
 #include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "hashtab_mname.h"
@@ -156,7 +157,7 @@ void gtm_unlink_all(void)
 			if (NULL == rtnhdr->shlib_handle)
 				/* We can only release this section if this is not a shared library */
 				GTM_TEXT_FREE(rtnhdr->ptext_adr);			/* R/O releasable section */
-			free(rtnhdr->literal_adr);				/* R/W releasable section part 1 */
+			free(RW_REL_START_ADR(rtnhdr));				/* R/W releasable section part 1 */
 			free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
 			free(rtnhdr->labtab_adr);				/* Usually non-releasable but not in this case */
 			/* Run the chain of old (replaced) versions freeing them also */

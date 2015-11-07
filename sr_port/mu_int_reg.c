@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,13 +122,6 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		}
 	}
 #	endif
-	if (dba_mm == cs_data->acc_meth && read_only)
-	{
-		util_out_print("!/MM database is read only. MM database cannot be frozen without write access.", TRUE);
-		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-		mu_int_skipreg_cnt++;
-		return;
-	}
 	assert(NULL != mu_int_master);
 	/* Ensure that we don't see an increase in the file header and master map size compared to it's maximum values */
 	assert(SGMNT_HDR_LEN >= SIZEOF(sgmnt_data) && (MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(cs_data)));
@@ -175,7 +168,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			default:
 				assert(FALSE);
 		}
-		if (read_only && !mu_int_wait_rdonly(csa, MUPIP_INTEG))
+		if (read_only && (dba_bg == csa->hdr->acc_meth) && !mu_int_wait_rdonly(csa, MUPIP_INTEG))
 		{
 			mu_int_skipreg_cnt++;
 			return;

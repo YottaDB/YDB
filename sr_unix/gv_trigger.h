@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -491,7 +491,8 @@ GBLREF	int4		tstart_trigger_depth;
 														\
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
 			end = &buff[MAX_ZWR_KEY_SZ - 1];							\
-		rts_error(VARLSTCNT(8) ERR_TRIGREPLSTATE, 2, DB_LEN_STR(REG), ERR_GVIS, 2, end - buff, buff);	\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGREPLSTATE, 2, DB_LEN_STR(REG), ERR_GVIS, 2,	\
+				end - buff, buff);								\
 	}													\
 }
 

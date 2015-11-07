@@ -1,0 +1,96 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	.title	mum_tstart	(re)start a GT.M frame from a sys$unwind
+
+	G_MSF
+	base_frame
+
+;	The code PSECT must have the MIX attribute in order to have read access to it.
+$CODE$	=	"MUM_TSTART,QUAD,PIC,CON,REL,LCL,SHR,EXE,RD,MIX,NOWRT"
+
+;	mum_tstart - (re)start a GT.M MUMPS stack frame
+;
+;	mum_tstart calls trans_code if proc_act_type is non-zero.  Then
+;	mum_tstart (re)loads the GT.M registers (including the code address)
+;	from the GT.M MUMPS stack frame, ensures the instruction cache and
+;	memory are consistent, reloads r10 with the current address of $TEST
+;	(mis-named "dollar_truth"), and then jumps to the code address indicated
+;	by the GT.M MUMPS stack frame.
+;
+;	mum_tstart is only invoked by sys$unwind after unwinding from a
+;	signal and not via the standard call mechanism.  Therefore,
+;	the context is that of the routine executing in the frame to
+;	which sys$unwind unwound and not to mum_tstart.  Consequently,
+;	we do not know what value may be in any of the registers and
+;	must establish pseudo PC-relative addressing in order to refer
+;	to any data, including the addresses of external items.
+
+	$code_section
+
+;	Pseudo linkage PSECT.
+
+A_dollar_truth:		.address	dollar_truth	; actually, $TEST
+A_frame_pointer:	.address	frame_pointer
+A_proc_act_type:	.address	proc_act_type
+
+L_trans_code:		.linkage_pair	trans_code
+L_error_return:		.linkage_pair	error_return
+
+	$routine	name=mum_tstart,entry=mum_tstart_ca,kind=null
+
+	br	r13, establish_base	; set up for PC-relative addressing
+establish_base:
+	.base	r13, establish_base
+
+	lda	sp,  -ARG_AREA_SZ(fp)	; (re)establish argument list area
+	ldq	r0,  A_proc_act_type
+	ldq_u	r28, (r0)
+	extwl	r28, r0, r28
+	beq	r28, l1
+	ldq	r26, L_trans_code
+	ldq	r27, L_trans_code+8
+	mov	r31, r25
+	jsr	r26, (r26)
+l1:	; We can't use getframe here with its imbedded $call invocation so hard code a getframe equivalent using
+	; the lobotomized manual linkages this module needs to use..
+	; start GETFRAME expansion
+        ; A_frame_pointer must be address of quadword containing the address of frame_pointer
+        ldq     r12, A_frame_pointer
+        ldl     r12, (r12)
+        lda     r8, msf$flags_off(r12)
+        ldq_u   r9, (r8)
+        extbl   r9, r8, r9
+        and     r9, sff_etrap_err, r9
+        beq     r9, l2
+        ; $call   ERROR_RETURN, set_arg_info=false, nonstandard=true
+	ldq	r26, L_error_return
+	ldq	r27, L_error_return+8
+	mov	r31, r25
+	jsr	r26,(r26)
+        ldq     r12, A_frame_pointer
+        ldl     r12, (r12)
+l2: 	ldl     r8,  msf$l_symtab_off(r12)
+        ldl     r9,  msf$temps_ptr_off(r12)
+        ldl     r13, msf$ctxt_off(r12)
+        ldl     r28, msf$literal_ptr_off(r12)
+        cmovne  r28, r28, r14                   ; only copy to r14 if initialized to non-zero value
+        ldl     r26, msf$mpc_off(r12)
+	; end getframe expansion
+	br	r0,  establish_base2	; r13 modified by getframe, set up another (temporary) base
+establish_base2:
+	.base	r0,  establish_base2
+	ldq	r10, A_dollar_truth
+	imb				; resynchronize instruction cache
+	ret	r26
+
+	$end_routine	name=mum_tstart
+
+	.end

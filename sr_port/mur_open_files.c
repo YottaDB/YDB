@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,26 +84,26 @@
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
 
-#define RELEASE_ACCESS_CONTROL(REGLIST)								\
-{												\
-	unix_db_info		*lcl_udi;							\
-	gd_region		*lcl_reg;							\
-	reg_ctl_list		*lcl_rctl;							\
-	int			save_errno;							\
-												\
-	lcl_reg = REGLIST->reg;									\
-	lcl_rctl = REGLIST->rctl;								\
-	lcl_udi = FILE_INFO(lcl_reg);								\
-	assert(INVALID_SEMID != lcl_udi->semid);						\
-	assert(lcl_udi->grabbed_access_sem && lcl_rctl->standalone);				\
-	if (0 != (save_errno = do_semop(lcl_udi->semid, 0, -1, SEM_UNDO)))			\
-	{											\
-		assert(FALSE);	/* we hold it, so we should be able to release it*/		\
-		rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,\
-				RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
-	}											\
-	lcl_udi->grabbed_access_sem = FALSE;							\
-	lcl_rctl->standalone = FALSE;								\
+#define RELEASE_ACCESS_CONTROL(REGLIST)									\
+{													\
+	unix_db_info		*lcl_udi;								\
+	gd_region		*lcl_reg;								\
+	reg_ctl_list		*lcl_rctl;								\
+	int			save_errno;								\
+													\
+	lcl_reg = REGLIST->reg;										\
+	lcl_rctl = REGLIST->rctl;									\
+	lcl_udi = FILE_INFO(lcl_reg);									\
+	assert(INVALID_SEMID != lcl_udi->semid);							\
+	assert(lcl_udi->grabbed_access_sem && lcl_rctl->standalone);					\
+	if (0 != (save_errno = do_semop(lcl_udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))			\
+	{												\
+		assert(FALSE);	/* we hold it, so we should be able to release it*/			\
+		rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,	\
+				RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);			\
+	}												\
+	lcl_udi->grabbed_access_sem = FALSE;								\
+	lcl_rctl->standalone = FALSE;									\
 }
 
 #define GRAB_ACCESS_CONTROL(REGLIST)									\
@@ -132,7 +132,7 @@
 			rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,\
 					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
 		}											\
-		lcl_udi->grabbed_access_sem = TRUE;							\
+		lcl_udi->grabbed_access_sem = TRUE;					\
 		lcl_rctl->standalone = TRUE;								\
 	}												\
 }
@@ -580,7 +580,7 @@ boolean_t mur_open_files()
 			TP_CHANGE_REG(reg);
 #			ifdef DEBUG
 			udi = FILE_INFO(reg);
-			assert(1 == (semval = semctl(udi->semid, 0, GETVAL)));
+			assert(1 == (semval = semctl(udi->semid, DB_CONTROL_SEM, GETVAL)));
 #			endif
 			assert(cs_addrs->now_crit);
 			cs_addrs->hold_onto_crit = TRUE; /* No more unconditional grab_crit/rel_crit on this region */

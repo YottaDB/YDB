@@ -1,0 +1,32 @@
+	.title	ERROR_RETURN_VMS
+
+;	ERROR_RETURN_VMS calls error_return (which doesn't return).
+;
+;	entry:
+;		r13 -	address of ERROR_RETURN_VMS's procedure descriptor (not r27)
+;
+;	WARNING: because ERROR_RETURN_VMS is designed to be invoked from a GT.M
+;	MUMPS stack frame, it does not conform to the Alpha calling
+;	standard and cannot be invoked from any high-level language.
+;	The invoker should load the address of ERROR_RETURN_VMS's procedure
+;	descriptor into r13, not r27.
+
+	g_msf
+
+	$linkage_section
+A_frame_pointer:
+	.address  frame_pointer
+
+	$code_section
+
+	$routine	ERROR_RETURN_VMS, entry=ERROR_RETURN_VMS_CA, kind=null
+	.base	r13, $ls
+
+	mov	r13, r27
+	$call	error_return, set_arg_info=false, nonstandard=true
+	getframe
+	ret     r26
+
+	$end_routine
+
+	.end

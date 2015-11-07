@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -1019,3 +1019,15 @@ OC_INDGET2:	pushab	val.1
 		calls	#2,xfer.xf_indget2
 OC_INDMERGE2:	pushab	val.1
 		calls	#1,xfer.xf_indmerge2
+OC_LITC:	pushab	val.1			; opcode not in sr_unix_nsb/ttt or sr_vvms/ttt
+		pushab	val.0
+		calls	#2,xfer.xf_litc
+OC_STOLITC:	movc3	#16,val.2,val.1		; opcode not in sr_unix_nsb/ttt or sr_vvms/ttt
+		pushab	val.1
+		calls	#1,xfer.xf_stolitc
+OC_FNZPEEK:	pushab	val.0
+		pushab	val.4
+		pushl	val.3
+		pushl	val.2
+		pushab	val.1
+		calls	#5,xfer.xf_fnzpeek

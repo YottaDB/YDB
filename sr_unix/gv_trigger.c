@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -179,12 +179,13 @@ LITREF	mval	literal_zero;
 		SAVE_RTN_NAME(rt_name, rt_name_len, lcl_trigdsc);						\
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);								\
 		if (ERR_PATMAXLEN == status) 									\
-			rts_error(VARLSTCNT(6) status, 0, ERR_TRIGIS, 2, rt_name_len, rt_name);			\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) status, 0, ERR_TRIGIS, 2, rt_name_len,		\
+					rt_name);								\
 		else if (ERR_TRIGSUBSCRANGE == status)								\
-			rts_error(VARLSTCNT(10) status, 4, save_var_name_len, save_var_name, SUBSCSTRLEN,	\
-				SUBSCSTR, ERR_TRIGIS, 2, rt_name_len, rt_name);					\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) status, 4, save_var_name_len, save_var_name,	\
+					SUBSCSTRLEN, SUBSCSTR, ERR_TRIGIS, 2, rt_name_len, rt_name);		\
 		else	/* error return from patstr */								\
-			rts_error(VARLSTCNT(1) status);								\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);					\
 	}													\
 	/* End of a range (in a set of ranges) or a subscript itself.						\
 	 * Either case, colon_imbalance can be safely reset.							\
@@ -244,7 +245,7 @@ LITREF	mval	literal_zero;
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
-#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT)					\
+#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
 {												\
 	if (CDB_STAGNATE > t_tries)								\
 	{											\
@@ -257,13 +258,14 @@ LITREF	mval	literal_zero;
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
 		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
 		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,	\
-			save_var_name_len, save_var_name, util_len, util_buff);			\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len,	\
+				save_var_name, save_var_name_len, save_var_name, util_len,	\
+				util_buff);							\
 	}											\
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<#COUNT|#CYCLE>) */
-#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO)	\
+#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO,CSA)	\
 {								\
 	if (CDB_STAGNATE > t_tries)				\
 	{							\
@@ -271,18 +273,18 @@ LITREF	mval	literal_zero;
 		t_retry(cdb_sc_triggermod);			\
 	} else							\
 	{							\
-		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO);	\
+		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA);	\
 	}							\
 }
 
-#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO)					\
+#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA)					\
 {											\
 	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
 	SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);				\
 	GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
-	rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,	\
-		save_var_name_len, save_var_name, LEN_AND_LIT(SUBSCRIPT),		\
-		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));					\
+	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len,	\
+			save_var_name, save_var_name_len, save_var_name,		\
+			LEN_AND_LIT(SUBSCRIPT), ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));	\
 }
 
 /* This code is modeled around "updproc_ch" in updproc.c */
@@ -438,26 +440,34 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 		end--;
 	}
 	len = UINTCAST(end - start);
-	if (len)
+	if (len || (GVTR_PARSE_POINT == type))
 	{
 		gvt_trigger = gvt->gvt_trigger;
-		nelems = DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE);
-		dststart = (char *)get_new_element(gvt_trigger->gv_trig_list, nelems);
-		dstptr = dststart;
-		for (srcptr = start; srcptr < end; srcptr++)
+		if (len == 0)
 		{
-			ch = *srcptr;
-			if ('"' == ch)
-			{	/* A double-quote in the middle of the string better be TWO consecutive double-quotes */
-				assert(((srcptr + 1) < end) && ('"' == srcptr[1]));
-				srcptr++;
+			tmpmval.mvtype = MV_STR;
+			tmpmval.str.addr = "";
+			tmpmval.str.len = 0;
+		} else
+		{
+			nelems = DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE);
+			dststart = (char *)get_new_element(gvt_trigger->gv_trig_list, nelems);
+			dstptr = dststart;
+			for (srcptr = start; srcptr < end; srcptr++)
+			{
+				ch = *srcptr;
+				if ('"' == ch)
+				{	/* A double-quote in the middle of the string better be TWO consecutive double-quotes */
+					assert(((srcptr + 1) < end) && ('"' == srcptr[1]));
+					srcptr++;
+				}
+				*dstptr++ = ch;
 			}
-			*dstptr++ = ch;
+			assert((dstptr - dststart) <= len);
+			tmpmval.mvtype = MV_STR;
+			tmpmval.str.addr = dststart;
+			tmpmval.str.len = INTCAST(dstptr - dststart);
 		}
-		assert((dstptr - dststart) <= len);
-		tmpmval.mvtype = MV_STR;
-		tmpmval.str.addr = dststart;
-		tmpmval.str.len = INTCAST(dstptr - dststart);
 		/* switch gv_target for mval2subsc */
 		save_gvt = gv_target;
 		gv_target = gvt;
@@ -466,15 +476,20 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 		out_key->top = DBKEYSIZE(MAX_KEY_SZ);
 		mval2subsc(&tmpmval, out_key);
 		gv_target = save_gvt;
+		if(len > 0)
+		{
 		/* Now that mval2subsc is done, free up the allocated dststart buffer */
-		ret = free_last_n_elements(gvt_trigger->gv_trig_list, nelems);
-		assert(ret);
+			ret = free_last_n_elements(gvt_trigger->gv_trig_list, nelems);
+			assert(ret);
+		}
 	}
-	/* else len == 0 means an open range (where left or right side of range is unspecified) */
+	/* else it means an open range (where left or right side of range is unspecified)
+	 * null subscript on the right side of a range is treated as negative infinity and
+	 * on the left side of a range is treated as positive infinity.
+	 */
 	switch(type)
 	{
 		case GVTR_PARSE_POINT:
-			assert(len);
 			assert(&subsdsc->gvtr_subs_type == &subsdsc->gvtr_subs_point.gvtr_subs_type);
 			len = out_key->end;	/* keep trailing 0 */
 			subsdsc->gvtr_subs_point.len = len;
@@ -710,7 +725,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		return;
 	}
 	if ((STR_LIT_LEN(HASHT_GBL_CURLABEL) != ret_mval->str.len) || MEMCMP_LIT(ret_mval->str.addr, HASHT_GBL_CURLABEL))
-		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL field is not " HASHT_GBL_CURLABEL);
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL field is not " HASHT_GBL_CURLABEL, csa);
 	/* So we can go ahead and read other ^#t("GBL") records */
 	/* -----------------------------------------------------------------------------
 	 *          Now read ^#t("GBL","#CYCLE")
@@ -718,10 +733,10 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, ret_mval);
 	if (!is_defined)
-		HASHT_DEFINITION_RETRY_OR_ERROR("\"#CYCLE\"","#CYCLE field is missing");
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#CYCLE\"","#CYCLE field is missing", csa);
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #CYCLE of 1.5 as 1 */
 	if (0 >= tmpint4) /* ^#t("GBL","#CYCLE") is not a positive integer. Error out */
-		HASHT_DEFINITION_ERROR("\"#CYCLE\"","#CYCLE field is negative");
+		HASHT_DEFINITION_ERROR("\"#CYCLE\"","#CYCLE field is negative", csa);
 	cycle = (uint4)tmpint4;
 	/* Check if ^#t("GBL") has previously been read from the db. If so, check if cycle is same as ^#t("GBL","#CYCLE"). */
 	gvt_trigger = gvt->gvt_trigger;
@@ -755,10 +770,10 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcount, ret_mval);
 	if (!is_defined)
-		HASHT_DEFINITION_RETRY_OR_ERROR("\"#COUNT\"","#COUNT field is missing");
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#COUNT\"","#COUNT field is missing", csa);
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #COUNT of 1.5 as 1 */
 	if (0 >= tmpint4) /* ^#t("GBL","#COUNT") is not a positive integer. Error out */
-		HASHT_DEFINITION_ERROR("\"#COUNT\"","#COUNT field is negative");
+		HASHT_DEFINITION_ERROR("\"#COUNT\"","#COUNT field is negative", csa);
 	num_gv_triggers = (uint4)tmpint4;
 	gvt_trigger->num_gv_triggers = num_gv_triggers;
 	/* We want a memory store for all the values that are going to be read in from the database. We dont know upfront
@@ -793,7 +808,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"");
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"", csa);
 		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
 		trigdsc->gvt_trigger = gvt_trigger;		/* Save ptr to our main gvt_trigger struct for this trigger. With
 								 * this and given a gv_trigger_t, we can get to the gvt_trigger_t
@@ -811,7 +826,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK,ZTR" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CMD\"");
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CMD\"", csa);
 		/* Initialize trigdsc->cmdmask */
 		ptr = ret_mval->str.addr;
 		ptr_top = ptr + ret_mval->str.len;
@@ -1074,7 +1089,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match gtm_chset issue error. */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_chset, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"");
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"", csa);
 		if ((!gtm_utf8_mode && ((STR_LIT_LEN(CHSET_M_STR) != ret_mval->str.len)
 						|| memcmp(ret_mval->str.addr, CHSET_M_STR, STR_LIT_LEN(CHSET_M_STR))))
 			|| (gtm_utf8_mode && ((STR_LIT_LEN(CHSET_UTF8_STR) != ret_mval->str.len)
@@ -1083,7 +1098,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 			SAVE_RTN_NAME(save_rtn_name, save_rtn_name_len, trigdsc);
 			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			rts_error(VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
 				save_var_name_len, save_var_name, ret_mval->str.len, ret_mval->str.addr);
 		}
 		/* Defer loading xecute string until time to compile it */
@@ -1384,7 +1399,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 					break;
 				}
 				/* else we encountered a TP restart (which would have triggered a call to t_retry
-				 * which in turn would have done a rts_error(TPRETRY) which would have been caught
+				 * which in turn would have done a rts_error(TPRETRY) which would have been caught	{BYPASSOK}
 				 * by gvtr_tpwrap_ch which would in turn have unwound the C-stack upto the point
 				 * where the ESTABLISH is done in gvtr_tpwrap_helper and then returned from there).
 				 * In this case we have to keep retrying the read until there are no tp restarts or
@@ -1405,7 +1420,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 				} else if (cdb_sc_onln_rlbk2 == failure)
 				{
 					assert(tstart_trigger_depth == gtm_trigger_depth);
-					rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 				}
 				/* update lcl_t_tries to reflect the fact that a restart happened */
 				lcl_t_tries = t_tries;
@@ -1669,7 +1684,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 					if (MAX_XECUTE_LEN <= trigdsc->xecute_str.str.len)
 					{
 						assert(FALSE);
-						rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_XECUTE_LEN);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_XECUTE_LEN);
 					}
 				}
 				gtm_trig_status = gtm_trigger(trigdsc, trigparms);

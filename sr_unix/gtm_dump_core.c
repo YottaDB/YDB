@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,5 +66,5 @@ void gtm_dump_core(void)
 	sigprocmask(SIG_UNBLOCK, &unblock_sigquit, NULL);
 	kill(getpid(), SIGQUIT);
 	sleep(60);	/* In case of async kill */
-	_exit(1);
+	_exit(EXIT_FAILURE);
 }

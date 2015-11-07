@@ -1,0 +1,51 @@
+; ################################################################
+; #                                                              #
+; #      Copyright 2001, 2008 Fidelity Information Services, Inc #
+; #                                                              #
+; #      This source code contains the intellectual property     #
+; #      of its copyright holder(s), and is made available       #
+; #      under a license.  If you do not know the terms of       #
+; #      the license, please stop and do not read further.       #
+; #                                                              #
+; ################################################################
+
+	.title	OP_PATTERN
+
+	mval$def
+
+	$routine OP_PATTERN, entry=OP_PATTERN_CA, kind=null
+	lda	sp, -16(sp)
+	stq	r13, 8(sp)
+	stq	r26, (sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	mov	r0, r16
+	mov	r1, r17
+
+	;
+	; This is an array of unaligned ints. If the first word is zero, then call do_pattern
+	; instead of do_patfixed. Only the low order byte is significant and so it is the only
+	; one we need to test. We would do this in assembly because (1) we need the assmembly
+	; routine anyway to save the return value into $TEST and (2) it saves an extra level of
+	; call linkage at the C level to do the decision here.
+	;
+	ldl	r28, mval$a_straddr(r1)
+	ldq_u	r24, (r28)
+	extbl	r24, r28, r24
+	beq	r24, 20$
+
+10$:	$call	DO_PATFIXED, args=<r16, r17>, set_arg_info=false, nonstandard=true
+
+15$:	mov	r0, r24
+	ldq	r26, (sp)
+	ldq	r13, 8(sp)
+	lda	sp, 16(sp)
+	ret	r26
+
+20$:	$call	DO_PATTERN, args=<r16, r17>, set_arg_info=false, nonstandard=true
+	br	15$
+
+	$end_routine
+
+	.end

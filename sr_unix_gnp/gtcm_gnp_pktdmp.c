@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 	}
 	chr = buf;
 	ctim = time(NULL);
-	ltime = localtime(&ctim);
+	GTM_LOCALTIME(ltime, &ctim);
 	FPRINTF(fp, "%04d%02d%02d%02d%02d%02d (%s) %s length %d\n",
 		ltime->tm_year+1900, ltime->tm_mon + 1, ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min, ltime->tm_sec, op, msg, count);

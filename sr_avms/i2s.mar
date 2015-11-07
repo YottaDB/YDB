@@ -1,0 +1,37 @@
+	.title	i2s	converts integer to string 
+
+VAX	=	1
+
+;char *i2s(v->num.i)
+
+; The function i2s() recieves an integer as input and returns
+; an address to the first byte after the last character inserted
+; in the globally defined stringpool.
+; STRINGPOOL OFFSETS
+base = 0
+free = 4
+top = 8
+
+	code_psect
+
+	.entry	i2s,^m<r2,r3,r4,r5>
+
+	movl	stringpool + free,r4	;store address of stringpool.free
+	movl	@4(ap),r5
+	blss	10$			;if input is negative insert "-"
+	bneq	15$
+	movb	#^A"0",(r4)+		;insert "0" in stringpool 
+	movl	r4,r0
+	ret
+
+10$:	mnegl	r5,r5
+	movb	#^A"-",(r4)+
+15$:	subl2	#24,sp			;get space and convert integer to
+	cvtlp	r5,#10,(sp)		;packed decimal, then numeric string
+	cvtps	#10,(sp),#10,12(sp)
+	skpc	#^A"0",#10,13(sp)	;skip over leading zeroes
+	movc3	r0,(r1),(r4)		;insert string into stringpool and
+	movl	r3,r0			;return address of first byte after
+	ret				;last character insert
+
+	.end

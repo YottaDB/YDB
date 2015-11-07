@@ -1,0 +1,48 @@
+	.title	gtm_ret_code
+
+	base_frame
+
+	$routine	gtm_ret_code, entry=gtm_ret_code_ca, kind=stack, -
+			saved_regs=<%string(base_frame_regs)>, -
+			rsa_offset=RSA_OFFSET, size=STACK_SIZE, -
+			standard_prologue=false, base_reg_is_fp=true, rsa_offset=RSA_OFFSET
+
+	.if	ne,$SIZE,STACK_SIZE
+		.error	"The stack frame size computed by $routine (%integer($SIZE)) differs from that defined in the base_frame -
+macro (%integer(STACK_SIZE))."
+	.endc
+
+	$linkage_section
+
+A_frame_pointer:	.address	frame_pointer
+A_msp:			.address	msp
+A_mumps_status:		.address	mumps_status
+
+
+;	Since gtm_ret_code executes in the machine stack frame set up by gtm$main, it need not set
+;	up the stack frame and because gtm_ret_code can only be invoked via a getframe/ret sequence,
+;	r13 has the address of the procedure descriptor, not r27.
+
+	$code_section
+
+	.base	r13, $ls
+	$end_prologue
+
+	stq	r31, 8(fp)		; clear pointer to condition handler address
+	$call	op_unwind, set_arg_info=false, nonstandard=true
+	ldq	r0,  A_msp
+	ldl	r28, (r0)
+	ldq	r1,  A_frame_pointer
+	ldl	r22, (r28)
+	stl	r22, (r1)		; frame_pointer = msp
+	lda	r28, 4(r28)
+	stl	r28, (r0)		; msp += 4
+	ldq	r28, A_mumps_status
+	ldl	r0,  (r28)		; return code
+
+	$return				; use standard $return macro to ensure epilogue uses values from the
+					;	$routine macro as defined in the base_frame macro
+
+	$end_routine	name=gtm_ret_code
+
+	.end

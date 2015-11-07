@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,54 +27,45 @@
 #include "gtm_zos_io.h"
 #endif
 
-GBLREF boolean_t	job_try_again;
+GBLREF int		job_errno;
 
-#define NULL_DEV_FNAME	"/dev/null"	/* Null device file name */
-#define OPEN_RSRC_CRUNCH_FAILURE		\
-	(EDQUOT == errno || ENFILE == errno || ENOMEM == errno || ENOSPC == errno || ETIMEDOUT == errno)
-
+ZOS_ONLY(error_def(ERR_BADTAG);)
+error_def(ERR_JOBFAIL);
+error_def(ERR_TEXT);
 /*
  * ---------------------------------------------------------
- * Set up input, output and error file descriptors in
+ * Set up output and error file descriptors in
  * a child.
  * ---------------------------------------------------------
  */
-bool ojchildioset(job_params_type *jparms)
+int ojchildioset(job_params_type *jparms)
 {
-	int	dup_ret, in_fd, out_fd, err_fd, save_errno;
-	char 	fname_buf[1024], buf[1024];
-	int	rc;
+	int		dup_ret, in_fd, out_fd, err_fd;
+	char 		fname_buf[MAX_STDIOE_LEN], buf[MAX_STDIOE_LEN];
+	int		rc;
+	joberr_t	joberr = joberr_gen;
 	ZOS_ONLY(int	realfiletag;)
 
-	error_def(ERR_TEXT);
-	error_def(ERR_JOBFAIL);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-
-	/* Redirect input */
+/*
+ * Redirect input
+ */
 	strncpy(fname_buf, jparms->input.addr, jparms->input.len);
 	*(fname_buf + jparms->input.len) = '\0';
 
 	OPENFILE(fname_buf, O_RDONLY, in_fd);
 	if (FD_INVALID == in_fd)
 	{
-		if (OPEN_RSRC_CRUNCH_FAILURE)
-			job_try_again = TRUE;
-		else
-		{
-			save_errno = errno;
-			SPRINTF(buf, "Error redirecting stdin (open) to %s", fname_buf);
-			gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		}
-		return FALSE;
+		joberr = joberr_io_stdin_open;
+		job_errno = errno;
+		return joberr;
 	}
 	CLOSEFILE(0, rc);
 	FCNTL3(in_fd, F_DUPFD, 0, dup_ret);
 	if (-1 == dup_ret)
 	{
-		save_errno = errno;
-		SPRINTF(buf, "Error redirecting stdin (fcntl) to %s", fname_buf);
-		gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		return FALSE;
+		joberr = joberr_io_stdin_dup;
+		job_errno = errno;
+		return joberr;
 	}
 #ifdef __MVS__
 	/* policy tagging because by default input is /dev/null */
@@ -82,6 +73,7 @@ bool ojchildioset(job_params_type *jparms)
 		TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_UNTAGGED);
 #endif
 	CLOSEFILE_RESET(in_fd, rc);	/* resets "in_fd" to FD_INVALID */
+
 /*
  * Redirect Output
  */
@@ -91,17 +83,10 @@ bool ojchildioset(job_params_type *jparms)
 	CREATE_FILE(fname_buf, 0666, out_fd);
 	if (FD_INVALID == out_fd)
 	{
-		if (OPEN_RSRC_CRUNCH_FAILURE)
-			job_try_again = TRUE;
-		else
-		{
-			save_errno = errno;
-			SPRINTF(buf, "Error redirecting stdout (creat) to %s", fname_buf);
-			gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		}
-		return FALSE;
+		joberr = joberr_io_stdout_creat;
+		job_errno = errno;
+		return joberr;
 	}
-
 #ifdef __MVS__
 	/* tagging as ASCII is fine now, that might change in the future for gtm_utf8_mode */
 	if (-1 == gtm_zos_set_tag(out_fd, TAG_ASCII, TAG_TEXT, TAG_FORCE, &realfiletag))
@@ -112,25 +97,18 @@ bool ojchildioset(job_params_type *jparms)
 	OPENFILE(fname_buf, O_WRONLY, out_fd);
 	if (FD_INVALID == out_fd)
 	{
-		if (OPEN_RSRC_CRUNCH_FAILURE)
-			job_try_again = TRUE;
-		else
-		{
-			save_errno = errno;
-			SPRINTF(buf, "Error redirecting stdout (open) to %s", fname_buf);
-			gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		}
-		return FALSE;
+		joberr = joberr_io_stdout_open;
+		job_errno = errno;
+		return joberr;
 	}
 
 	CLOSEFILE(1, rc);
 	FCNTL3(out_fd, F_DUPFD, 0, dup_ret);
 	if (-1 == dup_ret)
 	{
-		save_errno = errno;
-		SPRINTF(buf, "Error redirecting stdout (fcntl) to %s", fname_buf);
-		gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		return FALSE;
+		joberr = joberr_io_stdout_dup;
+		job_errno = errno;
+		return joberr;
 	}
 	CLOSEFILE_RESET(out_fd, rc);	/* resets "out_fd" to FD_INVALID */
 /*
@@ -142,47 +120,31 @@ bool ojchildioset(job_params_type *jparms)
 	CREATE_FILE(fname_buf, 0666, err_fd);
 	if (FD_INVALID == err_fd)
 	{
-		if (OPEN_RSRC_CRUNCH_FAILURE)
-			job_try_again = TRUE;
-		else
-		{
-			save_errno = errno;
-			SPRINTF(buf, "Error redirecting stderr (creat) to %s", fname_buf);
-			gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		}
-		return FALSE;
+		joberr = joberr_io_stderr_creat;
+		job_errno = errno;
+		return joberr;
 	}
-
 #ifdef __MVS__
 	if (-1 == gtm_zos_set_tag(err_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag))
 		TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_EBCDIC);
 #endif
 	CLOSEFILE_RESET(err_fd, rc);	/* resets "err_fd" to FD_INVALID */
-
 	OPENFILE(fname_buf, O_WRONLY, err_fd);
 	if (FD_INVALID == err_fd)
 	{
-		if (OPEN_RSRC_CRUNCH_FAILURE)
-			job_try_again = TRUE;
-		else
-		{
-			save_errno = errno;
-			SPRINTF(buf, "Error redirecting stderr (open) to %s", fname_buf);
-			gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		}
-		return FALSE;
+		joberr = joberr_io_stderr_open;
+		job_errno = errno;
+		return joberr;
 	}
-
 	CLOSEFILE(2, rc);
 	FCNTL3(err_fd, F_DUPFD, 0, dup_ret);
 	if (-1 == dup_ret)
 	{
-		save_errno = errno;
-		SPRINTF(buf, "Error redirecting stderr (fcntl) to %s", fname_buf);
-		gtm_putmsg(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(buf), save_errno);
-		return FALSE;
+		joberr = joberr_io_stderr_dup;
+		job_errno = errno;
+		return joberr;
 	}
 	CLOSEFILE_RESET(err_fd, rc);	/* resets "err_fd" to FD_INVALID */
 
-	return(TRUE);
+	return 0;
 }

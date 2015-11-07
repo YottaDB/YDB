@@ -1,0 +1,195 @@
+	.title	relqueopi	C-callable relative queue interlocked routines
+
+;	These routines perform interlocked operations on doubly-linked
+;	relative queues.  They are designed to emulate the VAX machine
+;	instructions (and corresponding VAX C library routines) after
+;	which they are named.
+;
+;	insqhi - insert entry into queue at head, interlocked
+;	insqti - insert entry into queue at tail, interlocked
+;	remqhi - remove entry from queue at head, interlocked
+;	remqti - remove entry from queue at tail, interlocked
+
+
+QI_STARVATION	=	1000	; for (lcnt = 0; lcnt < QI_STARVATION; lcnt++) wcs_sleep(lcnt) implies 1.5 minute wait
+QI_RETRY	=	128	; times to retry in a spin loop before going to sleep
+
+; the code below should use wcs_backoff() instead of wcs_sleep() to give a random component for the wait
+; at the same time ensuring we wait for a minimum period of time (say 1 minute). note that if we use wcs_backoff()
+; it is possible (though statistically improbable) that we end up waiting for less than a second even with a loopcnt of 1000.
+
+	code_psect
+
+
+; vax_insqhi - insert entry into self-relative queue at head, interlocked
+;
+;	calling sequence:
+;
+;	typedef struct
+;	{
+;		long flink,blink;
+;	} self_rel_que;
+;
+;	self_rel_que *insqhi (queheader)
+;	self_rel_que *queheader;
+;
+;	return:
+;		if  1, success; the entry is the only entry in the queue
+;		if  0, success; the entry is not the only entry in the queue
+;
+;		if -1, failure; the secondary interlock failed, the instruction may
+;			be retried, but should declare a GTMCHECK if the secondary
+;			interlock fails repeatedly
+;
+
+
+	.entry	vax_insqhi,^m<r2,r3>
+
+	clrl	r0
+	movl	#QI_STARVATION,r2
+3$:	movl	#QI_RETRY,r1
+5$:	insqhi	@4(ap),@8(ap)
+	bcs	20$
+	bneq	10$
+	incl	r0
+10$:	ret
+
+20$:	sobgtr	r1,5$
+	subl3	r2,#QI_STARVATION+1,r3
+	pushl	r3
+	calls	#1,G^wcs_sleep
+	clrl	r0	; we rely on r0 in the 5$: loop so reset it in case wcs_sleep trashed it
+	sobgtr	r2,3$
+	decl	r0
+	ret
+
+
+; vax_insqti - insert entry into self-relative queue at tail, interlocked
+;
+;	calling sequence:
+;
+;	typedef struct
+;	{
+;		long flink,blink;
+;	} self_rel_que;
+;
+;	self_rel_que *insqti (queheader)
+;	self_rel_que *queheader;
+;
+;	return:
+;		if  1, success; the entry is the only entry in the queue
+;		if  0, sucesss; the entry is not the only entry in the queue
+;
+;		if -1, failure; the secondary interlock failed, the instruction may
+;			be retried, but should declare a GTMCHECK if the secondary
+;			interlock fails repeatedly
+;
+
+	.entry	vax_insqti,^m<r2,r3>
+
+	clrl	r0
+	movl	#QI_STARVATION,r2
+3$:	movl	#QI_RETRY,r1
+5$:	insqti	@4(ap),@8(ap)
+	bcs	20$
+	bneq	10$
+	incl	r0
+10$:	ret
+
+20$:	sobgtr	r1,5$
+	subl3	r2,#QI_STARVATION+1,r3
+	pushl	r3
+	calls	#1,G^wcs_sleep
+	clrl	r0	; we rely on r0 in the 5$: loop so reset it in case wcs_sleep trashed it
+	sobgtr	r2,3$
+	decl	r0
+	ret
+
+
+; vax_remqhi - remove entry from self-relative queue at head, interlocked
+;
+;	calling sequence:
+;
+;	typedef struct
+;	{
+;		long flink,blink;
+;	} self_rel_que;
+;
+;	self_rel_que *remqhi (queheader)
+;	self_rel_que *queheader;
+;
+;	return:
+;		if non-zero, success; a pointer to the queue entry which was removed
+;
+;		if zero, then the queue was empty (operation succeeded, but nothing
+;				was in the queue to remove)
+;
+;		if -1, failure; the secondary interlock failed, the instruction may
+;			be retried, but should declare a GTMCHECK if the secondary
+;			interlock fails repeatedly
+;
+
+
+	.entry	vax_remqhi,^m<r2,r3>
+
+	movl	#QI_STARVATION,r2
+3$:	movl	#QI_RETRY,r1
+5$:	remqhi	@4(ap),r0
+	bcs	20$
+	bvc	10$
+	clrl	r0
+10$:	ret
+
+20$:	sobgtr	r1,5$
+	subl3	r2,#QI_STARVATION+1,r3
+	pushl	r3
+	calls	#1,G^wcs_sleep
+	sobgtr	r2,3$
+	mnegl	#1,r0
+	ret
+
+
+; vax_remqti - remove entry from self-relative queue at tail, interlocked
+;
+;	calling sequence:
+;
+;	typedef struct
+;	{
+;		long flink,blink;
+;	} self_rel_que;
+;
+;	self_rel_que *remqti (queheader)
+;	self_rel_que *queheader;
+;
+;	return:
+;		if non-zero, success; a pointer to the queue entry which was removed
+;
+;		if zero, then the queue was empty (operation succeeded, but nothing
+;				was in the queue to remove)
+;
+;		if -1, failure; the secondary interlock failed, the instruction may
+;			be retried, but should declare a GTMCHECK if the secondary
+;			interlock fails repeatedly
+;
+
+
+	.entry	vax_remqti,^m<r2,r3>
+
+	movl	#QI_STARVATION,r2
+3$:	movl	#QI_RETRY,r1
+5$:	remqti	@4(ap),r0
+	bcs	20$
+	bvc	10$
+	clrl	r0
+10$:	ret
+
+20$:	sobgtr	r1,5$
+	subl3	r2,#QI_STARVATION+1,r3
+	pushl	r3
+	calls	#1,G^wcs_sleep
+	sobgtr	r2,3$
+	mnegl	#1,r0
+	ret
+
+	.end
+

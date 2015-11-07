@@ -1,0 +1,11 @@
+	.title	get_registers
+
+;	get_registers - copy machine registers into argument array
+;
+;	This is a stub.
+
+	$routine	name=get_registers,entry=get_registers_ca,kind=null
+
+	ret	r26
+
+	$end_routine	name=get_registers

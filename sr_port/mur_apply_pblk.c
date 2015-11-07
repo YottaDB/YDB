@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,17 +46,18 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include <signal.h>
-GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	sigset_t		block_sigsent;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	jnlpool_addrs		jnlpool;
 #endif
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct 		mur_options;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_JNLREAD);
 error_def(ERR_JNLREADBOF);
@@ -84,6 +85,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
+		TP_CHANGE_REG(rctl->gd);
 		if (!apply_intrpt_pblk)
 		{
 			assert(NULL != rctl->jctl_turn_around);
@@ -257,8 +259,8 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 						} else if (jctl->rec_offset < jctl->jfh->turn_around_offset)
 						{
 							PRINT_VERBOSE_STAT(jctl, "mur_apply_blk:turn_around_offset is bad");
-							gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
-									jctl->jnl_fn, jctl->rec_offset);
+							gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3,
+									jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
 							return ERR_JNLBADRECFMT;
 						}
 					}
@@ -273,17 +275,17 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 				break;
 			if (ERR_NOPREVLINK == status)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+				gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_NOPREVLINK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
 				return ERR_NOPREVLINK;
 			} else if (ERR_JNLREADBOF == status)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_JNLREADBOF, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+				gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_JNLREADBOF, 2, jctl->jnl_fn_len, jctl->jnl_fn);
 				return ERR_JNLREADBOF;
 			} else if (ERR_JNLREAD == status) /* This message is already issued in mur_read_file */
 				return ERR_JNLREAD;
 			if ((NULL != jctl->next_gen) || (jctl->rec_offset < jctl->jfh->end_of_data))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
+				gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
 								jctl->jnl_fn, jctl->rec_offset);
 				return status;
 			}
@@ -294,17 +296,17 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 			if (SS_NORMAL != mur_fread_eof_crash(jctl, jctl->jfh->end_of_data, jctl->rec_offset))
 				return ERR_JNLBADRECFMT;
 		} /* end infinite for */
-		UNIX_ONLY(
-			gv_cur_region = rctl->csa->region;
-			udi = FILE_INFO(gv_cur_region);
-			DB_FSYNC(gv_cur_region, udi, rctl->csa, db_fsync_in_prog, save_errno);
-			if (0 != save_errno)
-			{
-				send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				gtm_putmsg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				return ERR_DBFSYNCERR;
-			}
-		)
+#		ifdef UNIX
+		assert(gv_cur_region == rctl->gd && rctl->gd == rctl->csa->region);
+		udi = FILE_INFO(gv_cur_region);
+		DB_FSYNC(gv_cur_region, udi, rctl->csa, db_fsync_in_prog, save_errno);
+		if (0 != save_errno)
+		{
+			send_msg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+			return ERR_DBFSYNCERR;
+		}
+#		endif
 	}
 	return SS_NORMAL;
 }
@@ -315,7 +317,8 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	file_control		*db_ctl;
 	struct_jrec_blk		pblkrec;
 	uchar_ptr_t		pblkcontents, pblk_jrec_start;
-	int4			size, fbw_size, fullblockwrite_len, blks_in_lmap;
+	int4			fullblockwrite_len, blks_in_lmap;
+	uint4			size, fbw_size;
 	sgmnt_addrs		*csa, *repl_csa;
 	node_local		*cnl;
 	sgmnt_data_ptr_t	csd;
@@ -376,8 +379,8 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	db_ctl->op_pos = ((gtm_int64_t)(csd->blk_size / DISK_BLOCK_SIZE) * pblkrec.blknum) + csd->start_vbn;
 	/* Use jrec size even if downgrade may have shrunk block. If the block has an integ error, we don't run into any trouble. */
 	size = pblkrec.bsiz;
-	assert(size <= csd->blk_size);
-	if (size > csd->blk_size)	/* safety check in pro to avoid buffer overflows */
+	assert(size <= (uint4)csd->blk_size);
+	if (size > (uint4)csd->blk_size)	/* safety check in pro to avoid buffer overflows */
 		size = csd->blk_size;
 	/* If full-block-writes are enabled, round size up to next full logical filesys block. We want to use "dbfilop" to
 	 * do the write but it does not honour full-block-writes setting. So prepare the buffer accordingly before invoking it.
@@ -451,8 +454,8 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		murgbl.incr_onln_rlbk_cycle = TRUE;
 		/* Now that we have started updating the database, do NOT honor any more interrupts like MUPIP STOP */
 		assert(NULL != jnlpool.repl_inst_filehdr);
-		send_msg(VARLSTCNT(1) ERR_ORLBKNOSTP);
-		gtm_putmsg(VARLSTCNT(1) ERR_ORLBKNOSTP);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKNOSTP);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKNOSTP);
 		assert(blocksig_initialized); /* set to TRUE at process startup time */
 		savemask = block_sigsent;
 		sigdelset(&savemask, SIGALRM); /* Block all signals except SIGALRM */

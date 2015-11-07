@@ -1,0 +1,9 @@
+	.title	bci	bit clear interlocked
+VAX	=	1
+	code_psect
+	.entry	bci,^m<>
+	clrl	r0
+	bbcci	#0,@4(ap),10$
+	incl	r0
+10$:	ret
+	.end

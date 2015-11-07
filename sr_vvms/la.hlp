@@ -1,0 +1,170 @@
+1 OVERVIEW
+ O[VERVIEW]
+   The   License   Administration   (LA)   issues   the   Product
+   Authorization  Keys  (PAKs)  that  are  delivered  to  License
+   Management systems at customer sites.  The LA  is  invoked  by
+   typing:
+   LA command [/qualifier=value... [parameter...]
+   The LA is terminated by the command EXIT.
+1 INITIALIZE
+ I[NITIALIZE] file name
+   The  INITIALIZE  command  creates   a   new,   empty   License
+   Administration  data  base  file.   The  command creates a new
+   version of the file when the file already  exists.   The  file
+   name has to be assigned the logical name GTM$LADB.
+1 CREATE
+ C[REATE]
+   The CREATE command enters new, valid PAKs in the LA data base.
+   The command does not accept any qualifiers, all the input data
+   is prompted for.  The invalid entry fields may be edited until
+   the field data is valid.
+1 PRINT
+ P[RINT]
+   The PRINT command creates the  files  PRODAUTHKEY.LIS  in  the
+   default  directory.   The  files  contain  the PAK data in the
+   format for mailing PAKs to customers.  There is one version of
+   the file above for each PAK matching the restrictions given by
+   the PRINT command qualifiers.
+   The syntax for the PRINT command is:
+   P[RINT] [/qualifier=value]
+2 /PRODUCT
+ /P[RODUCT]=pattern
+   Selects all PAKs with the product name matching the pattern.
+2 /VERSION
+ /VE[RSION]=pattern
+   Selects all PAKs with the product version  name  matching  the
+   pattern.
+2 /VALUE
+ /V[ALUE]=dec.num
+   Selects all PAKs with the license value of "dec.num".
+2 /LICENSE_ID
+ /L[ICENSE_ID]=dec.num
+   Selects all PAKs with the license ID of "dec.num".
+2 /SYSTEM_ID
+ /S[YSTEM_ID]=hex.num
+   Selects all PAKs with the system ID "hex.num".  For PAKs  with
+   more  than  one  system  ID  only the first one in the list is
+   matched.
+2 /NUM_SYS
+ /N[UM_SYS]=dec.num
+   Selects all PAKs with "dec.num" system IDs.
+2 /AVAILABLE
+ /A[VAILABLE]=date
+   Selects all PAKs available exactly at "date".
+2 /EXPIRES
+ /EX[PIRES]=date
+   Selects all PAKs expiring exactly at "date".
+2 /CREATED
+ /CR[EATED]=date
+   Selects all PAKs created exactly at "date".
+2 /ENCRYPTION
+ /EN[CRYPTION]=dec.num
+   Selects  all  PAKs  with  the   checksum   computed   by   the
+   "dec.num"-th encryption function.
+2 /CHECKSUM
+ /CH[ECKSUM]=pattern
+   Selects all PAKs with the checksum matching the pattern.   The
+   pattern  is  a  sequence of characters, without dashes between
+   groups of four characters and without the leading digit.
+2 /OPERATOR
+ /O[PERATOR]=pattern
+   Selects all PAKs created by the operator matching the pattern.
+1 LIST
+ L[IST]
+   The LIST command lists  all  PAKs  matching  the  restrictions
+   given by the qualifiers to the terminal.
+   The syntax for the LIST command is:
+   L[IST] [/qualifier=value]
+2 /PRODUCT
+ /P[RODUCT]=pattern
+   Selects all PAKs with the product name matching the pattern.
+2 /VERSION
+ /VE[RSION]=pattern
+   Selects all PAKs with the product version  name  matching  the
+   pattern.
+2 /VALUE
+ /V[ALUE]=dec.num
+   Selects all PAKs with the license value of "dec.num".
+2 /LICENSE_ID
+ /L[ICENSE_ID]=dec.num
+   Selects all PAKs with the license ID of "dec.num".
+2 /SYSTEM_ID
+ /S[YSTEM_ID]=hex.num
+   Selects all PAKs with the system ID "hex.num".  For PAKs  with
+   more  than  one  system  ID  only the first one in the list is
+   matched.
+2 /NUM_SYS
+ /N[UM_SYS]=dec.num
+   Selects all PAKs with "dec.num" system IDs.
+2 /AVAILABLE
+ /A[VAILABLE]=date
+   Selects all PAKs available exactly at "date".
+2 /EXPIRES
+ /EX[PIRES]=date
+   Selects all PAKs expiring exactly at "date".
+2 /CREATED
+ /CR[EATED]=date
+   Selects all PAKs created exactly at "date".
+2 /ENCRYPTION
+ /EN[CRYPTION]=dec.num
+   Selects  all  PAKs  with  the   checksum   computed   by   the
+   "dec.num"-th encryption function.
+2 /CHECKSUM
+ /CH[ECKSUM]=pattern
+   Selects all PAKs with the checksum matching the pattern.   The
+   pattern  is  a  sequence of characters, without dashes between
+   groups of four characters and without the leading digit.
+2 /OPERATOR
+ /O[PERATOR]=pattern
+   Selects all PAKs created by the operator matching the pattern.
+1 VOID
+ V[OID]
+   The VOID command marks all qualified PAKs void.   The  PAK  is
+   void    when    its   check   sum   is   replaced   with   the
+   n-0000-0000-0000-0000 string.  The encryption function  number
+   is kept.  The command invalidates PAKs created by mistake.  It
+   should not be used for valid PAKs.
+   The syntax for the VOID command is:
+   V[OID] [/qualifier=value]
+2 /PRODUCT
+ /P[RODUCT]=pattern
+   Selects all PAKs with the product name matching the pattern.
+2 /VERSION
+ /VE[RSION]=pattern
+   Selects all PAKs with the product version  name  matching  the
+   pattern.
+2 /VALUE
+ /V[ALUE]=dec.num
+   Selects all PAKs with the license value of "dec.num".
+2 /LICENSE_ID
+ /L[ICENSE_ID]=dec.num
+   Selects all PAKs with the license ID of "dec.num".
+2 /SYSTEM_ID
+ /S[YSTEM_ID]=hex.num
+   Selects all PAKs with the system ID "hex.num".  For PAKs  with
+   more  than  one  system  ID  only the first one in the list is
+   matched.
+2 /NUM_SYS
+ /N[UM_SYS]=dec.num
+   Selects all PAKs with "dec.num" system IDs.
+2 /AVAILABLE
+ /A[VAILABLE]=date
+   Selects all PAKs available exactly at "date".
+2 /EXPIRES
+ /EX[PIRES]=date
+   Selects all PAKs expiring exactly at "date".
+2 /CREATED
+ /CR[EATED]=date
+   Selects all PAKs created exactly at "date".
+2 /ENCRYPTION
+ /EN[CRYPTION]=dec.num
+   Selects  all  PAKs  with  the   checksum   computed   by   the
+   "dec.num"-th encryption function.
+2 /CHECKSUM
+ /CH[ECKSUM]=pattern
+   Selects all PAKs with the checksum matching the pattern.   The
+   pattern  is  a  sequence of characters, without dashes between
+   groups of four characters and without the leading digit.
+2 /OPERATOR
+ /O[PERATOR]=pattern
+   Selects all PAKs created by the operator matching the pattern.

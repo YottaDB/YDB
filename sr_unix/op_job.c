@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,24 +52,22 @@
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
 
+void	job_timer_handler(void);
+
 GBLDEF	short			jobcnt		= 0;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	int		dollar_truth;
 GBLREF	uint4		dollar_zjob;
-GBLREF	boolean_t	job_try_again;
 GBLREF	int4		outofband;
+static	int4	tid;	/* Job Timer ID */
 
 error_def(ERR_TEXT);
 error_def(ERR_JOBFAIL);
+error_def(ERR_NULLENTRYREF);
 
-static	int4	tid;	/* Job Timer ID */
-void	job_timer_handler(void);
-
-#define MAX_CHAR_CAPACITY	0xFF
 #define JOBTIMESTR "JOB time too long"
-
 
 /*
  * ---------------------------------------------------
@@ -81,7 +79,6 @@ void	job_timer_handler(void)
 {
 	ojtimeout = TRUE;
 }
-
 
 /*
  * ---------------------------------------------------
@@ -95,12 +92,12 @@ int	op_job(int4 argcnt, ...)
 	mval		*label, *inp;
 	int4		offset;
 	mval		*routine, *param_buf;
-	int4		timeout;		/* timeout in seconds */
-	int4		msec_timeout;		/* timeout in milliseconds */
+	int4		timeout;	/* timeout in seconds */
+	int4		msec_timeout;	/* timeout in milliseconds */
 	boolean_t	timed, single_attempt, non_exit_return;
 	unsigned char	buff[128], *c;
 	int4		status, exit_stat, term_sig, stop_sig;
-	pid_t		zjob_pid = 0; /* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
+	pid_t		zjob_pid = 0; 	/* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
 	int		pipe_fds[2], pipe_status;
 #	ifdef _BSD
 	union wait	wait_stat;
@@ -134,7 +131,7 @@ int	op_job(int4 argcnt, ...)
 	if (-1 == pipe_status)
 	{
 		va_end(var);
-		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
 	}
 	jobcnt++;
 	command.addr = &combuf[0];
@@ -143,11 +140,18 @@ int	op_job(int4 argcnt, ...)
 	job_params.label = label->str;
 	job_params.offset = offset;
 	ojparams(param_buf->str.addr, &job_params);
+	/*
+	 * Verify that entryref to JOB command is not NULL.
+	 */
+	if (!job_params.routine.len)
+	{
+		va_end(var);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
+	}
 	/* Clear the buffers */
 	flush_pio();
 	/* Start the timer */
 	ojtimeout = FALSE;
-	single_attempt = FALSE;
 	if (timeout < 0)
 		timeout = 0;
 	else if (TREF(tpnotacidtime) < timeout)
@@ -162,8 +166,6 @@ int	op_job(int4 argcnt, ...)
 		msec_timeout = timeout2msec(timeout);
 		if (msec_timeout > 0)
 			start_timer((TID)&tid, msec_timeout, job_timer_handler, 0, NULL);
-		else
-			single_attempt = TRUE;
 	}
 	if (argcnt)
 	{
@@ -182,48 +184,54 @@ int	op_job(int4 argcnt, ...)
 	} else
 		job_params.parms = 0;
 	va_end(var);
-	assert(joberr_tryagain + 1 == joberr_end);	/* they must be adjacent and the last two */
-	assert((joberr_tryagain * 2 - 1) < MAX_CHAR_CAPACITY);
 	/* Setup parameters and start the job */
-	do
+	job_errno = -1;
+	non_exit_return = FALSE;
+	status = ojstartchild(&job_params, argcnt, &non_exit_return, pipe_fds);
+	if (!non_exit_return)
 	{
-		job_try_again = FALSE;
-		non_exit_return = FALSE;
-		status = ojstartchild(&job_params, argcnt, &non_exit_return, pipe_fds);
-		if (status && !non_exit_return)
+#ifdef _BSD
+		assert(SIZEOF(wait_stat) == SIZEOF(int4));
+		wait_stat.w_status = status;
+		/* waitpid in ojstartchild() expects an int wait_status whereas the WIF* macros expect a union wait_stat as an
+		 * argument.
+		 */
+#else
+		wait_stat = status;
+#endif
+		exit_stat = WIFEXITED(wait_stat) ? WEXITSTATUS(wait_stat) : 0;
+		/* Middle process uses pipe(pipe_fds)
+		 *	a) to communicate a PID of grandchild to its parent process(i.e. current process)
+		 *	b) to communicate an errno to current process if any required setup for the grandchild is failed.
+		 * exit status joberr_pipe_mp of middle process means it failed WRITE operation on pipe used to communicate
+		 * grandchild's PID to current process. In this scenario, grandchild is terminated and middle process do not
+		 * communicate  errno to current process. Hence this process do not read the errno for joberr_pipe_mp exit status.
+		 */
+		if (status && joberr_pipe_mp != exit_stat)
 		{
-			/* check if it was a try_again kind of failure */
-#	ifdef _BSD
-			assert(SIZEOF(wait_stat) == SIZEOF(int4));
-			wait_stat.w_status = status;
-				/* waitpid in ojstartchild() expects an int wait_status whereas the WIF* macros expect a
-				 * union wait_stat as an arg
-				 */
-#	else
-			wait_stat = status;
-#	endif
-			if (WIFEXITED(wait_stat) && (joberr_tryagain < (exit_stat = WEXITSTATUS(wait_stat))))
-			{
-				/* one of try-again situations */
-				job_try_again = TRUE;
-				exit_stat -= joberr_tryagain;
-				assert(exit_stat < joberr_stp);
-			}
+			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
+			if (0 < pipe_status)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
+										joberrs[exit_stat].msg, 2, errno);
 		}
-	} while (!single_attempt && status && !ojtimeout && job_try_again);
+
+	}
 	if (argcnt)
 		free(job_params.parms);
 	if (timed && !ojtimeout)
 		cancel_timer((TID)&tid);
-	/* the child process (M), that wrote to pipe, would have been exited by now */
-	CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* close the write-end to make the following read non-blocking;
-							 * also resets "pipe_fds[1]" to FD_INVALID
-							 */
+	/* the child process (M), that wrote to pipe, would have been exited by now. Close the write-end to make the following read
+	 * non-blocking. also resets "pipe_fds[1]" to FD_INVALID
+	 */
+	CLOSEFILE_RESET(pipe_fds[1], pipe_status);
 	assert(SIZEOF(pid_t) == SIZEOF(zjob_pid));
-	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status); /* read jobbed off PID from pipe */
-	if (0 < pipe_status) /* empty pipe (pipe_status == -1) is ignored and not reported as error */
-		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error reading from pipe"), errno);
-	CLOSEFILE_RESET(pipe_fds[0], pipe_status); /* release the pipe; also resets "pipe_fds[0]" to FD_INVALID */
+	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status);
+	/* empty pipe (pipe_status == -1) is ignored and not reported as error */
+	if (0 < pipe_status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error reading zjobid from pipe"), errno);
+	/* release the pipe; also resets "pipe_fds[0]" to FD_INVALID */
+	CLOSEFILE_RESET(pipe_fds[0], pipe_status);
 	if (status)
 	{
 		if (timed)					/* $test should be modified only for timed job commands */
@@ -231,7 +239,7 @@ int	op_job(int4 argcnt, ...)
 		if (non_exit_return)
 		{
 			if (TIMEOUT_ERROR != status) 		/* one of errno returns, not the wait_status/timeout situation */
-				rts_error(VARLSTCNT(3) ERR_JOBFAIL, 0, status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBFAIL, 0, status);
 			else
 				return FALSE;
 		} else							/* wait_status from the child */
@@ -241,31 +249,44 @@ int	op_job(int4 argcnt, ...)
 				term_sig =  WTERMSIG(wait_stat);	/* signal that caused the termination */
 				memcpy(buff, joberrs[joberr_sig].msg, joberrs[joberr_sig].len);
 				c = i2asc(&buff[joberrs[joberr_sig].len], term_sig);
-				rts_error(VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
 			} else if (WIFSTOPPED(wait_stat))		/* child was STOPped */
 			{
 				stop_sig =  WSTOPSIG(wait_stat);	/* signal that caused the stop */
 				memcpy(buff, joberrs[joberr_stp].msg, joberrs[joberr_stp].len);
 				c = i2asc(&buff[joberrs[joberr_stp].len], stop_sig);
-				rts_error(VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
 			} else if (WIFEXITED(wait_stat))			/* child EXITed normally */
 			{
 				if (exit_stat < joberr_stp)		/* one of our EXITs */
 				{
-					rts_error(VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-						  joberrs[exit_stat].len, joberrs[exit_stat].msg);
+					if (-1 == job_errno)
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+							  joberrs[exit_stat].len,
+							  joberrs[exit_stat].msg);
+					} else
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+							  joberrs[exit_stat].len,
+							  joberrs[exit_stat].msg,
+							  job_errno);
+
+					}
 				} else					/* unknown exit status */
 				{
 					assert(FALSE);
 					util_out_print("Unknown exit status !UL (status = !UL)", TRUE, exit_stat, status);
-					rts_error(VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 						  joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
 				}
 			} else
 			{
 				assert(FALSE);
 				util_out_print("Unknown wait status !UL", TRUE, status);
-				rts_error(VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 						joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
 			}
 		}

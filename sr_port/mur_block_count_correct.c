@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,7 +102,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		bplmap = cs_data->bplmap;
 		new_blocks = (native_size - size)/(mu_data->blk_size / DISK_BLOCK_SIZE);
 		new_bit_maps = DIVIDE_ROUND_UP(total_blks + new_blocks, bplmap) - DIVIDE_ROUND_UP(total_blks, bplmap);
-		if (SS_NORMAL != (status = gdsfilext(new_blocks - new_bit_maps, total_blks)))
+		if (SS_NORMAL != (status = GDSFILEXT(new_blocks - new_bit_maps, total_blks, TRANS_IN_PROG_FALSE)))
 		{
 			jgbl.dont_reset_gbl_jrec_time = TRUE;
 			return (status);

@@ -1,0 +1,27 @@
+	.title memcmp() compare two char strings
+
+	;memcmp(a,b,len)
+	;char *a,*b;
+	;int len;
+
+	;compare two character strings 
+	;return 0 iff they are equal
+	;return < 0 if a < b and > 0 if a > b
+
+	code_psect
+
+	.entry	memcmp,^m<r2,r3>
+
+	cmpc3	12(ap),@4(ap),@8(ap)
+	blssu	10$
+	bnequ	20$
+	clrl	r0
+	ret
+
+10$:	movl	#-1,r0
+	ret
+
+20$:	movl	#1,r0
+	ret
+
+	.end

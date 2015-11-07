@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,7 @@ int gtcm_dmpstat(int sig)
     time_t		uptime, uphours, upmins, upsecs;
     time_t		itime, ihours, imins, isecs;
     int			status;
+    char		*tmp_time;
 
 #ifdef __MVS__
     int tag_status;
@@ -70,8 +71,9 @@ int gtcm_dmpstat(int sig)
     imins = (itime % 3600) / 60;
     isecs = itime % 60;
 
-    FPRINTF(fp, "%s", GTM_CTIME(&t));
-    OMI_DBG((omi_debug, "%s", GTM_CTIME(&t)));
+    GTM_CTIME(tmp_time, &t);
+    FPRINTF(fp, "%s", tmp_time);
+    OMI_DBG((omi_debug, "%s", tmp_time));
     FPRINTF(fp, "%d\n", omi_pid);
     OMI_DBG((omi_debug, "%d\n", omi_pid));
     FPRINTF(fp, "Up time:  %ld:%.2ld:%.2ld\n",uphours,upmins,upsecs);

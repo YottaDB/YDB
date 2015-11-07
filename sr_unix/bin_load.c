@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
 GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_addrs	*cs_addrs;
 #ifdef GTM_CRYPT
 GBLREF io_pair		io_curr_device;
 #endif
@@ -125,7 +126,7 @@ error_def(ERR_LDSPANGLOINCMP);
 	if (file_offset != last_sn_error_offset)										\
 	{															\
 		last_sn_error_offset = file_offset;										\
-		gtm_putmsg(VARLSTCNT(1) ERR_LDSPANGLOINCMP);									\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDSPANGLOINCMP);							\
 		util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);						\
 		if (sn_gvkey->end && expected_sn_chunk_number)									\
 		{														\
@@ -166,8 +167,6 @@ error_def(ERR_LDSPANGLOINCMP);
 	zwr_out_print(sn_hold_buff, sn_hold_buff_pos);										\
 	util_out_print(0, TRUE);												\
 }
-
-static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 
 /* starting extract file format 3, we have an extra record for each gvn, that contains the
  * collation information of the database at the time of extract. This record is transparent
@@ -255,7 +254,7 @@ void bin_load(uint4 begin, uint4 end)
 			(('7' == hdr_lvl) && (BIN_HEADER_SZ == len)) ||
 			(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
-		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* expecting the level in a single character */
@@ -263,7 +262,7 @@ void bin_load(uint4 begin, uint4 end)
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
 			*(BIN_HEADER_VERSION_ENCR) < hdr_lvl)
 	{	/* ignore the level check */
-		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* check if extract was generated in UTF-8 mode */
@@ -271,9 +270,9 @@ void bin_load(uint4 begin, uint4 end)
 	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
 	{ /* extract CHSET doesn't match $ZCHSET */
 		if (utf8_extract)
-			rts_error(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
 		else
-			rts_error(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 		mupip_exit(ERR_LDBINFMT);
 	}
 	if ('4' >= hdr_lvl)
@@ -303,8 +302,8 @@ void bin_load(uint4 begin, uint4 end)
 		extr_std_null_coll = STRTOUL(std_null_coll, NULL, 10);
 		if (0 != extr_std_null_coll && 1!= extr_std_null_coll)
 		{
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupted null collation field  in header"),
-				ERR_LDBINFMT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+				      RTS_ERROR_TEXT("Corrupted null collation field in header"), ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
 		}
 	} else
@@ -335,20 +334,21 @@ void bin_load(uint4 begin, uint4 end)
 		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
 		if (SIZEOF(coll_hdr) != len)
 		{
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"),
+				      ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
 		}
 		extr_collhdr = *((coll_hdr *)(ptr));
 		new_gvn = TRUE;
 	} else
-		gtm_putmsg(VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
 	if (begin < 2)
 		begin = 2;
 	for (iter = 2; iter < begin; iter++)
 	{
 		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base)))
 		{
-			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			util_out_print("Error reading record number: !UL\n", TRUE, iter);
 			mupip_error_occurred = TRUE;
 			return;
@@ -384,7 +384,7 @@ void bin_load(uint4 begin, uint4 end)
 		if (mu_ctrlc_occurred)
 		{
 			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
-				LEN_AND_LIT(gt_lit), key_count, max_subsc_len, max_data_len);
+				LEN_AND_LIT("LOAD TOTAL"), key_count, max_subsc_len, max_data_len);
 			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? (rec_count - 1) : 0);
 			mu_gvis();
 			util_out_print(0, TRUE);
@@ -452,14 +452,15 @@ void bin_load(uint4 begin, uint4 end)
 					{
 						if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
 						{
-							gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, extr_collhdr.act,
-								extr_collhdr.ver, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
+								       extr_collhdr.act, extr_collhdr.ver, ERR_GVIS, 2,
+								       gv_altkey->end - 1, gv_altkey->base);
 							mupip_exit(ERR_COLLTYPVERSION);
 						}
 					} else
 					{
-						gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, extr_collhdr.act,
-							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1,
+							       extr_collhdr.act, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						mupip_exit(ERR_COLLATIONUNDEF);
 					}
 				}
@@ -469,13 +470,14 @@ void bin_load(uint4 begin, uint4 end)
 					{
 						if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
 						{
-							gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, db_collhdr.act,
-								db_collhdr.ver, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
+								       db_collhdr.act, db_collhdr.ver, ERR_GVIS, 2,
+								       gv_altkey->end - 1, gv_altkey->base);
 							mupip_exit(ERR_COLLTYPVERSION);
 						}
 					} else
 					{
-						gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
 							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						mupip_exit(ERR_COLLATIONUNDEF);
 					}
@@ -789,7 +791,7 @@ void bin_load(uint4 begin, uint4 end)
 	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (rec_count - 1) : 0);
 	if (mu_ctrly_occurred)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_LOADCTRLY);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LOADCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 }
@@ -810,7 +812,7 @@ void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mstr *)parm2);
 			break;
 		case ERR_COR:
-			rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, parm1, parm2);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_CORRUPT, 2, parm1, parm2);
 		case BIN_KILL:
 			gvcst_kill(FALSE);
 			break;

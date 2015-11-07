@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,13 +21,14 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
-#include "gtm_time.h"		/* for ctime() and time() */
+#include "gtm_time.h"		/* for ctime and time */
 
 #include "gtcm.h"
 #include "rc_oflow.h"
 #include "eintr_wrappers.h"
 #include "gtm_socket.h"
 #include "gtmio.h"
+#include "have_crit.h"
 
 #ifdef BSD_TCP
 #include "gtm_inet.h"
@@ -47,6 +48,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	omi_conn	*cptr;
 	omi_fd		fd;
 	int		rc;
+	char 		*tmp_time;
 
 #ifdef BSD_TCP
 	GTM_SOCKLEN_TYPE			sln;
@@ -154,8 +156,9 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 			}
 		}
 	)
+	GTM_CTIME(tmp_time, &cptr->stats.start);
 	OMI_DBG((omi_debug, "%s: connection %d from %s by user <%s> at %s", SRVR_NAME,
-		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, GTM_CTIME(&cptr->stats.start)));
+		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, tmp_time));
 	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, SIZEOF(keepalive)) < 0)
 	{
 		PERROR("setsockopt:");

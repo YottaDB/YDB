@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,6 @@ error_def(ERR_REPLONLNRLBK);
 #endif
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
-error_def(ERR_TPLOCKRESTMAX);
 error_def(ERR_TPRESTART);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
@@ -682,8 +681,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			 * this frame, op_xnew creates a NEW symtab just for this frame. But when this code
 			 * unwound back to the TSTART, we also unwound the l_symtab this frame was using. So here
 			 * we verify this frame is a simple call frame from the previous and restore the use of its
-			 * l_symtab if so. If not, GTMASSERT. Note the outer SFF_UWN_SYMVAL check keeps us from having
-			 * non-existant l_symtab issues which is possible when we are MUPIP.
+			 * l_symtab if so. If not, assertpro/GTMASSERT2. Note the outer SFF_UWN_SYMVAL check keeps
+			 * us from having non-existant l_symtab issues which is possible when we are MUPIP.
 			 */
 			if ((frame_pointer->rvector == frame_pointer->old_frame_pointer->rvector)
 			    && (frame_pointer->vartab_ptr == frame_pointer->old_frame_pointer->vartab_ptr))
@@ -691,7 +690,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				frame_pointer->l_symtab = frame_pointer->old_frame_pointer->l_symtab;
 				frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;	/* No need to clear symtab now */
 			} else
-				GTMASSERT;
+				assertpro(FALSE);
 		} else
 		{	/* Otherwise the l_symtab needs to be cleared so its references get re-resolved to *this* symtab */
 			memset(frame_pointer->l_symtab, 0, frame_pointer->vartab_len * SIZEOF(ht_ent_mname *));

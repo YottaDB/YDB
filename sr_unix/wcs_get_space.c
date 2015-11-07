@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,6 @@ error_def(ERR_GBLOFLOW);
 }																\
 
 /* go after a specific number of buffers or a particular buffer */
-/* not called if UNTARGETED_MSYNC and MM mode */
 bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 {
 	sgmnt_addrs		*csa;
@@ -98,7 +97,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	int			maxspins, retries, spins;
 	uint4			lcnt, size, to_wait, to_msg, this_idx;
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
-	boolean_t		is_mm;
 	cache_rec		cr_contents;
 	DCL_THREADGBL_ACCESS;
 
@@ -108,8 +106,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	is_mm = (dba_mm == csd->acc_meth);
-	assert(is_mm || (dba_bg == csd->acc_meth));
+	assert(dba_bg == csd->acc_meth);
 	assert((0 == needed) || ((DB_CSH_RDPOOL_SZ <= needed) && (needed <= csd->n_bts)));
 	if (FALSE == csa->now_crit)
 	{
@@ -119,7 +116,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					/* a macro that ensure jnl is open, invokes wcs_wtstart() and checks for errors etc. */
 		return TRUE;
 	}
-	UNTARGETED_MSYNC_ONLY(assert(!is_mm);)
 	csd->flush_trigger = MAX(csd->flush_trigger - MAX(csd->flush_trigger / STEP_FACTOR, 1), MIN_FLUSH_TRIGGER(csd->n_bts));
 	/* Routine actually serves two purposes:
 	 *	1 - Free up required number of buffers or
@@ -132,8 +128,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		for (lcnt = 1; (cnl->wc_in_free < needed) && (BUF_OWNER_STUCK > lcnt); ++lcnt)
 		{
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, needed, save_errno);
-			if (is_mm && (ERR_GBLOFLOW == save_errno))
-				wcs_recover(reg);
 			if (cnl->wc_in_free < needed)
 			{
 				if ((ENOSPC == save_errno) && (csa->hdr->wait_disk_space > 0))
@@ -154,16 +148,14 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						if ((to_wait == cs_data->wait_disk_space)
 							|| (0 == to_wait % to_msg))
 						{
-							send_msg(VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
 								process_id, to_wait, DB_LEN_STR(reg), save_errno);
-							gtm_putmsg(VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
 								process_id, to_wait, DB_LEN_STR(reg), save_errno);
 						}
 						hiber_start(1000);
 						to_wait--;
 						JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, needed, save_errno);
-						if (is_mm && (ERR_GBLOFLOW == save_errno))
-							wcs_recover(reg);
 						if (cnl->wc_in_free >= needed)
 							break;
 					}
@@ -199,14 +191,10 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		assert(csa->now_crit);		/* must be crit to play with queues when not the writer */
 		BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush);
 		++fast_lock_count;			/* Disable wcs_stale for duration */
-		if (!is_mm)		/* Determine queue base to use */
-		{
-			base = &csa->acc_meth.bg.cache_state->cacheq_active;
-			/* If another process is concurrently finishing up phase2 of commit, wait for that to complete first. */
-			if (cr->in_tend && !wcs_phase2_commit_wait(csa, cr))
-				return FALSE;	/* assumption is that caller will set wc_blocked and trigger cache recovery */
-		} else
-			base = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
+		base = &csa->acc_meth.bg.cache_state->cacheq_active;
+		/* If another process is concurrently finishing up phase2 of commit, wait for that to complete first. */
+		if (cr->in_tend && !wcs_phase2_commit_wait(csa, cr))
+			return FALSE;	/* assumption is that caller will set wc_blocked and trigger cache recovery */
 		maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 		for (retries = LOCK_TRIES - 1; retries > 0 ; retries--)
 		{
@@ -232,8 +220,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					 * If this didn't work, flush normal amount next time in the loop.
 					 */
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 1, save_errno);
-					if (is_mm && (ERR_GBLOFLOW == save_errno))
-						wcs_recover(reg);
 					for (lcnt = 1; (0 != cr->dirty) && (UNIX_GETSPACEWAIT > lcnt); ++lcnt)
 					{
 						if (0 == (lcnt % LCNT_INTERVAL))
@@ -262,8 +248,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						{
 							BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_retries);
 							JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, save_errno);
-							if (is_mm && (ERR_GBLOFLOW == save_errno))
-								wcs_recover(reg);
 						}
 						/* Usually we want to sleep only if we need to wait on someone else
 						 * i.e. (i) if we are waiting for another process' fsync to complete
@@ -274,7 +258,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						 * Right now we know of only one case where there is no point in waiting
 						 *   which is if the cache-record is out of the active queue and is dirty.
 						 * But since that is quite rare and we don't lose much in that case by
-						 *   sleeping we do an unconditional sleep (only if cr is dirty).
+						 *   sleeping we do an unconditional sleep (only if cr is dirty).	{BYPASSOK}
 						 */
 						if (!cr->dirty)
 							return TRUE;
@@ -329,7 +313,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			return TRUE;
 	}
 	if (ENOSPC == save_errno)
-		rts_error(VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert(FALSE);
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);

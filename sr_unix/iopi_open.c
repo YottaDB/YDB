@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,7 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#define _REENTRANT
+#ifndef _REENTRANT
+#  define _REENTRANT
+#endif
 
 #include "mdef.h"
 
@@ -30,6 +32,7 @@
 #include "gtmio.h"
 #include "iosp.h"
 #include "jobsp.h"
+#include "have_crit.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
@@ -97,7 +100,7 @@ int parse_pipe(char *cmd_string, char *ret_token);
 */
 int parse_pipe(char *cmd_string, char *ret_token)
 {
-	char *str1, *str2, *str3, *token;
+	char *str1, *str2, *str3;
 	char *saveptr1, *saveptr2, *saveptr3;
 	char *env_var;
 	int env_inc;
@@ -431,6 +434,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 
 	/* child to write stdout (and possibly stderr) to pfd_read[1] and parent to read from pfd_read[0] */
 	if (return_stdout)
+	{
 		if (-1 == pipe(pfd_read))
 		{
 			save_errno = errno;
@@ -446,9 +450,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #endif
 			file_des_read = pfd_read[0];
 		}
+	}
 
 	/* child to write to pfd_read_stderr[1] and parent to read from pfd_read_stderr[0] */
 	if (return_stderr)
+	{
 		if (-1 == pipe(pfd_read_stderr))
 		{
 			save_errno = errno;
@@ -465,7 +471,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #endif
 			file_des_read_stderr = pfd_read_stderr[0];
 		}
-
+	}
 	file_des_write = pfd_write[1];
 	/*do the fork and exec */
 	cpid = fork();	/* BYPASSOK: we exec() immediately, no FORK_CLEAN needed */
@@ -593,7 +599,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		/* save read file descriptor for stdout return if set */
 		if (file_des_read)
 		{
-			if (NULL == (d_rm->read_filstr = FDOPEN(file_des_read, "r")))
+			FDOPEN(d_rm->read_filstr, file_des_read, "r");
+			if (NULL == d_rm->read_filstr)
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();

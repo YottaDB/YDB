@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <string.h>
+#include "gtm_string.h"
 #include <rtnhdr.h>
 
 #ifdef USHBIN_SUPPORTED
@@ -31,11 +31,10 @@ void zlmov_lnames(rhdtyp *hdr)
 		size += lab_ent->lab_name.len;
 	}
 	lab_ptr = (char *)malloc(size);
-	/* Store the pointer to malloc'd area in literal_text_adr so it can be accessable from the routine header.
-	 * Although we do not need this pointer, it is kept in literal_text_adr which otherwise anyway becomes
-	 * dangling after ptext_adr is released */
-	hdr->literal_text_adr = (unsigned char *)lab_ptr;
-	hdr->literal_text_len = size;
+	/* Previously, we would store the pointer to this malloc'd area in literal_text_adr so it could be accessable from the
+	 * routine header. However, we never use the field (e.g., to free it), so there's no point in saving it. With dynamic
+	 * literals, we still need literal_text_adr, so let's not do that.
+	 */
 	for (lab_ent = lab_bot + 1; lab_ent < lab_top; lab_ent++)
 	{
 		memcpy(lab_ptr, lab_ent->lab_name.addr, lab_ent->lab_name.len);

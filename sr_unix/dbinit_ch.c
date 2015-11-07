@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@
 #include "have_crit.h"
 
 GBLREF gd_region		*db_init_region;
-GBLREF boolean_t		sem_incremented;
 
 CONDITION_HANDLER(dbinit_ch)
 {
@@ -51,6 +50,7 @@ CONDITION_HANDLER(dbinit_ch)
 		PRN_ERROR;
 		CONTINUE;
 	}
+	assert(NULL != db_init_region);
 	seg = db_init_region->dyn.addr;
 	udi = NULL;
 	if (NULL != seg->file_cntl)
@@ -68,11 +68,10 @@ CONDITION_HANDLER(dbinit_ch)
 			csa->encrypted_blk_contents = NULL;
 		}
 #		endif
-		if (NULL != csa->hdr)
+		if ((NULL != csa->hdr) && (dba_mm == db_init_region->dyn.addr->acc_meth))
 		{
-			if (dba_mm == db_init_region->dyn.addr->acc_meth)
-				munmap((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]));
-			csa->hdr = (sgmnt_data_ptr_t)NULL;
+			assert((NULL != csa->db_addrs[1]) && (csa->db_addrs[1] > csa->db_addrs[0]));
+			munmap((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]));
 		}
 		if (NULL != csa->jnl)
 		{
@@ -84,35 +83,38 @@ CONDITION_HANDLER(dbinit_ch)
 			shmdt((caddr_t)csa->nl);
 			csa->nl = (node_local_ptr_t)NULL;
 		}
-		lcl_new_dbinit_ipc = TREF(new_dbinit_ipc);
-		if (lcl_new_dbinit_ipc)
-		{
-			if ((lcl_new_dbinit_ipc & NEW_DBINIT_SHM_IPC_MASK) && (INVALID_SHMID != udi->shmid))
-			{
-				shm_rmid(udi->shmid);
-				udi->shmid = INVALID_SHMID;
-			}
-			if ((lcl_new_dbinit_ipc & NEW_DBINIT_SEM_IPC_MASK) && (INVALID_SEMID != udi->semid))
-			{
-				sem_rmid(udi->semid);
-				udi->semid = INVALID_SEMID;
-				udi->grabbed_access_sem = FALSE;
-			}
-			TREF(new_dbinit_ipc) = 0;
-		}
-		if (sem_incremented)
-		{
-			if (INVALID_SEMID != udi->semid)
-			{
-				if (FALSE == db_init_region->read_only)
-					do_semop(udi->semid, 1, -1, SEM_UNDO);	/* decrement the read-write sem */
-				do_semop(udi->semid, 0, -1, SEM_UNDO);		/* release the startup-shutdown sem */
-			}
-			sem_incremented = FALSE;
-		}
 
+		if (udi->new_shm && (INVALID_SHMID != udi->shmid))
+		{
+			shm_rmid(udi->shmid);
+			udi->shmid = INVALID_SHMID;
+			udi->new_shm = FALSE;
+		}
+		if (udi->new_sem && (INVALID_SEMID != udi->semid))
+		{
+			sem_rmid(udi->semid);
+			udi->semid = INVALID_SEMID;
+			udi->new_sem = FALSE;
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+		}
+		if (udi->counter_acc_incremented)
+		{
+			assert((INVALID_SEMID != udi->semid) && !db_init_region->read_only);
+			do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT);	/* decrement the read-write sem */
+			udi->counter_acc_incremented = FALSE;
+		}
+		if (udi->grabbed_access_sem)
+		{
+			do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO | IPC_NOWAIT); /* release the startup-shutdown sem */
+			udi->grabbed_access_sem = FALSE;
+		}
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(db_init_region, TRUE, TRUE);
+			ftok_sem_release(db_init_region, udi->counter_ftok_incremented, TRUE);
+		else if (udi->counter_ftok_incremented)
+			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT);
+		udi->counter_ftok_incremented =FALSE;
+		udi->grabbed_ftok_sem = FALSE;
 		if (!IS_GTCM_GNP_SERVER_IMAGE) /* gtcm_gnp_server reuses file_cntl */
 		{
 			free(seg->file_cntl->file_info);
@@ -120,12 +122,7 @@ CONDITION_HANDLER(dbinit_ch)
 			seg->file_cntl = NULL;
 		}
 	}
-	/* Reset intrpt_ok_state to OK_TO_INTERRUPT in case we got called (due to an rts_error) with intrpt_ok_state
-	 * being set to INTRPT_IN_GVCST_INIT.
-	 * We should actually be calling RESTORE_INTRPT_OK_STATE macro but since we don't have access to local variable
-	 * save_intrpt_ok_state, set intrpt_ok_state directly.
-	 */
-	assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_GVCST_INIT == intrpt_ok_state));
-	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;
+	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error. */
+	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	NEXTCH;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,13 @@ GBLREF	boolean_t	gtm_utf8_mode;
 #define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
 #define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
 #endif
+
+/* Don't use toupper() because, with Turkish unicode settings, toupper('i') does not have well-defined behavior. On some platforms
+ * it returns back 'i' itself. This is because, in Turkish, the actual uppercase version of 'i' is 'I' with a dot on top, which is
+ * not an ascii character. Thus cli_strupper would incorrectly convert some qualifiers, resulting in CLIERR errors. For example it
+ * would convert "-dynamic_literals" to "-DYNAMiC_LiTERALS" or "-warnings" to "-WARNiNGS".
+ */
+#define CLI_TOUPPER(C)	(('a' <= (C) && (C) <= 'z') ? ((C) + ('A' - 'a')) : (C))
 
 static int tok_string_extract(void)
 {
@@ -204,7 +211,7 @@ void cli_strupper(char *sp)
 	int c;
 
 	while (c = *sp)
-		*sp++ = IS_ASCII(c) ? TOUPPER(c) : c;
+		*sp++ = IS_ASCII(c) ? CLI_TOUPPER(c) : c;
 }
 
 /*
@@ -221,7 +228,7 @@ int cli_is_hex(char *p)
 	if (('+' == *p) || ('-' == *p))
 		p++;
 
-	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
+	if (('0' == *p) && ('X' == CLI_TOUPPER(*(p + 1))))
         {
                 p = p + 2;
         }
@@ -338,7 +345,7 @@ static int	tok_extract (void)
 		token_len = 1;
 	} else if (ch)				/* only if something there */
 	{
-		/* smw if quotable, need to unicode isspace */
+		/* smw if quotable, need to unicode isspace (BYPASSOK) */
 		/* '-' is not a token separator */
 		while(ch && !CLI_ISSPACE(ch)
 		  && ch != '=')

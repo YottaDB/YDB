@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@ zshow_exte,
 zshow_field,
 zshow_fil,
 zshow_fixed,
+zshow_follow,
 zshow_host,
 zshow_ichset,
 zshow_independent,
@@ -43,6 +44,7 @@ zshow_nodest,
 zshow_noecho,
 zshow_noedit,
 zshow_noesca,
+zshow_nofollow,
 zshow_nohost,
 zshow_noinse,
 zshow_nopast,

@@ -1,0 +1,96 @@
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	MUMPS_BINDING ENTRYREF, LINKNAME, OUTPUT=no, ?rtnaddr, ?lbladdr
+
+	fgnout_yes	= 1
+	fgnout_ye	= 1
+	fgnout_y	= 1
+	fgnout_no	= 0
+	fgnout_n	= 0
+
+	.irp	$$tmp, <ENTRYREF, LINKNAME>
+	.if	b	$$tmp
+		.print		;MUMPS BINDING FORMAT ERROR: MUMPS ENTRYREF, LINKNAME, OUTPUT
+		.error		;REQUIRED KEYWORD OMITTED
+		.mexit
+	.endc
+	.endr
+
+	.if 	ndf	fgnout_%EDIT(OUTPUT,LOWERCASE)
+		.print		;MUMPS BINDING FORMAT ERROR: MUMPS ENTRYREF, LINKNAME, OUTPUT
+		.error		;OUTPUT MUST BE YES OR NO
+		.mexit
+	.endc
+
+	lablen = %LOCATE(<^>,ENTRYREF)
+	entlen = %LENGTH(ENTRYREF)
+	.if	eq	%LENGTH(ENTRYREF)-lablen
+		.print		;MUMPS BINDING FORMAT ERROR: MUMPS ENTRYREF, LINKNAME, OUTPUT
+		.error		;MUMPS ENTRYREF MUST SPECIFY ROUTINE
+		.mexit
+	.endc
+
+	rtnlen = entlen - lablen - 1
+	rstart = lablen+1
+
+	.if	gt	lablen-31
+		.print		;MUMPS BINDING FORMAT ERROR: MUMPS ENTRYREF, LINKNAME, OUTPUT
+		.error		;LABELS ARE LIMITED TO 31 CHARACTERS
+		.mexit
+	.endc
+
+	.if	gt	rtnlen-31
+		.print		;MUMPS BINDING FORMAT ERROR: MUMPS ENTRYREF, LINKNAME, OUTPUT
+		.error		;ROUTINES ARE LIMITED TO 31 CHARACTERS
+		.mexit
+	.endc
+
+	$routine	LINKNAME, entry=%string(LINKNAME)_CA, kind=stack, -
+			saved_regs=<r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15>, -
+			size=<<<$RSA_END+<7*8>+15>/16>*16>
+
+	$linkage_section
+		; Always generate the routine symbol in upper case so that routine's linkage
+		; works correctly even if the call table contains lower case routine name and
+		; the table is compiled with /NAMES={LOWERCASE,AS_IS}.
+rtnaddr:	.address	%EDIT(%EXTRACT(rstart, rtnlen, ENTRYREF),UPCASE)
+L_GTM$MAIN:	.linkage_pair	GTM$MAIN
+
+	.if	le	entlen-31
+		; The total length is within 31 chars. Generate a symbolic reference
+		; in the $linkage_section.
+lbladdr:	.address	%EXTRACT(rstart, rtnlen, ENTRYREF).%EXTRACT(0, lablen, ENTRYREF)
+		fgnlab_unresolved = 0
+	.else
+lbladdr:	.address	lblname
+		fgnlab_unresolved = lablen
+		; The MACRO compiler doesn't allow the symbol names of the form routine.label
+		; if the total length exceeds 31. So, generate a reference to a location in
+		; $data_section that stores the label string.
+	$data_section
+lblname:	.ascii		"%EXTRACT(0, lablen, ENTRYREF)"
+	.endc
+
+
+	$code_section
+
+	.base	r27, $ls
+
+;	Copy argument registers and argument information register to stack adjacent to any arguments that may be on stack.
+	stq	r21, $SIZE-8(fp)
+	stq	r20, $SIZE-16(fp)
+	stq	r19, $SIZE-24(fp)
+	stq	r18, $SIZE-32(fp)
+	stq	r17, $SIZE-40(fp)
+	stq	r16, $SIZE-48(fp)
+	stq	r25, $SIZE-56(fp)
+	ldq	r0,  L_GTM$MAIN
+	ldq	r1, L_GTM$MAIN+8
+
+; 	gtm$fgncall (A(MUMPS routine), A(MUMPS label), OUTPUT (yes or no), A(start of arguments on stack))
+	$call	GTM$FGNCALL, args=<rtnaddr, lbladdr, fgnout_%EDIT(OUTPUT,LOWERCASE)/A, $SIZE-56(fp)/A, fgnlab_unresolved/A>
+	$return
+
+	$end_routine	name=LINKNAME
+
+	.endm

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@
 #include "gtm_zlib.h"
 #include "fork_init.h"
 #include "heartbeat_timer.h"
+#include "gtmio.h"
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
@@ -83,6 +84,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	int			gtmsource_msgbufsiz;
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
+GBLREF	boolean_t		is_jnlpool_creator;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	int			gtmsource_srv_count;
@@ -96,6 +98,7 @@ error_def(ERR_MUPCLIERR);
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_NULLCOLLDIFF);
 error_def(ERR_REPLCOMM);
+error_def(ERR_REPLERR);
 error_def(ERR_REPLINFO);
 error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
@@ -108,18 +111,19 @@ int gtmsource()
 	char			print_msg[1024], tmpmsg[1024];
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
-	boolean_t		jnlpool_creator, all_files_open, isalive;
+	boolean_t		all_files_open, isalive;
 	pid_t			pid, ppid, procgp;
 	seq_num			read_jnl_seqno, jnl_seqno;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
 	boolean_t		this_side_std_null_coll;
+	int			null_fd, rc;
 
 	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	if (gtmsource_options.shut_down)
 	{	/* Wait till shutdown time nears even before going to "jnlpool_init". This is because the latter will return
 		 * with the ftok semaphore and access semaphore held and we do not want to be holding those locks (while
@@ -138,9 +142,9 @@ int gtmsource()
 		repl_log(stdout, TRUE, TRUE, "Initiating START of source server for secondary instance [%s]\n",
 			gtmsource_options.secondary_instname);
 	}
-	jnlpool_init(GTMSOURCE, gtmsource_options.start, &jnlpool_creator);
-	/* jnlpool_creator == TRUE ==> this process created the journal pool
-	 * jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.
+	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator);
+	/* is_jnlpool_creator == TRUE ==> this process created the journal pool
+	 * is_jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.
 	 */
 	if (gtmsource_options.shut_down)
 		gtmsource_exit(gtmsource_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
@@ -180,7 +184,7 @@ int gtmsource()
 	if (0 > pid)
 	{
 		save_errno = errno;
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not fork source server"), save_errno);
 	} else if (0 < pid)
 	{	/* Parent. Wait until child sets "child_server_running" to FALSE. That is an indication that the child
@@ -199,7 +203,7 @@ int gtmsource()
 		if (isalive)
 		{	/* Child process is alive and started with no issues */
 			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
-				rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 		} else
@@ -207,7 +211,7 @@ int gtmsource()
 			 * If we were the one who created the journal pool, let us clean it up.
 			 */
 			repl_log(stdout, TRUE, TRUE, "Source server startup failed. See source server log file\n");
-			if (jnlpool_creator)
+			if (is_jnlpool_creator)
 				status = gtmsource_shutdown(TRUE, NORMAL_SHUTDOWN);
 		}
 		/* If the parent is killed (or crashes) between the fork and exit, checkhealth may not detect that startup
@@ -216,6 +220,16 @@ int gtmsource()
 		 */
 		gtmsource_exit(isalive ? SRV_ALIVE : SRV_ERR);
 	}
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	FCNTL3(null_fd, F_DUPFD, 0, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	/* The parent process (source server startup command) will be holding the ftok semaphore and jnlpool access semaphore
 	 * at this point. The variables that indicate this would have been copied over to the child during the fork. This will
 	 * make the child think it is actually holding them as well when actually it is not. Reset those variables in the child
@@ -246,7 +260,8 @@ int gtmsource()
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 	if (-1 == (procgp = setsid()))
-		send_msg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Source server error in setsid"), errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
 #endif /* REPL_DEBUG_NOBACKGROUND */
 	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
@@ -257,7 +272,7 @@ int gtmsource()
 	all_files_open = region_init(FALSE);
 	if (!all_files_open)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
 		gtmsource_exit(ABNORMAL_SHUTDOWN);
 	}
 	/* Determine primary side null subscripts collation order */
@@ -272,18 +287,18 @@ int gtmsource()
 				this_side_std_null_coll = csa->hdr->std_null_coll;
 			else
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_NULLCOLLDIFF);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NULLCOLLDIFF);
 				gtmsource_exit(ABNORMAL_SHUTDOWN);
 			}
 		}
 		if (!REPL_ALLOWED(csa) && JNL_ALLOWED(csa))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 		if (reg->read_only && REPL_ALLOWED(csa))
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Source Server does not have write permissions to one or "
 					             "more database files that are replicated"));
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
@@ -292,8 +307,9 @@ int gtmsource()
 	/* Initialize source server alive/dead state related fields in "gtmsource_local" before the ftok semaphore is released */
 	gtmsource_local->gtmsource_pid = process_id;
 	gtmsource_local->gtmsource_state = GTMSOURCE_START;
-	if (jnlpool_creator)
+	if (is_jnlpool_creator)
 	{
+		DEBUG_ONLY(jnlpool.jnlpool_ctl->jnlpool_creator_pid = process_id);
 		gtmsource_seqno_init(this_side_std_null_coll);
 		if (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary)
 		{	/* Created the journal pool as a root primary. Append a history record to the replication instance file.
@@ -311,18 +327,18 @@ int gtmsource()
 	 * that. Do that while the parent is still holding on to the ftok semaphore waiting for our okay.
 	 */
 	if (!ftok_sem_incrcnt(jnlpool.jnlpool_dummy_reg))
-		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Increment the source server count semaphore */
 	status = incr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 	if (0 != status)
 	{
 		save_errno = errno;
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Counter semaphore increment failure in child source server"), save_errno);
 	}
 #else
 	if (0 != (save_errno = rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM)))
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error in rel_sem_immediate"), save_errno);
 #endif /* REPL_DEBUG_NOBACKGROUND */
 
@@ -337,7 +353,7 @@ int gtmsource()
 		process_id, gtmsource_local->secondary_instname);
 	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
-	if (jnlpool_creator)
+	if (is_jnlpool_creator)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Created jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
@@ -401,7 +417,7 @@ int gtmsource()
 		}
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
-			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);
 		gtmsource_filter = NO_FILTER;
 		if ('\0' != gtmsource_local->filter_cmd[0])

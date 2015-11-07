@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ static readonly unsigned char apos_ok[] =
 void advancewindow(void)
 {
 	unsigned char	*cp1, *cp2, *cp3, x;
-	char		*tmp, source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	char		*tmp;
 	int		y, charlen;
 #	ifdef UNICODE_SUPPORTED
 	uint4		ch;
@@ -96,7 +96,7 @@ void advancewindow(void)
 				}
 				if (!run_time)
 				{
-					show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+					show_source_line(TRUE);
 					dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
 				}
 			}

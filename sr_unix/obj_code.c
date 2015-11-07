@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,17 +72,17 @@ GBLREF spdesc			stringpool;
  *
  *	+---------------+
  *	|     rhead	| > - R/O - retain
- *	+---------------+
- *	|   generated	| \
- *	|     code	|  \
- *	+ - - - - - - - +   |
- *	| line num tbl	|   |- R/O releasable
- *	+ - - - - - - - +  /
- *	| lit text pool	| /
- *	+---------------+
- *	| lit mval tbl 	| \
+ *	+---------------+                                Alternative layout if compiled with GTM_DYNAMIC_LITERALS:
+ *	|   generated	| \                              \
+ *	|     code	|  \                              \
+ *	+ - - - - - - - +   |                              |
+ *	| line num tbl	|   |- R/O releasable              |
+ *	+ - - - - - - - +  /                               |- R/O releasable
+ *	| lit text pool	| /                                |
+ *	+---------------+                                 /
+ *	| lit mval tbl 	| \                              /
  *	+---------------+  |- R/W releasable
- *	| variable tbl	| /
+ *	| variable tbl	| /                              > - R/W releasable
  *	+ - - - - - - - +
  *	|   label tbl	| > - R/W retain
  *	+---------------+
@@ -93,6 +93,10 @@ GBLREF spdesc			stringpool;
  *
  * Note in addition to the above layout, a "linkage section" is allocated at run time and is
  * also releasable.
+ *
+ * If GTM_DYNAMIC_LITERALS is enabled, the literal mval table becomes part of the R/O-release section.
+ * In the case of shared libraries, this spares each process from having to take a malloced copy the lit mval table
+ * at link time (sr_unix/incr_link.c). This memory saving optimization is only available on USHBIN-supported platforms
  */
 
 error_def(ERR_TEXT);

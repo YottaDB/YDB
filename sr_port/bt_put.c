@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@ GBLREF	uint4			process_id;
 GBLREF 	jnl_gbls_t		jgbl;
 
 error_def(ERR_BTFAIL);
-error_def(ERR_WCFAIL);
 error_def(ERR_WCBLOCKED);
 
 bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
@@ -92,8 +91,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 			bt->killtn = lcl_tn;
 			insqt((que_ent_ptr_t)bt, (que_ent_ptr_t)hdr);
 			th = (th_rec_ptr_t)remqh((que_ent_ptr_t)csa->th_base);
-			if (EMPTY_QUEUE == (sm_long_t)th)
-				GTMASSERT;
+			assertpro(EMPTY_QUEUE != (sm_long_t)th);
 			break;
 		}
 		if (bt->blk == block)
@@ -114,8 +112,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 			assert(in_wcs_recover || (bt->tn < lcl_tn) || (jgbl.forw_phase_recovery && !JNL_ENABLED(csa)));
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->tnque.fl);
 			th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + SIZEOF(th->tnque)));
-			if (EMPTY_QUEUE == (sm_long_t)th)
-				GTMASSERT;
+			assertpro(EMPTY_QUEUE != (sm_long_t)th);
 			break;
 		}
 		if (0 == bt->blkque.fl)

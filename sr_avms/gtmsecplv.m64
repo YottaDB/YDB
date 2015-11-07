@@ -1,0 +1,60 @@
+	.title	gtmsecplv - GTMSECSHR PLV (privileged library vector)
+
+
+;	PLV (privileged library vector) for GTMSECSHR.
+;
+;	This is the Alpha AXP OpenVMS analogue for the VAX VMS PLV in the GT.M VAX source file: KERN_MODE.MAR
+;
+;	NOTE:  At the time this was written (10/29/93), the Alpha AXP OpenVMS documentation apparently did not
+;	match the actual implementation of this feature.  In particular, many of the following fields were
+;	described as 64 bits wide when, apparently, they must be 32 bits wide due to an as-yet-undocumented
+;	change to VMS.  Further, there seemed to be no system-supplied C header files or MACRO macro libraries
+;	that defined anything useful related to PLV's; if this situation changes, this file should be modified
+;	to use any system-supplied definitions that prove useful.
+;
+;	References:
+;		OpenVMS Programming Concepts Manual
+;		OpenVMS Linker Utility Manual
+;
+;	See also:
+;		Examples in files whose names start with "UWSS" (for User-Written System Service) in the
+;		directory SYS$EXAMPLES.  Pay special attention to the comments and revision history comments.
+
+
+PLV$C_TYP_CMOD	=	1	; not yet defined in any usable system include file (see $PLVDEF in some future VMS release?)
+
+	.psect	gtmsecplv, QUAD, PIC, CON, LCL, SHR, NOEXE, NOWRT, VEC
+
+
+	.long		PLV$C_TYP_CMOD		; PLV$L_TYPE
+	.long		0			; PLV$L_VERSION - system version number (unused)
+	.long		<kernel_routine_list_end - kernel_routine_list>/4	; PLV$L_KERNEL_ROUTINE_COUNT
+	.long		0			; PLV$L_EXEC_ROUTINE_COUNT
+	address_32	kernel_routine_list	; PLV$PS_KERNEL_ROUTINE_LIST
+	address_32	0			; PLV$PS_EXEC_ROUTINE_LIST
+	address_32	rundown_dispatch	; PLV$PS_KERNEL_RUNDOWN_HANDLER
+	.long		0			; reserved
+	address_32	0			; PLV$PS_RMS_DISPATCHER
+	.long		0			; reserved
+	.long		0			; reserved
+
+
+;	NOTE: I believe these addresses need to be in the same order as they appear in the symbol_vector
+;	definition in the buildsec.com GTMSECSHR linker options file.  That may not be the case, but it
+;	keeping them in the same order will probably not cause problems.
+
+kernel_routine_list:
+	address_32	crit_wake
+	address_32	del_sec
+	address_32	init_sec
+	address_32	gtm_enq
+	address_32	gtm_enqw
+	address_32	gtm_deq
+	address_32	gtm_blkast
+	address_32	get_proc_info
+	address_32	init_secshr_addrs
+	address_32	gtm_getlkiw
+	address_32	secshr_db_clnup
+kernel_routine_list_end:
+
+	.end

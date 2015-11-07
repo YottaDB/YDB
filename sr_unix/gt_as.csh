@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,20 +37,46 @@ alias	gt_as_local	"$comlist_gt_as"
 set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
 
-if ( "ia64" == $mach_type && "linux" == $platform_name ) then
-    set lfile = `basename $1`:r
-    set file = $lfile:r
+set asmlist=($*)
+set cmdfile="$gtm_log/gt_as_$$__batch.csh"
 
-    gt_cpp -E $1 > ${gtm_obj}/${file}_cpp.s
-    gt_as_local ${gtm_obj}/${file}_cpp.s -o ${gtm_obj}/${file}.o
-    \rm ${gtm_obj}/${file}_cpp.s
-else if ( "os390" == $platform_name ) then
-    set file = `basename $1`
-    set file = $file:r
+echo 'alias gt_as_local "$comlist_gt_as"' >> $cmdfile
 
-    gt_as_local $1
-    if ( -e $gtm_obj/${file}.dbg )  chmod ugo+r $gtm_obj/${file}.dbg
+foreach asm ($asmlist)
+	set outfile="$gtm_log/gt_as_$$_${asm:t:r}.out"
+	set redir=">& $outfile"
+	if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+		set file=$asm:t:r:r
+		set sfile="${gtm_obj}/${file}_cpp.s"
+		set ofile="${gtm_obj}/${file}.o"
+		echo "(eval 'gt_cpp -E $asm' > $sfile ; eval 'gt_as_local $sfile -o $ofile' ; /bin/rm $sfile) $redir &" >> $cmdfile
+	else if ( "os390" == $platform_name ) then
+		set file=$asm:t:r
+		set dbgfile="${gtm_obj}/${file}.dbg"
+		echo "(eval 'gt_as_local $asm' ; if ( -e $dbgfile ) chmod ugo+r $dbgfile) $redir &" >> $cmdfile
+	else
+		echo "eval 'gt_as_local $asm' $redir &" >> $cmdfile
+	endif
+end
+
+echo "wait" >> $cmdfile
+
+set cmdout="$gtm_log/gt_as_$$__batch.out"
+source $cmdfile >& $cmdout
+
+set stat=$status
+
+foreach asm ($asmlist)
+	set outfile="$gtm_log/gt_as_$$_${asm:t:r}.out"
+	/bin/cat $outfile
+	/bin/rm $outfile
+end
+
+if ($stat) then
+	/bin/cat $cmdout
 else
-    gt_as_local $1
+	/bin/rm $cmdfile
+	/bin/rm $cmdout
 endif
 
+exit 0

@@ -1,0 +1,22 @@
+	.title OP_NUMCMP "Compare mval's, set condition code"
+
+; On entry, r0 and r1 point to mval's.
+; On exit, r24 contains the appropriate condition.
+
+	$routine OP_NUMCMP, entry=OP_NUMCMP_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r26, (sp)
+	.base	r27, $ls
+
+	mov	r0, r16
+	mov	r1, r17
+	$call	NUMCMP, args=<r16, r17>, set_arg_info=false, nonstandard=true
+	mov	r0, r24
+
+	ldq	r26, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

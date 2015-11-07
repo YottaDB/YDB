@@ -28,6 +28,10 @@
 #include "eintr_wrappers.h"
 #include "gtmmsg.h"
 #include "anticipatory_freeze.h"
+#ifdef DEBUG
+#include "dpgbldir.h"
+#include "is_proc_alive.h"
+#endif
 
 #define MAX_TAG_LEN				128	/* Maximum size of an error mnemonic */
 #define MAX_READ_SZ				1024	/* Mnemonic + flags shouldn't exceed this limit */
@@ -47,6 +51,7 @@
 	}									\
 }
 
+error_def(ERR_ASSERT);
 error_def(ERR_CUSTERRNOTFND);
 error_def(ERR_CUSTERRSYNTAX);
 error_def(ERR_CUSTOMFILOPERR);
@@ -60,8 +65,10 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	gd_region		*gv_cur_region;
+#ifdef DEBUG
+GBLREF	uint4			process_id;
+GBLREF	volatile boolean_t	timer_in_handler;
+#endif
 
 /* Typically prototypes are included in the header file. But, in this case the static function - get_mnemonic_offset - has the
  * hash_table_str as one of the function parameters which means all the files which includes anticipatory_freeze.h needs to include
@@ -137,11 +144,10 @@ STATICFNDEF int		get_mnemonic_offset(hash_table_str **err_hashtab, char *mnemoni
 }
 
 /* Determine whether a given msg_id qualifies for an anticipatory freeze or not */
-boolean_t	is_anticipatory_freeze_needed(int msg_id)
+boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 {
 	const err_ctl		*ctl;
 	int			idx;
-	sgmnt_addrs		*csa;
 
 	assert(NULL != jnlpool.jnlpool_ctl);
 	/* Certain error messages should NOT trigger a freeze even if they are so configured in the custom errors file as they might
@@ -149,8 +155,11 @@ boolean_t	is_anticipatory_freeze_needed(int msg_id)
 	 * 1. ENOSPCQIODEFER : To ensure we don't set anticipatory freeze if we don't/can't hold crit (due to possible deadlock)
 	 * 2. DSKSPCAVAILABLE : To ensure we don't set anticipatory freeze if the disk space becomes available after an initial
 	 *			lack of space.
+	 * 3. ASSERT : To ensure we don't go into an infinite recursion and blow the stack doing assert() calls here.
 	 */
-	if ((ERR_ENOSPCQIODEFER == msg_id) || (ERR_DSKSPCAVAILABLE == msg_id))
+	if ((ERR_ENOSPCQIODEFER == msg_id) || (ERR_DSKSPCAVAILABLE == msg_id) DEBUG_ONLY(|| (ERR_ASSERT == msg_id)))
+		return FALSE;
+	if (!csa || !csa->nl || !csa->hdr || !csa->hdr->freeze_on_fail)
 		return FALSE;
 	ctl = err_check(msg_id);
 	if (NULL != ctl)
@@ -158,19 +167,13 @@ boolean_t	is_anticipatory_freeze_needed(int msg_id)
 		GET_MSG_IDX(msg_id, ctl, idx);
 		assert(idx < ARRAYSIZE(jnlpool_ctl->merrors_array));
 		if (jnlpool_ctl->merrors_array[idx] & AFREEZE_MASK)
-		{
-			assert(NULL != gv_cur_region);
-			assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);
-			csa = &FILE_INFO(gv_cur_region)->s_addrs;
-			if (csa && csa->hdr && csa->hdr->freeze_on_fail)
-				return TRUE;
-		}
+			return TRUE;
 	}
 	return FALSE;
 }
 
 /* set the anticipatory freeze in the journal pool */
-void		set_anticipatory_freeze(int msg_id)
+void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 {
 	boolean_t			was_crit;
 	sgmnt_addrs			*repl_csa;
@@ -179,7 +182,7 @@ void		set_anticipatory_freeze(int msg_id)
 	uint4				write;
 #	endif
 
-	assert(is_anticipatory_freeze_needed(msg_id));
+	assert(is_anticipatory_freeze_needed(csa, msg_id));
 	DEBUG_ONLY(
 		write_addr = jnlpool_ctl->write_addr;
 		write = jnlpool_ctl->write;
@@ -223,10 +226,10 @@ boolean_t		init_anticipatory_freeze_errors()
 	if (NULL == handle)
 	{
 		save_errno = errno;
-		send_msg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
-		gtm_putmsg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
 		return FALSE;
 	}
 	line_no = 0;
@@ -266,10 +269,12 @@ boolean_t		init_anticipatory_freeze_errors()
 		/* The first character has to be alpha-numeric or a comment */
 		if (!ISALNUM_ASCII(*buffptr) && (COMMENT_DELIMITER != *buffptr))
 		{
-			send_msg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-					ERR_TEXT, 2, LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
-			gtm_putmsg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-					ERR_TEXT, 2, LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
+					line_no, ERR_TEXT, 2,
+					LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
+					line_no, ERR_TEXT, 2,
+					LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
 			return FALSE;
 		}
 		while (ISALNUM_ASCII(*buffptr))
@@ -277,10 +282,10 @@ boolean_t		init_anticipatory_freeze_errors()
 			*errptr++ = *buffptr++;
 			if (errptr > errptr_top)
 			{
-				send_msg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-						ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
-				gtm_putmsg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-						ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len,
+						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len,
+						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
 				return FALSE;
 			}
 			assert(buffptr < buff_top); /* errptr > errptr_top should fail before this */
@@ -290,8 +295,8 @@ boolean_t		init_anticipatory_freeze_errors()
 		{	/* Non-empty error mnemonic found; look it up */
 			if (-1 == (offset = get_mnemonic_offset(&err_hashtab, mnemonic_buf, mnemonic_len)))
 			{
-				send_msg(VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
-				gtm_putmsg(VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
 				return FALSE;
 			}
 			jnlpool_ctl->merrors_array[offset] |= AFREEZE_MASK; /* duplicate entries are not considered an error */
@@ -304,10 +309,10 @@ boolean_t		init_anticipatory_freeze_errors()
 		assert(buffptr < buff_top);
 		if (COMMENT_DELIMITER != *buffptr)
 		{
-			send_msg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-					ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
-			gtm_putmsg(VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr, line_no,
-					ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
+					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
+					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
 			return FALSE;
 		}
 		/* Need to ignore the rest of the current buffer and exhaust the current line */
@@ -322,22 +327,54 @@ boolean_t		init_anticipatory_freeze_errors()
 	if (!feof(handle))
 	{
 		save_errno = errno;
-		send_msg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
-		gtm_putmsg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
 		return FALSE;
 	}
 	FCLOSE(handle, status);
 	if (SS_NORMAL != status)
 	{
 		save_errno = errno;
-		send_msg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
-		gtm_putmsg(VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len, custom_err_file.addr,
-				save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
+				custom_err_file.addr, save_errno);
 		return FALSE;
 	}
 	jnlpool_ctl->instfreeze_environ_inited = TRUE;
 	return TRUE;
 }
+
+#ifdef DEBUG
+void clear_fake_enospc_if_master_dead(void)
+{
+	gd_addr				*addr_ptr;
+	gd_region			*r_top, *r_local;
+	sgmnt_addrs			*csa;
+
+	if((jnlpool_ctl->jnlpool_creator_pid != process_id) && !is_proc_alive(jnlpool_ctl->jnlpool_creator_pid, 0))
+	{
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
+			{
+				if (!r_local->open || r_local->was_open)
+					continue;
+				if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
+					continue;
+				csa = &FILE_INFO(r_local)->s_addrs;
+				if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
+				{
+					csa->nl->fake_db_enospc = FALSE;
+					csa->nl->fake_jnl_enospc = FALSE;
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT, 2,
+						 LEN_AND_LIT("Resetting fake_db_enospc and fake_jnl_enospc because fake ENOSPC"
+							     " master is dead"));
+				}
+			}
+		}
+	}
+}
+#endif

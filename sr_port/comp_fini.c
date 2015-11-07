@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ GBLREF char		cg_phase;
 GBLREF unsigned char	*source_buffer;
 
 error_def(ERR_INDEXTRACHARS);
+error_def(ERR_INDRCOMPFAIL);
 
 int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *dst, mstr_len_t src_len)
 {
@@ -44,7 +45,11 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 	{
 		while (TK_SPACE == TREF(window_token))	/* Eat up trailing white space */
 			advancewindow();
-		if (((src_len + 2) != source_column)  &&  ('\0' != source_buffer[source_column]))
+		if (TK_ERROR == TREF(window_token))
+		{
+			status = EXPR_FAIL;
+			stx_error(ERR_INDRCOMPFAIL);
+		} else if ((TK_EOL != TREF(window_token)) || (source_column < src_len))
 		{
 			status = EXPR_FAIL;
 			stx_error(ERR_INDEXTRACHARS);
@@ -77,6 +82,12 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 			ind_code(obj);
 			indr_stringpool.free = indr_stringpool.base;
 		}
+	} else
+	{	/* If this assert fails, it means a syntax problem could have been caught earlier. Consider placing a more useful
+		 * and specific error message at that location.
+		 */
+		assert(FALSE);
+		stx_error(ERR_INDRCOMPFAIL);
 	}
 	if (EXPR_FAIL == status)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,8 +151,8 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry */
 			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
-				  mv_hash.str.len, mv_hash.str.addr);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr = key_val.str.addr;
 		len = STRLEN(ptr);
@@ -226,8 +226,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry */
 			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
-				  mv_hash.str.len, mv_hash.str.addr);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr = key_val.str.addr;
 		len = STRLEN(ptr);

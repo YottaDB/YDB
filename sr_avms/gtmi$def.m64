@@ -1,0 +1,14 @@
+	.title	gtmi$def	definitions for gtm external interface
+gtmi$_global == 1
+gtmi$_naked  == 2
+gtmi$_extgbl == 3
+gtmi$_local  == 4
+gtmi$_extlcl == 5
+
+gtmi$_lock    == 6
+gtmi$_zalloc  == 7
+gtmi$_zdealloc== 8
+gtmi$_inclock == 9
+gtmi$_declock == 10
+gtmi$_unlock == 11
+	.end

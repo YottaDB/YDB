@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -146,8 +146,8 @@ error_def(ERR_STPEXPFAIL);
 		 * gives compiler warnings in HPUX Itanium since source is 2-byte aligned whereas destination		\
 		 * is 8-byte aligned. The void * in between makes the compiler forget the 2-byte alignment.		\
 		 */													\
-		UNIX_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_mvtype);)						\
-		VMS_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_len);)						\
+		UNIX_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_mvtype));						\
+		VMS_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_len));						\
 	}														\
 }
 
@@ -346,7 +346,6 @@ error_def(ERR_STPEXPFAIL);
 #else
 #define DBGSTPGCOL(x)
 #endif
-
 static void expand_stp(unsigned int new_size)	/* BYPASSOK */
 {
 	if (retry_if_expansion_fails)
@@ -458,7 +457,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	int			*low_reclaim_passes;
 	int			*incr_factor;
 	int			killcnt;
-	long			stp_incr, space_needed_rounded_up;
+	long			stp_incr;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
 	ht_ent_addr		*tabent_addr, *topent_addr;
@@ -684,7 +683,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 					if (NULL != (symtab = mvs->mv_st_cont.mvs_stab))
 					{	/* if initalization of the table was successful */
 						for (lv_blk_ptr = symtab->lv_first_block; NULL != lv_blk_ptr;
-						    lv_blk_ptr = lv_blk_ptr->next)
+						     lv_blk_ptr = lv_blk_ptr->next)
 						{
 							for (lvp = (lv_val *)LV_BLK_GET_BASE(lv_blk_ptr),
 							    lvlimit = LV_BLK_GET_FREE(lv_blk_ptr, lvp);
@@ -704,11 +703,11 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 							}
 						}
 						for (lv_blk_ptr = symtab->lvtreenode_first_block; NULL != lv_blk_ptr;
-												lv_blk_ptr = lv_blk_ptr->next)
+						     lv_blk_ptr = lv_blk_ptr->next)
 						{
 							for (node = (lvTreeNode *)LV_BLK_GET_BASE(lv_blk_ptr),
-								node_limit = LV_BLK_GET_FREE(lv_blk_ptr, node);
-									node < node_limit; node++)
+								     node_limit = LV_BLK_GET_FREE(lv_blk_ptr, node);
+							     node < node_limit; node++)
 							{
 								/* node could be actively in use or free (added to the symval's
 								 * lvtreenode_flist). Ignore the free ones. Those should have
@@ -752,7 +751,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 					continue;
 				case MVST_NVAL:
 					/* The var_name field is only present in a debug build */
-					DEBUG_ONLY(MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_nval.name.var_name);)
+					DEBUG_ONLY(MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_nval.name.var_name));
 					continue;
 #				ifdef GTM_TRIGGER
 				case MVST_TRIGR:
@@ -838,7 +837,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		}
 	}
 	space_before_compact = stringpool.top - stringpool.free; /* Available space before compaction */
-	DEBUG_ONLY(blklen = stringpool.free - stringpool.base;)
+	DEBUG_ONLY(blklen = stringpool.free - stringpool.base);
 	stringpool.free = stringpool.base;
 	if (topstr != array)
 	{
@@ -893,11 +892,17 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		 * 	     occurrences of the stringpool filling up, and compaction not reclaiming enough space.
 		 *       In such cases, if the stringpool is expanded, we create more room, resulting in fewer calls
 		 *       to stp_gcol.
+		 *
+		 * Note it is not uncommon for space_needed to be a negative value. That can occur in here if we
+		 * recovered enough space from the GC to satisfy the immediate need but we have identified that
+		 * so little space is still available that we are best served by expanding the stringpool so as to
+		 * prevent another almost immediate need for another GC. This is also known as a non-mandatory
+		 * expansion. Assert that if space_needed is negative, we have a non-mandatory expansion.
 		 */
+		assert((0 <= space_needed) || non_mandatory_expansion);
 		strpool_base = stringpool.base;
 		/* Grow stringpool geometrically */
 		stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
-		space_needed_rounded_up = ROUND_UP(space_needed, OS_PAGE_SIZE);
 		first_expansion_try = TRUE;
 		while (first_expansion_try || (retry_if_expansion_fails && expansion_failed))
 		{
@@ -917,19 +922,25 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 					stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
 				} else
 					/* if we are already at the lowest incr_factor half our way down */
-					if (stp_incr > space_needed_rounded_up)
+					if (stp_incr > space_needed)
 						stp_incr = stp_incr / 2;
 			}
 			first_expansion_try = FALSE;
-			stp_incr = ROUND_UP(stp_incr, OS_PAGE_SIZE);
 			if (stp_incr < space_needed)
-				stp_incr = space_needed_rounded_up;
+				stp_incr = space_needed;
 			/* If we are asking for more than is actually needed we want to try again if we do not get it. */
-			retry_if_expansion_fails = (stp_incr > space_needed_rounded_up);
-			expansion_failed = FALSE; /* will be set to TRUE by condition handler if can't get memory */
-			assert(stp_incr + stringpool.top - stringpool.base >= space_needed + blklen);
-			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr,
-					space_needed_rounded_up));
+			retry_if_expansion_fails = (stp_incr > space_needed);
+			/* If this is a non-mandatory expansion (which also means space_needed is likely negative but this is
+			 * not *always* the case) and stp_incr has come down to less than the size of a page, then there's really
+			 * no point in continuing this loop - probably all the way to stp_incr = 0. But for a non-mandatory
+			 * expansion, leaving early carries no significiant penalty - especially since we're already operating
+			 * on the the edge.
+			 */
+			if (non_mandatory_expansion && (0 == stp_incr))
+				break;			/* stp_incr can't get smaller - give up and use what we have */
+			expansion_failed = FALSE;	/* will be set to TRUE by condition handler if can't get memory */
+			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
+			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
 			expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
 		}
 		if (strpool_base != stringpool.base) /* expanded successfully */
@@ -944,10 +955,11 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			/* Adjust incr_factor */
 			if (*incr_factor < STP_NUM_INCRS) *incr_factor = *incr_factor + 1;
 		} else
-		{	/* could not expand during forced expansion */
+		{	/* Could not expand during forced expansion */
 			assert(non_mandatory_expansion && stop_non_mandatory_expansion);
 			if (space_after_compact < space_needed)
-				rts_error(VARLSTCNT(3) ERR_STPEXPFAIL, 1, stp_incr + stringpool.top - stringpool.base);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_STPEXPFAIL, 1,
+					      (stp_incr + stringpool.top - stringpool.base));
 		}
 		*low_reclaim_passes = 0;
 	} else

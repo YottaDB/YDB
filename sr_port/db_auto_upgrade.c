@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ void db_auto_upgrade(gd_region *reg)
 	if (0 == csd->mutex_spin_parms.mutex_sleep_spin_count)
 		csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	/* zero is a legitimate value for csd->mutex_spin_parms.mutex_spin_sleep_mask; so can't detect if need re-initialization */
+	INIT_NUM_CRIT_ENTRY_IF_NEEDED(csd);
 
 	/* Auto upgrade based on minor database version number. This code currently only does auto upgrade and does not
 	 * do auto downgrade although that certainly is possible to implement if necessary. For now, if the current version
@@ -127,8 +128,12 @@ void db_auto_upgrade(gd_region *reg)
 				UNIX_ONLY(csd->freeze_on_fail = FALSE;)
 				UNIX_ONLY(csd->span_node_absent = TRUE;)
 				UNIX_ONLY(csd->maxkeysz_assured = FALSE;)
-				break;
 			case GDSMV60000:
+			case GDSMV60001:
+				/* GT.M V60002 introduced mutex_spin_parms.mutex_que_entry_space_size */
+				NUM_CRIT_ENTRY(csd) = DEFAULT_NUM_CRIT_ENTRY;
+				break;
+			case GDSMV60002:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

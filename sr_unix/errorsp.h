@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -385,7 +385,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 
 #define EXIT_HANDLER(x)
 
-#define SEND_CALLERID(callee) send_msg(VARLSTCNT(5) ERR_CALLERID, 3, LEN_AND_STR((callee)), caller_id());
+#define SEND_CALLERID(callee) send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CALLERID, 3, LEN_AND_STR((callee)), caller_id());
 #define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH, caller_id())
 #define UNIX_EXIT_STATUS_MASK	0xFF
 
@@ -430,5 +430,7 @@ CONDITION_HANDLER(gvcst_put_ch);
 CONDITION_HANDLER(gvcst_query_ch);
 CONDITION_HANDLER(gvcst_queryget_ch);
 CONDITION_HANDLER(gvcst_zprevious_ch);
+CONDITION_HANDLER(op_fnzpeek_ch);
+CONDITION_HANDLER(op_fnzpeek_getpool_ch);
 
 #endif

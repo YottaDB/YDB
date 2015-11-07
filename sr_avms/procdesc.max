@@ -1,0 +1,6 @@
+	.macro	PROCDESC
+
+GTM_PD_FLAGS	=	^X00183099	; these bits are set in create_object_file (in obj_file.c) in the beginning
+					; of the procedure descriptor for all GT.M MUMPS object modules
+
+	.endm

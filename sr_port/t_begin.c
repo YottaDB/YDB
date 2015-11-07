@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		mu_reorg_process;
 
+error_def(ERR_MMREGNOACCESS);
+
 void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcst_routine */
 {
 	srch_blk_status	*s;
@@ -60,7 +62,11 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 							 * incremented for the current transaction.
 							 */
 	t_err = err;
-
+	if ((NULL == cs_addrs->db_addrs[0]) && (dba_mm == cs_addrs->hdr->acc_meth))
+	{
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(cs_addrs->region),
+					DB_LEN_STR(cs_addrs->region));
+	}
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */
         /* start_tn manipulation for TP taken care of in tp_hist */
 	if (cs_addrs->critical)

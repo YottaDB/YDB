@@ -1,0 +1,70 @@
+	.title	cmj_util utility routines
+
+;	remqti	- remove self-relative queue entry from tail interlocked
+;
+;	calling sequence:
+;
+;	typedef struct
+;	{
+;		long flink,blink;
+;	} self_rel_que;
+;	
+;	self_rel_que *remqti(queheader)
+;	self_rel_que *queheader;
+;	
+;	return:
+;		if successful, then a pointer to the queue entry which was removed
+;		if zero, then the queue was empty
+;		if -1, then the secondary interlock failed, the instruction may
+;			be retried, but should declare a GTMCHECK if the secondary
+;			interlock fails repeatedly
+;	
+QI_STARVATION = 6
+
+	.entry	insqhi,^m<>
+	clrl	r0
+	movl	#QI_STARVATION,r1
+5$:	insqhi	@4(ap),@8(ap)
+	bcs	20$
+	bneq	10$
+	incl	r0
+10$:	ret
+20$:	sobgtr	r1,5$
+	decl	r0
+	ret
+
+	.entry	insqti,^m<>
+	clrl	r0
+	movl	#QI_STARVATION,r1
+5$:	insqti	@4(ap),@8(ap)
+	bcs	20$
+	bneq	10$
+	incl	r0
+10$:	ret
+20$:	sobgtr	r1,5$
+	decl	r0
+	ret
+
+	.entry	remqhi,^m<>
+	movl	#QI_STARVATION,r1
+5$:	remqhi	@4(ap),r0
+	bcs	20$
+	bvc	10$
+	clrl	r0
+10$:	ret
+20$:	sobgtr	r1,5$
+	mnegl	#1,r0
+	ret
+
+
+	.entry	remqti,^m<>
+	movl	#QI_STARVATION,r1
+5$:	remqti	@4(ap),r0
+	bcs	20$
+	bvc	10$
+	clrl	r0
+10$:	ret
+20$:	sobgtr	r1,5$
+	mnegl	#1,r0
+	ret
+	.end

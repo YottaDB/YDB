@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,14 +60,10 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	int4		srcsymvlvl;
 	boolean_t	added;
 
-	error_def(ERR_ALIASEXPECTED);
-
 	assert(alias_retarg == srcmv);
 	assert(srcmv);
 	assert(srcmv->mvtype & MV_ALIASCONT);
-	/* Verify is a temp mval */
-	assert((char *)srcmv >= (char *)frame_pointer->temps_ptr
-	       && (char *)srcmv < ((char *)frame_pointer->temps_ptr + (SIZEOF(char *) * frame_pointer->temp_mvals)));
+	assert(MVAL_IN_RANGE(srcmv, frame_pointer->temps_ptr, frame_pointer->temp_mvals));	/* Verify is a temp mval */
 	srclvc = (lv_val *)srcmv->str.addr;
 	assert(srclvc);
 	assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */

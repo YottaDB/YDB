@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,15 @@ enum gtm_types
 	gtm_char_starstar,
 	gtm_double_star,
 	gtm_pointertofunc,
-	gtm_pointertofunc_star
+	gtm_pointertofunc_star,
+	gtm_jboolean,
+	gtm_jint,
+	gtm_jlong,
+	gtm_jfloat,
+	gtm_jdouble,
+	gtm_jstring,
+	gtm_jbyte_array,
+	gtm_jbig_decimal
 };
 
 enum callintogtm_fncs

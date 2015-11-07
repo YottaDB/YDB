@@ -14,10 +14,6 @@
 
 #include <sys/types.h>
 
-#if defined(__ia64) || defined(__x86_64__) || defined(__sparc) || defined(__s390__)
-#define GTM64
-#endif /* __ia64 */
-
 #ifdef GTM64
 typedef	long		int8;		/* 8-byte signed integer */
 typedef unsigned long	uint8;	  	/* 8-byte unsigned integer */
@@ -38,11 +34,6 @@ typedef uint2 mach_inst;
 #define	INT8_FMTX		"[0x%llx]"
 #define UNICODE_SUPPORTED
 
-/* Starting off life as debugging parms and now we need them for the
-	short term so define them here */
-#define DEBUG_LEAVE_SM
-#define DEBUG_NOMSYNC
-
 #define UNIX 1
 #undef VMS
 #define BIGENDIAN 1
@@ -50,7 +41,6 @@ typedef uint2 mach_inst;
 
 #ifdef __sparc
 #define CACHELINE_SIZE	256
-#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #define USHBIN_SUPPORTED
 #define LINKAGE_PSECT_BOUNDARY	8
 #define OFF_T_LONG
@@ -78,7 +68,6 @@ typedef uint4 mach_inst;
 #endif /* __ia64 */
 
 #ifdef __hpux
-#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
 #define USHBIN_SUPPORTED
@@ -86,9 +75,12 @@ typedef uint4 mach_inst;
 /* Make sure linkage Psect is aligned on appropriate boundary. */
 #ifdef __ia64
 #define LINKAGE_PSECT_BOUNDARY	8
-#else
+#else /* parisc */
 #define LINKAGE_PSECT_BOUNDARY	4
-#endif //__ia64
+#ifdef __GNUC__
+typedef unsigned short	in_port_t; /* GCC needs this on PARISC */
+#endif
+#endif
 typedef uint4 mach_inst;	/* machine instruction */
 #endif /* __hpux */
 
@@ -127,16 +119,14 @@ typedef unsigned short	in_port_t;
 #define	GTM_CONTEXT(func)	(unsigned char *)func
 #define SSM_SIZE		256*1024*1024	/* Segments on 256M boundary */
 #define SHMAT_ADDR_INCS 	SSM_SIZE
-#define MSYNC_ADDR_INCS 	OS_PAGE_SIZE
 #define USHBIN_SUPPORTED
 #endif /* __s390__ */
 
 #ifdef __ia64
 #  ifdef __linux__
-#    define MSYNC_ADDR_INCS	OS_PAGE_SIZE
-#  undef BIGENDIAN
+#    undef BIGENDIAN
 #    define USHBIN_SUPPORTED
-	/* Make sure linkage Psect is aligned on appropriate boundary. */
+     /* Make sure linkage Psect is aligned on appropriate boundary. */
 #    define LINKAGE_PSECT_BOUNDARY  8
 typedef uint4 mach_inst;	/* machine instruction */
 #  elif defined(__hpux)
@@ -149,14 +139,12 @@ void dyncall();
 #ifdef __i386
 /* Through Pentium Pro/II/III, should use CPUID to get real value perhaps */
 #define CACHELINE_SIZE	32
-#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #undef BIGENDIAN
 typedef char  mach_inst;	/* machine instruction */
 #endif /* __i386 */
 
 #ifdef __x86_64__
 #define CACHELINE_SIZE	64
-#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #define USHBIN_SUPPORTED
 #define INO_T_LONG
 /*

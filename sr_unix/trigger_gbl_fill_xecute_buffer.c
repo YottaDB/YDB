@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "memcoherency.h"
 #include "t_retry.h"
 #include "gtmimagename.h"
+#include "filestruct.h"			/* for FILE_INFO, needed by REG2CSA */
 
 LITREF	mval			literal_ten;
 
@@ -135,7 +136,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 			assert(FALSE);
 			trgindx = mval2i(&index);
 			SET_PARAM_STRING(util_buff, util_len, trgindx, ",\"XECUTE\"");
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn, util_len, util_buff);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					trigvn_len, trigvn, util_len, util_buff);
 		}
 		val_ptr = &key_val;
 		xecute_buff_len = mval2i(val_ptr);
@@ -154,8 +156,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				free(xecute_buff);
 				assert(FALSE);
 				SET_PARAM_STRING(util_buff, util_len, num, ",\"XECUTE\"");
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn, util_len,
-					util_buff);
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+						trigvn_len, trigvn, util_len, util_buff);
 			}
 			memcpy(xecute_buff_ptr, key_val.str.addr, key_val.str.len);
 			xecute_buff_ptr += key_val.str.len;

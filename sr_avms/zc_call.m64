@@ -1,0 +1,363 @@
+; ****************************************************************
+; *								 *
+; *      Copyright 2001, 2012 Fidelity Information Services, Inc *
+; *      This source code contains the intellectual property     *
+; *      of its copyright holder(s), and is made available       *
+; *      under a license.  If you do not know the terms of       *
+; *      the license, please stop and do not read further.       *
+; *                                                              *
+; ****************************************************************
+
+	.title	ZC_CALL
+
+; Call interface:
+;
+;	int zc_call (zcrtn, zcret, lcllist, lcllistend, save_ret);
+;	zctabrtn	*zcrtn;
+;	zctabret	*zcret;
+;	lclarg		*lcllist, *lcllistend;
+;	int		*save_ret;
+;
+; On entry, lcllist points to a list of local arguments, and lcllistend
+; points to the byte just after the last argument in the list.  ZC_CALL
+; passes these arguments to the routine pointed to by zcrtn, and processes
+; the return value as specified by zcret and save_ret.
+
+; The following definitions must reflect the structure layouts in ZCALL.H:
+
+; ZCALL Table routine offsets (correspond to type zctabrtn):
+	rtn_entrypoint	= 4
+
+; ZCALL Table return offsets (correspond to type zctabret):
+	ret_class	= 0
+	ret_type	= 1
+
+; ZCALL Table argument offsets (correspond to types zctabinput and zctaboutput):
+	arg_mechanism	= 0
+	arg_type	= 1
+	arg_qualifier	= 3
+
+
+; Local argument offsets;  these definitions reflect the structure layout of
+; type lclarg, which is defined in DO_ZCALL.C:
+	lcl_skip	= 0
+	lcl_zctab	= 4
+	lcl_dsc		= 8
+
+	lcl_size	= 48
+
+
+	zcdef
+	macro64$callstd_defs
+
+
+	$linkage_section
+
+a_zcch:
+	.address ZCCH
+
+L_ERR_ZCSTATUS:
+	.long	ERR_ZCSTATUS
+
+L_ERR_GTMCHECK:
+	.long	ERR_GTMCHECK
+
+
+	$code_section
+
+	$routine ZC_CALL, entry=ZC_CALL_CA, kind=stack, saved_regs=<r2,r3,r13,fp>, -
+		handler=GTM$DYN_CH, rsa_offset=16
+	stq	r31, 8(fp)
+	mov	r27, r13
+	.base	r13, $ls
+
+
+; Process the local arguments in reverse order;
+;	r18 = lcllist
+;	r19 = lcllistend
+
+	clr	r0			; r0 will count the arguments
+	clr	r25			; r25 will accumulate argument information
+
+loop:
+	subq	r19, lcl_size, r19
+	cmple	r18, r19, r24
+	blbc	r24, setup_call
+
+	ldl	r1, lcl_zctab(r19)	; lclarg.zctab, ZCALL Table argument
+
+;	Skip this argument?
+	ldl	r26, lcl_skip(r19)	; lclarg.skip
+	blbc	r26, 10$
+
+;	Yes;  is this argument optional?
+	ldq_u	r24, arg_qualifier(r1)
+	lda	r23, arg_qualifier(r1)
+	extbl	r24, r23, r24
+	cmpeq	r24, zc$iqual_optional, r24
+	blbs	r24, loop		; yes; skip it
+
+10$:	addq	r0, 1, r0		; bump the argument count
+	lda	sp, -8(sp)		; allocate space for the argument
+
+;	Shift any previous argument information up one slot:
+	sll	r25, macro64$ai_reg_info1_length, r25
+
+	ldq_u	r24, arg_mechanism(r1)
+	lda	r23, arg_mechanism(r1)
+	extbl	r24, r23, r24
+
+	lda	r22, lcl_dsc(r19)	; lclarg.dsc
+
+	cmpeq	r24, zc$mech_descriptor, r23
+	blbs	r23, by_descriptor
+
+	cmpeq	r24, zc$mech_descriptor64, r23
+	blbs	r23, by_descriptor
+
+	ldl	r22, dsc$a_pointer(r22)
+
+	cmpeq	r24, zc$mech_reference, r23
+	blbs	r23, by_reference
+
+	cmpeq	r24, zc$mech_value, r23
+	blbc	r23, assertfail
+
+; Argument is to be passed by value:
+	ldq_u	r24, arg_type(r1)
+	lda	r23, arg_type(r1)
+	extbl	r24, r23, r24		; r24 = data type
+
+	cmpeq	r24, zc$dtype_long, r23
+	blbs	r23, long
+
+	cmpeq	r24, zc$dtype_word, r23
+	blbs	r23, word
+
+	cmpeq	r24, zc$dtype_byte, r23
+	blbs	r23, byte
+
+	cmpeq	r24, zc$dtype_longu, r23
+	blbs	r23, longu
+
+	cmpeq	r24, zc$dtype_wordu, r23
+	blbs	r23, wordu
+
+	cmpeq	r24, zc$dtype_byteu, r23
+	blbs	r23, byteu
+
+	cmpeq	r24, zc$dtype_quad, r23
+	blbs	r23, quad
+
+	cmpeq	r24, zc$dtype_floating, r23
+	blbs	r23, float
+
+	cmpeq	r24, zc$dtype_double, r23
+	blbs	r23, double
+
+	cmpeq	r24, zc$dtype_g_floating, r23
+	blbc	r23, assertfail
+
+double:
+	mov	macro64$ar_fg, r28
+	ldg	f0, (r22)		; D_ or G_floating - fall into float_common
+
+float_common:
+	stg	f0, (sp)
+	sll	r28, macro64$ai_reg_info1_start, r28
+	or	r25, r28, r25
+	br	loop
+
+float:	ldf	f0, (r22)
+	mov	macro64$ar_ff, r28
+	br	float_common
+
+byte:	ldq_u	r28, (r22)
+	lda	r23, 1(r22)
+	extqh	r28, r23, r28
+	sra	r28, 56, r28
+	stq	r28, (sp)
+	br	loop
+
+byteu:	ldq_u	r28, (r22)
+	extbl	r28, r22, r28
+	stq	r28, (sp)
+	br	loop
+
+word:	ldq_u	r28, (r22)
+	ldq_u	r27, 1(r22)
+	extwl	r28, r22, r28
+	extwh	r27, r22, r27
+	or	r27, r28, r28
+	sll	r28, 48, r28
+	sra	r28, 48, r28
+	stq	r28, (sp)
+	br	loop
+
+wordu:	ldq_u	r28, (r22)
+	ldq_u	r27, 1(r22)
+	extwl	r28, r22, r28
+	extwh	r27, r22, r27
+	or	r27, r28, r28
+	stq	r28, (sp)
+	br	loop
+
+long:	ldq_u	r28, (r22)
+	ldq_u	r27, 3(r22)
+	extll	r28, r22, r28
+	extlh	r27, r22, r27
+	or	r27, r28, r28
+	sll	r28, 32, r28
+	sra	r28, 32, r28
+	stq	r28, (sp)
+	br	loop
+
+longu:	ldq_u	r28, (r22)
+	ldq_u	r27, 3(r22)
+	extll	r28, r22, r28
+	extlh	r27, r22, r27
+	or	r27, r28, r28
+	stq	r28, (sp)
+	br	loop
+
+quad:	ldq_u	r28, (r22)
+	ldq_u	r27, 7(r22)
+	extql	r28, r22, r28
+	extqh	r27, r22, r27
+	or	r27, r28, r28
+	stq	r28, (sp)
+	br	loop
+
+
+; Argument is to be passed by descriptor or by reference:
+by_descriptor:
+	cmovlbs	r26, 0, r22		; if this arg is to be skipped, zero out r22
+
+by_reference:
+	stq	r22, (sp)		; stack address of argument
+	br	loop
+
+
+; All of the arguments have been processed;  set up the ZCALL:
+
+setup_call:
+	addq	r19, lcl_size, r19	; assert (r19 + lcl_size == lcllist);
+	cmpeq	r19, r18, r24
+	blbc	r24, assertfail
+
+	mov	r17, r2			; save zcret
+	mov	r20, r3			; save save_ret
+
+	ldl	r27, rtn_entrypoint(r16); r27 = zcrtn->entrypoint = address of procedure descriptor
+	ldq	r26, 8(r27)		; r26 = address of entry point
+
+;	Set up the Argument Information register, r25;
+;	bits <63:26> must be zero, and the argument count goes in the low order byte:
+	sll	r25, 38, r25
+	srl	r25, 38, r25
+	or	r25, r0, r25
+
+; At this point, all of the arguments are on the stack.  Even though there
+; may be fewer than six of them, it's a lot faster and easier to load all six
+; integer argument registers and all six floating point argument registers
+; than it would be to figure out how many to load, and into which registers.
+; If there are actually fewer than six arguments, then the values loaded into
+; some of these registers will be irrelevant.  This is not a big deal.
+
+	ldq	r16,   (sp)
+	ldq	r17,  8(sp)
+	ldq	r18, 16(sp)
+	ldq	r19, 24(sp)
+	ldq	r20, 32(sp)
+	ldq	r21, 40(sp)
+
+	ldg	f16,   (sp)
+	ldg	f17,  8(sp)
+	ldg	f18, 16(sp)
+	ldg	f19, 24(sp)
+	ldg	f20, 32(sp)
+	ldg	f21, 40(sp)
+
+; The stack pointer must also be adjusted to reflect that these arguments have
+; been "popped" off the stack.  Only the actual number of arguments (up to six)
+; will be popped.  This leaves the seventh and successive arguments on the stack
+; (if any).
+
+	mov	6, r22
+	cmplt	r0, r22, r24
+	cmovlbs	r24, r0, r22		; r22 = min(6,r0) = number of arguments popped
+	s8addq	r22, sp, sp
+
+
+	ldq	r28, a_zcch
+	stq	r28, 8(fp)		; establish ZCALL condition handler
+
+	jsr	r26, r26		; ZCALL
+
+	stq	r31, 8(fp)		; remove ZCALL condition handler
+
+;	Check the return class:
+	ldq_u	r28, ret_class(r2)
+	lda	r27, ret_class(r2)
+	extbl	r28, r27, r28		; r28 = zcret->class
+
+	cmpeq	r28, zc$retc_status, r23
+	blbs	r23, check_status
+
+	cmpeq	r28, zc$retc_value, r23
+	blbc	r23, return
+
+;	Return class = value;  check the data type:
+	ldq_u	r24, ret_type(r2)
+	lda	r27, ret_type(r2)
+	extbl	r24, r27, r24		; r24 = zcret->type
+
+	cmpeq	r24, zc$dtype_long, r23
+	blbs	r23, quad_ret
+
+	cmpeq	r24, zc$dtype_longu, r23
+	blbs	r23, quad_ret
+
+	cmpeq	r24, zc$dtype_quad, r23
+	blbs	r23, quad_ret
+
+	cmpeq	r24, zc$dtype_floating, r23
+	blbs	r23, float_ret
+
+	cmpeq	r24, zc$dtype_double, r23
+	blbs	r23, double_ret
+
+	cmpeq	r24, zc$dtype_g_floating, r23
+	blbc	r23, assertfail
+
+double_ret:
+	stg	f0, (r3)
+	br	return
+
+float_ret:
+	stf	f0, (r3)
+	br	return
+
+quad_ret:
+	stq	r0, (r3)
+
+
+return:
+	$return
+
+
+check_status:
+	stl	r0, (r3)
+	blbs	r0, return
+	mov	r0, r18
+	$call	LIB$SIGNAL, args=<L_ERR_ZCSTATUS/L, 0/a, r18, 0/a>, nonstandard=true
+	br	return
+
+
+assertfail:
+	$call	LIB$SIGNAL, args=L_ERR_GTMCHECK/L, nonstandard=true
+	br	return
+
+	$end_routine
+
+	.end

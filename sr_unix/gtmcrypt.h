@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,7 @@ GBLREF	boolean_t			gtmcrypt_initialized;
 LITREF	char				gtmcrypt_repeat_msg[];
 
 error_def(ERR_CRYPTDLNOOPEN);
+error_def(ERR_CRYPTDLNOOPEN2);
 error_def(ERR_CRYPTHASHGENFAILED);
 error_def(ERR_CRYPTINIT);
 error_def(ERR_CRYPTKEYFETCHFAILED);
@@ -102,7 +103,7 @@ uint4 gtmcrypt_entry(void);
 #define CLEAR_CRYPTERR_MASK(ERRID)		(ERRID = ((ERRID) & ~CRYPTERR_MASK))
 #define CLEAR_REPEAT_MSG_MASK(ERRID)		(ERRID = ((ERRID) & ~REPEAT_MSG_MASK))
 
-#define GTMCRYPT_REPORT_ERROR(ERRID, MECHANSIM, LEN, PTR)									\
+#define GTMCRYPT_REPORT_ERROR(ERRID, MECHANISM, LEN, PTR)									\
 {																\
 	GBLREF	char		dl_err[];											\
 																\
@@ -114,16 +115,18 @@ uint4 gtmcrypt_entry(void);
 	CLEAR_CRYPTERR_MASK(errid);												\
 	if (IS_REPEAT_MSG_MASK(errid))												\
 		errptr = &gtmcrypt_repeat_msg[0];										\
-	else if ((ERR_CRYPTDLNOOPEN == errid) || (MAKE_MSG_WARNING(ERR_CRYPTDLNOOPEN) == errid))				\
+	else if ((ERR_CRYPTDLNOOPEN == errid) || (ERR_CRYPTDLNOOPEN2 == errid)							\
+			|| (MAKE_MSG_WARNING(ERR_CRYPTDLNOOPEN2) == errid) || (MAKE_MSG_WARNING(ERR_CRYPTDLNOOPEN) == errid))	\
+	{															\
 		errptr = (const char *) &dl_err[0];										\
-	else															\
+	} else															\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 		errptr = (const char *) (*gtmcrypt_strerror_fnptr)();								\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 	}															\
 	CLEAR_REPEAT_MSG_MASK(errid);												\
-	MECHANSIM(VARLSTCNT(6) errid, 4, LEN, PTR, LEN_AND_STR(errptr));							\
+	MECHANISM(VARLSTCNT(6) errid, 4, LEN, PTR, LEN_AND_STR(errptr));							\
 }
 
 
@@ -189,7 +192,9 @@ uint4 gtmcrypt_entry(void);
 	RC = 0;															\
 	prompt_passwd = PROMPT_PASSWD(ptr);											\
 	if (prompt_passwd && dollar_tlevel)											\
-		rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP); /* GT.M call-ins don't support TP transactions (see gtm_ci_exec)*/	\
+	{	/* GT.M call-ins don't support TP transactions (see gtm_ci_exec) */						\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(1) ERR_CRYPTNOPSWDINTP); 							\
+	}															\
 	assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI)); /* ensures not already in gtm_ci */			\
 	/* ALLOC_BUFF_GET_ENCR_KEY eventually invokes gtmcrypt_getkey_by_hash to obtain the encryption key for the concerned	\
 	 * database. At this point encryption initialization is already done (as part of INIT_PROC_ENCRYPTION) even if the	\
@@ -234,7 +239,7 @@ uint4 gtmcrypt_entry(void);
 			prompt_passwd = PROMPT_PASSWD(ptr);									\
 			if (prompt_passwd && dollar_tlevel)									\
 			{	/* GT.M call-ins don't support TP transactions (see gtm_ci_exec)*/				\
-				rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);							\
+				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);					\
 			}													\
 			assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI)); /* ensures not already in gtm_ci */	\
 			/* If password is set to empty string, gtmcrypt_init (called below) invokes gtm_ci to obtain the	\

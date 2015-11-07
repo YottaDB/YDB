@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,12 +39,23 @@
 #include "min_max.h"
 #include "gtmimagename.h"
 #include "memcoherency.h"
+#include "gdskill.h"
+#include "gdscc.h"
+#include "jnl.h"
+#include "buddy_list.h"         /* needed for tp.h */
+#include "hashtab_int4.h"       /* needed for tp.h */
+#include "tp.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
+GBLREF	unsigned int		t_tries;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_addrs		*kip_csa;
+GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_DYNUPGRDFAIL);
 
@@ -56,10 +67,12 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
 	boolean_t		fully_upgraded, buff_is_modified_after_lseekread;
 	int			bsiz;
-	DEBUG_ONLY(
-		blk_hdr_ptr_t	blk_hdr_val;
-		static int	in_dsk_read;
-	)
+#	ifdef DEBUG
+	unsigned int		effective_t_tries;
+	boolean_t		killinprog;
+	blk_hdr_ptr_t		blk_hdr_val;
+	static int		in_dsk_read;
+#	endif
 	/* It is possible that the block that we read in from disk is a V4 format block.  The database block scanning routines
 	 * (gvcst_*search*.c) that might be concurrently running currently assume all global buffers (particularly the block
 	 * headers) are V5 format.  They are not robust enough to handle a V4 format block. Therefore we do not want to
@@ -77,7 +90,9 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	char			*in, *out;
 	boolean_t		is_encrypted;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
 	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
 	 */
@@ -141,12 +156,10 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		buff_is_modified_after_lseekread = TRUE;
 		/* Do not do encryption/decryption if block is FREE */
 		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, in_len)))
-		{
-			/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
-			 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
-			 * a V5 block header.
+		{	/* Due to concurrency conflicts, we are potentially reading a free block even though blk_free is
+			 * FALSE. Go ahead and safely "decrypt" such a block, even though it contains no valid contents.
+			 * We expect GTMCRYPT_DECRYPT to return success even if it is presented with garbage data.
 			 */
-			assert((bsiz <= cs_data->blk_size) && (bsiz >= SIZEOF(blk_hdr)));
 			ASSERT_ENCRYPTION_INITIALIZED;
 			memcpy(buff, enc_save_buff, SIZEOF(blk_hdr));
 			in = (char *)(enc_save_buff + SIZEOF(blk_hdr));
@@ -200,15 +213,24 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
 	}
-	DEBUG_ONLY(
-		in_dsk_read--;
-		if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
-		{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
-			 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
-			 */
-			blk_hdr_val = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
-			GDS_BLK_HDR_CHECK(cs_data, blk_hdr_val, fully_upgraded);
-		}
-	)
+#	ifdef DEBUG
+	in_dsk_read--;
+	/* Expect t_tries to be 3 if we have crit. Exceptions: gvcst_redo_root_search (where t_tries is temporarily reset
+	 * for the duration of the redo_root_search and so we should look at the real t_tries in redo_rootsrch_ctxt),
+	 * gvcst_expand_free_subtree and DSE (where we grab crit before doing the t_qread irrespective of t_tries), and
+	 * forward recovery (where we grab crit before doing everything).
+	 */
+	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
+	effective_t_tries = MAX(effective_t_tries, t_tries);
+	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
+	assert(dse_running || killinprog || (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)) || jgbl.forw_phase_recovery);
+	if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
+	{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
+		 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
+		 */
+		blk_hdr_val = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
+		GDS_BLK_HDR_CHECK(cs_data, blk_hdr_val, fully_upgraded);
+	}
+#	endif
 	return save_errno;
 }

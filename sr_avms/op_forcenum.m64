@@ -1,0 +1,96 @@
+;#################################################################
+;#								 #
+;#	Copyright 2006, 2008 Fidelity Information Services, Inc	 #
+;#								 #
+;#	This source code contains the intellectual property	 #
+;#	of its copyright holder(s), and is made available	 #
+;#	under a license.  If you do not know the terms of	 #
+;# 	the license, please stop and do not read further.	 #
+;#								 #
+;#################################################################
+	.title	OP_FORCENUM
+
+	mval$def
+
+
+	$routine OP_FORCENUM, entry=OP_FORCENUM_CA, kind=null
+	lda	sp, -32(sp)
+	stq	r26, (sp)
+	stq	r13, 8(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+
+	stq	r0, 16(sp)
+	mv_force_defined r1
+	stq	r1, 24(sp)
+	mv_force_num (r1)
+	ldq	r0, 16(sp)
+	ldq	r1, 24(sp)
+
+	mv_if_notstring (r1), 10$
+
+	ldl	r28, (r1)
+	and	r28, mval$m_num_approx, r28
+	beq	r28, 30$
+
+10$:	mv_if_notint (r1), 20$
+
+;	Set mvtype to int:
+	ldl	r28, mval$w_mvtype(r0)
+	mskwl	r28, mval$w_mvtype, r28
+	or	r28, mval$m_int, r28
+	stl	r28, mval$w_mvtype(r0)
+
+;	Copy r1->m1 to r0->m1
+	ldl	r24, mval$l_m1(r1)
+	stl	r24, mval$l_m1(r0)
+
+;	Return:
+	ldq	r26, (sp)
+	ldq	r13, 8(sp)
+	lda	sp, 32(sp)
+	ret	r26
+
+
+;	Copy r1->exp to r0->exp, and set r0->mvtype = nm:
+20$:	ldl	r28, mval$w_mvtype(r1)		; r28 = longword containing r1->exp
+	zapnot	r28, ^X1@mval$b_exp, r28	; clear all but the exp field
+	or	r28, mval$m_nm, r28		; set the mvtype field to nm
+	stl	r28, mval$w_mvtype(r0)
+
+;	Copy r1->(m0,m1) to r0->(m0,m1)
+	ldl	r24, mval$l_m0(r1)
+	ldl	r28, mval$l_m1(r1)
+	stl	r24, mval$l_m0(r0)
+	stl	r28, mval$l_m1(r0)
+
+;	Return:
+	ldq	r26, (sp)
+	ldq	r13, 8(sp)
+	lda	sp, 32(sp)
+	ret	r26
+
+
+;	Copy r1->mval to r0->mval
+;	(mval's are longword-aligned, and are 5 longwords long [mval$size = 20]):
+30$:	ldl	r16, (r1)
+	ldl	r17, 4(r1)
+	ldl	r18, 8(r1)
+	ldl	r19, 12(r1)
+	ldl	r20, 16(r1)
+	stl	r16, (r0)
+	stl	r17, 4(r0)
+	stl	r18, 8(r0)
+	stl	r19, 12(r0)
+	stl	r20, 16(r0)
+
+;	Return:
+	ldq	r26, (sp)
+	ldq	r13, 8(sp)
+	lda	sp, 32(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

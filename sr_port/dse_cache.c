@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,6 @@ void dse_cache(void)
 	char		temp_str[256], temp_str1[256];
 	sm_uc_ptr_t	chng_ptr;
 	cache_rec_ptr_t	cr_que_lo;
-	mmblk_rec_ptr_t	mr_que_lo;
 	boolean_t	is_mm, was_hold_onto_crit, wc_blocked_ok;
 
 	all_present = (CLI_PRESENT == cli_present("ALL"));
@@ -83,7 +82,7 @@ void dse_cache(void)
 		if (!cli_get_int("SIZE",   &size))
 			return;
 		if (!((SIZEOF(char) == size) || (SIZEOF(short) == size) || (SIZEOF(int4) == size)))
-			rts_error(VARLSTCNT(1) ERR_SIZENOTVALID4);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID4);
 	}
 	if (value_present  && !cli_get_hex("VALUE",  &value))
 		return;
@@ -227,14 +226,6 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 			} else
 			{
-				util_out_print("Region !AD :  mmblk_state        = 0x!XJ",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.mm.mmblk_state));
-				mr_que_lo = &csa->acc_meth.mm.mmblk_state->mmblk_array[0];
-				util_out_print("Region !AD :  mmblk_que_header   = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo), csa->hdr->bt_buckets, SIZEOF(mmblk_rec));
-				util_out_print("Region !AD :  mm_cache_record    = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo + csa->hdr->bt_buckets), csa->hdr->n_bts,
-					SIZEOF(mmblk_rec));
 				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
 					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csa->hdr);

@@ -1,0 +1,66 @@
+	.title	OPP_XNEW
+
+	G_MSF
+
+	$linkage_section
+A_frame_pointer:
+	.address frame_pointer
+
+	$routine OPP_XNEW, entry=OPP_XNEW_CA, kind=null
+stack_offset = 16
+	lda	sp, -stack_offset(sp)
+	stq	r2, (sp)
+	stq	r3, 8(sp)
+
+	mov	sp, r2			; save the current stack pointer
+
+; Note: we use r3 as a base for the linkage section instead of the usual r13,
+;	since r13 is saved by putframe and restored by getframe:
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+
+; The variable length argument list that was passed to us must be passed on to OP_XNEW.
+; However, since our first argument is actually the argument count, it has to be moved
+; into the Argument Information register (r25), and the remaining arguments must all be
+; moved down one slot in the list:
+
+	mov	r16, r25		; argument count
+	mov	r17, r16		; arg1
+	mov	r18, r17		; arg2
+	mov	r19, r18		; arg3
+	mov	r20, r19		; arg4
+	mov	r21, r20		; arg5
+	ldq	r21, stack_offset(sp)	; arg6 was on the stack
+
+; Any additional arguments that were on the stack must be re-stacked below our register save area:
+
+	subq	r25, 6, r28		; r28 = the number of arguments left on the stack
+	ble	r28, 5$			; skip if none
+
+	sll	r28, 3, r0
+	addq	r0, stack_offset, r0	; account for the saved registers
+	addq	r0, sp, r0		; r0 -> argN
+loop:
+	ldq	r1, (r0)
+	lda	sp, -8(sp)
+	lda	r0, -8(r0)
+	subq	r28, 1, r28
+	stq	r1, (sp)
+	bgt	r28, loop
+
+5$:	$call	OP_XNEW, set_arg_info=false, nonstandard=true
+
+	mov	r2, sp			; restore the stack
+
+	getframe
+
+	ldq	r2, (sp)
+	ldq	r3, 8(sp)
+	lda	sp, stack_offset(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

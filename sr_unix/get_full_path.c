@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,10 +19,11 @@
 
 #include "gdsroot.h"
 #include "gdsbt.h"
+#include "have_crit.h"
 
 error_def(ERR_FILENAMETOOLONG);
 
-/* gets the full path name for a given file name. Prepends the CWD, even if the file does not exist */
+/* Gets the full path name for a given file name. Prepends the CWD, even if the file does not exist. */
 boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len, int max_len, uint4 *status)
 {
 	char	*cptr, *c1;
@@ -32,8 +33,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 	char	*getcwd_res;
 
 	if ('/' == *orig_fn)
-	{
-		/* The original path is already complete */
+	{	/* The original path is already complete */
 		if (max_len < orig_len)
 		{
 			*status = ERR_FILENAMETOOLONG;
@@ -44,7 +44,8 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 		memcpy(full_fn, orig_fn, length);
 	} else
 	{
-		if (NULL == GETCWD(cwdbuf, SIZEOF(cwdbuf), getcwd_res))
+		GETCWD(cwdbuf, SIZEOF(cwdbuf), getcwd_res);
+		if (NULL == getcwd_res)
 		{
 			*status = errno;
 			return FALSE;

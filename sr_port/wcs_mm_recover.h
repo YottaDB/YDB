@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 {												\
 	if (csa->total_blks != csa->ti->total_blks)						\
 		wcs_mm_recover(reg);								\
-	assert(csa->total_blks == csa->ti->total_blks);						\
+	assert(!csa->now_crit || (csa->total_blks == csa->ti->total_blks));			\
 }
 
 #define CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg)						\

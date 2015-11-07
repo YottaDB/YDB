@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,23 +32,26 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	boolean_t	is_updproc;
 GBLREF	boolean_t	mupip_jnl_recover;
 
+error_def(ERR_TRANS2BIG);
+
 void tp_cw_list(cw_set_element **cs)
 {
-	cw_set_element	*last_cse, *tempcs, *prev_last;
-
-	error_def(ERR_TRANS2BIG);
+	cw_set_element		*last_cse, *tempcs, *prev_last;
+	boolean_t		is_bg;
+	sgmnt_data_ptr_t	csd;
 
 	/* Don't allow a single transaction to use more cw_set_elements than half of the global buffers or
-	 * more than 32K cw_set_elements. This because the "cw_index" field in "off_chain" structure is 15-bits.
+	 * more than 32K cw_set_elements. This because the "cw_index" field in "off_chain" structure is CW_INDEX_MAX_BITS-bits.
 	 */
-	if (dba_bg == cs_addrs->hdr->acc_meth)
-		if (sgm_info_ptr->cw_set_depth + 2 >= (cs_addrs->hdr->n_bts >> 1) ||
-				sgm_info_ptr->cw_set_depth + 2 > (32 * 1024))
-		{	/* catch the case where MUPIP recover or update process gets into this situation */
-			assert(!mupip_jnl_recover && !is_updproc);
-			rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
-		}
-
+	csd = cs_addrs->hdr;
+	is_bg = (dba_bg == csd->acc_meth);
+	assert(is_bg || (dba_mm == csd->acc_meth));
+	if ((sgm_info_ptr->cw_set_depth + 2 > (1 << CW_INDEX_MAX_BITS))
+		|| (is_bg && ((sgm_info_ptr->cw_set_depth + 2) >= (csd->n_bts >> 1))))
+	{	/* catch the case where MUPIP recover or update process gets into this situation */
+		assert(!mupip_jnl_recover && !is_updproc);
+		rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
+	}
 	tempcs = (cw_set_element *)get_new_element(sgm_info_ptr->cw_set_list, 1);
 	/* secshr_db_clnup relies on the cw_set_element (specifically the "mode" field) being initialized to a value
 	 * that is not "gds_t_committed". This needs to be done before setting sgm_info_ptr->first_cw_set. */

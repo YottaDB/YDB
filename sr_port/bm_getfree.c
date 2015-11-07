@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,9 @@ GBLREF uint4		dollar_tlevel;
 GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
 
+error_def(ERR_DBBADFREEBLKCTR);
+error_def(ERR_DBMBMINCFREFIXED);
+
 block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
@@ -99,7 +102,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 				hint = 1;
 				continue;
 			}
-			if (SS_NORMAL != (status = gdsfilext(cs_data->extension_size, total_blks)))
+			if (SS_NORMAL != (status = GDSFILEXT(cs_data->extension_size, total_blks, TRANS_IN_PROG_TRUE)))
 				return (status);
 			if (dba_mm == cs_data->acc_meth)
 				return (FILE_EXTENDED);
@@ -199,8 +202,12 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 			if (hint_cycled)
 				hint_cycled = (hint_limit < hint_cycled) ? hint_limit: 0;
 		}
-		if ((0 == depth) && (FALSE != cs_addrs->now_crit))	/* if it's from the cw_set, its state is murky */
-			bit_clear(bml / BLKS_PER_LMAP, MM_ADDR(cs_data));	/* if crit, repair master map error */
+		if ((0 == depth) && cs_addrs->now_crit)	/* if it's from the cw_set, its state is murky */
+		{
+			assert(FALSE);
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_DBMBMINCFREFIXED, 1, bml);
+			bit_clear(bml / BLKS_PER_LMAP, MM_ADDR(cs_data)); /* repair master map error */
+		}
 	}
 	/* If not in the final retry, it is possible that free_bit is >= map_size (e.g. if bitmap block gets recycled). */
 	if (map_size <= (uint4)free_bit && CDB_STAGNATE <= t_tries)
@@ -248,8 +255,6 @@ boolean_t	is_free_blks_ctr_ok(void)
 	sm_uc_ptr_t	bmp;
 	unsigned int	local_maps, total_blks, free_blocks;
 
-	error_def(ERR_DBBADFREEBLKCTR);
-
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data && cs_addrs->now_crit);
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 	local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
@@ -281,7 +286,8 @@ boolean_t	is_free_blks_ctr_ok(void)
 	assert(cs_addrs->ti->free_blocks == free_blocks);
 	if (cs_addrs->ti->free_blocks != free_blocks)
 	{
-		send_msg(VARLSTCNT(6) ERR_DBBADFREEBLKCTR, 4, DB_LEN_STR(gv_cur_region), cs_addrs->ti->free_blocks, free_blocks);
+		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_DBBADFREEBLKCTR, 4, DB_LEN_STR(gv_cur_region),
+				cs_addrs->ti->free_blocks, free_blocks);
 		cs_addrs->ti->free_blocks = free_blocks;
 		return FALSE;
 	}

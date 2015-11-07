@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,11 +113,11 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			jnl_write_eof_rec(csa, &eof_record);
 		if (SS_NORMAL != (jpc->status = jnl_flush(reg)))
 		{
-			send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
 				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during jnl_file_close"),
 				jpc->status);
 			assert(FALSE);
-			rts_error(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
 				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during jnl_file_close"),
 				jpc->status);
 		}
@@ -154,17 +154,17 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			if (SYSCALL_ERROR(jpc->status))
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			UNIX_ONLY(
 				GTM_JNL_FSYNC(csa, jpc->channel, rc);
 				if (-1 == rc)
 				{
 					save_errno = errno;
-					send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
 					assert(FALSE);
-					rts_error(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
 				}
 			)
@@ -188,6 +188,6 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
-		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
 	}
 }

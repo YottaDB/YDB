@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,16 @@
 #include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "cli.h"
+
+#define INIT_QUALIF_STR(QUALIF, CQCODE, FIELD)										\
+{															\
+	if ((glb_cmd_qlf.qlf & CQCODE) && (MV_STR == glb_cmd_qlf.FIELD.mvtype) && (0 < glb_cmd_qlf.FIELD.str.len))	\
+	{														\
+		QUALIF->FIELD.mvtype = MV_STR;										\
+		QUALIF->FIELD.str.len = glb_cmd_qlf.FIELD.str.len;							\
+		memcpy(QUALIF->FIELD.str.addr, glb_cmd_qlf.FIELD.str.addr, glb_cmd_qlf.FIELD.str.len);			\
+	}														\
+}
 
 GBLDEF list_params 		lst_param;
 
@@ -30,6 +40,9 @@ void get_cmd_qlf(command_qualifier *qualif)
 
 	qualif->qlf = glb_cmd_qlf.qlf;
 	qualif->object_file.mvtype = qualif->list_file.mvtype = qualif->ceprep_file.mvtype = 0;
+	INIT_QUALIF_STR(qualif, CQ_OBJECT, object_file);
+	INIT_QUALIF_STR(qualif, CQ_LIST, list_file);
+	INIT_QUALIF_STR(qualif, CQ_CE_PREPROCESS, ceprep_file);
 	if (gtm_utf8_mode)
 		qualif->qlf |= CQ_UTF8;		/* Mark as being compiled in UTF8 mode */
 	if (cli_present("OBJECT") == CLI_PRESENT)
@@ -157,4 +170,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 			s->len = len;
 	} else if (cli_negated("CE_PREPROCESS") == TRUE)
 		qualif->qlf &= ~CQ_CE_PREPROCESS;
+#	ifdef USHBIN_SUPPORTED
+	if (CLI_PRESENT == cli_present("DYNAMIC_LITERALS"))
+		qualif->qlf |= CQ_DYNAMIC_LITERALS;
+#	endif
 }

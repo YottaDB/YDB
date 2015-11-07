@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,6 +95,7 @@ void mucregini(int4 blk_init_size)
 		cs_data->lock_space_size = gv_cur_region->dyn.addr->lock_space * OS_PAGELET_SIZE;
 	else
 		cs_data->lock_space_size = DEF_LOCK_SIZE;
+	NUM_CRIT_ENTRY(cs_data) = DEFAULT_NUM_CRIT_ENTRY;
 	cs_data->staleness[0] = -300000000;	/* staleness timer = 30 seconds */
 	cs_data->staleness[1] = -1;
 	cs_data->ccp_quantum_interval[0] = -20000000;	/* 2 sec */

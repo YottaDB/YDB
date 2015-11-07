@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,6 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	mname_entry	lvent;
 	ht_ent_mname	*tabent, *top;
 	boolean_t	lcl_stdxkill;
-
-	error_def(ERR_XKILLCNTEXC);
 
 	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
 					   cleanup problems */

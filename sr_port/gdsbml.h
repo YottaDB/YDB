@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@
 		UNIX_ONLY(DEBUG_ONLY(|| (gtm_white_box_test_case_enabled						\
 		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
 	{														\
-		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),						\
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),				\
 				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\
 		status = FALSE;												\
 	} else														\

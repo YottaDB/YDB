@@ -1,0 +1,483 @@
+; ****************************************************************
+; *								 *
+; *      Copyright 2001, 2012 Fidelity Information Services, Inc   *
+; *      This source code contains the intellectual property     *
+; *      of its copyright holder(s), and is made available       *
+; *      under a license.  If you do not know the terms of       *
+; *      the license, please stop and do not read further.       *
+; *                                                              *
+; ****************************************************************
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro package zcpackage_name
+	.if	ge	zc$maxpos
+		endrout
+	.endc
+	.if	df	zcpack_start
+		endpack
+	.endc
+	.macro labelentry cname	; use of this macro is currently suppressed
+	__GTM$ZC'zcpackage_name'.'cname'::
+	.endm
+
+	zcpack_start = zctalloc
+	zcpack_name = zcvalloc
+	.save_psect	local_block
+	.psect	gtm$zcallvalues		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,quad
+	. = zcvalloc
+	.ascic	"zcpackage_name"
+	zcvalloc = .
+	.psect	gtm$zcalltabaab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	.restore_psect
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	routine	callname, linkname, inputs=0, outputs=0, outofband=default
+
+	zc$num_args	= inputs + outputs
+
+	.irp	$$tmp, <callname, linkname, inputs, outputs>
+	.if	b	$$tmp
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: ROUTINE callname, linkname, inputs, outputs
+		.error		;REQUIRED KEYWORD OMITTED
+		.mexit
+	.endc
+	.endr
+
+	.irp	$$tmp, <inputs, outputs>
+	.if	lt	$$tmp
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: ROUTINE callname, linkname, inputs, outputs
+		.error		;INPUTS AND OUTPUTS MUST BE >= 0
+		.mexit
+	.endc
+	.endr
+
+	.if	ndf	zc$rout_'outofband
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: ROUTINE outofband
+		.error		; UNDEFINED OUT-OF-BAND KEYWORD: outofband
+		.mexit
+	.endc
+	.if	ge	zc$maxpos
+		endrout
+	.endc
+
+	;labelentry callname	;this is suppressed until case issues are resolved
+	.align		long
+	.word		<<<<<2+1+1+4+1+1+1+%length(callname)+2+3>/4>*4>+<8*inputs>+<8*outputs>+1+3>/4>*4
+	.byte		inputs
+	.byte		outputs
+	address_32	linkname
+	.byte		zc$rout_'outofband
+	.byte		0			; padding
+	.ascic		"callname"
+	zc$maxpos = 0
+	zc$retlin = 0
+	zc$ip = 0
+	zc$op = 0
+	zc$ips = inputs
+	zc$ops = outputs
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	return	class=status, type
+
+	.if	ne zc$retlin
+		.print	;GT.M EXTERNAL CALL FORMAT ERROR:
+		.error	;RETURN LINE MUST IMMEDIATELY FOLLOW ROUTINE
+		.mexit
+	.endc
+	.irp	$$tmp, <class>
+	.if	b	$$tmp
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+		.error		;REQUIRED KEYWORD OMITTED
+		.mexit
+	.endc
+	.endr
+	.if	ndf	zc$retc_'class
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+		.error		; UNDEFINED RETURN_CLASS KEYWORD: class
+		.mexit
+	.endc
+	.if	eq	zc$retc_'class - zc$retc_value
+		.if	b	type
+		.ift
+			.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+			.error		;REQUIRED KEYWORD OMITTED
+			.mexit
+		.iff
+			.if	ndf	zc$dtype_'type
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+				.error		; UNDEFINED RETURN_CLASS KEYWORD: class
+				.mexit
+			.endc
+			.if	eq	zc$dtype_'type - zc$dtype_string
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+				.error		;ILLEGAL COMBINATION
+				.mexit
+			.endc
+			.if	eq	zc$dtype_'type - zc$dtype_h_floating
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: RETURN class, type
+				.error		;ILLEGAL COMBINATION
+				.mexit
+			.endc
+		.endc
+	.endc
+
+	.byte		zc$retc_'class
+	.byte		zc$dtype_'type
+	.align		long
+	zc$retlin = 1
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	input	qualifier=required,type,mechanism,position,value
+
+	.if	eq zc$retlin
+		return
+	.endc
+	.irp	$$tmp, <type,mechanism,position>
+	.if	b	$$tmp
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		;REQUIRED KEYWORD OMITTED
+		.mexit
+	.endc
+	.endr
+	.if	ndf	zc$dtype_'type
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; UNDEFINED INPUT_TYPE KEYWORD: type
+		.mexit
+	.endc
+	.if	ndf	zc$mech_'mechanism
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; UNDEFINED INPUT_MECHANISM KEYWORD: mechanism
+		.mexit
+	.endc
+	.if	eq	zc$dtype_string - zc$dtype_'type
+		.if	ne	zc$mech_descriptor - zc$mech_'mechanism
+			.if	ne	zc$mech_descriptor64 - zc$mech_'mechanism
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+				.error		; ILLEGAL COMBINATION
+				.mexit
+			.endc
+		.endc
+	.endc
+	.if	ndf	zc$iqual_'qualifier
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; UNDEFINED INPUT_QUALIFIER KEYWORD: qualifier
+		.mexit
+	.endc
+	.if	idn	zc$iqual_block,zc$iqual_'qualifier
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; UNSUPPORTED INPUT_QUALIFIER KEYWORD: qualifier
+		.mexit
+	.endc
+
+	zc$iqual_constant		= 1
+	zc$iqual_optional		= 2
+	zc$iqual_optional_0		= 3
+	zc$iqual_default		= 4
+	zc$iqual_required		= 5
+	zc$iqual_block			= 6
+	.if	le	position
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; POSITION MUST BE POSITIVE: position
+		.mexit
+	.endc
+	.if	lt	zc$num_args - position
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: INPUT type, mechanism, position
+		.error		; POSITION MUST NOT BE GREATER THAN NUMBER OF ARGUMENTS: position, zc$num_args
+		.mexit
+	.endc
+
+	.byte		zc$mech_'mechanism
+	.byte		zc$dtype_'type
+	.byte		position
+	.byte		zc$iqual_'qualifier
+	.if	b	<value>
+		.ift
+			.if	eq	zc$iqual_default - zc$iqual_'qualifier
+				.iff
+					.if	eq	zc$iqual_constant - zc$iqual_'qualifier
+						.iff
+							.long	0
+						.ift
+							putval type,value
+					.endc
+				.ift
+					putval type,value
+			.endc
+		.iff
+			putval type,<value>
+	.endc
+	zc$ip = zc$ip + 1
+	.if	lt zc$maxpos - position
+		zc$maxpos = position
+	.endc
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	putval	t,val
+
+	address_32	zcvalloc
+	.save_psect	local_block
+	.psect	gtm$zcallvalues		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,quad
+	. = zcvalloc
+	.if	eq	zc$dtype_string - zc$dtype_'t
+		.ift
+			.ascid	/val/
+		.iff
+		.if	eq	zc$dtype_floating - zc$dtype_'t
+			.ift
+				.f_floating	val
+			.iff
+				.'t	val
+		.endc
+	.endc
+	zcvalloc = .
+	.psect	gtm$zcalltabaab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	.restore_psect
+
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	output	qualifier=required,type,mechanism,position,value
+
+	.if	eq zc$retlin
+		.if	eq zc$ips
+			return
+		.endc
+	.endc
+	.if	ne zc$ips - zc$ip
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR:
+		.error		;NOT ALL INPUT LINES DEFINED BEFORE OUTPUT
+		.mexit
+	.endc
+	.irp	$$tmp, <type,mechanism,position>
+	.if	b	$$tmp
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		;REQUIRED KEYWORD OMITTED
+		.mexit
+	.endc
+	.endr
+
+	.if	ndf	zc$dtype_'type
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; UNDEFINED OUTPUT_TYPE KEYWORD: type
+		.mexit
+	.endc
+	.if	ndf	zc$mech_'mechanism
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; UNDEFINED OUTPUT_MECHANISM KEYWORD: mechanism
+		.mexit
+	.endc
+	.if	eq	zc$dtype_string - zc$dtype_'type
+		.if	ne	zc$mech_descriptor - zc$mech_'mechanism
+			.if	ne	zc$mech_descriptor64 - zc$mech_'mechanism
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+				.error		; ILLEGAL COMBINATION
+				.mexit
+			.endc
+		.endc
+	.endc
+	.if	ndf	zc$oqual_'qualifier
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; UNDEFINED INPUT_QUALIFIER KEYWORD: qualifier
+		.mexit
+	.endc
+	.if	le	position
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; POSITION MUST BE POSITIVE: position
+		.mexit
+	.endc
+	.if	lt	zc$num_args - position
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; POSITION MUST NOT BE GREATER THAN NUMBER OF ARGUMENTS: position, zc$num_args
+		.mexit
+	.endc
+	.if	eq	zc$mech_value - zc$mech_'mechanism
+		.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+		.error		; OUTPUT_MECHANISM MAY NOT BE BY VALUE
+		.mexit
+	.endc
+
+	.if	eq	zc$oqual_'qualifier - zc$oqual_preallocate
+		.if	ne	zc$dtype_string - zc$dtype_'type
+			.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+			.error		; PREALLOCATE QUALIFIER VALID ONLY WITH STRINGS
+			.mexit
+		.endc
+		.if	b	value
+			.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+			.error		; VALUE REQUIRED WITH PREALLOCATE QUALIFIER
+			.mexit
+		.endc
+		.if	le	value
+			.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+			.error		; PREALLOCATE SIZE MUST BE GREATER THAN ZERO
+			.mexit
+		.endc
+		.if	eq	zc$mech_descriptor - zc$mech_'mechanism
+			.if	gt	value - 65535
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+				.error		; PREALLOCATE SIZE CANNOT BE GREATER THAN 65535 WITH DESCRIPTOR
+				.mexit
+			.endc
+		.endc
+		.if	eq	zc$mech_descriptor64 - zc$mech_'mechanism
+			.if	gt	value - 1048576
+				.print		;GT.M EXTERNAL CALL FORMAT ERROR: OUTPUT type, mechanism, position
+				.error		; PREALLOCATE SIZE CANNOT BE GREATER THAN 1048576 WITH DESCRIPTOR64
+				.mexit
+			.endc
+		.endc
+	.endc
+
+	.byte		zc$mech_'mechanism
+	.byte		zc$dtype_'type
+	.byte		position
+	.byte		zc$oqual_'qualifier
+	.if	b	value
+		.ift
+			.long	0
+		.iff
+			.long	value
+	.endc
+	zc$op = zc$op + 1
+	.if	lt zc$maxpos - position
+		zc$maxpos = position
+	.endc
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	zcinit
+	.macro labelentry cname	;use of this macro is currently suppressed
+	__GTM$ZC.'cname'::
+	.endm
+	.psect	gtm$zcallvalues		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,quad
+	zcvalloc = .
+	.psect	gtm$zcalltabaab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	zctalloc = .
+	zcdef
+	zc$maxpos = -1
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	zcallini
+	.psect	gtm$zcallvalues		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,quad
+	zcvalloc = .
+	.psect	gtm$zcalltabaab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	zctalloc = .
+	zcdef
+	zc$maxpos = -1
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro  zcallfin
+	.if	df	zc$maxpos
+		endrout
+	.endc
+	.if	df	zcpack_start
+		endpack
+	.endc
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	endrout
+	.if	ne zc$ip - zc$ips
+		.print	;GT.M EXTERNAL CALL FORMAT ERROR:
+		.error	;INPUTS DO NOT MATCH INPUT LINES
+		.mexit
+	.endc
+	.if	ne zc$op - zc$ops
+		.print	;GT.M EXTERNAL CALL FORMAT ERROR:
+		.error	;OUTPUTS DO NOT MATCH OUTPUT LINES
+		.mexit
+	.endc
+	.if	eq zc$ips
+		.if	eq zc$ops
+			.if	eq zc$retlin
+				return
+			.endc
+		.endc
+	.endc
+	.byte zc$maxpos
+	zc$maxpos = -1
+	zctalloc = .
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	endpack
+	.save_psect	local_block
+	.psect	gtm$zcallpackab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	address_32	zcpack_start
+	address_32	zctalloc
+	address_32	zcpack_name
+	.psect	gtm$zcalltabaab		pic,con,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	.restore_psect
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	.macro	zcdef
+	$dscdef
+
+	zc$rout_default			= 0		; don't touch out-of-band handling
+	zc$rout_reset			= 1		; set out-of-band handling back to normal
+
+	zc$retc_			= 0		; Return classes
+	zc$retc_status			= 1
+	zc$retc_value			= 2
+	zc$retc_ignored			= 3
+
+	zc$mech_			= 0		; Argument-passing mechanisms
+	zc$mech_value			= 1
+	zc$mech_reference		= 2
+	zc$mech_descriptor		= 3
+	zc$mech_descriptor64		= 4
+
+	zc$dtype_			= 0		; Native data types
+	zc$dtype_string			= DSC$K_DTYPE_T
+	zc$dtype_byte			= DSC$K_DTYPE_B
+	zc$dtype_byteu			= DSC$K_DTYPE_BU
+	zc$dtype_word			= DSC$K_DTYPE_W
+	zc$dtype_wordu			= DSC$K_DTYPE_WU
+	zc$dtype_long			= DSC$K_DTYPE_L
+	zc$dtype_longu			= DSC$K_DTYPE_LU
+	zc$dtype_quad			= DSC$K_DTYPE_Q
+	zc$dtype_floating		= DSC$K_DTYPE_F
+	zc$dtype_double			= DSC$K_DTYPE_G
+	zc$dtype_g_floating		= DSC$K_DTYPE_G
+	zc$dtype_h_floating		= DSC$K_DTYPE_H
+
+	zc$iqual_			= 0		; Input argument qualifiers
+	zc$iqual_constant		= 1
+	zc$iqual_optional		= 2
+	zc$iqual_optional_0		= 3
+	zc$iqual_default		= 4
+	zc$iqual_required		= 5
+	zc$iqual_block			= 6
+
+	zc$oqual_			= 0		; Output argument qualifiers
+	zc$oqual_required		= 1
+	zc$oqual_dummy			= 2
+	zc$oqual_preallocate		= 3
+
+	.endm
+
+;----------------------------------------------------------------------------------------------------------------------------------
+
+	; create 32-bit address item
+	.macro	address_32	item
+	.long	item
+	.endm	address_32

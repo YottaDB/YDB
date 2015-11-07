@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,6 +109,55 @@ error_def(ERR_TRIGTCOMMIT);
 error_def(ERR_TCOMMITDISALLOW);
 #endif
 
+STATICFNDCL void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm_info *si);
+
+STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm_info *si)
+{
+	cw_set_element		*update_cse;
+	srch_blk_status		*t1;
+	blk_segment		*array, *seg, *stop_ptr;
+	sm_long_t		delta;
+	sgmnt_addrs		*csa;
+
+	csa = si->tp_csa;
+	delta = (sm_long_t)(csa->db_addrs[0] - old_db_addrs[0]);
+	assert(0 != delta);
+	/* update cse's update array and old_block */
+	for (update_cse = si->first_cw_set; NULL != update_cse; update_cse = update_cse->next_cw_set)
+	{
+		TRAVERSE_TO_LATEST_CSE(update_cse);
+		if (gds_t_writemap != update_cse->mode)
+		{
+			array = (blk_segment *)update_cse->upd_addr;
+			stop_ptr = update_cse->first_copy ? array : array + 1;
+			seg = (blk_segment *)array->addr;
+			while (seg != stop_ptr)
+			{
+				if ((old_db_addrs[0] <= seg->addr) && (old_db_addrs[1] >= seg->addr))
+					seg->addr += delta;
+				seg--;
+			}
+		}
+		if (NULL != update_cse->old_block)
+		{
+			if ((old_db_addrs[0] <= update_cse->old_block) && (old_db_addrs[1] >= update_cse->old_block))
+				update_cse->old_block += delta;
+			/* else, old_block is already updated -- this is mostly the case with gds_t_writemap in which case
+			 * bm_getfree invokes t_write_map
+			 */
+			assert((csa->db_addrs[0] <= update_cse->old_block)
+					&& (csa->db_addrs[1] >= update_cse->old_block));
+		}
+	}
+	/* update all the tp_hist */
+	for (t1 = si->first_tp_hist; t1 != si->last_tp_hist; t1++)
+	{
+		if ((old_db_addrs[0] <= t1->buffaddr) && (old_db_addrs[1] >= t1->buffaddr))
+			t1->buffaddr += delta;
+	}
+	return;
+}
+
 enum cdb_sc	op_tcommit(void)
 {
 	boolean_t		blk_used, is_mm, was_crit;
@@ -128,12 +177,7 @@ enum cdb_sc	op_tcommit(void)
 	kill_set		*ks;
 	off_chain		chain1;
 	tp_region		*tr;
-	/* for MM extend */
-	cw_set_element		*update_cse;
-	blk_segment		*seg, *stop_ptr, *array;
-	sm_long_t		delta;
-	sm_uc_ptr_t		old_db_addrs[2];
-	srch_blk_status		*t1;
+	sm_uc_ptr_t		old_db_addrs[2]; /* for MM extend */
 	jnl_buffer_ptr_t	jbp; /* jbp is non-NULL only if before-image journaling */
 	blk_hdr_ptr_t		old_block;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
@@ -154,7 +198,7 @@ enum cdb_sc	op_tcommit(void)
 	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
 #	endif
 	if (!dollar_tlevel)
-		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
 	tp_kill_bitmaps = FALSE;
@@ -175,7 +219,8 @@ enum cdb_sc	op_tcommit(void)
 				 * trigger invocation to be done before completing the explicit (outside-trigger) update.
 				 * Cannot commit such a transaction. Issue error.
 				 */
-				rts_error(VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth, tstart_trigger_depth);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth,
+						tstart_trigger_depth);
 			}
 			if (tp_pointer->cannot_commit)
 			{	/* If this TP transaction was implicit, any unhandled error when crossing the trigger boundary
@@ -184,7 +229,7 @@ enum cdb_sc	op_tcommit(void)
 				 * transaction so we should never see an implicit TP inside op_tcommit.
 				 */
 				assert(!tp_pointer->implicit_tstart);
-				rts_error(VARLSTCNT(1) ERR_TCOMMITDISALLOW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TCOMMITDISALLOW);
 			}
 		)
 		save_cur_region = gv_cur_region;
@@ -198,7 +243,7 @@ enum cdb_sc	op_tcommit(void)
 				csa = cs_addrs;
 				csd = cs_data;
 				cnl = csa->nl;
-				is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
+				is_mm = (dba_mm == csa->hdr->acc_meth);
 				si->cr_array_index = 0;
 				if (!is_mm && (si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2))))
 				{	/* reallocate a bigger cr_array. We need atmost read-set (si->num_of_blks) +
@@ -260,67 +305,23 @@ enum cdb_sc	op_tcommit(void)
 						if (gds_t_create == cse->mode)
 						{
 							old_cw_depth = si->cw_set_depth;
-							old_db_addrs[0] = csa->db_addrs[0];
-							old_db_addrs[1] = csa->db_addrs[1];
 							first_cse = si->first_cw_set;
 							TRAVERSE_TO_LATEST_CSE(first_cse);
+							old_db_addrs[0] = csa->db_addrs[0];
+							old_db_addrs[1] = csa->db_addrs[1];
 							while (FILE_EXTENDED == (new_blk = bm_getfree(cse->blk, &blk_used,
 								cw_depth, first_cse, &si->cw_set_depth)))
 							{
 								assert(is_mm);
-								was_crit = csa->now_crit;
-								if (!csa->hold_onto_crit && !was_crit)
-									grab_crit(si->gv_cur_region); /* for wcs_mm_recover */
-								wcs_mm_recover(si->gv_cur_region);
-								if (!csa->hold_onto_crit && !was_crit)
-									rel_crit(si->gv_cur_region);
-								delta = (sm_long_t)((sm_uc_ptr_t)csa->hdr - (sm_uc_ptr_t)csd);
-								csd = csa->hdr;
-								/* update cse's update array and old_block */
-								for (update_cse = si->first_cw_set;  NULL != update_cse;
-									update_cse = update_cse->next_cw_set)
-								{
-									TRAVERSE_TO_LATEST_CSE(update_cse);
-									if (gds_t_writemap != update_cse->mode)
-									{
-										array = (blk_segment *)update_cse->upd_addr;
-										stop_ptr = update_cse->first_copy ?
-												array : array + 1;
-										seg = (blk_segment *)array->addr;
-										while (seg != stop_ptr)
-										{
-											if ((old_db_addrs[0] < seg->addr)
-											&& (old_db_addrs[1] >= seg->addr))
-												seg->addr += delta;
-											seg--;
-										}
-									}
-									if (NULL != update_cse->old_block)
-									{
-										assert((old_db_addrs[0] < update_cse->old_block) &&
-											(old_db_addrs[1] > update_cse->old_block));
-										update_cse->old_block += delta;
-									}
-								}
-								/* update all the tp_hist */
-								for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
-								{
-									if ((old_db_addrs[0] < t1->buffaddr)
-										&& (old_db_addrs[1] >= t1->buffaddr))
-										t1->buffaddr += delta;
-								}
-								/* In case the while loop above needs to repeat more than once,
-								 * the mmaped addresses for the file's start and end could have
-								 * changed if wcs_mm_recover() caused a file extension.  In that
-								 * case, reset the limits to the new values.
-								 */
+								MM_DBFILEXT_REMAP_IF_NEEDED(csa, si->gv_cur_region);
 								if (csa->db_addrs[0] != old_db_addrs[0])
 								{
+									fix_updarray_and_oldblock_ptrs(old_db_addrs, si);
 									old_db_addrs[0] = csa->db_addrs[0];
 									old_db_addrs[1] = csa->db_addrs[1];
-									csd = csa->hdr;
 								}
 							}
+							assert(csd == csa->hdr);
 							if (0 > new_blk)
 							{
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
@@ -365,10 +366,12 @@ enum cdb_sc	op_tcommit(void)
 							}
 							cse->blk = new_blk;
 							cse->mode = gds_t_acquired;
+							assert(!is_mm || (new_blk < csa->total_blks));
 							assert(GDSVCURR == cse->ondsk_blkver);
-							assert(CDB_STAGNATE > t_tries ||
-								(is_mm ? (cse->blk < csa->total_blks)
-										: (cse->blk < csa->ti->total_blks)));
+							/* Assert that in final retry total_blks (private and shared) are in sync */
+							assert((CDB_STAGNATE > t_tries) || !is_mm
+									|| (csa->total_blks == csa->ti->total_blks));
+							assert((CDB_STAGNATE > t_tries) || (cse->blk < csa->ti->total_blks));
 						}	/* if (gds_t_create == cse->mode) */
 					}	/* for (all cw_set_elements) */
 					if (NULL == si->first_cw_bitmap)
@@ -421,7 +424,8 @@ enum cdb_sc	op_tcommit(void)
 				{
 					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 						end = &buff[MAX_ZWR_KEY_SZ - 1];
-					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				} else if (!skip_invoke_restart)
 					INVOKE_RESTART;
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)

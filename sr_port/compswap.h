@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,8 @@
 		boolean_t compswap(sm_global_latch_ptr_t lock, int compval, int newval1);
 #		define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, NEWVAL1)
 #		define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, NEWVAL1)
-#	elif defined(__HP_cc)
-		/* Use compiler inline assembly macros for HP-UX/HP C */
+#	elif (defined(__HP_cc) || (defined(__hpux) && defined(__GNUC__)))
+		/* Use compiler inline assembly macros for HP-UX/HP C or GCC on HPUX*/
 		/* This is assuming 32 bit lock storage, which right now seems to be PIDs
 		 * most of the time. PIDs are currently 32 bit values, but that could change
 		 * someday, so beware
@@ -46,6 +46,8 @@
 			_Asm_cmpxchg((_Asm_sz)_SZ_W,(_Asm_sem)_SEM_REL,(uint32_t *)LCK,				\
 				(uint64_t)NEWVAL1, (_Asm_ldhint)_LDHINT_NONE) == (uint64_t)CMPVAL1 ? 1 : 0	\
 		)
+#	else
+#		error Unsupported Platform sr_port/compswap.h
 #	endif /* __ia64 */
 #else
 	boolean_t compswap(sm_global_latch_ptr_t lock, int compval1, int compval2, int newval1, int newval2);

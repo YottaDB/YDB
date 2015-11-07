@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -213,7 +213,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
 	op_close(dump_file_spec, &parms);
 	/* Notify operator dump was taken */
-	send_msg(VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);
 	REVERT;
 }
 
@@ -240,7 +240,7 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	UNIX_ONLY(util_out_print(0, OPER));
 	VMS_ONLY(sig->chf$l_sig_args -= 2);
 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));
-	send_msg(VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
 
 	/* Stop the errors here and return to caller */
 	UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing this error later */

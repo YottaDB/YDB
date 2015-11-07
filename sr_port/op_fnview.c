@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -268,7 +268,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_NOISOLATION:
 			if (NOISOLATION_NULL != parmblk.ni_list.type || NULL == parmblk.ni_list.gvnh_list
 			    || NULL != parmblk.ni_list.gvnh_list->next)
-				rts_error(VARLSTCNT(1) ERR_VIEWFN);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);
 			n = parmblk.ni_list.gvnh_list->gvnh->noisolation;
 			break;
 		case VTK_PATCODE:
@@ -277,22 +277,22 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str = tmpstr;
 			break;
 		case VTK_REGION:
-		  /* if gd_header is null then get the current one, and update the gd_map */
-		  if (!gd_header)
-		  {
-			  SET_GD_HEADER(v);
-			  SET_GD_MAP;
-		  }
-		  DEBUG_ONLY(else GD_HEADER_ASSERT);
-		  map = gd_map;
-		  map++;	/* get past local locks */
-		  for (; memcmp(parmblk.ident.c, map->name, SIZEOF(mident_fixed)) >= 0; map++)
-		    assert(map < gd_map_top);
-		  reg = map->reg.addr;
-		  tmpstr.addr = (char *)reg->rname;
-		  tmpstr.len = reg->rname_len;
-		  s2pool(&tmpstr);
-		  dst->str = tmpstr;
+			/* if gd_header is null then get the current one, and update the gd_map */
+			if (!gd_header)
+			{
+				SET_GD_HEADER(v);
+				SET_GD_MAP;
+			}
+			DEBUG_ONLY(else GD_HEADER_ASSERT);
+			map = gd_map;
+			map++;	/* get past local locks */
+			for (; memcmp(parmblk.ident.c, map->name, SIZEOF(mident_fixed)) >= 0; map++)
+				assert(map < gd_map_top);
+			reg = map->reg.addr;
+			tmpstr.addr = (char *)reg->rname;
+			tmpstr.len = reg->rname_len;
+			s2pool(&tmpstr);
+			dst->str = tmpstr;
 		  break;
 		case VTK_RTNEXT:
 			view_routines(dst, &parmblk.ident);
@@ -405,15 +405,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = -1;
 			if (arg)
 			{
-				if (!MEMCMP_LIT(arg->str.addr, "nct"))
+				if (0 == MEMCMP_LIT(arg->str.addr, "nct"))
 					n = TREF(local_coll_nums_as_strings) ? 1 : 0;
-				else
-				{
-					assert(!MEMCMP_LIT(arg->str.addr, "ncol"));
+				else if (0 == MEMCMP_LIT(arg->str.addr, "ncol"))
 					n = TREF(local_collseq_stdnull);
-				}
-			}
-			if (-1 == n)
+			} else
 				n = TREF(local_collseq) ? (TREF(local_collseq))->act : 0;
 			break;
 		case VTK_ZDEFBUFF:
@@ -472,13 +468,13 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_LOGTPRESTART:
 			n = TREF(tprestart_syslog_delta);
 			break;
-#ifndef VMS
+#		ifndef VMS
 		case VTK_JNLERROR:
 			n = TREF(error_on_jnl_file_lost);
 			break;
-#endif
+#		endif
 		default:
-			rts_error(VARLSTCNT(1) ERR_VIEWFN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);
 	}
 	dst->mvtype = vtp->restype;
 	if (MV_NM == vtp->restype)

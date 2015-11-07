@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
 		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		/* If any of the mini transaction below restarts because of an online rollback, we don't want the application
-		 * refresh to happen (like $ZONLNRLBK++ or rts_error(DBROLLEDBACK). This is because, although we are currently in
+		 * refresh to happen (like $ZONLNRLBK++ or rts_error(DBROLLEDBACK). This is because, although we are currently in	{BYPASSOK}
 		 * non-tp (dollar_tleve = 0), we could actually be in a TP transaction and have actually faked dollar_tlevel. In
 		 * such a case, we should NOT * be issuing a DBROLLEDBACK error as TP transactions are supposed to just restart in
 		 * case of an online rollback. So, set the global variable that gtm_onln_rlbk_clnup can check and skip doing the
@@ -225,8 +225,8 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 						 * to the application. But, before that reset only_reset_clues_if_onln_rlbk to FALSE
 						 */
 						TREF(in_gvcst_bmp_mark_free) = FALSE;
-						send_msg(VARLSTCNT(6) ERR_IGNBMPMRKFREE, 4, REG_LEN_STR(gv_cur_region),
-								DB_LEN_STR(gv_cur_region));
+						send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_IGNBMPMRKFREE, 4,
+								REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 						t_abort(gv_cur_region, cs_addrs);
 						return ret_tn; /* actually 0 */
 					}

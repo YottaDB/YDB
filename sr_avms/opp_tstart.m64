@@ -1,0 +1,97 @@
+	.title	OPP_TSTART "Initiate a transaction processing frame"
+
+	G_MSF
+
+	$linkage_section
+a_frame_pointer:
+	.address frame_pointer
+
+
+	$code_section
+
+	$routine OPP_TSTART, entry=OPP_TSTART_CA, kind=null
+stack_offset = 16
+	lda	sp, -stack_offset(sp)
+	stq	r2, (sp)
+	stq	r3, 8(sp)
+
+; Note: we use r3 as a base for the linkage section instead of the usual r13,
+;	since r13 is saved by putframe and restored by getframe:
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+
+; On entry to this routine, the value in arg3 (i.e. r18) has the following meaning:
+;	= -2	: preserve all variables
+;	= -1	: not restartable
+;	>= 0	: = the number of variables to preserve
+;
+; IFF (arg3 >= 0), the total number of arguments to this routine is (arg3 + 3);
+; otherwise, there are just 3 arguments.  (Note that r25 DOES NOT contain any
+; argument information;  calls to this routine emulate the VAX JSB instruction,
+; and do not set up such information.)
+;
+; On the other hand, OP_TSTART, called below, expects $Test as its first argument,
+; followed by all of the arguments passed to this routine.
+;
+; Therefore, we have to create a new argument list with all of our arguments moved
+; UP one slot in the list in order to make room for $Test.  The fact that the first
+; six arguments are passed in registers, while any arguments in excess of six are
+; passed on the stack, complicates this task.  So...
+;
+; First, move any arguments passed on the stack from their current positions
+; just above our register save area to new positions just below it:
+
+	mov	sp, r2			; save the current stack pointer
+
+	subq	r18, 4, r28		; r28 = the number of arguments on the stack, less 1
+	blt	r28, 10$		; skip if there weren't any on the stack
+
+	sll	r28, 3, r0
+	addq	r0, stack_offset, r0	; account for the saved registers
+	addq	r0, sp, r0		; r0 -> the last argument
+loop:
+	ldq	r1, (r0)
+	lda	sp, -8(sp)
+	lda	r0, -8(r0)
+	subq	r28, 1, r28
+	stq	r1, (sp)
+	bgt	r28, loop
+
+; Next, put the original arg6 onto the stack:
+
+10$:	lda	sp, -8(sp)
+	stq	r21, (sp)
+
+; Now, shift the first five arguments up into the next higher registers:
+
+	mov	r20, r21
+	mov	r19, r20
+	mov	r18, r19
+	mov	r17, r18
+	mov	r16, r17
+
+; Finally, put "tstart-is-implicit" flag into the first argument register, and call OP_TSTART:
+
+	lda	r16, 0
+
+; Note that what was in r18 is now in r19:
+	clr	r25
+	cmovgt	r19, r19, r25		; iff r19 > 0, number of arguments is r19, ...
+	addq	r25, 4, r25		; ... plus the original 3 arguments, plus $Test
+
+	$call	OP_TSTART, set_arg_info=false, nonstandard=true
+
+	getframe
+
+	mov	r2, sp			; restore the stack
+
+	ldq	r2, (sp)
+	ldq	r3, 8(sp)
+	lda	sp, stack_offset(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

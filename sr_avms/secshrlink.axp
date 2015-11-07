@@ -1,0 +1,32 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2001, 2010 Fidelity Information Services, Inc	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+protect=yes
+obd/inc=(gtmsecplv,crit_wake,del_sec,init_sec,gtm_enq,gtm_enqw,gtm_deq,gtm_blkast)
+obd/inc=(get_proc_info,init_secshr_addrs,gtm_getlkiw,secshr_db_clnup)
+obd/inc=(adawi,bci,gtm_memmove,mutex_stoprel,probe,prober,probew,relqueop,rundown_dispatch)
+obd/inc=(sec_shr_blk_build,sec_shr_map_build,aswp_secshr,compswap_secshr,is_proc_alive)
+urd
+gsmatch=lequal,13,0
+symbol_vector=( -
+	crit_wake	= PROCEDURE, -
+	del_sec		= PROCEDURE, -
+	init_sec	= PROCEDURE, -
+	gtm_enq		= PROCEDURE, -
+	gtm_enqw	= PROCEDURE, -
+	gtm_deq		= PROCEDURE, -
+	gtm_blkast	= PROCEDURE, -
+	get_proc_info	= PROCEDURE, -
+	init_secshr_addrs	= PROCEDURE, -
+	gtm_getlkiw	= PROCEDURE, -
+	secshr_db_clnup	= PROCEDURE, -
+	probe		= PROCEDURE -
+	)

@@ -1,0 +1,1108 @@
+	.title	fgncal_dispatch
+
+
+	G_MSF
+	base_frame
+
+
+;	Syntax codes.
+syn0		=	0	; no mode argument (gtm$xecute)
+syn1		=	1	; mode is in position 1, counting from 0 (gtm$lock)
+syn2		=	3	; mode is in position 0, counting from 0 (gtm$get)
+syn3		=	4	; mode is in position 2, counting from 0 (gtm$lock2)
+
+;	Stack offsets and related information.
+
+;	Locals.
+SAVE_R13	=	GTM_LOCAL_1
+
+
+	$linkage_section
+
+A_active_lv:		.address	active_lv
+
+A_FGNCAL_CH:		.address	FGNCAL_CH
+A_fgncal_stack:		.address	fgncal_stack
+A_fgncal_rtn:		.address	fgncal_rtn
+A_frame_pointer:	.address	frame_pointer
+
+A_literal_null:		.address	literal_null
+A_mdb_condition_handler:.address	mdb_condition_handler
+A_msp:			.address	msp
+A_mumps_status:		.address	mumps_status
+A_stringpool:		.address	stringpool
+A_xfer_table:		.address	xfer_table
+A_dollar_zstatus:	.address	dollar_zstatus
+
+L_ERR_IFBADPARM:	.long		ERR_IFBADPARM
+L_ERR_IFNOTINIT:	.long		ERR_IFNOTINIT
+L_ERR_LCKSTIMOUT:	.long		ERR_LCKSTIMOUT
+L_ERR_ORDER2:		.long		ERR_ORDER2
+L_ERR_VAREXPECTED:	.long		ERR_VAREXPECTED
+
+Q_gtmi$_extgbl:		.quad		gtmi$_extgbl
+Q_gtmi$_extlcl:		.quad		gtmi$_extlcl
+Q_gtmi$_global:		.quad		gtmi$_global
+Q_gtmi$_local:		.quad		gtmi$_local
+Q_gtmi$_naked:		.quad		gtmi$_naked
+
+;	Strictly speaking, no_timeout should be in the data section,
+;	but it'll work here and save a base register.
+no_timeout:		.long	^X0007fffe
+
+
+
+;
+	.macro	fgncal_entry	name, syn, fk, dst, ?A
+
+	$routine	name, entry=%string(name)_CA, kind=stack, -
+			saved_regs=<%string(base_frame_regs)>, -
+			rsa_offset=RSA_OFFSET, size=STACK_SIZE, -
+			standard_prologue=false, handler=GTM$DYN_CH, synch_exceptions=true
+
+
+	.if	ne,$SIZE,STACK_SIZE
+		.error	"The stack frame size computed by $routine (%integer($SIZE)) differs from that expected -
+(%integer(STACK_SIZE))."
+	.endc
+
+	.if	ne,$SIZE-56,ARG_OFFSET
+		.error	"The homed argument list offset computed by $routine (%integer($SIZE-56)) differs from -
+that expected (%integer(ARG_OFFSET))."
+	.endc
+
+	create_base_frame
+
+	mov	r27, r13		; establish local base register
+	.base	r13, $ls
+
+	ldq	r28, A_stringpool
+	ldl	r28, (r28)
+	bne	r28, A			; if stringpool.base == 0, not initialized yet
+	$call	lib$signal, args=<L_ERR_IFNOTINIT/L>
+	$return
+
+A:	ldq	r28, A_FGNCAL_CH
+	stq	r28, 8(fp)		; establish fgncal_ch as condition handler
+	lda	r2,  syn(r31)
+	lda	r5,  dst(r31)		; [Vinaya 10/30/2002] see note about dst in fgncal_procarg
+	lda	r7,  fk(r31)
+	ldq	r28, A_mumps_status
+	lda	r22, 1(r31)
+	stl	r22, (r28)
+	ldq	r23, A_msp
+	ldq	r24, A_fgncal_stack
+	ldl	r23, (r23)
+	stl	r23, (r24)
+
+	.endm
+
+
+;	fgncal_old provides an interface between old DAL entry points
+;	and new ones.  The old version used separate names for the global
+;	and local versions of each function, while the new version uses
+;	the same name for both.  fgncal_old creates dummy procedures that
+;	reset the link register and transfer execution to the new entry
+;	point.
+;
+;	arguments:
+;		newname	- name of new entry point
+;		gname	- name of old global entry point
+;		lname	- name of old local entry point
+
+	.macro	fgncal_old	newname, gname, lname
+
+	$linkage_section
+
+L_'newname:	.linkage_pair	newname
+
+
+	$routine	gname, entry=%string(gname)_CA, kind=null
+
+	.base	r27, $ls
+
+	ldq	r28, L_'newname	; N.B. don't modify r26
+	ldq	r27, L_'newname+8
+	jmp	r28		; jump to name as if it were the entry point invoked
+
+	$end_routine	name=gname
+
+
+	$routine	lname, entry=%string(lname)_CA, kind=null
+
+	.base	r27, $ls
+
+	ldq	r28, L_'newname	; N.B. don't modify r26
+	ldq	r27, L_'newname+8
+	jmp	r28		; jump to name as if it were the entry point invoked
+
+	$end_routine	name=lname
+
+	.endm
+
+
+;	calls mimics the VAX calls instruction.  It assumes all of
+;	the arguments to the routine to be called are on the stack.
+;	First, it copies the top 6 stack values to argument registers
+;	and pops the top 6 (or fewer, if fewer arguments) off the
+;	stack.  After the call, it further adjusts the stack by
+;	removing any arguments after the first six.
+;
+;	Arguments:
+;		args	- number of arguments, must be either a saved
+;				register or an integer expression
+;		routine	- routine to be called
+
+	.macro	calls	args, routine
+
+;	Move arguments from stack to registers.
+	mov	args, r25
+	ldq	r16, (sp)
+	ldq	r17, 8(sp)
+	ldq	r18, 16(sp)
+	ldq	r19, 24(sp)
+	ldq	r20, 32(sp)
+	ldq	r21, 40(sp)
+
+;	Adjust stack for arguments moved to registers.
+	lda	r22, 6(r31)
+	subq	r22, args, r28
+	cmovgt	r28, args, r22	; lesser of 6, actual number of arguments
+	s8addq	r22, sp, sp	; pop stack accordingly
+
+	$call	routine, set_arg_info=false, nonstandard=true
+
+;	If more than 6 arguments; remove rest from stack.
+	mov	args, r28
+	subq	r28, 6, r28
+	cmovlt	r28, r31, r28	; number of arguments not in registers
+	s8addq	r28, sp, sp	; adjust stack
+
+	.endm
+
+
+	.macro	bind	sbc, mode, ?A, ?B, ?C, ?D, ?E, ?F, ?G
+
+	ldq	r28, Q_gtmi$_global
+	subq	mode, r28, r28
+	beq	r28, B
+
+	ldq	r28, Q_gtmi$_extgbl
+	subq	mode, r28, r28
+	beq	r28, D
+
+	ldq	r28, Q_gtmi$_local
+	subq	mode, r28, r28
+	beq	r28, A
+
+	ldq	r28, Q_gtmi$_extlcl
+	subq	mode, r28, r28
+	beq	r28, C
+
+F:	br	bparm		; unknown mode
+
+C:	; extlcl
+	subq	sbc, 2, r28
+	blt	r28, F		; too few args
+	ldq	mode, (sp)
+	br	G
+
+D:	; extgbl
+	subq	sbc, 2, r28
+	blt	r28, F		; too few args
+	ldq	mode, (sp)
+
+;	NOTE: The VAX instruction is "calls #0,fgn_glopref" which will not affect
+;	the caller's stack and requires the callee to handle its arguments properly.
+;	Consequently, we make no stack adjustment after the call here.
+	$call	fgn_glopref, args=<8(sp)/Q>, nonstandard=true
+G:	stq	r31, (sp)	; add 2nd env arg
+	subq	sp, 8, sp
+	stq	mode, (sp)
+	br	E
+
+B:	; global
+;	NOTE: The VAX instruction is "calls #0,fgn_glopref" which will not affect
+;	the caller's stack and requires the callee to handle its arguments properly.
+;	Consequently, we make no stack adjustment after the call here.
+	$call	fgn_glopref, args=<0(sp)/Q>, nonstandard=true
+A:	subq	sp, 8, sp
+	stq	r31, (sp)
+E:	addq	sbc, 1, sbc
+
+;	Move arguments to registers and set up stack properly.
+	mov	sbc, r25
+	ldq	r16, (sp)
+	ldq	r17, 8(sp)
+	ldq	r18, 16(sp)
+	ldq	r19, 24(sp)
+	ldq	r20, 32(sp)
+	ldq	r21, 40(sp)
+	lda	r22, 6(r31)	; number of arguments in registers
+	subq	sbc, r22, r28
+	cmovlt	r28, sbc, r22	; lesser of 6, actual number of arguments
+	s8addq	r22, sp, sp	; pop register arguments off stack
+	$call	op_lkname, set_arg_info=false, nonstandard=true
+	subq	sbc, 6, r28
+	cmovlt	r28, r31, r28	; number of arguments not in registers
+	s8addq	r28, sp, sp	; pop rest off stack
+	mov	r31, sbc
+
+	.endm
+
+
+;	fgncal_procarg is called at the beginning of each gtm$ fgncal_entry
+;	routine to verify and process input arguments.
+;
+;	Entry:
+;		r2	- syntax code (syn)
+;		r5	- # of output arguments	[Vinaya 10/30/2002] see note about dst below
+;		r7	- position of first key (fk), minimum # of arguments
+;
+;	[Vinaya 10/30/2002] Note about dst. The role of this argument is not clear (to me).
+;			    Note that this argument is 2 for gtm$data (and other functions
+;			    that return a value) whereas $data returns only 1 result,
+;			    i.e., there is only 1 destination argument. Also, $put doesn't
+;			    provide any result, it takes input from arg in position 1
+;			    (counting from 0). In the below code, dst argument doesn't seem
+;			    to be used, and doesn't appear to be stored by fgncal_procarg
+;			    (in register or stack) for future use. I believe we could use
+;			    this argument during argument processing.
+;
+;	Exit:
+;		r0	- if local, pointer to lv_val -ret
+;		r2	- syntax code (syn)
+;		r3	- # of input arguments, # of subscripts
+;		r4	- return address of caller
+;		r5	- address of local name
+;		r6	- current key descriptor (b.j), mode -ret
+;		r7	- position of first key (fk), minimum # of arguments
+;		r8	- current arg in r25 (n)
+;		stack	- sequence of &mval
+
+
+	$routine	name=fgncal_procarg, entry=fgncal_procarg_ca, kind=null, local=true
+
+	stq	r13, SAVE_R13(fp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	mov	r26, r4		; save return address
+	ldq	r8,  ARG_OFFSET(fp)	; n = ac
+	subq	r8, r7, r28	; compare minimum # of arguments
+	bge	r28, 0$
+	br	bparm		; too few
+
+0$:	bne	r8, 15$		; any args?
+	subq	r2, syn1, r28	; might be a lock with no timeout
+	bne	r28, 12$
+	ldl	r28, no_timeout
+	subq	sp, 8, sp
+	stq	r28, (sp)
+12$:	br	fgncal_procarg_ret
+
+15$:	mov	r31, r3		; argument count
+
+20$:	; loop top
+	lda	r6, ARG_OFFSET(fp)
+	s8addq	r8, r6, r6
+	ldq	r6, (r6)	; r6 = b.n
+	ldq	r28, Q_gtmi$_extlcl	; highest-valued mode
+	subq	r6, r28, r28
+	ble	r28, 22$	; is it a mode?
+	br	23$
+
+22$:	ldq	r28, Q_gtmi$_global	; lowest-valued mode
+	subq	r6, r28, r28
+	bge	r28, 24$	; it is a mode
+
+23$:	; It's not a mode.
+	$call	push_mval, args=<A_literal_null>, nonstandard=true
+	subq	sp, 8, sp
+	stq	r0, (sp)	; pointer to mval used by op_xxname (accumulate on the stack)
+	mov	r0, r17		; destination for conversion
+	mov	r6, r16		; source descriptor
+	$call	desc2mval, args=<r16, r17>, nonstandard=true	; convert descriptor to mval
+	addq	r3, 1, r3
+	subq	r8, 1, r8
+	subq	r8, r7, r28	; n - fk	cnt, bnd
+	bge	r28, 20$	; more arguments left
+	br	pfin		; n == fk
+
+24$:	; It's a mode.
+	subq	r2, syn1, r28
+	beq	r28, 25$
+	subq	r2, syn3, r28
+	beq	r28, 25$
+	br	bparm		; mode before done, but not a lock
+
+25$:	bne	r3, 27$		; any args?
+	subq	r8, r7, r28	; n - fk
+	bne	r28, bparm	; should be done
+	subq	r8, 1, r8
+	br	pfin		; n == fk
+
+27$:	bind	r3, r6		; bind.(k, nf, mode)
+	subq	r8, 1, r8
+	subq	r8, r7, r28	; n - fk	cnt, bnd
+	ble	r28, pfin	; n == fk
+	lda	r6, ARG_OFFSET(fp)
+	s8addq	r8, r6, r6
+	ldq	r6, (r6)	; r6 = b.n
+	bne	r6, bparm	; should be 0 delimiter between arguments
+	subq	r8, 1, r8
+	subq	r8, r7, r28	; n - fk	cnt, bnd
+	beq	r28, bparm	; should be more to do
+	br	20$
+
+bparm:	$call	lib$signal, args=<L_ERR_IFBADPARM/L>, nonstandard=true
+	br	fgncal_procarg_ret
+
+pfin:	; procarg wrap up
+	subq	r2, syn2, r28
+	beq	r28, 50$
+	subq	r2, syn1, r28
+	beq	r28, 30$
+	subq	r2, syn0, r28
+	beq	r28, 40$
+	lda	r28, ARG_OFFSET(fp)
+	s8addq	r8, r28, r28
+	ldq	r28, (r28)
+	subq	sp, 8, sp
+	stq	r28, (sp)	; auxowner
+	subq	r8, 1, r8
+30$:	beq	r8, 35$
+	subq	r8, 1, r28
+	beq	r28, 33$
+	br	bparm		; should be down to timeout in position 0, counting from 0
+
+33$:	lda	r6, ARG_OFFSET(fp)
+	s8addq	r8, r6, r6
+	ldq	r6, (r6)	; timeout
+	blt	r6, 35$
+	subq	sp, 8, sp
+	stq	r6, (sp)
+	br	40$
+
+35$:	ldl	r0, no_timeout
+	subq	sp, 8, sp
+	stq	r0, (sp)
+40$:	br	fgncal_procarg_ret
+
+50$:	subq	r3, 1, r28
+	blt	r28, bparm	; should have at least one arg
+	ldq	r6, ARG_OFFSET+8(fp)
+	ldq	r28, Q_gtmi$_global
+	subq	r6, r28, r28
+	bne	r28, 60$
+	calls	r3, op_gvname
+	br	fgncal_procarg_ret
+
+60$:	ldq	r28, Q_gtmi$_naked
+	subq	r6, r28, r28
+	bne	r28, 70$
+	calls	r3, op_gvnaked
+	br	fgncal_procarg_ret
+
+70$:	ldq	r28, Q_gtmi$_extgbl
+	subq	r6, r28, r28
+	bne	r28, 90$
+	subq	r3, 2, r28
+	blt	r28, bparm	; extended globals need at least 2 args
+	ldq	r1, (sp)	; put new second parameter in for extnam
+	ldq	r28, A_literal_null	; second param for extnam is "" string
+	stq	r28, (sp)
+	subq	sp, 8, sp
+	stq	r1, (sp)
+	addq	r3, 1, r3
+	calls	r3, op_gvextnam
+	br	fgncal_procarg_ret
+
+90$:	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	bne	r28, 95$
+	ldq	r5, (sp)
+	$call	fgncal_lookup, args=<r5>, nonstandard=true
+	addq	sp, 8, sp
+	beq	r0, 100$
+	subq	sp, 8, sp
+	stq	r0, (sp)
+	br	fgncal_procarg_ret
+
+95$:	br	bparm		; unknown mode
+
+100$:	$call	lib$signal, args=<L_ERR_VAREXPECTED/L>, nonstandard=true
+	br	fgncal_procarg_ret
+
+fgncal_procarg_ret:
+	ldq	r13, SAVE_R13(fp)
+	ret	r4
+
+	$end_routine	name=fgncal_procarg
+
+
+;	fgncal_dispget sets up a destination mval and calls the op_ routine whose
+;	address is in r2.
+;
+;	entry:
+;		r2	- address of routine to call
+;
+;	exit:
+;		to fgncal_lclfini
+
+	$routine	fgncal_dispget, entry=fgncal_dispget_ca, kind=null, local=true
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	$call	push_mval, args=<A_literal_null>, nonstandard=true	; prepare a destination
+	mov	r0,  r4		; save for fgncal_lclfini
+
+;	$call	(r2), args=<r0>	; do the real thing
+	mov	r0,  r16
+	lda	r25, 1(r31)
+	mov	r2,  r27
+	ldq	r26, 8(r27)
+	jsr	r26, (r26)
+
+	$call	fgncal_lclfini, set_arg_info=false, local=true, nonstandard=true
+;	doesn't return
+
+	$end_routine	name=fgncal_dispget
+
+
+;	fgncal_lclfini converts that to which r4 points from mval format to descriptor format.
+;
+;	entry:
+;		r4	- pointer to mval
+;
+;	exit:
+;		caller's second argument - descriptor created from mval
+
+	$routine	fgncal_lclfini, entry=fgncal_lclfini_ca, kind=null, local=true
+
+	mov	r27, r13
+	.base	R13, $ls
+
+	$call	mval2desc, args=<r4, ARG_OFFSET+16(fp)/Q>, nonstandard=true	; convert it for caller
+
+	$call	fgncal_dispret, set_arg_info=false, local=true, nonstandard=true
+;	doesn't return
+
+	$end_routine	name=fgncal_lclfini
+
+
+;	fgncal_dispret cleans up the fgncal stack and returns to the foreign caller.
+;	This is the routine that returns from the stack frame created by fgncal_entry.
+
+	$routine	fgncal_dispret, entry=fgncal_dispret_ca, kind=stack, local=true, -
+			saved_regs=<%string(base_frame_regs)>, -
+			rsa_offset=RSA_OFFSET, size=STACK_SIZE, -
+			standard_prologue=false, handler=GTM$DYN_CH, synch_exceptions=true
+
+;	Since fgncal_dispret executes in and returns from the stack frame set up by
+;	fgncal_entry, it need not set up its own stack frame although it needs to declare
+;	one for the $return macro to work properly.
+
+	$end_prologue
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	$call	fgncal_unwind, set_arg_info=false, nonstandard=true
+	ldq	r28, A_mumps_status
+	ldl	r0,  (r28)
+
+	$return		; to foreign caller
+
+	$end_routine	name=fgncal_dispret
+
+
+	fgncal_entry	gtm$get, syn2, 3, 2
+
+	$linkage_section
+
+A_op_gvget:	.address	op_gvget
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	ldq	r2, A_op_gvget
+	$call	fgncal_dispget, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	subq	r3, 1, r28
+	beq	r28, 10$
+	calls	r3, op_getindx
+10$:	mov	r0, r4
+	$call	fgncal_lclfini, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$get
+
+	fgncal_old	gtm$get, gtm$gblget, gtm$lclget
+
+
+	fgncal_entry	gtm$put, syn2, 3, 2
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	$call	push_mval, args=<A_literal_null>	; convert value assigned
+	mov	r0, r4
+	$call	desc2mval, args=<ARG_OFFSET+16(fp)/Q, r4>
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	$call	op_gvput, args=<r4>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	ldq	r0, (sp)	; local
+	subq	r3, 1, r28
+	beq	r28, 10$
+	calls	r3, op_putindx
+10$:	ldl	r16, (r4)
+	ldl	r17, 4(r4)
+	ldl	r18, 8(r4)
+	ldl	r19, 12(r4)
+	ldl	r20, 16(r4)
+	stl	r16, (r0)
+	stl	r17, 4(r0)
+	stl	r18, 8(r0)
+	stl	r19, 12(r0)
+	stl	r20, 16(r0)
+	ldq	r28, A_active_lv
+	stl	r31, (r28)
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$put
+
+	fgncal_old	gtm$put, gtm$gblput, gtm$lclput
+
+
+	fgncal_entry	gtm$kill, syn2, 2, 0
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	$call	op_gvkill, args=<>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	subq	r3, 1, r28
+	beq	r28, 10$
+	calls	r3, op_srchindx
+	subq	sp, 8, sp
+	stq	r0, (sp)
+10$:	calls	1, op_kill
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$kill
+
+	fgncal_old	gtm$kill, gtm$gblkill, gtm$lclkill
+
+
+	fgncal_entry	gtm$withdraw, syn2, 2, 0
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	$call	op_gvzwithdraw, args=<>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	subq	r3, 1, r28
+	beq	r28, 10$
+	calls	r3, op_srchindx
+	subq	sp, 8, sp
+	stq	r0, (sp)
+10$:	calls	1, op_lvzwithdraw
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$withdraw
+
+	fgncal_old	gtm$withdraw, gtm$gblwithdraw, gtm$lclwithdraw
+
+	$routine	gtm$zkill, entry=gtm$zkill_CA, kind=null
+
+	.base	r27, $ls
+
+	ldq	r28, L_gtm$withdraw	; defined by previous fgncal_old macro invocation
+	ldq	r27, L_gtm$withdraw+8
+	jmp	r28
+
+	$end_routine	name=gtm$zkill
+
+
+	fgncal_entry	gtm$data, syn2, 3, 2
+
+	$linkage_section
+
+A_op_gvdata:	.address	op_gvdata
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	ldq	r2, A_op_gvdata
+	$call	fgncal_dispget, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	subq	r3, 1, r28
+	beq	r28, 10$
+	calls	r3, op_srchindx
+	subq	sp, 8, sp
+	stq	r0, (sp)
+10$:	$call	push_mval, args=<A_literal_null>
+	mov	r0, r4
+	ldq	r0, (sp)
+	addq	sp, 8, sp
+	mov	r4, r17		; put return mval underneath lv_val
+	mov	r0, r16
+	$call	op_fndata, args=<r16, r17>
+	$call	fgncal_lclfini, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$data
+
+	fgncal_old	gtm$data, gtm$gbldata, gtm$lcldata
+
+
+	fgncal_entry	gtm$order, syn2, 4, 2
+
+	$linkage_section
+
+A_op_gvorder:	.address	op_gvorder
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r1, ARG_OFFSET+24(fp)	; direction argument
+	addq	r1, 1, r28
+	beq	r28, 0$		; -1
+	subq	r1, 1, r28
+	beq	r28, 1$		; 1
+	$call	lib$signal, args=<L_ERR_ORDER2/L>	; second order arg must be -1 or 1
+	; shouldn't return
+
+0$:	$call	prev, set_arg_info=false, local=true	; based on direction, jump to zprevious
+	; shouldn't return
+
+1$:	$call	order, set_arg_info=false, local=true
+	; shouldn't return
+
+	$end_routine	name=gtm$order
+
+
+	$routine	order, entry=order_ca, kind=null, local=true
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	ldq	r2, A_op_gvorder
+	$call	fgncal_dispget, set_arg_info=false, local=true, nonstandard=true
+	; doesn't return
+
+1$:	$call	push_mval, args=<A_literal_null>, nonstandard=true
+	mov	r0, r4
+	subq	r3, 1, r3
+	beq	r3, 10$
+	subq	r3, 1, r28
+	beq	r28, 20$
+	calls	r3, op_srchindx
+	subq	sp, 8, sp
+	stq	r0, (sp)
+	br	20$
+
+10$:	addq	sp, 8, sp
+	$call	op_fnlvname, args=<r5, r31, r4>, nonstandard=true
+	$call	fgncal_lclfini, set_arg_info=false, local=true, nonstandard=true
+	; doesn't return
+
+20$:	ldq	r0, (sp)	; put dst under src and key arguments
+	ldq	r1, 8(sp)
+	addq	sp, 16, sp
+	mov	r0, r16
+	mov	r1, r17
+	mov	r4, r18
+	$call	op_fnorder, args=<r16, r17, r18>, nonstandard=true
+	$call	fgncal_lclfini, set_arg_info=false, local=true, nonstandard=true
+	; doesn't return
+
+	$end_routine	name=order
+
+
+	fgncal_entry	gtm$gblorder, syn2, 3, 2
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	$call	order, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$gblorder
+
+
+	$routine	gtm$lclorder, entry=gtm$lclorder_ca, kind=null
+
+	$linkage_section
+
+L_gtm$gblorder:	.linkage_pair	gtm$gblorder
+
+
+	$code_section
+
+	.base	r27, $ls
+
+	ldq	r28, L_gtm$gblorder	; N.B. don't modify r26
+	ldq	r27, L_gtm$gblorder+8
+	jmp	r28			; jump to gtm$gblorder as if it were the entry point invoked
+
+	$end_routine	name=gtm$lclorder
+
+
+	fgncal_entry	gtm$previous, syn2, 3, 2
+
+	$linkage_section
+
+A_op_zprevious:	.address	op_zprevious
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	$call	prev, set_arg_info=false, local=true
+	; shouldn't return
+
+	$end_routine	name=gtm$previous
+
+
+	$routine	prev, entry=prev_ca, kind=null, local=true
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	ldq	r2, A_op_zprevious
+	$call	fgncal_dispget, set_arg_info=false, nonstandard=true
+	; doesn't return
+
+1$:	$call	push_mval, args=<A_literal_null>, nonstandard=true
+	mov	r0, r4
+	subq	r3, 1, r3
+	beq	r3, 10$
+	subq	r3, 1, r28
+	beq	r28, 20$
+	calls	r3, op_srchindx
+	subq	sp, 8, sp
+	stq	r0, (sp)
+	br	20$
+
+10$:	addq	sp, 8, sp
+	$call	op_fnlvprvname, args=<r5, r4>, nonstandard=true	; put return mval underneath lv name
+	$call	fgncal_lclfini, set_arg_info=false, local=true, nonstandard=true
+	; doesn't return
+
+20$:	ldq	r0, (sp)	; put dst under src and key arguments
+	ldq	r1, 8(sp)
+	addq	sp, 16, sp
+	mov	r0, r16
+	mov	r1, r17
+	$call	op_fnzprevious, args=<r16, r17, r4>, nonstandard=true
+	$call	fgncal_lclfini, set_arg_info=false, local=true, nonstandard=true
+	; doesn't return
+
+	$end_routine	name=prev
+
+	fgncal_old	gtm$previous, gtm$gblprevious, gtm$lclprevious
+
+
+	fgncal_entry	gtm$query, syn2, 3, 2
+
+	$linkage_section
+
+A_op_gvquery:	.address	op_gvquery
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r28, Q_gtmi$_local
+	subq	r6, r28, r28
+	beq	r28, 1$
+	ldq	r2, A_op_gvquery
+	$call	fgncal_dispget, set_arg_info=false, local=true
+	; doesn't return
+
+1$:	subq	sp, 8, sp
+	stq	r5, (sp)
+	$call	push_mval, args=<A_literal_null>
+	mov	r0, r4
+	subq	sp, 8, sp
+	stq	r0, (sp)
+	addq	r3, 2, r3
+	calls	r3, op_fnquery
+	$call	fgncal_lclfini, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$query
+
+	fgncal_old	gtm$query, gtm$gblquery, gtm$lclquery
+
+
+	fgncal_entry	gtm$gblnext, syn2, 3, 2
+
+	$linkage_section
+
+A_op_gvnext:	.address	op_gvnext
+
+
+	$code_section
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r2, A_op_gvnext
+	$call	fgncal_dispget, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$gblnext
+
+
+
+	; NOTE:	For lock transactions, the mode is considered part of the key,
+	;	since there can be multiple keys in a lock transaction.
+	;
+
+
+	fgncal_entry	gtm$lock, syn1, 2, 0
+
+	$call	op_unlock, args=<>
+	ldq	r0, ARG_OFFSET(fp)
+	and	r0, ^Xff, r0		; number of original arguments
+	bne	r0, 100$
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+100$:	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	addq	sp, 8, sp
+	$call	op_lock, args=<r16>
+	subq	r0, 1, r28
+	beq	r28, 110$
+	ldl	r22, L_ERR_LCKSTIMOUT
+	ldq	r23, A_mumps_status
+	stl	r22, (r23)
+110$:	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$lock
+
+
+	fgncal_entry	gtm$inclock, syn1, 2, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	addq	sp, 8, sp
+	$call	op_incrlock, args=<r16>
+	subq	r0, 1, r28
+	beq	r28, 111$
+	ldl	r22, L_ERR_LCKSTIMOUT
+	ldq	r23, A_mumps_status
+	stl	r22, (r23)
+111$:	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$inclock
+
+
+	fgncal_entry	gtm$declock, syn1, 1, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	addq	sp, 8, sp
+	$call	op_decrlock, args=<r16>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$declock
+
+
+	fgncal_entry	gtm$zalloc, syn1, 2, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	addq	sp, 8, sp
+	$call	op_zallocate, args=<r16>
+	subq	r0, 1, r28
+	beq	r28, 112$
+	ldl	r22, L_ERR_LCKSTIMOUT
+	ldq	r23, A_mumps_status
+	stl	r22, (r23)
+112$:	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$zalloc
+
+
+	fgncal_entry	gtm$zdealloc, syn1, 1, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	addq	sp, 8, sp
+	$call	op_zdeallocate, args=<r16>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$zdealloc
+
+
+	fgncal_entry	gtm$lock2, syn3, 3, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	ldq	r17, 8(sp)
+	addq	sp, 16, sp
+	$call	op_lock2, args=<r16, r17>
+	subq	r0, 1, r28
+	beq	r28, 113$
+	ldl	r22, L_ERR_LCKSTIMOUT
+	ldq	r23, A_mumps_status
+	stl	r22, (r23)
+113$:	$call	fgncal_dispret, set_arg_info=false, local=true
+
+	$end_routine	name=gtm$lock2
+
+
+	fgncal_entry	gtm$zdealloc2, syn3, 2, 0
+
+	$call	op_lkinit, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)
+	ldq	r17, 8(sp)
+	addq	sp, 16, sp
+	$call	op_zdealloc2, args=<r16, r17>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$zdealloc2
+
+
+	fgncal_entry	gtm$setgbldir, syn0, 1, 0
+
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r17, (sp)
+	addq	sp, 8, sp
+	lda	r16, 22(r31)
+	$call	op_svput, args=<r16, r17>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$setgbldir
+
+
+	fgncal_entry	gtm$ztstart, syn0, 0, 0
+
+	$call	op_ztstart, args=<>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$ztstart
+
+
+	fgncal_entry	gtm$ztcommit, syn0, 1, 0
+
+	ldq	r28, ARG_OFFSET(fp)
+	subq	r28, r7, r28
+	bge	r28, 10$
+	br	bparm
+
+10$:	$call	op_ztcommit, args=<ARG_OFFSET+8(fp)/Q>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$ztcommit
+
+
+	fgncal_entry	gtm$mval2subsc, syn0, 2, 0
+
+	ldq	r28, ARG_OFFSET(fp)
+	subq	r28, r7, r28
+	bge	r28, 10$
+	br	bparm
+
+10$:	$call	mval2subsc, args=<ARG_OFFSET+8(fp)/Q, ARG_OFFSET+16(fp)/Q>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$mval2subsc
+
+
+	fgncal_entry	gtm$rundown, syn0, 0, 0
+
+	$call	fgncal_rundown, args=<>
+	$call	fgncal_dispret, set_arg_info=false, local=true
+	; doesn't return
+
+	$end_routine	name=gtm$rundown
+
+
+	fgncal_entry	gtm$xecute, syn0, 1, 0
+
+	ldq	r28, ARG_OFFSET(fp)
+	subq	r28, r7, r28
+	bge	r28, 10$
+	br	bparm
+
+10$:	ldq	r11, A_xfer_table
+	ldq	r10, A_fgncal_rtn	; procedure descriptor
+	ldq	r10, 8(r10)	; entry point from procedure descriptor (=> routine header)
+	$call	base_frame, args=<r10>
+	$call	new_stack_frame, args=<r10, mrt$lnk_ptr(r10)/L, mrt$hdr_size(r10)/A>
+	$call	gtm_savetraps, args=<>
+	$call	fgncal_procarg, set_arg_info=false, local=true
+	ldq	r16, (sp)	; string to execute
+	addq	sp, 8, sp
+	lda	r17, 19(r31)	; indir_linetail
+	$call	op_commarg, args=<r16, r17>
+	ldq	r28, A_mdb_condition_handler
+	stq	r28, 8(fp)	; establish mdb_condition_handler as condition handler
+	getframe
+	imb
+	ret	r26		; it will go through gtm_ret_code on the way out
+
+	$end_routine	name=gtm$xecute
+
+	fgncal_entry	gtm$zstatus, syn0, 1, 0
+	ldq	r28, ARG_OFFSET(fp)
+	subq	r28, r7, r28
+	bge	r28, 10$
+	br	bparm
+
+10$:	ldq	r28, A_dollar_zstatus
+	$call	mval2desc, args=<r28, ARG_OFFSET+8(fp)/Q>, nonstandard=true	; convert it for caller
+	$call	fgncal_dispret, set_arg_info=false, local=true, nonstandard=true
+;	doesn't return
+
+	$end_routine	name=gtm$zstatus
+
+	.end

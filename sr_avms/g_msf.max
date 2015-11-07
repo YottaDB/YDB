@@ -1,0 +1,76 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	.macro G_MSF
+
+;	msf - offsets into the GT.M MUMPS stack frame
+;
+;	note: these offsets correspond to fields in the stack frame defined in stack_frame.h
+
+	msf$rvector_off		=	0
+	msf$l_symtab_off	=	4
+	msf$mpc_off		=	8
+	msf$ctxt_off		=	12
+	msf$literal_ptr_off	=	16
+	msf$temps_ptr_off	=	20
+	msf$vartab_ptr_off	=	24
+	msf$vartab_len_off	=	28
+	msf$temp_mvals		=	30
+	msf$old_frame_off	=	32
+	msf$typ_off		=	36
+	msf$flags_off		=	38
+	msf$for_ctrl_stack	=	40
+
+	msf$frame_size		=	48
+
+;	Stack frame type (msf$typ_off) field bits (see also stack_frame.h):
+
+	sft_count		=	^X01	; frame counts (real code) or doesn't (transcendental code)
+	sft_dm			=	^X02	; direct mode
+	sft_rep_op		=	^X04	; frame to replace opcode (zbreak has already occurred)
+	sft_zbrk_act		=	^X08	; action frame for zbreak
+	sft_dev_act		=	^X10	; action frame for device error handler
+	sft_ztrap		=	^X20	; ztrap frame
+	sft_zstep_act		=	^X80	; action frame for a zstep
+	sft_zintr		=	^X100	; $zinterrupt frame
+
+;	Stack frame flag (msf$flags_off) bits (see in stack_frame.h)
+
+	sff_indce		=	^X01	; frame requires indr cache entry cleanup in op_unwind
+	sff_etrap_err		=	^X10	; A $ETRAP style error occurred while in this frame.
+
+;	mrt - offsets into the GT.M object file routine header
+;
+;	note: these offsets correspond to fields in the routine header defined in rtnhdr.h
+
+	mrt$jsb			=	0
+	mrt$src_len		=	12
+	mrt$src_addr		=	16
+	mrt$rtn_len		=	20
+	mrt$rtn_addr		=	24
+	mrt$var_ptr		=	28
+	mrt$var_len		=	32
+	mrt$lab_ptr		=	36
+	mrt$lab_len		=	40
+	mrt$lnr_ptr		=	44
+	mrt$lnr_len		=	48
+	mrt$ptxt_ptr		=	52
+	mrt$checksum		=	56
+	mrt$compiler_qlf	=	60
+	mrt$oldr_ptr		=	64
+	mrt$curr_ptr		=	68
+	mrt$tmp_mv		=	72
+	mrt$tmp_sz		=	74
+	mrt$lnk_ptr		=	76
+	mrt$lit_ptr		=	80
+
+	mrt$hdr_size	=	84
+
+	.endm

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,21 +48,15 @@ GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	pid_t		process_id;
 GBLREF	uint4		image_count;
 
+error_def(ERR_JNLACCESS);
 error_def(ERR_JNLCNTRL);
 error_def(ERR_JNLFLUSH);
 error_def(ERR_JNLFLUSHNOPROG);
 error_def(ERR_JNLPROCSTUCK);
+error_def(ERR_JNLQIOSALVAGE);
 error_def(ERR_JNLWRTDEFER);
 error_def(ERR_JNLWRTNOWWRTR);
 error_def(ERR_TEXT);
-error_def(ERR_JNLWRTDEFER);
-error_def(ERR_JNLWRTNOWWRTR);
-
-#ifdef VMS
-#  define CURRENT_WRITER jb->now_writer
-#else
-#  define CURRENT_WRITER jb->io_in_prog_latch.u.parts.latch_pid
-#endif
 
 static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt, uint4 threshold)
 {
@@ -147,9 +141,9 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		UNIX_ONLY(assert(ERR_JNLWRTNOWWRTR != status);)	/* dont have asynchronous jnl writes in Unix */
 		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
 			return status;
-		if ((writer != CURRENT_WRITER) || (1 == *lcnt))
+		if ((writer != CURRENT_JNL_IO_WRITER(jb)) || (1 == *lcnt))
 		{
-			writer = CURRENT_WRITER;
+			writer = CURRENT_JNL_IO_WRITER(jb);
 			loop_image_count = jb->image_count;
 			*lcnt = 1;	/* !!! this should be detected and limited by the caller !!! */
 			break;
@@ -160,21 +154,19 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			break;
 		}
 		VMS_ONLY(
-			if ((CURRENT_WRITER == process_id) && (jpc->qio_active == TRUE) && (jb->iosb.cond == -2))
+			if ((CURRENT_JNL_IO_WRITER(jb) == process_id) && (jpc->qio_active == TRUE) && (jb->iosb.cond == -2))
 		        {	/* this an "impossible" condition where the private flag and the io have lost sync */
 				GTMASSERT;	/* this should only occur in VMS; secshr_db_clnup should clear the problem */
 			}
 		)
-		if (writer == CURRENT_WRITER)
+		if (writer == CURRENT_JNL_IO_WRITER(jb))
 		{
 			if (!was_crit)
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			if (VMS_ONLY(0 == writer ||) FALSE == is_proc_alive(writer, jb->image_count))
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
-				jnl_send_oper(jpc, ERR_JNLFLUSH);
-				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
-				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Journal IO writer changed during wait"));
+				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
 				VMS_ONLY(jb->io_in_prog = 0);
 				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
 				if (!was_crit)
@@ -188,7 +180,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
 			jpc->status = status;
 			jnl_send_oper(jpc, ERR_JNLFLUSH);
-			send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
 			stuck_cnt++;
 			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, writer, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
@@ -212,7 +204,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 {
 	jnl_buffer_ptr_t	jb;
-	unsigned int		lcnt, prev_lcnt, cnt, proc_stuck_cnt;
+	unsigned int		lcnt, prev_lcnt, cnt;
 	sgmnt_addrs		*csa;
 	unsigned int		status;
 	boolean_t		was_crit, jnlfile_lost, exact_check;
@@ -237,7 +229,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	 * the grab_crit calls (done in jnl_write_attempt and jnl_sub_write_attempt) to ensure no deadlocks are possible.
 	 */
 	assert(was_crit || (0 == have_crit(CRIT_HAVE_ANY_REG)));
-	for (prev_lcnt = lcnt = cnt = 1, proc_stuck_cnt = 0;
+	for (prev_lcnt = lcnt = cnt = 1;
 		(was_crit || (NOJNL != jpc->channel)) && (exact_check ? jb->dskaddr != threshold : jb->dskaddr < threshold);
 		lcnt++, prev_lcnt = lcnt, cnt++)
 	{
@@ -251,28 +243,19 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 		}
 		if (SS_NORMAL == status)
 		{
-			if (JNL_FLUSH_PROG_TRIES > lcnt)
-			{
-				proc_stuck_cnt = 0;
-				/* In VMS, jnl writes are asynchronous. The above call to "jnl_sub_write_attempt" has returned
-				 * SS_NORMAL status. This means the jnl qio lock is not in use by anyone else and is up for grabs.
-				 * We would have scheduled a jnl qio write through a sys$dclast call. We have no control of when
-				 * the AST routine "jnl_start_ast" will actually get control and start the write. Until then
-				 * we dont want to keep reinvoking "jnl_sub_write_attempt" in a hard spin loop. So sleep.
-				 * In Unix, writes are synchronous so SS_NORMAL status return implies we have completed a jnl
-				 * write and "jb->dskaddr" is closer to "threshold" than it was in the previous iteration.
-				 * A sleep at this point will only slow things down unnecessarily. Hence no sleep if Unix.
-				 */
-				VMS_ONLY(wcs_sleep(lcnt);)
-				continue;
-			}
-			jpc->status = SS_NORMAL;
-			jnl_send_oper(jpc, ERR_JNLFLUSH);
-			send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr),
-				 ERR_TEXT, 2, LEN_AND_LIT("Could not flush all the buffered journal data"));
-			GTMASSERT; /* too many attempts to flush journal data */
+			/* In VMS, jnl writes are asynchronous. The above call to "jnl_sub_write_attempt" has returned
+			 * SS_NORMAL status. This means the jnl qio lock is not in use by anyone else and is up for grabs.
+			 * We would have scheduled a jnl qio write through a sys$dclast call. We have no control of when
+			 * the AST routine "jnl_start_ast" will actually get control and start the write. Until then
+			 * we dont want to keep reinvoking "jnl_sub_write_attempt" in a hard spin loop. So sleep.
+			 * In Unix, writes are synchronous so SS_NORMAL status return implies we have completed a jnl
+			 * write and "jb->dskaddr" is closer to "threshold" than it was in the previous iteration.
+			 * A sleep at this point will only slow things down unnecessarily. Hence no sleep if Unix.
+			 */
+			VMS_ONLY(wcs_sleep(lcnt);)
+			continue;
 		}
-		if ((ERR_JNLCNTRL == status)
+		if ((ERR_JNLCNTRL == status) || (ERR_JNLACCESS == status)
 			|| (csa->now_crit
 				&& (ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status)))
 		{	/* If JNLCNTRL or if holding crit and not waiting for some other writer (or self in VMS)
@@ -281,7 +264,10 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			if (was_crit)
 				jb->blocked = 0;
 			else
+			{
+				assertpro(0 == have_crit(CRIT_HAVE_ANY_REG));
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
+			}
 			jnlfile_lost = FALSE;
 			if (jb->free_update_pid)
 			{
@@ -290,7 +276,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			{
 				assert((gtm_white_box_test_case_enabled
 					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))
-				       UNIX_ONLY(|| TREF(gtm_test_fake_enospc)));
+				       UNIX_ONLY(|| TREF(gtm_test_fake_enospc) || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC)));
 				if (JNL_ENABLED(csa->hdr))
 				{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
 					 * error, whatever its error handling method is.  Also, an operator log will be sent by some
@@ -314,16 +300,9 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 		}
 #		ifdef UNIX
 		if ((ERR_JNLWRTDEFER == status) && IS_REPL_INST_FROZEN)
-		{	/* Check if instance freeze is in effect and this db has instance freeze activation enabled.
-			 * In that case, we do not want to keep retrying the jnl_qio as that might cause lcnt to increase
-			 * and eventually GTMASSERT implying this is an IO issue whereas it is possible some other process
-			 * is holding the jnl_qio lock on this region and is not able to write to the journal file for a
-			 * long time because the instance is frozen. To avoid false GTMASSERTs, wait for freeze to be
-			 * lifted before continuing with normal flow (which is to increment lcnt and keep retrying the
-			 * attempt at the jnl_qio lock). Note that this process is guaranteed not to have set the instance
-			 * freeze due to a ENOSPC situation as in that case we would never have allowed any interrupt to occur
-			 * until we succeed with that write and will clear the freeze before moving on.
-			 * Note that the below macro takes care of the "db has instance freeze activation enabled" check too.
+		{	/* Check if the write was deferred because the instance is frozen.
+			 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
+			 * in jnl_qio.
 			 */
 			 WAIT_FOR_REPL_INST_UNFREEZE(csa);
 		}
@@ -344,28 +323,11 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 		} else if (prev_lcnt != lcnt)
 		{
 			assert(1 == lcnt);
-			if (ERR_JNLWRTDEFER == status)
+			if ((ERR_JNLWRTDEFER == status) && (JNL_FLUSH_PROG_TRIES <= cnt))
 			{	/* Change of writer */
-				if (JNL_FLUSH_PROG_TRIES <= cnt)
-				{
-					send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr),
-						ERR_TEXT, 2, LEN_AND_LIT("No progress even with multiple writers"));
-					GTMASSERT;
-				}
-				proc_stuck_cnt = 0;
-			} else if (ERR_JNLPROCSTUCK == status && (JNL_FLUSH_PROG_FACTOR <= ++proc_stuck_cnt))
-			{
-				send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
-					LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
-				VMS_ONLY(
-					if (TREF(gtm_environment_init))
-					{
-						proc_stuck_cnt = 0;
-						continue;
-					}
-				)
-
-				GTMASSERT;
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr),
+					ERR_TEXT, 2, LEN_AND_LIT("No progress even with multiple writers"));
+				cnt = 0;
 			}
 		}
 	}

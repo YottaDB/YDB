@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,8 +101,10 @@ THREADGBLDEF(in_op_gvget,			boolean_t)			/* TRUE if op_gvget() is a C-stack call
 THREADGBLDEF(issue_DBROLLEDBACK_anyways,	boolean_t)			/* currently set by MUPIP LOAD */
 THREADGBLDEF(last_fnquery_return_subcnt,	int)				/* count subscript in last_fnquery_return_sub */
 THREADGBLDEF(last_fnquery_return_varname,	mval)				/* returned varname of last $QUERY() */
+#ifdef VMS
 THREADGBLDEF(new_dbinit_ipc,			int4)				/* indicates whether shared memory/semaphore is
 										 * created by db_init (also used by dbinit_ch) */
+#endif
 THREADGBLDEF(ok_to_call_wcs_recover,		boolean_t)			/* Set to TRUE before a few wcs_recover callers.
 										 * Any call to wcs_recover in the final retry
 										 * assert to prevent cache recovery while in a
@@ -148,6 +150,7 @@ THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation 
 /* Replication variables */
 THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the source
 										 * server */
+THREADGBLDEF(tqread_nowait,			boolean_t)			/* avoid sleeping in t_qread if TRUE */
 /* Miscellaneous */
 THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mapped collation
 										 * algorithms - since this seems only used in
@@ -170,6 +173,11 @@ THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* UNIX op_fnzsearch subscript constu
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* UNIX op_fnzsearch temp for null subs control */
 #endif
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
+#if defined(UNIX) && defined(GTMDBGFLAGS_ENABLED)
+THREADGBLDEF(gtmdbgflags,			int)
+THREADGBLDEF(gtmdbgflags_freq,			int)
+THREADGBLDEF(gtmdbgflags_freq_cntr,		int)
+#endif
 THREADGBLDEF(gtm_env_init_done,			boolean_t)			/* gtm_env_init flag for completion */
 THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
 THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
@@ -214,6 +222,9 @@ THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared librar
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
 #ifdef UNIX
+THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
+THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */
+THREADGBLDEF(zpeek_reg_ptr,			gd_region *)			/* Resolved pointer for zpeekop_regname */
 THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or fifo device is
 										 * interrupted */
 #endif
@@ -314,6 +325,7 @@ THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates 
 										 * useful to invalidate all those triggers in case
 										 * of a transaction restart or rollback.
 										 */
+THREADGBLDEF(in_op_fntext,			boolean_t)			/* Denote the trigger was processed in $Text() */
 #endif
 
 /* Debug values */

@@ -1,0 +1,12 @@
+	.title	RUNDOWN_DISPATCH
+
+	$routine RUNDOWN_DISPATCH, kind=stack
+	.base	r27, $ls
+
+	$call	USER_RUNDOWN
+
+	$return
+
+	$end_routine
+
+	.end

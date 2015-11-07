@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,9 +54,9 @@ void	op_fnascii(int4 num, mval *in, mval *out);
 void	op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
 void	op_fnextract(int last, int first, mval *src, mval *dest);
 #ifdef __sun
-void	op_fnfgncal(uint4 n_mvals, ...);
 int	op_fnfgncal_rpc(unsigned int n_mvals, ...); /* typ to keep the compiler happy as set into xfer_table, which is int */
-#elif defined(UNIX)
+#endif
+#if defined(UNIX)
 void	op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...);
 #elif defined(VMS)
 void	op_fnfgncal(mval *dst, ...);
@@ -127,6 +127,9 @@ void	op_fnzlkid(mint boolex, mval *retval);
 void	op_fnzm(mint x, mval *v);
 void	op_fnzp1(mval *src, int del, int trgpcidx, UNIX1_VMS2(mval *dst, boolean_t srcisliteral));
 void	op_fnzparse(mval *file, mval *field, mval *def1, mval *def2, mval *type, mval *ret);
+#ifdef UNIX
+void	op_fnzpeek(mval *baseaddr, int offset, int len, mval *format, mval *ret);
+#endif
 void	op_fnzpid(mint boolexpr, mval *ret);
 void	op_fnzpiece(mval *src, mval *del, int first, int last, UNIX1_VMS2(mval *dst, boolean_t srcisliteral));
 void	op_fnzpopulation(mval *arg1, mval *arg2, mval *dst);
@@ -208,6 +211,7 @@ void	op_killall(void);
 void	op_killall(void);
 int	op_linefetch();
 int	op_linestart();
+void	op_litc(mval *dst, mval *src);
 void	op_lkinit(void);
 void	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...);
 int	op_lock(int timeout);
@@ -245,6 +249,7 @@ int	op_startintrrpt();
 #elif defined(VMS)
 void	op_startintrrpt();
 #endif
+void	op_stolitc(mval *val);
 void	op_sub(mval *u, mval *v, mval *s);
 void	op_sub(mval *u, mval *v, mval *s);
 void	op_svget(int varnum, mval *v);
@@ -279,13 +284,11 @@ void	op_wtone(int c);
 void	op_wttab(mint x);
 void	op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...);
 void	op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...);
-int	op_zalloc2(int4 timeout, UINTPTR_T auxown);
 int	op_zallocate(int timeout);
-int	op_zallocate(int timeout);		/***type int added***/
 void	op_zattach(mval *);
 int	op_zbfetch();
 int	op_zbstart();
-void	op_zcompile(mval *v, boolean_t mExtReqd);
+void	op_zcompile(mval *v, boolean_t ignore_dollar_zcompile);
 void	op_zcont(void);
 void	op_zdealloc2(int4 timeout, UINTPTR_T auxown);
 void	op_zdeallocate(int4 timeout);

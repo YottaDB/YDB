@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2012 Fidelity Information Services, Inc.    	;
+;	Copyright 2012, 2013 Fidelity Information Services, Inc.    	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -43,7 +43,7 @@ dump(reglist,output,what,detail)	; dump information
 	set gtmdist=$select(isVMS:"gtm$dist",1:"gtm_dist")
 	;
 	; Applicable regions list
-	set reglist=$$reglist($$FUNC^%UCASE($get(reglist,"*")),mod)
+	set reglist=$$reglist($$FUNC^%UCASE($get(reglist,"*")),isVMS)
 	; What operation? for now, should be just "dump -fileheader [-all]"
 	if (0=$length($get(what)))!("fileheader"=$$FUNC^%LCASE($get(what))) set what=mod_"fileheader"
 	else  set $ecode=",U254," quit:$quit 254 quit
@@ -121,10 +121,13 @@ dsefilecmd(output,regionlist,cmd,isVMS)
 	;  indicates that the script could find no applicable regions. The second piece
 	;  could be null. If so, that piece represents the first region in which DSE
 	;  starts up
-reglist(reglist,mod)
+reglist(reglist,isVMS)
 	; reglist - comma separated list of regions
-	; mod - the modifier in use, VMS uses '/' whereas Unix uses '-'
-	new reg,regavail,i
+	; isVMS - use '/' (vms) or '-' (unix) for the modifier
+	;	  determine GT.CM regions, '::' (vms) vs ':' (unix)
+	new reg,regavail,i,mod,gtcmKey,regpath
+	set mod=$select(isVMS:"/",1:"-")
+	set gtcmKey=$select(isVMS:"::",1:":")
 	; determine the applicable regions - reglist vs actual available regions
 	set reglist=$select($get(reglist)="":"*",reglist="ALL":"*",1:reglist)
 	set regavail=""
@@ -132,6 +135,8 @@ reglist(reglist,mod)
 	. set reg=$piece(reglist,",",i) set regavail(reg)=1  ; define the region
 	kill reg
 	for i=1:1 set reg=$view("gvnext",$get(reg)) quit:reg=""  do
+	. set regpath=$VIEW("GVFILE",reg)
+	. quit:(1<$length(regpath,gtcmKey))
 	. if ("*"=reglist)!($data(regavail(reg))) do
 	. . set $piece(regavail,",",$length(regavail,",")+1)=$select(i>1:"find "_mod_"region="_reg,1:"")
 	quit regavail
@@ -153,6 +158,7 @@ parsefhead(output,active)
 	. if line?1"File"1." ".E set fcnt=$length(line," "),file=$piece(line," ",fcnt) quit
 	. if line?1"Region"1." ".E do  quit
 	. . set fcnt=$length(line," "),region=$piece(line," ",fcnt)
+	. . if $data(parsed(region,"File")) kill parsed(region)		; DUPLICATE, throw it away
 	. . set parsed(region,"File")=file
 	. quit:$data(region)=0
 	. if line?1"Date/Time".E set parsed(region,"Date/Time")=$$FUNC^%TRIM($extract(line,10,$length(line))) quit

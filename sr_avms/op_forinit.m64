@@ -1,0 +1,74 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2008 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.title	OP_FORINIT
+
+	G_MSF
+	mval$def
+
+	$routine OP_FORINIT, entry=OP_FORINIT_CA, kind=null
+stack_offset = 32
+	lda	sp, -stack_offset(sp)
+	stq	r13, (sp)
+	stq	r2, 8(sp)
+	stq	r3, 16(sp)
+	stq	r4, 24(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	stl	r26, msf$mpc_off(r12)
+
+	mov	r16, r2
+	mov	r17, r3
+	mov	r18, r4
+
+	mv_force_defined r2
+	mv_force_num (r2)
+	mv_force_defined r3
+	mv_force_num (r3)
+	mv_force_defined r4
+	mv_force_num (r4)
+
+	ldl	r28, mval$l_m1(r3)
+	blt	r28, 40$
+
+	mv_if_int (r3), 30$
+
+; The following sequence emulates the Vax instruction:
+;	tstb	mval$b_exp(r3)
+
+	ldq_u	r28, mval$b_exp(r3)
+	lda	r0, mval$b_exp+1(r3)
+	extqh	r28, r0, r28
+
+	blt	r28, 40$
+
+30$:	mov	r2, r0
+	mov	r4, r1
+	br	50$
+
+40$:	mov	r4, r0
+	mov	r2, r1
+
+50$:	$call	OP_NUMCMP, set_arg_info=false, nonstandard=true
+
+	ldl	r28, msf$mpc_off(r12)
+
+	ldq	r13, (sp)
+	ldq	r2, 8(sp)
+	ldq	r3, 16(sp)
+	ldq	r4, 24(sp)
+	lda	sp, stack_offset(sp)
+
+	ret	r28
+
+	$end_routine
+
+	.end

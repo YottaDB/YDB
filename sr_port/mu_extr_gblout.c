@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,10 +45,10 @@
 #endif
 #include "gvcst_protos.h"
 
-#define INTEG_ERROR_RETURN 							\
-{										\
-	gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
-	return FALSE;								\
+#define INTEG_ERROR_RETURN										\
+{													\
+	gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr);	\
+	return FALSE;											\
 }
 
 GBLREF	bool			mu_ctrlc_occurred;
@@ -62,8 +62,6 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_EXTRFAIL);
 error_def(ERR_RECORDSTAT);
-
-STATICDEF readonly unsigned char gt_lit[] = "TOTAL";
 
 #if defined(UNIX) && defined(GTM_CRYPT)
 boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format, muext_hash_hdr_ptr_t hash_array,
@@ -158,7 +156,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 			return FALSE;
 		if (mu_ctrlc_occurred)
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT(gt_lit),
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT("TOTAL"),
 				st->recknt, st->keylen, st->datalen, st->reclen);
 			mu_ctrlc_occurred = FALSE;
 		}

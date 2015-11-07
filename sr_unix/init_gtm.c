@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,12 @@
 
 #include "mdef.h"
 
+#ifdef GTM_PTHREAD
+#  include <pthread.h>
+#endif
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+
 #include "startup.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
@@ -37,6 +41,7 @@
 #include "gtm_malloc.h"
 #include "stp_parms.h"
 #include "create_fatal_error_zshow_dmp.h"
+#include "mtables.h"
 
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF void		(*tp_timeout_action_ptr)(void);
@@ -48,6 +53,11 @@ GBLREF void		(*op_wteol_ptr)(int4 n);
 GBLREF void		(*unw_prof_frame_ptr)(void);
 
 GBLREF mstr		default_sysid;
+#ifdef GTM_PTHREAD
+GBLREF pthread_t	gtm_main_thread_id;
+GBLREF boolean_t	gtm_main_thread_id_set;
+GBLREF boolean_t	gtm_jvm_process;
+#endif
 GBLDEF boolean_t	gtm_startup_active = FALSE;
 
 void init_gtm(void)
@@ -80,8 +90,17 @@ void init_gtm(void)
 	assert(SIZEOF(mval) == SIZEOF(mval_b));
 	assert(SIZEOF(chkmval.fnpc_indx) == SIZEOF(chkmval_b.fnpc_indx));
 	assert(OFFSETOF(mval, fnpc_indx) == OFFSETOF(mval_b, fnpc_indx));
+	DEBUG_ONLY(mtables_chk());	/* Validate mtables.c assumptions */
 
 	SFPTR(create_fatal_error_zshow_dmp_fptr, create_fatal_error_zshow_dmp);
+#	ifdef GTM_PTHREAD
+	assert(!gtm_main_thread_id_set);
+	if (!gtm_main_thread_id_set && gtm_jvm_process)
+	{
+		gtm_main_thread_id = pthread_self();
+		gtm_main_thread_id_set = TRUE;
+	}
+#	endif
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;
 	tp_timeout_action_ptr = tp_timeout_action;

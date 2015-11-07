@@ -1,0 +1,55 @@
+; ****************************************************************
+; *								 *
+; *      Copyright 2001, 2004 Sanchez Computer Associates, Inc.   *
+; *      This source code contains the intellectual property     *
+; *      of its copyright holder(s), and is made available       *
+; *      under a license.  If you do not know the terms of       *
+; *      the license, please stop and do not read further.       *
+; *                                                              *
+; ****************************************************************
+
+	.title	ZC_MAKESPACE
+
+;
+; Call interface:
+;
+;	void zc_makespace (dst, mask, mvallist, mvallistend, zcrtn, n_tabargs)
+;	mval		*dst, **mvallist, **mvallistend;
+;	long		mask;
+;	zctabrtn	*zcrtn;
+;	unsigned	n_tabargs;
+;
+; ZC_MAKESPACE calls DO_ZCALL as follows:
+;
+;	do_zcall (dst, mask, mvallist, mvallistend, zcrtn, lcllist, lcllistend);
+;
+; where:
+;
+;	dst ... zcrtn	are simply passed on unchanged;
+;	lcllist		is the address of the first element of an array of
+;			struct lclarg_type [see DO_ZCALL.C for definition]; and
+;	lcllistend	is the address of the next byte after the last element
+;			in the array pointed to by lcllist.
+;
+; Since lcllistend is the seventh argument, it must be passed on the stack.
+; The array is also allocated on the stack;  the number of elements is specified
+; by the input parameter n_tabargs, and the size of each element is 48 bytes.
+; See DO_ZCALL.C for details.
+;
+
+	$routine ZC_MAKESPACE, entry=ZC_MAKESPACE_CA, kind=stack
+	.base	r27, $ls
+
+;	On entry, r21 = n_tabargs
+	mulq	r21, 48, r21	; r21 = n_tabargs * 48
+	subq	sp, r21, sp
+	mov	sp, r21		; r21 = lcllist
+
+;	lcllistend = fp [= original sp]
+	$call	DO_ZCALL, args=<r16,r17,r18,r19,r20,r21,fp>
+
+	$return
+
+	$end_routine
+
+	.end

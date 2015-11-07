@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@
 	char		asccurtime[10];							\
 	size_t		len;								\
 	now = time(NULL);								\
-	tm_struct = localtime(&now);							\
+	GTM_LOCALTIME(tm_struct, &now);							\
 	STRFTIME(asccurtime, SIZEOF(asccurtime), TIME_EXT_FMT, tm_struct, len);		\
 	DBGTPTDFRL(x);									\
 }

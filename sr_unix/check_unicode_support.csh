@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2010 Fidelity Information Services, Inc #
+#	Copyright 2007, 2013 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,7 +29,7 @@ endif
 # It should be manually tested using this command :
 #    ssh <some host> ls -l {/usr/local,/usr,}/lib{64,,32}/libicuio.{a,so,sl}
 
-foreach libdir ( {/usr/local,/usr,}/lib{64,,32}/libicuio.{a,so,sl} )
+foreach libdir ( {/usr/local,/usr,}/lib{64,/x86_64-linux-gnu,,32,/i386-linux-gnu}/libicuio.{a,so,sl} )
 	# 36 is the least version GT.M supports for ICU.
 	# We have to get the numeric value from the ICU library. On non-AIX platforms, this can be done by
 	# first getting the library to which libicuio.so is pointing to (this is always TRUE, in the sense

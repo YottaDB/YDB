@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"		/* for SPRINTF() atleast */
 #include "gtm_time.h"
+#include "have_crit.h"
 #include <signal.h>
 
 #include "gtcm.h"
@@ -115,9 +116,10 @@ void save_rc_rsp(char *buff, int len)
 void dump_omi_rq(void)
 {
     char	msg[256];
-    char	*then = GTM_CTIME(&omi_hist[omi_hist_num].timestamp);
+    char	*then;
     omi_conn	*temp;
 
+    GTM_CTIME(then, &omi_hist[omi_hist_num].timestamp);
     then[24] = '\0';
     if (omi_hist_num < 0)   /* no history? */
 	return;
@@ -131,18 +133,19 @@ void dump_omi_rq(void)
 
 void dump_rc_hist(void)
 {
-	int i;
+	int	i;
+	char	msg[256];
+	char	*then;
 
 	if (rc_hist_num < 0)	/* no history? */
 		return;
 	i = rc_hist_num;
 	do
 	{
-		i = (i+1) % HISTORY;
+		i = (i + 1) % HISTORY;
 		if (rc_hist[i].timestamp)
 		{
-			char msg[256];
-			char *then = GTM_CTIME(&rc_hist[i].timestamp);
+			GTM_CTIME(then, &rc_hist[i].timestamp);
 			then[24] = '\0'; /* eliminate newline */
 			if (rc_hist[i].toobigflag)
 			{

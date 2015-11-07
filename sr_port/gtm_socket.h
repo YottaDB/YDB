@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,6 @@
 #define GTM_SOCKLEN_TYPE size_t
 #elif defined(VMS)
 #define GTM_SOCKLEN_TYPE size_t
-#elif defined(__sparc)
-#define GTM_SOCKLEN_TYPE int
 #else
 #define GTM_SOCKLEN_TYPE socklen_t
 #endif

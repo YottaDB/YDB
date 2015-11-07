@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -218,8 +218,8 @@ typedef struct
 typedef struct { /* keep this structure and member offsets defined in sr_avms/mutex.mar in sync */
 	int4	mutex_hard_spin_count;
 	int4	mutex_sleep_spin_count;
-	int4	mutex_spin_sleep_mask;
-	int4	filler1;
+	int4	mutex_spin_sleep_mask;			/* currently unused */
+	int4	mutex_que_entry_space_size;		/* total number of entries */
 } mutex_spin_parms_struct;
 
 enum crit_ops
@@ -592,12 +592,28 @@ typedef struct node_local_struct
 #define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
 
-#define NUM_CRIT_ENTRY		1024
-#define CRIT_SPACE		(NUM_CRIT_ENTRY * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
-#define NODE_LOCAL_SIZE		(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
-#define NODE_LOCAL_SPACE	(ROUND_UP(CRIT_SPACE + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
+#define MIN_CRIT_ENTRY				1024
+#define MAX_CRIT_ENTRY				32768
+#define DEFAULT_NUM_CRIT_ENTRY			1024
+#define NUM_CRIT_ENTRY(CSD)			(CSD)->mutex_spin_parms.mutex_que_entry_space_size
+#define CRIT_SPACE(ENTRIES)			((ENTRIES) * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
+#define JNLPOOL_CRIT_SPACE			CRIT_SPACE(DEFAULT_NUM_CRIT_ENTRY)
+#define NODE_LOCAL_SIZE				(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
+#define NODE_LOCAL_SPACE(CSD)			(ROUND_UP(CRIT_SPACE(NUM_CRIT_ENTRY(CSD)) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
+#define MIN_NODE_LOCAL_SPACE			(ROUND_UP(CRIT_SPACE(MIN_CRIT_ENTRY) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 /* In order for gtmsecshr not to pull in OTS library, NODE_LOCAL_SIZE_DBS is used in secshr_db_clnup instead of NODE_LOCAL_SIZE */
-#define NODE_LOCAL_SIZE_DBS	(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
+#define NODE_LOCAL_SIZE_DBS			(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
+
+#define INIT_NUM_CRIT_ENTRY_IF_NEEDED(CSD)											\
+{	/* The layout of shared memory depends on the number of mutex queue entries specified in the file header. Thus in	\
+	 * order to set, for example, csa->critical or csa->shmpool_buffer, we need to know this number. However, this		\
+	 * number can be zero if we have not yet done db_auto_upgrade. So go ahead and upgrade to the value that will		\
+	 * eventually be used, which is DEFAULT_NUM_CRIT_ENTRY.									\
+	 */															\
+	/* Be safe in PRO and check if we need to initialize crit entries, even for GDSMV60002 and later. */			\
+	if (0 == NUM_CRIT_ENTRY(CSD))												\
+		NUM_CRIT_ENTRY(CSD) = DEFAULT_NUM_CRIT_ENTRY;									\
+}
 
 /* Define pointer types for above structures that may be in shared memory and need 64
    bit pointers. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,13 +64,13 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
 		if ((-level) > curlvl)
-			rts_error(VARLSTCNT(1) ERR_ZGOTOLTZERO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
 		level += curlvl;	/* Compute relative desired level */
 	} else
 	{	/* Else level is the level we wish to achieve - compute unrolls necessary */
 		if (0 > (curlvl - level))
 			/* Couldn't get to the level we were trying to unwind to */
-			rts_error(VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
 	/* Migrate mval parm contents to private buffers since the mvals could die as we unwind things */
 	MV_FORCE_STR(rtn_name);
@@ -90,7 +90,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * was NULL.
 		 */
 		if (0 == lblname.str.len)
-			rts_error(VARLSTCNT(1) ERR_RTNNAME);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RTNNAME);
 		rtnhdr = frame_pointer->rvector;
 		if (0 == level)
 		{	/* If doing unlink, recall name of routine as well as will need it later */
@@ -118,7 +118,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	 * since the base frame cannot be rewritten as a GTM frame.
 	 */
 	if (0 == level)
-		rts_error(VARLSTCNT(1) ERR_ZGOTOINVLVL2);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOINVLVL2);
 #	endif
 #	ifdef GTM_TRIGGER
 	if (!IS_GTM_IMAGE && (1 >= level))
@@ -127,7 +127,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * entry ref was coded) and are not resume-able (if no entry ref were specified) so we cannot
 		 * permit ZGOTOs to these levels in a utility.
 		 */
-		rts_error(VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
 #	endif
 #	ifdef UNIX
 	/* One last check if we are unlinking, make sure no call-in frames exist on our stack */
@@ -140,7 +140,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 				continue;
 			if (fp->flags & SFF_CI)
 				/* We have a call-in frame - cannot do unlink */
-				rts_error(VARLSTCNT(1) ERR_ZGOCALLOUTIN);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOCALLOUTIN);
 			if (NULL == fpprev)
 			{	/* Next frame is some sort of base frame */
 #				ifdef GTM_TRIGGER

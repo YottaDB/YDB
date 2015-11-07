@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "gdsbt.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
+#include "gtmio.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
@@ -40,7 +41,6 @@
 #include "muprec.h"
 #include "iosp.h"
 #include "jnl_typedef.h"
-#include "gtmio.h"
 #include "gtmmsg.h"
 #include "anticipatory_freeze.h"
 #include "wcs_flu.h"	/* for wcs_flu() prototype */
@@ -83,9 +83,8 @@ uint4 mur_process_intrpt_recov()
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
-		gv_cur_region = rctl->gd;	/* wcs_flu requires this to be set */
-		cs_addrs = rctl->csa;
-		csd = cs_data = rctl->csd;	/* MM logic after wcs_flu call requires this to be set */
+		TP_CHANGE_REG(rctl->gd);
+		csd = cs_data;	/* MM logic after wcs_flu call requires this to be set */
 		assert(csd == rctl->csa->hdr);
 		jctl = rctl->jctl_turn_around;
 		max_jnl_alq = max_jnl_deq = max_autoswitchlimit = 0;
@@ -219,8 +218,8 @@ uint4 mur_process_intrpt_recov()
 				 * is in progress
 				 */
 				bt_refresh(cs_addrs, FALSE); /* sets earliest bt TN to be the turn around TN */
-				db_csh_ref(cs_addrs, FALSE);
 			}
+			db_csh_ref(cs_addrs, FALSE);
 			assert(NULL != cs_addrs->jnl);
 			jpc = cs_addrs->jnl;
 			assert(NULL != jpc->jnl_buff);
@@ -255,6 +254,7 @@ uint4 mur_process_intrpt_recov()
 	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
+		TP_CHANGE_REG_IF_NEEDED(rctl->gd);
 		if (!rctl->jfh_recov_interrupted)
 			jctl = rctl->jctl_turn_around;
 		else
@@ -336,10 +336,10 @@ uint4 mur_process_intrpt_recov()
 				{
 					assert(FALSE);
 					if (SS_NORMAL == jctl->status2)
-						gtm_putmsg(VARLSTCNT(5) ERR_JNLWRERR, 2, jctl->jnl_fn_len,
+						gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLWRERR, 2, jctl->jnl_fn_len,
 							jctl->jnl_fn, jctl->status);
 					else
-						gtm_putmsg(VARLSTCNT1(6) ERR_JNLWRERR, 2, jctl->jnl_fn_len,
+						gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT1(6) ERR_JNLWRERR, 2, jctl->jnl_fn_len,
 							jctl->jnl_fn, jctl->status, PUT_SYS_ERRNO(jctl->status2));
 					return jctl->status;
 				}
@@ -349,7 +349,7 @@ uint4 mur_process_intrpt_recov()
 					{
 						jctl->status2 = errno;
 						assert(FALSE);
-						gtm_putmsg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
+						gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
 							jctl->jnl_fn_len, jctl->jnl_fn,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), jctl->status2);
 						return ERR_JNLFSYNCERR;
@@ -373,7 +373,7 @@ uint4 mur_process_intrpt_recov()
 		jgbl.gbl_jrec_time = rctl->jctl_turn_around->turn_around_time;	/* time needed for cre_jnl_file_common() */
 		if (EXIT_NRM != cre_jnl_file_common(&jnl_info, rename_fn, rename_fn_len))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 			return jnl_info.status;
 		}
 #		ifdef UNIX

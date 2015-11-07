@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -333,5 +333,13 @@ void	gtm_env_init_sp(void)
 	TREF(gtm_test_fake_enospc) = logical_truth_value(&val, FALSE, &is_defined);
 	if (!is_defined)
 		TREF(gtm_test_fake_enospc) = FALSE;
+#	endif
+#	ifdef GTMDBGFLAGS_ENABLED
+	val.addr = GTMDBGFLAGS;
+	val.len = SIZEOF(GTMDBGFLAGS) - 1;
+	TREF(gtmdbgflags) = trans_numeric(&val, &is_defined, TRUE);
+	val.addr = GTMDBGFLAGS_FREQ;
+	val.len = SIZEOF(GTMDBGFLAGS_FREQ) - 1;
+	TREF(gtmdbgflags_freq) = trans_numeric(&val, &is_defined, TRUE);
 #	endif
 }

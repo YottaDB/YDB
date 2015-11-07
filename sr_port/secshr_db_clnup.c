@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1178,7 +1178,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						blk_ptr = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 					} else
 					{	/* access method is MM */
-						blk_ptr = (sm_uc_ptr_t)csa->acc_meth.mm.base_addr + (off_t)csd->blk_size * cs->blk;
+						blk_ptr = MM_BASE_ADDR(csa) + (off_t)csd->blk_size * cs->blk;
 						if (!GTM_PROBE(csd->blk_size, blk_ptr, WRITE))
 						{
 							SECSHR_ACCOUNTING(7);
@@ -1187,7 +1187,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							SECSHR_ACCOUNTING(cs->blk);
 							SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
 							SECSHR_ACCOUNTING(csd->blk_size);
-							SECSHR_ACCOUNTING((INTPTR_T)csa->acc_meth.mm.base_addr);
+							SECSHR_ACCOUNTING((INTPTR_T)(MM_BASE_ADDR(csa)));
 							assert(FALSE);
 							continue;
 						}
@@ -1746,7 +1746,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
 				}
 				assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
-				if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
+				if (GTM_PROBE(CRIT_SPACE(NUM_CRIT_ENTRY(csd)), csa->critical, WRITE))
 				{
 					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
 					 * process exiting as secshr_db_clnup during process exiting is always preceded by
@@ -1792,7 +1792,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					SECSHR_ACCOUNTING((INTPTR_T)cnl);
 					SECSHR_ACCOUNTING(NODE_LOCAL_SIZE_DBS);
 					SECSHR_ACCOUNTING((INTPTR_T)csa->critical);
-					SECSHR_ACCOUNTING(CRIT_SPACE);
+					SECSHR_ACCOUNTING(CRIT_SPACE(NUM_CRIT_ENTRY(csd)));
 					assert(FALSE);
 				}
 			}
@@ -1828,7 +1828,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			}
 #ifdef UNIX
 			/* All releases done now. Double check latch is really cleared */
-			if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
+			if (GTM_PROBE(CRIT_SPACE(NUM_CRIT_ENTRY(csd)), csa->critical, WRITE))
 			{
 				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
 				assert(!csa->now_crit || csa->hold_onto_crit);
@@ -1904,7 +1904,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 				cnl = csa->nl;
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, cnl, WRITE)) &&
-					(GTM_PROBE(CRIT_SPACE, csa->critical, WRITE)))
+					(GTM_PROBE(JNLPOOL_CRIT_SPACE, csa->critical, WRITE)))
 				{
 					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
 					 * process exiting as secshr_db_clnup during process exiting is always preceded by

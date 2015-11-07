@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,8 @@ LITREF octabstruct 		oc_tab[];
 #define MAX_TEMP_COUNT		128	/* bad things, which need investigation, happen if we raise this above 1024 */
 
 error_def(ERR_TMPSTOREMAX);
+
+STATICFNDCL void remove_backptr(triple *curtrip, oprtype *opnd, char (*tempcont)[MAX_TEMP_COUNT]);
 
 void alloc_reg(void)
 {
@@ -101,7 +103,7 @@ void alloc_reg(void)
 #				ifdef DEBUG
 				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
 					assert(0 == tempcont[TVAL_REF][c]);	/* check against leaking TVAL temps */
-					if (OC_LINESTART == opc)
+				if (OC_LINESTART == opc)
 					break;
 #				endif
 			case OC_FETCH:
@@ -139,40 +141,14 @@ void alloc_reg(void)
 				}
 				break;
 		}
-		for (j = x->operand, y = x; j < ARRAYTOP(y->operand); )
-		{
-			if (TRIP_REF == j->oprclass)
-			{
-				ref = j->oprval.tref;
-				if (OC_PARAMETER == ref->opcode)
-				{
-					y = ref;
-					j = y->operand;
-					continue;
-				}
-				if (r = ref->destination.oprclass)	/* Note assignment */
-				{
-					dqloop(&ref->backptr, que, b)
-					{
-						if (b->bpt == y)
-						{
-							dqdel(b, que);
-							break;
-						}
-					}
-					if ((ref->backptr.que.fl == &ref->backptr) && (TVAR_REF != r))
-						tempcont[r][j->oprval.tref->destination.oprval.temp] = 0;
-				}
-			}
-			j++;
-		}
 		if (OC_PASSTHRU == x->opcode)
 		{
 			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
+			remove_backptr(x, &x->operand[0], tempcont);
 			x->opcode = OC_NOOP;
 			continue;
 		}
-		if (!(dest_type = x->destination.oprclass))	/* Note assignment */
+		if (NO_REF == (dest_type = x->destination.oprclass))	/* Note assignment */
 		{
 			oct = oc_tab[opc].octype;
 			if ((oct & OCT_VALUE) && (x->backptr.que.fl != &x->backptr) && !(oct & OCT_CGSKIP))
@@ -209,6 +185,27 @@ void alloc_reg(void)
 			assert(x->destination.oprval.tref->destination.oprclass);
 			x->destination = x->destination.oprval.tref->destination;
 		}
+		for (j = x->operand, y = x; j < ARRAYTOP(y->operand); )
+		{	/* Loop through all the parameters of the current opcode. For each parameter that requires an intermediate
+			 * temporary, decrement (this is what remove_backptr does) the "reference count" -- opcodes yet to be
+			 * processed that still need the intermediate result -- and if that number is zero, mark the temporary
+			 * available. We can then reuse the temp to hold the results of subsequent opcodes. Note that remove_backptr
+			 * is essentially the resolve_tref() in resolve_ref.c. resolve_tref increments the "reference count",
+			 * while remove_backptr decrements it.
+			 */
+			if (TRIP_REF == j->oprclass)
+			{
+				ref = j->oprval.tref;
+				if (OC_PARAMETER == ref->opcode)
+				{
+					y = ref;
+					j = y->operand;
+					continue;
+				}
+				remove_backptr(y, j, tempcont);
+			}
+			j++;
+		}
 	}
 	for (r = 0; VALUED_REF_TYPES > r; r++)
 		sa_temps[r] = temphigh[r] + 1;
@@ -222,4 +219,34 @@ void alloc_reg(void)
 	sa_temps_offset[TVAD_REF] = size;
 	size += sa_temps[TCAD_REF] * sa_class_sizes[TCAD_REF];
 	sa_temps_offset[TCAD_REF] = size;
+}
+
+void remove_backptr(triple *curtrip, oprtype *opnd, char (*tempcont)[MAX_TEMP_COUNT])
+{
+	triple		*ref;
+	tbp		*b;
+	int		r;
+
+	assert(TRIP_REF == opnd->oprclass);
+	ref = opnd->oprval.tref;
+	while (OC_PASSTHRU == opnd->oprval.tref->opcode)
+	{
+		ref = ref->operand[0].oprval.tref;
+		opnd = &ref->operand[0];
+		assert(TRIP_REF == opnd->oprclass);
+	}
+	r = ref->destination.oprclass;
+	if (NO_REF != r)
+	{
+		dqloop(&ref->backptr, que, b)
+		{
+			if (b->bpt == curtrip)
+			{
+				dqdel(b, que);
+				break;
+			}
+		}
+		if ((ref->backptr.que.fl == &ref->backptr) && (TVAR_REF != r))
+			tempcont[r][ref->destination.oprval.temp] = 0;
+	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,6 @@ GBLDEF siginfo_t	exi_siginfo;
 
 GBLDEF gtm_sigcontext_t	exi_context;
 
-GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	enum gtmImageTypes	image_type;
@@ -133,15 +132,15 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			/* If nothing pending AND we have crit or already in exit processing, wait to
 			 * invoke shutdown.
 			 */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
 			{
-				forced_exit = TRUE;
+				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
 			exit_state = EXIT_IMMED;
-			send_msg(VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			dont_want_core = TRUE;
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
@@ -169,9 +168,9 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					GTMASSERT;
 			}
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
 			{
-				forced_exit = TRUE;
+				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
@@ -179,32 +178,36 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
-					send_msg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
-					gtm_putmsg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
+						GTMIMAGENAMETXT(image_type), process_id, sig);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
+						GTMIMAGENAMETXT(image_type), process_id, sig);
 					break;
 				case GTMSIGINFO_USER:
-					send_msg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.send_pid, signal_info.send_uid);
-					gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.send_pid, signal_info.send_uid);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6,
+						GTMIMAGENAMETXT(image_type), process_id, sig,
+						signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
-					send_msg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
-					gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6,
+						GTMIMAGENAMETXT(image_type), process_id, sig,
+						signal_info.int_iadr, signal_info.bad_vadr);
 					break;
 				case GTMSIGINFO_ILOC:
-					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr);
-					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.int_iadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5,
+						GTMIMAGENAMETXT(image_type), process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
-					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.bad_vadr);
-					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.bad_vadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5,
+						GTMIMAGENAMETXT(image_type), process_id, sig, signal_info.bad_vadr);
 					break;
 			}
 			break;
@@ -212,15 +215,15 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 		case SIGDANGER:
 			forced_exit_err = ERR_KRNLKILL;
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
 			{
-				forced_exit = TRUE;
+				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
 			exit_state = EXIT_IMMED;
-			send_msg(VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			dont_want_core = TRUE;
 			break;
 #endif
@@ -230,47 +233,51 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			{
 				case GTMSIGINFO_NONE:
 					exit_state = EXIT_IMMED;
-					send_msg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
-					gtm_putmsg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
+						GTMIMAGENAMETXT(image_type), process_id, sig);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
+						GTMIMAGENAMETXT(image_type), process_id, sig);
 					break;
 				case GTMSIGINFO_USER:
 					/* This signal was SENT to us so it can wait until we are out of crit to cause an exit */
 					forced_exit_err = ERR_KILLBYSIGUINFO;
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
-					if (EXIT_PENDING_TOLERANT >= exit_state && (psa_gbl->dbc_critical || exit_handler_active))
+					if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
 					{
-						forced_exit = TRUE;
+						SET_FORCED_EXIT_STATE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
 						gtm_fork_n_core();	/* Generate "virgin" core while we can */
 						return;
 					}
 					exit_state = EXIT_IMMED;
-					send_msg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.send_pid, signal_info.send_uid);
-					gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.send_pid, signal_info.send_uid);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6,
+						GTMIMAGENAMETXT(image_type), process_id, sig,
+						signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
 					exit_state = EXIT_IMMED;
-					send_msg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
-					gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6,
+						GTMIMAGENAMETXT(image_type), process_id, sig,
+						signal_info.int_iadr, signal_info.bad_vadr);
 					break;
 				case GTMSIGINFO_ILOC:
 					exit_state = EXIT_IMMED;
-					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr);
-					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.int_iadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5,
+						GTMIMAGENAMETXT(image_type), process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
 					exit_state = EXIT_IMMED;
-					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.bad_vadr);
-					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-							process_id, sig, signal_info.bad_vadr);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5,
+						GTMIMAGENAMETXT(image_type), process_id, sig, signal_info.bad_vadr);
 					break;
 				default:
 					exit_state = EXIT_IMMED;
@@ -278,8 +285,8 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			if (0 != signal_info.sig_err)
 			{
-				send_msg(VARLSTCNT(1) signal_info.sig_err);
-				gtm_putmsg(VARLSTCNT(1) signal_info.sig_err);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) signal_info.sig_err);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) signal_info.sig_err);
 			}
 			break;
 	} /* switch (sig) */

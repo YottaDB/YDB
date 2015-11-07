@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 		FPRINTF(stderr, "\nUsage:\n"); \
 		FPRINTF(stderr, "\t%s [%s<number>] <file1> <file2> ... <filen>\n\n", argv[0], ID_PREFIX); \
 		FPRINTF(stderr, "Reports IPC Key(s) (using id 1, or <number>) of <file1> <file2> ... <filen>\n\n"); \
-		exit(1); \
+		exit(EXIT_FAILURE); \
 	}
 
 int main (int argc, char *argv[])

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 # include "trigger.h"
 # include "gv_trigger.h"
 #endif
+#include "mtables.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -174,14 +175,14 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STAB */
 	FALSE,	/* MVST_IARR */
 	TRUE,	/* MVST_NTAB */
-	FALSE,	/* MVST_ZINTCMD */
+	TRUE,	/* MVST_ZINTCMD */
 	TRUE,	/* MVST_PVAL */
 	FALSE,	/* MVST_STCK */
 	TRUE,	/* MVST_NVAL */
 	TRUE,	/* MVST_TVAL */
 	TRUE,	/* MVST_TPHOLD */
 	TRUE,	/* MVST_ZINTR */
-	FALSE,	/* MVST_ZINTDEV */
+	TRUE,	/* MVST_ZINTDEV */
 	TRUE,	/* MVST_STCK_SP */
 	TRUE,	/* MVST_LVAL */
 	FALSE,	/* MVST_TRIGR */
@@ -953,4 +954,13 @@ LITDEF char vxi_opcode[][6] =
 	"CVTHD "
 };
 
+/* Routine invoked in debug mode by init_gtm() on UNIX to verify certain assumptions about some of the
+ * tables in this routine. Routine must be resident in this module to do these checks since dimensions
+ * are not known in other routines using a LITREF.
+ */
+void mtables_chk(void)
+{
+	assert(SIZEOF(mvs_size) == (MVST_LAST + 1));
+	assert(SIZEOF(mvs_save) == (SIZEOF(boolean_t) * (MVST_LAST + 1)));
+}
 #endif

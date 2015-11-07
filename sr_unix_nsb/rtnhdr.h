@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,6 +128,9 @@ typedef struct
 #define LABEL_ADDR(rtnhdr, lab_tabent_ptr)(CODE_BASE_ADDR(rtnhdr) + *(LABENT_LNR_ENTRY(rtnhdr, lab_tabent_ptr)))
 #define CODE_BASE_ADDR(rtnhdr) ((unsigned char *)(rtnhdr))
 #define CODE_OFFSET(rtnhdr, addr) ((char *)(addr) - (char *)(rtnhdr))
+
+#define DYNAMIC_LITERALS_ENABLED(rtnhdr) FALSE
+#define RW_REL_START_ADR(rtnhdr) ((char *)LITERAL_ADR(rtnhdr))
 
 /* Flag values for get_src_line call */
 #define VERIFY		TRUE

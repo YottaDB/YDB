@@ -1,0 +1,24 @@
+; ################################################################
+; #                                                              #
+; #      Copyright 2008 Fidelity Information Services, Inc #
+; #                                                              #
+; #      This source code contains the intellectual property     #
+; #      of its copyright holder(s), and is made available       #
+; #      under a license.  If you do not know the terms of       #
+; #      the license, please stop and do not read further.       #
+; #                                                              #
+; ################################################################
+
+	.title	op_forchk1
+
+;	op_forchk1 - dummy routine called at start of FOR-statement
+;
+;	During normal execution, this routine would be called at the beginning of a For-statement.
+;	However, when it is desired to set a break at that location, the entry in the xfer table
+;	pointing to op_forchk1 would be altered to point to the desired alternative routine.
+
+	$routine	name=op_forchk1,entry=op_forchk1_ca,kind=null
+
+	ret	r26
+
+	$end_routine	name=op_forchk1

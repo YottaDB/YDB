@@ -1,0 +1,140 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                               ;
+;       Copyright 2000, 2001 Sanchez Computer Associates, Inc.  ;
+;                                                               ;
+;       This source code contains the intellectual property     ;
+;       of its copyright holder(s), and is made available       ;
+;       under a license.  If you do not know the terms of       ;
+;       the license, please stop and do not read further.       ;
+;                                                               ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	.title	mutex_stoprel	gtm mutex control
+
+MUTEX_OWNCNT = 0
+MUTEX_WRTPND = 2
+MUTEX_PROCHEAD =  64 ;  8
+MUTEX_FREEHEAD = 128 ; 24
+MQUE_PID = 8
+QUE_RETRY = 128
+
+; NOTE:  The following definition corresponds to an item of the same name in CDB_SC.H.
+;	 Make sure that it is maintained compatibly!
+cdb_sc_dbccerr = 81	; 'Q'
+
+	code_psect
+
+	.entry	mutex_stoprelr,^m<r2,r3>
+	movl	4(ap),r2		;r2 points to head of structure
+;+
+; Moser and Jordan (Compaq Computer Corporation))  2-APR-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.  With the single
+; atomic operation, the ordering issue described above are no longer
+; possible.
+;
+;	adawi	#-1,(r2)		;decrement semaphore
+;	bgeq	20$
+;	bbcci	#0,MUTEX_WRTPND(r2),20$	;if was a write pending do wakeup
+;-
+ 
+	ASSUME	MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+15$:	evax_ldll r16,(r2)		; read mutex locked
+	evax_sll  r16,#16,r28		; Move WRTPND to bit pos 0
+	decw	r16			; decr owner count
+	evax_and r16,#^xffff,r16	; clear WRTPND bit
+	evax_stlc r16,(r2)		; store mutex	
+	.branch_unlikely
+	evax_beq r16,15$		; retry, if store failed
+	evax_mb
+
+	blbs	r28,20$ 		; skip, if no write pending
+        bsbw    mutex_wakeup
+
+20$:	clrl	r0			;return success:  cdb_sc_normal == 0
+	ret
+
+
+	.entry	mutex_stoprelw,^m<r2,r3>
+	movl	4(ap),r2		;r2 points to head of structure
+
+;+
+; Moser and Jordan (Compaq Computer Corporation))  2-APR-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        adawi   #-1,(r2)                ;decrement the semaphore
+;	bbcci	#0,MUTEX_WRTPND(r2),10$
+;-
+
+	ASSUME	MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+15$:	evax_ldll r16,(r2)		; read mutex locked
+	decw	r16			; decr owner count
+	evax_and r16,#^xffff,r16	; clear WRTPND bit
+	evax_stlc r16,(r2)		; store mutex	
+	.branch_unlikely
+	evax_beq r16,15$		; retry, if store failed
+	evax_mb
+
+	bsb	mutex_wakeup
+	clrl	r0			;return success:  cdb_sc_normal == 0
+	ret
+
+
+mutex_wakeup:
+	.jsb32_entry
+
+	movzbl	#QUE_RETRY,r1
+5$:	remqhi	MUTEX_PROCHEAD(r2),r3	;get first entry in queue
+	bvc	20$			;got a que entry
+	bcc	70$			;no entries left...all done
+	sobgtr	r1,5$			;secondary interlock failed
+
+10$:	movl	#cdb_sc_dbccerr,r0
+	ret
+
+20$:	movl	MQUE_PID(r3),r0
+	movzbl	#QUE_RETRY,r1
+40$:	insqti	(r3),MUTEX_FREEHEAD(r2)
+	bcc	50$
+	sobgtr	r1,40$
+	bsb	wake_job
+	brb	10$
+
+50$:	bsb	wake_job
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001 
+;
+; There is no need to foce an interlock read on the write pending bit here.
+;
+;	bbssi   #1,MUTEX_WRTPND(r2),60$ ;force access to the write pending byte
+;60$:
+;-
+	blbs	MUTEX_WRTPND(r2),70$	;if write pending set stop wakeups
+	brb	mutex_wakeup
+
+70$:	rsb
+
+
+; wake up a job
+; enter with r0 containing the pid
+; exit with job awakened, r0,r1 destroyed
+; this is a subroutine, because we wish to insert que entry in free
+; list prior to making service call in order to minimize the time
+; that the que entry is unattached.  Also we wish to wake up the
+; job, even if the insq fails
+
+wake_job:
+	.jsb32_entry
+
+	pushl	r0		;store pid on stack, so that it can be
+				;referenced by address
+	movl	sp,r0		;argument to crit_wake is address of pid
+	pushl	r0		;use two instructions for safety
+	calls	#1,G^crit_wake
+	moval	4(sp),sp	;clean-up the stack
+	rsb			;return to calling program
+
+	.end

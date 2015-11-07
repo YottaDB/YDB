@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,10 @@
 
 #include <errno.h>
 #include <signal.h>
+#ifdef GTM_PTHREAD
+#  include <pthread.h>
+#endif
+
 #include "ctrlc_handler.h"
 #include "std_dev_outbndset.h"
 
@@ -21,8 +25,9 @@ void ctrlc_handler(int sig)
 	int4     ob_char;
 	int	 save_errno;
 
-	if (sig == SIGINT)
+	if (SIGINT == sig)
 	{
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
 		save_errno = errno;
 		ob_char = 3;
 		std_dev_outbndset(ob_char);

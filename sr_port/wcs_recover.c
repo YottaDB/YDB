@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,16 +103,15 @@ GBLREF	boolean_t		in_mu_rndwn_file;
 error_def(ERR_BUFRDTIMEOUT);
 error_def(ERR_DBADDRALIGN);
 error_def(ERR_DBADDRANGE);
-error_def(ERR_DBCCERR);
 error_def(ERR_DBCNTRLERR);
 error_def(ERR_DBCRERR);
 error_def(ERR_DBDANGER);
 error_def(ERR_DBFILERR);
-error_def(ERR_ERRCALL);
 error_def(ERR_INVALIDRIP);
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
 error_def(ERR_STOPTIMEOUT);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
 void wcs_recover(gd_region *reg)
@@ -201,7 +200,7 @@ void wcs_recover(gd_region *reg)
 	if (wcs_verify(reg, TRUE, TRUE))	/* expect_damage is TRUE, in_wcs_recover is TRUE */
 	{	/* if it passes verify, then recover can't help ??? what to do */
 		BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_verify_passed);
-		send_msg(VARLSTCNT(4) ERR_DBCNTRLERR, 2, DB_LEN_STR(reg));
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCNTRLERR, 2, DB_LEN_STR(reg));
 	}
 	if (gtmDebugLevel)
 		verifyAllocatedStorage();
@@ -247,13 +246,13 @@ void wcs_recover(gd_region *reg)
 				old_block = (INTPTR_T)GDS_ANY_REL2ABS(csa, cr->twin);
 				if (!IS_PTR_IN_RANGE(old_block, bp_lo, bp_top))
 				{
-					send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
 						cr, cr->blk, old_block, RTS_ERROR_TEXT("bkup_before_image_range"), bp_lo, bp_top);
 					assert(FALSE);
 					continue;
 				} else if (!IS_PTR_ALIGNED(old_block, bp_lo, csd->blk_size))
 				{
-					send_msg(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, cr->blk,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("bkup_before_image_align"), old_block, bp_lo, csd->blk_size);
 					assert(FALSE);
 					continue;
@@ -266,26 +265,28 @@ void wcs_recover(gd_region *reg)
 				/* Do other checks to validate before-image buffer */
 				if (cr_alt == cr)
 				{
-					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("bkup_before_image_cr_same"), cr_alt, FALSE, CALLFROM);
 					assert(FALSE);
 					continue;
 				} else if (cr->blk != cr_alt->blk)
 				{
-					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("bkup_before_image_blk"), cr_alt->blk, cr->blk, CALLFROM);
 					assert(FALSE);
 					continue;
 				} else if (!cr_alt->in_cw_set)
 				{
-					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt, cr_alt->blk,
-						RTS_ERROR_TEXT("bkup_before_image_in_cw_set"), cr_alt->in_cw_set, TRUE, CALLFROM);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt,
+							cr_alt->blk, RTS_ERROR_TEXT("bkup_before_image_in_cw_set"),
+							cr_alt->in_cw_set, TRUE, CALLFROM);
 					assert(FALSE);
 					continue;
 				} else if (cr_alt->stopped)
 				{
-					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt, cr_alt->blk,
-						RTS_ERROR_TEXT("bkup_before_image_stopped"), cr_alt->stopped, FALSE, CALLFROM);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt,
+							cr_alt->blk, RTS_ERROR_TEXT("bkup_before_image_stopped"),
+							cr_alt->stopped, FALSE, CALLFROM);
 					assert(FALSE);
 					continue;
 				}
@@ -360,7 +361,7 @@ void wcs_recover(gd_region *reg)
 			r_epid = cr->r_epid;
 			if (cr->read_in_progress < -1)
 			{
-				send_msg(VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
 				INTERLOCK_INIT(cr);
 				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
@@ -388,9 +389,9 @@ void wcs_recover(gd_region *reg)
 						GTMASSERT;
 					/* process still active but not playing fair or cache is corrupted */
 					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, TWICE);
-					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
 						DB_LEN_STR(reg));
-					send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
 					INTERLOCK_INIT(cr);
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
@@ -427,8 +428,10 @@ void wcs_recover(gd_region *reg)
 							GTMASSERT;
 						if (0 != epid)
 						{	/* process still active, but not playing fair */
-							send_msg(VARLSTCNT(5) ERR_STOPTIMEOUT, 3, epid, DB_LEN_STR(reg));
-							send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_STOPTIMEOUT, 3, epid,
+									DB_LEN_STR(reg));
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
+									LEN_AND_LIT("Buffer forcibly seized"));
 							cr->epid = 0;
 						}
 						continue;
@@ -615,7 +618,8 @@ void wcs_recover(gd_region *reg)
 			 * In Unix, no rebuild would have been attempted since no kernel extension routine currently available.
 			 * In either case, we do not want to discard this buffer so send a warning to the user and proceed.
 			 */
-			send_msg(VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid, DB_LEN_STR(reg), cr->blk);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+					DB_LEN_STR(reg), cr->blk);
 			cr->data_invalid = 0;
 		}
 		if (cr->in_tend)
@@ -824,57 +828,65 @@ void wcs_recover(gd_region *reg)
 	return;
 }
 
-#ifdef UNIX
-
 #ifdef MM_FILE_EXT_OK
 void	wcs_mm_recover(gd_region *reg)
 {
-	int			mm_prot;
+	int			save_errno;
+	gtm_uint64_t		mmap_sz;
 	INTPTR_T		status;
 	struct stat     	stat_buf;
-	sm_uc_ptr_t		old_base[2];
-	sigset_t        	savemask;
-	boolean_t       	need_to_restore_mask = FALSE, was_crit;
+	sm_uc_ptr_t		old_db_addrs[2], mmap_retaddr;
+	boolean_t       	was_crit, read_only;
 	unix_db_info		*udi;
+	const char		*syscall = "munmap()";
 
+	VMS_ONLY(assert(FALSE));
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->hdr == cs_data);
-	if (!(was_crit = cs_addrs->now_crit) && !(cs_addrs->hdr->clustered))
+	assert(!cs_addrs->hdr->clustered);
+	assert(!cs_addrs->hold_onto_crit || cs_addrs->now_crit);
+	if (!(was_crit = cs_addrs->now_crit))
 		grab_crit(gv_cur_region);
 	SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, FALSE);
-	if (cs_addrs->total_blks == cs_addrs->ti->total_blks)
-	{
-		/* I am the one who actually did the extension, don't need to remap again */
+	assert((NULL != cs_addrs->db_addrs[0]) || process_exiting);
+	if ((cs_addrs->total_blks == cs_addrs->ti->total_blks) || (NULL == cs_addrs->db_addrs[0]))
+	{	/* I am the one who actually did the extension, don't need to remap again OR an munmap/mmap failed and we are in
+		 * shutdown logic
+		 */
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 		return;
 	}
-	mm_prot = cs_addrs->read_write ? (PROT_READ | PROT_WRITE) : PROT_READ;
-	/* Block SIGALRM to ensure cs_data and cs_addrs are always in-sync / No IO in this period */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
-	old_base[0] = cs_addrs->db_addrs[0];
-	old_base[1] = cs_addrs->db_addrs[1];
-	status = (INTPTR_T)munmap((caddr_t)old_base[0], (size_t)(old_base[1] - old_base[0]));
+	old_db_addrs[0] = cs_addrs->db_addrs[0];
+	old_db_addrs[1] = cs_addrs->db_addrs[1];
+	cs_addrs->db_addrs[0] = NULL;
+	status = (INTPTR_T)munmap((caddr_t)old_db_addrs[0], (size_t)(old_db_addrs[1] - old_db_addrs[0]));
 	if (-1 != status)
 	{
 		udi = FILE_INFO(gv_cur_region);
 		FSTAT_FILE(udi->fd, &stat_buf, status);
-		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL, (size_t)stat_buf.st_size,
-										mm_prot, GTM_MM_FLAGS, udi->fd, (off_t)0));
+		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(cs_data);
+		CHECK_LARGEFILE_MMAP(gv_cur_region, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
+		read_only = gv_cur_region->read_only;
+		syscall = "mmap()";
+		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(cs_data), read_only));
+		GTM_WHITE_BOX_TEST(WBTEST_MMAP_SYSCALL_FAIL, status, -1);
 	}
 	if (-1 == status)
 	{
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
+		save_errno = errno;
+		WBTEST_ASSIGN_ONLY(WBTEST_MMAP_SYSCALL_FAIL, save_errno, ENOMEM);
 		if (!was_crit)
 			rel_crit(gv_cur_region);
-		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+		assert(WBTEST_ENABLED(WBTEST_MMAP_SYSCALL_FAIL));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+				LEN_AND_STR(syscall), CALLFROM, save_errno);
 	}
-	/* In addition to updating the internal map values, gds_map_moved also updates cs_data to point to the remapped file */
-	gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], (off_t)stat_buf.st_size);
+	gds_map_moved(mmap_retaddr, old_db_addrs[0], old_db_addrs[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
+	cs_addrs->db_addrs[0] = mmap_retaddr;
         cs_addrs->total_blks = cs_addrs->ti->total_blks;
 	if (!was_crit)
 		rel_crit(gv_cur_region);
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
 	return;
 }
 #else	/* !MM_FILE_EXT_OK */
@@ -882,29 +894,13 @@ void	wcs_mm_recover(gd_region *reg)
 {
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
 
-	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-		end = &buff[MAX_ZWR_KEY_SZ - 1];
-	rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-	return;
-}
-#endif
-#elif defined(VMS)
-/* wcs_mm_recover is not yet implemented on VMS */
-void	wcs_mm_recover(gd_region *reg)
-{
-	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
-
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
-	assert(cs_addrs->now_crit);
 	assert(cs_addrs->hdr == cs_data);
-	if (!cs_addrs->hold_onto_crit)
-		rel_crit(gv_cur_region);
+	if (cs_addrs->now_crit && !cs_addrs->hold_onto_crit)
+		rel_crit(reg);
 	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 		end = &buff[MAX_ZWR_KEY_SZ - 1];
-	rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+	rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	return;
 }
-
-#else
-#  error UNSUPPORTED PLATFORM
 #endif

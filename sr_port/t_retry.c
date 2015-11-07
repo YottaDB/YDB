@@ -294,7 +294,6 @@ void t_retry(enum cdb_sc failure)
 			}
 #			endif
 			assert(csa->now_crit);
-			CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			csd = cs_data;
 			if (CDB_STAGNATE == t_tries)
@@ -310,7 +309,6 @@ void t_retry(enum cdb_sc failure)
 				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_jnlclose)
 					&& (failure != cdb_sc_jnlstatemod) && (failure != cdb_sc_bkupss_statemod)
 					&& (failure != cdb_sc_inhibitkills));
-				assert(csa->now_crit);
 				local_t_tries = t_tries;
 				if (!csa->hold_onto_crit)
 				{
@@ -320,24 +318,29 @@ void t_retry(enum cdb_sc failure)
 				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
 				if (cdb_sc_gbloflow == failure)
-					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+				{
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+				}
 				if (IS_DOLLAR_INCREMENT)
 				{
 					assert(ERR_GVPUTFAIL == t_err);
 					t_err = ERR_GVINCRFAIL;	/* print more specific error message */
 				}
-				UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
+				UNIX_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
 #ifdef DEBUG
 				/* Core is not needed. We intentionally create this error. */
 				if (!gtm_white_box_test_case_enabled)
 #endif
 				UNIX_ONLY(gtm_fork_n_core());
-				VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist,
+				VMS_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff));
-				rts_error(VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist, ERR_GVIS, 2, end-buff,
+						buff);
 			}
 		}
+		CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
 		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(cnl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 		{
 			assert(csa->hdr->clustered);
@@ -380,14 +383,14 @@ void t_retry(enum cdb_sc failure)
 						 * KILL. So, assert that kip_csa is still NULL
 						 */
 						assert(NULL == kip_csa);
-						rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 					}
 				}
 				assert(!redo_root_search_done);
 				if (WANT_REDO_ROOT_SEARCH)
 					gvcst_redo_root_search();
 				if (is_updproc)
-					rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_REPLONLNRLBK);
 			}
 #			ifdef DEBUG
 			else

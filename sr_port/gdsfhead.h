@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@ error_def(ERR_DBENDIAN);
 error_def(ERR_DBFLCORRP);
 error_def(ERR_GVIS);
 error_def(ERR_GVSUBOFLOW);
+error_def(ERR_MMFILETOOLARGE);
 error_def(ERR_REPLINSTMISMTCH);
 error_def(ERR_REPLREQROLLBACK);
 error_def(ERR_SCNDDBNOUPD);
@@ -51,64 +52,7 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TNTOOLARGE);
 error_def(ERR_TNWARN);
 
-/* all this record's fields should exactly be the first members of the cache_rec in the same order */
-typedef struct mmblk_rec_struct
-{
-	struct
-	{
-		sm_off_t	fl;
-		sm_off_t	bl;
-	}
-			blkque,		/* cache records whose block numbers hash to the same location */
-			state_que;	/* cache records in same state (either wip or active) */
-	union
-	{
-		short	semaphore;
-		volatile int4	latch;		/* int required for atomic swap on Unix */
-			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
-	} interlock;
-	block_id	blk;
-	uint4		refer;
-	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
-					   (prior to any dynamic conversion that may have occurred when read in).
-					*/
-	trans_num	dirty;
-} mmblk_rec;
-
-/* all the fields of this record should exactly be the first members of the cache_state_rec in the same order */
-typedef struct mmblk_state_rec_struct
-{
-	struct
-	{
-		sm_off_t	fl;
-		sm_off_t	bl;
-	}
-			state_que;	/* WARNING -- from this point onwards this should be identical to a mmblk_rec */
-	union
-	{
-		short	semaphore;
-		volatile int4	latch;		/* int required for atomic swap on Unix */
-			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
-	} interlock;
-	block_id	blk;
-	uint4		refer;
-	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
-					   (prior to any dynamic conversion that may have occurred when read in).
-					*/
-	trans_num	dirty;
-} mmblk_state_rec;
-
-typedef struct
-{
-	mmblk_que_head	mmblkq_wip,	/* write-in-progress queue -- unused in Unix */
-			mmblkq_active;	/* active queue */
-	mmblk_rec	mmblk_array[1];		/* the first mmblk record */
-} mmblk_que_heads;
-
-
-		/* need to keep quadword aligned */
-
-/* Cache record  -- NOTE: the head portion of this should exactly match with mmblk_rec */
+/* Cache record */
 typedef struct cache_rec_struct
 {
 	struct
@@ -179,7 +123,7 @@ typedef struct cache_rec_struct
    on some platforms where processes are already running near the edge.
 */
 
-/* cache_state record  -- NOTE: the first few fields of this should be identical to that of mmblk_state_rec */
+/* cache_state record */
 typedef struct
 {
 	struct
@@ -270,12 +214,6 @@ typedef cache_rec	**cache_rec_ptr_ptr_t;
 typedef cache_state_rec	*cache_state_rec_ptr_t;
 typedef cache_que_heads	*cache_que_heads_ptr_t;
 
-typedef mmblk_que_head	*mmblk_que_head_ptr_t;
-typedef mmblk_rec	*mmblk_rec_ptr_t;
-typedef mmblk_rec	**mmblk_rec_ptr_ptr_t;
-typedef mmblk_state_rec *mmblk_state_rec_ptr_t;
-typedef mmblk_que_heads	*mmblk_que_heads_ptr_t;
-
 void verify_queue_lock(que_head_ptr_t qhdr);
 void verify_queue(que_head_ptr_t qhdr);
 
@@ -291,6 +229,34 @@ void verify_queue(que_head_ptr_t qhdr);
 #else
 #define VERIFY_QUEUE(base)
 #define VERIFY_QUEUE_LOCK(base,latch)
+#endif
+
+#define BLK_ZERO_OFF(CSD)			((CSD->start_vbn - 1) * DISK_BLOCK_SIZE)
+#ifdef UNIX
+# ifdef GTM64
+#  define CHECK_LARGEFILE_MMAP(REG, MMAP_SZ)
+# else
+#  define CHECK_LARGEFILE_MMAP(REG, MMAP_SZ)										\
+{															\
+	assert(SIZEOF(gtm_uint64_t) == SIZEOF(MMAP_SZ));								\
+	assert(0 < MMAP_SZ);												\
+	if (MAXUINT4 < (gtm_uint64_t)(MMAP_SZ))										\
+		rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(6) ERR_MMFILETOOLARGE, 4, REG_LEN_STR(REG),		\
+				DB_LEN_STR(REG));									\
+}
+# endif
+# define MMAP_FD(FD, SIZE, OFFSET, READ_ONLY)	mmap((caddr_t)NULL, SIZE, MM_PROT_FLAGS(READ_ONLY), GTM_MM_FLAGS, FD, OFFSET)
+# define MSYNC(BEGPTR, ENDPTR)			(BEGPTR ? DBG_ASSERT(BEGPTR < ENDPTR) msync(BEGPTR, (ENDPTR - BEGPTR), MS_SYNC)	\
+							: 0)
+# define MM_PROT_FLAGS(READ_ONLY)		(READ_ONLY ? PROT_READ : (PROT_READ | PROT_WRITE))
+# define MM_BASE_ADDR(CSA) 			(sm_uc_ptr_t)CSA->db_addrs[0]
+# define SET_MM_BASE_ADDR(CSA, CSD)
+#else
+# define MM_BASE_ADDR(CSA)			(sm_uc_ptr_t)CSA->acc_meth.mm.base_addr
+# define SET_MM_BASE_ADDR(CSA, CSD)											\
+{															\
+	CSA->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_long_t)CSD + (off_t)(CSD->start_vbn - 1) * DISK_BLOCK_SIZE);	\
+}
 #endif
 
 /* The following 3 macros were introduced while solving a problem with $view where a call to $view in */
@@ -542,10 +508,7 @@ void verify_queue(que_head_ptr_t qhdr);
 			assert(cse->blk == cache_start[bufindx].blk);							\
 			assert(dse_running || write_after_image || (process_id == cache_start[bufindx].in_cw_set));	\
 		} else													\
-		{													\
-			assert(cse->old_block == csa->db_addrs[0] + (off_t)cse->blk * csd->blk_size			\
-						+ (off_t)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);			\
-		}													\
+			assert(cse->old_block == MM_BASE_ADDR(csa) + (off_t)cse->blk * csd->blk_size);			\
 	}														\
 }
 
@@ -960,7 +923,7 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 				jnlpool_detach();										\
 				assert(NULL == jnlpool.jnlpool_ctl);								\
 				assert(FALSE == pool_init);									\
-				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);							\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SCNDDBNOUPD);					\
 			}													\
 			CSA->jnlpool_validate_check |= SCNDDBNOUPD_CHECK_DONE;							\
 		}														\
@@ -993,8 +956,9 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 				jnlpool_detach();										\
 				assert(NULL == jnlpool.jnlpool_ctl);								\
 				assert(FALSE == pool_init);									\
-				rts_error(VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8, LEN_AND_STR(instfilename_copy), jnlpool_shmid,	\
-						DB_LEN_STR(REG), LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);	\
+				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8,				\
+						LEN_AND_STR(instfilename_copy), jnlpool_shmid, DB_LEN_STR(REG),			\
+						LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);			\
 			}													\
 			CSA->jnlpool_validate_check |= REPLINSTMISMTCH_CHECK_DONE;						\
 		}														\
@@ -1014,6 +978,27 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 		assert(pool_init);												\
 		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_TRUE);				\
 	}															\
+}
+
+#define ASSERT_VALID_JNLPOOL(CSA)										\
+{														\
+	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;								\
+	GBLREF	jnlpool_addrs		jnlpool;								\
+														\
+	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
+	assert(jnlpool_ctl && (jnlpool_ctl == jnlpool.jnlpool_ctl));						\
+	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + JNLPOOL_CRIT_SPACE			\
+		+ SIZEOF(mutex_spin_parms_struct)));								\
+	assert(jnlpool_ctl->filehdr_off);									\
+	assert(jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);				\
+	assert(jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);			\
+	assert(jnlpool.repl_inst_filehdr == (repl_inst_hdr_ptr_t) ((sm_uc_ptr_t)jnlpool_ctl			\
+			+ jnlpool_ctl->filehdr_off));								\
+	assert(jnlpool.gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool_ctl				\
+			+ jnlpool_ctl->srclcl_array_off));							\
+	assert(jnlpool.gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool_ctl		\
+					+ jnlpool_ctl->sourcelocal_array_off));					\
 }
 
 /* Explanation for why we need the following macro.
@@ -1235,10 +1220,11 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 			jpc = csa->jnl;											\
 			assert(NULL != jpc);										\
 			if (SS_NORMAL != jpc->status)									\
-				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),	\
-					jpc->status);									\
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),		\
+						DB_LEN_STR(gv_cur_region), jpc->status);				\
 			else												\
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));	\
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),		\
+						DB_LEN_STR(gv_cur_region));						\
 		}													\
 	}                                                                       					\
 }
@@ -1391,7 +1377,8 @@ typedef union
 	endian32_struct	check_endian;									\
 	check_endian.word32 = (CSD)->minor_dbver;							\
 	if (!check_endian.shorts.ENDIANCHECKTHIS)							\
-		rts_error(VARLSTCNT(6) ERR_DBENDIAN, 4, FNLEN, FNNAME, ENDIANOTHER, ENDIANTHIS);	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBENDIAN, 4, FNLEN, FNNAME, ENDIANOTHER,	\
+				ENDIANTHIS);								\
 }
 
 /* This is the structure describing a segment. It is used as a database file header (for MM or BG access methods).
@@ -1708,8 +1695,11 @@ typedef struct
 
 typedef struct
 {
+#	ifdef VMS
 	FILL8DCL(sm_uc_ptr_t, base_addr, 1);
-	FILL8DCL(mmblk_que_heads_ptr_t, mmblk_state, 2);	/* pointer to beginnings of state and blk queues */
+#	else
+	int 	filler;
+#	endif
 } sgmm_addrs;
 
 #define MAX_NM_LEN	MAX_MIDENT_LEN
@@ -1746,9 +1736,11 @@ typedef struct
 	if (MEMCMP_LIT(TSD->label, GDS_LABEL))							\
 	{											\
 		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))				\
-			rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(REG));		\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_DBNOTGDS, 2,	\
+					DB_LEN_STR(REG));					\
 		else										\
-			rts_error(VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(REG));		\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_BADDBVER, 2,	\
+					DB_LEN_STR(REG));					\
 	}											\
 }
 
@@ -1768,11 +1760,16 @@ typedef struct
 		if (IS_DSE_IMAGE)								\
 		{										\
 			gtm_errcode = MAKE_MSG_WARNING(gtm_errcode);				\
-			gtm_putmsg(VARLSTCNT(4) gtm_errcode, 2, DB_LEN_STR(REG));		\
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) gtm_errcode, 2,	\
+					DB_LEN_STR(REG));					\
 		} else										\
-			rts_error(VARLSTCNT(4) gtm_errcode, 2, DB_LEN_STR(REG));		\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) gtm_errcode, 2,	\
+					DB_LEN_STR(REG));					\
 	}											\
 }
+
+#define REG2CSA(REG)	(((REG) && (REG)->dyn.addr && (REG)->dyn.addr->file_cntl) ? (&FILE_INFO(REG)->s_addrs) : NULL)
+#define JCTL2CSA(JCTL)	(((JCTL) && (JCTL->reg_ctl)) ? (JCTL->reg_ctl->csa) : NULL)
 
 typedef struct	file_control_struct
 {
@@ -1955,10 +1952,6 @@ typedef struct	sgmnt_addrs_struct
 						 * dirty buffers to disk and when the idle flush timer (5 seconds) popped.
 						 */
 	/* 8-byte aligned at this point on all platforms (32-bit, 64-bit or Tru64 which is a mix of 32-bit and 64-bit pointers) */
-	sgmnt_data_ptr_t	mm_core_hdr;	/* Most OSs don't include memory mapped files in the core dump.  For MM access
-						 * mode, this is a pointer to a copy of the header that will be in the corefile.
-						 * The pointer is only used for MM and that too only in Unix.
-						 */
 	size_t		fullblockwrite_len;	/* Length of a full block write */
 	uint4		total_blks;		/* Last we knew, file was this big. Used to signal MM processing file was
 						 * extended and needs to be remapped. In V55000 was used with BG to detect
@@ -1981,7 +1974,6 @@ typedef struct	sgmnt_addrs_struct
 	block_id	reorg_last_dest;	/* last destinition block used for swap */
 	boolean_t	jnl_before_image;
 	boolean_t	read_write;
-	boolean_t	extending;
 	boolean_t	persistent_freeze;	/* if true secshr_db_clnup() won't unfreeze this region */
 	/* The following 3 fields are in cs_addrs instead of in the file-header since they are a function
 	 * of the journal-record sizes that can change with journal-version-numbers (for the same database).
@@ -2477,7 +2469,8 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);					\
 	endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), GVKEY, TRUE);			\
 	GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
-	rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);	\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,		\
+			endBuff - fmtBuff, fmtBuff);						\
 }
 
 #define COPY_SUBS_TO_GVCURRKEY(mvarg, max_key, gv_currkey, was_null, is_null)					\
@@ -2729,12 +2722,14 @@ typedef enum
 															\
 		if ((CSA)->hdr->max_tn <= (TN))										\
 		{													\
-			rts_error(VARLSTCNT(5) ERR_TNTOOLARGE, 3, DB_LEN_STR((CSA)->region), &(CSA)->hdr->max_tn);	\
+			rts_error_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_TNTOOLARGE, 3, DB_LEN_STR((CSA)->region),		\
+					&(CSA)->hdr->max_tn);								\
 			assert(FALSE);	/* should not come here */							\
 		}													\
 		assert((CSD)->max_tn > (TN));										\
 		trans_left = (CSD)->max_tn - (TN);									\
-		send_msg(VARLSTCNT(6) ERR_TNWARN, 4, DB_LEN_STR((CSA)->region), &trans_left, &(CSD)->max_tn);		\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(6) ERR_TNWARN, 4, DB_LEN_STR((CSA)->region), &trans_left,		\
+				&(CSD)->max_tn);									\
 		(CSD)->max_tn_warn = (TN) + 1 + ((trans_left - 1) >> 1);						\
 		assert((TN) < (CSD)->max_tn_warn);									\
 		assert((CSD)->max_tn_warn <= (CSD)->max_tn);								\
@@ -2781,8 +2776,6 @@ typedef enum
 #define CACHE_CONTROL_SIZE(X)												\
 	(ROUND_UP((ROUND_UP((X->bt_buckets + X->n_bts) * SIZEOF(cache_rec) + SIZEOF(cache_que_heads), OS_PAGE_SIZE)	\
 		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (X->is_encrypted ? 2 : 1))), OS_PAGE_SIZE))
-#define MMBLK_CONTROL_SIZE(X) (ROUND_UP((((sgmnt_data_ptr_t)X)->bt_buckets + ((sgmnt_data_ptr_t)X)->n_bts) * SIZEOF(mmblk_rec) \
-	+ SIZEOF(mmblk_que_heads), OS_PAGE_SIZE))
 
 OS_PAGE_SIZE_DECLARE
 
@@ -3066,8 +3059,10 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 
 #define INVALID_SEMID			-1
 #define INVALID_SHMID 			-1L
+#ifdef VMS
 #define NEW_DBINIT_SHM_IPC_MASK		(1 << 0)	/* 1 if db_init created a new shared memory (no pre-existing one) */
 #define NEW_DBINIT_SEM_IPC_MASK		(1 << 1)	/* 1 if db_init created a new access control semaphore */
+#endif
 
 #define RESET_SHMID_CTIME(X)		\
 {					\
@@ -3105,10 +3100,11 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 }
 
 #define STANDALONE(x) mu_rndwn_file(x, TRUE)
-#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(5) msg, 2, DB_LEN_STR(gv_cur_region), status);
+#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(5) msg, 2,			\
+							DB_LEN_STR(gv_cur_region), status);
 #elif defined(VMS)
 #define STANDALONE(x) mu_rndwn_file(TRUE)	/* gv_cur_region needs to be equal to "x" */
-#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(6) msg, 2, DB_LEN_STR(gv_cur_region), status, \
+#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) msg, 2, DB_LEN_STR(gv_cur_region), status,	\
 						   FILE_INFO(gv_cur_region)->fab->fab$l_stv);
 #else
 #error unsupported platform
@@ -3116,8 +3112,6 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 
 #define CR_NOT_ALIGNED(cr, cr_base)		(!IS_PTR_ALIGNED((cr), (cr_base), SIZEOF(cache_rec)))
 #define CR_NOT_IN_RANGE(cr, cr_lo, cr_hi)	(!IS_PTR_IN_RANGE((cr), (cr_lo), (cr_hi)))
-#define MBR_NOT_ALIGNED(mbr, mbr_base)		(!IS_PTR_ALIGNED((mbr), (mbr_base), SIZEOF(mmblk_rec)))
-#define MBR_NOT_IN_RANGE(mbr, mbr_lo, mbr_hi)	(!IS_PTR_IN_RANGE((mbr), (mbr_lo), (mbr_hi)))
 
 /* Examine that cr->buffaddr is indeed what it should be. If not, this macro fixes its value by
  * recomputing from the cache_array.
@@ -3141,8 +3135,9 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	bp = bp_lo + ((cr) - (cr_lo)) * csd->blk_size;						\
 	if (bp != cr->buffaddr)									\
 	{											\
-		send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk, 		\
-			RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp, CALLFROM);		\
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),	\
+				cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"),			\
+				cr->buffaddr, bp, CALLFROM);					\
 		cr->buffaddr = bp;								\
 	}											\
 	DEBUG_ONLY(bp_top = bp_lo + (gtm_uint64_t)csd->n_bts * csd->blk_size;)			\
@@ -3339,8 +3334,8 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
 						 * snapshot is no more valid 							\
 						 */										\
-						send_msg(VARLSTCNT(4) ERR_SSATTACHSHM, 1, lcl_ss_ctx->nl_shmid, 		\
-							lcl_failure_errno);							\
+						send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_SSATTACHSHM, 1,			\
+								lcl_ss_ctx->nl_shmid, lcl_failure_errno);			\
 						ss_shm_ptr->failure_errno = lcl_failure_errno;					\
 						ss_shm_ptr->failed_pid = process_id;						\
 					} else /* snapshot context creation done while things were in flux */			\
@@ -3353,7 +3348,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
 						 * snapshot is no more valid							\
 						 */										\
-						send_msg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), 			\
+						send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), 	\
 							LEN_AND_STR(lcl_ss_ctx->shadow_file), lcl_failure_errno);		\
 						ss_shm_ptr->failure_errno = lcl_failure_errno;					\
 						ss_shm_ptr->failed_pid = process_id;						\
@@ -3497,7 +3492,7 @@ typedef struct redo_root_search_context_struct
 			 * the necessary stuff.										\
 			 */												\
 			assert(gtm_trigger_depth == tstart_trigger_depth);						\
-			rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);							\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);					\
 		default:												\
 			break;												\
 	}														\
@@ -3573,7 +3568,7 @@ typedef struct redo_root_search_context_struct
 	ASSERT_BEGIN_OF_FRESH_TP_TRANS;												\
 	frame_pointer->flags |= SFF_IMPLTSTART_CALLD;										\
 	if (est_first_pass && (cdb_sc_onln_rlbk2 == LAST_RESTART_CODE))								\
-		rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);							\
 	tp_set_sgm();														\
 	GVCST_ROOT_SEARCH;													\
 }
@@ -3782,7 +3777,7 @@ typedef struct
 	error_def(ERR_UNIMPLOP); /* BYPASSOK */										\
 															\
 	if (span_nodes_disallowed)											\
-		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,	ERR_TEXT, 2,							\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0,	ERR_TEXT, 2,				\
 					LEN_AND_LIT("GT.CM Server does not support spanning nodes"));			\
 }
 # define IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(STATEMENT)									\

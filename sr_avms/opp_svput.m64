@@ -1,0 +1,27 @@
+	.title	OPP_SVPUT
+
+	G_MSF
+
+
+	$linkage_section
+a_frame_pointer:
+	.address  frame_pointer
+
+
+	$routine OPP_SVPUT, entry=OPP_SVPUT_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r3, (sp)
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+	$call	OP_SVPUT, args=<r16,r17>, set_arg_info=false, nonstandard=true
+	getframe
+
+	ldq	r3, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -146,6 +146,9 @@ typedef struct
 #define LABEL_ADDR(rtnhdr, lab_tabent_adr) (CODE_BASE_ADDR(rtnhdr) + *(LABENT_LNR_ENTRY(rtnhdr, lab_tabent_adr)))
 #define CODE_BASE_ADDR(rtnhdr) ((rtnhdr)->ptext_adr)
 #define CODE_OFFSET(rtnhdr, addr) ((char *)(addr) - (char *)(rtnhdr->ptext_adr))
+
+#define DYNAMIC_LITERALS_ENABLED(rtnhdr) ((rtnhdr)->compiler_qlf & CQ_DYNAMIC_LITERALS)
+#define RW_REL_START_ADR(rtnhdr) (((DYNAMIC_LITERALS_ENABLED(rtnhdr)) ? (char *)VARTAB_ADR(rtnhdr) : (char *)LITERAL_ADR(rtnhdr)))
 
 /* Macro to determine if given address is inside code segment. Note that even though
  * the PTEXT_END_ADR macro is the address of end_of_code + 1, we still want a <= check

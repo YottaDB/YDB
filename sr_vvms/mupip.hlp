@@ -1,0 +1,2355 @@
+
+
+1 Overview
+  MUPIP overview
+   The GT.M  MUMPS  Peripheral  Interchange  Program,  MUPIP,  is  a  utility
+   that provides an assortment of tools  for  GT.M  database  management  and
+   database journaling.
+
+   MUPIP provides the following commands:
+
+   For stand-alone database services:
+
+   o  CREATE database files
+
+   o  EXTEND Mapped Memory database files
+
+   o  JOURNAL, recover database files and extract journal records
+
+   o  INTEG, check the integrity of GDS database files
+
+   o  RESTORE incremental backups to GDS database files
+
+   o  SET database file characteristics
+
+   For concurrent database services:
+
+   o  BACKUP GDS database files
+
+   o  BACKUP/INCREMENTAL changes to GDS database files
+
+   o  EXTEND Buffered Global database files
+
+   o  EXTRACT data from GDS databases
+
+   o  INTEG, check the integrity of GDS databases
+
+   o  LOAD databases from sequential files
+
+   o  REORGanize database files to optimize performance
+
+   o  RUNDOWN database files that are not currently accessed
+
+   For non-database services:
+
+   o  CONVERT MUMPS programs in sequential format into RMS files
+
+   o  HELP for MUPIP commands
+
+   o  STOP GT.M processes
+
+1 Global_dir
+  MUPIP and the Global Directory
+   Some of the MUPIP commands require information  contained  in  the  Global
+   Directory. Therefore, a  process  must  have  access  to  a  valid  Global
+   Directory before using any MUPIP  database  service  commands  other  than
+   JOURNAL, RESTORE, and the /FILE options of INTEG and SET.
+
+   The  logical  name  GTM$GBLDIR  specifies  the  Global  Directory.  Define
+   GTM$GBLDIR using the DCL command DEFINE. The  system  manager  may  define
+   GTM$GBLDIR  in  a  GROUP  or  SYSTEM  table.   Individual   users   define
+   GTM$GBLDIR in their LOGIN.COM or other command files.
+
+   Example
+
+   $ DEFINE GTM$GBLDIR PROD.GLD
+
+1 BACKUP
+  B[ACKUP]
+   BACKUP copies blocks  from  one  or  more  Greystone  Technology  Database
+   Structure (GDS) files to a new file  or  files.  BACKUP  suspends  updates
+   to all regions specified by the BACKUP command from  the  time  it  starts
+   the first region until it finishes the  last  region.  This  ensures  that
+   BACKUP  captures  a  consistent  application  state.   BACKUP   does   not
+   suspend processes that only perform retrievals.
+
+   The format of the BACKUP command is:
+
+   B[ACKUP][/qualifier[...]]           region-list[,...]            file-spec
+   
+
+   By default, BACKUP is /COMPREHENSIVE.
+
+   The first argument may  specify  more  than  one  region  of  the  current
+   Global Directory in a list separated  with  commas.  Any  region-name  may
+   include the DCL wildcard characters * and %.
+
+   To BACKUP only one region,  the  file-specification  must  resolve  to  an
+   RMS  file  or   directory   name.   To   BACKUP   several   regions,   the
+   file-specification   must   be   a   directory   specification.   If   the
+   file-specification is a directory, MUPIP  assigns  the  backup  files  the
+   same name as  the  file  associated  with  the  dynamic  segment  of  each
+   region. Therefore, the target  directory  must  not  contain  any  of  the
+   regions included in the BACKUP.
+
+2 Qualifiers
+/COMPREHENSIVE
+  /C[OMPREHENSIVE]
+   Specifies that BACKUP copy the entire  file  from  disk  to  disk.  On
+   completion, the result is ready for  use  as  a  GT.M  database.  This
+   option does not support operation to magnetic tape.
+
+   BACKUP  /COMPREHENSIVE  produces  a  result  similar  to  the   result
+   produced by  a  DCL  COPY  command  or  some  variations  of  the  DCL
+   BACKUP command, but it has the following advantages:
+
+   o  It does not require exclusive access to the file
+
+   o  It can interlock multiple files simultaneously
+
+   The  /COMPREHENSIVE  qualifier  is  not  compatible  with  any   other
+   qualifier.
+
+   By default, BACKUP operates /COMPREHENSIVE.
+
+/INCREMENTAL
+  /I[NCREMENTAL]
+   Specifies that BACKUP include  only  blocks  from  the  database  that
+   have  changed  since  a  prior  point  specified  by  the  /SINCE   or
+   /TRANSACTION  qualifier.  MUPIP  RESTORE  integrates  the  results  of
+   a BACKUP /INCREMENTAL into a database.
+
+   When directing the  output  file  to  a  magnetic  tape,  use  DCL  to
+   MOUNT  the  tape  /INITIALIZE=CONTINUATION.  This   causes   automatic
+   handling of multiple volumes. When  mounting  a  volume  to  tape  for
+   a  BACKUP  /INCREMENTAL,  specify  a  blocksize  twelve   (12)   bytes
+   larger  than  the  size   of   the   blocks   in   the   database   to
+   accommodate overhead (i.e., 4 bytes  for  GTM  overhead  and  8  bytes
+   for RMS overhead).  If  the  block  size  is  too  small,  the  BACKUP
+   fails when it encounters a full block.
+
+   The   /INCREMENTAL   qualifier   is   not    compatible    with    the
+   /COMPREHENSIVE qualifier.
+
+/RECORD
+  /R[ECORD]
+   Specifies  that  the  BACKUP  utility  record   this   backup   as   a
+   reference  point  for  subsequent  backups.   Each   time   a   BACKUP
+   specifies  /RECORD,  that  backup  replaces  the   previous   recorded
+   backup as the RECORD reference point for the file.
+
+/SINCE
+  /S[INCE]=keyword
+   Specifies  that  a  BACKUP  /INCREMENTAL   includes   blocks   changed
+   since the last specified BACKUP.
+
+   /SINCE accepts the keywords:
+
+   o  C[OMPREHENSIVE]  -  Backup  all  changes  since  the  last   BACKUP
+      /COMPREHENSIVE
+
+   o  I[NCREMENTAL]  -  Backup  all  changes  since   the   last   BACKUP
+      /INCREMENTAL
+
+   o  R[ECORD] -  Backup  all  changes  since  the  last  BACKUP  /RECORD
+   
+   The /SINCE qualifier  is  incompatible  with  the  /COMPREHENSIVE  and
+   /TRANSACTION qualifiers.
+
+   By default, BACKUP /INCREMENTAL operates /SINCE=COMPREHENSIVE.
+
+/TRANSACTION
+  /T[RANSACTION]=transaction-number
+   Specifies a  hexadecimal  starting  transaction  which  causes  BACKUP
+   /INCREMENTAL to  copy  all  blocks  that  have  been  changed  by  the
+   specified  and  all  subsequent  transactions.   Transaction   numbers
+   appear in a DSE DUMP  /FILEHEADER,  with  a  "Current  TN"  label.  If
+   the transaction  number  is  invalid,  BACKUP  reports  an  error  and
+   rejects the command.
+   
+   BACKUP  /INCREMENTAL  /TRANSACTION=1  copies  all  in-use  blocks  and
+   produces  a  result  similar  to   the   result   produced   by   some
+   variations of  the  DCL  BACKUP  command  but  it  has  the  following
+   advantages:
+
+   o  It does not require exclusive access to the file
+
+   o  It can interlock multiple files simultaneously
+
+   o  It should  be  faster,  if  the  database  is  not  very  full  (it
+      must be nearly empty to be an advantage)
+
+   o  It is useful for backing up an entire database to tape
+
+   Different  regions  do  not  normally  have   a   single   transaction
+   number  that  marks  a   meaningful   point.   Therefore,   a   BACKUP
+   command  specifying  multiple  regions  and  using  the   /TRANSACTION
+   qualifier  with  arguments  other  than  one  (1)   is   unlikely   to
+   produce desirable results.
+
+   The    /TRANSACTION    qualifier    is    incompatible    with     the
+   /COMPREHENSIVE and /SINCE qualifiers.
+
+2 Examples
+  BACKUP Examples
+   Example:
+
+   $ MUPIP BACKUP * [.backup]
+   
+   This comprehensively  backs  up  all  regions  of  the  entire  database
+   (defined   by   the   current   Global   Directory)   into    the    RMS
+   sub-directory  [.backup].  BACKUP  creates  a  copy  of   each   dynamic
+   segment in  the  sub-directory.  The  file  for  each  segment  has  the
+   same name as the file being backed up.
+
+   Example
+
+   $ INIT MSA0: FULL
+   $ MOUNT/INIT=CONT/BLOCK=2060 MSA0: FULL
+   $ MUPIP BACKUP/INCREMENTAL/TRANSACTION=1 MAIN_REG FULL:MAIN
+   
+   In this example, the first command  initializes  a  magnetic  tape  with
+   the  label  FULL.  The  second  command  mounts  the   tape   with   VMS
+   automatic  volume  initialization  and  a  block  size  of   2060.   The
+   magnetic tape block size of  2060  handles  a  database  block  of  2048
+   bytes. The  MUPIP  command  backs  up  the  dynamic  segment  associated
+   with MAIN_REG  to  the  tape.  Because  of  the  /TRANSACTION=1,  BACKUP
+   copies all blocks in use to the tape.
+
+   Example
+
+   $ MUPIP BACKUP main*,%xref usr$bck:[tuesday]
+   
+   This comprehensively backs up  all  regions  that  have  names  starting
+   with  "main"  and  all  regions  that  have  names  starting  with   any
+   single   character   and   ending   with   "xref"   to   the   directory
+   usr$bck:[tuesday].
+
+   Example
+
+   $ MUPIP BACKUP/INCREMENTAL/SINCE=COMPREHENSIVE * [19880505]
+   
+   This backs up all changes made  since  the  last  BACKUP  /COMPREHENSIVE
+   for  all  regions  of  the  database  defined  by  the  current   Global
+   Directory into  the  RMS  directory  [19880505].  BACKUP  creates  files
+   in  the  directory,  with  names  corresponding   to   each      dynamic
+   segment's file name.
+
+   Note: BACKUPs of multiple  regions  can  lead  to  more  than  one  file
+   with the same  name  in  the  backup  directory,  as  different  regions
+   can  have  the  same  file  names  as  long  as   they   use   different
+   directory paths or logical names to access them.
+
+1 CONVERT
+  CO[NVERT]
+   CONVERT transforms MUMPS  routines  in  the  sequential  format  described
+   in the ANSI standard into individual RMS source files  for  use  by  GT.M.
+   Use CONVERT to make MUMPS RO format files accessable as GT.M routines.
+
+   The format of the CONVERT command is:
+
+   CO[NVERT][/F[ORMAT]=RO]              file-spec              directory-spec
+   
+   CONVERT   takes   its   input   from   the    file    defined    by    the
+   file-specification. CONVERT places  the  output  files  in  the  directory
+   defined by the directory-specification.  CONVERT  uses  the  routine  name
+   and a ".M" extension as the output file name for each routine.
+
+
+2 Qualifiers
+/FORMAT
+  /F[ORMAT]=RO
+   Specifies the format of  the  input  file.  The  RO  (Routine  Output)
+   format code is the default and the only code CONVERT recognizes.
+
+
+1 CREATE
+  CR[EATE]
+   CREATE generates database files using  the  characteristics  stored  in  a
+   Global Directory by the Global Directory Editor  (GDE).  CREATE  uses  the
+   Global Directory to map a region to a segment and a  segment  to  a  file.
+   Use the MUPIP CREATE command to create a new database or  a  new  copy  of
+   a  previously  existing  file  during  a  database  reorganization.  If  a
+   database file already exists for the  segment,  CREATE  takes  no  action.
+   If  a  file  does  not  exist,  CREATE  sets  up  the  file.  CREATE  also
+   initializes the database structure (GDS).
+
+   The format of the CREATE command is:
+
+   CR[EATE] [/R[EGION]=region-name]
+   
+   The optional /REGION qualifier specifies a  single  region  for  which  to
+   create a database file.
+
+   By default,  CREATE  sets  up  database  files  for  all  regions  in  the
+   current Global Directory.
+
+2 Qualifiers
+/REGION
+  /R[EGION]=region-name
+   Specifies a  single  region  for  creation  of  a  database  file.  By
+   default, CREATE sets up  (creates)  database  files  for  all  regions
+   in the current Global Directory.
+
+1 EXIT
+  EXI[T]
+   EXIT or <CTRL Z>  terminates  MUPIP  and  returns  control  to  the  point
+   where MUPIP was invoked. This command is  useful  when  you  invoke  MUPIP
+   without an action and wish to  leave  without  performing  one,  or  after
+   using MUPIP HELP.
+
+   The format of the EXIT command is:
+
+   EXI[T]
+
+   The Exit command does not accept any qualifiers.
+
+1 EXTEND
+  EXTE[ND]
+   EXTEND expands a GDS database file. Databases  with  a  BG  access  method
+   generally  extend  automatically  when  they  become  full.  MM  databases
+   must be MUPIP EXTENDed. For MM  segments,  EXTEND  requires  exclusive  or
+   stand-alone  access  to  the  file.   When   EXTEND   requires   exclusive
+   database access and cannot obtain it, MUPIP rejects the command.
+
+   The format of the EXTEND command is:
+
+   EXTE[ND] region-name [/B[LOCKS]=blocks]
+   
+   The required region-name parameter specifies the name  of  the  region  to
+   expand. EXTEND uses  the  Global  Directory  to  map  the  region  to  the
+   dynamic segment and the segment to the file.
+
+2 Qualifiers
+/BLOCKS
+  /B[LOCKS]=blocks
+   Specifies the number of GDS  database  blocks  by  which  GT.M  should
+   extend the file. GDS files  use  some  blocks  for  bit  maps.  EXTEND
+   adds  the  specified  number  of  blocks  and  the  bit   map   blocks
+   required as overhead. For  more  information  about  bit  maps,  refer
+   to the  "GDS"  chapter  of  the  GT.M  Administration  and  Operations
+   Guide.
+
+   EXTEND uses  the  value  in  the  fileheader  as  the  number  of  GDS
+   blocks by which to extend the database file.
+
+1 EXTRACT
+  EXTR[ACT]
+   EXTRACT  copies  specified  globals  from  the  current  database   to   a
+   sequential output file in one  of  two  formats  (i.e.,  GO,  or  BINARY).
+   Use EXTRACT to back up specific  globals  or  when  extracting  data  from
+   the  database  for  use  by  another  system.  EXTRACT  uses  the   Global
+   Directory  to  determine  which  database  files  to  use.   EXTRACT   may
+   operate concurrently with normal GT.M  database  access.  To  ensure  that
+   an EXTRACT reflects  a  consistent  application  state,  suspend  database
+   updates  to  all  regions  involved  in  the  extract  with  the   /FREEZE
+   qualifier.
+
+   The format of the EXTRACT command is:
+
+   EXTR[ACT][/qualifier[...]] file-specification
+
+   EXTRACT   places   its   output   in   the    file    defined    by    the
+   file-specification. EXTRACT may output  to  an  RMS  file  on  any  device
+   that supports such files, including magnetic  tapes.  Note  that  magnetic
+   tapes may have a smaller file maximum  size  than  disks.  When  directing
+   the  output  file  to  a  magnetic  tape,  use  DCL  to  MOUNT  the   tape
+   /INITIALIZE=CONTINUATION.  This  causes  automatic  handling  of  multiple
+   volumes. When mounting  a  volume  to  tape  for  an  EXTRACT,  specify  a
+   blocksize that is eight (8) bytes larger  than  the  size  of  the  blocks
+   in the database  to    accommodate  RMS  overhead.  <CTRL  C>  produces  a
+   status  message  from  EXTRACT.  <CTRL  Y>  aborts  EXTRACT.  An   EXTRACT
+   terminated abnormally by operator  action  or  error  produces  incomplete
+   output.
+
+2 Qualifiers
+/SELECT
+  /S[ELECT]=global-name-list
+   Specifies the  globals  to  extract.  The  "^"  in  the  specification
+   of the  global  name  is  optional.  Enclose  lowercase  global  names
+   in quotes ("").
+
+   The global-specification can be:
+
+   o  A global name, such as MEF
+
+   o  A range of global names, such as A7:B6
+
+   o  A parenthetical list, such as (A,B,C)
+
+   o  Global names with the same prefix, such as TMP*
+
+   In the  first  case,  EXTRACT  selects  only  global  ^MEF.    In  the
+   second  case,  EXTRACT  selects  all  global  names  between  ^A7  and
+   ^B6, inclusive.  In  the  third  case,  EXTRACT  selects  globals  ^A,
+   ^B, and ^C. In the fourth  case,  EXTRACT  selects  all  global  names
+   from ^TMP through ^TMPzzzzz.
+
+   By  default,  EXTRACT  selects  all  globals,  as  if   it   had   the
+   qualifier /SELECT=*.
+
+/FORMAT
+  /FO[RMAT]=GO|B[INARY]
+   Specifies the format of the output file.
+
+   The format codes are:
+
+   o  GO  -  Global  Output  format,  used  for   files   you   want   to
+      transport or archive
+
+   o  B[INARY]    -  Binary  format,  used  for  database  reorganization
+      or short term backups
+
+   /FORMAT=GO  stores  the  data  in  record  pairs.  Each  global   node
+   produces one record for the  key  and  one  for  the  data.  FORMAT=GO
+   has two header records.
+
+   /FORMAT=BINARY  only  applies  for   Greystone   Technology   Database
+   Structure  (GDS)  files.  EXTRACT  /FORMAT=BINARY  works  much  faster
+   than EXTRACT /FORMAT=GO.
+
+   By default, EXTRACT uses /FORMAT=GO.
+
+/FREEZE
+  /FR[EEZE]
+   Prevents database updates to  all  regions  of  the  Global  Directory
+   used by the EXTRACT for the duration of the EXTRACT.
+
+   By default, EXTRACT does not freeze regions during operation.
+
+/LABEL
+  /LA[BEL]=text
+   Specifies a  text  string  which  becomes  the  first  record  in  the
+   output  file.  Enclose  labels  containing  punctuation  or  lowercase
+   labels  in  quotes  ("").   EXTRACT   /FORMAT=BINARY   truncates   the
+   label text to 32 characters.
+
+   By default, EXTRACT uses the label "GT.M MUPIP EXTRACT".
+
+   For a description of  the  /FORMAT=BINARY  header  label,    refer  to
+   the subsequent section on EXTRACT /FORMAT=BINARY.
+
+/LOG
+  /[NO]LO[G]
+   Specifies whether or not  to  display  a  message  on  SYS$OUTPUT  for
+   each  global  extracted.  The  message  shows  the  number  of  global
+   nodes, the maximum  subscript  length  and  maximum  data  length  for
+   each global.
+
+   By default, EXTRACT operates /LOG.
+
+2 Examples
+  EXTRACT Examples
+   Example:
+
+   $ MUPIP EXTRACT/NOLOG FL.GLO
+
+   This instructs  EXTRACT  to  create  the  global  output  file,  FL.GLO,
+   consisting  of  all  global   variables   in   the   database,   without
+   displaying statistics on a  global-by-global  basis.  Because  no  label
+   is  specified,  the  first  record  in  FL.GLO   contain   "GT.M   MUPIP
+   EXTRACT" as text.
+
+   Example
+
+   $ INIT MSA0: SPECIAL
+   $ MOUNT/INIT=CONT/BLOCK=4104 MSA0: SPECIAL
+   $ MUPIP EXTR/FO=BIN/SEL=("a22",M:Z)/LAB="SPSAVE" MSA0:SPEC.SVX
+
+   In this example, the first command  initializes  a  magnetic  tape  with
+   the  label  SPECIAL.  The  second  command  mounts  the  tape  with  VMS
+   automatic  volume  initialization  and  a  block  size  of   4104.   The
+   magnetic tape block size of  4104  handles  a  database  block  of  4096
+   bytes.  The  MUPIP  command  instructs  EXTRACT  to  create   a   BINARY
+   output file, SPEC.SVX, with the label  SPSAVE.  The  file  contains  the
+   global ^a22, every global starting with the  letters  M  through  Y  and
+   the global ^Z.   EXTRACT displays statistics for each global.
+
+   Example
+
+   $ MUPIP EXTRACT/SELECT=DRG TT
+
+   This instructs EXTRACT to dump  the  global  ^DRG  to  the  device  with
+   the logical name TT (normally the login terminal).
+
+1 HELP
+  H[ELP]
+   HELP provides online information  about  MUPIP  commands  and  qualifiers.
+   HELP uses similar conventions to the VAX/VMS help facility.
+
+   The format of the HELP command is:
+
+   H[ELP] [options...]
+
+   The  HELP  command  does  not  accept  any  qualifiers.  Enter  the  MUPIP
+   command  for  which  you  want  information  at  the  Topic  prompt.   Use
+   <RETURN> or <CTRL Z> to leave the help facility.
+
+1 INTEG
+  I[NTEG]
+   The INTEG command performs an integrity check  on  a  GDS  database  file.
+   INTEG operates on one or more regions  in  the  current  global  directory
+   by suspending concurrent updates to  those  regions.  INTEG  of  a  single
+   file   database   without   a   Global   Directory   requires    exclusive
+   (stand-alone) access to that file.
+
+   Use INTEG at the following times:
+
+   o  Periodically - to insure ongoing  integrity  of  database(s);  frequent
+      INTEGs help catch integrity problems before  they  spread  through  the
+      database file
+
+   o  After a crash - to insure the database was not corrupted
+
+   o  When database errors are reported - to troubleshoot the problem
+
+   The format of the INTEG command is:
+
+   I[NTEG][/qualifier[...]] file-spec | region-list
+
+   The file-specification directly identifies the  GDS  file  to  INTEG.  The
+   region-list identifies one or more  regions  that  in  turn  identify  GDS
+   files through the current Global Directory.
+
+   Always analyze errors reported by INTEG  immediately  to  prevent  further
+   corruption. Greystone strongly  recommends  fixing  the  following  errors
+   as soon as they are discovered:
+
+   o  Blocks  incorrectly  marked  free  -  these  may   cause   accelerating
+      damage when  processes  make  updates  to  any  part  of  the  database
+      region.
+
+   o  Integrity errors in an index  block  -  these  may  cause  accelerating
+      damage when processes  make  updates  to  that  area  of  the  database
+      region that uses the faulty index.
+
+   INTEG /FAST and the  "regular"  INTEG  both  report  these  errors.  Other
+   database errors do not pose  the  threat  of  rapidly  spreading  problems
+   in GDS files,  but  if  operations  continue  the  errors  may  cause  the
+   following:
+
+   o  Invalid application operation due to "missing" data
+
+   o  Process errors when a database access encounters an error
+
+   o  Degrading  application  level  integrity  as  a  result  of  incomplete
+      update sequences caused by the prior symptoms
+
+   You must assess the type of damage,  the  risk  of  continued  operations,
+   and the disruption of  stopping  normal  operation  for  database  repair.
+   For information on analyzing and  correcting  database  errors,  refer  to
+   the  "Database  Integrity"  chapter  in  the   GT.M   Administration   and
+   Operations Guide.
+
+   <CTRL C> or <CTRL  Y>  aborts  INTEG.  Because  INTEG  does  most  of  its
+   reporting at the end, aborting the process before  it  completes  may  not
+   give you all the information you need.
+
+2 /FAST
+  /FA[ST]
+   Specifies that INTEG checks only index  blocks.  INTEG  /FAST  does  not
+   check data blocks. INTEG  /FAST  produces  results  dramatically  faster
+   than a full INTEG.  While  INTEG  /FAST  is  not  a  replacement  for  a
+   full INTEG, it  very  quickly  detects  the  most  dangerous  structural
+   errors in a database.
+
+   The /FAST qualifier is incompatible with the /TN_RESET qualifier.
+
+   By default, INTEG checks  all  active  index  and  data  blocks  in  the
+   database.
+
+2 /REGION
+  /R[EGION]
+   Specifies that the  INTEG  parameter  identifies  one  or  more  regions
+   rather than a database file.
+
+   INTEG /REGION does  not  require  sole  access  to  databases.  Instead,
+   it  freezes  updates   to   the   database   during   the   check.   The
+   region-list  argument  may  specify  more  than  one   region   of   the
+   current  Global  Directory  in  a  list  separated  with   commas.   Any
+   region-name may include the DCL  wildcard  characters  *  and  %.  INTEG
+   /REGION  requires  the  logical  name  GTM$GBLDIR  to  specify  a  valid
+   Global  Directory.  For  more  information   on   defining   GTM$GBLDIR,
+   refer  to  the  "Global  Directory   Editor"   chapter   of   the   GT.M
+   Administration and Operations Guide.
+
+   Note:  Because  a  KILL  may  briefly  defer  marking  the   blocks   it
+   releases "free" in the bit  maps,  INTEG  /REGION  may  report  spurious
+   block  incorrectly  marked  busy  errors.  Because   block   incorrectly
+   marked  busy  errors  are  benign,  ignore  these  errors  unless  INTEG
+   consistently reports a block as incorrectly marked busy.
+
+   The /REGION qualifier is  incompatible  with  the  /FILE  and  /TN_RESET
+   qualifiers.
+
+   By default, INTEG operates /FILE.
+
+2 /FILE
+  /FI[LE]
+   Specifies   that   the   parameter   to   the   INTEG   command   is   a
+   file-specification.  INTEG  /FILE   requires   exclusive   (stand-alone)
+   access to a database file and  does  not  require  a  Global  Directory.
+   Because it has stand-alone access to  the  file,  INTEG  /FILE  is  able
+   to check reference counts.
+
+   The /FILE qualifier is incompatible with the /REGION qualifier.
+
+   By default, INTEG operates /FILE.
+
+2 /TN_RESET
+  /TN[_RESET]
+   Instructs an INTEG /FILE to reset  the  transaction  number  to  one  in
+   every database block currently holding valid data.
+
+   Transaction number overflow back to 0  disrupts  the  integrity  of  the
+   database.
+
+   The  /TN_RESET  qualifier  is  incompatible  with  the  /BLOCK,   /FAST,
+   /REGION and /SUBSCRIPT qualifiers.
+
+   By default, INTEG does not modify the block transaction numbers.
+
+2 /SUBSCRIPT
+  /S[UBSCRIPT]=subscript
+   Specifies a global or a range of  keys  to  INTEG.  Enclose  the  global
+   key  in  quotes  ("")  and  identify   a   range   by   separating   two
+   subscripts  with  a  colon  (:).  /SUBSCRIPT  limits  map  checking   to
+   incorrectly marked free errors.
+
+   Use  /SUBSCRIPT  only  if  you  know  the  path  to  the  keys  in   the
+   subscript and have reason  to  believe  the  path  is  not  damaged.  If
+   the path is questionable or  known  to  be  damaged,  use  DSE  to  find
+   the block(s) and INTEG /BLOCK.
+
+   The  /SUBSCRIPT  qualifier  is  incompatible   with   the   /BLOCK   and
+   /TN_RESET qualifiers.
+
+   Use /FULL to have INTEG report all global-names covered by a range.
+
+2 Examples
+  INTEG /SUBSCRIPT= Examples
+
+   Example
+
+   MUPIP INTEG /SUBSCRIPT="^a" MUMPS.DAT
+
+   This INTEGs the global variable ^a in the database file MUMPS.DAT.
+
+   Example
+
+   MUPIP INTEG/SUBSCRIPT="^a(100)":"^b(""c"")"/reg $DEFAULT
+
+   This INTEGs all global  variables  greater  than  or  equal  to  ^a(100)
+   and less  than ^b("c") in the default region.
+
+   Note: To specify a literal in the  command  string,  use  double  quotes
+   e.g., ^b(""c"").
+
+2 /BLOCK
+  /BL[OCK]=block-number
+   Specifies the block at  which  to  start  checking  a  sub-tree  of  the
+   database.  /BLOCK  limits  map  checking  to  incorrectly  marked   free
+   errors.
+
+   The  /BLOCK  qualifier  is  incompatible   with   the   /SUBSCRIPT   and
+   /TN_RESET qualifiers.
+
+2 /KEYRANGES
+  /[NO]K[EYRANGES]
+   Specifies whether or not the  INTEG  report  includes  key  ranges  that
+   identify the data suspected of problems detected by INTEG.
+
+   By default, INTEG displays /KEYRANGES.
+
+2 /MAP
+  /[NO]MAP[=integer]
+   Specifies the maximum number of  incorrectly  marked  busy  errors  that
+   INTEG reports.
+
+   /NOMAP removes  limits  on  incorrectly  marked  busy  reporting,  i.e.,
+   INTEG reports all map errors.  /NOMAP  does  not  accept  assignment  of
+   an argument.
+
+   Because  incorrectly  marked  free  errors  are  very  dangerous,  INTEG
+   always reports them, and /MAP does not affect them.
+
+   An  error  in  an   index   block   prevents   INTEG   from   processing
+   potentially large areas  of  the  database.  A  single  "primary"  error
+   may  cause  large  numbers  of  "secondary"  incorrectly   marked   busy
+   errors.  Because  "real"  or  primary  incorrectly  marked  busy  errors
+   only  make  "empty"  blocks  unavailable  to  the   system,   they   are
+   relatively benign.
+
+   By default, INTEG reports a maximum of 10 map errors (/MAP=10).
+
+2 /MAXKEYSIZE
+  /[NO]MAX[KEYSIZE][=integer]
+   Specifies  the  maximum  number  of  key  size  too  large  errors  that
+   INTEG reports.
+
+   /NOMAXKEYSIZE  removes  limits  on  key  size  reporting,  i.e.,   INTEG
+   reports  all  key  size  too  large  errors.    /NOMAXKEYSIZE  does  not
+   accept assignment of an argument.
+
+   Key size too large error  should  only  occur  after  someone  uses  DSE
+   CHANGE /FILEHEADER /KEY_MAX_SIZE to reduce the maximum key-size.
+
+   By  default,  INTEG  reports  a  maximum   of   10   key   size   errors
+   (/NOMAXKEYSIZE=10).
+
+2 /TRANSACTION
+  /[NO]TR[ANSACTION][=integer]
+   Specifies the maximum number  of  block  transaction  number  too  large
+   errors that INTEG reports.
+
+   /NOTRANSACTION  removes   limits   on   transaction   reporting,   i.e.,
+   INTEG reports  all  transaction  number  errors.    /NOTRANSACTION  does
+   not accept assignment of an argument.
+
+   A system crash may generate many  block  transaction  number  too  large
+   errors.  These  errors  can  cause  problems  for  BACKUP  /INCREMENTAL,
+   but  have  no  effect  on  the  run-time  environment.  The  DSE  CHANGE
+   /FILEHEADER  /BLOCKS_FREE=  command  quickly  fixes  block   transaction
+   number too large number errors.
+
+   By default, INTEG reports a  maximum  of  10  block  transaction  errors
+   (/TRANSACTION=10).
+
+2 /BRIEF
+  /BR[IEF]
+   Specifies an INTEG  summary  report  which  displays  the  total  number
+   of  directory,  index  and  data  blocks.  The   /BRIEF   qualifier   is
+   incompatible with the /FULL qualifier.
+
+   By default, INTEG reports are /BRIEF.
+
+2 /FULL
+  /FU[LL]
+   Specifies  an  expanded  INTEG  report  which  displays  the  number  of
+   index and data blocks in the directory tree  and  in  each  global  tree
+   as well as the  total  number  of  directory,  index  and  data  blocks.
+   The /FULL qualifier is incompatible with the /BRIEF qualifier.
+
+   By default, INTEG reports are /BRIEF.
+
+2 /ADJACENCY
+  /A[DJACENCY]=integer
+   Specifies the range of blocks  within  which  INTEG  considers  a  block
+   adjacent to another database block on  the  same  level.  The  adjacency
+   report from INTEG  gives  an  approximation  of  physical  data  density
+   which   directly   affects   efficient   database   access.   Use    the
+   /ADJACENCY   qualifier   to   adjust   the    reporting    to    reflect
+   characteristics of your disks, e.g., pick  a  factor  that  matches  the
+   number of sectors on a drive.
+
+   By default, INTEG uses /ADJACENCY=10.
+
+1 Jrnl_overview
+  Journaling overview
+   Journaling  records  an  extra  copy  of   information   during   database
+   updates in order to  provide  resiliency  against  hardware  and  software
+   failures. Journaling can reduce the "window  of  exposure"  from  some  of
+   the most common types of  failure:  power  loss  and  media  loss  due  to
+   head-to-disk interference.  Journals  also  provide  a  valuable  tool  in
+   cases of software errors and  operational  miscues.  A  journal  file  has
+   questionable value only in the case where the  database  and  the  journal
+   share a common point of failure that  affects  the  information  in  both,
+   over a significant  period  of  time.  Therefore,  using  different  disks
+   and, when possible, different disk controllers for  the  journal  and  the
+   database  files  improves  the  likelihood  of  the  journal  serving  its
+   intended purpose.
+
+   The database management portion of a  MUMPS  implementation  ensures  that
+   multiple concurrent updates and retrievals of  the  same  information  (or
+   information "close  together"  in  ordered  sequence)  are  handled  in  a
+   predictable  and  logical  fashion.  The  database  manager  may  have  to
+   change multiple  records,  usually  indices,  as  a  result  of  a  single
+   update.   Therefore,   interrupting   a   process   performing   such    a
+   "multi-point"  update  violates  a  design   assumption   of   the   MUMPS
+   implementation  and  results  in  a  malformed  database.  Access   to   a
+   damaged area  of  the  database  does  not  produce  the  desired  result.
+   Instead, such an "integrity"  problem  causes  symptoms  including  system
+   hangs,  misplaced  updates,  failure  to  find  information  that  exists,
+   finding information out of sequence,  and  run-time  errors.  If  the  bad
+   records  contain  no  valid  information  or  redundant  information,  the
+   simplest  cures  for  integrity   errors   entail   deleting   incorrectly
+   formatted  records.  However,  sometimes  crashes  damage  information  of
+   value and, in any case, database repair  requires  time  and  skill.  GT.M
+   journaling provides a means to recover  or  replace  databases  that  have
+   integrity problems. Use of journaling  at  this  "global"  level  requires
+   no MUMPS programming.
+
+   MUPIP and its documentation uses the term  transaction  to  mean  database
+   update.  In  journaling,  the  term  transaction  may  refer  to  multiple
+   related database updates.
+
+2 Forward_Recovery
+  Forward Recovery
+   Forward  Recovery  consists  of  restoring  a   backup   copy   of   the
+   database and applying the  journal  file  to  that  database  file.  The
+   journal  file  contains  copies  of  each   database   update.   Forward
+   Recovery reads the entire journal file  from  beginning  to  end  (in  a
+   "forward" direction) and  updates  the  backup  copy  of  the  database.
+   The optional  MUPIP  JOURNAL  /BEFORE=  qualifier  specifies  a  journal
+   ending time that  stops  journal  processing  before  the  physical  end
+   of the journal file. In general,  Forward  Recovery  takes  longer  than
+   Backward  Recovery.  However,  if  the  current  database   is   somehow
+   destroyed, you must use  Forward  Recovery.  Also,  if  a  journal  file
+   was  created  NOBEFORE_IMAGE  with  a  MUPIP  SET,  that  journal   only
+   permits Forward Recovery.
+
+   Example of Forward Recovery:
+
+   MUPIP JOURNAL /RECOVER /FORWARD
+
+
+                                   /BEFORE
+                                   |
+   --------------------------------V-----------X--------->time
+                                  10:30       10:32
+   ¯+++++++++++++++++++++++++++++++¯+++++++++¯¯
+   
+
+   This  shows  a  recovery  after  a  system   crash   at   10:32,   which
+   processes the  entire  journal  file  forward.  If  we  add  /BEFORE="--
+   10:30"  to   the   command,   the   recovery   stops   when   processing
+   encounters updates that originally occurred after 10:30.
+
+2 Backward_Recovery
+  Backward Recovery
+   Backward Recovery works by  processing  from  the  end  of  the  journal
+   file that  contains  information  for  the  period  just  prior  to  the
+   failure event,  thereby  minimizing  recovery  time.  Backward  Recovery
+   uses  "before-image"   journaling.   With   "before-image"   journaling,
+   GT.M  captures  the  database  updates,  as  well  as  "snap-shots"   of
+   portions of the database immediately  prior  to  the  change  caused  by
+   the   update.   In   effect,    MUPIP    JOURNAL=BEFORE_IMAGE    creates
+   "mini-backups"  preceding  each  database  update.   Backward   Recovery
+   uses the mini-backups to restore  the  database  as  far  back  in  time
+   as specified, then it  goes  forward  in  time  replaying  the  database
+   updates. Using Backward  Recovery  with  the  MUPIP  JOURNAL  qualifiers
+   /BEFORE=, /SINCE=, and /LOOKBACK=, you  can  specify  a  block  of  time
+   to recover. JOURNAL /RECOVER /BACKWARD  only  works  if  the  production
+   database is useable, and if the  MUPIP  SET  command  that  created  the
+   journal file specified the BEFORE_IMAGE characteristic.
+
+   Note: Before-images require more disk I/O and storage space.
+
+   Example of Backward Recovery:
+
+   MUPIP JOURNAL /RECOVER /BACKWARD /SINCE="-- 9:30"
+
+
+                   /LOOKBACK_LIMIT
+                   |       /SINCE
+                   |       |       /BEFORE
+                   |       |       |
+   ----------------V-------V-------V------X--------->time
+                           9:30    10:30  10:32
+                   <*******<++++++++++++++®
+                   ********++++++++¯++++++¯
+
+   
+
+   This shows a recovery after  a  system  crash  at  10:32.  The  recovery
+   "undoes"  the  database  updates  backward  to  9:30  and  then  forward
+   until the crash. If we  add  /BEFORE="--  10:30"  to  the  command,  the
+   recovery  stops  when  forward  processing   encounters   updates   that
+   originally  occurred  after   10:30.   If   the   application   includes
+   ZTSTART  and  ZTCOMMIT  commands  to  fence  a  group  of  transactions,
+   backwards processing may  continue  back  prior  to  9:30  searching  to
+   resolve  fenced  transactions  that  were  incomplete   at   9:30.   The
+   /LOOKBACK_LIMIT=   qualifier   controls   the    maximum    amount    of
+   additional backward processing.
+
+2 Fencing_Transactions
+  Fencing Transactions
+   Journaling without fences in MUMPS addresses  the  fact  that  a  system
+   crash  can  damage  the  database  integrity.  However,   sound   design
+   frequently  dictates  modelling   a   single   "real-world"   event   in
+   updates to  more  than  one  global  variable.  Such  real-world  events
+   are  usually  captured  in  a  single  data  entry   session   and   are
+   referred  to  as  logical  transactions.   Therefore,   interrupting   a
+   process  performing  a  "multi-node"  logical  transaction  violates   a
+   design  assumption  of  the   application   and   results   in   logical
+   inconsistencies  in   the   database.   Such   logical   inconsistencies
+   produce symptoms  including  run-time  errors,  inappropriate  branching
+   and   incorrect   reports.   Sometimes   logical   inconsistencies   are
+   referred to as application-level database integrity problems.
+
+   Standard MUMPS does not yet  include  a  method  to  identify  the  fact
+   that a single logical transaction may be  made  up  of  multiple  global
+   updates.  Therefore,  a  journal   recovery   that   corrects   database
+   integrity  problems  may  perform  an  update  that  is   part   of   an
+   incomplete sequence of updates intended as a single logical unit.
+
+   GT.M provides the MUMPS commands ZTSTART to  mark  the  beginning  of  a
+   logical  transaction  and  ZTCOMMIT  to  mark  the  end  of  a   logical
+   transaction. When ZTSTART and  ZTCOMMIT  fence  a  logical  transaction,
+   the  journal  recovery  can  refrain   from   starting   an   incomplete
+   update. To  take  advantage  of  this  additional  level  of  journaling
+   functionality,  the  application   must   use   ZTSTART   and   ZTCOMMIT
+   commands.
+
+   Journaling  does  not  require  modification  of  application  programs.
+   However,  using  ZTSTART  and  ZTCOMMIT  to   add   transaction   fences
+   around updates that  comprise  a  logical  unit  significantly  improves
+   the  benefit  of  journaling.  For  instance,  the  logical  transaction
+   "transfer funds between accounts" consists of  a  debit  update  to  one
+   account and a credit update to  another  account.  One  of  the  updates
+   made without the other  is  not  valid.  When  recovering  from  journal
+   files,  JOURNAL  processing  recovers  either  all  updates  within  the
+   transaction fences or none  of  them.  MUPIP  JOURNAL  /RECOVER  reports
+   the latter case during recovery.
+
+1 SET
+  SE[T]
+
+   MUPIP SET  changes  some  database  characteristics,  such  as  whether  a
+   specified file  or  region(s)  have  journaling  activated.  SET  requires
+   sole access to the database. SET operates on either regions or files.
+
+   The format for the SET command is:
+
+   SE[T] /qualifier... file-spec or region-list
+   
+   The  file-specification  or  region-list  identifies  the  target  of  the
+   SET. Region-names  separated  by  commas  (,)  make  up  a    region-list.
+   Region-names may include  the  DCL  wildcards  %  and  *.  For  a  summary
+   table of MUPIP commands and  qualifiers  including  MUPIP  SET,  refer  to
+   the MUPIP chapter in the GT.M Administration and Operations Guide.
+
+2 Object_qualifiers
+  Object Qualifiers
+
+/FILE
+  /F[ILE]
+   Specifies that  the  argument  contains  a  file-specification  for  a
+   single  database  file.  The  /FILE  qualifier  is  incompatible  with
+   the /REGION qualifier.
+
+/REGION
+  /R[EGION]
+   Specifies  that   the   argument   contains   a   region-name   which,
+   through the  mapping  of  the  current  Global  Directory,  identifies
+   a  database  file.  SET  /REGION  modifies  multiple  files  when  the
+   parameter  contains  more  than  one  name   and/or   wildcards.   The
+   /REGION qualifier is incompatible with the /FILE qualifier.
+
+2 Action_qualifiers
+  Action Qualifiers
+
+/ACCESS_METHOD
+  /A[CCESS_METHOD]=BG or MM
+   Specifies  the  access  method  for   a   GDS   database   file.   For
+   information  on  ACCESS_METHOD,  refer  to   the   "Global   Directory
+   Editor" chapter of the GT.M Administration and Operations Guide.
+
+   By   default,   MUPIP   CREATE    establishes    ACCESS_METHOD    from
+   information entered in the Global Directory with GDE.
+
+/GLOBAL_BUFFERS
+  /G[LOBAL_BUFFERS]=integer
+   Specifies  the  number  of  cache  buffers  for  a  BG  database.  For
+   information on  determining  good  working  sizes  of  GLOBAL_BUFFERS,
+   refer  to  the  "Global  Directory  Editor"  chapter   of   the   GT.M
+   Administration and Operations Guide.
+
+   The minimum is  64  buffers  and  the  maximum  is  4096  buffers.  By
+   default,    MUPIP    CREATE    establishes     GLOBAL_BUFFERS     from
+   information entered in the Global Directory with GDE.
+
+/JOURNAL
+  /[NO]J[OURNAL][=journal-option-list]
+   Specifies  whether  the  database  allows  journaling   and,   if   it
+   does, characteristics for the journal file.
+
+   /NOJOURNAL   specifies   that   the   database    does    not    allow
+   journaling.  /NOJOURNAL  does  not  accept  an  argument   assignment.
+   /NOJOURNAL  does  not  create  new  journal  files.  When  a  database
+   has been SET  /NOJOURNAL,  it  appears  to  have  no  journaling  file
+   name or other characteristics.
+
+   /JOURNAL=  enables  journaling  for   a   database   file.   /JOURNAL=
+   takes  one  or  more  arguments  in  a   journal-option-list.   Except
+   when used  with  the  OFF  option,  SET  /JOURNAL=  always  creates  a
+   new    version    of    the    specified    journal    file(s).    The
+   journal-option-list  contains  keywords  separated  with  commas   (,)
+   enclosed  in  parentheses  ().  When  the  list  contains   only   one
+   keyword, the parentheses are optional.
+
+   For details on the list refer to the journal-option-list topic.
+
+2 journal-option-list
+ journal-option-list elements
+
+    The following topics detail the journal-option-list elements.
+
+3 ON
+  ON
+   ON specifies that MUPIP create  a  new  journal  file  and  that  GT.M
+   record subsequent updates  to  the  database  in  that  journal  file.
+   A   SET   /JOURNAL=ON   must   include    either    BEFORE_IMAGE    or
+   NOBEFORE_IMAGE  in  the  accompanying  journal-option-list.   When   a
+   database has been SET  /JOURNAL=ON,  GT.M  journals  updates  to  that
+   file.
+
+   By default, SET /JOURNAL= turns journaling on.
+
+3 OFF
+  OFF
+   OFF  specifies  that  GT.M  not  record  subsequent  updates  to   the
+   database in the  journal  file.  OFF  may  also  be  used  to  set  up
+   journaling  characteristics  without  creating  a  journal   file   or
+   starting journaling.  When  a  database  has  been  SET  /JOURNAL=OFF,
+   it has established journal  characteristics  ready  to  turn  ON,  but
+   GT.M does not journal updates to that file.
+
+   By default, SET /JOURNAL= turns journaling on.
+
+3 BEFORE_IMAGE
+  [NO]BE[FORE_IMAGE]
+   [NO]BEFORE_IMAGE  controls  whether   the   journal   should   capture
+   before-images of information  that  an  update  is  about  to  modify.
+   MM   databases   must   use   NOBEFORE_IMAGE   journaling.    A    SET
+   /JOURNAL=ON  must  include  either  BEFORE_IMAGE   or   NOBEFORE_IMAGE
+   in the accompanying journal-option-list.
+
+   A  BEFORE_IMAGE  journal  permits  the   possibility   of   performing
+   "roll-back" recovery  (i.e.,  Backward  Recovery)  of  the  associated
+   database.  BEFORE_IMAGE  increases   the   load   on   I/O   and   CPU
+   resources and therefore may affect performance.
+
+3 FILE_NAME
+  F[ILE_NAME]=file-specification
+   FILE_NAME=file-specification  specifies  the  name  of   the   journal
+   file. FILE_NAME is incompatible with SET /REGION.
+
+   Journal file-specifications are limited to 55 characters.
+
+   By    default,    MUPIP     CREATE     establishes     the     journal
+   file-specification  from  the  Global   Directory.   If   the   Global
+   Directory  does  not  contain   a   journal   file-specification   SET
+   /JOURNAL   derives   the   journal   file-specification    from    the
+   database file-specification using a  file  type  of  .MJL.  Note  that
+   because the default usually  places  the  journal  file  on  the  same
+   disk  drive  as  the  database  file,  it  does   not   protect   well
+   against disk hardware failures.
+
+3 ALLOCATION
+  A[LLOCATION]=blocks
+   ALLOCATION=blocks specifies the  initial  size  of  the  journal  file
+   in RMS  blocks.  Because  frequent  journal  file  extensions  degrade
+   run-time  performance,  make  journal  file  allocation  ample  for  a
+   production database.
+
+   The  minimum  ALLOCATION   is   10   blocks   and   the   maximum   is
+   16,777,216 blocks.
+
+   If   journaling   characteristics    have    not    been    previously
+   established  by  GDE  or  a  prior  SET  /FILE  /JOURNAL  and  a   SET
+   /JOURNAL=  specifies  ALLOCATION  but  does  not  specify   EXTENSION,
+   the command automatically  changes  EXTENSION  to  equal  10%  of  the
+   new ALLOCATION.
+
+   By  default,  MUPIP  CREATE  establishes  the  ALLOCATION   from   the
+   Global  Directory,  where  the  Greystone  supplied  default  is   100
+   blocks.  If  the  Global  Directory  does   not   contain   ALLOCATION
+   information, SET /JOURNAL uses a default of 100 blocks.
+
+3 EXTENSION=blocks
+  E[XTENSION]=blocks
+   EXTENSION=blocks  specifies  the  size  by  which   a   journal   file
+   extends  when  it  becomes  full.   EXTENSION=0   disables   automatic
+   journal file extension.  While  this  technique  exerts  firm  control
+   over disk  space  consumption  by  a  journal  file,  running  out  of
+   journal file space  terminates  journaling  for  the  region.  Because
+   frequent  journal  file  extensions  degrade   run-time   performance,
+   make the journal file extension ample for a production database.
+
+   The  minimum  EXTENSION  is  0  blocks  and  the  maximum  is   65,536
+   blocks.
+
+   If   journaling   characteristics    have    not    been    previously
+   established  by  GDE  or  a  prior  SET  /FILE  /JOURNAL  and  a   SET
+   /JOURNAL=  specifies  ALLOCATION  but  does  not  specify   EXTENSION,
+   the command automatically  changes  EXTENSION  to  equal  10%  of  the
+   new ALLOCATION.
+
+   By  default,  MUPIP  CREATE  establishes  the   EXTENSION   from   the
+   Global  Directory,  where  the  Greystone-supplied  default   is   100
+   blocks.  If  the  Global  Directory   does   not   contain   EXTENSION
+   information  and  the   SET   /JOURNAL   does   not   specify   either
+   ALLOCATION or EXTENSION, MUPIP uses a default of 100 blocks.
+
+3 BUFFER_SIZE=pages
+  BU[FFER_SIZE]=pages
+   BUFFER_SIZE=pages specifies  the  amount  of  memory  used  to  buffer
+   journal file output.
+
+   A  larger  BUFFER_SIZE   usually   smooths   and   improves   run-time
+   performance  by  allowing  larger,  less  frequent  writes.   On   the
+   other hand, a  larger  BUFFER_SIZE  requires  more  memory  resources,
+   which may be scarce. A  larger  BUFFER_SIZE  provides  more  room  for
+   journal  records  in  buffered  memory  and  therefore  increases  the
+   number of update records that may be lost in a system failure.
+
+   The minimum BUFFER_SIZE is enough  512-byte  pages  to  hold  two  GDS
+   database blocks and the maximum is 2000 pages.
+
+   By  default,  MUPIP  CREATE  establishes  the  BUFFER_SIZE  from   the
+   Global  Directory,  where  the  Greystone-supplied  default   is   128
+   pages.  If  the  Global  Directory  does   not   contain   BUFFER_SIZE
+   information, SET /JOURNAL uses a default of 128 pages.
+
+2 Examples
+  SET /JOURNAL Examples
+
+   Example
+
+   $ mupip set /file /journal=(nobefore,buff=128) cus.dat
+   
+   This  initiates  journaling  for  the  database  file  cus.dat.  Because
+   the  parameters  include  NOBEFORE,  subsequent  JOURNAL   commands   to
+   /RECOVER the database updates in  the  journal  must  specify  /FORWARD.
+   The journal file created has the name cus.mjl.
+
+   Example
+
+   mupip set /region /journal=(before,alloc=50000,ext=5000) *
+
+   This enables  journaling  with  BEFORE_IMAGES  on  all  regions  of  the
+   current Global  Directory  and  gives  each  journal  an  ALLOCATION  of
+   50000  RMS  blocks  and  an  EXTENSION  of  5000  RMS  blocks.  If   the
+   regions have  significantly  different  levels  of  update,  either  set
+   the  ALLOCATION  and  EXTENSION  in  the  Global  Directory  before  the
+   MUPIP CREATE(s) or use several MUPIP SET /FILE commands.
+
+   Example
+
+   mupip set /region /journal=before *
+   
+   This declares journaling  active  with  before-images  for  all  regions
+   of the current Global Directory when they are next opened.
+
+   Example
+
+   mupip set /file /nojournal MUMPS.DAT
+   
+   This  disables  journaling  on  the  database  file  MUMPS.DAT  in   the
+   current default directory.
+
+1 JOURNAL
+  J[OURNAL]
+
+   The MUPIP  JOURNAL  command  analyzes,  extracts  from,  reports  on,  and
+   recovers journal files.
+
+   Another MUPIP command,  SET,  turns  journaling  on  and  off,  identifies
+   the   type   of   journaling,   and   sets   some   database    journaling
+   characteristics.
+
+   The format for the JOURNAL command is:
+
+   MUPIP J[OURNAL] /qualifier[...] file-specification[,...]
+   
+
+2 Action_qualifiers
+  Action Qualifiers
+
+/RECOVER
+  /REC[OVER]
+   Instructs the JOURNAL  command  to  replay  database  updates  in  the
+   specified  journal  file  into  the  appropriate  database.   /RECOVER
+   initiates  the  central  JOURNAL  operation.  JOURNAL   commands   may
+   specify /RECOVER alone or with other action qualifiers.
+
+/VERIFY
+  /[NO]V[ERIFY]
+   Checks  a  journal  file  for  proper  form.  JOURNAL   commands   may
+   specify  /VERIFY  alone  or  with  other  action  qualifiers.  JOURNAL
+   /RECOVER  commands  implicitly  /VERIFY  the  file(s)  on  which  they
+   operate.  JOURNAL  /RECOVER  ignores  /NOVERIFY  for   all   qualifier
+   combinations that do not include /FORWARD and /FENCES=NONE.
+
+/EXTRACT
+  /EX[TRACT][=file-specification]
+   Specifies  that  JOURNAL  transfer  the  contents  of  one   or   more
+   journal files to a  single  output  file  in  a  format  intended  for
+   processing  by  a  MUMPS  program.  For  a  description  of   /EXTRACT
+   output record formats,  refer  to  the  section  on  JOURNAL  /EXTRACT
+   output  records.  JOURNAL  commands  may  specify  /EXTRACT  alone  or
+   with other action qualifiers.
+
+   /EXTRACT  takes  an  optional  argument,  which  provides  an   output
+   file-specification.
+
+   By default,  MUPIP  JOURNAL  derives  the  output  file  specification
+   using the name of the  original  database  file  associated  with  the
+   journal and a file  type  of  .MJF.  If  the  command  specifies  more
+   than  one  journal  file,  JOURNAL  /EXTRACT   derives   the   default
+   output file specification from the name of the first database.
+
+/SHOW
+  /SH[OW]=show-option-list
+   Specifies what  information  the  JOURNAL  command  displays  about  a
+   journal file.  JOURNAL  commands  may  specify  /SHOW  alone  or  with
+   other action qualifiers.
+
+   For  information  on  the  options  refer  to   the   show-option-list
+   topic.
+
+2 show-option-list
+ show-option-list
+
+    The following topics detail the show-option-list elements.
+
+3 ALL
+  AL[L]
+   ALL  displays  every  available  type   of   information   about   the
+   journal   file.   For   additional   information,   refer    to    the
+   descriptions of each of the other SHOW keywords.
+
+3 HEADER
+  H[EADER]
+   HEADER displays the journal file header information.
+
+   This includes:
+
+   o  Database file name
+
+   o  Journal file name
+
+   o  Journal file version label (.e.g. GDSJNLnn)
+
+   o  Whether before-images were captured
+
+   o  Journal creation time/date
+
+   o  Journal creator
+
+   o  The last user to open the journal
+
+   o  The last time the journal file was opened
+
+   The information for the creator and last user includes:
+
+   o  Process Name
+
+   o  Process Identification Number
+
+   o  Node Name
+
+   o  Terminal Number
+
+   o  Login date and time
+
+3 PROCESSES
+  P[ROCESSES]
+   PROCESSES  displays   all   processes   active   during   the   period
+   specified  implicitly  or   explicitly   by   JOURNAL   command   time
+   qualifiers.
+
+3 ACTIVE_PROCESSES
+  AC[TIVE_PROCESSES]
+   ACTIVE_PROCESSES displays all processes  active  at  the  end  of  the
+   period  specified  implicitly  or  explicitly   by   JOURNAL   command
+   time qualifiers.
+
+3 BROKEN_TRANSACTIONS
+  B[ROKEN_TRANSACTIONS]
+   BROKEN_TRANSACTIONS  displays  all  processes  that   had   incomplete
+   fenced  transactions  at  the  end  of  the  period  covered  by   the
+   JOURNAL command.
+
+3 STATISTICS
+  S[TATISTICS]
+   STATISTICS  displays   a   count   of   all   journal   record   types
+   processed  during  the  period  specified  implicitly  or   explicitly
+   by JOURNAL command time qualifiers.
+
+2 Direction_qualifiers
+  Direction Qualifiers
+
+/FORWARD
+  /FO[RWARD]
+   Specifies  that  JOURNAL  processing  should   proceed   from      the
+   beginning  of  the  given  journal  files.  If  the  actions   include
+   /RECOVER, the target database file  should  contain  a  copy  of  that
+   database made at  the  time  when  MUPIP  SET  /JOURNAL=  created  the
+   journal files.
+
+   /FORWARD is incompatible with /BACKWARD.
+
+/BACKWARD
+  /BA[CKWARD]
+   Specifies that JOURNAL processing  should  proceed  from  the  end  of
+   the  journal  files.  If  the  actions   include   /RECOVER,   JOURNAL
+   /BACKWARD starts  restoring  before-images  starting  at  the  end  of
+   the  file,  back  to  an  explicitly  or  implicitly  specified  point
+   before  it  "reverses"  and  processes   database   updates   in   the
+   forward  direction.  The  target  database  file  should  "match"  the
+   end of the journal  file,  i.e.,  be  the  same  as  when  GT.M  wrote
+   the last record of the journal.
+
+   /BACKWARD is incompatible with /FORWARD.
+
+2 Time_qualifiers
+  Journal time specifications
+   Journal qualifiers  specifying  time  take  arguments  in  VMS  absolute
+   or delta  time  format.  Enclose  time  arguments  in  quotes  ("")  and
+   include  all  leading  delimiters.  Absolute  format   is   "day-mm-yyyy
+   hh:mm:ss:cc" , where cc represents  hundredths  of  a  second.  Absolute
+   time may indicate  today's  date  with  "--"  before  the  hours.  Delta
+   format is "day hh:mm:ss:cc"  ,  where  cc  represents  hundredths  of  a
+   second. If delta time is less than  a  day,  it  must  start  with  zero
+   (0) followed by a  space,  or  just  a  space,  before  the  hours.  For
+   information on how to specify the time,  refer  to  the  VAX/VMS  System
+   Services Manual.
+
+   Delta time is always relative to the time of  the  last  record  in  all
+   journal  file  arguments  to  the  MUPIP  JOURNAL  command.   A   normal
+   database  closure,  caused  by  the  last  accessing   process   leaving
+   GT.M,   also   properly   closes   the    associated    journal    file.
+   Alternatively, a  system  failure  causes  the  journal  to  end  in  an
+   abnormal  or  "disorganized"  fashion.  JOURNAL  processing  deals  with
+   both cases.
+
+   The time qualifiers perform as follows:
+
+   o   /AFTER= only applies to  JOURNAL  /EXTRACT  /FORWARD  and  specifies
+       a starting time; processing for  all  other  /FORWARD  actions  must
+       start at the beginning of the journal files
+
+   o   /BEFORE= specifies  an  ending  time  for  any  action  /FORWARD  or
+       /BACKWARD
+
+   o   /SINCE= specifies a starting time for any action /BACKWARD
+
+   o   /LOOKBACK_LIMIT=  specifies  a  "safety  zone"  for  resolving  open
+       fenced  transactions  when  processing  any  action  /BACKWARD;  the
+       /LOOKBACK_LIMIT= argument may  be  a  list  of  limits:  "TIME=time"
+       and/or "OPERATIONS=integer"
+
+   Because GT.M rounds time-stamps within  the  journal  to  hundredths  of
+   a  second  and  the  JOURNAL  processing  can  only  determine  time  as
+   exactly  as  the   journal   records   permit,   the   JOURNAL   command
+   processes specified times  in  a  "fuzzy"  fashion.  Because  they  deal
+   with   processing   completed   logical   transactions,   /SINCE=    and
+   /LOOKBACK= times have more "blur" than /AFTER= and /BEFORE= times.
+
+/AFTER
+  /A[FTER]=time
+   Specifies  the  starting  time  for  JOURNAL  /EXTRACT   /FORWARD   to
+   commence  output.  The  time  specified  references  time  stamps   in
+   the  journal  and   identifies   the   point   after   which   JOURNAL
+   processing  starts  extracting  information   out   of   the   journal
+   file.  /AFTER=  specifies  time  in  VMS  absolute   or   delta   time
+   formats. Delta format  specifies  an  offset  from  the  time  of  the
+   last  record  of  the  journal  file.  If  /AFTER=  provides  a   time
+   following  the  last  time   recorded   in   the   journal   file   or
+   following  any  /BEFORE=  time,   JOURNAL   processing   produces   no
+   result.  Using  /BEFORE=  with  /AFTER=  restricts   /EXTRACT   to   a
+   particular period of time.
+
+   /AFTER=  is  incompatible  with  /BACKWARD   and   with   all   action
+   qualifiers except /EXTRACT.
+
+   By  default,  /EXTRACT  starts  at  the  beginning  of   the   journal
+   file.
+
+/BEFORE
+  /BE[FORE]=time
+   Specifies  the  ending  time  at  which   JOURNAL   processing   stops
+   extracting  or  recovering  data.  The   time   specified   references
+   time stamps in the journal  files.  /BEFORE=  specifies  time  in  VMS
+   absolute or delta time  formats.  Delta  format  specifies  an  offset
+   from the time stamp in the last  record  of  each  the  journal  file.
+   If /BEFORE= provides a time  preceding  the  first  time  recorded  in
+   the  journal  file  or  preceding  any  /AFTER=   or   /SINCE=   time,
+   JOURNAL processing produces no result.
+
+   /BEFORE= is compatible with all other JOURNAL qualifiers.
+
+   By  default,  JOURNAL  processing  terminates  at  the  end   of   the
+   journal file.
+
+/SINCE
+  /SI[NCE]=time
+   Specifies how far  back  in  time  JOURNAL  /BACKWARD  should  process
+   from the  end  of  the  journal  file,  before  starting  its  forward
+   processing.  The  time  specified  references  time  stamps   in   the
+   journal files.  /SINCE=  specifies  time  in  VMS  absolute  or  delta
+   time  formats. Delta format specifies  an  offset  from  the  time  of
+   the  last  record  of  the  journal  file.  When   JOURNAL   /BACKWARD
+   locates the /SINCE= time, if  it  has  open  fenced  transactions,  it
+   continues processing backward  to  resolve  them  unless  the  command
+   also  specifies  /FENCES=NONE.  The  /LOOKBACK=   qualifier   controls
+   the length of processing backward past the /SINCE= time.
+
+   If /SINCE=  time  exceeds  the  last  time  recorded  in  the  journal
+   files,  JOURNAL  processing   effectively   ignores   the   qualifier.
+   /SINCE=  is  incompatible  with  /FORWARD.  If  /SINCE=   provides   a
+   time preceding any  /BEFORE=  time,  JOURNAL  processing  produces  no
+   result.
+
+   By  default,  JOURNAL  /BACKWARD   processes   the   last   five   (5)
+   minutes of the journal file(s).
+
+/LOOKBACK_LIMIT
+                           /[NO]LOO[KBACK_LIMIT][=lookback-option-list]
+   Specifies  how  far  JOURNAL  /BACKWARD  processes   back   past   the
+   explicit (/SINCE=) or  implicit  turn  around  time  while  attempting
+   to  resolve  open  transaction  fences.  /LOOKBACK=  options   include
+   time and transaction counts.
+
+   /NOLOOKBACK_LIMIT  specifies  that  JOURNAL  /BACKWARD   can   process
+   all the way to the  beginning  of  the  journal  file,  if  necessary,
+   to resolve open transaction fences.
+
+   /LOOKBACK_LIMIT=    is    incompatible     with     /FORWARD.     When
+   /FENCES=NONE, JOURNAL processing ignores /LOOKBACK_LIMIT=.
+
+   The lookback-options are:
+
+   TIME=time             limits lookback by a specified amount of
+                         delta or absolute journal time
+
+   OPERATIONS=integer    limits  lookback  to  some  number  of  database
+                         updates
+
+   The lookback-option names  and  values  must  be  enclosed  in  quotes
+   (""),  e.g.,  "Time=0  00:05"   or   "Oper=10."      When   /LOOKBACK=
+   specifies both options,  they  must  be  enclosed  in  parentheses  ()
+   and  separated  by  a  comma  (,).  When  /LOOKBACK=  specifies   both
+   options, the first limit reached terminates the lookback.
+
+   By  default,  MUPIP  JOURNAL   uses   /LOOKBACK_LIMIT="TIME=0   00:05"
+   providing five minutes of journal  time  prior  to  /SINCE=  in  which
+   to resolve open fences.
+
+2 Control_qualifiers
+  Control Qualifiers
+
+/REDIRECT
+  /RED[IRECT]=file-pair-list
+   Specifies  that  JOURNAL  /RECOVER  replay  the  journal  file  to   a
+   database different  than  the  one  for  which  it  was  created.  Use
+   this qualifier  to  create  or  maintain  databases  for  training  or
+   testing.
+
+   JOURNAL rejects /REDIRECT unless it appears with /RECOVER.
+
+   The   file-pair-list   consists   of   one   or    more    pairs    of
+   file-specifications  enclosed  in  parentheses  ()  and  separated  by
+   commas  (,).  The  pairs  are  separated  by  an  equal  sign  in  the
+   form:
+
+   old-file-specification=new-file-specification
+   
+   where  the  first  file-specification  names  the  original   database
+   file and  the  second  file-specification  names  the  target  of  the
+   /RECOVER.  When  /REDIRECT  specifies  only   one   file   pair,   the
+   parentheses are optional.
+
+   By default,  JOURNAL  directs  /RECOVER  to  the  database  file  from
+   which the journal was made.
+
+/FENCES
+  /FE[NCES]=fence-option
+   Specifies  how   JOURNAL   processes   fenced   transactions.   Fenced
+   transactions  are   logical   transactions   made   up   of   database
+   updates preceded in MUMPS by a  ZTSTART  command  and  followed  by  a
+   ZTCOMMIT command.  All  updates  between  a  ZTSTART  and  a  ZTCOMMIT
+   are designed such that  they  should  all  occur  together,  i.e.,  no
+   one of them should reach the database unless they all do.
+
+   The fence options are:
+
+   o  NONE, which causes JOURNAL  to  apply  all  individual  updates  as
+      if transaction fences did not exist
+
+   o  ALWAYS,  which  causes   JOURNAL   to   treat   any   unfenced   or
+      improperly fenced updates as errors
+
+   o  PROCESS,  which  causes  JOURNAL  to   accept   unfenced   database
+      updates,  and  also   to   observe   fences   when   they   appear,
+      generating  an  error  in  the  case   of   a   ZTSTART   with   no
+      corresponding ZTCOMMIT
+
+   By default, MUPIP JOURNAL uses /FENCES=PROCESS.
+
+/INTERACTIVE
+  /[NO]IN[TERACTIVE]
+   Specifies whether, for  each  error  over  the  /ERROR_LIMIT,  JOURNAL
+   processing   prompts   the   invoking   operator   for    an    answer
+   controlling continuation  of  processing.  If  the  operator  responds
+   that  processing  should  not   continue,   the      JOURNAL   command
+   terminates.
+
+   /NOINTERACTIVE terminates  the  journal  processing  as  soon  as  the
+   process   generates   the    number    of    errors    specified    in
+   /ERROR_LIMIT.
+
+   When   processing   in    INTERACTIVE    mode,    the    default    is
+   /INTERACTIVE,  otherwise,   e.g.,   BATCH   mode,   the   default   is
+   /NOINTERACTIVE.
+
+/ERROR_LIMIT
+  /[NO]ER[ROR_LIMIT][=integer]
+   Specifies the number of  errors  that  JOURNAL  processing  treats  as
+   acceptable. When  the  number  of  errors  exceeds  the  /ERROR_LIMIT,
+   the  /INTERACTIVE  qualifier  determines  whether  JOURNAL  processing
+   halts or defers to the operator.
+
+   /NOERROR_LIMIT prevents  JOURNAL  from  stopping  because  of  errors.
+   Journal processing will continue until  it  reaches  the  end  of  the
+   journal  file,  regardless  of  the  number  of  errors.   Note   that
+   /NOERROR_LIMIT is not the same as /ERROR_LIMIT=0.
+
+   By default, MUPIP  JOURNAL  uses  /ERROR_LIMIT=0,  causing  the  first
+   error to initiate the appropriate error action.
+
+/LOG
+  /[NO]LOG[=file-specification]
+   Specifies  whether  JOURNAL  reports  its  actions  as   it   performs
+   them. /NOLOG suppresses JOURNAL messages.
+   /LOG=file-specification specifies the name of a log file.
+
+   By default, MUPIP JOURNAL uses /LOG=SYS$OUTPUT.
+
+/CHECKTN
+  /[NO]C[HECKTN]
+   /CHECKTN  specifies  that  JOURNAL  /FORWARD  must  ensure  that   the
+   first  database  update   in   the   journal   file   has   the   next
+   transaction number after  the  current  transaction  in  the  database
+   file.
+
+   /NOCHECKTN   suppresses   checking    of    the    starting    journal
+   transaction against the ending database transaction number.
+
+   /CHECKTN is incompatible with the /BACKWARD qualifier.
+
+   By default, JOURNAL /FORWARD uses /CHECKTN.
+
+2 Selection_qualifiers
+  Selection Qualifiers
+
+/GLOBAL
+  /G[LOBAL]=global-list
+   Specifies  globals  for   JOURNAL   to   include   or   exclude   from
+   processing.  You  may  find  this  qualifier  useful  for   extracting
+   and analyzing specific data.
+
+   The global-list contains  names  of  one  or  more  global-names  (not
+   including subscripts) preceded  by  "^"  enclosed  in  parentheses  ()
+   and separated by commas (,).  If  /GLOBAL  specifies  only  one  item,
+   the  parentheses  are  optional.  The  names  may  include   the   DCL
+   wildcards  %  and  *.  However,  to  allow  specification  of   global
+   names  starting  with  a  "percent"  (%),  MUPIP  JOURNAL   does   not
+   interpret  the  first  character  in  a  global-name  as  a  wildcard.
+   The entire  list  or  each  name  may  optionally  be  preceded  by  a
+   minus  (-),  requiring  JOURNAL  to  exclude  database  updates   that
+   update  the    specified  global(s).  When  the  global-list  with   a
+   JOURNAL /GLOBAL  does  not  start  with  a  minus,  JOURNAL  processes
+   only the explicitly named globals.
+
+   By default, JOURNAL processes all globals.
+
+/USER
+  /U[SER]=user-list
+   Specifies  that  JOURNAL  processing  include  or   exclude   database
+   updates  generated  by  one  or  more  users.   You   may   use   this
+   qualifier  to  "back-out"  database  updates  erroneously  entered  by
+   a specific user.
+
+   The user-list  contains  names  of  one  or  more  users  enclosed  in
+   parentheses ()  and  separated  by  commas  (,).  If  /USER  specifies
+   only  one  item,  the  parentheses  are  optional.   The   names   may
+   include the DCL wildcards % and  *.  The  entire  list  or  each  name
+   may optionally be preceded  by  a  minus  (-),  requiring  JOURNAL  to
+   exclude  database  updates  initiated  by   the   specified   user(s).
+   When the user-list  with  a  JOURNAL  /USER  does  not  start  with  a
+   minus, JOURNAL  processes  only  database  updates  generated  by  the
+   explicitly named users.
+
+   By default, JOURNAL  processes  database  updates  regardless  of  the
+   user by which they were initiated.
+
+/ID
+  /ID=pid-list
+   Specifies  that  JOURNAL  processing  include  or   exclude   database
+   updates  generated  by  one   or   more   processes,   identified   by
+   process  identification  numbers  (PIDs)  in  hexadecimal.   You   may
+   use this qualifier for troubleshooting or analysis of data.
+
+   The pid-list  contains  one  or  more  PIDs  enclosed  in  parentheses
+   () and separated by commas  (,).  If  /ID  specifies  only  one  item,
+   the parentheses  are  optional.  The  entire  list  or  each  PID  may
+   optionally  be  preceded  by  a  minus  (-),  requiring   JOURNAL   to
+   exclude  database  updates  associated  with  the  specified   PID(s).
+   When  the  pid-list  with  a  JOURNAL  /ID  does  not  start  with   a
+   minus,   JOURNAL  processes  only  database  updates  associated  with
+   the explicitly listed PIDs.
+
+   By default, JOURNAL  processes  database  updates  regardless  of  the
+   process by which they were initiated.
+
+/PROCESS
+  /P[ROCESS]=process-name-list
+   Specifies  that  JOURNAL  processing  include  or   exclude   database
+   updates generated by one  or  more  processes,  identified  by  names.
+   You  may  use  this  qualifier  to  extract  specific  process-related
+   data for testing or troubleshooting.
+
+   The  process-name-list  contains  names  of  one  or  more   processes
+   enclosed  in  parentheses  ()  and  separated  by   commas   (,).   If
+   /PROCESS specifies  only  one  item,  the  parentheses  are  optional.
+   The names may include the DCL wildcards  %  and  *.  The  entire  list
+   or each process-name  may  optionally  be  preceded  by  a  minus  (-)
+   requiring  JOURNAL  to  exclude  database  updates   associated   with
+   the specified process  name(s).  When  the  process-name-list  with  a
+   JOURNAL /PROCESS does  not  start  with  a  minus,  JOURNAL  processes
+   only  database  updates   associated   with   the   explicitly   named
+   processes.
+
+   By default, JOURNAL  processes  database  updates  regardless  of  the
+   process by which they were initiated.
+
+/TRANSACTION
+  /T[RANSACTION]=transaction-type
+   Specifies  transaction-types  for  JOURNAL  to  include   or   exclude
+   from  processing.  For  example,  you  may  use  this   qualifier   to
+   exclude  KILL  transactions  and  prevent  an  accidental  KILL   from
+   reoccurring during replay.
+
+   The transaction-types are:
+
+    SET
+
+    KILL
+
+   These types correspond to  the  MUMPS  commands  of  the  same  names.
+   The transaction-type  may  optionally  be  preceded  by  a  minus  (-)
+   requiring JOURNAL to  exclude  transactions  of  the  specified  type.
+   When  the  transaction-type  with  a  JOURNAL  /TRANSACTION  does  not
+   start with  a  minus,  JOURNAL  processes  only  transactions  of  the
+   explicitly named type.
+
+   By default, JOURNAL processes transactions regardless of type.
+
+2 Examples
+  Journal Examples
+
+   Example
+
+   $ copy sys$dat:cus.dat []
+   $ mupip journal /recover /forward /fences=none cus.mjl
+   
+   The COPY statement copies a backup copy  of  the  database  for  use  in
+   recovery. The MUPIP JOURNAL command  recovers  the  database  using  the
+   cus.mjl  journal  file.  The  JOURNAL  command  processes  the   journal
+   file in a  forward  direction  (from  the  beginning  of  the  journal).
+   The /FENCES=NONE directs  JOURNAL  to  ignore  any  fences  and  recover
+   all individual updates.
+
+   Example
+
+   $ mupip set /file /journal=(before,buff=128) cus.dat
+   $ mupip set /file /journal=(before,buff=128) acc.dat
+   ...
+   $ mupip journal/recover/verify/back/error=2 cus.mjl,acc.mjl
+   
+   The  first  two  command  lines  initiate   journaling   for   the   two
+   specified database  files.  MUPIP  JOURNAL  does  not  accept  wildcards
+   in  database  file  names.  Because  the  MUPIP  SET  command  specifies
+   JOURNAL=BEFORE,   subsequent   JOURNAL   /RECOVER   may   have    either
+   /FORWARD or /BACKWARD direction. The  last  line  contains  the  command
+   to recover the two  database  files  using  the  two  specified  journal
+   files. The journal recover  processes  in  a  BACKWARD  direction  using
+   before-image  processing.  If  JOURNAL  processing  encounters  two   or
+   more errors (/ERROR=2), the recovery process terminates.
+
+   Example
+
+   $ mupip journal/forw/befo="-- 10:30"/glob="^bv%r*"/extr=bv cus.mjl
+   
+   This command line extracts  database  updates  that  occurred  from  the
+   beginning of the journal  until  10:30  to  global  variables  with  the
+   prefix ^bv , followed by  some  character,  followed  by  r,  optionally
+   followed  by  more  characters.  The   JOURNAL   /EXTRACT   places   the
+   updates in a file called bv.mjf
+   
+   Because the command does  not  specify  an  extension,  JOURNAL  assigns
+   the default extension .mjf to the output file.
+
+   Example
+
+   $ mupip jour/rec/back/befo="-- 10:30"/since="-- 9:30" -
+   /lookback="time=0 00:05" cus.mjl
+   
+   This command  line  performs  a  /RECOVERY  /BACKWARD  of  the  database
+   file  that  corresponds  to  the  journal   file   cus.mjl.      JOURNAL
+   /RECOVER  processes  from  the  journal  time  9:30  to   journal   time
+   10:30.  If  the  JOURNAL  finds  open  fenced  transactions,  it  "looks
+   back" an additional five minutes  to  resolve  them.  The  /BEFORE=  and
+   /SINCE= qualifiers in  this  example  use  absolute  time.  Because  the
+   time specification omits the date, JOURNAL assumes today's date.
+
+2 extract_formats
+  JOURNAL /EXTRACT formats
+   EXTRACT  output  records  are  constructed   of   fields   or   "pieces"
+   delimited by back-slashes (\).
+
+   The first  piece  of  an  EXTRACT  output  record  always  contains  the
+   two-digit decimal transaction  record  type,  e.g.,  01  for  a  process
+   initialization record.
+
+   The  second  piece  always  contains  the  full   date   and   time   of
+   operation,  represented  in  $HOROLOG-format,  with   decimal   seconds,
+   e.g., 54271,44580.55.
+
+   The third piece always contains the process  id  (PID)  of  the  process
+   that performed the operation,  represented  as  a  decimal  number.  The
+   remainder of the record depends on the record type.
+
+   The  fields  described  as  "database  transaction  number"  contain   a
+   GT.M assigned number that is unique within the journal file.
+
+3 proc_initialization
+  Process Initialization Record
+   A  type  1  record  indicates  an  image-initiated  contact  with  the
+   GT.M  database  region  for  the  first  time.  The   format   for   a
+   process initialization record is:
+
+   01\time\pid\pnam\nnam\unam\mode\term\ltim\icnt
+   
+   where
+
+   time full time/date
+
+   pid        process id
+
+   pnam process name
+
+   nnam node name
+
+   unam user name
+
+   mode process mode, i.e., $zgetjpi("jobtype")
+
+   term terminal name
+
+   ltim process login time/date
+
+   icnt       process image count
+
+3 proc_termination
+  Type 2 - Process Termination Record
+   A  type  2  record  indicates  an   image   terminated   and   dropped
+   interest in the  GT.M  database  region.  The  format  for  a  process
+   termination record is:
+
+   02\time\pid\pnam\nnam\unam\mode\term\ltim\icnt
+
+   where
+
+   time full time/date
+
+   pid        process id
+
+   pnam process name
+
+   nnam node name
+
+   unam user name
+
+   mode process mode, i.e., $zgetjpi("jobtype")
+
+   term terminal name
+
+   ltim process login time/date
+
+   icnt       process image count
+
+   tnum database transaction number
+
+3 end_of_file
+  Type 3 - End of File Record
+   A type  3  record  indicates  all  GT.M  images  dropped  interest  in
+   the region and the  journal  file  was  closed  normally.  The  format
+   for an end-of-file record is:
+
+   03\time\pid\pnam\nnam\unam\mode\term\ltim\icnt\tnum
+
+   where
+
+   time full time/date
+
+   pid        process id
+
+   pnam process name
+
+   nnam node name
+
+   unam user name
+
+   mode process mode, i.e., $zgetjpi("jobtype")
+
+   term terminal name
+
+   ltim process login time/date
+
+   icnt       process image count
+
+   tnum database transaction number
+
+3 Kill
+  Type 4 - Kill Record
+   A type  4  record  indicates  a  database  update  caused  by  a  KILL
+   command. The format for a KILL record is:
+
+   04\time\pid\tnum\node
+   
+   where
+
+   time full time/date
+
+   pid        process id
+
+   tnum database transaction number
+
+   node a MUMPS node reference in external format
+
+3 Set
+  Type 5 - Set Record
+   A  type  5  record  indicates  a  database  update  caused  by  a  SET
+   command. The format for a SET record is:
+
+   05\time\pid\tnum\sarg
+
+   where
+
+   time full time/date
+
+   pid        process id
+
+   tnum database transaction number
+
+   sarg a MUMPS set argument
+
+   Note a MUMPS  SET  argument  has  a  node  reference  followed  by  an
+   equal-sign (=) and MUMPS data string expression.
+
+3 tr_start
+  Type 6 - Transaction Start Record
+   A type 6  record  indicates  a  ZTSTART  command.  The  format  for  a
+   transaction start record is:
+
+   06\time\pid
+
+   where
+
+   time full time/date
+
+   pid        process id
+
+3 tr_commit
+  Type 7 - Transaction Commit Record
+   A type 7 record  indicates  a  ZTCOMMIT  command.  The  format  for  a
+   transaction commit record is:
+
+   07\time\pid\tnum\part
+   
+   where
+
+   time full time/date
+
+   pid        process id
+
+   tnum database transaction number
+
+   part number of journal entries in the transaction
+
+1 Jrnl_examples
+ The   following   examples   present   a   typical   use    of    database
+   journaling  to  prevent  loss  of  data.  In  our  examples  the  database
+   consists   of   three   regions,    ACC,    MAIN,    and    TMP,    mapped
+   respectively    to    files    USER:[PROD]ACC.DAT,    USER:[PROD]MUMPS.DAT
+   and USER:[PROD]TMP.DAT.
+
+2 Setting_Database_Regions_for_Journaling
+ We  assume  that  region  TMP  holds  only  process-local   data,   and,
+   therefore, does  not  require  backups  or  journaling.  We  assume,  on
+   the  other  hand,  that   regions   ACC   and   MAIN   hold   production
+   application   data   that   should   be   protected    by    journaling.
+   Moreover,    our    application    requires    a    high    degree    of
+   availability.  Therefore,  we  set  up  journaling  with   BEFORE_IMAGES
+   for  regions  ACC  and  MAIN.  The  BEFORE_IMAGES  allow   for   JOURNAL
+   RECOVER  /BACKWARD,  which   generally   works   faster   than   JOURNAL
+   RECOVER  /FORWARD.  Because  both  our  journaled  regions  map  to  the
+   database files  on  device  USER:,  we  choose  a  different  disk  with
+   a  different  controller  to  accommodate  the   journal   files.   This
+   choice improves resiliency against hardware failures.
+
+   Example
+
+   $ mupip set /region/journal=(off,buff=200,file=JNL:[PROD]ACC)
+   ACC
+   $ mupip set/region/journal=(off,buff=200,file=JNL:[PROD]MAIN)
+   MAIN
+   
+   These  commands  must  be   issued   when   the   database   files   are
+   available   for   exclusive   (stand-alone)   access.   They   establish
+   several   journal   characteristics.   The   example    increases    the
+   journal buffer size from the default of 128 pages to 200 pages.
+
+2 Journal_Maintenance
+ First  backup  the  database  files.  Thencreate  and   initialize   new
+   journal files.
+
+   Example
+
+   $ mupip backup ACC,MAIN USR$BCK:[051590]
+   $ mupip set /region /journal=(on,before) ACC,MAIN
+   $ purge JNL:[PROD]*.MJL
+   
+   This  sequence  of  commands  backs  up  the  database  files  to  disk,
+   initializes  new  journal  files   for   each   and   purges   the   old
+   journal  files.  MUPIP  BACKUP  can  operate  without  exclusive  access
+   to the database  files  by  freezing  all  updates.  However,  in  order
+   to ensure  that  the  BACKUP  captures  an  application  state  matching
+   the beginning of the journal files, it should run stand-alone.
+
+   Some   applications   with   high   rates   of   updates   may    create
+   considerable  amount  of  journaling  data.  To  save  the  disk  space,
+   you  may  archive  journal  files  to  magnetic  tapes  until  the  next
+   database backup.  Before  archiving  a  journal  file,  first  create  a
+   new one.
+
+   Example
+
+   $ mupip set /file /journal=(on,before) ACC.DAT
+   $ backup []ACC.MJL;-1 MSA0:051590JNL.BCK /save_set
+   $ purge JNL:[PROD]ACC.MJL
+   
+   This  sequence  creates  a  new  journal  file,   backs   up   the   old
+   journal  file  to  the  tape  and  finally,   purges   the   old   file.
+   Notice  that  the  MUPIP  SET   requires   exclusive   access   to   the
+   database file  to  ensure  that  the  old  journal  stops  and  the  new
+   journal starts with consistent transaction states.
+
+2 Recovery_from_Journal_Files
+ Because  we  set  up  our  databases   with   BEFORE_IMAGE   journaling,
+   when  both  the  database  and  journal  files  are  available  after  a
+   failure event, we can use JOURNAL /RECOVER /BACKWARD.
+
+   Example
+
+   $ delete user:[prod]tmp.dat.
+   $ mupip create /region=tmp
+   $ mupip journal/reco/show/back/nointer JNL:[PROD]ACC,MAIN
+   $ mupip integ /region *
+   
+   This  first  deletes  and   recreates   TMP.DAT.   The   MUPIP   JOURNAL
+   command includes the  /SHOW  qualifier  to  generate  a  report  on  the
+   status  of  activity  in  the  journal  files.  It  also  includes   the
+   /NOINTERACTIVE  qualifier   to   prevent   operator   interaction   when
+   JOURNAL  processing  encounters  an  error.  By  default,  this  JOURNAL
+   /RECOVER  has  an  implicit  /ERROR_LIMIT=0,  which  causes  the   first
+   broken   transaction   to   terminate   processing.   In   addition   to
+   checking database  integrity,  the  MUPIP  INTEG  /REGION  acts  as  the
+   first database access  after  the  recovery  and,  if  the  old  journal
+   file  terminates  improperly,  creates  a  new  journal   file.   Unlike
+   INTEG /REGION,  the  command  MUPIP  INTEG  /FILE  does  not  initialize
+   a new journal file.  However,  if  the  old  journal  file  has  damage,
+   any  other  access  to  the  data  base  creates  a  new   version.   If
+   MUPIP   JOURNAL   /RECOVER   reports    broken    transactions    during
+   recovery, reenter the transactions.
+
+   If  the  databases  were  lost,  for  instance  due  to  a  disk   drive
+   failure,  we  would  have  to  use  JOURNAL  /RECOVER   /FORWARD   after
+   replacing  the  drive  and  retrieving   backups   of   the   databases.
+   This  recovery  may   take   much   longer   than   backward   recovery,
+   depending on the amount of data in the journal.
+
+   Example
+
+   $ delete USER:[PROD]*.DAT;*
+   $ backup USR$BCK:[051590]ACC.DAT USER:[PROD]
+   $ backup USR$BCK:[051590]MUMPS.DAT USER:[PROD]
+   $ mupip journal /reco /forw /err=5 JNL:[JNL]ACC,MAIN
+   $ mupip create /region=TMP
+   $ mupip integ /region /fast *
+   
+   This  sequence  of  commands  recreates  the  databases  to  the   point
+   of  the  last  backup.  Then  it   recovers   all   updates   from   the
+   journal   files.   The   /ERROR_LIMIT=    qualifier    causes    JOURNAL
+   /RECOVER to attempt  processing  through  up  to  five  (5)  errors.  By
+   default,  when  the  JOURNAL  /RECOVER  executes  in  batch,  processing
+   terminates  after  five  errors.  However  if   the   command   executes
+   interactively,  after  five  errors,  MUPIP  JOURNAL  prompts  the   the
+   operator  at  the  invoking  terminal  to  choose   between   continuing
+   or  terminating.  Also  by  default,  the   JOURNAL   /RECOVER   command
+   implies  a  /VERIFY,  causing  a  check  of   the   journal   prior   to
+   /RECOVER  processing.  The   commands   up   to   this   point   require
+   exclusive  (stand-alone)   access   to   the   database   files.   MUPIP
+   INTEG  /REGION  verifies  the  integrity  of  the  recovered   database.
+   If  the  journal  was  not  properly  closed,  the  INTEG  /REGION  also
+   creates a new  version  of  the  journal  file.  Because  the  databases
+   are  large,  we  use  the  /FAST  qualifier  on   the   INTEG.   Because
+   INTEG  freezes  all   updates   and   we   wish   to   ensure   database
+   integrity  before  going  back   into   production,   we   continue   to
+   restrict  access  to  the  database  until  the  INTEG  completes.  Once
+   the database  has  been  verified,  we  can  resume  work.  One  of  the
+   first  items   of   business   should   be   to   reenter   any   broken
+   transactions.
+
+   Should the system  crash  again  and  something  such  as  a  hard  disk
+   failure  prevent  backward  recovery,  we  must  recover  the   database
+   forward,  twice.  First,  restore  the  database   from   backup,   then
+   recover  to  the  point  of  the  first  crash,  finally,  recover  from
+   that  point  to  the   point   of   the   second   crash.   To   recover
+   transactions  in  their  proper  order,  include  the   file   versions.
+   Notice   that   it   is   not   necessary   to   reenter   the    broken
+   transactions   after   the   first   recovery   because   the    current
+   version of the journal file contains those transactions.
+
+   Example
+
+   $ delete *.DAT;*
+   $ mupip restore ACC.DAT USR$BCK:[051590]ACC.BCK
+   $ backup USR$BCK:[051590]ACC.DAT USER:[PROD]
+   $ backup USR$BCK:[051590]MUMPS.DAT USER:[PROD]
+   $ mupip journal/reco/veri/forw/err=5
+   JNL:[JNL]ACC.MJL;-1,MUMPS.MJL;-1
+   $ mupip journal/reco/veri/forw/err=5 JNL:[JNL]ACC.MJL,MUMPS.MJL
+   $ mupip create /region=TMP
+   $ mupip integ /region /fast *
+
+   This  is  similar  to  the  previous  example,  however,  this  sequence
+   recovers   the   database   regions   from   two   consecutive   journal
+   files.
+
+
+1 LOAD
+  L[OAD]
+   LOAD enters global variable names  and  their  corresponding  data  values
+   into a GT.M  database  from  a  sequential  file.  LOAD  uses  the  Global
+   Directory to determine which database  files  to  use.  LOAD  may  operate
+   concurrently with normal  GT.M  database  access.  However,  a  LOAD  does
+   not  use  MUMPS  LOCKs  and  therefore   may   produce   application-level
+   integrity problems if run concurrently with many applications.
+
+   The format of the LOAD command is:
+
+   L[OAD] [qualifier...] file-specification
+
+   LOAD takes its input from the file defined by the file-specification.
+
+   <CTRL C> produces a status message from LOAD.  <CTRL  Y>  aborts  LOAD.  A
+   LOAD terminated abnormally by  operator  action  or  error  is  incomplete
+   but does not adversely affect the database structure.
+
+2 /FORMAT
+  /FO[RMAT]=keyword
+   Specifies the format of the  input  file.  The  format  must  match  the
+   actual format of the input file for LOAD to operate.
+
+   The format codes are:
+
+   GO - Global Output format
+
+   B[INARY] - Binary format
+
+   GOQ - Format produced by certain MUMPS implementations
+
+   By default, LOAD uses /FORMAT=GO.
+
+3 GO
+  /FORMAT=GO
+   /FORMAT=GO stores the data in record pairs. Each global node  produces
+   one record for the key
+   and one for the data. /FORMAT=GO has  two  header  records,  therefore
+   LOAD /FORMAT=GO
+   starts active work with record number three (3).
+
+3 BINARY
+  /FORMAT=BINARY
+   /FORMAT=BINARY  only  applies  for   Greystone   Technology   Database
+   Structure (GDS) files. A
+   BINARY format file loads significantly faster than a GO  format  file.
+   /FORMAT=BINARY stores
+   the data in internal GDS format. /FORMAT=BINARY has one header record,
+   therefore LOAD
+   /FORMAT=BINARY starts active work with record number two (2).
+
+3 GOQ
+  /FORMAT=GOQ
+   /FORMAT=GOQ loads files prepared by certain MUMPS implementations  and
+   is significantly
+   faster than a GO format file. Use the GOQ format as a conversion  aid.
+   /FORMAT=GOQ stores the
+   data in fixed length 2048 byte blocks which contain a variable  number
+   of keys and data.
+   FORMAT=GOQ has one or more header records depending on the  number  of
+   globals in the tape.
+
+2 /BEGIN
+  /BE[GIN]=integer
+   Specifies the record number of the input file  with  which  LOAD  should
+   begin. Directing LOAD to begin
+   at a point other than the beginning of a valid key causes an error.
+
+   Each format has some number of header records to consider when  choosing
+   a /BEGIN point. For more
+   information, refer to the section on /FORMAT.
+
+   For /FORMAT=GO input, normally the value should be an odd number.
+
+   Because /FORMAT=BINARY requires important information from  the  header,
+   this type of load requires
+   an intact file header regardless of the /BEGIN value.
+
+   By default, LOAD starts at the beginning of the input file.
+
+2 /END
+  /E[ND]=integer
+   Specifies the record number of the input file at which LOAD should stop.
+   The /END=integer must be
+   greater than the /BEGIN=integer for LOAD  to  operate.  LOAD  terminates
+   after processing the record of
+   the number specified by /END or reaching the end of the input file.
+
+   For /FORMAT=GO input, normally the value should be an even number.
+
+   By default, LOAD continues to the end of the input file.
+
+2 /FILL_FACTOR
+  /FI[LL_FACTOR]=integer
+   Specifies the target fill density for the data  blocks  updated  in  the
+   database file. /FILL_FACTOR must be
+   an integer between 5 and 100 specifying the percentage fill rate for the
+   block.
+
+   In  general,  maximum  data  densities  provide  the  best  performance.
+   However, if you have an
+   understanding of the  update  patterns  of  your  application,  you  may
+   achieve a performance benefit over
+   time from lowering the initial fill-factor.
+
+   By default, LOAD uses /FILL_FACTOR=100 for maximum data density.
+
+1 REORG
+  REO[RG]
+   MUPIP REORG offers a tool for optimizing  your  database  files  for  peak
+   database performance. REORG
+   requires minimal operator resources,  and  runs  concurrently  with  other
+   database activity, including updates.
+   Competing activity generally increases the time to  perform  a  REORG,  as
+   well as that of the competing
+   operations. If you use REORG concurrently with normal database access, you
+   may wish to lower the priority
+   of the process performing the REORG  to  minimize  its  impact  on  normal
+   operations.
+
+   Note that while REORG optimizes the GDS structure of  database  files,  it
+   does not deal with native file system
+   file fragmentation. Because native file  fragmentation  may  significantly
+   impair database performance, its
+   prevention and control  is  still  important.  Always  create  files  with
+   appropriate allocations and extensions, on
+   disks  with  large  contiguous  free-space.  Use  native  utilities   and,
+   depending on your procedures, MUPIP
+   utilities to eliminate file fragmentation when database  files  have  been
+   extended more than a dozen times.
+
+   The format of the REORG command is:
+
+   REO[RG] [qualifier...] file-specification
+
+   <CTRL C> produces a status message from REORG. <CTRL Y>  aborts  REORG.  A
+   REORG terminated
+   abnormally by  operator  action  or  error  is  incomplete  but  does  not
+   adversely affect the database structure.
+
+2 Qualifiers
+/SELECT
+  /SELECT=global-name-list
+   Restricts REORG  operation  to  a  subset  of  specified  globals.  By
+   default, REORG operates on all
+   globals in  all  database  files  identified  by  the  current  global
+   directory for the process executing the
+   MUPIP command.
+
+   Arguments to this qualifier may be an individual global name, a prefix
+   followed by an asterisk (*)
+   wild-card symbol, or a list of names and/or prefixes followed  by  the
+   wild-card symbol. The "^" in
+   the specification of the global name is  optional.  Enclose  lowercase
+   global names in quotes ("").
+
+   The global-specification can be:
+
+   o  A global name, such as MEF
+
+   o  A range of global names, such as A7:B6
+
+   o  A parenthetical list, such as (A,B,C)
+
+   o  Global names with the same prefix, such as TMP*
+
+   In the first case, EXTRACT selects only global ^MEF.   In  the  second
+   case, EXTRACT selects all
+   global names between ^A7  and  ^B6,  inclusive.  In  the  third  case,
+   EXTRACT selects globals ^A, ^B,
+   and ^C. In the fourth case, EXTRACT selects all global names from ^TMP
+   through ^TMPzzzzz.
+
+/FILL_FACTOR
+  /FILL_FACTOR=percent-qualifier
+   Directs REORG to leave free space within blocks  for  future  updates.
+   Arguments to this qualifier must be
+   integers from 5 to 100. REORG uses this figure in deciding whether  to
+   place more information in a
+   block; currently REORG does not move information out  of  a  block  to
+   make more room. By default,
+   REORG attempts to fill blocks to their maximum capacity.
+
+1 RESTORE
+  RE[STORE]
+   RESTORE  integrates  one  or  more  BACKUP  /INCREMENTAL  files   into   a
+   corresponding database. For a
+   RESTORE to work, the transaction numbers in the incremental  file(s)  must
+   sequentially follow those in the
+   database. Gaps or overlaps in the transaction  numbers  at  RESTORE  input
+   file boundaries cause RESTORE to
+   issue errors.
+
+   The format of the RESTORE command is:
+
+   RE[STORE] [qualifier] file-spec file-list
+
+   The file-specification identifies the  name  of  the  database  file  that
+   RESTORE uses as a starting point. The
+   transaction number in the database must  match  the  starting  transaction
+   number of each successive input to the
+   RESTORE. If the BACKUP /INCREMENTAL was created using /TRANSACTION=1,  set
+   the database up
+   with MUPIP CREATE and do not access it  with  anything  except  the  MUPIP
+   commands INTEG, EXTEND,
+   and SET before initiating the RESTORE.
+
+   The file list specifies one or more files produced by BACKUP  /INCREMENTAL
+   to RESTORE into the
+   database. The file-specifications are separated by commas (,) and must  be
+   in sequential order, from the oldest
+   transaction number to the most recent. RESTORE may take its input from  an
+   RMS file on any device that
+   supports such files, including magnetic tape devices. When using an  input
+   file on a magnetic tape, use DCL
+   to MOUNT specifying the same /BLOCKSIZE= as the one used to make the tape.
+
+2 Qualifiers
+/EXTEND
+  /[NO]EXTEND
+   Specifies whether RESTORE should extend automatically  if  its  target
+   database file is smaller than the file
+   size identified by the input BACKUP /INCREMENTAL file. MUMPS  activity
+   between backups may
+   automatically extend a database file.  Therefore,  the  database  file
+   specified as the starting point for a
+   RESTORE may require an extension before the RESTORE. If  the  database
+   needs an extension, MUPIP
+   displays a message. The message gives  the  sizes  of  the  input  and
+   output database files and the number of
+   blocks by which to extend the database. If the RESTORE specifies  more
+   than one incremental backup
+   with a file  list,  the  database  file  may  require  more  than  one
+   extension.
+
+   By  default,  RESTORE  automatically  extends   the   database   file.
+1 RUNDOWN
+  RU[NDOWN]
+   When database files have not been properly closed,  RUNDOWN  closes  those
+   currently inactive databases and
+   releases the central memory they claim.  In  normal  operation,  the  last
+   process to close a database file performs
+   the RUNDOWN actions.
+
+   The format of the RUNDOWN command is:
+
+   RU[NDOWN] [/qualifier file-spec or region-list]
+
+   The  file-specification  or  region-list  identifies  the  target  of  the
+   RUNDOWN. If RUNDOWN has no parameter,
+   it ignores any qualifier  and  flushes  the  memory  associated  with  all
+   database      files       that       currently       have       associated
+   memory and no active users.
+
+   Use RUNDOWN after a system crash or after the  last  process  accessing  a
+   database terminates abnormally.
+   RUNDOWN ensures that an inactive database is properly closed and ready for
+   subsequent use. RUNDOWN
+   has no effect on any database that is actively being accessed at the  time
+   the RUNDOWN is issued.
+
+   A RUNDOWN that specifies a target file or region can  correct  file  state
+   problems which a RUNDOWN with
+   no parameters does not find.
+
+2 Qualifiers
+/FILE
+  /F[ILE]
+   Specifies that the argument  is  a  file-specification  for  a  single
+   database file. The /FILE qualifier is
+   incompatible with the /REGION  qualifier.  If  the  rundown  parameter
+   consists of a list of files, the
+   command only operates on the first item in the list.
+
+/REGION
+  /R[EGION]
+   Specifies that the argument contains one or  more  region-names  which
+   identify database files mapped
+   by the current Global Directory.  Region-names  may  include  the  DCL
+   wildcards % and *. The
+   /REGION qualifier is incompatible with the /FILE qualifier.
+
+1 STOP
+  ST[OP]
+   STOP terminates a GT.M image. The image executes an orderly rundown of all
+   databases in which it
+   currently has an interest and then exits. A  MUPIP  STOP  performs  a  VMS
+   FORCEX system service and
+   therefore may also be used to stop non-GT.M images.
+
+   The format of the STOP command is:
+
+   ST[OP] /N[AME]=process-name | /ID=process-id
+
+   At least one of the qualifiers must appear.  If  both  qualifiers  appear,
+   they must refer to the same process or
+   STOP rejects the command.
+
+   Use the DCL command SHOW SYSTEM to display a list of active process  names
+   and process identifiers
+   (PIDs). PIDs appear as hexadecimal numbers on a SHOW SYSTEM display, which
+   is how they are specified
+   to MUPIP STOP.
+
+
+2 Qualifiers
+/ID
+  /I[D]=process-id
+   Specifies the PID of the process to  stop.  STOP  interprets  the  /ID
+   qualifier as a hexadecimal number
+   that corresponds to the form displayed by the DCL command SHOW SYSTEM.
+
+/NAME
+  /N[AME]=process-name
+   Specifies the name of the process to stop. The maximum length  of  the
+   name is 15 characters. Use
+   the /ID qualifier if the process belongs to an owner  in  a  different
+   group.
+
+

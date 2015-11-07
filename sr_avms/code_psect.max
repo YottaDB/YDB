@@ -1,0 +1,3 @@
+	.macro code_psect
+	.psect	$code,pic,usr,con,rel,lcl,shr,exe,rd,nowrt,novec
+	.endm

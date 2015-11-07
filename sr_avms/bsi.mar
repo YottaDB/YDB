@@ -1,0 +1,11 @@
+	.title	bsi	bit set interlocked
+VAX	=	1
+	code_psect
+	.entry	bsi,^m<>
+	clrl	r0
+	bbssi	#0,@4(ap),10$
+	ret
+
+10$:	incl	r0
+	ret
+	.end

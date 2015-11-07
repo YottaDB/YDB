@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,8 @@
 		if (-1 == fstat_res)											\
 		{													\
 			save_errno = errno;										\
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);	\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),            \
+			CALLFROM, save_errno);							                        \
 		}													\
 		mode = mode1 = statbuf.st_mode;										\
 		fstat_done = TRUE;											\
@@ -123,7 +124,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_length:
 			GET_LONG(length, (pp->str.addr + p_offset));
 			if (length < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_w_protection:
@@ -147,7 +148,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				GET_LONG(padchar, (pp->str.addr + p_offset));
 				if (!IS_PADCHAR_VALID(iod->ochset, padchar))
-					rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				rm_ptr->padchar = padchar;
 			}
 			break;
@@ -169,9 +170,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{	/* only if not open, not UTF, or no reads or writes yet */
 				GET_LONG(recordsize, (pp->str.addr + p_offset));
 				if (recordsize <= 0)
-					rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHPOS);
 				else if (MAX_STRLEN < recordsize)
-					rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 				rm_ptr->recordsize = recordsize;
 				rm_ptr->def_recsize = FALSE;
 			}
@@ -182,12 +183,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 				iorm_flush(iod);
 				if (lseek(rm_ptr->fildes, (off_t)0, SEEK_SET) == -1)
 				{
-					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 							RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
 				if (fseek(rm_ptr->filstr, (long)0, SEEK_SET) == -1)	/* Rewind the input stream */
 				{
-					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
 							RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
 				iod->dollar.zeof = FALSE;
@@ -229,18 +230,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 				int ftruncate_res;
 				if (fseek(rm_ptr->filstr, (long)rm_ptr->file_pos, SEEK_SET) == -1)
 				{
-					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 				}
 				if (lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET) == -1)
 				{
-					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 				}
 				FTRUNCATE(rm_ptr->fildes, (off_t)rm_ptr->file_pos, ftruncate_res);
 				if (0 != ftruncate_res)
 				{
-					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("ftruncate"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("ftruncate"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 				}
 				iod->dollar.zeof = TRUE;
@@ -281,19 +282,19 @@ void	iorm_use(io_desc *iod, mval *pp)
 				}
 				CHG_OWNER(iod->trans_name->dollar_io, uic.mem, uic.grp, chown_res);
 				if (-1 == chown_res)
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
 		case iop_width:
 			assert(iod->state == dev_open);
 			GET_LONG(width, (pp->str.addr + p_offset));
 			if (0 > width || (0 == width && !IS_UTF_CHSET(iod->ochset)))
-				rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHPOS);
 			else if (MAX_STRLEN < width)
-				rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 			/* Do not allow a WIDTH of 1 if either ICHSET or OCHSET is UTF-* */
 			if ((1 == width) && gtm_utf8_mode && ((IS_UTF_CHSET(iod->ochset)) || (IS_UTF_CHSET(iod->ichset))))
-				rts_error(VARLSTCNT(1) ERR_WIDTHTOOSMALL);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 			if (IS_UTF_CHSET(iod->ochset) && rm_ptr->fixed)
 				iorm_flush(iod);	/* need to flush current record first */
 			rm_ptr->def_width = FALSE;
@@ -372,7 +373,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					iod->ochset = temp_chset;
 					ochset_specified = TRUE;
 					if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
-						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				}
 			}
                         break;
@@ -387,7 +388,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						break;	/* ignore UTF chsets if not utf8_mode */
 					iod->ochset = temp_chset;
 					if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
-						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 					iod->ichset = iod->ochset;
 					ochset_specified = ichset_specified = TRUE;
 				}
@@ -412,6 +413,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 					(iop_utf16be == c) ? CHSET_UTF16BE : CHSET_UTF16LE;
 				ichset_specified = ochset_specified = TRUE;
 			}
+			break;
+		case iop_follow:
+			if (!rm_ptr->fifo && !rm_ptr->pipe)
+				rm_ptr->follow = TRUE;
+			break;
+		case iop_nofollow:
+			if (!rm_ptr->fifo && !rm_ptr->pipe)
+				rm_ptr->follow = FALSE;
 			break;
 		default:
 			break;
@@ -448,13 +457,13 @@ void	iorm_use(io_desc *iod, mval *pp)
 				assert(DEF_RM_RECORDSIZE == 32767);
 				rm_ptr->recordsize = ROUND_DOWN2(rm_ptr->recordsize, 4);
 			} else if (0 != rm_ptr->recordsize % 2)
-				rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
 		}
 	}
 	if (fstat_done && mode != mode1)
 	{	/* if the mode has been changed by the qualifiers, reset it */
 		if (-1 == CHMOD(iod->trans_name->dollar_io, mode))
-			rts_error(VARLSTCNT(1) errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 	}
 	return;
 }

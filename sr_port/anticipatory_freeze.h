@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,22 +24,22 @@
 #include "wait_for_disk_space.h"	/* needed by DB_LSEEKWRITE macro for prototype */
 #include "gtmimagename.h"		/* needed for IS_GTM_IMAGE */
 
-boolean_t		is_anticipatory_freeze_needed(int msg_id);
-void			set_anticipatory_freeze(int msg_id);
+boolean_t		is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id);
+void			set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id);
 boolean_t		init_anticipatory_freeze_errors(void);
 
 /* Define function pointers to certain functions to avoid executables like gtmsecshr from unnecessarily
  * linking with these functions (which causes the database/replication stuff to be pulled in).
  */
-typedef boolean_t	(*is_anticipatory_freeze_needed_t)(int msgid);
-typedef void		(*set_anticipatory_freeze_t)(int msg_id);
+typedef boolean_t	(*is_anticipatory_freeze_needed_t)(sgmnt_addrs *csa, int msgid);
+typedef void		(*set_anticipatory_freeze_t)(sgmnt_addrs *csa, int msg_id);
 
 GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	boolean_t				pool_init;
 GBLREF	boolean_t				mupip_jnl_recover;
 #ifdef DEBUG
-GBLREF	uint4					lseekwrite_target;
+GBLREF	uint4	  				lseekwrite_target;
 #endif
 
 error_def(ERR_MUINSTFROZEN);
@@ -49,6 +49,7 @@ error_def(ERR_MUNOACTION);
 error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
+error_def(ERR_TEXT);
 
 
 #define ENABLE_FREEZE_ON_ERROR											\
@@ -60,33 +61,34 @@ error_def(ERR_REPLINSTUNFROZEN);
 	}													\
 }
 
-#define CHECK_IF_FREEZE_ON_ERROR_NEEDED(MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID)					\
-{														\
-	GBLREF	jnlpool_addrs		jnlpool;								\
-	DCL_THREADGBL_ACCESS;											\
-														\
-	SETUP_THREADGBL_ACCESS;											\
-	if (!FREEZE_NEEDED && ANTICIPATORY_FREEZE_AVAILABLE && (NULL != is_anticipatory_freeze_needed_fnptr))	\
-	{	/* NOT gtmsecshr */										\
-		if (IS_REPL_INST_UNFROZEN && (*is_anticipatory_freeze_needed_fnptr)(MSG_ID))			\
-		{												\
-			FREEZE_NEEDED = TRUE;									\
-			FREEZE_MSG_ID = MSG_ID;									\
-		}												\
-	}													\
-}
-
-#define FREEZE_INSTANCE_IF_NEEDED(FREEZE_NEEDED, FREEZE_MSG_ID)								\
+#define CHECK_IF_FREEZE_ON_ERROR_NEEDED(CSA, MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID)					\
 {															\
 	GBLREF	jnlpool_addrs		jnlpool;									\
+	DCL_THREADGBL_ACCESS;												\
 															\
-	if (FREEZE_NEEDED)												\
-	{														\
-		assert(NULL != set_anticipatory_freeze_fnptr);								\
-		(*set_anticipatory_freeze_fnptr)(FREEZE_MSG_ID);							\
-		send_msg(VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);	\
-		send_msg(VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);		\
+	SETUP_THREADGBL_ACCESS;												\
+	if (!FREEZE_NEEDED && ANTICIPATORY_FREEZE_AVAILABLE && (NULL != is_anticipatory_freeze_needed_fnptr))		\
+	{	/* NOT gtmsecshr */											\
+		if (IS_REPL_INST_UNFROZEN && (*is_anticipatory_freeze_needed_fnptr)((sgmnt_addrs *)CSA, MSG_ID))	\
+		{													\
+			FREEZE_NEEDED = TRUE;										\
+			FREEZE_MSG_ID = MSG_ID;										\
+		}													\
 	}														\
+}
+
+#define FREEZE_INSTANCE_IF_NEEDED(CSA, FREEZE_NEEDED, FREEZE_MSG_ID)								\
+{																\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+																\
+	if (FREEZE_NEEDED)													\
+	{															\
+		assert(NULL != set_anticipatory_freeze_fnptr);									\
+		(*set_anticipatory_freeze_fnptr)((sgmnt_addrs *)CSA, FREEZE_MSG_ID);						\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,							\
+				jnlpool.repl_inst_filehdr->inst_info.this_instname);						\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);	\
+	}															\
 }
 
 #define CLEAR_ANTICIPATORY_FREEZE(FREEZE_CLEARED)									\
@@ -100,12 +102,13 @@ error_def(ERR_REPLINSTUNFROZEN);
 	}														\
 }
 
-#define REPORT_INSTANCE_UNFROZEN(FREEZE_CLEARED)									\
-{															\
-	GBLREF	jnlpool_addrs		jnlpool;									\
-															\
-	if (FREEZE_CLEARED)												\
-		send_msg(VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);	\
+#define REPORT_INSTANCE_UNFROZEN(FREEZE_CLEARED)										\
+{																\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+																\
+	if (FREEZE_CLEARED)													\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,						\
+				jnlpool.repl_inst_filehdr->inst_info.this_instname);						\
 }
 
 #define AFREEZE_MASK				0x01
@@ -157,14 +160,14 @@ error_def(ERR_REPLINSTUNFROZEN);
 		if (!IS_GTM_IMAGE)												\
 		{														\
 			GET_CUR_TIME;												\
-			gtm_putmsg(VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, time_ptr,					\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, time_ptr,		\
 					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
 		}														\
 		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;										\
 		if (!IS_GTM_IMAGE)												\
 		{														\
 			GET_CUR_TIME;												\
-			gtm_putmsg(VARLSTCNT(7) ERR_MUINSTUNFROZEN, 5, CTIME_BEFORE_NL, time_ptr,				\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTUNFROZEN, 5, CTIME_BEFORE_NL, time_ptr,		\
 					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
 		}														\
 	}															\
@@ -196,11 +199,12 @@ error_def(ERR_REPLINSTUNFROZEN);
 	{										\
 		if (exit_state != 0)							\
 		{									\
-			send_msg(VARLSTCNT(1) forced_exit_err);				\
-			gtm_putmsg(VARLSTCNT(1) forced_exit_err);			\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
 			exit(-exi_condition);						\
 		}									\
 		SHORT_SLEEP(SLEEP_INSTFREEZEWAIT);					\
+		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);				\
 	}										\
 }
 #define WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_SAFE		\
@@ -258,13 +262,34 @@ error_def(ERR_REPLINSTUNFROZEN);
 #ifdef DEBUG
 #define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)						\
 {															\
-	if (!IS_DSE_IMAGE) /*DSE does not freeze so let it work as normal */						\
-		if ((NULL != CSA) && (NULL != ((sgmnt_addrs *)CSA)->nl) && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC) \
+	GBLREF	jnlpool_addrs		jnlpool;									\
+	if (NULL != CSA)												\
+	{														\
+		if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC))								\
+		{	/* This test case is only used by mupip */							\
+			gtm_wbox_input_test_case_count++;								\
+			if ((0 != gtm_white_box_test_case_count)							\
+			    && (gtm_white_box_test_case_count <= gtm_wbox_input_test_case_count))			\
+			{												\
+				LCL_STATUS = ENOSPC;									\
+				if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,				\
+					     LEN_AND_LIT("Turning on fake ENOSPC for exit status test"));		\
+			}												\
+		} else if (!IS_DSE_IMAGE /*DSE does not freeze so let it work as normal */				\
+			   && ((NULL != jnlpool.jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl))			\
+			   && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)						\
 		{													\
 			LCL_STATUS = ENOSPC;										\
 			lseekwrite_target = LSEEKWRITE_TARGET;								\
 		}													\
+	}														\
 }
+
+void clear_fake_enospc_if_master_dead(void);
+
+#define CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD	clear_fake_enospc_if_master_dead()
+
 #else
 #define	FAKE_ENOSPC(CSA, FAKE_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS) {}
 #endif
@@ -287,11 +312,11 @@ error_def(ERR_REPLINSTUNFROZEN);
 	if (ENOSPC == lcl_status)												\
 	{															\
 		wait_for_disk_space(csa, (char *)fnptr, fd, (off_t)new_eof, (char *)buff, (size_t)size, &lcl_status);		\
-		assert(!((sgmnt_addrs *)csa)->nl->FAKE_WHICH_ENOSPC || (ENOSPC != lcl_status));					\
+		assert((NULL == csa) || (NULL == ((sgmnt_addrs *)csa)->nl) || !((sgmnt_addrs *)csa)->nl->FAKE_WHICH_ENOSPC	\
+		       || (ENOSPC != lcl_status));										\
 	}															\
 	status = lcl_status;													\
 }
-
 
 /* Currently, writes to replication instance files do NOT trigger instance freeze behavior.
  * Neither does a pre-existing instance freeze affect replication instance file writes.

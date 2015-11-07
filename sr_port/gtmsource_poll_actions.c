@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,7 +123,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			 * cause sig. time4 and temp_time are used as temporary variable for converting time to string.*/
 			GET_LONG(time4, &overdue_heartbeat.ack_time[0]);
 			temp_time = time4;
-			time_ptr = GTM_CTIME(&temp_time);
+			GTM_CTIME(time_ptr, &temp_time);
 			memcpy(time_str, time_ptr, CTIME_BEFORE_NL);
 			time_str[CTIME_BEFORE_NL] = '\0';
 			VMS_ONLY(SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO %llu in %0.f seconds. "

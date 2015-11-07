@@ -1,0 +1,168 @@
+	.macro	base_frame
+
+;	base_frame describes the machine stack frame in which all GT.M MUMPS object code
+;	executes.  It has a fixed stack size large enough for the saved registers and
+;	the condition handler address as expected by GTM$DYN_CH.  In addition, there is
+;	a stack temporary area large enough for the largest allowable number of parameters
+;	(limited by the VAX 'calls' instruction whose count parameter must be <= 255).
+
+;	Stack size information.  These fields MUST match values in create_object_file() in
+;	obj_file.c.  Changes to any of these values will require customers both to recompile
+;	their GT.M source files and to re-link the new object files.
+
+;	Note: the intricacy of the offset calculations is required in order to duplicate
+;	the structure expected by the $routine and $return macros which require certain
+;	blocks of data in a stack frame to be aligned on 16-byte boundaries.
+
+NQUADS_REQUIRED	=	2		; one at (sp) for r27 and one at 8(sp) for A(condition handler)
+NLOCALS		=	16		; allows room for expansion
+base_frame_regs	=	"r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, fp"
+NREGS_SAVED	=	16		; <r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,fp> and r26 (default)
+NARGS_SAVED	=	<1+6>		; r25 (count) and r16-r21
+RSA_END		=	<<<<<NQUADS_REQUIRED+NLOCALS+NREGS_SAVED>*8>+15>/16>*16>	; end of register save area
+RSA_OFFSET	=	<RSA_END-<NREGS_SAVED*8>>
+STACK_SIZE	=	<<<RSA_END+<NARGS_SAVED*8>+15>/16>*16>	; add room for argument save area (round up again)
+ARG_OFFSET	=	<STACK_SIZE-<NARGS_SAVED*8>>		; offset of r25, r16-r21 save area in stack frame
+
+;	Offsets from fp into stack frame for locals:
+GTM_LOCAL_1	=	16
+GTM_LOCAL_2	=	24
+GTM_LOCAL_3	=	32
+GTM_LOCAL_4	=	40
+GTM_LOCAL_5	=	48
+GTM_LOCAL_6	=	56
+GTM_LOCAL_7	=	64
+GTM_LOCAL_8	=	72
+GTM_LOCAL_9	=	80
+GTM_LOCAL_10	=	88
+GTM_LOCAL_11	=	96
+GTM_LOCAL_12	=	104
+GTM_LOCAL_13	=	112
+GTM_LOCAL_14	=	120
+GTM_LOCAL_15	=	128
+GTM_LOCAL_16	=	136
+
+GTM_LOCAL_SIZE	=	GTM_LOCAL_16+8
+
+;	Stack extension area for building argument lists for calling other routines and for internal use.
+ARG_AREA_SZ	=	256*8		; room for 256 arguments + 6 extra quadwords.  The VAX 'calls' instruction allows a maximum
+					; of 255 arguments and we pass the count as an argument sometimes, but because the AXP
+					; passes the first six arguments and the argument count in registers, we only need 250
+					; locations for argument-passing and the other 6 quadwords are available for internal
+					; GT.M use.
+
+;	Offsets from fp into stack extension area for internal use-quadwords (hidden locals):
+GTM_INTERNAL_1	=	-1*8
+GTM_INTERNAL_2	=	-2*8
+GTM_INTERNAL_3	=	-3*8
+GTM_INTERNAL_4	=	-4*8
+GTM_INTERNAL_5	=	-5*8
+GTM_INTERNAL_6	=	-6*8
+
+;	Here's the stack frame defined by base_frame and created by create_base_frame:
+
+
+;			+---------------------------------------+	<- caller's sp 		-----
+;			|	r21	(argument 6)		|\	  (Q-aligned)		  ^
+;			+---------------------------------------+ \				  |
+;			|	r20	(argument 5)		|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r19	(argument 4)		|  |				  |
+;			+---------------------------------------+  |	home area for arguments	  |
+;			|	r18	(argument 3)		|  |---	passed in registers; must |
+;			+---------------------------------------+  |	be contiguous with	  |
+;			|	r17	(argument 2)		|  |	caller's sp for varargs	  |
+;			+---------------------------------------+  |	to work			  |
+;			|	r16	(argument 1)		|  |				  |
+;			+---------------------------------------+ /				  |
+;			|	r25	(argument info/count)	|/				  |
+;			+---------------------------------------+				  |
+;			=	<probable alignment padding>	=				  |
+;	fp+RSA_END->	+---------------------------------------+	(Q-aligned)		  |
+;			|	fp				|\				  |
+;			+---------------------------------------+ \				  |
+;			|	r15				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r14				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r13				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r12				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r11				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r10				|  |				  |
+;			+---------------------------------------+  |---	saved registers		  |
+;			|	r9				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r8				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r7				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r6				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r5				|  |				  |
+;			+---------------------------------------+  |				  |
+;			|	r4				|  |				  |
+;			+---------------------------------------+  |				  |--- STACK_SIZE
+;			|	r3				|  |				  |
+;			+---------------------------------------+ /				  |
+;			|	r2				|/				  |
+;	fp+RSA_OFFSET-> +---------------------------------------+				  |
+;			=	<possible alignment padding>	=				  |
+;			+---------------------------------------+				  |
+;	fp+136		|	GTM_LOCAL_16			|				  |
+;			+---------------------------------------+				  |
+;	fp+128		|	GTM_LOCAL_15			|				  |
+;			+---------------------------------------+				  |
+;	fp+120		|	GTM_LOCAL_14			|				  |
+;			+---------------------------------------+				  |
+;	fp+112		|	GTM_LOCAL_13			|				  |
+;			+---------------------------------------+				  |
+;	fp+104		|	GTM_LOCAL_12			|				  |
+;			+---------------------------------------+				  |
+;	fp+96		|	GTM_LOCAL_11			|				  |
+;			+---------------------------------------+				  |
+;	fp+88		|	GTM_LOCAL_10			|				  |
+;			+---------------------------------------+				  |
+;	fp+80		|	GTM_LOCAL_9			|				  |
+;			+---------------------------------------+				  |
+;	fp+72		|	GTM_LOCAL_8			|				  |
+;			+---------------------------------------+				  |
+;	fp+64		|	GTM_LOCAL_7			|				  |
+;			+---------------------------------------+				  |
+;	fp+56		|	GTM_LOCAL_6			|				  |
+;			+---------------------------------------+				  |
+;	fp+48		|	GTM_LOCAL_5			|				  |
+;			+---------------------------------------+				  |
+;	fp+40		|	GTM_LOCAL_4			|				  |
+;			+---------------------------------------+				  |
+;	fp+32		|	GTM_LOCAL_3			|				  |
+;			+---------------------------------------+				  |
+;	fp+24		|	GTM_LOCAL_2			|				  |
+;			+---------------------------------------+				  |
+;	fp+16		|	GTM_LOCAL_1			|				  |
+;			+---------------------------------------+				  |
+;	fp+8		|	A(condition handler)		|	GTM$DYN_CH looks here	  |
+;			+---------------------------------------+	(0 => no handler)	  |
+;			|	r27 (PV)			|				  v
+;			+---------------------------------------+	<- fp (Q-aligned)	-----
+;	fp-8		|	GTM_INTERNAL_1			|\				  ^
+;			+---------------------------------------+ \				  |
+;	fp-16		|	GTM_INTERNAL_2			|  |				  |
+;			+---------------------------------------+  |				  |
+;	fp-24		|	GTM_INTERNAL_3			|  |				  |
+;			+---------------------------------------+  |---	internal-use quadwords	  |
+;	fp-32		|	GTM_INTERNAL_4			|  |	(hidden locals)		  |--- ARG_AREA_SZ
+;			+---------------------------------------+  |				  |
+;	fp-40		|	GTM_INTERNAL_5			|  |				  |
+;			+---------------------------------------+ /				  |
+;	fp-48		|	GTM_INTERNAL_6			|/				  |
+;			+---------------------------------------+				  |
+;			=	<argument build area>		=				  |
+;			|	(room for 250 arguments)	|				  |
+;			=					=				  V
+;	fp-ARG_AREA_SZ	+---------------------------------------+	<- sp (Q-aligned)	-----
+
+
+	.endm	base_frame

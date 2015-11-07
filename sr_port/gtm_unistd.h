@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,11 @@
 #define GTM_MAX_DIR_LEN		(PATH_MAX + 1) /* DIRECTORY + terminating '\0' */
 
 #define GETCWD(buffer, size, getcwd_res)			\
-	(getcwd_res = getcwd(buffer, size))
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC);		\
+	getcwd_res = getcwd(buffer, size);			\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC);		\
+}
 
 #endif
 

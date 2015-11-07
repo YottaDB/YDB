@@ -1,0 +1,27 @@
+	.title	OPP_COMMARG
+
+	G_MSF
+
+
+	$linkage_section
+a_frame_pointer:
+	.address  frame_pointer
+
+
+	$routine OPP_COMMARG, entry=OPP_COMMARG_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r3, (sp)
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+	$call	OP_COMMARG, args=<r16, r17>, set_arg_info=false, nonstandard=true
+	getframe
+
+	ldq	r3, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

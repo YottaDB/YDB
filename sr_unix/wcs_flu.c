@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +121,8 @@ error_def(ERR_WRITERSTUCK);
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
 				mechanism to kick in.*/									\
 				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
-				send_msg(VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart, DB_LEN_STR(gv_cur_region));	\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart,		\
+						DB_LEN_STR(gv_cur_region));						\
 				return FALSE;										\
 			}												\
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
@@ -129,9 +130,10 @@ error_def(ERR_WRITERSTUCK);
 				save_errno = errno;									\
 				if (1 == lcnt)										\
 				{											\
-					send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));		\
-					send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"),		\
-							CALLFROM, save_errno);						\
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,				\
+							DB_LEN_STR(gv_cur_region));					\
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+							RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);		\
 				} 											\
 			} else if (1 == shm_buf.shm_nattch)								\
 			{												\
@@ -146,11 +148,18 @@ error_def(ERR_WRITERSTUCK);
 	}														\
 }
 
+#define REL_CRIT_BEFORE_RETURN			\
+{						\
+	cnl->wcsflu_pid = 0;			\
+	if (!was_crit)				\
+		rel_crit(gv_cur_region);	\
+}
+
 boolean_t wcs_flu(uint4 options)
 {
 	bool			success, was_crit;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
-	boolean_t		flush_msync, speedup_nobefore, clean_dbsync;
+	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early;
 	unsigned int		lcnt, pass;
 	int			save_errno, wtstart_errno;
 	jnl_buffer_ptr_t	jb;
@@ -218,96 +227,44 @@ boolean_t wcs_flu(uint4 options)
 		if (SS_NORMAL != jnl_status)
 		{
 			assert(ERR_JNLFILOPN == jnl_status);
-			send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 			if (JNL_ENABLED(csd))
 			{	/* If journaling is still enabled, but we failed to open the journal file,
 				 * we don't want to continue processing.
 				 */
-				if (!was_crit)
-					rel_crit(gv_cur_region);
+				REL_CRIT_BEFORE_RETURN;
 				return FALSE;
 			}
 			jnl_enabled = FALSE;
 		}
 	}
-	if (jnl_enabled && speedup_nobefore && !csd->jnl_before_image)
-	{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for processing
-		 * to be speeded up in that case. Write only an epoch record, dont do heavyweight flush or fsync of db or jnl.
-		 * This will avoid bunching of IO at the epoch time like is the case with before-image journaling where this is
-		 * currently necessary for correctness. But for nobefore, there is no need to do this since no backward recovery
-		 * will be performed. Note that if db has journaling disabled OR enabled with before-image journaling, we skip
-		 * this portion of code and follow through to the rest of wcs_flu as if WCSFLU_SPEEDUP_NOBEFORE was not specified.
-		 */
-		assert(!jgbl.mur_extract);	/* We dont know of a case where journal extract calls us with skip_db_flush set */
-		assert(write_epoch);
-		assert(flush_hdr);
-		/* For Recovery/Rollback logic (even in case of NOBEFORE image journaling) to work correctly, the TN values in the
-		 * file header - jnl_eovtn and curr_tn - should be greater than eov_tn in the journal file header. Note: eov_tn
-		 * in the journal file header is the TN of the penultimate EPOCH and so should always be <= current database
-		 * transaction number. If this relation is not maintained by GT.M, Rollback/Recovery logic can issue JNLDBTNNOMATCH
-		 * error. To avoid this situation, flush and sync the DB file header.
-		 */
-		fileheader_sync(gv_cur_region);
-		assert(NULL != jpc);
-		if (0 == jpc->pini_addr)
-			jnl_put_jrt_pini(csa);
-		JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
-		if (!was_crit)
-			rel_crit(gv_cur_region);
-		return TRUE;
-	}
-	BG_TRACE_ANY(csa, total_buffer_flush);
-	INCR_GVSTATS_COUNTER(csa, cnl, n_db_flush, 1);
-	cnl->wcsflu_pid = process_id;
-	if (dba_mm == csd->acc_meth)
-	{
-#		if !defined(NO_MSYNC) && !defined(UNTARGETED_MSYNC)
-		SIGNAL_WRITERS_TO_STOP(cnl);	/* to stop all active writers */
-		WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXGETSPACEWAIT);
-		if (MAXGETSPACEWAIT == lcnt)
-		{
-			GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
-			assert(FALSE);
-			cnl->wcsflu_pid = 0;
-			if (!was_crit)
-				rel_crit(gv_cur_region);
-			return FALSE;
-		}
-		SIGNAL_WRITERS_TO_RESUME(cnl);
-		/* wcs_flu() is currently also called from wcs_clean_dbsync() which is interrupt driven code. We are about to
-		 * remap the database in interrupt code. Depending on where the interrupt occurred, all sorts of strange failures
-		 * can occur in the mainline code after the remap in interrupt code. Thankfully, this code is currently not
-		 * enabled by default (NO_MSYNC is the default) so we are fine. If ever this gets re-enabled, we need to
-		 * solve this problem by changing wcs_clean_dbsync not to call wcs_flu. The assert below is a note for this.
-		 */
-		assert(FALSE);
-		MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
-		/* MM MM_DBFILEXT_REMAP_IF_NEEDED can remap the file so reset csd which might no long point to the file */
-		csd = csa->hdr;
-		while (0 != csa->acc_meth.mm.mmblk_state->mmblkq_active.fl)
-		{
-			wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);
-			assert(ERR_GBLOFLOW != wtstart_errno);
-		}
-#		else
-		if (NO_MSYNC_ONLY((csd->freeze || flush_msync) && ) (csa->ti->last_mm_sync != csa->ti->curr_tn))
-		{
-			if (0 == msync((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]), MS_SYNC))
-				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
-			else
-			{
-				cnl->wcsflu_pid = 0;
-				if (!was_crit)
-					rel_crit(gv_cur_region);
-				return FALSE;
-			}
-		}
-#		endif
-	}
 	if (jnl_enabled)
 	{
-		jb = jpc->jnl_buff;
 		assert(SS_NORMAL == jnl_status);
+		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
+		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
+			 * processing to be speeded up in that case. Write only an epoch record, dont do heavyweight flush or fsync
+			 * of db.This will avoid bunching of IO at the epoch time like is the case with before-image journaling
+			 * where this is currently necessary for correctness. But for nobefore, there is no need to do this since
+			 * no backward recovery will be performed. Note that if db has journaling disabled OR enabled with before-
+			 * image journaling, we skip this portion of code and follow through to the rest of wcs_flu as if
+			 * WCSFLU_SPEEDUP_NOBEFORE was not specified.
+			 */
+			assert(!jgbl.mur_extract); /* Dont know of a case where journal extract calls us with skip_db_flush set */
+			assert(write_epoch);
+			assert(flush_hdr);
+			/* For Recovery/Rollback logic (even in case of NOBEFORE image journaling) to work correctly, the TN values
+			 * in the file header - jnl_eovtn and curr_tn - should be greater than eov_tn in the journal file header.
+			 * Note: eov_tn in the journal file header is the TN of the penultimate EPOCH and so should always be <=
+			 * current database transaction number. If this relation is not maintained by GT.M, Rollback/Recovery logic
+			 * can issue JNLDBTNNOMATCH error. To avoid this situation, flush and sync the DB file header.
+			 */
+			fileheader_sync(gv_cur_region);
+			assert(NULL != jpc);
+			if (0 == jpc->pini_addr)
+				jnl_put_jrt_pini(csa);
+			JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
+		}
 		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
 		if (fsync_dskaddr != jb->freeaddr)
 		{
@@ -315,30 +272,49 @@ boolean_t wcs_flu(uint4 options)
 			if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
-				if (!was_crit)
-					rel_crit(gv_cur_region);
-				send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"),
-					jnl_status);
+				REL_CRIT_BEFORE_RETURN;
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd), ERR_TEXT, 2,
+					RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
 				return FALSE;
 			}
 			assert(jb->freeaddr == jb->dskaddr);
 			jnl_fsync(gv_cur_region, jb->dskaddr);
 			assert(jb->fsync_dskaddr == jb->dskaddr);
 		}
+		if (return_early)
+		{
+			REL_CRIT_BEFORE_RETURN;
+			return TRUE;
+		}
+	}
+	BG_TRACE_ANY(csa, total_buffer_flush);
+	INCR_GVSTATS_COUNTER(csa, cnl, n_db_flush, 1);
+	cnl->wcsflu_pid = process_id;
+	if (dba_mm == csd->acc_meth)
+	{
+		if ((csd->freeze || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn))
+		{
+			if (0 == MSYNC((caddr_t)(MM_BASE_ADDR(csa)), (caddr_t)csa->db_addrs[1]))
+				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
+			else
+			{
+				REL_CRIT_BEFORE_RETURN;
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
+					RTS_ERROR_TEXT("Error during file msync during flush"));
+				return FALSE;
+			}
+		}
 	}
 	if (dba_mm != csd->acc_meth)
-	{
-		/* If not mupip rundown, wait for ALL active phase2 commits to complete first.
+	{	/* If not mupip rundown, wait for ALL active phase2 commits to complete first.
 		 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
 		 */
 		assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
 		if (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
 		{
 			assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number); /* see wcs_phase2_commit_wait.c */
-			if (!was_crit)
-				rel_crit(gv_cur_region);
-			return FALSE;	/* we expect the caller to trigger cache-recovery which will fix this counter */
+			REL_CRIT_BEFORE_RETURN;
+			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
 		/* Now that all concurrent commits are complete, wait for these dirty buffers to be flushed to disk.
 		 * Note that calling wcs_wtstart just once assumes that if we ask it to flush all the buffers, it will.
@@ -393,9 +369,9 @@ boolean_t wcs_flu(uint4 options)
 						if ((to_wait == csd->wait_disk_space)
 						    || (0 == to_wait % to_msg))
 						{
-							send_msg(VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
 								 process_id, to_wait, DB_LEN_STR(gv_cur_region), wtstart_errno);
-							gtm_putmsg(VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
 								   process_id, to_wait, DB_LEN_STR(gv_cur_region), wtstart_errno);
 						}
 						hiber_start(1000);
@@ -406,8 +382,10 @@ boolean_t wcs_flu(uint4 options)
 					}
 					if ((to_wait <= 0) && (cnl->wcs_active_lvl || crq->fl))
 					{	/* not enough space became available after the wait */
-						send_msg(VARLSTCNT(5) ERR_OUTOFSPACE, 3, DB_LEN_STR(gv_cur_region), process_id);
-						rts_error(VARLSTCNT(5) ERR_OUTOFSPACE, 3, DB_LEN_STR(gv_cur_region), process_id);
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
+								DB_LEN_STR(gv_cur_region), process_id);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
+								DB_LEN_STR(gv_cur_region), process_id);
 					}
 				} else
 				{	/* There are four different cases we know of currently when this is possible:
@@ -436,11 +414,12 @@ boolean_t wcs_flu(uint4 options)
 					{
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
-						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_wcs_flu1"),
-								 process_id, &csa->ti->curr_tn, DB_LEN_STR(gv_cur_region));
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+								LEN_AND_LIT("wcb_wcs_flu1"), process_id, &csa->ti->curr_tn,
+								DB_LEN_STR(gv_cur_region));
 					} else
 					{	/* Encountered I/O error. Transfer control to error trap */
-						rts_error(VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(gv_cur_region),
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(gv_cur_region),
 								DB_LEN_STR(gv_cur_region), wtstart_errno);
 					}
 					if (in_commit)
@@ -448,6 +427,7 @@ boolean_t wcs_flu(uint4 options)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
 						assert(was_crit);	/* so dont need to rel_crit */
+						cnl->wcsflu_pid = 0;
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
@@ -466,10 +446,9 @@ boolean_t wcs_flu(uint4 options)
 							if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
 							{
 								assert(NOJNL == jpc->channel); /* jnl file lost */
-								if (!was_crit)
-									rel_crit(gv_cur_region);
-								send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-									ERR_TEXT, 2,
+								REL_CRIT_BEFORE_RETURN;
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
+									JNL_LEN_STR(csd), ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
 									jnl_status);
 								return FALSE;
@@ -487,9 +466,7 @@ boolean_t wcs_flu(uint4 options)
 					WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
 					if (cnl->wcs_active_lvl || crq->fl)
 					{
-						cnl->wcsflu_pid = 0;
-						if (!was_crit)
-							rel_crit(gv_cur_region);
+						REL_CRIT_BEFORE_RETURN;
 						GTMASSERT;
 					}
 				}
@@ -521,9 +498,7 @@ boolean_t wcs_flu(uint4 options)
 			{
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
-				cnl->wcsflu_pid = 0;
-				if (!was_crit)
-					rel_crit(gv_cur_region);
+				REL_CRIT_BEFORE_RETURN;
 				GTMASSERT;
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
@@ -547,9 +522,7 @@ boolean_t wcs_flu(uint4 options)
 		}
 	}
 	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
-	cnl->wcsflu_pid = 0;
-	if (!was_crit)
-		rel_crit(gv_cur_region);
+	REL_CRIT_BEFORE_RETURN;
 	/* sync the epoch record in the journal if needed. */
 	if (jnl_enabled && write_epoch && sync_epoch && (csa->ti->curr_tn == csa->ti->early_tn))
 	{	/* Note that if we are in the midst of committing and came here through a bizarre
@@ -566,34 +539,11 @@ boolean_t wcs_flu(uint4 options)
 			DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog, save_errno);
 			if (0 != save_errno)
 			{
-				send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 				assert(FALSE);	/* should not come here as the rts_error above should not return */
 				return FALSE;
 			}
-		} else
-		{
-#ifndef NO_MSYNC
-#ifndef TARGETED_MSYNC
-			DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog, save_errno);
-			if (0 != save_errno)
-			{
-				send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				assert(FALSE);	/* should not come here as the rts_error above should not return */
-				return FALSE;
-			}
-#else
-			if (-1 == msync((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]), MS_SYNC))
-			{
-				save_errno = errno;
-				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-					  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file msync during flush"), save_errno);
-				assert(FALSE);	/* should not come here as the rts_error above should not return */
-				return FALSE;
-			}
-#endif
-#endif
 		}
 	}
 	return TRUE;

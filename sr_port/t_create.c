@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,15 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "t_create.h"
+
+#define TP_ALLOCATION_CLUE_INCREMENT	1	/* This is the default value. Defined below (under a #ifdef) is another value
+						 * Enable below #ifdef/#endif block if you want that value instead.
+						 */
+#ifdef TP_ALLOCATION_CLUE_BUMP_BY_512
+#define	TP_ALLOCATION_CLUE_INCREMENT	512	/* Change this to some other number if you want a different bump to the
+						 * tp allocation clue each time it is used.
+						 */
+#endif
 
 GBLREF	cw_set_element		cw_set[];
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -61,11 +70,15 @@ block_index t_create (
 	{
 		if (!tp_allocation_clue)
 		{
-			tp_allocation_clue = gtm_tp_allocation_clue + 1;
-			hint = tp_allocation_clue;
+			tp_allocation_clue = gtm_tp_allocation_clue + 1; /* + 1 so we dont start out with 0 value for "hint" */
+			hint = tp_allocation_clue;			 /* this is copied over to cse->blk which is asserted
+									  * in gvcst_put as never being 0.
+									  */
 		} else
 		{
-			hint = ++tp_allocation_clue;
+			tp_allocation_clue += TP_ALLOCATION_CLUE_INCREMENT;
+			hint = tp_allocation_clue;
+			/* What if hint becomes greater than total_blks. Should we wrap back to 0? */
 			if (tp_allocation_clue < 0)
 				GTMASSERT;
 		}
@@ -73,9 +86,9 @@ block_index t_create (
 		assert(gv_target);
 		cse->blk_target = gv_target;
 	}
-
 	cse->mode = gds_t_create;
 	cse->blk_checksum = 0;
+	assert(hint);	/* various callers (particularly gvcst_put) rely on gds_t_create cse to have a non-zero "blk" */
 	cse->blk = hint;
 	cse->upd_addr = upd_addr;
 	cse->ins_off = ins_off;

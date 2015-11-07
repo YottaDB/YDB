@@ -1,0 +1,231 @@
+	.title	gtm$fgncall perform calls from foreign languages to MUMPS
+
+
+	G_MSF
+	base_frame
+
+
+MAXARGS		=	32		; maximum number of arguments allowed
+
+;	Offsets from frame pointer into stack extension area.
+output		=	-8
+label		=	output - 8
+routine		=	label - 8
+argcnt		=	routine - 8
+arglist		=	argcnt - 8
+save_sp		=	arglist - 8
+
+end		=	save_sp - 8
+
+ARG_COPY	=	end - <<MAXARGS+1>*4>	; argument copy area (one extra space for argument count)
+
+
+;	Offsets from stack pointer into stack extension area.
+
+args		=	0		; address of local array [0:MAXARGS] into which fgn_parms builds its argument list
+retval		=	MAXARGS*4	; address of last element in the array into which fgn_parms puts return value address
+
+
+;	Invoked via entry created by MUMPS_BINDING macro.
+;
+;	Arguments:
+;		r16	address of MUMPS routine
+;		r17	address of MUMPS label
+;		r18	does MUMPS routine return a value (is it a function)? 1 => yes, 0 => no
+;		r19	address of argument list (starting with argument count)
+;		r20	= 0, if the MUMPS label has been resolved by VMS linker
+;			= length of the MUMPS label, if it hasn't been resolved by VMS linker
+
+;	The code PSECT must have the MIX attribute in order to contain data.
+$CODE$	=	"GTM$FGNCALL,QUAD,PIC,CON,REL,LCL,SHR,EXE,RD,MIX,NOWRT"
+
+	$routine	name=gtm$fgncall, entry=gtm$fgncall_ca, kind=stack, -
+			saved_regs=<%string(base_frame_regs)>, -
+			base_reg_is_fp=true, data_section_pointer=true -
+			rsa_offset=RSA_OFFSET, size=STACK_SIZE, -
+			standard_prologue=false, handler=GTM$DYN_CH, synch_exceptions=true
+
+	.if	ne,$SIZE,STACK_SIZE
+		.error "The stack size computed by $routine (%integer($SIZE)) differs from that defined in the -
+base_frame macro (%integer(STACK_SIZE))."
+	.endc
+
+	$linkage_section
+
+A_line1:		.address	line1
+A_var_on_cstack_ptr:	.address	var_on_cstack_ptr
+
+L_ERR_GTMCHECK:	.long		ERR_GTMCHECK
+
+	$data_section
+literal_table:	.asciz	"$FGNFNC"
+
+	$code_section
+
+jsb:
+	.base	r27, $ls
+
+;	the no-ops were introduced so that this code remains the same size
+;	at that of a generated mumps object file.
+	nop
+	nop
+	jsr	r0, (r0)	; gtm$main sets up the actual frame
+
+	$end_prologue
+
+	.if	ne,<.-$cs>,mrt$src_len
+		.error	"The dummy routine header jsb size is incorrect; please check it against g_msf.max."
+	.endc
+
+src_full_name:
+	.long		0			; source file name length
+	address_32	0			; source file name
+routine_name:
+	.long		7			; routine name length (sizeof("$FGNFNC") - 1)
+	address_32	$ds			; routine name (dummy)
+vartab_ptr:
+	.long		label_table - $cs	; variable table
+vartab_len:
+	.word		0			; variable table length
+	.word		0			; padding
+labtab_ptr:
+	.long		label_table - $cs	; label table
+labtab_len:
+	.word		1			; label table length
+	.word		0			; padding
+lnrtab_ptr:
+	.long		line_table - $cs	; line table
+lnrtab_len:
+	.word		2			; line table length
+	.word		0			; padding
+ptext_ptr:
+	.long		gtm$fgncode - $cs	; pointer to start of actual code
+checksum:
+	.long		0
+compiler_qlf:
+	.long		0
+old_rhead_ptr:
+	address_32	0
+current_rhead_ptr:
+	address_32	0
+temp_mvals:
+	.word		0
+temp_size:
+	.word		0
+linkage_ptr:
+	address_32	$ls
+literal_ptr:
+	address_32	$ds
+
+;	End of GT.M routine header.
+	.if	ne,<.-jsb>,mrt$hdr_size
+		.error	"The dummy routine header size is incorrect; please check it against g_msf.max."
+	.endc
+
+gtm$fgncode:
+;	gtm$main, among other things, creates a GT.M MUMPS stack frame for this routine;
+;	for which this is the entry point to which control is transferred by a
+;	"getframe/ret	r26" sequence.
+
+	.base	r13, $ls	; also set up by getframe/ret sequence
+
+;	Reset var_on_cstack_ptr for the new M environment
+	ldq	r28, A_var_on_cstack_ptr
+	stl	r31, (r28)	; var_on_cstack_ptr = NULL;
+
+;	Save the current error trap and NEW it before any error could possibly occur.
+	$call	gtm_savetraps, args=<>, set_arg_info=false
+
+;	Restore argument info and argument registers (saved here by gtm$main).
+	ldq	r20, $SIZE-16(fp)	; MUMPS label length (0 if resolved by LINK)
+	beq	r20, resolved
+	$call	fgn_resolve_lab, args=<$SIZE-48(fp)/Q, r20, $SIZE-40(fp)/Q>
+	stq	r0,  $SIZE-40(fp)
+resolved:
+	ldq	r16, $SIZE-48(fp)	; A(MUMPS routine)
+	ldq	r17, $SIZE-40(fp)	; A(MUMPS label)
+	ldq	r18, $SIZE-32(fp)	; output?
+	ldq	r19, $SIZE-24(fp)	; A(arg list to interface)
+
+	stq	r16, routine(fp)
+	stq	r17, label(fp)
+	stq	r18, output(fp)
+	stq	r19, arglist(fp)
+	stq	sp,  save_sp(fp)
+	ldq	r28, A_line1
+	stl	r28, msf$mpc_off(r12)
+line1:	ldq	r0, arglist(fp)	; original argument list
+	lda	r1, ARG_COPY(fp)
+	ldl	r22, (r0)	; number of arguments in arglist
+
+; 	Copy arguments from original arglist to array of longs (or address_32's).
+1$:	ldq	r28, (r0)
+	stl	r28, (r1)
+	lda	r0, 8(r0)
+	lda	r1, 4(r1)
+	subq	r22, 1, r22
+	bge	r22, 1$		; one extra iteration to include the argument count
+	$call	fgn_parms, args=<output(fp), sp, MAXARGS/A, ARG_COPY(fp)/A>
+	stq	r0, argcnt(fp)
+	bgt	r0, 5$		; if any arguments
+	ldq	r28, output(fp)
+	bgt	r28, 20$	; if it's a function
+	$call	op_extcall, args=<routine(fp), label(fp)>
+	br	after_call
+
+;	Extend stack and copy arguments returned from fgn_parms to extension.
+5$:	; Put first argument into appropriate register, then deal with rest.
+	ldl	r21, (sp)
+	mov	#MAXARGS+1, r22	; copy entire array, including extra space at end for retval
+	lda	r0, 4(sp)	; start of arguments that don't fit into argument registers
+	addq	r22, 1, r23	; round up to even double-quadword boundary
+	bic	r23, 1, r23
+	subq	r31, r23, r28	; negate because s8subq works backwards
+	s8addq	r28, sp, sp
+	mov	sp, r1
+10$:	ldl	r28, (r0)
+	stq	r28, (r1)
+	lda	r0, 4(r0)
+	lda	r1, 8(r1)
+	subq	r22, 1, r22
+	bgt	r22, 10$
+20$:	ldq	r22, save_sp(fp)
+	$call	op_extexfun, args=<routine(fp), label(fp), retval(r22)/L, 0/A, argcnt(fp), r21>, set_arg_info=false
+after_call:
+	ldq	sp,  save_sp(fp)
+	ldl	r16, retval(sp)
+	beq	r16, gohome
+	$call	op_exfunret, args=<r16>
+	ldq	r17, arglist(fp)
+	ldq	r17, 8(r17)
+	ldl	r16, retval(sp)
+	$call	mval2desc, args=<r16, r17>
+gohome:
+;	Leaving new M environment; reset var_on_cstack_ptr for the old M environment
+	ldq	r28, A_var_on_cstack_ptr
+	stl	r31, (r28)	; var_on_cstack_ptr = NULL;
+
+	$begin_epilogue
+	$call	opp_ret, set_arg_info=false
+
+;	shouldn't return
+	$call	lib$signal, args=<L_ERR_GTMCHECK/L>
+;	also shouldn't return
+
+
+;	Standard variable (null), label, and line tables for end of GT.M object module.
+
+;	Variable table would go here if there were one.
+
+label_table:	; initialize the lab_tabent entry
+	.long		0
+	address_32	0
+	.long		lte - $cs
+
+line_table:
+	.long	gtm$fgncode - $cs	; line 0
+lte:	.long	line1 - $cs		; line 1
+
+	$end_routine	name=gtm$fgncall
+
+	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,5 @@
 #define cancel_timer		GTM_PREFIX(cancel_timer)
 #define hiber_start		GTM_PREFIX(hiber_start)
 #define hiber_start_wait_any	GTM_PREFIX(hiber_start_wait_any)
-#define start_timer		GTM_PREFIX(start_timer)
 
 #endif /* MDEFSA_included */

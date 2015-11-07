@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 #include "lke_getcli.h"
+#include "gtm_ctype.h" /* Needed for TOUPPER() */
 
 /* This routine performs the necessary transformation of the LOCK keys passed in
  * from the CLI layer and produces a canonical formatted key. This routine
@@ -30,7 +31,8 @@ int lke_getki(char* src, int srclen, char* outbuff)
 {
 	char	*inptr, *nextptr, *intop, *outptr, *tmpptr;
 	mval	subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-	char	one_lockbuf[MAX_ZWR_KEY_SZ + 1];
+	char	one_lockbuf[MAX_ZWR_KEY_SZ + 1], *one_char;
+	char	*valid_char = "HAR"; /* This is used for validating characters following $ZCH and $C */
 
 	if (srclen > 1 && '"' == src[0] && '"' == src[srclen - 1])
 	{
@@ -55,9 +57,37 @@ int lke_getki(char* src, int srclen, char* outbuff)
 	outptr += inptr - src;
 	for (intop = src + srclen; inptr < intop; inptr = nextptr)
 	{
-		if ('$' == *inptr)
-		{ /* the entire subscript is within $C() or $ZCH() */
-			*outptr++ = *inptr++;
+		if (')' == *inptr) /* Catches incomplete lists or string concatenations */
+			return -1;
+		else if ('$' == *inptr)
+		{	/* the entire subscript is within $C() or $ZCH */
+			*outptr++ = '$';
+			inptr++;
+			if (('z' == *inptr) || ('Z' == *inptr))
+			{	/* Very likely $ZCHAR() */
+				*outptr++ = 'Z';
+				inptr++;
+			}
+			if (('c' == *inptr) || ('C' == *inptr))
+			{
+				*outptr++ = 'C';
+				inptr++;
+				if (('Z' == *(outptr - 2)) && (('h' == *inptr) || ('H' == *inptr)))
+				{
+					*outptr++ ='H';
+					inptr++;
+					one_char = valid_char + 1;
+				}
+				else
+					one_char = valid_char;
+				/* Validate/skip letters following C so that we allow C, CH, CHA, CHAR */
+				while (('\0' != *one_char) && ('(' != *inptr))
+					if (TOUPPER(*inptr++) != *one_char++)
+						return -1;
+				if ('(' != *inptr)
+					return -1;
+			} else	/* We don't support anything other than $C() or $ZCH in locks */
+				return -1;
 			nextptr = memchr(inptr, ')', intop - inptr);
 			if (NULL == nextptr)
 				return -1;
@@ -65,14 +95,35 @@ int lke_getki(char* src, int srclen, char* outbuff)
 			memcpy(outptr, inptr, nextptr - inptr);
 			outptr += nextptr - inptr;
 		} else
-		{ /* unquoted string or a number */
-			nextptr = memchr(inptr, ',', intop - inptr);
-			if (NULL == nextptr)
-			{
-				nextptr = intop - 1;;
-				if (')' != *nextptr)
-					return -1;
+		{
+			if ('"' == *inptr) /* Is this a quoted string? */
+			{	/*Process character by character because '_' or ',' can be used within the quotes. */
+				for (nextptr = inptr + 1; nextptr < intop; nextptr++)
+					if ('"' == *nextptr && (nextptr + 1 < intop))
+					{
+						nextptr++;
+						if ('"' != *nextptr)
+							/* This is not a two double-quote so terminate. */
+							break;
+					}
+			} else
+			{ /* Fast-forward to the next separator */
+				nextptr = memchr(inptr, '_', intop - inptr);
+				if (NULL == nextptr)
+				{ /* Not a string concatineated with $C() or $ZCH() */
+					nextptr = memchr(inptr, ',', intop - inptr);
+					if (NULL == nextptr)
+						nextptr = intop - 1;
+				}
 			}
+			if (intop - 1 == nextptr)
+			{ /* If it reached to the end, it had better closed the paran */
+			    if (')' != *nextptr)
+				    return -1;
+			}
+			else if ((',' != *nextptr) && ('_' != *nextptr))
+				/* If we are not at the end, it must be a separator*/
+				return -1;
 			subsc.str.len = INTCAST(nextptr - inptr);
 			subsc.str.addr = inptr;
 			if (val_iscan(&subsc))
@@ -83,13 +134,9 @@ int lke_getki(char* src, int srclen, char* outbuff)
 			{
 				if (nextptr - 1  > inptr  && '"' == *inptr && '"' == *(nextptr - 1))
 				{ /* The string is already enclosed by a pair of quotes */
-					*outptr++ = *inptr++;	/* initial quote */
-					for (; inptr < nextptr - 1; *outptr++ = *inptr++)
-					{
-						if ('"' == *inptr && (++inptr >= nextptr - 1 || *inptr != '"'))
-							return -1;	/* invalid (unescaped) quote within a quoted string */
-					}
-					*outptr++ = *inptr++;	/* final quote */
+					memcpy(outptr, inptr, nextptr - inptr);
+					outptr += nextptr - inptr;
+					inptr += nextptr - inptr;
 				} else
 				{ /* unquoted string: add quotes */
 					*outptr++ = '"';
@@ -98,12 +145,17 @@ int lke_getki(char* src, int srclen, char* outbuff)
 						*outptr++ = *tmpptr;
 						if ('"' == *tmpptr)
 							*outptr++ = '"';
+						if ('_' == *tmpptr)
+						{
+							*--outptr;
+							nextptr = tmpptr;
+						}
 					}
 					*outptr++ = '"';
 				}
 			}
 		}
-		if (',' != *nextptr && ')' != *nextptr)
+		if ((',' != *nextptr) && (')' != *nextptr) && ('_' != *nextptr))
 			return -1;
 		*outptr++ = *nextptr++;
 	}

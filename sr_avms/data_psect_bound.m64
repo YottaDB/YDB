@@ -1,0 +1,34 @@
+	.title	data_psect_bound	define boundaries of $DATA PSECT's
+	G_MSF
+
+	.psect $DAT9ZZZZZZZZZZ	pic,ovr,rel,gbl,noshr,noexe,rd,wrt,novec,long
+datastrt:
+
+	.psect $DATAAAAAAAAAAA	pic,ovr,rel,gbl,noshr,noexe,rd,wrt,novec,long
+dataend:
+
+	$linkage_section
+A_datastrt:
+	.address	datastrt
+A_dataend:
+	.address	dataend
+
+;	data_psect_bound
+;
+;		arg1	address of pointer to receive address of datastrt
+;		arg2	address of pointer to receive address of dataend
+
+	$routine	name=data_psect_bound,entry=data_psect_bound_ca,kind=null
+
+	.base	r27, $ls
+
+	ldq	r28, A_datastrt
+	ldq	r22, A_dataend
+	stl	r28, (r16)
+	stl	r22, (r17)
+
+	ret	r26
+
+	$end_routine	name=data_psect_bound
+
+	.end

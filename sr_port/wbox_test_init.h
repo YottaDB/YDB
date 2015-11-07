@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,16 @@ typedef enum {
 						 *      wcs_get_space to be called before committing an update */
 	/* HugeTLB tests */
 	WBTEST_HUGETLB_DLOPEN,			/* 86 : Fail dlopen(libhugetlbfs.so) */
-	WBTEST_HUGETLB_DLSYM			/* 87 : Fail dlsym(shmget) */
+	WBTEST_HUGETLB_DLSYM,			/* 87 : Fail dlsym(shmget) */
+	WBTEST_FSYNC_SYSCALL_FAIL,		/* 88 : Force error from fsync() */
+	WBTEST_HUGE_ALLOC,			/* 89 : Force ZALLOCSTOR, ZREALSTOR, and ZUSEDSTOR to be values exceeding
+						 *	the capacity of four-byte ints. */
+	WBTEST_MMAP_SYSCALL_FAIL,		/* 90 : Force mmap() to return an error */
+	WBTEST_TAMPER_HOSTNAME,			/* 91 : Change host name in db_init to call condition handler */
+	WBTEST_RECOVER_ENOSPC			/* 92 : Cause ENOSPC error on Xth write to test return status on error */
+	/* Note: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
+	 * whenever applicable
+	 */
 } wbtest_code_t;
 
 #ifdef DEBUG
@@ -144,6 +153,7 @@ typedef enum {
 #endif
 
 #ifdef DEBUG
+#define WBTEST_ENABLED(WBTEST_NUMBER)	(gtm_white_box_test_case_enabled && (WBTEST_NUMBER == gtm_white_box_test_case_number))
 #define ENABLE_WBTEST_ABANDONEDKILL									\
 {													\
 	int	sleep_counter;										\
@@ -161,9 +171,18 @@ typedef enum {
 #define WB_PHASE1_COMMIT_ERR	(WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number)
 #define WB_PHASE2_COMMIT_ERR	(WBTEST_BG_UPDATE_PHASE2FAIL == gtm_white_box_test_case_number)
 #define WB_COMMIT_ERR_ENABLED	(WB_PHASE1_COMMIT_ERR || WB_PHASE2_COMMIT_ERR)	/* convoluted definition to simplify usage */
+#define WBTEST_ASSIGN_ONLY(WBTEST_NUMBER, LHS, RHS)							\
+{													\
+	if (WBTEST_ENABLED(WBTEST_NUMBER))								\
+	{												\
+		LHS = RHS;										\
+	}												\
+}
 #else
+#define WBTEST_ENABLED(WBTEST_NUMBER)	FALSE
 #define ENABLE_WBTEST_ABANDONEDKILL
 #define WB_COMMIT_ERR_ENABLED
+#define WBTEST_ASSIGN_ONLY(WBTEST_NUMBER, LHS, RHS)
 #endif
 
 #endif

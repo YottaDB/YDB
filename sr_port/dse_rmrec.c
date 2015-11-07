@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,6 @@ GBLREF block_id 	patch_curr_blk;
 GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned short 	patch_comp_count;
 GBLREF cw_set_element   cw_set[];
-GBLREF unsigned char	*non_tp_jfb_buff_ptr;
 
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
@@ -145,7 +144,7 @@ void dse_rmrec(void)
 				}
 				t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 					((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-				BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
+				BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
 				t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 				free(lbp);
 				return;
@@ -195,7 +194,7 @@ void dse_rmrec(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
+		BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 		free(lbp);
 		return;

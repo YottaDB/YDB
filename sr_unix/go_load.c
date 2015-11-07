@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,11 +39,12 @@
 #include <rtnhdr.h>
 #include "gv_trigger.h"
 
-GBLREF bool	mupip_error_occurred;
-GBLREF bool	mu_ctrly_occurred;
-GBLREF bool	mu_ctrlc_occurred;
-GBLREF spdesc	stringpool;
-GBLREF gv_key	*gv_currkey;
+GBLREF bool		mupip_error_occurred;
+GBLREF bool		mu_ctrly_occurred;
+GBLREF bool		mu_ctrlc_occurred;
+GBLREF spdesc		stringpool;
+GBLREF gv_key		*gv_currkey;
+GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_LOADCTRLY);
 error_def(ERR_LOADEOF);
@@ -63,12 +64,11 @@ error_def(ERR_TRIGDATAIGNORE);
 	 */															\
 	if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !hasht_ignored)					\
 	{															\
-		gtm_putmsg(VARLSTCNT(4) ERR_TRIGDATAIGNORE, 2, KEYLENGTH, PTR);							\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGDATAIGNORE, 2, KEYLENGTH, PTR);				\
 		hasht_ignored = TRUE;												\
 	}															\
 }
 
-static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 
 void go_load(uint4 begin, uint4 end)
@@ -103,9 +103,9 @@ void go_load(uint4 begin, uint4 end)
 		if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
 		{ /* extract CHSET doesn't match $ZCHSET */
 			if (utf8_extract)
-				gtm_putmsg(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
 			else
-				gtm_putmsg(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 			mupip_error_occurred = TRUE;
 			free(rec_buff);
 			return;
@@ -131,7 +131,7 @@ void go_load(uint4 begin, uint4 end)
 		len = file_input_get(&ptr);
 		if (len < 0)	/* The IO device has signalled an end of file */
 		{
-			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			mupip_error_occurred = TRUE;
 		}
 		if (mupip_error_occurred)
@@ -155,7 +155,7 @@ void go_load(uint4 begin, uint4 end)
 		if (mu_ctrlc_occurred)
 		{
 			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
-				LEN_AND_LIT(gt_lit), key_count, max_subsc_len, max_data_len);
+				       LEN_AND_LIT("LOAD TOTAL"), key_count, max_subsc_len, max_data_len);
 			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? iter : 0);
 			mu_gvis();
 			util_out_print(0, TRUE);
@@ -287,7 +287,7 @@ void go_load(uint4 begin, uint4 end)
 	file_input_close();
 	if (mu_ctrly_occurred)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_LOADCTRLY);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_LOADCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL",TRUE,key_count,max_subsc_len,

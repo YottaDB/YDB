@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,6 @@ error_def(ERR_TEXT);
 
 CONDITION_HANDLER(iob_io_error)
 {
-	int	dummy1, dummy2;
 	char 	s[80];
 	char 	*fgets_res;
 
@@ -117,7 +116,7 @@ CONDITION_HANDLER(iob_io_error)
 		CONTINUE;
 	}
 	PRN_ERROR;
-	UNWIND(dummy1, dummy2);
+	UNWIND(NULL, NULL);
 }
 
 
@@ -128,9 +127,8 @@ void mupip_restore(void)
 	inc_list_struct 	*ptr;
 	inc_header		inhead;
 	sgmnt_data		old_data;
-	short			iosb[4];
 	unsigned short		n_len;
-	int4			status, rsize, size, temp, save_errno, old_start_vbn;
+	int4			status, rsize, temp, save_errno, old_start_vbn;
 	uint4			rest_blks, totblks;
 	trans_num		curr_tn;
 	uint4			ii;
@@ -139,7 +137,7 @@ void mupip_restore(void)
 	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
-	uint4			old_blk_size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
+	uint4			old_blk_size, size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
 	off_t			new_eof, offset;
 #	ifdef GTM_TRUNCATE
 	off_t			new_size;
@@ -152,7 +150,6 @@ void mupip_restore(void)
 	backup_type		type;
 	unsigned short		port;
 	int4			timeout, cut, match;
-	char			debug_info[256];
 	void			(*common_read)();
 	char			*errptr;
 	pid_t			waitpid_res;
@@ -424,7 +421,7 @@ void mupip_restore(void)
 					util_out_print("  Current input file is !AD with !UL (!XL hex) total blocks!/",
 						TRUE, ptr->input_file.len, ptr->input_file.addr,
 						inhead.db_total_blks, inhead.db_total_blks);
-					gtm_putmsg(VARLSTCNT(1) status);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
 				/* --- initialize all new bitmaps, just in case they are not touched later --- */
@@ -446,7 +443,7 @@ void mupip_restore(void)
 						{
 							util_out_print("Aborting restore!/", TRUE);
 							util_out_print("Bitmap 0x!XL initialization error!", TRUE, ii);
-							gtm_putmsg(VARLSTCNT(1) status);
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 							free(newmap);
 							CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 						}
@@ -697,7 +694,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 		 */
 		else if ((EINTR != errno) && (EAGAIN != errno))
 		{
-			gtm_putmsg(VARLSTCNT(1) errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 				WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
@@ -747,7 +744,7 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 		}
 		if ((status < 0) && (errno != EINTR))
 		{
-			gtm_putmsg(VARLSTCNT(1) errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			restore_read_errno = errno;
 			break;

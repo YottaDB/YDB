@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -614,11 +614,7 @@ tn_restart:
 		dbg_trace_array[dbg_num_iters].retry_line = 0;
 		split_targ = NULL;
 	)
-	/* If MM and file extension occurred, reset csd to cs_data to avoid out-of-date value. If BG we dont need the reset
-	 * but if checks are costlier than unconditional sets in a pipelined architecture so we choose not to do the if.
-	 */
-	assert(is_mm || (csd == cs_data));
-	csd = cs_data;
+	assert(csd == cs_data);	/* To ensure they are the same even if MM extensions happened in between */
 #	ifdef GTM_TRIGGER
 	gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
 	assert(!ztval_gvcst_put_redo || IS_PTR_INSIDE_M_STACK(val));

@@ -1,6 +1,8 @@
 gtm_main
 gtm_init
+gtm_jinit
 gtm_ci
+gtm_cij
 gtm_cip
 gtm_exit
 gtm_zstatus
@@ -13,3 +15,4 @@ gtm_free
 gtm_filename_to_id
 gtm_is_file_identical
 gtm_xcfileid_free
+gtm_is_main_thread

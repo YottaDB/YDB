@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 		jrec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)jrec, SIZEOF(struct_jrec_null));
 
 #	ifdef GTM_CRYPT
-	if (REPL_ALLOWED(csa))
+	if (csa->hdr->is_encrypted && REPL_ALLOWED(csa))
 	{
 		jrec_alt = (struct_jrec_upd *)jfb->alt_buff;
 		jrec_alt->prefix = jrec->prefix;

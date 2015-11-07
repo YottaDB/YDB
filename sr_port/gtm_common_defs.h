@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,61 +11,73 @@
 #ifndef GTM_COMMON_DEFS_H
 #define GTM_COMMON_DEFS_H
 
-#ifndef __vms
-# define readonly
-# define GBLDEF
-# define GBLREF		extern
-# define LITDEF		const
-# define LITREF		extern const
-# define error_def(x)	LITREF int x
+#if defined(__ia64) || defined(__x86_64__) || defined(__sparc) || defined(__s390__) || defined (_AIX)
+#  define GTM64
+#endif
+
+#ifdef GTM64
+#  define GTM64_ONLY(X)		X
+#  define NON_GTM64_ONLY(X)
 #else
-# ifdef __cplusplus
+#  define GTM64_ONLY(X)
+#  define NON_GTM64_ONLY(X)	X
+#endif
+
+#ifndef __vms
+#  define readonly
 #  define GBLDEF
-#  define GBLREF extern
-#  define LITDEF const
-#  define LITREF extern const
-# else
-#  define GBLDEF globaldef
-#  define GBLREF globalref
-#  define LITDEF const globaldef
-#  define LITREF const globalref
-# endif
+#  define GBLREF		extern
+#  define LITDEF		const
+#  define LITREF		extern const
+#  define error_def(x)		LITREF int x
+#else
+#  ifdef __cplusplus
+#    define GBLDEF
+#    define GBLREF		extern
+#    define LITDEF		const
+#    define LITREF		extern const
+#  else
+#    define GBLDEF		globaldef
+#    define GBLREF		globalref
+#    define LITDEF		const globaldef
+#    define LITREF		const globalref
+#  endif
 #endif
 /* Use GBLDEF to define STATICDEF for variables and STATICFNDEF, STATICFNDCL for functions. Define STATICDEF to "GBLDEF". This way
  * we know such usages are intended to be "static" but yet can effectively debug these variables since they are externally
  * visible. For functions, do not use the "static" keyword to make them externally visible. Note that a STATICREF for variables
  * does not make sense since statics are supposed to be used only within one module.
  */
-#define	STATICDEF	GBLDEF
-#define	STATICFNDCL	extern
+#define	STATICDEF		GBLDEF
+#define	STATICFNDCL		extern
 #define	STATICFNDEF
 
 #ifndef TRUE
-#	define TRUE		 1
+#  define TRUE			1
 #endif
 #ifndef FALSE
-#	define FALSE		 0
+#  define FALSE			0
 #endif
 #ifndef NULL
-#	define NULL		((void *) 0)
+#  define NULL			((void *) 0)
 #endif
 
 #if defined(__ia64) || defined(__MVS__)
-#	define INTCAST(X) ((int)(X))
-#	define UINTCAST(X) ((uint4)(X))
-#	define STRLEN(X) ((int)(strlen(X)))
-#	define USTRLEN(X) ((unsigned int)(strlen(X)))
-#	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
+#  define INTCAST(X)		((int)(X))
+#  define UINTCAST(X)		((uint4)(X))
+#  define STRLEN(X)		((int)(strlen(X)))
+#  define USTRLEN(X)		((unsigned int)(strlen(X)))
+#  define OFFSETOF(X,Y)		((int)(offsetof(X,Y)))
 #else
-#	define  INTCAST(X) X
-#	define  UINTCAST(X) X
-#	define 	STRLEN(X) strlen(X)
-#	define 	USTRLEN(X) strlen(X)
-#	define	OFFSETOF(X,Y) offsetof(X,Y)
+#  define INTCAST(X)		X
+#  define UINTCAST(X)		X
+#  define STRLEN(X)		strlen(X)
+#  define USTRLEN(X)		strlen(X)
+#  define OFFSETOF(X,Y)		offsetof(X,Y)
 #endif
 
 #ifndef __vms
-#define DIR_SEPARATOR		'/'
+#  define DIR_SEPARATOR		'/'
 #endif
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */

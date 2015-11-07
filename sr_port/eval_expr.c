@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@ LITREF toktabtype tokentable[];
 int eval_expr(oprtype *a)
 {
 	boolean_t	ind_pat, saw_local, saw_se, se_warn;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	int		op_count, se_handling;
 	opctype		bin_opcode;
 	oprtype		optyp_1, optyp_2, *optyp_ptr;
@@ -134,11 +133,7 @@ int eval_expr(oprtype *a)
 							dqins(t1,  exorder, argtrip); /* NOTE: violates infomation hiding */
 							optyp_ptr->oprval.tref = argtrip;
 							if (se_warn)
-							{
-								TREF(last_source_column) = t1->src.column + 1;
-								show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-								dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
-							}
+								ISSUE_SIDEEFFECTEVAL_WARNING(t1->src.column + 1);
 						}
 					}					/* end of side effect processing */
 					assert((catbp == catbp->que.fl) && (catbp == catbp->que.bl) && (NULL == catbp->bpt));
@@ -191,11 +186,7 @@ int eval_expr(oprtype *a)
 				optyp_1 = put_tref(ref);
 				dqins(ref1, exorder, ref);	/* NOTE: another violation of information hiding */
 				if (se_warn)
-				{
-					 TREF(last_source_column) = ref1->src.column + 1;
-					 show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-					 dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
-				}
+					ISSUE_SIDEEFFECTEVAL_WARNING(ref1->src.column + 1);
 			}
 			ref = newtriple(bin_opcode);
 			ref->operand[0] = optyp_1;

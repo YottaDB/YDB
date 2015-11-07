@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,7 @@ GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilatio
 GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
+GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
 
 void	gtm_env_init(void)
 {
@@ -299,6 +300,10 @@ void	gtm_env_init(void)
 		val.addr = ZTRAP_NEW;
 		val.len = SIZEOF(ZTRAP_NEW) - 1;
 		ztrap_new = logical_truth_value(&val, FALSE, NULL);
+		/* See if $gtm_max_storalloc is set */
+		val.addr = GTM_MAX_STORALLOC;
+		val.len = SIZEOF(GTM_MAX_STORALLOC) - 1;
+		gtm_max_storalloc = trans_numeric(&val, &is_defined, TRUE);
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 		TREF(gtm_env_init_done) = TRUE;

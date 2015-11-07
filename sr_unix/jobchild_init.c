@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@ GBLREF uint4		process_id;
 error_def(ERR_RUNPARAMERR);
 error_def(ERR_TEXT);
 error_def(ERR_SYSCALL);
+error_def(ERR_JOBLABOFF);
 
 CONDITION_HANDLER(job_init_ch)
 {
@@ -82,24 +83,20 @@ void jobchild_init(void)
 		if (PUTENV(CLEAR_CHILD_FLAG_ENV))
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);
-			rts_error(VARLSTCNT(1) errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		}
 		/* read parameters into parameter structure */
 		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Execute the command to be run before executing the actual M routine */
 		if (jparms.startup.len && (0 != SYSTEM(jparms.startup.addr)))
-			rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
-		/* Set up job's input, output and error files.  Redirect them, if necessary.
-		 * It is needed since the middle process would not have always done this(under jobpid == TRUE cases)
-		 */
-		if (!(status = ojchildioset(&jparms)))
-			rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Failed to set STDIN/OUT/ERR for the job"));
-		job_addr(&jparms.routine, &jparms.label, jparms.offset, (char **)&base_addr, (char **)&transfer_addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
+		if(!job_addr(&jparms.routine, &jparms.label, jparms.offset, (char **)&base_addr, (char **)&transfer_addr))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		/* Set process priority */
 		if (jparms.baspri)
 		{	/* send message to system log if nice fails */
 			if (-1 == nice((int)jparms.baspri))
-				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("nice"), CALLFROM, errno);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("nice"), CALLFROM, errno);
 		}
 		/* Set up $ZMODE to "OTHER" */
 		(TREF(dollar_zmode)).mvtype = MV_STR;
@@ -130,9 +127,10 @@ void jobchild_init(void)
 		{
 			arg_len = FILE_NAME_SIZE;
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
-				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RUNPARAMERR);
 			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
-			job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr);
+			if(!job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{
 			base_addr = make_cimode();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,6 +96,7 @@
 #include "trace_table.h"
 #include "parm_pool.h"
 #include "util.h"		/* for util_outbuff manipulations */
+#include "nametabtyp.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"

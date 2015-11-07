@@ -1,0 +1,19 @@
+	.title probew
+	; returns 1 if address is accessible
+
+VAX	=	1
+
+	code_psect
+
+	.entry probew,^m<>
+;	movq 	4(ap),r0
+	movl 	4(ap),r0
+	movl 	8(ap),r1
+	probew	#0,r0,(r1)
+	beql	10$
+	movl	#1,r0
+	ret
+
+10$:	clrl	r0
+	ret
+	.end

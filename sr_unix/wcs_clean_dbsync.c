@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -144,8 +144,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * by setting ok_to_call_wcs_recover to TRUE. Need to save and restore the global as it could be
 			 * TRUE or FALSE depending on where wcs_clean_dbsync interrupted mainline code.
 			 */
-			assert(CDB_STAGNATE >= t_tries ||
-			       gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVDATAFAIL == gtm_white_box_test_case_number));
+			assert(CDB_STAGNATE >= t_tries || WBTEST_ENABLED(WBTEST_ANTIFREEZE_GVDATAFAIL));
 			if (CDB_STAGNATE <= t_tries)
 			{
 				save_ok_to_call_wcs_recover = TREF(ok_to_call_wcs_recover);
@@ -184,9 +183,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * This way wcs_flu is not redundantly invoked and it ensures that the least number of epochs
 			 * (only the necessary ones) are written OR the least number of db file header flushes are done.
 			 *
-			 * If MM and not writing EPOCHs, we dont need to even flush the file header since MM by default
-			 * does NO msyncs of the database file during normal operation but instead only at database rundown.
-			 * So no need to do wcs_flu in this case.
+			 * If MM and not writing EPOCHs, we need to flush the fileheader out as that is not mmap'ed.
 			 */
 			/* Write idle/free epoch only if db curr_tn did not change since when the last dirty cache record was
 			 * written in wcs_wtstart to when the dbsync timer (5 seconds) popped. If the curr_tn changed it means
@@ -210,9 +207,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 				if ((NULL != jpc) && JNL_HAS_EPOCH(jpc->jnl_buff)
 					? (((NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
 							&& (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn))
-					: !is_mm && (cnl->last_wcsflu_tn < csa->ti->curr_tn))
+					: (cnl->last_wcsflu_tn < csa->ti->curr_tn))
 				{
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC);
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC
+							| WCSFLU_SPEEDUP_NOBEFORE);
 					BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
 					/* If MM, file could have been remapped by wcs_flu above.
 					 * If so, cs_data needs to be reset.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,16 +31,20 @@ error_def(ERR_ARROWNTDSP);
 
 #define MAXLINESIZEFORDISPLAY 1023
 
-void show_source_line(char* buf, ssize_t buflen, boolean_t warn)
+void show_source_line(boolean_t warn)
 {
-	char 	*b, *b_top, *c, *c_top;
-	int	chlen, chwidth;
-	unsigned int ch, line_chwidth = 0;
-	boolean_t unable_to_complete_arrow = FALSE;
-	mstr	msgstr;
+	char 		*b, *b_top, *c, *c_top, *buf;
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	ssize_t		buflen;
+	int		chlen, chwidth;
+	unsigned int	ch, line_chwidth = 0;
+	boolean_t	unable_to_complete_arrow = FALSE;
+	mstr		msgstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	buf = source_line_buff;
+	buflen = SIZEOF(source_line_buff);
 	b_top = buf + buflen - STR_LIT_LEN(ARROW) - 1; /* allow room for arrow and string terminator */
 	for (c = (char *)source_buffer, b = buf, c_top = c + TREF(last_source_column) - 1; c < c_top;)
 	{

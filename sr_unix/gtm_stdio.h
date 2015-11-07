@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,16 @@
 
 #include <stdio.h>
 
-#define FDOPEN				fdopen
+/* If interrupted, this function has previously caused hangs to do a subsequent gtm_putmsg() invocation from
+ * generic_signal_handler(), so just defer interrupts to be safe.
+ */
+#define FDOPEN(VAR, FILE_DES, MODE)		\
+{						\
+	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN);	\
+	VAR = fdopen(FILE_DES, MODE);		\
+	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN);	\
+}
+
 #define FGETS(strg, n, strm, fgets_res)	(fgets_res = fgets(strg,n,strm))
 #define Fopen				fopen
 #define GETS(buffer, gets_res)		syntax error

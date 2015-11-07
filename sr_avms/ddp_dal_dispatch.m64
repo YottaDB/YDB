@@ -1,0 +1,113 @@
+	.title	ddp_dal_dispatch
+
+
+MAX_SUBSCRIPTS	=	12
+MAX_ARG_SIZE	=	<<<<MAX_SUBSCRIPTS+3>*8>+15>/16>*16	; space for gtmi$_extgbl, destination, aux owner, all subscripts
+
+
+	$linkage_section
+
+A_subscript_array:	.address	subscript_array
+A_subscript_count:	.address	subscript_count
+
+Q_gtmi$_extgbl:		.quad		gtmi$_extgbl
+
+
+	$routine	name=ddp_dal_dispatch, entry=ddp_dal_dispatch_ca, -
+			kind=stack, base_reg_is_fp=true, standard_prologue=true
+
+	.base	r27, $ls
+
+	subq	sp, MAX_ARG_SIZE, sp
+	ldq	r0, A_subscript_count
+	ldq	r1, A_subscript_array
+	ldl	r0, (r0)
+	addq	r0, 1, r25		; argument count (array starts @ 0, argument count @ 1)
+
+;	If destination argument (argument 2) is non-zero, pass it as 2nd argument, else skip it.
+;	Rest of argument list to dispatched routine is addresses of elements in subscript array.
+	beq	r17, 3$			; if no destination argument
+	addq	r25, 1, r25		; need another argument position for destination (leave in r17)
+	br	5$
+
+3$:	lda	r17, (r1)		; if no destination argument, start with first array element in r17
+	addq	r1, 8, r1		; skip over first array element (already in argument list)
+	subq	r0, 1, r0		; remember not to count it twice
+5$:	lda	r18, (r1)
+	lda	r19, 8(r1)
+	lda	r20, 16(r1)
+	lda	r21, 24(r1)
+	subq	r0, 4, r0
+	ble	r0, 20$			; if no more arguments
+
+;	Copy rest of array element addresses to stack area.
+	addq	r1, 32, r1
+	mov	sp, r22
+10$:	lda	r28, (r1)
+	stq	r28, (r22)
+	subq	r0, 1, r0
+	addq	r1, 8, r1
+	addq	r22, 8, r22
+	bgt	r0, 10$
+
+20$:	ldq	r0, Q_gtmi$_extgbl
+	mov	r16, r27
+	ldq	r26, 8(r16)
+	mov	r0, r16
+	jsr	r26, (r26)
+
+	$return
+
+	$end_routine	name=ddp_dal_dispatch
+
+
+	$routine	name=ddp_lock_dispatch, entry=ddp_lock_dispatch_ca, -
+			kind=stack, base_reg_is_fp=true, standard_prologue=true
+
+	.base	r27, $ls
+
+	subq	sp, MAX_ARG_SIZE, sp
+	ldq	r0, A_subscript_count
+	ldq	r1, A_subscript_array
+	ldl	r0, (r0)
+	addq	r0, 2, r25		; array elements + 1 for auxown
+	mov	r16, r22		; save A(routine to call) for later
+
+;	Skip timeout on unlock.
+	and	r17, ^Xff, r16
+	bne	r16, 3$			; skip timeout on unlock (otherwise timeout in r16 == 0)
+	mov	r18, r17		; aux owner
+	ldq	r18, Q_gtmi$_extgbl
+	addq	r25, 1, r25		; need another argument position
+	br	5$
+
+3$:	mov	r18, r16		; aux owner
+	ldq	r17, Q_gtmi$_extgbl
+	lda	r18, (r1)
+	addq	r1, 8, r1		; skip over first array element (already in argument list)
+	subq	r0, 1, r0		; remember not to count it twice
+5$:	lda	r19, (r1)
+	lda	r20, 8(r1)
+	lda	r21, 16(r1)
+	subq	r0, 3, r0
+	ble	r0, 20$			; if no more arguments
+
+;	Copy rest of array element addresses to stack area.
+	addq	r1, 24, r1
+	mov	sp, r23
+10$:	lda	r28, (r1)
+	stq	r28, (r23)
+	subq	r0, 1, r0
+	addq	r1, 8, r1
+	addq	r23, 8, r23
+	bgt	r0, 10$
+
+20$:	ldq	r26, 8(r22)
+	mov	r22, r27
+	jsr	r26, (r26)
+
+	$return
+
+	$end_routine	name=ddp_lock_dispatch
+
+	.end

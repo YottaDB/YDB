@@ -1,0 +1,70 @@
+	.macro	bndsym	symbol, image, ?entry_point, ?proc_value, ?symdesc, ?imdesc
+
+;	Bind a universal symbol at run time
+
+
+	$routine symbol, entry=symbol'_CA, kind=null, -
+		data_section=<$bndsym_data,pic,noexe>, data_section_pointer=true
+
+	$data_section
+
+	.align	quad
+entry_point:	.quad	0	; entry_point and proc_value together
+proc_value:	.quad	0	;  define a linkage pair
+
+	.align	long
+symdesc:	.ascid	/symbol/
+
+	.align	long
+imdesc:		.ascid	/image/
+
+
+	$code_section
+
+	.base	r27, $ls
+
+	ldq	r22, $dp
+	.base	r22, $ds
+
+	ldq	r28, entry_point
+	beq	r28, 10$
+
+	ldq	r27, proc_value
+	jmp	r28
+
+
+; Call BIND_SYMBOL to resolve the symbol's address, then jmp to it.
+; This must be transparent, so save (and restore) all of the
+; argument-related registers, as well as the original return address.
+
+10$:	lda	sp, -80(sp)
+	stq	r16,  0(sp)
+	stq	r17,  8(sp)
+	stq	r18, 16(sp)
+	stq	r19, 24(sp)
+	stq	r20, 32(sp)
+	stq	r21, 40(sp)
+	stq	r22, 48(sp)	; data section base register
+	stq	r25, 56(sp)	; original argument count
+	stq	r26, 64(sp)	; original return address
+
+	$call	BIND_SYMBOL, args=<imdesc/a, symdesc/a, entry_point/a>, nonstandard=true
+
+	ldq	r16,  0(sp)
+	ldq	r17,  8(sp)
+	ldq	r18, 16(sp)
+	ldq	r19, 24(sp)
+	ldq	r20, 32(sp)
+	ldq	r21, 40(sp)
+	ldq	r22, 48(sp)
+	ldq	r25, 56(sp)
+	ldq	r26, 64(sp)
+	lda	sp,  80(sp)
+
+	ldq	r28, entry_point
+	ldq	r27, proc_value
+	jmp	r28
+
+	$end_routine
+
+	.endm

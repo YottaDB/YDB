@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #include "repl_sp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#include "have_crit.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -156,7 +157,7 @@ int repl_log_fd2fp(FILE **fp, int fd)
 	 * FDOPEN will fail returning NULL for the file pointer. */
 	if (NULL != *fp)
 		FCLOSE(*fp, fclose_res);
-	*fp = FDOPEN(fd, "a");
+	FDOPEN(*fp, fd, "a");
 	assert(NULL != *fp); /* we don't expect FDOPEN to fail */
 	return(SS_NORMAL);
 }

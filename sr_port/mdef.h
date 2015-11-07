@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,18 +88,22 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #include <inttypes.h>
 #include "mdefsa.h"
+#include "gtm_common_defs.h"
 #include <mdefsp.h>
 #include "gtm_sizeof.h"
-#include "gtm_common_defs.h"
 #include "gtm_threadgbl.h"
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
 #ifdef DEBUG
 error_def(ERR_ASSERT);
-#define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__, (SIZEOF(#x) - 1), (#x)))
+# define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
+						(SIZEOF(#x) - 1), (#x)))
+# ifdef UNIX
+#  define GTMDBGFLAGS_ENABLED
+# endif
 #else
-#define assert(x)
+# define assert(x)
 #endif
 
 #ifdef GTM64
@@ -152,8 +156,6 @@ typedef UINTPTR_T uintszofptr_t;
 
 #ifdef GTM64
 #	define USER_STACK_SIZE  8192
-#	define GTM64_ONLY(X)	X
-#	define NON_GTM64_ONLY(X)
 #	define VA_ARG_TYPE long
 #	define VA_ARG_TYPE_BOOL int
 #	define GTM_IS_64BIT		TRUE
@@ -161,8 +163,6 @@ typedef UINTPTR_T uintszofptr_t;
 #	define GTM_BITNESS_OTHER	"32-bit"
 #else
 #       define USER_STACK_SIZE  4096
-#	define GTM64_ONLY(X)
-#	define NON_GTM64_ONLY(X)	X
 #	define VA_ARG_TYPE int
 #	define VA_ARG_TYPE_BOOL int
 #	define GTM_IS_64BIT		FALSE
@@ -198,6 +198,13 @@ typedef UINTPTR_T uintszofptr_t;
 
 #if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
 #	define UNALIGNED_ACCESS_SUPPORTED
+#endif
+
+#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
+#	define GTM_PTHREAD
+#	define GTM_PTHREAD_ONLY(X) X
+#else
+#	define GTM_PTHREAD_ONLY(X)
 #endif
 
 #if defined(__ia64)
@@ -438,9 +445,9 @@ mval *underr_strict(mval *start, ...);
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #ifdef GTM64
-#define MV_FORCE_ULMVAL(M,L)	(((L) >= 1000000) ? ul2mval((M),(unsigned long)(L)) : \
+#define MV_FORCE_ULMVAL(M,L)	(((L) >= 1000000) ? ui82mval((M),(gtm_uint64_t)(L)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
-#define MV_FORCE_LMVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? l2mval((M),(long)(L)) : \
+#define MV_FORCE_LMVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? i82mval((M),(gtm_int64_t)(L)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
 #else
 #define MV_FORCE_ULMVAL		MV_FORCE_UMVAL
@@ -585,8 +592,12 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define	DBG_MARK_RTS_ERROR_UNUSABLE
 #endif
 int	rts_error(int argcnt, ...);
+int	rts_error_csa(void *csa, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
+#define CSA_ARG(CSA)	(CSA),
 void	dec_err(uint4 argcnt, ...);
 #elif defined(VMS)
+#define rts_error_csa	rts_error
+#define CSA_ARG(CSA)	/* no csa arg on VMS */
 void dec_err(int4 msgnum, ...);
 #else
 #error unsupported platform
@@ -641,67 +652,12 @@ int m_usleep(int useconds);
 #	define SHORT_SLEEP(x) hiber_start(x);
 #endif
 
-/* The following "MSYNC" defines are for the MM access method
- *    NO_MSYNC		-- minimum number of msyncs -- only in run down
- *    UNTARGETED_MSYNC	-- msync the entire file
- *    TARGETED_MSYNC	-- keep track of changed buffers and only msync them
- *    REGULAR_MSYNC	-- do regular file I/O on the mapped file (ignoring the fact it is mapped)
- *
- * If none of the MSYNCs are explicitly defined, the ifdef and elif defined sequence will fall through
- * to the else case, defining NO_MSYNC as the default.
- */
 #ifdef UNIX
 #	define UNIX_ONLY(X)		X
 #	define UNIX_ONLY_COMMA(X)	X,
-#	if defined UNTARGETED_MSYNC
-#		define UNTARGETED_MSYNC_ONLY(X)		X
-#		define NON_UNTARGETED_MSYNC_ONLY(X)
-#		define TARGETED_MSYNC_ONLY(X)
-#		define NON_TARGETED_MSYNC_ONLY(X)	X
-#		define REGULAR_MSYNC_ONLY(X)
-#		define NON_REGULAR_MSYNC_ONLY(X)	X
-#		define NO_MSYNC_ONLY(X)
-#		define NON_NO_MSYNC_ONLY(X)
-#	elif defined TARGETED_MSYNC
-#		define UNTARGETED_MSYNC_ONLY(X)
-#		define NON_UNTARGETED_MSYNC_ONLY(X)	X
-#		define TARGETED_MSYNC_ONLY(X)		X
-#		define NON_TARGETED_MSYNC_ONLY(X)
-#		define REGULAR_MSYNC_ONLY(X)
-#		define NON_REGULAR_MSYNC_ONLY(X)	X
-#		define NO_MSYNC_ONLY(X)
-#		define NON_NO_MSYNC_ONLY(X)
-#	elif defined REGULAR_MSYNC
-#		define UNTARGETED_MSYNC_ONLY(X)
-#		define NON_UNTARGETED_MSYNC_ONLY(X)	X
-#		define TARGETED_MSYNC_ONLY(X)
-#		define NON_TARGETED_MSYNC_ONLY(X)	X
-#		define REGULAR_MSYNC_ONLY(X)		X
-#		define NON_REGULAR_MSYNC_ONLY(X)
-#		define NO_MSYNC_ONLY(X)
-#		define NON_NO_MSYNC_ONLY(X)
-#	else
-#		define NO_MSYNC
-#		define UNTARGETED_MSYNC_ONLY(X)
-#		define NON_UNTARGETED_MSYNC_ONLY(X)
-#		define TARGETED_MSYNC_ONLY(X)
-#		define NON_TARGETED_MSYNC_ONLY(X)
-#		define REGULAR_MSYNC_ONLY(X)
-#		define NON_REGULAR_MSYNC_ONLY(X)
-#		define NO_MSYNC_ONLY(X)			X
-#		define NON_NO_MSYNC_ONLY(X)
-#	endif
 #else
 #	define UNIX_ONLY(X)
 #	define UNIX_ONLY_COMMA(X)
-#	define UNTARGETED_MSYNC_ONLY(X)
-#	define TARGETED_MSYNC_ONLY(X)
-#	define REGULAR_MSYNC_ONLY(X)
-#	define NON_UNTARGETED_MSYNC_ONLY(X)
-#	define NON_TARGETED_MSYNC_ONLY(X)
-#	define NON_REGULAR_MSYNC_ONLY(X)
-#	define NO_MSYNC_ONLY(X)
-#	define NON_NO_MSYNC_ONLY(X)
 #endif
 
 /* HP-UX on PA-RISC and z/OS are not able to have dynamic file extensions while running in MM access mode
@@ -859,7 +815,7 @@ typedef struct
 	sm_off_t bl; /* backward link - relative offset from beginning of this element to previous element in queue */
 	global_latch_t	latch;	/* required for platforms without atomic operations to modify both fl and bl concurrently;
 				 * unused on platforms with such instructions. */
-} que_head, cache_que_head, mmblk_que_head;
+} que_head, cache_que_head;
 
 #define	IS_PTR_ALIGNED(ptr, ptr_base, elemSize)					\
 	(0 == ((((sm_uc_ptr_t)(ptr)) - ((sm_uc_ptr_t)(ptr_base))) % elemSize))
@@ -1224,11 +1180,11 @@ typedef INTPTR_T  ptroff_t;
 #  define CACHELINE_PAD_COND(fieldSize, fillnum)
 #endif
 
-#define MEMCP(dst,src,start,count,limit){ 		\
-	if (start+count > limit) 			\
-		rts_error(VARLSTCNT(1) ERR_CPBEYALLOC); \
-	else						\
-		memcpy(dst+start,src,count); 		\
+#define MEMCP(dst,src,start,count,limit){					\
+	if (start+count > limit)						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CPBEYALLOC);	\
+	else									\
+		memcpy(dst+start,src,count);					\
 }
 
 #ifndef USING_ICONV
@@ -1269,7 +1225,8 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n);
 /* ascii conversion functions */
 int4 asc2i(uchar_ptr_t p, int4 len);
 qw_num asc2l(uchar_ptr_t p, int4 len);
-unsigned int asc_hex2i(char *p, int len);
+unsigned int asc_hex2i(uchar_ptr_t p, int len);
+gtm_uint64_t asc_hex2l(uchar_ptr_t p, int len);
 
 /* This macro converts an integer to a decimal string (a more efficient alternative to i2asc).
  * It is used by format2zwr() which is called a lot during MUPIP EXTRACT (which can be time-consuming
@@ -1778,17 +1735,42 @@ enum
 				 * how many parameters are allowed to be passed between M and C.
 				 */
 #if defined(DEBUG) && defined(UNIX)
-#define OPERATOR_LOG_MSG											\
-{														\
-	error_def(ERR_TEXT);	/* BYPASSOK */									\
-	if (gtm_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == gtm_white_box_test_case_number))		\
-	{													\
-		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Send message to operator log"));		\
-	}													\
+#define OPERATOR_LOG_MSG												\
+{															\
+	error_def(ERR_TEXT);	/* BYPASSOK */										\
+	if (gtm_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == gtm_white_box_test_case_number))			\
+	{														\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Send message to operator log"));	\
+	}														\
 }
 #else
 #define OPERATOR_LOG_MSG
 #endif
 
+#ifdef GTM_PTHREAD
+/* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
+ * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
+ * signal, dispatches a new thread to invoke signal handlers other than its own. The ptrhead_kill() enables us to target the signal
+ * to a specific thread rather than rethrow it to the whole process.
+ */
+#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)								\
+{														\
+	GBLREF pthread_t	gtm_main_thread_id;								\
+	GBLREF boolean_t	gtm_main_thread_id_set;								\
+														\
+	if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, pthread_self()))			\
+	{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
+		pthread_kill(gtm_main_thread_id, SIG);								\
+		return;												\
+	}													\
+}
+#else
+#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)
+#endif
+
+#ifdef DEBUG
+# define MVAL_IN_RANGE(V, START, END)	(((char *)(V) >= (char *)(START))					\
+				      && ((char *)(V) < ((char *)(START) + (INTPTR_T)(END) * SIZEOF(mval))))
+#endif
 
 #endif /* MDEF_included */

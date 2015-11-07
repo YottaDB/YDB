@@ -1,0 +1,77 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2006 Fidelity Information Services, Inc	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%GSE	;GT.M %GSE utility - global search
+	;
+	n c,i,g,gn,gtmvt,m,n,p,rl,s,sl,sx,tics,x,%ZD,%ZG
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GSE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSE")
+	w !,"Global Search for Every Occurrence",!
+	d base
+	q
+base	f  d  q:$l(%ZD)
+	. r !,"Output device: <terminal>: ",%ZD,!
+	. i '$l(%ZD) s %ZD=$p q
+	. i %ZD="^" q
+	. i %ZD="?" d  q
+	 . . w !!,"Select the device you want for output"
+	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
+	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
+	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
+	. i '$t  w !,%ZD," is not available" s %ZD="" q
+	. q
+noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
+	q:%ZD="^"
+	i %ZD'=$p u %ZD w $zd($h,"DD-MON-YEAR 24:60:SS"),!,"Global Search for Every occurrence",! u $p
+	f  d main q:'%ZG
+	c:%ZD'=$p %ZD u $p:(ctrap="":exc="")
+	q
+main	k %ZG d CALL^%GSEL i '%ZG q
+	s gn=""
+	r "Find string: ",s,!!
+	i s="" w !,"No string to find - no search done.",! s %ZG=0 q
+	i s?.E1C.E w !,"The Find string contains control characters"
+	u %ZD s gtmvt=$$GTMVT
+	i gtmvt s sx=$c(27)_"[7m"_s_$c(27)_"[0m"
+	e  s sx=s,sl=$l(s),tics=$tr($j("",sl)," ","^")
+	f  s gn=$o(%ZG(gn)) q:gn=""  d search
+	q
+search	u %ZD w:$x>70 ! w gn,?$x\10+1*10
+	s g=gn,(m,n)=0
+	i ($d(@g)#10=1) s n=1 d:@g[s show
+	f  s g=$q(@g) q:g=""  s n=n+1 d:@g[s show
+	i m w !!,"Total ",m," matches found in ",n," nodes.",!
+	e  w !,"No matches found in ",n," nodes.",!
+	u $p
+	q
+show	s x=@g,c=$l(x,s),m=m+c-1,rl=$j("",16)
+	w !,g,?16 f i=1:1:c-1 s p=$tr($p(x,s,i),$c(9)," ") w p,sx i 'gtmvt s rl=rl_$j(tics,$l(p)+sl)
+	w $p(@g,s,c)
+	i 'gtmvt w !,rl
+	q
+	;
+GTMVT()	; true if a video
+	i $zver'["VMS" n d d  q +d ;if should be more precise
+	. s d=""
+	. i $i'=$p q
+	. zsh "d":d
+	. f  s d=$o(d("D",d)) q:d=""  i $p(d("D",d)," ")=$p s d=$p(d("D",d)," ",3) q
+	. i d["TERMINAL" s d=$tr($ztrnlnm("TERM"),"ANSIVT","ansivt") i $l(d),d["ansi"!(d["vt") s d=1
+	i @"$zgetdvi($zparse($zio,""DEVICE""),""TRM"")",@"$zgetdvi($zio,""DECCRT"")"
+	q $t
+	;
+ERR	i $d(%ZD),%ZD'=$p c %ZD
+	u $p w !,$p($zs,",",2,99),!
+	u $p:(ctrap="":exc="")
+	s $ec=""
+	q
+LOOP	i $d(%ZD),%ZD'=$p c %ZD
+	d base
+	q

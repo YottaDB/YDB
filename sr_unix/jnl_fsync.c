@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,10 +34,10 @@
 #include "gtm_c_stack_trace.h"
 #include "gtmsecshr.h"		/* for continue_proc */
 #include "anticipatory_freeze.h"
+#include "wbox_test_init.h"
 #ifdef DEBUG
 #include "gt_timer.h"
 #include "gtm_stdio.h"
-#include "wbox_test_init.h"
 #include "is_proc_alive.h"
 #endif
 
@@ -49,8 +49,6 @@ error_def(ERR_JNLFRCDTERM);
 error_def(ERR_JNLFSYNCERR);
 error_def(ERR_JNLFSYNCLSTCK);
 error_def(ERR_TEXT);
-
-#define CURRENT_WRITER jb->fsync_in_prog_latch.u.parts.latch_pid
 
 void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 {
@@ -66,54 +64,55 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
 	jb  = jpc->jnl_buff;
+	assert(process_id != CURRENT_JNL_FSYNC_WRITER(jb));
 	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 	{
 		csd = csa->hdr;
 		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc); lcnt++)
 		{
-			if (MAX_FSYNC_WAIT_CNT / 2 == lcnt) /* half way into the wait timeout */
+			if (0 == (lcnt % FSYNC_WAIT_HALF_TIME))
 			{
 				saved_status = jpc->status;
 				jpc->status = SS_NORMAL;
-				DEBUG_ONLY(
-					if (CURRENT_WRITER)
-						GET_C_STACK_FROM_SCRIPT("JNLFSYNCSTUCK_HALF_TIME",
-							process_id, CURRENT_WRITER, ONCE);
-				)
+#				ifdef DEBUG
+				if (CURRENT_JNL_FSYNC_WRITER(jb))
+					GET_C_STACK_FROM_SCRIPT("JNLFSYNCSTUCK_HALF_TIME",
+						process_id, CURRENT_JNL_FSYNC_WRITER(jb), lcnt / FSYNC_WAIT_HALF_TIME);
+#				endif
 				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
 				jpc->status = saved_status;
-			} else if (MAX_FSYNC_WAIT_CNT < lcnt) /* timed-out waiting for the fsync lock */
+			}
+			else if (0 == (lcnt % FSYNC_WAIT_TIME))
 			{
 				saved_status = jpc->status;
 				jpc->status = SS_NORMAL;
-				if (CURRENT_WRITER)
-					GET_C_STACK_FROM_SCRIPT("JNLFSYNCSTUCK", process_id, CURRENT_WRITER, TWICE);
+				if (CURRENT_JNL_FSYNC_WRITER(jb))
+					GET_C_STACK_FROM_SCRIPT("JNLFSYNCSTUCK",
+						process_id, CURRENT_JNL_FSYNC_WRITER(jb), lcnt / FSYNC_WAIT_HALF_TIME);
 				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
 				jpc->status = saved_status;
-				send_msg(VARLSTCNT(4) ERR_FSYNCTIMOUT, 2, JNL_LEN_STR(csd));
-				GTMASSERT;
 			}
 			BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
 			if (GET_SWAPLOCK(&jb->fsync_in_prog_latch))
 				break;
 			wcs_sleep(lcnt);
 			/* trying to wake up the lock holder one iteration before calling c_script */
-			if ((MAX_FSYNC_WAIT_CNT / 2 - 1 == lcnt) || (MAX_FSYNC_WAIT_CNT == lcnt))
+			if ((lcnt % FSYNC_WAIT_HALF_TIME) == (FSYNC_WAIT_HALF_TIME - 1))
 				performCASLatchCheck(&jb->fsync_in_prog_latch, TRUE);
 		}
-		DEBUG_ONLY(
-			if (gtm_white_box_test_case_enabled
-				&& (WBTEST_EXTEND_JNL_FSYNC == gtm_white_box_test_case_number))
-			{
-				FPRINTF(stderr, "JNL_FSYNC: will sleep for 40 seconds\n", process_id);
-				LONG_SLEEP(40);
-				FPRINTF(stderr, "JNL_FSYNC: done sleeping\n", process_id);
-				gtm_white_box_test_case_enabled = FALSE;
-			}
-		)
+#		ifdef DEBUG
+		if (gtm_white_box_test_case_enabled
+			&& (WBTEST_EXTEND_JNL_FSYNC == gtm_white_box_test_case_number))
+		{
+			FPRINTF(stderr, "JNL_FSYNC: will sleep for 40 seconds\n", process_id);
+			LONG_SLEEP(40);
+			FPRINTF(stderr, "JNL_FSYNC: done sleeping\n", process_id);
+			gtm_white_box_test_case_enabled = FALSE;
+		}
+#		endif
 		if (fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc))
 		{
-			assert(process_id == jb->fsync_in_prog_latch.u.parts.latch_pid);  /* assert we have the lock */
+			assert(process_id == CURRENT_JNL_FSYNC_WRITER(jb));  /* assert we have the lock */
 			saved_dsk_addr = jb->dskaddr;
 			if (jpc->sync_io)
 			{	/* We need to maintain the fsync control fields irrespective of the type of IO, because we might
@@ -131,13 +130,16 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0)
 						|| (onln_rlbk_pid != csa->nl->in_crit));
 				GTM_JNL_FSYNC(csa, jpc->channel, fsync_ret);
+				GTM_WHITE_BOX_TEST(WBTEST_FSYNC_SYSCALL_FAIL, fsync_ret, -1);
+				WBTEST_ASSIGN_ONLY(WBTEST_FSYNC_SYSCALL_FAIL, errno, EIO);
 				if (-1 == fsync_ret)
 				{
 					save_errno = errno;
-					assert(FALSE);
-					send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					assert(WBTEST_ENABLED(WBTEST_FSYNC_SYSCALL_FAIL));
+					RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
-					rts_error(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
 				} else
 				{
@@ -146,8 +148,9 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				}
 			}
 		}
-		if (process_id == jb->fsync_in_prog_latch.u.parts.latch_pid)
+		if (process_id == CURRENT_JNL_FSYNC_WRITER(jb))
 			RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 	}
+	assert(process_id != CURRENT_JNL_FSYNC_WRITER(jb));
 	return;
 }

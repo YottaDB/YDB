@@ -1,0 +1,17 @@
+	.title	gtm_code_address	return code address for a routine given its procedure descriptor address
+
+;	gtm$code_address
+;
+;	entry:
+;		a0 (r16)	address of procedure descriptor
+;
+;	exit:
+;		r0		address of entry point indicated by procedure descriptor
+
+	$routine	name=gtm$code_address,entry=gtm$code_address_ca,kind=null
+
+	ldq	r0, 8(r16)
+
+	ret	r26
+
+	$end_routine	name=gtm$code_address

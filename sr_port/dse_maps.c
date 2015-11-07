@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,11 @@ GBLREF gd_region        *gv_cur_region;
 GBLREF short            crash_count;
 GBLREF boolean_t        unhandled_stale_timer_pop;
 GBLREF srch_hist	dummy_hist;
-GBLREF unsigned char	*non_tp_jfb_buff_ptr;
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
+
 
 void dse_maps(void)
 {
@@ -83,10 +87,6 @@ void dse_maps(void)
 	jnl_buffer_ptr_t	jbp;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEFAIL);
 
 	if (CLI_PRESENT == cli_present("BUSY") || CLI_PRESENT == cli_present("FREE") ||
 		CLI_PRESENT == cli_present("MASTER") || CLI_PRESENT == cli_present("RESTORE_ALL"))
@@ -159,7 +159,7 @@ void dse_maps(void)
 			grab_crit(gv_cur_region);
 		bml_blk = blk / bplmap * bplmap;
 		if (dba_mm == csd->acc_meth)
-			bp = (sm_uc_ptr_t)csa->acc_meth.mm.base_addr + (off_t)bml_blk * blk_size;
+			bp = MM_BASE_ADDR(csa) + (off_t)bml_blk * blk_size;
 		else
 		{
 			assert(dba_bg == csd->acc_meth);
@@ -220,7 +220,7 @@ void dse_maps(void)
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
 			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
-			BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, csa->ti->curr_tn);
+			BUILD_AIMG_IF_JNL_ENABLED(csd, csa->ti->curr_tn);
 			t_end(&dummy_hist, NULL, csa->ti->curr_tn);
 		}
 		/* Fill in master map */

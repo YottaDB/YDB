@@ -1,0 +1,42 @@
+	.title	OP_GETTRUTH
+
+	mval$def
+
+
+	$linkage_section
+
+a_literal_zero:
+	.address literal_zero
+
+a_literal_one:
+	.address literal_one
+
+
+	$code_section
+
+	$routine OP_GETTRUTH, entry=OP_GETTRUTH_CA, kind=null
+	.base	r27, $ls
+
+	ldl	r20, 0(r10)		; $TEST value
+	ldq	r24, a_literal_one
+	ldq	r28, a_literal_zero
+	cmovne	r20, r24, r28
+
+; mval's are longword-aligned, and are 5 longwords long [mval$size = 20]:
+	ldl	r16, (r28)
+	ldl	r17, 4(r28)
+	ldl	r18, 8(r28)
+	ldl	r19, 12(r28)
+	ldl	r20, 16(r28)
+
+	stl	r16, (r1)
+	stl	r17, 4(r1)
+	stl	r18, 8(r1)
+	stl	r19, 12(r1)
+	stl	r20, 16(r1)
+
+	ret	r26
+
+	$end_routine
+
+	.end

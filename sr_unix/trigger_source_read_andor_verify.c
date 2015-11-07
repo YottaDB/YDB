@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,10 +70,12 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 LITREF	mval			literal_batch;
 LITREF	mval			literal_hasht;
 
+#define TRIG_FAILURE_RC	-1
+
 STATICFNDCL CONDITION_HANDLER(trigger_source_raov_ch);
 STATICFNDCL int trigger_source_raov(mstr *trigname, trigger_action trigger_op);
 STATICFNDCL int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action trigger_op);
-STATICFNDCL void trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc);
+STATICFNDCL boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc);
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_TPRETRY);
@@ -185,7 +187,7 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 		{	/* Now that we are TP wrapped, fetch the trigger source lines from the ^#t global */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
 			src_fetch_status = trigger_source_raov_tpwrap_helper(trigname, trigger_op);
-			if (0 == src_fetch_status)
+			if ((0 == src_fetch_status) || (TRIG_FAILURE_RC == src_fetch_status))
 			{
 				assert(0 == dollar_tlevel); /* op_tcommit should have made sure of this */
 				break;
@@ -213,9 +215,9 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 	} else
 		/* no return if TP restart */
 		src_fetch_status = trigger_source_raov(trigname, trigger_op);
-	assert(0 == src_fetch_status);
+	assert((0 == src_fetch_status) || (TRIG_FAILURE_RC == src_fetch_status));
 	RESTORE_TRIGGER_REGION_INFO;
-	return 0;
+	return src_fetch_status;
 }
 
 /* Now TP wrap and fetch the trigger source lines from the ^#t global */
@@ -228,7 +230,7 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action
 	ESTABLISH_RET(trigger_source_raov_ch, SIGNAL);
 	assert(donot_INVOKE_MUMTSTART);
 	rc = trigger_source_raov(trigname, trigger_op);
-	assert(0 == rc);
+	assert((0 == rc) || (TRIG_FAILURE_RC == rc));
 	/* Finish it now verifying it completed successfully */
 	GVTR_OP_TCOMMIT(cdb_status);
 	if (cdb_sc_normal != cdb_status)
@@ -237,7 +239,7 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action
 		t_retry(cdb_status);
 	}
 	REVERT;
-	return 0;
+	return rc;
 }
 
 /* Routine to do the dirty work of resolving a trigger name into a trigger and perform the missing parts of
@@ -263,7 +265,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 	/* First lets locate the trigger. Try simple way first - lookup in routine name table */
 	if (NULL == (rtn_vector = find_rtn_hdr(trigname)))	/* Note assignment */
 	{	/* Wasn't found - look for it the harder way in the #t of the default region */
-		trigger_source_raov_trigload(trigname, &trigdsc);
+		if(TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc))
+			return TRIG_FAILURE_RC;
 	} else
 	{	/* Have a routine header addr. From that we can get the gv_trigger_t descriptor and from that, the
 		 * gvt_trigger and other necessaries
@@ -329,7 +332,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 			gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle;
 			DBGTRIGR((stderr, "trigger_source_raov: triggers reloaded - "
 				  "gvt->db_trigger_cycle updated to %d\n", gvt->db_trigger_cycle));
-			trigger_source_raov_trigload(trigname, &trigdsc);
+			if (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc))
+				return TRIG_FAILURE_RC;
 			triggers_reloaded = TRUE;
 		} else
 			DBGTRIGR((stderr, "trigger_source_raov: trigger validated\n"));
@@ -390,7 +394,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 }
 
 /* Routine called when need triggers loaded for a given global */
-STATICFNDEF void trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc)
+STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc)
 {
 	mname_entry		gvent;
 	mval			val;
@@ -405,12 +409,18 @@ STATICFNDEF void trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret
 	mval			trig_index;
 	gv_trigger_t		*trigdsc;
 	uint4			cycle_start;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Find region trigger name is in */
 	if (!trigger_read_name_entry(trigname, &val))
 	{	/* Trigger name not found - nothing we can do */
-		CLEAR_IMPLICIT_TP_BEFORE_ERROR;
-		rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
+		if (!TREF(in_op_fntext))
+		{
+			CLEAR_IMPLICIT_TP_BEFORE_ERROR;
+			rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
+		}
+		return TRIG_FAILURE;
 	}
 	/* Extract region name and trigger index number from result */
 	ptr = val.str.addr;
@@ -449,7 +459,7 @@ STATICFNDEF void trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	*ret_trigdsc = trigdsc;
-	return;
+	return TRIG_SUCCESS;
 }
 
 #endif /* GTM_TRIGGER */

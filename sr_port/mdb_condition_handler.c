@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -174,6 +174,7 @@ error_def(ERR_RTSLOC);
 error_def(ERR_SRCLOCUNKNOWN);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_TLVLZERO);
 error_def(ERR_TPRETRY);
 error_def(ERR_TPRESTNESTERR);
 error_def(ERR_TPSTACKCRIT);
@@ -183,22 +184,25 @@ error_def(ERR_UNSOLCNTERR);
 error_def(ERR_VMSMEMORY);
 
 boolean_t clean_mum_tstart(void);
-void setup_error(int argcnt, ...);
+void setup_error(sgmnt_addrs *csa, int argcnt, ...);
 
-#ifdef GTM_TRIGGER
-/* When we go to restart generated code after handling an error, verify that we are not in frame or one created on its
- * behalf that invoked a trigger and caused a dynamic TSTART to be done on its behalf. This can happen for example if
- * a trigger is invoked for the first time but get a compilation or link failure error. This error is thrown from
- * gtm_trigger() while no trigger based error handling is in effect so no rollback of the dynamic frame occurs which
- * will result in unhandled TPQUIT errors, perhaps interminably.
+#ifdef UNIX
+/* When we restart generated code after handling an error, verify that we are not in the frame or one created on its
+ * behalf that invoked a trigger or spanning node and caused a dynamic TSTART to be done on its behalf. This can happen
+ * for example if a trigger is invoked for the first time but gets a compilation or link failure error or if a spanning
+ * node fetch or update drives an error. In the trigger case, the relevant error is thrown from gtm_trigger() while no
+ * trigger based error handling is in effect so no rollback of the dynamic frame occurs which results in unhandled TPQUIT
+ * errors, perhaps interminably. In both the trigger and spanning-node cases, the MUM_TSTART we are about to execute unrolls
+ * the C stack preventing any return to the C frame that did the implicit tstart and prevents it from being committed so
+ * it must be rolled back.
  */
-#define MUM_TSTART_FRAME_CHECK								\
-{											\
-	if ((0 == gtm_trigger_depth) && tp_pointer && tp_pointer->implicit_tstart)	\
-	{										\
-		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);				\
-		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */			\
-	}										\
+#define MUM_TSTART_FRAME_CHECK										\
+{													\
+	if (GTMTRIG_ONLY((0 == gtm_trigger_depth) &&) tp_pointer && tp_pointer->implicit_tstart) 	\
+	{												\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);						\
+		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */					\
+	}												\
 }
 #else
 #define MUM_TSTART_FRAME_CHECK
@@ -235,12 +239,12 @@ boolean_t clean_mum_tstart(void)
 /* Routine to setup an error in util_outbuff as if rts_error had put it there. Used when we morph ERR_TPRETRY
  * to ERR_TPRESTNESTERR. Requires a va_list var containing the args so do this in this separate routine.
  */
-void setup_error(int argcnt, ...)
+void setup_error(sgmnt_addrs *csa, int argcnt, ...)
 {
 	va_list		var;
 
 	VAR_START(var, argcnt);
-	gtm_putmsg_list(argcnt, var);
+	gtm_putmsg_list(csa, argcnt, var);
 	va_end(var);
 }
 #endif
@@ -251,7 +255,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	char			src_line[MAX_ENTRYREF_LEN];
-	char			source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	mstr			src_line_d;
 	io_desc			*err_dev;
 	tp_region		*tr;
@@ -370,7 +373,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 #			endif
 			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
 			DBGEHND((stderr, "mdb_condition_handler: tp_restart returned with rc=%d. state=%d, and SIGNAL=%d\n",
-				 rc, GTMTRIG_ONLY(tprestart_state) NOT_GTMTRIG_ONLY(0), error_condition));
+				 rc, GTMTRIG_ONLY(tprestart_state) NON_GTMTRIG_ONLY(0), error_condition));
 #			ifdef GTM_TRIGGER
 			if (0 != rc)
 			{	/* The only time "tp_restart" will return non-zero is if the error needs to be
@@ -421,12 +424,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 #		ifdef UNIX
 		else
-		{	/* TP restart occurred during error handling - treat as nested error to prevent issues with errors being
-			 * rethrown during a TP restart. Change the error from TPRETRY to TPRESTNESTERR so we don't give
-			 * internal use only error name to user and let error continue through regular processing.
+		{
+			if (0 == dollar_tlevel)
+				SIGNAL = ERR_TLVLZERO;		/* TPRESTART specified but not in TP */
+			else
+				SIGNAL = ERR_TPRESTNESTERR;	/* Only if actually in TP */
+			/* TPRETRY encountered or requested during error handling - treat as nested error to prevent issues
+			 * with errors being rethrown during a TP restart. Change the error from TPRETRY to either TLVLZERO or
+			 * TPRESTNESTERR as appropriate so we don't give internal use only error name to user and let error
+			 * continue through regular processing (both treated as nested error since error_frame non-NULL).
 			 */
-			SIGNAL = ERR_TPRESTNESTERR;
-			setup_error(VARLSTCNT(1) SIGNAL);
+			setup_error(gv_target ? gv_target->gd_csa : NULL, VARLSTCNT(1) SIGNAL);
 		}
 #		endif
 	}
@@ -469,10 +477,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			/* Fix gv_currkey to null-str in case gv_target points to dir_tree (possible in case of name-level-$order).
 			 * This is similar to how we fix gv_currkey for a successful name-level-$order operation (see op_gvorder.c).
-			 * Do same in case gv_target points to cs_addrs->hasht_tree (no idea how this is possible, but better to fix
-			 * it so we dont take the fast path in op_gvname when gv_target is clearly not GVT of a user-visible global.
+			 * Do same in case gv_target points to cs_addrs->hasht_tree so we dont take the fast path in op_gvname
+			 * when gv_target is clearly not GVT of a user-visible global.
 			 */
-			GTMTRIG_ONLY(assert(gv_target != csa->hasht_tree);)
 			if ((gv_target == csa->dir_tree) GTMTRIG_ONLY(|| (gv_target == csa->hasht_tree)))
 			{
 				gv_currkey->end = 0;
@@ -534,9 +541,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 * duplicate message.
 			 */
 			assert(ERR_VMSMEMORY == SIGNAL);
-			send_msg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),
+			send_msg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),	/* BYPASSOK - send_msg */
 				 *(int **)(&sig->chf$is_sig_arg1 + 2));
-			gtm_putmsg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),
+			gtm_putmsg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),	/* BYPASSOK - gtm_putmsg */
 				   *(int **)(&sig->chf$is_sig_arg1 + 2));
 			SIGNAL = ERR_GTMERREXIT;	/* Override reason for "stop" */
 #			endif
@@ -668,7 +675,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		/* Verify not indirect or that context is unchanged before reset context */
 		assert(NULL != restart_pc);
 		assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
-		DBGEHND((stderr, "mdb_condition_handler(1): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt"
+		DBGEHND((stderr, "mdb_condition_handler(1): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
 			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
 			 frame_pointer->type));
 		frame_pointer->mpc = restart_pc;
@@ -681,7 +688,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{	/* Verify not indirect or that context is unchanged before reset context */
 			assert(NULL != restart_pc);
 			assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
-			DBGEHND((stderr, "mdb_condition_handler(2): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt"
+			DBGEHND((stderr, "mdb_condition_handler(2): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
 				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
 				 frame_pointer->type));
 			frame_pointer->mpc = restart_pc;
@@ -819,7 +826,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				} else
 				{
 					PRN_ERROR;
-					rts_error(VARLSTCNT(1) ERR_NOEXCNOZTRAP);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOEXCNOZTRAP);
 				}
 			}
 			if (clean_mum_tstart())
@@ -856,7 +863,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{	/* Verify not indirect or that context is unchanged before reset context */
 		assert(NULL != restart_pc);
 		assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
-		DBGEHND((stderr, "mdb_condition_handler(4): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt"
+		DBGEHND((stderr, "mdb_condition_handler(4): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
 			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
 			 frame_pointer->type));
 		frame_pointer->mpc = restart_pc;
@@ -1159,7 +1166,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			PRN_ERROR;
 			if (TREF(compile_time) && (((int)ERR_LABELMISSING) != SIGNAL))
-				show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+				show_source_line(TRUE);
 		}
 	}
 	/* Slight divergence in how we handle otherwise unhandled errors on UNIX and VMS. UNIX now has a strict no-unsolicited

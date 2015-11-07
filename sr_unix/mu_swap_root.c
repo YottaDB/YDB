@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,9 +115,6 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csd = cs_data;
-	csa = cs_addrs;
-	cnl = csa->nl;
 	assert(mu_reorg_process);
 	gv_target->root = 0;
 	gv_target->clue.end = 0;
@@ -127,6 +124,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 #	ifdef GTM_TRIGGER
 	if (IS_MNAME_HASHT_GBLNAME(gn->str))
 	{	/* Initialize ^#t global for this region. */
+		csa = cs_addrs;	/* needed for SETUP_TRIGGER_GLOBAL and INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED macros */
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
@@ -138,6 +136,11 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 		return TRUE;
 	}
+	csa = cs_addrs;
+	cnl = csa->nl;
+	csd = cs_data;	/* Be careful to keep csd up to date. With MM, cs_data can change, and
+			 * dereferencing an older copy can result in a SIG-11.
+			 */
 	if (dba_mm == csd->acc_meth)
 		/* return for now without doing any swapping operation because later mu_truncate
 		 * is going to issue the MUTRUNCNOTBG message.
@@ -348,12 +351,15 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* parent_blk_lvl is 0 iff we're moving a gvt root block */
 	parent_blk_id = dir_hist_ptr->h[parent_blk_lvl].blk_num;
 	CHECK_AND_RESET_UPDATE_ARRAY;
-	freeblkhist.blk_num = (block_id)free_blk_id;
-	if (NULL == (freeblkhist.buffaddr = t_qread(free_blk_id, (sm_int_ptr_t)&freeblkhist.cycle, &freeblkhist.cr)))
-	{
-		assert(t_tries < CDB_STAGNATE);
-		t_retry((enum cdb_sc)rdfail_detail);
-		return RETRY_SWAP;
+	if (free_blk_recycled)
+	{	/* Otherwise, it's a completely free block, in which case no need to read. */
+		freeblkhist.blk_num = (block_id)free_blk_id;
+		if (NULL == (freeblkhist.buffaddr = t_qread(free_blk_id, (sm_int_ptr_t)&freeblkhist.cycle, &freeblkhist.cr)))
+		{
+			assert(t_tries < CDB_STAGNATE);
+			t_retry((enum cdb_sc)rdfail_detail);
+			return RETRY_SWAP;
+		}
 	}
 	child_blk_size = ((blk_hdr_ptr_t)child_blk_ptr)->bsiz;
 	BLK_INIT(bs_ptr, bs1);

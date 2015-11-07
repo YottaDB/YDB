@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ void mupip_extend(void)
 	r_len = SIZEOF(regionname);
 	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
-		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
 	if (cli_get_int("BLOCKS",&tblocks))
 	{
 		if (tblocks < 1)
@@ -98,7 +98,7 @@ void mupip_extend(void)
 	}
 	if (i >= gd_header->n_regions)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_NOREGION, 2, r_len, regionname);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, r_len, regionname);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	if ((dba_bg != gv_cur_region->dyn.addr->acc_meth) && (dba_mm != gv_cur_region->dyn.addr->acc_meth))
@@ -127,7 +127,7 @@ void mupip_extend(void)
 	gvcst_init(gv_cur_region);
 	if (gv_cur_region->was_open)
 	{	/* This should not happen as extend works on only one region at a time, but handle for safety */
-		gtm_putmsg(VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));
 		DB_IPCS_RESET(gv_cur_region);
 		mupip_exit(ERR_MUNOACTION);
 	}
@@ -147,7 +147,7 @@ void mupip_extend(void)
 	/* cannot extend for read_only database. */
 	if (gv_cur_region->read_only)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		DB_IPCS_RESET(gv_cur_region);
 		mupip_exit(ERR_MUNOACTION);
 	}
@@ -158,7 +158,7 @@ void mupip_extend(void)
 			grab_crit(gv_cur_region);
 			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
 			old_total = cs_addrs->ti->total_blks;
-			if ((uint4)NO_FREE_SPACE == (status = gdsfilext(blocks, old_total)))
+			if ((uint4)NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 			{
 				rel_crit(gv_cur_region);
 				util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,

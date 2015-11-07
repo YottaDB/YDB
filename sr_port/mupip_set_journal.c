@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -145,7 +145,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	max_reg_seqno = 1;
 	if (!mupip_set_journal_parse(&jnl_options, &jnl_info))
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_MUPCLIERR);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		error_condition = ERR_MUPCLIERR;
 		return ERR_MUPCLIERR;
 	}
 	if (region && (NULL == grlist))
@@ -178,7 +179,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		{
 			if (dba_usr == rptr->reg->dyn.addr->acc_meth)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Journaling is not supported for access method USR"));
 				exit_status |= EXIT_WRN;
 				continue;
@@ -217,7 +218,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		assert(!gv_cur_region->was_open);	/* In case mupip_set_file opened it, they must have closed */
 		if (gv_cur_region->read_only)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 			exit_status |= EXIT_RDONLY;
 			continue;
 		}
@@ -303,7 +304,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				rptr->state = ALLOCATED;
 			} else
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_MUSTANDALONE, 2,
+						DB_LEN_STR(gv_cur_region));
 				exit_status |= EXIT_ERR;
 				continue;
 			}
@@ -398,11 +400,13 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			if (jnl_info.alignsize <= csd->blk_size)
 			{
 				if (region)
-					gtm_putmsg(VARLSTCNT(9) ERR_JNLALIGNTOOSM, 7, jnl_info.alignsize, csd->blk_size,
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_JNLALIGNTOOSM, 7,
+							jnl_info.alignsize, csd->blk_size,
 							LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
 							(DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE));
 				else
-					gtm_putmsg(VARLSTCNT(9) ERR_JNLALIGNTOOSM, 7, jnl_info.alignsize, csd->blk_size,
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_JNLALIGNTOOSM, 7,
+							jnl_info.alignsize, csd->blk_size,
 							LEN_AND_LIT("database file"), jnl_info.fn_len, jnl_info.fn,
 							(DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE));
 
@@ -454,18 +458,19 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 */
 			if (jnl_info.autoswitchlimit < jnl_info.alloc)
 			{
-				gtm_putmsg(VARLSTCNT(7) ERR_JNLSWITCHTOOSM, 5, jnl_info.autoswitchlimit,
-								jnl_info.alloc, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLSWITCHTOOSM, 5,
+						jnl_info.autoswitchlimit, jnl_info.alloc, DB_LEN_STR(gv_cur_region));
 				if (newjnlfiles)
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+							jnl_info.jnl_len, jnl_info.jnl);
 				exit_status |= EXIT_ERR;
 				break;
 #ifdef UNIX
 			} else if (jnl_info.alloc + jnl_info.extend > jnl_info.autoswitchlimit
 					&& jnl_info.alloc != jnl_info.autoswitchlimit)
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc, jnl_info.autoswitchlimit,
-						"database file", DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc,
+						jnl_info.autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
 				jnl_info.alloc = jnl_info.autoswitchlimit;
 #endif
 			} else
@@ -482,15 +487,15 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					if (jnl_options.autoswitchlimit_specified || jnl_options.extension_specified
 											|| jnl_options.allocation_specified)
 					{	/* print rounding down of autoswitchlimit only if journal options were specified */
-						gtm_putmsg(VARLSTCNT(8) ERR_JNLSWITCHSZCHG, 6,
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLSWITCHSZCHG, 6,
 								jnl_info.autoswitchlimit, align_autoswitch,
 								jnl_info.alloc, jnl_info.extend, DB_LEN_STR(gv_cur_region));
 					}
 					jnl_info.autoswitchlimit = align_autoswitch;
 					if (JNL_AUTOSWITCHLIMIT_MIN > jnl_info.autoswitchlimit)
 					{
-						gtm_putmsg(VARLSTCNT(5) ERR_JNLINVSWITCHLMT, 3, jnl_info.autoswitchlimit,
-											JNL_AUTOSWITCHLIMIT_MIN, JNL_ALLOC_MAX);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_JNLINVSWITCHLMT, 3,
+								jnl_info.autoswitchlimit, JNL_AUTOSWITCHLIMIT_MIN, JNL_ALLOC_MAX);
 						exit_status |= EXIT_ERR;
 						break;
 					}
@@ -506,9 +511,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 			if (FILE_STAT_ERROR == (new_stat_res = gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &status)))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len, jnlfile.addr, status);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len,
+						jnlfile.addr, status);
 				if (newjnlfiles)
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnlfile.len, jnlfile.addr);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+							jnlfile.len, jnlfile.addr);
 				exit_status |= EXIT_ERR;
 				break;
 			}
@@ -518,8 +525,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			/* Note: At this point jnlfile should have expanded journal name with extension */
 			if (MAX_FN_LEN + 1 < jnl_info.jnl_len)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_FILENAMETOOLONG);
-				gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+						jnl_info.jnl_len, jnl_info.jnl);
 				exit_status |= EXIT_ERR;
 				break;
 			}
@@ -531,9 +539,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			{
 				if (FILE_STAT_ERROR == (curr_stat_res = gtm_file_stat(&jnlfile, NULL, NULL, TRUE, &status)))
 				{
-					gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len, jnlfile.addr, status);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2,
+							jnlfile.len, jnlfile.addr, status);
 					if (newjnlfiles)
-						gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+								jnl_info.jnl_len, jnl_info.jnl);
 					exit_status |= EXIT_ERR;
 					break;
 				}
@@ -605,8 +615,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				}
 				if ((FILE_PRESENT & new_stat_res) && !safe_to_switch)
 				{
-					gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEEXISTS, 2,
+							jnl_info.jnl_len, jnl_info.jnl);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+							jnl_info.jnl_len, jnl_info.jnl);
 					exit_status |= EXIT_ERR;
 					break;
 				}
@@ -625,14 +637,17 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				{
 					if (FILE_READONLY & curr_stat_res)
 					{
-						gtm_putmsg(VARLSTCNT(4) ERR_JNLRDONLY, 2, JNL_LEN_STR(csd));
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLRDONLY, 2,
+								JNL_LEN_STR(csd));
 						if (newjnlfiles)
-							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
+									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 						exit_status |= EXIT_RDONLY;
 						continue;
 					}
 				} else
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, JNL_LEN_STR(csd));
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLFNF, 2,
+							JNL_LEN_STR(csd));
 			}
 			if (!rptr->exclusive)
 			{
@@ -696,8 +711,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 #						ifdef VMS
 						if (!jnlname_same && (FILE_PRESENT & new_stat_res))
 						{
-							gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
-							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
+									ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
+									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 							exit_status |= EXIT_ERR;
 							break;
 						}
@@ -727,20 +744,21 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
                                 if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
 				{	/* There was an error attempting to create the journal file */
 					exit_status |= status;
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+							jnl_info.jnl_len, jnl_info.jnl);
 					continue;
 				}
 				csd->jnl_checksum = jnl_info.checksum;
 				csd->jnl_eovtn = csd->trans_hist.curr_tn;
-				gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 					db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
 					LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
 				if ((!curr_jnl_present && (jnl_open == jnl_curr_state))
 					|| (curr_jnl_present && jnl_info.no_prev_link) || this_iter_prevlinkcut_error)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
 						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
-					send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
 						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
 				}
                         }
@@ -757,13 +775,13 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				if (jnl_buffer_invalid)
 				{
 					SNPRINTF(s, JNLBUFFUPDAPNDX_SIZE, JNLBUFFUPDAPNDX, JNL_BUFF_PORT_MIN(csd), JNL_BUFFER_MAX);
-					gtm_putmsg(VARLSTCNT(10)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(10)
 						(region ? ERR_JNLBUFFREGUPD : ERR_JNLBUFFDBUPD), 4,
 						(region ? gv_cur_region->rname_len : jnl_info.fn_len),
 						(region ? gv_cur_region->rname : jnl_info.fn),
 						jnl_info.buffer, jnl_buffer_size, ERR_TEXT, 2, LEN_AND_STR(s));
 				} else
-					gtm_putmsg(VARLSTCNT(6)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6)
 						(region ? ERR_JNLBUFFREGUPD : ERR_JNLBUFFDBUPD), 4,
 						(region ? gv_cur_region->rname_len : jnl_info.fn_len),
 						(region ? gv_cur_region->rname : jnl_info.fn),
@@ -793,11 +811,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			UNIX_ONLY(csd->yield_lmt = DEFAULT_YIELD_LIMIT;)
 		}
 		if (CLI_ABSENT != jnl_options.cli_journal || CLI_ABSENT != jnl_options.cli_replic_on)
-			gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
-				LEN_AND_STR(jnl_state_lit[rptr->jnl_new_state]));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len,
+					db_reg_name, LEN_AND_STR(jnl_state_lit[rptr->jnl_new_state]));
 		if (CLI_ABSENT != jnl_options.cli_replic_on)
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
-				LEN_AND_STR(repl_state_lit[jnl_info.repl_state]));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_REPLSTATE, 6, db_or_reg_len, db_or_reg, db_reg_name_len,
+					db_reg_name, LEN_AND_STR(repl_state_lit[jnl_info.repl_state]));
 		/* Write the updated information back to the database file */
 		fc->op = FC_WRITE;
 		fc->op_buff = (sm_uc_ptr_t)csd;

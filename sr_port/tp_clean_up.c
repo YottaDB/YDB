@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -180,9 +180,14 @@ void	tp_clean_up(boolean_t rollback_flag)
 			}
 #			endif
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */
+			tp_allocation_clue = gtm_tp_allocation_clue;	/* Reset clue to what it was at beginning of transaction */
 		} else
 		{
 			GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, TRUE));
+			gtm_tp_allocation_clue = tp_allocation_clue;	/* Update tp allocation clue for next transaction to skip
+									 * past values used in this transaction now that this one
+									 * is successfully committed.
+									 */
 		}
 		GTMTRIG_ONLY(assert(!TREF(gvt_triggers_read_this_tn));)
 		GTMTRIG_ONLY(TP_ASSERT_ZTRIGGER_CYCLE_RESET;) /* for all regions, we better have csa->db_dztrigger_cycle = 0*/
@@ -289,7 +294,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 								}
 							} else
 							{
-								t1->buffaddr = cs_addrs->acc_meth.mm.base_addr
+								t1->buffaddr = MM_BASE_ADDR(cs_addrs)
 											+ (sm_off_t)cs_data->blk_size * cseblk;
 								assert(NULL == t1->cr);
 							}
@@ -306,8 +311,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 										blk_target->root = cseblk;
 									t1->blk_num = cseblk;
 									if (is_mm)
-										t1->buffaddr =
-											cs_addrs->acc_meth.mm.base_addr
+										t1->buffaddr = MM_BASE_ADDR(cs_addrs)
 											+ (sm_off_t)cs_data->blk_size * cseblk;
 									else
 									{
@@ -425,7 +429,6 @@ void	tp_clean_up(boolean_t rollback_flag)
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
 	VMS_ONLY(tp_has_kill_t_cse = FALSE;)
-	tp_allocation_clue = gtm_tp_allocation_clue + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP). The only exception

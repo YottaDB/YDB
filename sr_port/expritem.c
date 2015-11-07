@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -263,6 +263,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "ZM"}, {8, "ZMESSAGE"}
 	,{2, "ZP"}, {8, "ZPREVIOU*"}
 	,{6, "ZPARSE"}
+	,{5, "ZPEEK"}
 	,{3, "ZPI"}, {6, "ZPIECE"}
 	,{4, "ZPID"}
 	,{5, "ZPRIV"}, {8, "ZPRIVILE*"}
@@ -283,7 +284,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 115	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 116	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -351,6 +352,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
 	,{ OC_FNZPREVIOUS, ALL_SYS }, { OC_FNZPREVIOUS, ALL_SYS }
 	,{ OC_FNZPARSE, ALL_SYS }
+	,{ OC_FNZPEEK, UNIX_OS }
 	,{ OC_FNZPIECE, ALL_SYS }, { OC_FNZPIECE, ALL_SYS }
 	,{ OC_FNZPID, VMS_OS }
 	,{ OC_FNZPRIV, VMS_OS }, { OC_FNZPRIV, VMS_OS }
@@ -427,6 +429,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_mint, f_mint,
 	f_zprevious, f_zprevious,
 	f_zparse,
+	f_zpeek,
 	f_piece, f_piece,
 	f_mint,
 	f_mstr, f_mstr,
@@ -445,7 +448,6 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 int expritem(oprtype *a)
 {
 	boolean_t	parse_warn, saw_local, saw_se, se_warn;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	oprtype 	*j, *k, x1;
 	int		i, index, sv_opcode;
 	tbp		argbp, *funcbp, *tripbp;
@@ -712,11 +714,7 @@ int expritem(oprtype *a)
 					dqins(t1, exorder, ref); 	/* NOTE:this violates infomation hiding */
 					k->oprval.tref = ref;
 					if (se_warn)
-					{
-						TREF(last_source_column) = t1->src.column + 1;
-						show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-						dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
-					}
+						ISSUE_SIDEEFFECTEVAL_WARNING(t1->src.column + 1);
 				} else
 					saw_se = TRUE;
 			}

@@ -1,0 +1,31 @@
+	.title	OP_RESTARTPC  "Save PC"
+
+	G_MSF
+
+call_inst_size = 12
+
+	$linkage_section
+
+A_restart_ctxt:
+	.address restart_ctxt
+A_restart_pc:
+	.address restart_pc
+
+
+	$code_section
+
+	$routine OP_RESTARTPC, entry=OP_RESTARTPC_CA, kind=null
+	.base	r27, $ls
+
+	ldq	r25, A_restart_pc
+	subq	r26, call_inst_size, r28
+	stl	r28, (r25)
+	ldq	r25, A_restart_ctxt
+	ldl	r28, msf$ctxt_off(r12)
+	stl	r28, (r25)
+
+	ret	r26
+
+	$end_routine
+
+	.end

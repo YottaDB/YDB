@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,8 +66,8 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 	}
 	if (SS_NORMAL != (new_jctl->status = mur_fread_eof(new_jctl, rctl)))
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_JNLBADRECFMT, 3, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
-				new_jctl->rec_offset, new_jctl->status);
+		gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(6) ERR_JNLBADRECFMT, 3, new_jctl->jnl_fn_len,
+			new_jctl->jnl_fn, new_jctl->rec_offset, new_jctl->status);
 		free(new_jctl);
 		return FALSE;
 	}
@@ -79,7 +79,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 	assert((new_jctl->properly_closed && !new_jctl->jfh->crash) || (jctl->jfh->recover_interrupted &&
 			!new_jctl->jfh->recover_interrupted));
 	assert(!mur_options.forward || (!(jctl->jfh->recover_interrupted && !new_jctl->jfh->recover_interrupted)));
-	/* Skip the continuty of journal files check if both of these are true:
+	/* Skip the continuity of journal files check if both of these are true:
 	 * 1) if current generation was created by recover and
 	 * 2) the new one to be inserted was not created by recover
 	 */
@@ -96,7 +96,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		}
 		if ((!mur_options.forward || !mur_options.notncheck) && (new_jctl->jfh->eov_tn != jctl->jfh->bov_tn))
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
 				&new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
 				&jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
 			free(new_jctl);
@@ -115,9 +115,9 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		}
 		if (NULL == rl_ptr)
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd), new_jctl->jnl_fn_len,
-					new_jctl->jnl_fn, new_jctl->jfh->data_file_name_length,
-					new_jctl->jfh->data_file_name);
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(8) ERR_DBJNLNOTMATCH,
+				6, DB_LEN_STR(rctl->gd), new_jctl->jnl_fn_len, new_jctl->jnl_fn,
+				new_jctl->jfh->data_file_name_length, new_jctl->jfh->data_file_name);
 			free(new_jctl);
 			return FALSE;
 		}
@@ -127,7 +127,8 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		if (new_jctl->jfh->prev_jnl_file_name_length == cur_jctl->jnl_fn_len &&
 			0 == memcmp(new_jctl->jfh->prev_jnl_file_name, cur_jctl->jnl_fn, cur_jctl->jnl_fn_len))
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLCYCLE, 4, cur_jctl->jnl_fn_len, cur_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(6) ERR_JNLCYCLE, 4, cur_jctl->jnl_fn_len,
+				cur_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
 			free(new_jctl);
 			return FALSE;
 		}
@@ -153,6 +154,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 	rctl->jctl = rctl->jctl_head = new_jctl;
 	assert(new_jctl->reg_ctl == rctl);
 	*jjctl = new_jctl;
-	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLPREVGEN, 4, new_jctl->jnl_fn_len, new_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
+	gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(6) ERR_MUJNLPREVGEN, 4, new_jctl->jnl_fn_len,
+		new_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
 	return TRUE;
 }

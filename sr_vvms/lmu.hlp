@@ -1,0 +1,589 @@
+
+1 Overview
+  LMU Overview
+   Greystone products are sold under license. A  license  permits  the  legal
+   operation  of  a  Greystone  product  on  one  or  more   machines.   When
+   entering into a software license  agreement  with  Greystone  you  receive
+   an  installation  kit  containing  the  software  and  a  unique  set   of
+   information  called  a  Product  Authorization  Key  (PAK).  Although  the
+   software license gives you the legal right to  use  the  software,  it  is
+   the PAK which mechanically enables you  to  use  the  software.  You  must
+   enter this PAK information  into  your  system  before  you  can  actually
+   use  the  licensed  software.  The  License   Management   Utility   (LMU)
+   provides  the  commands  needed   to   enter   and   maintain   this   PAK
+   information. LMU is supplied with all  Greystone  products  which  require
+   a PAK.
+
+2 Acquiring_PAKs
+      Acquiring     your     Product     Authorization     Key      (PAK)
+   A Product Authorization Key (PAK)  is  a  set  of  information  provided
+   by   Greystone   which   identifies   and   authorizes   your   licensed
+   configuration.  The  PAK  includes  those  configuration  details  which
+   are required by LMU to permit normal  operation  of  the  product.  PAKs
+   may  be  communicated  in  hardcopy,  orally  or  via  electronic  mail.
+   Handle your PAK  information  with  care.  Inappropriate  disclosure  of
+   PAKs could place  your  organization  in  violation  of  your  Greystone
+   license agreement(s).
+
+   If you have  just  received  new  PAK  information  you  need  to  enter
+   this  information  into  your  system  using  LMU   and   the   REGISTER
+   command.
+
+2 PAK_Info
+  PAK Information
+   When REGISTERing a PAK be sure to  enter  the  information  on  the  PAK
+   exactly. PAKs contain the following fields  of  information.  If  a  PAK
+   field is left blank the default listed  appears  when  you  display  the
+   PAK information again.
+
+3 Product
+  Product
+   o  Product - the name, for example GT.M
+
+3 Version
+  Version
+   o  Version   -   if   not   specified   the   configuration   is   not
+      restricted  to  a  particular  version.  Version  identifiers   are
+      in  the  format  Vm.n-p  where  m  is  a  major  release,  n  is  a
+      maintenance release, and  p  is  a  patch  level.  The  default  is
+      blank.
+
+3 Configuration
+  Configuration
+   o  Configuration  value  -  identifies  the  type  of  license  (user-
+      based or machine-based) and  if  user-based,  how  many  users.  If
+      no value is specified  the  configuration  does  not  restrict  the
+      number of  users,  indicating  a  machine-based  license.  A  value
+      corresponds  numerically  to  the  maximum  number  of   concurrent
+      users  licensed  for  the   product   (user-based   license).   The
+      default is "Unlimited jobs."
+
+3 Activation
+  Activation
+   o  Activation date  -  if  no  time  is  specified  the  configuration
+      is  already  valid.  Times   are   specified   in   [d]d-mon-[yy]yy
+      format. The default is "Not limited."
+
+3 Expiration
+  Expiration
+   o  Expiration date -  if  no  value  is  specified  the  configuration
+      does not expire.  If  a  PAK  has  no  expiration  date,  that  PAK
+      can  continue  in  use  until  some  event  such  as  an   operator
+      action or a CPU change makes  the  PAK  obsolete.  The  default  is
+      "Not limited."
+
+3 Configuration_ID
+  Configuration_ID
+   o  Configuration  ID  -  an  integer  which  uniquely  identifies  the
+      configuration. This field is required.
+
+3 Number-of-systems
+  Number-of-systems
+   o  Number of Systems -  how  many  separate  computers  share  in  the
+      configuration. Multiprocessor machines  such  as  a  VAX  6420  are
+      considered a single computer. This field is required.
+
+3 Hardware_Model
+  Hardware_Model
+   o  Hardware Model(s)  -  a  mnemonic  or  hexadecimal  identifier  for
+      the  computers  covered  by  the  configuration.  Hardware   models
+      are  included  even  in  PAKs  for  user-based  licenses.  Hardware
+      model  identifications  may  be  examined  using  the  SHOW  SYSTEM
+      command.
+
+3 Check_Sum
+  Check_Sum
+   o  Checksum - a 1 digit integer field followed by 4 fields each
+      of  4  alpha   characters   with   dashes   between   fields,   for
+      example:   0-AFFF-CEDC-EDCF-BDDD.   The   checksum   is   used   to
+      validate  that  the  fixed  portions  of  the  configuration   have
+      been correctly entered. This field is required.
+
+3 Creation
+  Creation
+   o  Creation date -  the  system  date  and  time  when  this  PAK  was
+      entered. This is automatically  generated  and  filled  in  by  the
+      system.
+
+3 Operator_ID
+  Operator_ID
+   o  Operator ID - the  Username  of  the  account  used  when  the  PAK
+      information  was  entered.  This  is  automatically  generated  and
+      filled in by the system.
+
+2 Configuration_files
+  Configuration Database Files
+   LMU  stores  the  PAK  information  in  one  or  more  files  which  are
+   referred to as  the  configuration  database.  Because  an  LMU  session
+   deals  with  a  single   file,   user   configuration   activities   are
+   generally  simplified  and  minimized  when  a  single  file  holds  all
+   licenses in  a  system.  This  is  particularly  true  in  a  VAXcluster
+   when multiple licenses for the same  product  may  exist  for  different
+   cluster  members.  However,  you  may  use  multiple  files  to   manage
+   configurations.
+
+   Note: The  system  automatically  sets  up  the  configuration  database
+   if you use the standard installation procedures.  If  you  do  not,  the
+   following provides information you may need.
+
+   Products access the configuration  database  through  the  logical  name
+   GTM$CNFDB.  The  default  specification  for  a  configuration  file  is
+   GTM$DIST:GTC.CNF.
+
+2 VMS_Locks
+     VMS     Locks     Used     by     the     Configuration     Facility
+   Greystone products  use  VMS  locks  to  verify  a  properly  configured
+   operation.  Each  process  actively  using   one   or   more   Greystone
+   configured  product(s)   requires   three   locks   per   product.   For
+   example, if there  are  5  programmers  using  the  GT.M  product,  they
+   are accessing 15 locks.
+
+   Make sure your system can  accommodate  the  number  of  locks  required
+   for your new software. Systems  with  large  numbers  of  processes  may
+   require adjustments  to  the  LOCKIDTBL  and  the  LOCKIDTBL_MAX  SYSGEN
+   parameters.
+
+2 License_types
+  License Types
+   To  prepare  the  appropriate  PAK  for  your  installation   you   must
+   determine  which  type  of  license  you  need.  Licenses   are   either
+   machine-based or user-based.
+
+3 Machine-based
+  Machine-based Licenses
+   A  machine-based  license  permits  any   number   of   processes   to
+   concurrently  use  a  Greystone  product  on  a  particular   machine.
+   Machine-based licenses are  usually  purchased  when  a  computer  has
+   a  potentially  large  number  of  concurrent  users.  The  advantages
+   of machine-based licenses are:
+
+   o  They  reward  an  efficient  time-sharing  environment.   If   your
+      application(s) supports many  users  per  VAX  Unit  of  Processing
+      (VUP), you are not penalized for your efficiency.
+
+   o  They  are  frequently   appropriate   for   the   dedicated   MUMPS
+      environment.
+
+   o  They   may   reduce   administrative    costs    in    a    growing
+      environment.  As  the  number  of  users  increases  no  action  is
+      required.  There  is  a  single  justification  cycle  rather  than
+      multiple cycles.
+
+3 User-based
+  User-based Licenses
+
+   A  user-based  license  places  a  maximum  limit  on  the  number  of
+   processes in a system  which  can  concurrently  use  a  product.  All
+   types   of   jobs   count   toward   the   user    limit    including:
+   interactive,  batch,   detached,   spawned   and   remote   processes.
+   User-based  licenses  are  generally  purchased  when  the  number  of
+   concurrent  users  is  small  relative  to   the   capacity   of   the
+   system. A user-based license  can  be  converted  to  a  machine-based
+   license.
+
+   The advantages of user-based licenses are:
+
+   o  They  reward  the  environment  where  jobs  tend  to  be   massive
+      rather than distributed.
+
+   o  They  permit  the  use  of  a  few  MUMPS  processes  in  a   large
+      general purpose system.
+
+   o  They permit a  "pay-as-you-go"  approach  to  the  introduction  of
+      MUMPS. Additional users  may  be  added  to  a  user-based  license
+      in increments of 4.
+
+
+1 DELETE
+  D[ELETE]
+   The DELETE command  removes  one  or  more  PAKs  from  the  configuration
+   database.
+
+   The format of the DELETE command is:
+
+   D[ELETE] [/qualifier=value]
+
+   Qualifiers to the DELETE command select the  PAKs  on  which  the  command
+   operates. If multiple qualifiers are used on a  DELETE,  only  PAKs  which
+   satisfy  the  values  for  all  qualifiers  are  presented  for  deletion.
+   After the PAK is presented, LMU presents the prompt:
+
+   Delete, Next or Quit D/N/Q [N]:
+
+   Example
+
+   LMU> DELETE/CON=135975
+
+
+1 EXIT
+  E[XIT]
+   The EXIT command terminates an LMU session.
+
+   The format of the EXIT command is:
+
+   E[XIT]
+
+   Example
+
+   LMU> EXIT
+   $
+
+1 HELP
+  H[ELP]
+   The HELP command  displays  online  information  about  LMU  commands  and
+   qualifiers,  using  the  VMS  help  facility.  HELP  takes   an   optional
+   parameter which specifies a topic on which  you  desire  help.  Exit  from
+   HELP by entering <RET> enough times to  leave  all  nested  levels  or  by
+   entering <CTRL Z>.
+
+   The format of the HELP command is:
+
+   H[ELP] [topic]
+
+   Example
+
+   LMU> HELP MODIFY
+
+   This command displays help on the MODIFY command.
+
+1 INITIALIZE
+  I[NITIALIZE]
+   The INITIALIZE command creates  and  formats  a  new  configuration  file.
+   If the file previously exists, INITIALIZE  displays  a  warning  and  does
+   not create the file. If you need  to  replace  an  existing  configuration
+   file, use the DCL DELETE command  to  remove  the  existing  copy  of  the
+   file before initiating the LMU session.
+
+   The format of the INITIALIZE command is:
+
+   I[NITIALIZE]
+
+   Example
+
+   LMU> INITIALIZE
+
+   Caution:  If  you  have   a   cluster   which   should   have   a   common
+   configuration  database,  define  GTM$CNFDB  to  GTC.CNF  or  some   other
+   appropriate file in a common directory  before  invoking  LMU  to  perform
+   an INITIALIZE.
+
+1 LIST
+  L[IST]
+   The LIST  command  displays  one  or  more  PAKs  from  the  configuration
+   database.
+
+   The format of the LIST command is:
+
+   L[IST] [/qualifier=value]
+
+   Qualifiers to the LIST command  select  the  PAKs  on  which  the  command
+   operates. If you use multiple  qualifiers  on  a  LIST,  only  PAKs  which
+   satisfy the values for all the qualifiers display.
+
+   For  more  detailed  information  and   examples,   refer   to   the   LMU
+   qualifiers description.
+
+   Example
+
+   LMU> LIST
+
+   This command LISTs  the  entire  contents  of  the  current  configuration
+   file.
+
+1 MODIFY
+  M[ODIFY]
+   The  MODIFY  command  changes  one  or  more  PAKs  in  the  configuration
+   database. Use the MODIFY command  to  reflect  any  changes  in  the  node
+   specific  information,   or   to   correct   discrepancies   between   the
+   information  entered  with  a  prior  REGISTER  or  MODIFY  and  the   PAK
+   information.
+
+   If your current configuration does not contain  all  the  nodes  specified
+   in  the  PAK,  LMU  is  not  able  to  fill  in   the   node   information
+   automatically. In this case, enter the information  if  it  is  available.
+   Otherwise, leave it blank and MODIFY  the  configuration  again  when  the
+   node becomes available.
+
+   The format of the MODIFY command is:
+
+   M[ODIFY] [/qualifier=value]
+
+   Qualifiers to the MODIFY command select the  PAKs  on  which  the  command
+   operates. If you use multiple qualifiers on  a  MODIFY,  only  PAKs  which
+   satisfy  the  values  for   all   the   qualifiers   are   presented   for
+   modification.
+
+1 REGISTER
+  R[EGISTER]
+   The  REGISTER  command  inserts   the   PAK   information   describing   a
+   configuration into a configuration  file.  Once  you  accurately  REGISTER
+   an appropriate PAK, the system configures  the  product  for  full  normal
+   operation.
+
+   The format of the REGISTER command is:
+
+   R[EGISTER]
+
+   REGISTER prompts for all fields. REGISTER does  not  verify  the  accuracy
+   of the configuration. However,  the  configuration  is  verified  whenever
+   a  process  uses  the  product.  Be  sure   to   enter   all   information
+   accurately  and  exactly,  as  an  incomplete  or  incorrect  PAK   cannot
+   provide normal product operation.
+
+   Warning: when LMU prompts to save  the  license,  it  acts  on  the  first
+   character of the response and does not wait for a <RET>.
+
+   If your current configuration does not contain  all  the  nodes  specified
+   in  the  PAK,  LMU  is  not  able  to  fill  in   the   node   information
+   automatically. In this case, enter the information  if  it  is  available.
+   Otherwise, leave it blank and  MODIFY  the  configuration  when  the  node
+   becomes available.
+
+1 SHOW
+  S[HOW] S[YSTEM]
+   The SHOW SYSTEM  command  presents  the  details  required  to  complement
+   the information supplied by the PAK to REGISTER a configuration.
+
+   The format of the SHOW SYSTEM command is:
+
+   S[HOW] S[YSTEM]
+
+   The SHOW SYSTEM command displays the following information:
+
+   o  Node name
+
+   o  Node id
+
+   o  Hardware Model mnemonic or hexadecimal identifier
+
+   In a VAXcluster, the  display  shows  a  line  for  each  machine.  In  an
+   unclustered   system,   SHOW   SYSTEM   displays   the   node   name    as
+   "stand-alone." The model mnemonic  displays  if  it  is  known,  otherwise
+   the hexadecimal id displays.
+
+1 Qualifiers
+  Qualifiers
+   LMU qualifiers are used with LMU  commands  to  direct  the  system  to  a
+   specific license or PAK.
+
+   The  INITIALIZE,  REGISTER  and  SHOW  SYSTEM  commands  do   not   accept
+   qualifiers. The LIST, MODIFY and DELETE commands  may  act  on  more  than
+   one PAK and take the same selecting  qualifiers.  If  multiple  qualifiers
+   are specified, only PAKs which  satisfy  the  values  for  all  qualifiers
+   are treated as objects of the command.  In  other  words,  the  effect  of
+   multiple qualifiers on the same command works as if there were ANDs.
+
+   LMU qualifiers  may  be  abbreviated  using  enough  characters  from  the
+   beginning of  the  qualifier  to  unambiguously  identify  the  qualifier.
+   LMU qualifiers can always be  abbreviated  to  four  characters  or  less.
+   Greystone  recommends  using  four   characters   or   more   in   command
+   procedure  files  so  commands  introduced  in  future  versions  do   not
+   necessitate  coding  changes.   The   description   for   each   qualifier
+   identifies the  current  minimum  abbreviation  by  showing  the  optional
+   part of the qualifier in square brackets ([]).
+
+   All of the LMU qualifiers  take  arguments.  The  qualifier  is  delimited
+   by an equal sign (=) which is followed by the argument.
+
+2 /ACTIVATION
+  /A[CTIVATION]
+   The  /ACTIVATION  qualifier   selects   PAKs   which   activate   on   a
+   particular date.
+
+   The format for the ACTIVATION qualifier is:
+
+   A[CTIVATION]=date
+
+   The  date  is  of  the   form   [d]d-mon-[yy]yy   and   cannot   contain
+   wildcards.  The  keywords  YESTERDAY,  TODAY  and  TOMORROW   are   also
+   accepted.
+
+   Example
+
+   LMU> LIST/ACTIV=31-oct-1985
+
+   This command LISTs all PAKs  with  an  availability  date  matching  the
+   31st of October, 1985.
+
+2 /CHECKSUM
+  /CH[ECKSUM]
+   The /CHECKSUM qualifier selects all  PAKs  with  checksums  which  match
+   the specified pattern.
+
+   The format for the CHECKSUM qualifier is:
+
+   /CH[ECKSUM]=pattern
+
+   Example
+
+   LMU> MODIFY/CHECKSUM=0-FDCI-AL*
+
+   This  command  selects   any   PAKs   with   checksums   starting   with
+   0-FDCI-AL for modification.
+
+2 /CONFIGURATION_ID
+  /CO[NFIGURATION_ID]
+   The /CONFIGURATION_ID  qualifier  selects  a  particular  PAK  based  on
+   its identifier.
+
+   The format for the CONFIGURATION_ID qualifier is:
+
+   /CO[NFIGURATION_ID]=integer
+
+   Example
+
+   LMU> LIST/CONFIG=1345
+
+   This command LISTs the PAK with the ID 1345.
+
+2 /CREATION
+  /CR[EATION]
+   The  /CREATION  qualifier  selects  PAKs  which  were  REGISTERed  on  a
+   particular date.
+
+   The format for the CREATION qualifier is:
+
+   /CR[EATION]=date
+
+   The  date  is  of  the   form   [d]d-mon-[yy]yy   and   cannot   contain
+   wildcards.  The  keywords  YESTERDAY,  TODAY  and  TOMORROW   are   also
+   accepted.
+
+   Example
+
+   LMU> MODIFY/CREATION=today
+
+   This command presents for modification all PAKs created today.
+
+2 /EXPIRATION
+  /E[XPIRATION]
+   The  /EXPIRATION  qualifier  selects  PAKs  which  have   a   particular
+   EXPIRATION date.
+
+   The format for the EXPIRATION qualifier is:
+
+   /E[XPIRATION]=date
+
+   The  date  is  of  the   form   [d]d-mon-[yy]yy   and   cannot   contain
+   wildcards.  The  keywords  YESTERDAY,  TODAY  and  TOMORROW   are   also
+   accepted.
+
+   Example
+
+   LMU> DELETE/EXPIR=yesterday
+
+   This  command   presents   for   deletion   all   PAKs   which   expired
+   yesterday.
+
+2 /HARDWARE_MODEL
+  /H[ARDWARE_MODEL]
+   The  /HARDWARE_MODEL  qualifier   selects   PAKs   which   configure   a
+   computer of a particular model.
+
+   The format for the HARDWARE_MODEL qualifier is:
+
+   /H[ARDWARE_MODEL]=hexadecimal-integer or mnemonic
+
+   Example
+
+   LMU> DELETE/HARDWARE=VUV2
+
+   or
+
+   LMU> DELETE/HARDWARE=0x8
+   
+   These commands display for possible deletion  all  PAKs  which  cover  a
+   MicroVAX II.
+
+2 /NODE_NUM
+  /NO[DE_NUM]
+   The /NODE_NUM qualifier  selects  PAKs  for  a  computer  based  on  the
+   node number.
+
+   The format for the NODE_NUM qualifier is:
+
+   /NO[DE_NUM]=integer
+
+   Example
+
+   LMU> LIST/NODE=57
+
+   This command LISTs all PAKs which configure node 57.
+
+2 /NUM_SYS
+  /NU[M_SYS]
+   The /NUM_SYS qualifier selects PAKs  which  cover  a  particular  number
+   of computers.
+
+   The format for the NUM_SYS qualifier is:
+
+   /NU[M_SYS]=integer
+
+   Example
+
+   DELETE/NUM_SYS=2
+
+   This  command  presents  for  deletion  all  PAKs   for   configurations
+   which cover two computers.
+
+2 /OPERATOR
+  /O[PERATOR]
+   The /OPERATOR qualifier  selects  PAKs  which  were  REGISTERed  by  VMS
+   user account(s) which match a pattern.
+
+   The format for the OPERATOR qualifier is:
+
+   /O[PERATOR]=pattern
+
+   Example
+
+   LMU> LIST/OPER=SMITH_C
+
+   This command LISTs all PAKs which had been REGISTERed by SMITH_C.
+
+2 /PRODUCT
+  /P[RODUCT]
+   The /PRODUCT qualifier  selects  PAKs  which  configure  products  which
+   match a pattern.
+
+   The format for the PRODUCT qualifier is:
+
+   /P[RODUCT]=pattern
+
+   Example
+
+   LMU> MODIFY/PROD=GT.CX
+
+   This  command  presents  for  modification  all  PAKs  for   the   GT.CX
+   product.
+
+2 /VALUE
+  /VA[LUE]
+   The  /VALUE  qualifier  selects  PAKs  which  authorize   a   particular
+   number of concurrent processes.
+
+   The format for the VALUE qualifier is:
+
+   /VA[LUE]=integer
+
+   Example
+
+   LMU> LIST/VALUE=20
+
+   This command LISTs all PAKs which configure 20 users.
+
+2 /VERSION
+  /VE[RSION]
+   The  /VERSION   qualifier   selects   PAKs   which   authorize   product
+   versions which match a pattern.
+
+   The format for the VERSION qualifier is:
+
+   /VE[RSION]=pattern
+
+   Example
+
+   LMU> MODIFY/VERSION=V2*
+
+   This  command  presents  for  modification  all  PAKs  with  a   version
+   starting with V2.

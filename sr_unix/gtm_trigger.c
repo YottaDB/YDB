@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 
 #include <errno.h>
 
+#include "cmd_qlf.h"
 #include "compiler.h"
 #include "error.h"
 #include <rtnhdr.h>
@@ -454,7 +455,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	mv_chain->mv_st_cont.mvs_msav.v = dollar_zsource;
 	mv_chain->mv_st_cont.mvs_msav.addr = &dollar_zsource;
 	TREF(trigger_compile) = TRUE;		/* Set flag so compiler knows this is a special trigger compile */
-	op_zcompile(&zcompprm, FALSE);	/* Compile but don't require a .m file extension */
+	op_zcompile(&zcompprm, TRUE);	/* Compile but don't use $ZCOMPILE qualifiers */
 	TREF(trigger_compile) = FALSE;	/* compile_source_file() establishes handler so always returns */
 	if (0 != TREF(dollar_zcstatus))
 	{	/* Someone err'd.. */
@@ -975,7 +976,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	stp_move((char *)rtnhdr->literal_text_adr,
 		 (char *)(rtnhdr->literal_text_adr + rtnhdr->literal_text_len));
 	GTM_TEXT_FREE(rtnhdr->ptext_adr);			/* R/O releasable section */
-	free(rtnhdr->literal_adr);				/* R/W releasable section part 1 */
+	free(RW_REL_START_ADR(rtnhdr));				/* R/W releasable section part 1 */
 	free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
 	free(rtnhdr->labtab_adr);				/* Usually non-releasable but triggers don't have labels so
 								 * this is just cleaning up a dangling null malloc

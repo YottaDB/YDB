@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,20 @@
 #include "gtmimagename.h"
 #include "error.h"
 #include "util.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "gtmmsg.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	int		gtm_errno;
 GBLREF	boolean_t 	created_core;
 GBLREF	boolean_t	dont_want_core;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnlpool_addrs	jnlpool;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -38,15 +48,40 @@ error_def(ERR_REPLONLNRLBK);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TPRETRY);
 
+int rts_error_va(void *csa, int argcnt, va_list var);
+
 /* ----------------------------------------------------------------------------------------
  *  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
  *  =======	zero MUST be specified if there are no parameters.
  * ----------------------------------------------------------------------------------------
  */
+
 int rts_error(int argcnt, ...)
 {
-	int 		msgid;
 	va_list		var;
+	sgmnt_addrs	*csa;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	csa = (ANTICIPATORY_FREEZE_AVAILABLE && jnlpool.jnlpool_ctl) ? REG2CSA(gv_cur_region) : NULL;
+	VAR_START(var, argcnt);
+	return rts_error_va(csa, argcnt, var);
+}
+
+int rts_error_csa(void *csa, int argcnt, ...)
+{
+	va_list		var;
+
+	VAR_START(var, argcnt);
+	return rts_error_va(csa, argcnt, var);
+}
+
+int rts_error_va(void *csa, int argcnt, va_list var)
+{
+	int 		msgid;
+	va_list		var_dup;
+	const err_msg	*msg;
+	const err_ctl	*ctl;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -61,11 +96,10 @@ int rts_error(int argcnt, ...)
 		assert(FALSE);
 	}
 #	endif
+	VAR_COPY(var_dup, var);
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
-	VAR_START(var, argcnt);
-	msgid = va_arg(var, int);
-	va_end(var);
+	msgid = va_arg(var_dup, int);
 	/* If there was a previous fatal error that did not yet get printed, do it before overwriting the
 	 * util_output buffer with the about-to-be-handled nested error. This way one will see ALL the
 	 * fatal error messages (e.g. assert failures) in the order in which they occurred instead of
@@ -84,14 +118,20 @@ int rts_error(int argcnt, ...)
 		 */
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, RESET);
-		VAR_START(var, argcnt);		/* restart arg list */
-		gtm_putmsg_list(argcnt, var);
-		va_end(var);
+		if (NULL == (ctl = err_check(msgid)))
+			msg = NULL;
+		else
+			GET_MSG_INFO(msgid, ctl, msg);
+		error_condition = msgid;
+		severity = NULL == msg ? ERROR : SEVMASK(msgid);
+		gtm_putmsg_list(csa, argcnt, var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, OPER);			/* gtmsecshr errors always immediately pushed out */
 	}
+	va_end(var_dup);
+	va_end(var);
 	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers
 	 * when the severity was error or above. That code had to be removed because of several errors

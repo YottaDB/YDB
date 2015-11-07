@@ -1,0 +1,149 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2012 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.macro	mval$def
+
+mval$v_nm 	  = 0
+mval$v_int	  = 1
+mval$v_str	  = 2
+mval$v_num_approx = 3
+mval$v_canonical  = 4
+mval$v_sym	  = 5
+mval$v_sublit	  = 6
+mval$v_retarg	  = 7
+mval$v_utflen     = 8
+mval$v_aliascont  = 9
+
+mval$m_nm 	  = ^x1
+mval$m_int	  = ^x3
+mval$m_str	  = ^x4
+mval$m_num_approx = ^x8
+mval$m_canonical  = ^x10
+mval$m_sym	  = ^x20
+mval$m_sublit	  = ^x40
+mval$m_retarg	  = ^x80
+mval$m_utflen     = ^x100
+mval$m_aliascont  = ^x200
+
+mval$w_mvtype	= 0
+mval$b_exp	= 2
+mval$l_strlen	= 4
+mval$a_straddr	= 8
+mval$q_num	= 12
+mval$l_m0	= 12
+mval$l_m1	= 16
+
+mval$size	= 20
+
+MV_BIAS		= 1000
+MANT_LO		= 100000000
+MANT_HI		= 1000000000
+INT_HI		= 1000000
+
+	.macro	mv_force_defined	mval, ?label
+	mv_if_defined (mval), label
+	$call	underr, args=<mval>, nonstandard=true
+	mov	r0, mval
+label:	.endm	mv_force_defined
+
+	.macro	mv_force_defined_strict	mval, ?label
+	mv_if_defined (mval), label
+	$call	underr_strict, args=<mval>, nonstandard=true
+label:	.endm	mv_force_defined_strict
+
+	.macro	mv_force_str	mval, ?label
+	mv_if_string mval, label
+	$call	n2s, args=<mval/a>, nonstandard=true
+label:	.endm	mv_force_str
+
+	.macro	mv_force_num	mval, ?label
+	mv_if_number mval, label
+	$call	s2n, args=<mval/a>, nonstandard=true
+label:	.endm	mv_force_num
+
+	.macro	mv_force_str_if_num_approx	mval, ?label
+	mv_if_notnumapprox mval, label
+	$call	n2s, args=<mval/a>, nonstandard=true
+label:	.endm	mv_force_str_if_num_approx
+
+	.macro	mv_i2mval	int, mval
+	mov	MV_BIAS, r22
+	ldl	r24, mval$w_mvtype(mval)
+	mov	mval$m_int, r23
+	mskwl	r24, 0, r24			; clear mval$w_mvtype
+	mull	r22, int, r28
+	or	r24, r23, r24
+	stl	r28, mval$l_m1(mval)
+	stl	r24, (mval)
+	.endm	mv_i2mval
+
+	.macro	mv_if_string	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_str, r28
+	bne	r28, label
+	.endm	mv_if_string
+
+	.macro	mv_if_notstring	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_str, r28
+	beq	r28, label
+	.endm	mv_if_notstring
+
+	.macro	mv_if_number	mval, label
+	ldl	r28, mval
+	blbs	r28, label
+	.endm	mv_if_number
+
+	.macro	mv_if_notnumber	mval, label
+	ldl	r28, mval
+	blbc	r28, label
+	.endm	mv_if_notnumber
+
+	.macro	mv_if_notnumapprox	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_num_approx, r28
+	beq	r28, label
+	.endm	mv_if_notnumapprox
+
+	.macro	mv_if_int	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_int-mval$m_nm, r28
+	bne	r28, label
+	.endm	mv_if_int
+
+	.macro	mv_if_notint	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_int-mval$m_nm, r28
+	beq	r28, label
+	.endm	mv_if_notint
+
+	.macro	mv_if_defined	mval, label
+	ldl	r28, mval
+	and	r28, mval$m_nm+mval$m_str, r28
+	bne	r28, label
+	.endm	mv_if_defined
+
+	.macro	mv_if_notdefined mval, label
+	ldl	r28, mval
+	and	r28, mval$m_nm+mval$m_str, r28
+	beq	r28, label
+	.endm	mv_if_notdefined
+
+	.macro	mv_if_canonical	mval, label, ?label1, ?label2
+	mv_if_notnumber mval, label1
+	and	r28, mval$m_num_approx, r28
+	bne	label2
+	br	label
+label1:	$call	val_iscan, args=<mval/a>, nonstandard=true
+	bne	r0, label
+label2:	.endm	mv_if_canonical
+
+
+	.endm	mval$def

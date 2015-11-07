@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2010, 2012 Fidelity Information Services, Inc.#
+#       Copyright 2010, 2013 Fidelity Information Services, Inc.#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -247,7 +247,8 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     fi
     if [ -z "$gtm_repl_instance" ] ; then
         gtm_repl_instance=$gtmdir/$gtmver/g/gtm.repl ; export gtm_repl_instance
-    else gtm_repl_instance=`echo $gtm_repl_instance | sed "s;$old_gtmver;$gtmver;"`
+    elif [ -n "$old_gtmver" ] ; then
+	gtm_repl_instance=`echo $gtm_repl_instance | sed "s;$old_gtmver;$gtmver;"`
     fi
     if [ -z "$gtm_retention" ] ; then
         gtm_retention=42 ; export gtm_retention

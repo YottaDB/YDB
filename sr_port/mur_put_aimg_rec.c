@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ GBLREF	srch_hist		dummy_hist;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	cw_set_element		cw_set[];
-GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 /* Modified on the similar lines of dse AIMG record logic, needed for recover to write journal records */
 
 void mur_put_aimg_rec(jnl_record *rec)
@@ -87,7 +87,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 	if (JNL_ENABLED(cs_data))
 	{
 		cse = (cw_set_element *)(&cw_set[0]);
-		cse->new_buff = non_tp_jfb_buff_ptr;
+		cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
 		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, cs_addrs->ti->curr_tn);
 		cse->done = TRUE;
 	}

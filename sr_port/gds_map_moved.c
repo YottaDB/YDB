@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gv_namehead             *gv_target_list;
 
 
-void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top, off_t new_eof)
+void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top, size_t mmap_sz)
 {
 	int		hist_index;
 	sm_long_t	adj;
@@ -41,16 +41,11 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 
 	csa = cs_addrs;
 	assert(csa->now_crit);
-	/* This initialization has to be done irrespective of whether new_base is different from old_base or not. */
-	cs_data = csa->hdr = (sgmnt_data_ptr_t)new_base;
-	if (NULL != csa->mm_core_hdr)
-		*((sgmnt_data_ptr_t *)csa->mm_core_hdr) = cs_data;
-	csa->db_addrs[1] = new_base + new_eof - 1;
-	csa->bmm = MM_ADDR(cs_data);
-	csa->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_uc_ptr_t)cs_data + (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE);
-	if (NULL != csa->sgm_info_ptr)
-		csa->sgm_info_ptr->tp_csd = csa->hdr;
-	bt_init(csa);
+	assert(cs_data == csa->hdr);
+	assert((NULL == csa->sgm_info_ptr) || (csa->hdr == csa->sgm_info_ptr->tp_csd));
+	assert(csa->bmm == MM_ADDR(cs_data));
+	assert(csa->ti == &cs_data->trans_hist);
+	csa->db_addrs[1] = new_base + mmap_sz - 1;
 	/* The following adjustment needs to be done only if new_base is different from old_base */
 	if (new_base == old_base)
 		return;

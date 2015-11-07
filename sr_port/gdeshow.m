@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -15,7 +15,6 @@ ALL
 COMMANDS
 	s BOL="!"
 	set delim=$select("VMS"=ver:"/",1:"-")
-	set defconst=$select("VMS"=ver:"$DEFAULT",1:"DEFAULT")
 	i $l($get(cfile)) o cfile:(newversion:exc="w !,$ztatus c cfile zgoto $zl:cfilefail") u cfile d
 	. d namec,segmentc,regionc,templatec
 	. c cfile
@@ -44,8 +43,7 @@ namec:
 	w !,"LOCKS "_delim_"REGION=",nams(s)
 	f  s s=$o(nams(s)) q:'$l(s)  d
 	. i "*"'=s w !,"ADD "_delim_"NAME ",s," "_delim_"REGION=",nams(s) q
-	. s defreg=nams(s)
-	. i defconst'=defreg w !,"RENAME "_delim_"REGION "_defconst_" ",defreg
+	. i defreg'=nams(s) w !,"CHANGE "_delim_"NAME "_s_" "_delim_"REGION=",nams(s)
 	w !
 	q
 REGION
@@ -85,10 +83,12 @@ onejnl:
 	w !,BOL
 	q
 regionc:
-	s s=""
+	n defseen,cmd
+	s s="",defseen=FALSE
 	f  s s=$o(regs(s)) q:'$l(s)  d
-	. i s=defreg s defseg=regs(s,"DYNAMIC_SEGMENT")
-	. w !,$s(s=defreg:"CHANGE",1:"ADD")," "_delim_"REGION ",s," "_delim_"DYNAMIC=",regs(s,"DYNAMIC_SEGMENT")
+	. i s=defreg s defseen=TRUE,cmd="CHANGE"
+	. e  s cmd="ADD"
+	. w !,cmd," "_delim_"REGION ",s," "_delim_"DYNAMIC=",regs(s,"DYNAMIC_SEGMENT")
 	. f q="COLLATION_DEFAULT","RECORD_SIZE","KEY_SIZE" w " "_delim,q,"=",regs(s,q)
 	. w " "_delim_"NULL_SUBSCRIPTS=",$s(regs(s,"NULL_SUBSCRIPTS")=1:"ALWAYS",regs(s,"NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
 	. i regs(s,"STDNULLCOLL") w " "_delim_"STDNULLCOLL"
@@ -101,7 +101,7 @@ regionc:
 	. else  w " "_delim_"NOJOURNAL"
 	. i (ver'="VMS") w " "_delim_$s(regs(s,"INST_FREEZE_ON_ERROR"):"",1:"NO")_"INST_FREEZE_ON_ERROR"
 	. i (ver'="VMS") w " "_delim_$s(regs(s,"QDBRUNDOWN"):"",1:"NO")_"QDBRUNDOWN"
-	i defconst'=defseg w !,"DELETE "_delim_"SEGMENT "_defconst
+	i (FALSE=defseen) w !,"DELETE "_delim_"REGION "_defreg
 	w !,BOL
 	q
 SEGMENT
@@ -139,9 +139,12 @@ MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=OFF"
 	q
 segmentc:
-	s s=""
+	n defseen,cmd
+	s s="",defseen=FALSE
 	f  s s=$o(segs(s)) q:'$l(s)  s am=segs(s,"ACCESS_METHOD") d
-	. w !,$s(s=defseg:"CHANGE",1:"ADD")," "_delim_"SEGMENT ",s," "_delim_"ACCESS_METHOD=",segs(s,"ACCESS_METHOD")
+	. i s=defseg s defseen=TRUE,cmd="CHANGE"
+	. e  s cmd="ADD"
+	. w !,cmd," "_delim_"SEGMENT ",s," "_delim_"ACCESS_METHOD=",segs(s,"ACCESS_METHOD")
 	. i am="USER" q
 	. f q="BLOCK_SIZE","ALLOCATION","EXTENSION_COUNT","LOCK_SPACE","RESERVED_BYTES" w " "_delim,q,"=",segs(s,q)
 	. i "BG"=am d
@@ -149,6 +152,7 @@ segmentc:
 	.. i $zver'["VMS",encsupportedplat=TRUE,segs(s,"ENCRYPTION_FLAG") w " "_delim_"ENCRYPT"
 	. i "MM"=am w " "_delim,$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	. w " "_delim_"FILE=",segs(s,"FILE_NAME")
+	i (FALSE=defseen) w !,"DELETE "_delim_"SEGMENT "_defseg
 	w !,BOL
 	q
 MAP

@@ -1,0 +1,28 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+cluster = code_clust
+collect = code_clust,$code
+psect_attr = $char_string_constants,shr,nowrt
+cluster = gtmvector
+collect = gtmvector,gtmvector
+gsmatch = lequal,4,0
+symbol_vector=( -
+	cmi_close	= PROCEDURE, -
+	cmi_init	= PROCEDURE, -
+	cmi_open	= PROCEDURE, -
+	cmi_read	= PROCEDURE, -
+	cmi_write	= PROCEDURE, -
+	cmi_write_int	= PROCEDURE, -
+	cmu_makclb	= PROCEDURE, -
+	cmu_getclb	= PROCEDURE, -
+	cmu_ntdroot	= PROCEDURE -
+	)

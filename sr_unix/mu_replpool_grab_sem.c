@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,7 +172,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semctl()");
 		}
 		semarg.buf = &semstat;
-		if (-1 == semctl(sem_id, 0, IPC_STAT, semarg))
+		if (-1 == semctl(sem_id, DB_CONTROL_SEM, IPC_STAT, semarg))
 		{
 			save_errno = errno;
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semctl()");

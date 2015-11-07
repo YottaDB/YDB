@@ -1,0 +1,51 @@
+	.title	mint2mval "Convert integer to mval"
+
+; ###############################################################
+; #								#
+; #	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
+; #								#
+; #	This source code contains the intellectual property	#
+; #	of its copyright holder(s), and is made available	#
+; #	under a license.  If you do not know the terms of	#
+; #	the license, please stop and do not read further.	#
+; #								#
+; ###############################################################
+
+;	On input, r1 = integer value, r0 -> mval
+
+	mval$def
+
+	$linkage_section
+
+int_hi_val:
+	.quad	INT_HI
+
+	$routine MINT2MVAL, entry=MINT2MVAL_CA, kind=null
+	lda	sp, -24(sp)
+	stq	r26, (sp)
+	stq	r13, 8(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	ldq	r22, int_hi_val
+	cmplt	r1, r22, r28
+	beq	r28, 11$		; int >= INT_HI
+	negq	r22, r22
+	cmple	r1, r22, r28
+	bne	r28, 11$		; int <= -INT_HI
+
+	mv_i2mval r1, r0
+
+12$:	ldq	r26, (sp)
+	ldq	r13, 8(sp)
+	lda	sp, 24(sp)
+	ret	r26
+
+11$:	mov	r0, r16
+	mov	r1, r17
+	$call I2MVAL, args=<r16, r17>, set_arg_info=false, nonstandard=true
+	br	12$
+
+	$end_routine
+
+	.end

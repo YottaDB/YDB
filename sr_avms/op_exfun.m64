@@ -1,0 +1,85 @@
+	.title	op_exfun - invoke (internal) extrinsic function
+; ###############################################################
+; #								#
+; #	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+; #								#
+; #	This source code contains the intellectual property	#
+; #	of its copyright holder(s), and is made available	#
+; #	under a license.  If you do not know the terms of	#
+; # 	the license, please stop and do not read further.	#
+; #								#
+; ###############################################################
+
+	G_MSF
+
+;	op_exfun - invoke (internal) extrinsic function
+;
+;	arguments:
+;		ret_value	address for function to place return value
+;		offset		to this frame's continue (return) point past branch to subroutine
+;		mask
+;		actualcnt	actual argument count
+;		actual1		address of actual first argument
+;		actual2		address of actual second argument
+;		. . .
+
+	$routine	name=op_exfun, entry=op_exfun_ca, kind=stack, saved_regs=<r2, r13, r16, r17, r18, r19, r20, r21, fp>, -
+			data_section_pointer=true, -
+			data_section=<$DATA$, QUAD, NOPIC, CON, REL, LCL, NOSHR, MIX, NOEXE, RD, WRT>
+
+	$linkage_section
+
+A_frame_pointer:	.address	frame_pointer
+
+	$code_section
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	ldq	r1,  A_frame_pointer
+	ldl	r1,  (r1)
+	addl	r26, r17, r28	; add size of jump sequence to get return addr for frame.
+	stl	r28, msf$mpc_off(r1)
+	$call	exfun_frame, set_arg_info=false
+	ldl	r16, 0(r10)		; $TRUTH aka $TEST value
+        bic     r16, #^Xfe, r16         ; clear all but low order bit
+	ldq	r17, $RSA_OFFSET+24(fp)	; old r16 (ret_value)
+	ldq	r18, $RSA_OFFSET+40(fp) ; old r18 (mask)
+	ldq	r19, $RSA_OFFSET+48(fp) ; old r19 (actualcnt)
+	ldq	r20, $RSA_OFFSET+56(fp) ; old r20 (actual1)
+	ldq	r21, $RSA_OFFSET+64(fp)	; old r21 (actual2)
+	lda	r25, 4(r19)
+
+;	If more than 2 actual arguments, push rest onto stack.
+	subq	r19, 2, r28		; number of arguments originally passed on stack (actual3 . . . actualn)
+	ble	r28, zero_in_stack	; all original arguments in registers
+	lda	r0,  $SIZE(fp)
+	subq	r28, 1, r28		; offset = number - 1
+	s8addq	r28, r0, r0		; address of actualn
+loop:	ldq	r1,  (r0)
+	lda	sp,  -8(sp)
+	lda	r0,  -8(r0)
+	stq	r1,  (sp)
+	subq	r28, 1, r28
+	bge	r28, loop
+zero_in_stack:
+	$call	push_parm, set_arg_info=false	; push_parm ($T, ret_value, mask, actualcnt [, actual1[, actual2 . . .]])
+
+done:	ldq	r28, A_frame_pointer
+	ldl	r2,  (r28)
+	mov	r2,  r12
+	ldl	r9,  msf$temps_ptr_off(r12)
+
+	$begin_epilogue
+	mov	fp,  sp
+	ldq	r26, $RSA_OFFSET(sp)
+	ldq	r2,  $RSA_OFFSET+8(sp)
+	ldq	r13, $RSA_OFFSET+16(sp)
+	ldq     fp,  $RSA_OFFSET+72(sp)
+	lda	sp,  $SIZE(sp)
+	ret	r26
+	$end_epilogue
+
+	$end_routine	name=op_exfun
+
+	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -746,9 +746,8 @@ research:
 					WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			}
 			if ((trans_num)0 == t_end(gvt_hist, alt_hist, TN_NOT_SPECIFIED))
-			{	/* In case this is MM and t_end caused a database extension, reset csd */
-				assert(is_mm || (csd == cs_data));
-				csd = cs_data;
+			{
+				assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && write_logical_jnlrecs)
 				{	/* If ZTransaction and first KILL and the kill resulted in an update
 					 * Note that "write_logical_jnlrecs" is used above instead of JNL_WRITE_LOGICAL_RECS(csa)
@@ -770,9 +769,7 @@ research:
 				update_trans = UPDTRNS_DB_UPDATED_MASK;
 				continue;
 			}
-			/* In case this is MM and t_end caused a database extension, reset csd */
-			assert(is_mm || (csd == cs_data));
-			csd = cs_data;
+			assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 		} else
                 {
                         cdb_status = tp_hist(alt_hist);
@@ -787,7 +784,7 @@ research:
 			assert(gvt_root);
 			GVTR_OP_TCOMMIT(cdb_status);
 			if (cdb_sc_normal != cdb_status)
-				GOTO_RETRY(SKIP_ASSERT_FALSE);
+				GOTO_RETRY(SKIP_ASSERT_TRUE);
 		}
 #		endif
 		if (!killing_chunks)
@@ -815,11 +812,7 @@ research:
 				assert(!csd->dsid);
 				ENABLE_WBTEST_ABANDONEDKILL;
 				gvcst_expand_free_subtree(&kill_set_head);
-				/* In case this is MM and "gvcst_expand_free_subtree" called "gvcst_bmp_mark_free"
-				 * which in turn called "t_retry" which remapped an extended database, reset csd.
-				 */
-				assert(is_mm || (csd == cs_data));
-				csd = cs_data;
+				assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 				DECR_KIP(csd, csa, kip_csa);
 			}
 			assert(0 < kill_set_head.used || (NULL == kip_csa));
@@ -892,8 +885,6 @@ retry:
 			 */
 			update_trans = UPDTRNS_DB_UPDATED_MASK;
 		}
-		/* In case this is MM and "t_retry" remapped an extended database, reset csd */
-		assert(is_mm || (csd == cs_data));
-		csd = cs_data;
+		assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 	}
 }

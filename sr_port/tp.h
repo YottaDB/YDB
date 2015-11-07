@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,15 +160,25 @@ typedef struct sgm_info_struct
 	uint4			tot_jrec_size;		/* maximum journal space needs for this transaction */
 } sgm_info;
 
+/* Define macros to reflect the size of cw_index and next_off in the off_chain structure.
+ * If the structure layout changes, these formulas might need corresponding adjustment.
+ * Note that ideally we should be using SIZEOF(off_chain) * 8 instead of 32 in the NEXT_OFF_MAX_BITS definition
+ * (currently commented due to a gengtmdeftypes issue). But that introduces a cyclic dependency causing a compiler error.
+ */
+#define	CW_INDEX_MAX_BITS	15
+/* Remove the next line and uncomment the following line once gengtmdeftypes is fixed to allow expressions in bitfield members */
+#define	NEXT_OFF_MAX_BITS	16
+/* #define	NEXT_OFF_MAX_BITS	(32 - CW_INDEX_MAX_BITS - 1) */
+
 typedef struct
 {
 #ifdef	BIGENDIAN
 	unsigned	flag	 : 1;
-	unsigned	cw_index : 15;
-	unsigned	next_off : 16;
+	unsigned	cw_index : CW_INDEX_MAX_BITS;
+	unsigned	next_off : NEXT_OFF_MAX_BITS;
 #else
-	unsigned	next_off : 16;
-	unsigned	cw_index : 15;
+	unsigned	next_off : NEXT_OFF_MAX_BITS;
+	unsigned	cw_index : CW_INDEX_MAX_BITS;
 	unsigned	flag	 : 1;
 #endif
 } off_chain;
@@ -374,6 +384,7 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 typedef struct trans_restart_hist_struct
 {
 	uint4			t_tries;
+	uint4			dollar_tlevel;
 	enum cdb_sc		retry_code;
 	caddr_t			call_from;
 	union
@@ -400,6 +411,7 @@ typedef struct trans_restart_hist_struct
 		curidx = TREF(trans_restart_hist_index) = 0;						\
 	this_restart_hist = (TADR(trans_restart_hist_array) + curidx);					\
 	this_restart_hist->t_tries = t_tries;								\
+	this_restart_hist->dollar_tlevel = dollar_tlevel;						\
 	this_restart_hist->retry_code = RETRY_CODE;							\
 	this_restart_hist->call_from = (caddr_t)caller_id();						\
 	if (NULL != jnlpool.jnlpool_ctl)								\
@@ -804,9 +816,9 @@ typedef struct trans_restart_hist_struct
    code in mdb_condition_handler). The number of extra parameters need to be 2 more than the largest
    number of parameters for an rts_error in tp_restart().
 */
-#define INVOKE_RESTART	rts_error(VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0, 0, 0, 0, 0);
+#define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0, 0, 0, 0, 0);
 #else
-#define INVOKE_RESTART	rts_error(VARLSTCNT(1) ERR_TPRETRY);
+#define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
 #endif
 
 /* the following macros T_BEGIN_READ_NONTP_OR_TP and T_BEGIN_SETORKILL_NONTP_OR_TP are similar except for one difference
@@ -910,7 +922,8 @@ GBLREF	unsigned int	t_tries;
 		assert(!mupip_jnl_recover);										\
 		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;									\
 		getzposition(&zpos);											\
-		send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);		\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len,	\
+				zpos.str.addr);										\
 	}														\
 }
 

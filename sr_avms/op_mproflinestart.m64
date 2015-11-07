@@ -1,0 +1,24 @@
+	.title	op_mproflinestart
+	G_MSF
+
+;	op_mproflinestart - establish start of line in GT.M MUMPS stack frame
+
+	$routine        name=op_mproflinestart, entry=op_mproflinestart_ca, kind=stack, saved_regs=<r2, r13, fp>
+
+	stl	r26, msf$mpc_off(r12)
+	stl	r13, msf$ctxt_off(r12)
+
+	mov	r27, r13
+	.base	r13, $ls
+
+	$call	PCURRPOS, args=<>, set_arg_info=false, nonstandard=true
+
+	$begin_epilogue
+	mov	fp,  sp
+	ldl	r26, msf$mpc_off(r12)	; use the return address from the MUMPS stack frame
+	ldq	r2,  $RSA_OFFSET+8(sp)
+	ldq	r13, $RSA_OFFSET+16(sp)
+	ldq	fp,  $RSA_OFFSET+24(sp)
+	lda	sp,  $SIZE(sp)
+	ret	r26
+	$end_routine	name=op_mproflinestart

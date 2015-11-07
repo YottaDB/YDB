@@ -87,25 +87,7 @@ void process_deferred_stale(void)
 				{
 					gv_cur_region = r_cur;
 					tp_change_reg();
-#					if defined(UNIX) && defined(UNTARGETED_MSYNC)
-					if (csa->ti->last_mm_sync != csa->ti->curr_tn)
-					{
-						boolean_t    was_crit;
-
-						was_crit = csa->now_crit;
-						if (FALSE == was_crit)
-							grab_crit(r_cur);
-						msync((caddr_t)csa->db_addrs[0],
-							(size_t)(csa->db_addrs[1] - csa->db_addrs[0]),
-							MS_SYNC);
-						/* Save when did last full sync */
-						csa->ti->last_mm_sync = csa->ti->curr_tn;
-						if (FALSE == was_crit)
-							rel_crit(r_cur);
-					}
-#					else
 					DCLAST_WCS_WTSTART(r_cur, 0, status);
-#					endif
 					csa->stale_defer = FALSE;
 					BG_TRACE_ANY(csa, stale_defer_processed);
 				}

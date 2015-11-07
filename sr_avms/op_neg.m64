@@ -1,0 +1,98 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2008 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.title	OP_NEG
+
+	mval$def
+
+
+	$routine OP_NEG, entry=OP_NEG_CA, kind=null
+	lda	sp, -32(sp)
+	stq	r26, (sp)
+	stq	r2, 8(sp)
+	stq	r3, 16(sp)
+	stq	r13, 24(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	mov	r0, r2		; r2 -> output mval
+	mov	r1, r3		; r3 -> input mval
+
+	mv_force_defined r3
+	mv_force_num (r3)
+
+;	Move the mvtype from the input mval to the output mval,
+;	except for the str bit:
+	ldq_u	r23, mval$w_mvtype(r3)
+	ldq_u	r22, mval$w_mvtype(r2)
+	extwl	r23, r3, r23
+	mskwl	r22, r2, r22
+	and	r23, #mval$m_int, r23	; clear everything except mval$v_nm and mval$v_int
+	inswl	r23, r2, r23
+	or	r22, r23, r22
+	stq_u	r22, mval$w_mvtype(r2)
+
+;	Is the input zero?
+	ldl	r24, mval$l_m1(r3)
+	beq	r24, 10$
+
+;	No;  is it int?
+	mv_if_notint (r3), 15$
+
+;	Yes;  output m1 = - input m1
+	ldl	r24, mval$l_m1(r3)
+	negl	r24, r24
+	stl	r24, mval$l_m1(r2)
+
+;	Return:
+5$:	ldq	r28, (sp)
+	ldq	r2, 8(sp)
+	ldq	r3, 16(sp)
+	ldq	r13, 24(sp)
+	lda	sp, 32(sp)
+
+	ret	r28
+
+
+;	Input mval is zero;  clear output exp, sign, m0, and m1:
+10$:	ldq_u	r22, mval$b_exp(r2)
+	lda	r23, mval$b_exp(r2)
+	mskbl	r22, r23, r22
+	stq_u	r22, mval$b_exp(r2)
+	stl	r31, mval$l_m0(r2)
+	stl	r31, mval$l_m1(r2)
+
+	br	5$
+
+
+;	Input is not int;  move input m0 and m1 to output
+15$:	ldl	r22, mval$l_m0(r3)
+	ldl	r23, mval$l_m1(r3)
+	stl	r22, mval$l_m0(r2)
+	stl	r23, mval$l_m1(r2)
+
+;	Move exp from input to output, but flip the sign:
+	ldq_u	r22, mval$b_exp(r2)
+	ldq_u	r23, mval$b_exp(r3)
+	lda	r24, mval$b_exp(r2)
+	lda	r25, mval$b_exp(r3)
+	mskbl	r22, r24, r22
+	extbl	r23, r25, r23		; low order byte of r23 = input exp and sign
+	xor	r23, ^x80, r23		; flip the sign bit
+	insbl	r23, r24, r23
+	or	r22, r23, r22
+	stq_u	r22, mval$b_exp(r2)
+
+	br	5$
+
+
+	$end_routine
+
+	.end

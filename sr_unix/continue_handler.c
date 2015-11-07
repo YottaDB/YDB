@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,9 @@
 #include <mdef.h>
 
 #include <signal.h>
+#ifdef GTM_PTHREAD
+#  include <pthread.h>
+#endif
 #include "gtm_syslog.h"
 #include "gtm_limits.h"
 
@@ -24,7 +27,7 @@
 
 GBLREF volatile int	suspend_status;
 GBLREF io_pair		io_std_device;
-GBLREF pid_t		process_id;
+GBLREF uint4		process_id;
 
 error_def(ERR_REQ2RESUME);
 
@@ -34,6 +37,7 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
 	/* Count how many times we get a continue-process signal (in DEBUG) */
 	DEBUG_ONLY(DBGGSSHR((LOGFLAGS, "continue_handler: pid %d, continue_proc_cnt bumped from %d to %d\n",
 			     process_id, TREF(continue_proc_cnt), TREF(continue_proc_cnt) + 1)));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -319,6 +319,7 @@ boolean_t	tp_tend()
 		csa = cs_addrs;
 		csd = cs_data;
 		cnl = csa->nl;
+		is_mm = (dba_mm == csd->acc_meth);
 		UNIX_ONLY(
 			assert(!csa->hold_onto_crit || jgbl.onlnrlbk); /* In TP, hold_onto_crit is set ONLY by online rollback */
 			assert(!jgbl.onlnrlbk || (csa->hold_onto_crit && csa->now_crit));
@@ -327,11 +328,10 @@ boolean_t	tp_tend()
 		sgm_info_ptr = si;
 		*prev_tp_si_by_ftok = si;
 		prev_tp_si_by_ftok = &si->next_tp_si_by_ftok;
-		if ((cnl->wc_blocked) ||			/* If blocked, or.. */
-			((dba_mm == csd->acc_meth) &&		/* we have MM and.. */
-			(csa->total_blks != csd->trans_hist.total_blks)))	/* and file has been extended */
-		{	/* Force repair */
+		if ((cnl->wc_blocked) || (is_mm && (csa->total_blks != csd->trans_hist.total_blks)))
+		{	/* If blocked, or we have MM and file has been extended, force repair */
 			status = cdb_sc_helpedout; /* special status to prevent punishing altruism */
+			assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == csd->trans_hist.total_blks));
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 			goto failed_skip_revert;
 		}
@@ -363,7 +363,7 @@ boolean_t	tp_tend()
 				: (!csa->now_crit || region_is_frozen))
 		{
 			assert(!csa->hold_onto_crit);
-			send_msg(VARLSTCNT(8) ERR_DLCKAVOIDANCE, 6, DB_LEN_STR(tr->reg),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DLCKAVOIDANCE, 6, DB_LEN_STR(tr->reg),
 						&csd->trans_hist.curr_tn, t_tries, dollar_trestart, csa->now_crit);
 			/* The only possible case we know of is (c). assert to that effect. Use local variable region_is_frozen
 			 * instead of csd->freeze as it could be concurrently changed even though we hold crit (freeze holding
@@ -399,7 +399,6 @@ boolean_t	tp_tend()
 		} else
 		{
 			do_validation = TRUE;
-			is_mm = (dba_mm == cs_data->acc_meth);
 			/* We are still out of crit if this is not our last attempt. If so, run the region list and check
 			 * that we have sufficient free blocks for our update. If not, get them now while we can.
 			 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
@@ -418,7 +417,7 @@ boolean_t	tp_tend()
 				/* check if current TP transaction's jnl size needs are greater than max jnl file size */
 				if (si->tot_jrec_size > csd->autoswitchlimit)
 					/* can't fit in current transaction's journal records into one journal file */
-					rts_error(VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
 						JNL_LEN_STR(csd), csd->autoswitchlimit);
 			}
 			if (REPL_ALLOWED(csa))
@@ -453,7 +452,8 @@ boolean_t	tp_tend()
 		assert(jgbl.gbl_jrec_time);
 		/* If any one DB that we are updating has replication turned on and another has only journaling, issue error */
 		if (replication && yes_jnl_no_repl)
-			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
+			rts_error_csa(CSA_ARG(REG2CSA(save_gv_cur_region)) VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
+					DB_LEN_STR(save_gv_cur_region));
 	}
 	if (!do_validation)
 	{
@@ -747,17 +747,17 @@ boolean_t	tp_tend()
 						ctn = csd->trans_hist.curr_tn;
 						assert(csd->trans_hist.early_tn == ctn);
 						if (SS_NORMAL != jpc->status)
-							rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
 								DB_LEN_STR(gv_cur_region), jpc->status);
 						else
-							rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
 								DB_LEN_STR(gv_cur_region));
 					}
 					if (DISK_BLOCKS_SUM(jbp->freeaddr, si->total_jnl_rec_size) > jbp->filesize)
 					{	/* Moved here to prevent jnlrecs split across multiple generation journal files. */
 						if (SS_NORMAL != (jnl_status = jnl_flush(jpc->region)))
 						{
-							send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
 								ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush in tp_tend"),
 								jnl_status);
 							assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));

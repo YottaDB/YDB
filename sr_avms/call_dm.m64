@@ -1,0 +1,33 @@
+	.title	CALL_DM
+
+;	CALL_DM - call direct mode
+;
+;	CALL_DM controls execution of GT.M direct mode.  It executes in a
+;	GT.M MUMPS stack frame and is, in fact, normally entered via a
+;	getframe/ret instruction sequence.  CALL_DM invokes OPP_DMODE
+;	for each input line.
+;
+;	entry:
+;		r13 -	address of CALL_DM's procedure descriptor (not r27)
+;
+;	WARNING: because CALL_DM is designed to be invoked from a GT.M
+;	MUMPS stack frame, it does not conform to the Alpha calling
+;	standard and cannot be invoked from any high-level language.
+;	The invoker should load the address of PSEUDO_RET's procedure
+;	descriptor into r13, not r27.
+
+	$linkage_section
+
+	$code_section
+
+	$routine CALL_DM, entry=CALL_DM_CA, kind=null
+
+	.base	r13, $ls
+
+loop:	$call	OPP_DMODE, nonstandard=true
+	$call	OP_OLDVAR, nonstandard=true
+	br	loop
+
+	$end_routine
+
+	.end

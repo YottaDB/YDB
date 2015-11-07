@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,6 +91,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;
+	assert(dba_mm != csd->acc_meth);
 	assert(csa->now_crit);
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
 	max_ent = csd->n_bts;

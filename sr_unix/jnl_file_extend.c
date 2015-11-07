@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,24 +131,26 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					SETUP_THREADGBL_ACCESS;
 					if (!ANTICIPATORY_FREEZE_ENABLED(csa))
 					{
-						send_msg(VARLSTCNT(6) ERR_NOSPACEEXT, 4,
-							JNL_LEN_STR(csd), new_blocks, avail_blocks);
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
+								JNL_LEN_STR(csd), new_blocks, avail_blocks);
 						new_blocks = 0;
 						jpc->status = SS_NORMAL;
 						break;
 					} else
-						send_msg(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
-							JNL_LEN_STR(csd), new_blocks, avail_blocks);
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
+								JNL_LEN_STR(csd), new_blocks, avail_blocks);
 				} else
-					send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd), (avail_blocks - warn_blocks));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
+							(avail_blocks - warn_blocks));
 			}
 		} else
-			send_msg(VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
 		new_alq = jb->filesize + new_blocks;
 		/* ensure current journal file size is well within autoswitchlimit --> design constraint */
 		assert(csd->autoswitchlimit >= jb->filesize);
 		if (csd->autoswitchlimit < (jb->filesize + (EXTEND_WARNING_FACTOR * new_blocks)))	/* close to max */
-			send_msg(VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd), csd->autoswitchlimit - jb->filesize);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd),
+					csd->autoswitchlimit - jb->filesize);
 		if (csd->autoswitchlimit < new_alq)
 		{	/* Reached max, need to autoswitch */
 			/* Ensure new journal file can hold the entire current transaction's journal record requirements */
@@ -198,10 +200,11 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			} else
 			{
 				if (SS_NORMAL != jpc->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
-						jpc->status);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region), jpc->status);
 				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region));
 			}
 			assert(!jgbl.forw_phase_recovery || (NULL != jgbl.mur_pini_addr_reset_fnptr));
 			assert(jgbl.forw_phase_recovery || (NULL == jgbl.mur_pini_addr_reset_fnptr));
@@ -220,7 +223,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(csd->jnl_before_image == jnl_info.before_images);
 				csd->jnl_checksum = jnl_info.checksum;
 				csd->jnl_eovtn = csd->trans_hist.curr_tn;
-				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (sm_uc_ptr_t)csd;
@@ -228,17 +231,18 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				fc->op_pos = 1;
 				status = dbfilop(fc);
 				if (SS_NORMAL != status)
-					send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				assert(JNL_ENABLED(csa));
 				/* call jnl_ensure_open instead of jnl_file_open to make sure jpc->pini_addr is set to 0 */
 				jnl_status = jnl_ensure_open();	/* sets jpc->status */
 				if (0 != jnl_status)
 				{
 					if (jpc->status)
-						rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
-							jpc->status);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+								DB_LEN_STR(gv_cur_region), jpc->status);
 					else
-						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+								DB_LEN_STR(gv_cur_region));
 				}
 				assert(jb->filesize == csd->jnl_alq);
 				if (csd->jnl_alq + csd->jnl_deq <= csd->autoswitchlimit)
@@ -257,7 +261,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				}
 			} else
 			{
-				send_msg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, JNL_LEN_STR(csd));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_JNLNOCREATE, 2, JNL_LEN_STR(csd));
 				jpc->status = ERR_JNLNOCREATE;
 				new_blocks = -1;
 			}
@@ -273,7 +277,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			if (SS_NORMAL != jpc->status)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			assert((header->virtual_size + new_blocks) == new_alq);
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
@@ -282,8 +286,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					header, read_write_size, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 			{
-				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+				assert(WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 		}
 		if (0 >= new_blocks)

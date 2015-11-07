@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -276,7 +276,7 @@ LITREF	char 			*trigger_subs[];
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
-#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT)					\
+#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
 {												\
 	if (CDB_STAGNATE > t_tries)								\
 		t_retry(cdb_sc_triggermod);							\
@@ -285,28 +285,28 @@ LITREF	char 			*trigger_subs[];
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
 		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
 		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,			\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,	\
 			trigvn_len, trigvn, util_len, util_buff);				\
 	}											\
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<#LABEL|#COUNT|#CYCLE>) */
-#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO)	\
+#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO,CSA)	\
 {								\
 	if (CDB_STAGNATE > t_tries)				\
 		t_retry(cdb_sc_triggermod);			\
 	else							\
 	{							\
-		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO);	\
+		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA);	\
 	}							\
 }
 
-#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO)					\
-{											\
-	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
-	rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
-		trigvn_len, trigvn, LEN_AND_LIT(SUBSCRIPT),				\
-		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));					\
+#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA)						\
+{												\
+	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);			\
+	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(12) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
+		trigvn_len, trigvn, LEN_AND_LIT(SUBSCRIPT),					\
+		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));						\
 }
 
 STATICFNDEF boolean_t validate_label(char *trigvn, int trigvn_len)
@@ -317,7 +317,7 @@ STATICFNDEF boolean_t validate_label(char *trigvn, int trigvn_len)
 	SETUP_THREADGBL_ACCESS;
 	BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 	if (!gvcst_get(&trigger_label)) /* There has to be a #LABEL */
-		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL was not found")
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL was not found", REG2CSA(gv_cur_region))
 	return ((trigger_label.str.len == STRLEN(HASHT_GBL_CURLABEL))
 		&& (0 == memcmp(trigger_label.str.addr, HASHT_GBL_CURLABEL, trigger_label.str.len)));
 }
@@ -455,7 +455,7 @@ STATICFNDEF int4 add_trigger_hash_entry(char *trigvn, int trigvn_len, char *cmd_
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
  	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	set_cmp = (NULL != strchr(cmd_value, 'S'));
 	mv_indx_ptr = &mv_indx;
@@ -556,7 +556,7 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[TRIGNAME_SUB],
 					STRLEN(trigger_subs[TRIGNAME_SUB]));
 			if (!gvcst_get(setname)) /* There has to be a name value */
-				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(set_indx, ",\"TRIGNAME\"");
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(set_indx, ",\"TRIGNAME\"", csa);
 			set_name_match = ((value_len[TRIGNAME_SUB] == (setname->str.len - 1))
 				&& (0 == memcmp(setname->str.addr, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB])));
 		}
@@ -573,7 +573,7 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[CMD_SUB],
 							 STRLEN(trigger_subs[CMD_SUB]));
 			if (!gvcst_get(&val))	/* There has to be a command string */
-				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"CMD\"");
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"CMD\"", csa);
 			db_has_S = (NULL != memchr(val.str.addr, 'S', val.str.len));
 			db_has_K = ((NULL != memchr(val.str.addr, 'K', val.str.len)) ||
 				    (NULL != memchr(val.str.addr, 'R', val.str.len)));
@@ -590,7 +590,7 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[TRIGNAME_SUB],
 							 STRLEN(trigger_subs[TRIGNAME_SUB]));
 			if (!gvcst_get(killname)) /* There has to be a name string */
-				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"TRIGNAME\"");
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"TRIGNAME\"", csa);
 			kill_name_match = ((value_len[TRIGNAME_SUB] == (killname->str.len - 1))
 				&& (0 == memcmp(killname->str.addr, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB])));
 		}
@@ -855,7 +855,7 @@ STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, in
 	i2mval(&trigindx, trigger_index);
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[CMD_SUB], STRLEN(trigger_subs[CMD_SUB]));
 	if (!gvcst_get(&val)) /* There has to be a command string */
-		HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigger_index, ",\"CMD\"");
+		HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigger_index, ",\"CMD\"", REG2CSA(gv_cur_region));
 	memcpy(trig_cmds, val.str.addr, val.str.len);
 	trig_cmds[val.str.len] = '\0';
 	/* get(^#t(GVN,trigindx,"OPTIONS") */
@@ -985,7 +985,7 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == user_trigname_len)
 	{	/* autogenerated name */
@@ -1219,14 +1219,14 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	gbl_name.len = trigvn_len;
 	GV_BIND_NAME_ONLY(gd_header, &gbl_name);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(gv_target->gd_csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	csa = gv_target->gd_csa;
 	/* Now that the gv_target of the global the trigger refers to is setup, check if we are attempting to modify/delete a
 	 * trigger for a global that has already had a trigger fire in this transaction. For these single-region (at a time)
 	 * checks, we can do them all the time as they are cheap.
 	 */
 	if (gv_target->trig_local_tn == local_tn)
-		rts_error(VARLSTCNT(1) ERR_TRIGMODINTP);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_TRIGMODINTP);
 	csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time */
 	if (dollar_ztrigger_invoked)
 	{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction, on this region, will re-read
@@ -1649,7 +1649,7 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				rts_error_csa(CSA_ARG(gv_target->gd_csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
 			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the

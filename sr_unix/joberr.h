@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,16 +14,31 @@ char		*msg;
 int		len;
 }joberr_msg;
 
+/*
+ * The follwoing array is index by values from the enum joberr_t from jobsp.h.
+ */
 LITDEF joberr_msg joberrs[] = {
 	"", 0,
-	"Job error in child process", SIZEOF("Job error in child process")-1,
-	"Job error in I/O specification", SIZEOF("Job error in I/O specification")-1,
-	"Job error in directory specification", SIZEOF("Job error in directory specification")-1,
-	"Job error in routine specification", SIZEOF("Job error in routine specification")-1,
-	"Job error in fork", SIZEOF("Job error in fork")-1,
-	"Job error in syscall", SIZEOF("Job error in syscall")-1,
-	"Job child was stopped by signal", SIZEOF("Job child was stopped by signal")-1,
-	"Job child terminated due to signal", SIZEOF("Job child terminated due to signal")-1,
-	"", SIZEOF("")-1	/* this is used internally to determine try-again situations */
+	LIT_AND_LEN("Job error in child process"),
+	LIT_AND_LEN("Job error in opening STDIN"),
+	LIT_AND_LEN("Job error in directing input to STDIN"),
+	LIT_AND_LEN("Job error in creating STDOUT"),
+	LIT_AND_LEN("Job error in opening STDOUT"),
+	LIT_AND_LEN("Job error in directing output to STDOUT"),
+	LIT_AND_LEN("Job error in creating STDERR"),
+	LIT_AND_LEN("Job error in opening STDERR"),
+	LIT_AND_LEN("Job error in directing output to STDERR"),
+	LIT_AND_LEN("Job error in directory specification"),
+	LIT_AND_LEN("Job error - CHDIR error"),
+	LIT_AND_LEN("Job error in routine specification. Label and offset not found in created process"),
+	LIT_AND_LEN("Job error in setting independent session"),
+	LIT_AND_LEN("Job error in fork"),
+	LIT_AND_LEN("Job error in renaming standard output file"),
+	LIT_AND_LEN("Job error in renaming standard error file"),
+	LIT_AND_LEN("Job error in middle process to parent process pipe communication"),
+	LIT_AND_LEN("Job error in middle process to grandchild process pipe communication"),
+	LIT_AND_LEN("Job child was stopped by signal"),
+	LIT_AND_LEN("Job child terminated due to signal"),
+	LIT_AND_LEN("") 	/* this is used internally to determine try-again situations */
 };
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,10 @@
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct  mur_options;
 GBLREF 	jnl_gbls_t	jgbl;
+
+error_def(ERR_JNLREAD);
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_NOPINI);
 
 #define	PROCEED_IF_EXTRACT_SHOW_VERIFY(JCTL, PINI_ADDR, PLST, PPLST)							\
 {	/* allow EXTRACT/SHOW/VERIFY to proceed after printing BAD PINI error if error_limit permits.			\
@@ -76,10 +80,6 @@ uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **p
 	reg_ctl_list		*rctl;
 	mur_read_desc_t		*mur_desc;
 
-	error_def(ERR_JNLREAD);
-	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_NOPINI);
-
 	if (NULL != (tabent = lookup_hashtab_int4(&jctl->pini_list, (uint4 *)&pini_addr)))
 		plst = tabent->value;
 	else
@@ -98,8 +98,9 @@ uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **p
 	{
 		if (mur_options.update && jctl->after_end_of_data && !jgbl.forw_phase_recovery)
 			return ERR_JNLBADRECFMT;
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
+		gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+				jctl->rec_offset);
+		gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
 		assert(FALSE);
 		murgbl.wrn_count++;
 		PROCEED_IF_EXTRACT_SHOW_VERIFY(jctl, pini_addr, plst, pplst);
@@ -111,9 +112,10 @@ uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **p
 	{
 		if (mur_options.update && jctl->after_end_of_data && !jgbl.forw_phase_recovery)
 			return ERR_JNLBADRECFMT;
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
+		gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+				jctl->rec_offset);
 		if (JRT_PINI != pinirec->prefix.jrec_type)
-			gtm_putmsg(VARLSTCNT(5) ERR_NOPINI, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_NOPINI, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
 		assert(FALSE);
 		murgbl.wrn_count++;
 		PROCEED_IF_EXTRACT_SHOW_VERIFY(jctl, pini_addr, plst, pplst);

@@ -1,0 +1,27 @@
+; ################################################################
+; #                                                              #
+; #      Copyright 2001, 2008 Fidelity Information Services, Inc #
+; #                                                              #
+; #      This source code contains the intellectual property     #
+; #      of its copyright holder(s), and is made available       #
+; #      under a license.  If you do not know the terms of       #
+; #      the license, please stop and do not read further.       #
+; #                                                              #
+; ################################################################
+
+	.title	cacheflush - flush data and instruction caches
+
+;	cacheflush
+;
+;	entry:
+;		a0 (r16)	address of start of region to flush
+;		a1 (r17)	length (in bytes) of region to flush
+;		a2 (r18)	flag indicating which region to flush (not used on AXP)
+
+	$routine	name=cacheflush, entry=cacheflush_ca, kind=null
+
+	imb
+
+	ret	r26
+
+	$end_routine	name=cacheflush

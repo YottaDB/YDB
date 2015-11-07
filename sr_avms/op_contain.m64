@@ -1,0 +1,243 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2008 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.title	op_contain "'[' ('contains') operator"
+
+;	OP_CONTAIN implements the MUMPS string relational operator "[" ("contains"):
+;
+;		lhs [ rhs
+;
+;	lhs ("left-hand-side") and rhs ("right-hand-side") are expressions interpreted
+;	as strings.  If rhs is contained exactly somewhere in lhs, the resulting
+;	relation is true, otherwise, false.
+;
+;	On entry to this routine:
+;		r0 -> mval for lhs
+;		r1 -> mval for rhs
+;
+;	This version of OP_CONTAIN is not a simple, straightforward translation of the
+;	VAX version.  The VAX has a rich set of instructions that can be used for string
+;	manipulation, and the VAX version of this routine takes advantage of that, using
+;	locc and cmpb instructions, as well as auto-increment addressing mode.  None of
+;	these features exist in the Alpha architecture.  Alpha does have a set of byte
+;	manipulation instructions, however, but they work only on data in registers.
+;	Thus, it makes sense to load as much of the strings in question into registers
+;	as is feasible, rather than working with just one byte at a time.
+
+	mval$def
+
+	$routine OP_CONTAIN, entry=OP_CONTAIN_CA, kind=null
+
+; Routine prologue:
+	lda	sp, -48(sp)
+	stq	r26, (sp)
+	stq	r13, 8(sp)
+	stq	r2, 16(sp)
+	stq	r3, 24(sp)
+	stq	r4, 32(sp)
+	stq	r5, 40(sp)
+
+	mov	r27, r13		; Set up a base register
+	.base	r13, $ls		;  for the linkage section
+; End of prologue
+
+	.page
+; **************************************************************************************
+; Validate the input parameters and handle the trivial cases.
+
+;	Make sure that both lhs and rhs are strings:
+	mov	r0, r2			; r2 -> lhs mval
+	mov	r1, r3			; r3 -> rhs mval
+	mv_force_defined r2
+	mv_force_str (r2)
+	mv_force_defined r3
+	mv_force_str (r3)
+
+;	If rhs is a null string, we have a match (by definition):
+	ldl	r1, mval$l_strlen(r3)	; r1 = length of rhs string
+	beq	r1, match
+
+;	If lhs is a null string, we don't have a match:
+	ldl	r0, mval$l_strlen(r2)	; r0 = length of lhs string
+	beq	r0, nomatch
+
+;	If lhs is shorter than rhs, there can't possibly be a match:
+	cmplt	r0, r1, r24
+	blbs	r24, nomatch
+
+
+; **************************************************************************************
+; OK, neither string is null, and their lengths check out;  load as much
+; of rhs as possible into r5 (i.e. min (8, length of rhs) characters),
+; then load the same number of characters from lhs into r4.
+
+;	Load the first 8 characters of rhs into r5:
+	ldl	r3, mval$a_straddr(r3)	; r3 -> rhs string
+	ldq_u	r5, (r3)
+	ldq_u	r28, 7(r3)
+	extql	r5, r3, r5
+	extqh	r28, r3, r28
+	or	r28, r5, r5
+
+;	Load the first 8 characters of lhs into r4:
+	ldl	r2, mval$a_straddr(r2)	; r2 -> lhs string
+	ldq_u	r4, (r2)
+	ldq_u	r28, 7(r2)
+	extql	r4, r2, r4
+	extqh	r28, r2, r28
+	or	r28, r4, r4
+
+;	Compute the number of characters to retain in r5 and r4:
+	mov	8, r22
+	cmplt	r1, r22, r24
+	cmovlbs	r24, r1, r22		; r22 = min (8, r1)
+
+;	Clear any excess characters that may have been loaded above:
+	mov	^xff, r28
+	sll	r28, r22, r28
+	zap	r5, r28, r5
+	zap	r4, r28, r4
+
+;	Update the string counters and pointers:
+	subq	r1, r22, r1
+	subq	r0, r22, r0
+	addq	r3, r22, r3
+	addq	r2, r22, r2
+
+;	Compute a shift count for later use in loading new characters from lhs into r4:
+	subq	r22, 1, r22
+	sll	r22, 3, r22
+
+
+; **************************************************************************************
+; At this point,
+;	r5 contains either all of rhs, or the first 8 characters of rhs
+;	r4 contains the corresponding number of characters from lhs
+;	r22 = a shift count to use for loading new characters from lhs into r4
+;	r1 = the number of characters remaining in rhs (exclusive of what's in r5)
+;	r0 = the number of characters remaining in lhs (exclusive of what's in r4)
+;	r3 -> the remainder of rhs (meaningful only if r1 > 0)
+;	r2 -> the remainder of lhs
+
+main_loop:
+	cmpeq	r4, r5, r24
+
+;	If there's a match here, go check the remainder of rhs:
+	blbs	r24, check_remainder
+
+;	There's no match this iteration;  if nothing's left in lhs, return false:
+	beq	r0, nomatch
+
+;	Return here from check_remainder if no match was found there, either:
+restart:
+
+;	Load the next character from lhs into r4:
+	srl	r4, 8, r4		; shift everything down by a byte, losing the low order character
+	ldq_u	r28, (r2)		; load the quadword containing the next character in lhs
+	extbl	r28, r2, r28		; extract the character
+	sll	r28, r22, r28		; shift it up into the correct position
+	or	r28, r4, r4		; and stick it into r4
+
+;	Update the lhs context:
+	subq	r0, 1, r0
+	lda	r2, 1(r2)
+
+;	And try again:
+	br	main_loop
+
+	.page
+; **************************************************************************************
+; The main loop found a match somewhere in lhs with the first portion of rhs.  We now
+; have to check to see if the remainder of rhs (if any) matches the same number of characters
+; in the remainder of lhs.
+
+check_remainder:
+
+;	If there's nothing left in rhs, we have a match:
+	beq	r1, match
+
+;	If there are fewer characters remaining in lhs than there are in rhs,
+;	then there can't possibly be a match:
+	cmplt	r0, r1, r28
+	blbs	r28, nomatch
+
+;	Save context:
+	mov	r1, r17			; r17 = remaining length of rhs
+	mov	r3, r19			; r19 -> remainder of rhs
+	mov	r2, r18			; r18 -> remainder of lhs
+
+; Now loop, comparing the remainders of the two strings.
+
+remainder_loop:
+
+;	Load the first 8 characters of the remainder of rhs into r21:
+	ldq_u	r21, (r19)
+	ldq_u	r28, 7(r19)
+	extql	r21, r19, r21
+	extqh	r28, r19, r28
+	or	r28, r21, r21
+
+;	Load the first 8 characters of the remainder of lhs into r20:
+	ldq_u	r20, (r18)
+	ldq_u	r28, 7(r18)
+	extql	r20, r18, r20
+	extqh	r28, r18, r28
+	or	r28, r20, r20
+
+;	Should we compare all 8 characters?
+	cmplt	r17, 8, r24
+	blbc	r24, compare			; yes;  skip
+
+;	We need to compare fewer than 8 characters, so
+;	clear the excess characters that were loaded above:
+	mov	^xff, r28
+	sll	r28, r17, r28
+	zap	r21, r28, r21
+	zap	r20, r28, r20
+
+compare:
+	cmpeq	r20, r21, r24
+
+;	If no match, go back to the main loop and try again:
+	blbc	r24, restart
+
+;	Update for the next iteration:
+	subq	r17, 8, r17
+	ble	r17, match
+	lda	r19, 8(r19)
+	lda	r18, 8(r18)
+
+	br	remainder_loop
+
+
+; **************************************************************************************
+
+nomatch:
+	clr	r0
+	br	return
+
+match:
+	mov	1, r0
+
+return:
+	mov	r0, r24		; set condition code (emulator) according to function result
+; Routine epilogue:
+	ldq	r28, (sp)
+	ldq	r13, 8(sp)
+	ldq	r2, 16(sp)
+	ldq	r3, 24(sp)
+	ldq	r4, 32(sp)
+	ldq	r5, 40(sp)
+	lda	sp, 48(sp)
+	ret	r28
+
+	$end_routine
+
+	.end

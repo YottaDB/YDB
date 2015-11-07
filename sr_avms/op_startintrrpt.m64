@@ -1,0 +1,52 @@
+	.title	OP_STARTINTRRPT
+
+	G_MSF
+
+	$linkage_section
+
+a_neterr_pending:
+	.address neterr_pending
+
+a_iott_write_error:
+	.address iott_write_error
+
+a_frame_pointer:
+	.address frame_pointer
+
+
+	$code_section
+
+	$routine OP_STARTINTRRPT, entry=OP_STARTINTRRPT_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r2, (sp)
+	mov	r27, r2
+	.base	r2, $ls
+
+	putframe
+
+	ldq	r0, a_neterr_pending
+	ldq_u	r24, (r0)
+	extbl	r24, r0, r24
+	beq	r24, 10$
+
+	$call	outofband_clear, set_arg_info=false, nonstandard=true
+	$call	gvcmz_neterr, args=<0/a>, set_arg_info=false, nonstandard=true
+
+10$:	ldq	r0, a_iott_write_error
+	ldl	r24, (r0)
+	beq	r24, 15$
+
+	$call	outofband_clear, set_arg_info=false, nonstandard=true
+	$call	iott_wrterr, set_arg_info=false, nonstandard=true
+
+15$:	$call 	async_action, args=<1/a>, set_arg_info=false, nonstandard=true
+
+20$:	getframe
+
+	ldq	r2, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

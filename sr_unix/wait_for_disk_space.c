@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	 * or DSKNOSPCAVAIL is not configured as a custom error, return right away.
 	 */
 	if (!ANTICIPATORY_FREEZE_ENABLED(csa) || (NULL == is_anticipatory_freeze_needed_fnptr)
-			|| !(*is_anticipatory_freeze_needed_fnptr)(ERR_DSKNOSPCAVAIL))
+			|| !(*is_anticipatory_freeze_needed_fnptr)(csa, ERR_DSKNOSPCAVAIL))
 		return;
 	fn_len = STRLEN(fn);
 	was_crit = csa->now_crit;
@@ -89,7 +89,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		tp_grab_crit(reg);
 	if (!csa->now_crit)
 	{
-		send_msg(VARLSTCNT(4) ERR_ENOSPCQIODEFER, 2, fn_len, fn);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ENOSPCQIODEFER, 2, fn_len, fn);
 		*save_errno = ERR_ENOSPCQIODEFER;
 		return;
 	}
@@ -104,7 +104,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	 * case. Hence the reason not to allow interrupts.
 	 */
 	DEFER_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE);
-	send_msg(VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn); /* this should set the instance freeze */
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn); /* this should set the instance freeze */
 	/* Make a copy of the freeze comment which would be set by the previous message. */
 	GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_DSKNOSPCAVAIL);
 	tmp_errno = *save_errno;
@@ -116,23 +116,24 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		{	/* Some other process cleared the instance freeze. But we still dont have our disk
 			 * space issue resolved so set the freeze flag again until space is available for us.
 			 */
-			send_msg(VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn);
 		} else if (exit_state != 0)
 		{
-			send_msg(VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			exit(-exi_condition);
 		}
 		/* Sleep for a while before retrying the write. Do not use "hiber_start" as that
 		 * uses timers and if we are already in a timer handler now, nested timers wont work.
 		 */
 		SHORT_SLEEP(SLEEP_IORETRYWAIT);
+		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);
 		/* If some other process froze the instance and changed the comment, a retry of the
 		 * LSEEKWRITE may not be appropriate, so just loop waiting for the freeze to be lifted.
 		 */
 		if (IS_REPL_INST_FROZEN && (STRCMP(wait_comment, jnlpool.jnlpool_ctl->freeze_comment) != 0))
 		{
-			send_msg(VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
 			WAIT_FOR_REPL_INST_UNFREEZE(csa)
 		}
 		LSEEKWRITE(fd, offset, buf, count, tmp_errno);
@@ -144,7 +145,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 #		endif
 	}
 	/* Report that we were able to continue whether we are still frozen or not. */
-	send_msg(VARLSTCNT(4) ERR_DSKSPCAVAILABLE, 2, fn_len, fn);
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKSPCAVAILABLE, 2, fn_len, fn);
 	/* Only report if we were the process to set the current freeze comment; otherwise someone else reported it. */
 	if (STRCMP(wait_comment, jnlpool.jnlpool_ctl->freeze_comment) == 0)
 	{

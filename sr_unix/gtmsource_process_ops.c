@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@
 #include "gtm_zlib.h"
 #include "replgbl.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
+#include "gtmdbgflags.h"
 
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	boolean_t		gtmsource_pool2file_transition;
@@ -604,9 +605,9 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	if (recvd_jnl_seqno > cur_read_jnl_seqno)
 	{	/* The secondary is requesting a seqno higher than what we last remember having sent but yet it is in sync with us
 		 * upto seqno "recvd_jnl_seqno" as otherwise the caller would have determined it is out of sync and not even call
-		 * us. To illustrate an example of how this could happen, consider an INSTA->INSTB replication and INSTA->INSTB
-		 * replication going on. Lets say INSTA's journal sequence number is at 100. INSTB is at 60 and INSTB is at 30.
-		 * This means, last sequence number sent by INSTA to INSTB is 60 and to INSTB is 30. Now, lets say INSTA is shutdown
+		 * us. To illustrate an example of how this could happen, consider an INSTA->INSTB replication and INSTA->INSTC
+		 * replication going on. Lets say INSTA's journal sequence number is at 100. INSTB is at 60 and INSTC is at 30.
+		 * This means, last sequence number sent by INSTA to INSTB is 60 and to INSTC is 30. Now, lets say INSTA is shutdown
 		 * and INSTB comes up as the primary to INSTC and starts replicating the 30 updates thereby bringing both INSTB and
 		 * INSTC sequence number to 60. Now, if INSTA comes backup again as primary against INSTC, we will have a case where
 		 * gtmsource_local->read_jnl_seqno as 30, but recvd_jnl_seqno as 60. This means that we are going to bump
@@ -790,13 +791,10 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 	read_addr = gtmsource_local->read_addr;
 	assert(read_addr <= write_addr);
 	assert((0 != write_addr) || (read_jnl_seqno <= jctl->start_jnl_seqno));
-#	ifdef GTMSOURCE_ALWAYS_READ_FILES
-	gtmsource_local->read_state = READ_FILE;
-#	endif
+	GTMDBGFLAGS_NOFREQ_ONLY(GTMSOURCE_FORCE_READ_FILE_MODE, gtmsource_local->read_state = READ_FILE);
 	switch(gtmsource_local->read_state)
 	{
 		case READ_POOL:
-#			ifndef GTMSOURCE_ALWAYS_READ_FILES_STRESS
 			if (read_addr == write_addr)
 			{	/* Nothing to read. While reading pool, the comparison of read_addr against write_addr is
 				 * the only reliable indicator if there are any transactions to be read. This is due to
@@ -817,8 +815,6 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				return (total_tr_len);
 			if (0 < *data_len)
 				return (-1);
-#			endif /* for GTMSOURCE_ALWAYS_READ_FILES_STRESS, we let the source server switch back and forth between
-				 pool read and file read */
 			/* Overflow, switch to READ_FILE */
 			gtmsource_local->read_state = READ_FILE;
 			QWASSIGN(gtmsource_save_read_jnl_seqno, read_jnl_seqno);

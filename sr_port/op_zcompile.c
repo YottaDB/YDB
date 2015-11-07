@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ GBLREF mcalloc_hdr 		*mcavailptr;
 
 #define FILE_NAME_SIZE 255
 
-void op_zcompile(mval *v, boolean_t mExtReqd)
+void op_zcompile(mval *v, boolean_t ignore_dollar_zcompile)
 {
 	unsigned		status;
 	command_qualifier	save_qlf;
@@ -51,14 +51,17 @@ void op_zcompile(mval *v, boolean_t mExtReqd)
 	if (!v->str.len)
 		return;
 	save_qlf = glb_cmd_qlf;
-	glb_cmd_qlf.object_file.str.addr = obj_file;
-	glb_cmd_qlf.object_file.str.len = FILE_NAME_SIZE;
-	glb_cmd_qlf.list_file.str.addr = list_file;
-	glb_cmd_qlf.list_file.str.len = FILE_NAME_SIZE;
-	glb_cmd_qlf.ceprep_file.str.addr = ceprep_file;
-	glb_cmd_qlf.ceprep_file.str.len = FILE_NAME_SIZE;
-	zl_cmd_qlf(&v->str, &glb_cmd_qlf);
-	cmd_qlf = glb_cmd_qlf;
+#	ifdef UNIX	/* VMS retains old behavior, for which $ZCOMPILE only affects ZLINK, not ZCOMPILE or compile mode */
+	if (!ignore_dollar_zcompile)
+	{
+		INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, FILE_NAME_SIZE);
+		zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf);	/* Process $ZCOMPILE qualifiers */
+		glb_cmd_qlf = cmd_qlf;
+	}
+#	endif
+	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, FILE_NAME_SIZE);
+	zl_cmd_qlf(&v->str, &cmd_qlf);			/* Process ZCOMPILE arg. Override any conflicting quals in $ZCOMPILE */
+	glb_cmd_qlf = cmd_qlf;
 	assert(run_time);
 	assert(rts_stringpool.base == stringpool.base);
 	rts_stringpool = stringpool;
@@ -94,7 +97,7 @@ void op_zcompile(mval *v, boolean_t mExtReqd)
 		status;
 		status = cli_get_str("INFILE",source_file_string, &len))
 	{
-		compile_source_file(len, source_file_string, mExtReqd);
+		compile_source_file(len, source_file_string, FALSE);
 		len = FILE_NAME_SIZE;
 	}
 	/* Determine if need to remove any added added mc blocks. Min value of mcallocated will ensure

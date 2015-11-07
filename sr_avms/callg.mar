@@ -1,0 +1,12 @@
+	.title callg
+
+	;callg(rout, args)
+
+VAX	=	1
+	code_psect
+	.entry	callg,^m<>
+	movl	8(ap),r0
+	callg	(r0),@4(ap)
+	ret
+
+	.end

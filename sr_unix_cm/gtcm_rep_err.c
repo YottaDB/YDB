@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ void gtcm_rep_err(char *msg, int errcode)
 	char	outbuf[OUT_BUFF_SIZE];
 	time_t	now;
 	int	status, retval;
-	char 	*gtm_dist, *filebuf;
+	char 	*gtm_dist, *filebuf, *tag_emsg, *tmp_time;
 	mstr	tn;
 	MSTR_DEF(val, strlen(GTM_DIST_PATH), GTM_DIST_PATH);		/* BYPASSOK */
 
@@ -87,7 +87,7 @@ void gtcm_rep_err(char *msg, int errcode)
 #	ifdef __MVS__
 	if (-1 != gtm_zos_create_tagged_file(fileName, TAG_EBCDIC))
 	{
-		char *tag_emsg = STRERROR(errno);
+		tag_emsg = STRERROR(errno);
 		sgtm_putmsg(outbuf, VARLSTCNT(10) ERR_BADTAG, 4, LEN_AND_STR(fileName),
 			    -1, TAG_EBCDIC, ERR_TEXT, 2, RTS_ERROR_STRING(tag_emsg));
 	}
@@ -95,7 +95,8 @@ void gtcm_rep_err(char *msg, int errcode)
 	if ((fp = Fopen(fileName, "a")))
 	{
 		now = time(0);
-		FPRINTF(fp, "%s", GTM_CTIME(&now));
+		GTM_CTIME(tmp_time, &now);
+		FPRINTF(fp, "%s", tmp_time);
 		FPRINTF(fp, "server(%s)  %s", omi_service, outbuf);
 		FCLOSE(fp, status);
 	}

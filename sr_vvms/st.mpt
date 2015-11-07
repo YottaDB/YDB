@@ -1,0 +1,77 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 1989,2001 Sanchez Computer Associates, Inc.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%ST	;GT.M %ST utility - status display
+	;
+	n image s image=0 d work
+	q
+IMAGE	n image s image=1 d work
+	q
+work	n nopriv,lock,pid,access,users,ctime,group,jtype,ltime,member,procid,tname,uname,iname,i,sort,oldpriv,$zt
+	s (lock,nopriv,users)=0
+	s $zt="zg "_$zl_":ERR^%ST" u $p:ctrap=$c(3)
+	s oldpriv=$zsetprv("SYSLCK,GROUP,WORLD")
+	i '$zpriv("SYSLCK") w !,"You need SYSLCK privilege to run this program.",! d exit q
+	s access(0)="Detach",access(1)="Network",access(2)="Batch",access(3)="Local",access(4)="Dialup",access(5)="Remote"
+	s lock=$zlkid(0)
+	i lock d  f  s lock=$zlkid(1) q:'lock  d
+	. i $extract($zgetlki(lock,"RESNAM"),1,6)="GTM$LM" s pid=$zgetlki(lock,"PID") d getjob(pid)
+	s users=users+nopriv
+	i users d header,ishow:image,ushow:'image w !!,"Total ",users," user",$s(users>1:"s.",1:"."),!
+	e  w !,"No current GT.M users.",!
+	i nopriv w !,"Insufficient privileges to examine ",nopriv," process",$s(nopriv>1:"es.",1:"."),!
+exit	s oldpriv=$zsetprv(oldpriv) u $p:ctrap=""
+	q
+header	w !,"GT.M Mumps users on ",$$datetime($horolog),!
+	w !,"Terminal",?9,"Username",?24,"UIC",?30,"Proc. id",?39,"Access",?47,"CPU time",?61,"Login time"
+	w !,"--------",?9,"------------",?22,"-------",?30,"--------",?39,"------",?47,"-------------",?61,"------------------"
+	q
+ushow	s uname="" f  s uname=$order(sort(uname)) q:uname=""  f i=1:1:sort(uname) d
+	. s tname=$piece(sort(uname,i),"^",1),procid=$piece(sort(uname,i),"^",2),group=$piece(sort(uname,i),"^",3)
+	. s member=$piece(sort(uname,i),"^",4),jtype=$piece(sort(uname,i),"^",5),ctime=$piece(sort(uname,i),"^",6)
+	. s ltime=$piece(sort(uname,i),"^",7)
+	. w !,tname,?9,uname,?22,group,",",member,?30,procid,?39,access(jtype),?47,ctime,?61,ltime
+	q
+ishow	s iname="" f  s iname=$order(sort(iname)) q:iname=""  d
+	. w !,"Image  : ",iname s uname="" f  s uname=$order(sort(iname,uname)) q:uname=""  f i=1:1:sort(iname,uname) d
+	. . s tname=$piece(sort(iname,uname,i),"^",1),procid=$piece(sort(iname,uname,i),"^",2)
+	. . s group=$piece(sort(iname,uname,i),"^",3),member=$piece(sort(iname,uname,i),"^",4)
+	. . s jtype=$piece(sort(iname,uname,i),"^",5),ctime=$piece(sort(iname,uname,i),"^",6)
+	. . s ltime=$piece(sort(iname,uname,i),"^",7)
+	. . w !,tname,?9,uname,?22,group,",",member,?30,procid,?39,access(jtype),?47,ctime,?61,ltime
+	. w !
+	q
+getjob(pid)
+	n $zt
+	s $zt="g blindpid"
+	s procid=$$FUNC^%DH(pid,8),tname=$zgetjpi(pid,"terminal"),uname=$zgetjpi(pid,"USERNAME")
+	s group=$$FUNC^%DO($zgetjpi(pid,"grp"),3),member=$$FUNC^%DO($zgetjpi(pid,"mem"),3),jtype=$zgetjpi(pid,"JOBTYPE")
+	s ltime=$$datetime($zgetjpi(pid,"logintim")),ctime=$$cputime($zgetjpi(pid,"CPUTIM"))
+	i image s iname=$zgetjpi(pid,"IMAGNAME"),i=$get(sort(iname,uname))+1,sort(iname,uname)=i
+	i  s sort(iname,uname,i)=tname_"^"_procid_"^"_group_"^"_member_"^"_jtype_"^"_ctime_"^"_ltime_"^"_iname
+	e  s i=$get(sort(uname))+1,sort(uname)=i,sort(uname,i)=tname_"^"_procid_"^"_group_"^"_member_"^"_jtype_"^"_ctime_"^"_ltime
+	s users=users+1
+	q
+datetime(horolog)
+	q $zdate(horolog,"DD-MON-YY 24:60:SS","Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec")
+	;
+cputime(s)
+	n T,S,M,H,D
+	s T=s#100,s=s\100 s:$length(T)=1 T="0"_T
+	s S=s#60,s=s\60 s:$length(S)=1 S="0"_S
+	s M=s#60,s=s\60 s:$length(M)=1 M="0"_M
+	s H=s#24,D=s\24 s:$length(H)=1 H="0"_H
+	q D_" "_H_":"_M_":"_S_"."_T
+	;
+blindpid
+	i $zs["NOPRIV" s nopriv=nopriv+1 q
+ERR	w !,"lock = ",lock,!
+	w !,$p($zs,",",2,99),! u $p:ctrap="" s:$d(oldpriv) oldpriv=$zsetprv(oldpriv)
+	q

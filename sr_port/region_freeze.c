@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@
 #include "cli.h"
 #include "util.h"
 #include "wbox_test_init.h"
+#include "have_crit.h"
 
 GBLREF	bool		caller_id_flag;
 GBLREF	bool		in_mupip_freeze;

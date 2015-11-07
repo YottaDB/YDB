@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	char *gtm_dist;
 
 	ctim = time(0);
-	ltime = localtime(&ctim);
+	GTM_LOCALTIME(ltime, &ctim);
 	SPRINTF(tbuf, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 

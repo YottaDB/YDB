@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,6 @@
 
 #define ARROW	"^-----"
 
-void show_source_line(char* buf, ssize_t buflen, boolean_t warn);
+void show_source_line(boolean_t warn);
 
 #endif /* SHOW_SOURCE_LINE_INCLUDED */

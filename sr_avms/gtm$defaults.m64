@@ -1,0 +1,27 @@
+;****************************************************************
+;*								*
+;*	Copyright 2002, 2011 Fidelity Information Services, Inc	*
+;*								*
+;*	This source code contains the intellectual property	*
+;*	of its copyright holder(s), and is made available	*
+;*	under a license.  If you do not know the terms of	*
+;*	the license, please stop and do not read further.	*
+;*								*
+;****************************************************************/
+
+	.TITLE	GTM$DEFAULTS
+GTM$USER_STACK_SIZE == 256 * 1024
+GTM$USER_SPAWN_FLAG == 0
+GTM$USER_INDRCACHE_SIZE == 32
+GTM$USER_STRPL_SIZE == 20480
+GTM$USER_IO_TIMER == 3300000
+GTM$USER_WRITE_FILTER == 0
+GTM$SPECIAL_INPUT == ^X000000
+GTM$UNDEF_INHIBIT == 0
+GTM$CTRLC_ENABLE  == 1
+GTM$BREAK_MESSAGE_MASK == 15
+GTM$LOWER_CASE_LABELS == 1
+GTM$LVNULLSUBS == 1
+GTM$ZDIR_FORM == 0
+GTM$ZDATE_FORM == 0
+	.END

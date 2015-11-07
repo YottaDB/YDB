@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	int			keylen;
 	char			format_key[MAX_MIDENT_LEN + 1];	/* max key length + 1 byte for '^' */
 	gv_namehead		*tmp_gvt;
+	sgmnt_addrs		*csa;
 
 	gd_map = addr->maps;
 	gd_map_top = gd_map + addr->n_maps;
@@ -119,13 +120,13 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 					 * and gv_currkey to get out of sync in case of an error condition.
 					 */
 	}
-	change_reg();
 	if ((keylen = gvent.var_name.len + 2) > gv_cur_region->max_key_size)	/* caution: embedded assignment of "keylen" */
 	{
 		assert(ARRAYSIZE(format_key) >= (1 + gvent.var_name.len));
 		format_key[0] = '^';
 		memcpy(&format_key[1], gvent.var_name.addr, gvent.var_name.len);
-		rts_error(VARLSTCNT(10) ERR_KEY2BIG, 4, keylen, (int4)gv_cur_region->max_key_size,
+		csa = &FILE_INFO(gv_cur_region)->s_addrs;
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_KEY2BIG, 4, keylen, (int4)gv_cur_region->max_key_size,
 			REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, 1 + gvent.var_name.len, format_key);
 	}
 	memcpy(gv_currkey->base, gvent.var_name.addr, gvent.var_name.len);
@@ -134,5 +135,6 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	gv_currkey->base[gvent.var_name.len] = 0;
 	gv_currkey->end = gvent.var_name.len;
 	gv_currkey->prev = 0;
+	change_reg();
 	return;
 }

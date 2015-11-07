@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,48 +111,62 @@
 
 #ifdef VMS
 /* These routines for VMS are AST-safe */
-#  define MALLOC(size, addr)							\
-{										\
-        int	msize, errnum;							\
-	void	*maddr;								\
-	msize = size;								\
-        errnum = lib$get_vm(&msize, &maddr);					\
-	if (SS$_NORMAL != errnum)						\
-	{									\
-		gtmMallocErrorSize = size;					\
-		gtmMallocErrorCallerid = CALLERID;				\
-		gtmMallocErrorErrno = errnum;					\
-		raise_gtmmemory_error();					\
-	}									\
-	addr = (void *)maddr;							\
+#  define MALLOC(size, addr)										\
+{													\
+        int	msize, errnum;										\
+	void	*maddr;											\
+	if ((0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
+	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
+		gtmMallocErrorSize = size;								\
+		gtmMallocErrorCallerid = CALLERID;							\
+		gtmMallocErrorErrno = ERR_MALLOCMAXVMS;							\
+		raise_gtmmemory_error();								\
+	}												\
+	msize = size;											\
+        errnum = lib$get_vm(&msize, &maddr);								\
+	if (SS$_NORMAL != errnum)									\
+	{												\
+		gtmMallocErrorSize = size;								\
+		gtmMallocErrorCallerid = CALLERID;							\
+		gtmMallocErrorErrno = errnum;								\
+		raise_gtmmemory_error();								\
+	}												\
+	addr = (void *)maddr;										\
 }
-#  define FREE(size, addr)							\
-{										\
-        int	msize, errnum;							\
-	void	*maddr;								\
-	msize = size;								\
-        maddr = addr;								\
-        errnum = lib$free_vm(&msize, &maddr);					\
-	if (SS$_NORMAL != errnum)						\
-	{									\
-		--gtmMallocDepth;						\
-		assert(FALSE);							\
-		rts_error(VARLSTCNT(4) ERR_FREEMEMORY, 1, CALLERID, errnum);	\
-	}									\
+#  define FREE(size, addr)										\
+{													\
+        int	msize, errnum;										\
+	void	*maddr;											\
+	msize = size;											\
+        maddr = addr;											\
+        errnum = lib$free_vm(&msize, &maddr);								\
+	if (SS$_NORMAL != errnum)									\
+	{												\
+		--gtmMallocDepth;									\
+		assert(FALSE);										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FREEMEMORY, 1, CALLERID, errnum);		\
+	}												\
 }
 #  define GTM_MALLOC_REENT
 #else
 /* These routines for Unix are NOT thread-safe */
-#  define MALLOC(size, addr) 							\
-{										\
-	addr = (void *)malloc(size);						\
-	if (NULL == (void *)addr)						\
-	{									\
-		gtmMallocErrorSize = size;					\
-		gtmMallocErrorCallerid = CALLERID;				\
-		gtmMallocErrorErrno = errno;					\
-		raise_gtmmemory_error();					\
-	}									\
+#  define MALLOC(size, addr) 										\
+{													\
+	if ((0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
+	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
+		gtmMallocErrorSize = size;								\
+		gtmMallocErrorCallerid = CALLERID;							\
+		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
+		raise_gtmmemory_error();								\
+	}												\
+	addr = (void *)malloc(size);									\
+	if (NULL == (void *)addr)									\
+	{												\
+		gtmMallocErrorSize = size;								\
+		gtmMallocErrorCallerid = CALLERID;							\
+		gtmMallocErrorErrno = errno;								\
+		raise_gtmmemory_error();								\
+	}												\
 }
 #  define FREE(size, addr) free(addr);
 #endif
@@ -337,6 +351,8 @@ GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to h
 GBLREF	uint4		outOfMemoryMitigateSize;	/* Size of above reserve in Kbytes */
 GBLREF	int		mcavail;
 GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
+GBLREF	size_t		totalRallocGta;			/* Size allocated by gtm_text_alloc if at all */
+GBLREF	size_t		gtm_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
 GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
 UNIX_ONLY(GBLREF ch_ret_type (*ht_rhash_ch)();)		/* Function pointer to hashtab_rehash_ch */
 UNIX_ONLY(GBLREF ch_ret_type (*jbxm_dump_ch)();)	/* Function pointer to jobexam_dump_ch */
@@ -435,8 +451,10 @@ error_def(ERR_INVMEMRESRV);
 error_def(ERR_MEMORYRECURSIVE);
 UNIX_ONLY(error_def(ERR_MEMORY);)
 UNIX_ONLY(error_def(ERR_SYSCALL);)
+UNIX_ONLY(error_def(ERR_MALLOCMAXUNIX);)
 VMS_ONLY(error_def(ERR_FREEMEMORY);)
 VMS_ONLY(error_def(ERR_VMSMEMORY);)
+VMS_ONLY(error_def(ERR_MALLOCMAXVMS);)
 
 /* Internal prototypes */
 void gtmSmInit(void);
@@ -533,7 +551,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 		if (NULL == outOfMemoryMitigation)
 		{
 			save_errno = errno;
-			gtm_putmsg(VARLSTCNT(5) ERR_INVMEMRESRV, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVMEMRESRV, 2,
 				   RTS_ERROR_LITERAL(UNIX_ONLY("$gtm_memory_reserve")VMS_ONLY("GTM_MEMORY_RESERVE")),
 				   save_errno);
 			exit(save_errno);
@@ -714,7 +732,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				{
 					--gtmMallocDepth;
 					assert(FALSE);
-					rts_error(VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MEMORYRECURSIVE);
 				}
 			);
 			INCR_CNTR(totalMallocs);
@@ -914,7 +932,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 		{
 			--gtmMallocDepth;
 			assert(FALSE);
-			rts_error(VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MEMORYRECURSIVE);
 		}
 #		endif
 		INCR_CNTR(smTn);	/* Bump the transaction number */
@@ -1130,7 +1148,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
         if (GDL_None == gtmDebugLevel)
         {
 #	endif
-		if (NULL != (addr = (void *)outOfMemoryMitigation)
+		if (NULL != (addr = (void *)outOfMemoryMitigation)	/* Note assignment */
 		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stpgc_ch == active_ch->ch)))
 		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is
 			 * going to unwind this error and ignore it. On VMS the error will not be trapped.
@@ -1148,8 +1166,9 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 			--gtmMallocDepth;
 		UNIX_ONLY(--fast_lock_count);
 		DEFERRED_EXIT_HANDLING_CHECK;
-		UNIX_ONLY(rts_error(VARLSTCNT(5) ERR_MEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid, gtmMallocErrorErrno));
-		VMS_ONLY(rts_error(VARLSTCNT(4) ERR_VMSMEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid));
+		UNIX_ONLY(rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid,
+					gtmMallocErrorErrno));
+		VMS_ONLY(rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VMSMEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid));
 #	ifndef DEBUG
 	} else
 		/* If not a debug module and debugging is enabled, reroute call to the debugging version. */

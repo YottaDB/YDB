@@ -1,0 +1,952 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                               ;
+;       Copyright 2000, 2007 Fidelity Information Services, Inc  ;
+;                                                               ;
+;       This source code contains the intellectual property     ;
+;       of its copyright holder(s), and is made available       ;
+;       under a license.  If you do not know the terms of       ;
+;       the license, please stop and do not read further.       ;
+;                                                               ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	.title  MUTEX   GT.M Mutex Control (VMS)
+;
+;       General:
+;               Multiple readers are allowed at one time, but only one writer (no readers while there is a writer).
+;               A write request blocks access to additional readers until after the writer is granted crit and then
+;               releases it.  Freeze allows readers, but not writers, and write pendings do not block new readers.
+;
+;       Interface:
+;               void mutex_init(addr, n, crash)                 - Initialize a mutex at addr with n queue slots
+;                                                                 If crash is TRUE, then this is a "crash" reinitialization;
+;                                                                 otherwise, it's a "clean" initialization
+;               enum cdb_sc mutex_lockr(addr, seq, flag, spinparms)        - Read access to mutex at addr
+;               enum cdb_sc mutex_lockw(addr, seq, flag, spinparms)        - Write access to mutex at addr
+;               enum cdb_sc mutex_lockwim(addr, seq, flag)      - Write access to mutex at addr;  if cannot lock, immediately
+;                                                                 return cdb_sc_nolock
+;               enum cdb_sc mutex_lockw_ccp(addr, seq, flag, k) - Write access to mutex at addr;  if cannot lock, place CCP in
+;                                                                 queue for "wakeup" and return cdb_sc_nolock (do NOT hibernate)
+;               enum cdb_sc mutex_wtor(addr, rflag, wflag)      - Change write access to mutex at addr to read access, do a wakeup
+;               enum cdb_sc mutex_unlockr(addr, seq, flag)      - Unlock read access to mutex at addr
+;               enum cdb_sc mutex_unlockw(addr, seq, flag)      - Unlock write access to mutex at addr
+;
+;               For routines taking the seq argument, if seq != crash count, return cdb_sc_critreset.
+;
+;               See GDSBT.H for related C declarations
+;
+;       Mutex structure (must be quadword aligned):
+;
+;               ---------------------------------
+;               | write pending | ownership cnt | 0
+;               ---------------------------------
+;               | # of que slots| crash count   |
+;               ---------------------------------
+;               //                              //
+;               ---------------------------------
+;               |_ fl waiting process que head _| 64 MUTEX_PROCHEAD
+;               |_ bl                          _|
+;               |_      --- unused ---         _|
+;               |       --- unused ---          |
+;               ---------------------------------
+;               //                              //
+;               ---------------------------------
+;               |_ fl unused slots queue head  _| 128 MUTEX_FREEHEAD
+;               |_ bl                          _|
+;               |_      --- unused ---         _|
+;               |       --- unused ---          |
+;               ---------------------------------
+;               |_ fl   first queue entry      _|
+;               |_ bl                          _|
+;               |_ pid                         _|
+;               |  super_crit [CCP use only]*   |
+;               ---------------------------------
+;               |_ fl   second queue entry     _|
+;               |_ bl                          _|
+;               |_ pid                         _|
+;               |  super_crit [CCP use only]*   |
+;               ---------------------------------
+;               :       :       :       :       :
+;               ---------------------------------
+;               |_ fl   last queue entry       _|
+;               |_ bl                          _|
+;               |_ pid                         _|
+;               |  super_crit [CCP use only]*   |
+;               ---------------------------------
+;
+;               * Note:  only one entry at a time (at the head of the waiting process queue) will ever use this field.
+
+; Offsets from the beginning of the mutex structure:
+
+MUTEX_OWNCNT    = 0
+MUTEX_WRTPND_MASK = ^X10000
+MUTEX_WRTPND_BIT  = 16
+MUTEX_WRTPND    = 2
+MUTEX_CRASHCNT  = 4
+MUTEX_QUESLOTS  = 6
+MUTEX_PROCHEAD  = 64    ;  8
+MUTEX_FREEHEAD  = 128   ; 24
+
+; Offsets of spin counts in mutex_spin_parms, keep these offsets in sync with mutex_spin_parms_struct definition in gdsbt.h
+MUTEX_HARD_SPIN_COUNT_OFFSET    = 0
+MUTEX_SLEEP_SPIN_COUNT_OFFSET   = 4
+MUTEX_SPIN_SLEEP_MASK_OFFSET    = 8
+
+; Offsets from the beginning of a queue entry:
+MUTEX_PID       = 8
+MUTEX_SUPER_CRIT = 12
+
+; Retry counts for interlocked queue instructions:
+QUANT_RETRY     = 10000
+QUEUE_RETRY     = 255
+MAX_WAKE	= 37	;not actually a retry count but another queue loop limiter
+REST_FREQ	= ^X3	;sleep mask of complemented low order bits
+
+; NOTE:  The following definitions correspond to items of the same name in CDB_SC.H.
+;        Make sure that they are maintained compatibly!
+cdb_sc_nolock   = 3
+cdb_sc_dbccerr  = 81    ; 'Q'
+cdb_sc_critreset = 82   ; 'R'
+
+
+; NOTE:  The following definition corresponds to an item of the same name,
+;        defined in CCP.H via inclusion of CCPACT_TAB.H.
+;        Make sure that it is maintained compatibly!
+CCTR_SCRIT      = 10    ; Super_crit granted
+
+	$psldef
+	$efndef
+
+	code_psect
+
+;       void    mutex_init(mutex_struct *addr, int N, bool crash);
+;
+;       Initialize a mutex with N que entries.   If crash is TRUE, then this is
+;       a "crash" reinitialization;  otherwise it's a "clean" initialization.
+
+
+	.entry  mutex_init,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+	movl    8(ap),r3                ;r3 = number of queue entries
+	blbs    12(ap),crash            ;branch if this is a crash reinitialization
+
+; Clean initialization
+clean:  movw    r3,MUTEX_QUESLOTS(r2)   ;set the number of queue entries
+
+	;initialize the waiting process queue to be empty
+	.disable flagging
+	clrq    MUTEX_PROCHEAD(r2)
+	clrq    MUTEX_PROCHEAD+8(r2)
+
+	;initialize the free queue to be empty
+	movaq   MUTEX_FREEHEAD(r2),r1
+	clrq    (r1)
+	clrq    8(r1)
+
+	movaq   16(r1),r0               ;r0 -> first free entry
+	clrq    (r0)                    ;clear it
+	clrq    8(r0)
+	.enable flagging
+	decl    r3
+
+	;insert each entry into the free queue
+10$:    insqti  (r0),(r1)
+	bcs     30$                     ;branch if the secondary interlock failed
+	addl    #16,r0
+	sobgtr  r3,10$
+
+	;initialize the rest of the mutex structure
+	movw    #-1,(r2)                ;initial semaphore value = -1
+	clrw    MUTEX_WRTPND(r2)        ;initial flags value = 0;
+	blbs    12(ap),20$              ;if this was a crash, don't clear the count
+	clrw    MUTEX_CRASHCNT(r2)
+20$:    ret
+
+30$:    pushl   #ERR_DBCCERR
+	calls   #1,G^LIB$SIGNAL
+	ret
+
+
+; Crash reinitialization
+crash:  bbssi   #0,MUTEX_WRTPND(r2),10$ ;set the write pending bit
+10$:    adawi   #1,MUTEX_CRASHCNT(r2)   ;increment the crash sequence number
+	.disable flagging
+	clrq    MUTEX_FREEHEAD(r2)      ;assure that no one goes into the wait queue
+	.enable flagging
+
+	;wake up all sleeping processes;  they will crash
+	movab   MUTEX_PROCHEAD(r2),r4
+	movl    r4,r5                   ;r4,r5 -> queue head
+
+	addw3   #1,MUTEX_QUESLOTS(r2),r0 ;r0 = number of queue slots
+	cvtwl   r0,r0
+	ashl    r0,#4,r0                ;scale by 16
+	movab   MUTEX_PROCHEAD(r2)[r0],r6 ;r6 -> top of the queue array
+
+20$:    movl    (r4),r0
+	beql    clean                   ;the wait queue was empty;  do a clean initialization
+
+	addl    r0,r4                   ;r4 probably -> queue entry
+	cmpl    r4,r5                   ;if r4 -> queue head, then loop is done
+	blequ   clean                   ;if r4 -> below queue head, then the queue is corrupt
+					;... either way, do a clean initialization
+	cmpl    r4,r6                   ;if r4 -> above queue top, then the queue is corrupt
+	bgequ   clean                   ;... so do a clean initialization
+	bitb    r4,#3                   ;if r4 is not quadword aligned, then the queue is corrupt
+	beqlu   30$
+	brw     clean                   ;... so do a clean initialization
+
+	;otherwise, wake up the process
+30$:    pushal  MUTEX_PID(r4)
+	calls   #1,G^crit_wake
+	brb     20$
+
+
+;       enum    cdb_sc  mutex_lockr(mutex_struct *addr, int4 crash_count, uint4 *read_lock, mutex_spin_parms_ptr_t spin_parms);
+;
+;       Lock read access to the mutex at addr
+
+
+	.entry  mutex_lockr,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+	movl    12(ap),r4               ;r4 -> read lock flag
+
+10$:    cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    30$                     ;if so, return an error
+
+	movl    #1,(r4)                 ;set the read lock flag
+;+
+;
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;        adawi   #1,(r2)                 ;increment the semaphore
+;        bbssi   #1,MUTEX_WRTPND(r2),20$ ;force access to the write pending byte
+;20$:    blbs    MUTEX_WRTPND(r2),40$    ;if write pending, sleep and try again later
+;-
+
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_mb                         ; need memory barrier
+15$:
+	evax_ldll r16,(r2)              ; read mutex locked
+	bbs     #16,r16,40$             ; skip, if write pending
+	incw    r16                     ; incr owner count
+	evax_stlc r16,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r16,15$                ; retry, if store failed
+	evax_mb                         ; need memory barrier
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+30$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+40$:    movl    16(ap),r6                               ;spin_parms
+	movl    MUTEX_HARD_SPIN_COUNT_OFFSET(r6),r6     ;spin_parms->mutex_hard_spin_count
+	bsbw    sleep                                   ;(clears the read lock flag)
+	brb     10$                                     ;try again
+
+
+;       enum    cdb_sc  mutex_lockw(mutex_struct *addr, int4 crash_count, uint4 *write_lock, mutex_spin_parms_ptr_t spin_parms);
+;
+;       Lock write access to the mutex at addr
+
+
+	.entry  mutex_lockw,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+	movl    12(ap),r4               ;r4 -> write lock flag
+
+10$:    cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    40$                     ;if so, return an error
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),20$ ;set the write pending bit
+;20$:    movl    #1,(r4)                 ;set the write lock flag
+;        adawi   #1,(r2)                 ;increment the semaphore
+;        bgtr    50$                     ;branch if semaphore > 0 - there are other owners
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),30$ ;set write pending again
+;30$:    tstw    (r2)                    ;see if any other process has entered crit
+;        bneq    60$                     ;if so, sleep and try again later
+;-
+	evax_mb                         ; need memory barrier
+	movl    #MUTEX_WRTPND_MASK,r18  ; Get a write pending mask in R18
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+15$:    evax_ldll r16,(r2)              ; read mutex locked
+	evax_extwl r16,#0,r17           ; extract owner count from low word
+	evax_addq  r17,#1,r28           ; Owner plus 1
+	evax_extwl r28,#0,r28           ; maintain owner count as a word
+	evax_cmoveq     r28,#0,r17      ; If zero we can own, otherwise don't change
+	evax_addq r18,r17,r16           ; set write pending bit
+	evax_stlc r16,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r16,15$                ; retry, if store failed
+	evax_mb                         ; need memory barrier
+	evax_bne r28,60$                ; branch, if wait flag set
+
+	movl    #1,(r4)                 ;set the write lock flag
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+40$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; The additional bbssi is not required - with the prior use of
+; multiple interlock operations, the probablity that a writer
+; unlocked the mutex was much greater.
+
+;50$:    bbssi   #0,MUTEX_WRTPND(r2),60$ ;set write pending again
+;-
+
+60$:    movl    16(ap),r6                               ;spin_parms
+	movl    MUTEX_HARD_SPIN_COUNT_OFFSET(r6),r6     ;spin_parms->mutex_hard_spin_count
+	bsbw    sleep                                   ;(clears the write lock flag)
+	brb     10$                                     ;try again
+
+
+;       enum    cdb_sc  mutex_lockwim(mutex_struct *addr, int4 crash_count, uint4 *write_lock);
+;
+;       Lock write access to the mutex at addr;  if cannot lock, immediately return cdb_sc_nolock
+
+
+	.entry  mutex_lockwim,^m<r2>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+
+	cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    30$                     ;if so, return error condition
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),10$ ;set the write pending bit
+;10$:    adawi   #1,(r2)                 ;increment the semaphore
+;        bgtr    40$                     ;branch if semaphore > 0 - there are other owners
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),20$ ;set write pending again
+;20$:    tstw    (r2)                    ;see if any other process has entered crit
+;        bneq    40$                     ;branch if so
+;-
+	evax_mb                         ; need memory barrier to force all writes out
+15$:    movl    #MUTEX_WRTPND_MASK,r19  ; Get a write pending mask in R19
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_ldll r16,(r2)              ; read mutex locked
+	evax_addq  r16,#1,r19           ; Owner plus 1
+	evax_extwl r19,#0,r28           ; extract owner count
+	tstl    r28                     ; Can we obtain the mutex?
+	bneq    40$                     ; If other owners then no, branch and return error
+	evax_stlc r19,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r19,15$                ; retry, if store failed
+	evax_mb                         ; need memory barrier
+
+	movl    #1,@12(ap)              ;set the write lock flag
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+30$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; The mutex manipulation no longer leaves the owner count incremented
+; when the mutex is not acquired.  The decrement is thus no longer
+; required.  In addition, the Note below no longer applies since
+; the atomic manipulation above can not incorrectly leave the
+; write pending flag set.
+;
+;       adawi   #-1,(r2)                ;decrement the semaphore
+;       blss    10$
+;
+;40$:
+;
+;        ;Note:  this may incorrectly leave write pending set, but as long as there is
+;        ;       a process in crit, this will produce only a temporary inefficiency
+; -
+
+40$:    movzbl  #cdb_sc_nolock,r0       ;return failure
+	ret
+
+
+;       enum    cdb_sc  mutex_lockw_ccp(mutex_struct *addr, short crash_count, uint4 *write_lock, long super_crit);
+;
+;       Lock write access to the mutex at addr;  if cannot lock, queue the CCP process for "wakeup",
+;       and return cdb_sc_nolock (do NOT hibernate)
+
+
+	.entry  mutex_lockw_ccp,^m<r2,r3,r4,r5>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+
+	cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    30$                     ;if so, return an error
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),10$ ;set the write pending bit
+;10$:    adawi   #1,(r2)                 ;increment the semaphore
+;        bgtr    40$                     ;branch if semaphore > 0 - there are other owners
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),20$ ;set write pending again
+;20$:    tstw    (r2)                    ;see if any other process has entered crit
+;        bneq    40$                     ;branch if so
+;
+;-
+	evax_mb                         ; need memory barrier to force all writes out
+15$:    movl    #MUTEX_WRTPND_MASK,r18  ; Get a write pending mask in R18
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_ldll r16,(r2)              ; read mutex locked
+
+	evax_extwl r16,#0,r17           ; extract owner count from low word
+	evax_addq  r17,#1,r28           ; Owner plus 1
+	evax_extwl r28,#0,r28           ; maintain owner count as a word
+	evax_cmoveq     r28,#0,r17      ; If zero we can own, otherwise don't change
+	evax_addq r18,r17,r16           ; set write pending bit
+	evax_stlc r16,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r16,15$                ; retry, if store failed
+	evax_mb                         ; need memory barrier
+	evax_bne r28,40$                ; branch, if wait flag set
+
+	movl    #1,@12(ap)              ;set the write lock flag
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+30$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;40$:    adawi   #-1,(r2)                ;decrement the semaphore
+;        blss    10$
+;-
+40$:
+
+; Insert the CCP process at the HEAD of the wakeup queue, but do NOT hibernate
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        bbssi   #0,MUTEX_WRTPND(r2),50$ ;set write pending again
+;
+; I don't know enough about how this mutex code is used and wheter or not
+; this is an issue, but there is a window such that when we are placing a
+; CCP process in the wait queue for a mutex, if the existing owner should release
+; the mutex prior to us getting an entry on the wait queue, then no one will
+; try to wake up the CCP process.
+;-
+
+50$:    movl    #QUANT_RETRY,r5
+60$:    movzbl  #QUEUE_RETRY,r1
+
+70$:    remqhi  MUTEX_FREEHEAD(r2),r3   ;get a free slot
+	bvs     130$                    ;branch if the queue was empty or the secondary interlock failed
+
+	movl    16(ap),MUTEX_SUPER_CRIT(r3) ;stash the super_crit value (no need to stash the pid)
+
+	movl    #QUANT_RETRY,r5
+80$:    movzbl  #QUEUE_RETRY,r1
+
+90$:    insqhi  (R3),MUTEX_PROCHEAD(r2) ;insert at the HEAD of the wait queue
+	bcs     100$                    ;branch if the secondary interlock failed
+
+	movzbl  #cdb_sc_nolock,r0       ;return failure to lock - successfully queued
+	ret
+
+	;the secondary interlock failed on an attempt to insert into the wait queue
+100$:   sobgtr  r1,90$
+	sobgtr  r5,120$
+
+	;too many queue failures
+110$:   movzbl  #cdb_sc_dbccerr,r0      ;return error
+	ret
+
+120$:   calls   #0,G^rel_quant
+	brb     80$
+
+	;the free queue was empty or the secondary interlock failed
+130$:   sobgtr  r1,70$
+	sobgtr  r5,140$
+
+	;too many queue failures
+	brb     110$
+
+140$:   calls   #0,G^rel_quant
+	brb     60$
+
+
+;       enum    cdb_sc  mutex_wtor(mutex_struct *addr, uint4 *read_lock, uint4 *write_lock);
+;
+;       Change write access to the mutex at addr to read access, and do a wakeup
+
+	.entry  mutex_wtor,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+
+	movl    #1,@8(ap)               ;set the read lock flag
+
+;        bbcci   #0,MUTEX_WRTPND(r2),10$ ;clear the write pending bit
+;10$:
+;-
+
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_mb                         ; need memory barrier
+15$:
+	evax_ldll r16,(r2)              ; read mutex locked
+	clrl    r16
+	evax_stlc r16,(r2)              ; store mutex as 0
+	.branch_unlikely
+	evax_beq r16,15$                ; retry, if store failed
+	evax_mb                         ; need memory barrier
+
+	bsbw    mutex_wakeup
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+
+;       enum    cdb_sc  mutex_unlockr(mutex_struct *addr, short crash_count, uint4 *read_lock);
+;
+;       Unlock read access to the mutex at addr
+
+
+	.entry  mutex_unlockr,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+
+	cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    20$                     ;if so, return an error
+
+	clrl    @12(ap)                 ;clear the read lock flag
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.
+;
+;        adawi   #-1,(r2)                ;decrement the semaphore
+;-
+
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_mb                         ; need memory barrier
+15$:
+	evax_ldll r16,(r2)              ; read mutex locked
+	decw    r16                     ; decr owner count
+	evax_stlc r16,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r16,15$                ; retry, if store failed
+	evax_mb
+
+;
+;
+; The following two source lines seem to be an attempt at recovering
+; from a situation in which a writer dies after setting it (and before
+; incrementing the semaphore) causing later readers to block. They are being
+; commented out for the following reasons -
+; a. If this reader clears wrtpnd after a new writer has set wrtpnd (and before
+;    incrementing semaphore), a new reader coming after the new writer might
+;    successfully grab read crit forcing the new writer to wait in violation of
+;       "A write request blocks access to additional readers until after
+;       the writer is granted crit and then releases it"
+;    as stated above.
+; b. Recovery from failures is anyway incomplete. We can live without this one!
+;
+; Vinaya, 07/21/98
+;
+;       bgeq    10$                     ;if less than zero, there are no more
+;                                       ;owners <--??? is this logic correct?
+;       bbcci   #0,MUTEX_WRTPND(r2),10$ ;clear the write pending bit;
+;                                       ;if already clear, skip the wakeup
+
+	bsbw    mutex_wakeup
+
+;Label no longer required. See comments above. Vinaya, 07/21/98
+;10$:   clrl    r0                      ;return success (cdb_sc_normal == 0)
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+20$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+
+;       enum    cdb_sc  mutex_unlockw(mutex_struct *addr, short crash_count, uint4 *write_lock);
+;
+;       Unlock write access to the mutex at addr
+
+
+	.entry  mutex_unlockw,^m<r2,r3,r4,r5,r6>
+
+	movl    4(ap),r2                ;r2 -> mutex structure
+
+	cmpw    8(ap),MUTEX_CRASHCNT(r2) ;has the crash count changed?
+	bneq    20$                     ;if so, return an error
+
+	clrl    @12(ap)                 ;clear the write lock flag
+
+;
+;The order in which the semaphore is decremented and wrtpnd is cleared is
+;important. The order "decrement semaphore" and then "clear wrtpnd" might
+;lead to a writer and multiple readers all acquiring crit successfully
+;(violation of mutual exclusion). An example scenario -
+; 0. Writer A in the process of releasing crit, decrements semaphore
+; 1. Writer B acquires crit
+; 2. Writer A clears wrtpnd
+; 3. Readers C, D, etc grab read crit successfully
+;By changing the order to "clear wrtpnd" and then "decrement semaphore", we
+;prevent such scenarios from occuring. But we now have the possibility of
+;new readers beating a prior writer in violation of -
+;       "A write request blocks access to additional readers until after
+;       the writer is granted crit and then releases it"
+;as stated above. This might happen in the window between clearing wrtpnd and
+;decrementing the semaphore. Note that this won't violate mutual exclusion and
+;hence a better choice.
+;
+; Vinaya, 07/21/98
+;
+;       adawi   #-1,(r2)                ;decrement the semaphore
+;
+;       bbcci   #0,MUTEX_WRTPND(r2),10$ ;clear the write pending bit
+;10$:   bsbw    mutex_wakeup
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Change manipulation of the mutex owner count and write pending flag
+; to a single atomic operation using ldl_l/stl_c.  With the single
+; atomic operation, the ordering issue described above are no longer
+; possible.
+;
+;        bbcci   #0,MUTEX_WRTPND(r2),10$ ;clear the write pending bit
+;10$:    adawi   #-1,(r2)                ;decrement the semaphore
+;-
+
+	ASSUME  MUTEX_WRTPND EQ MUTEX_OWNCNT+2
+	evax_mb                         ; need memory barrier
+15$:
+	evax_ldll r16,(r2)              ; read mutex locked
+	movl #^xffff,r17                ; create free mutex state
+	evax_stlc r17,(r2)              ; store mutex
+	.branch_unlikely
+	evax_beq r17,15$                ; retry, if store failed
+	evax_mb
+
+	bsbw    mutex_wakeup
+
+	clrl    r0                      ;return success (cdb_sc_normal == 0)
+	ret
+
+20$:    movzbl  #cdb_sc_critreset,r0    ;return error
+	ret
+
+
+;       Insert this process at the tail of the wait queue,
+;       and hibernate for 10 seconds
+;
+;       On entry, r2 -> mutex structure
+;                 r4 -> read lock flag or write lock flag
+
+
+sleep:
+	.jsb32_entry    input=<r2,r4,r6>
+
+	clrl    (r4)                    ;clear the lock flag (read or write)
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; The mutex manipulation no longer leaves the owner count incremented
+; when the mutex is not acquired.  The decrement is thus no longer
+; required.
+;
+;       adawi   #-1,(r2)                ;decrement the semaphore
+;       bgeq    10$                     ;branch if there are other owners
+;-
+	tstl    num_additional_processors ; If no other processors
+	beql    10$                     ; .. avoid spinlock and go right to sleep
+	evax_mb                         ; complete all reads/writes prior to lock ref
+5$:
+	tstw    (r2)
+	blss    7$                      ; branch if lock is available
+	sobgeq  r6,5$
+	brb     10$
+
+
+7$:
+; 06/19/2002 se: In previous incarnations of GT.M we used read locks. Because of that,
+; the jsb to mutex_wakeup below was warranted because we might need to wake up some
+; readers. Now with all locks being write locks what is happening is that if we fail
+; to get a write lock the first time and come here, then within some few number of hard-spin
+; iterations we see the lock available, we don't return to try and get the lock until after
+; we have gone to mutex_wakeup and woken up the first of any sleepers. This is also
+; another potential cause for the AST thrashing being seen at the VA. This sleep
+; routine has no reason to wake up anybody except itself.
+;       jsb     mutex_wakeup
+	rsb
+
+10$:    movl    #QUANT_RETRY,r5
+20$:    movzbl  #QUEUE_RETRY,r1
+
+30$:    remqhi  MUTEX_FREEHEAD(r2),r3   ;get a free slot
+	bvs     100$                    ;branch if the queue was empty or the secondary interlock failed
+
+	movl    process_id,MUTEX_PID(r3)
+
+	movl    #QUANT_RETRY,r5
+40$:    movzbl  #QUEUE_RETRY,r1
+
+50$:    insqti  (R3),MUTEX_PROCHEAD(r2) ;insert at the tail of the wait queue
+	bcs     70$                     ;branch if the secondary interlock failed
+
+	;08/20/2002 nars : we need to redo the crit test after inserting ourselves into the wait queue.
+	; this is because it is possible that crit became free in the time between our hard spin loop and
+	;       insertion into the wait queue in which case, if we otherwise decide to hibernate for
+	;       10 seconds there will be nobody to wake us up.
+	; also note that we will do a mutex_wakeup ONLY IF we see noone holding crit. this is therefore
+	;       not likely to result in cascading wakeups (for large number of processes) since the very
+	;       first process to be woken up and obtain crit will stop future wakeups.
+	tstw    (r2)                    ;see if any other process has entered crit
+	bgeq    60$                     ;branch if so
+	jsb     mutex_wakeup
+
+	;hibernate for 10 seconds
+60$:
+	clrl    crit_sleep_expired      ;clear timer so can know if it expired or we were woken up
+	pushl   #-1                     ;build the timer quadword on the stack...
+	pushl   #-100000000              ;... 10 seconds delta time
+	movl    sp,r0                   ;save its address
+
+	clrl    -(sp)                   ;flags argument:  elapsed time
+	pushl   r2                      ;reqidt argument:  address of the mutex structure
+	pushab  mutex_tickle            ;astadr argument:  see routine below
+	pushl   r0                      ;daytim argument:  address of the timer quadword on the stack
+	pushl   #efn$c_enf              ;use no efn argument
+	calls   #5,G^sys$setimr
+
+	addl    #8,sp                   ;pop the timer quadword
+
+	calls   #0,G^sys$hiber
+
+	tstl    crit_sleep_expired      ;if not expired, return now to try to get lock immediately
+	bnequ   65$                     ;branch if expired.
+	pushl   #PSL$C_USER             ;acmode argument
+	pushl   r2                      ;reqidt argument:  address of the mutex structure
+	calls   #2,G^sys$cantim         ; kill unpopped timer
+	rsb                             ; retry lock
+
+65$:    pushl   r2                      ; address of mutex structure
+	calls   #1,mutex_deadlock_check ;crit deadlock detection check
+	rsb                             ;retry lock even though we were not awakened.
+
+	;the secondary interlock failed on an attempt to insert into the wait queue
+70$:    sobgtr  r1,50$
+	sobgtr  r5,90$
+
+	;too many queue failures
+80$:    movzbl  #cdb_sc_dbccerr,r0      ;return error
+;        ret *** replaced with rsb below to eliminate compiler warnings. Using a ret here is not valid in the
+;                cross compiled environment due to not keeping args/save areas on the stack in
+;                the same way the vax did. se 8/2002
+	rsb
+
+90$:    calls   #0,G^rel_quant
+	brb     40$
+
+	;the free queue was empty or the secondary interlock failed
+100$:   bcs     110$                    ;branch if the secondary interlock failed
+
+	;the free queue was empty - wait a second, then try again
+; 2000/1/25 smw avoid link error for amac$flt_tsf
+;       movf    #1.0,-(sp)              ;store the value on the stack so that it can be passed by reference
+;       movl    sp,r0                   ;the argument to lib$wait is the address of the value
+;       pushl   r0
+;       calls   #1,G^lib$wait
+;       addl    #4,sp                   ;clean up the stack
+	pushl   #1000                   ; 1 second
+	calls   #1,G^hiber_start        ; wait
+	brw     10$
+
+	;the secondary interlock failed on an attempt to remove an entry from the free queue
+110$:   sobgtr  r1,120$
+	sobgtr  r5,130$
+
+	;too many queue failures
+	brb     80$
+
+120$:   brw     30$
+
+130$:   calls   #0,G^rel_quant
+	brw     20$
+
+
+;       AST routine for the timer in sleep, above
+;
+;       The argument is the address of a mutex structure
+
+	.entry  mutex_tickle,^m<r2,r3,r4,r5,r6>
+
+	movl    #1,crit_sleep_expired   ;we waited long and hard..
+	clrl    -(sp)
+	clrl    -(sp)
+	calls   #2,G^sys$wake
+
+	movl    4(ap),r2
+	bsb     mutex_wakeup
+
+	ret
+
+
+;       Wake up the process at the head of the wait queue
+;
+;       On entry, r2 -> mutex structure
+
+
+mutex_wakeup:
+	.jsb32_entry    input=<r2>
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; Perform a quick test to see if there are any processes waiting for the
+; mutex.  This avoids the more expensive REMQTI PAL Call at 20$ from
+; performing this test.
+;-
+	movzbl	#MAX_WAKE,r6
+3$:	evax_mb                         ; make sure we see changes done by other processor
+	tstl    MUTEX_PROCHEAD(r2)      ; Are there any waiters?
+	bneq    5$                      ; if neq, yes go release them
+	rsb                             ;  otherise return quickly
+
+5$:	movl    #QUANT_RETRY,r5
+10$:    movzbl  #QUEUE_RETRY,r1
+
+20$:    remqhi  MUTEX_PROCHEAD(r2),r3   ;get the first entry from the wait queue
+	bvs     90$                     ;branch if the queue was empty or the secondary interlock failed
+
+;	movl    MUTEX_SUPER_CRIT(r3),r6 ;save the super_crit value in r6 for wake_process - no more CCP 3/2007 RP
+;	clrl    MUTEX_SUPER_CRIT(r3)
+
+	movl    #QUANT_RETRY,r5
+30$:    movzbl  #QUEUE_RETRY,r1
+
+	movl    MUTEX_PID(r3),r0        ;save the pid in r0 for wake_process
+
+40$:    insqti  (r3),MUTEX_FREEHEAD(r2)
+	bcs     60$                     ;branch if the secondary interlock failed
+
+	bsb     wake_process
+
+;+
+; Moser and Jordan (Compaq Computer Corporation)) 29-Mar-2001
+;
+; There is no need to force an interlock read on the write pending bit here.
+;
+;       bbssi   #1,MUTEX_WRTPND(r2),50$ ;force access to the write pending byte
+;50$:
+;-
+	sobgtr	r6,50$
+	rsb				;enough waking for one process
+50$:	bicl3	#REST_FREQ,r6,r0
+	bneq	55$
+	calls   #0,G^rel_quant	;to be sure that some process is awakened, pause and try another if still no pending rp 3/2007
+55$:	blbc    MUTEX_WRTPND(r2),3$
+	rsb				;write pending is set - stop wakeups
+
+	;the secondary interlock failed on an attempt to insert into the free queue
+60$:    sobgtr  r1,40$
+	sobgtr  r5,80$
+
+	bsb     wake_process
+
+	;too many queue failures
+70$:    movzbl  #cdb_sc_dbccerr,r0      ;return error
+;        ret *** replaced with rsb below to eliminate compiler warnings. Using a ret here is not valid in the
+;                cross compiled environment due to not keeping args/save areas on the stack in
+;                the same way the vax did. se 8/2002
+	rsb
+
+80$:    calls   #0,G^rel_quant
+	brb     30$
+
+	;the wait queue was empty or the secondary interlock failed
+90$:    bcs     100$                    ;branch if the secondary interlock failed
+
+	rsb
+
+	;the secondary interlock failed on an attempt to remove an entry from the wait queue
+100$:   sobgtr  r1,20$
+	sobgtr  r5,110$
+
+	;too many queue failures
+	brb     70$
+
+110$:   calls   #0,G^rel_quant
+	brb     10$
+
+
+;       Wake up a process
+;
+;       This is a subroutine because we wish to insert the queue entry into the free queue prior to
+;       doing the wakeup, in order to minimize the time that the queue entry is unattached.
+;       Also, we wish to wake up the process even if the insq fails.
+;
+;       On entry, r0 == process id,
+;                 r6 == super_crit value
+
+wake_process:
+	.jsb32_entry    input=<r0,r6>
+
+; 07/30/2002 se: Don't disturb pipe for a condition that is no longer needed
+;        tstl    r6              ;was super_crit set?
+;        bneq    wake_ccp        ;branch if so
+
+	pushl   r0              ;store the pid on the stack, so that it can be passed by reference
+	movl    sp,r0           ;the argument to crit_wake is the address of the pid
+	pushl   r0              ;use two instructions for safety
+	calls   #1,G^crit_wake
+	addl    #4,sp           ;clean up the stack
+
+	rsb
+
+; 07/30/2002 se: The following code is disabled because it is no longer used and the compiler
+;                complains about dead (unreachable) code.
+;       The CCP never hibernated, so it doesn't get awakened per se;
+;       rather, we send it an appropriate message:
+;wake_ccp:
+;        pushl   r6              ;store the super_crit value on the stack, so that it can be passed by reference
+;        movl    sp,r0           ;the second argument to ccp_sendmsg is the address of the super_crit value
+;        pushl   r0              ;use two instructions for safety
+;        pushl   #CCTR_SCRIT     ;the first argument to ccp_sendmsg is the action code:  super_crit granted
+;        calls   #2,G^ccp_sendmsg
+;        addl    #4,sp           ;clean up the stack
+;
+;        rsb
+
+	.end

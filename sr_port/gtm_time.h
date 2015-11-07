@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,13 +15,12 @@
 
 #include <time.h>
 
-/* CTIME collides with linux define in termios */
-
-#define GTM_CTIME	ctime
-#define GTM_CTIME_R	ctime_r
-
 #define STRFTIME(dest, maxsize, format, timeptr, res)	\
-		res = strftime(dest, maxsize, format, timeptr)
+{							\
+	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);	\
+	res = strftime(dest, maxsize, format, timeptr);	\
+	ENABLE_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);	\
+}
 
 /* To use GET_CUR_TIME macro these definitions are required
  * now_t now; char *time_ptr; char time_str[CTIME_BEFORE_NL + 2];
@@ -59,15 +58,48 @@ typedef time_t	now_t;
 {		 						\
 	if ((time_t)-1 == (now = time(NULL)))			\
 		time_ptr = "****** time failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
-	else if (NULL == (time_ptr = (char *)GTM_CTIME(&now)))	\
-		time_ptr = "***** ctime failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
 	else							\
 	{							\
-		memcpy(time_str, time_ptr, CTIME_BEFORE_NL + 2);	\
-		time_ptr = time_str;				\
+		GTM_CTIME(time_ptr, &now);				\
+		if (NULL == time_ptr)				\
+			time_ptr = "***** ctime failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
+		else						\
+		{						\
+			memcpy(time_str, time_ptr, CTIME_BEFORE_NL + 2);	\
+			time_ptr = time_str;			\
+		}						\
 	}							\
 }
 
+#define GTM_MKTIME(VAR, TIME)					\
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+	VAR = mktime(TIME);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+}
+
+#define GTM_GMTIME(VAR, TIME)					\
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+	VAR = gmtime(TIME);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+}
+
 #endif /* UNIX, VMS */
+
+#define GTM_LOCALTIME(VAR, TIME)				\
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+	VAR = localtime(TIME);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+}
+
+/* CTIME collides with linux define in termios */
+#define GTM_CTIME(VAR, TIME)					\
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+	VAR = ctime(TIME);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION);		\
+}
 
 #endif

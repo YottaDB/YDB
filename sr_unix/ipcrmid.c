@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include "gtm_string.h"
 #include "gtm_limits.h"
 
 #include "io.h"
@@ -41,7 +42,8 @@ error_def(ERR_SYSCALL);
  */
 int sem_rmid(int ipcid)
 {
-	int status, save_errno;
+	int 		status, save_errno;
+	char		buff[128];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -52,22 +54,35 @@ int sem_rmid(int ipcid)
 			if (EPERM != errno)
 			{
 				save_errno = errno;
-				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(IPC_RMID)"), CALLFROM, save_errno);
+				SNPRINTF(buff, 128, "semctl(IPC_RMID, %d)", ipcid);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
+				errno = save_errno;
 				return -1;
 			} else
 			{
-				if (0 != REMIPC(REMOVE_SEM, ipcid))
+				if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
+				{
+					errno = status;
 					return -1;
+				}
 			}
 		}
-	} DEBUG_ONLY(else if (0 != REMIPC(REMOVE_SEM, ipcid)) return -1);
+	}
+#	ifdef DEBUG
+	else if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
+	{
+		errno = status;
+		return -1;
+	}
+#	endif
 	return 0;
 }
 
 /* Remove a shared memory id */
 int shm_rmid(int ipcid)
 {
-	int status, save_errno;
+	int 		status, save_errno;
+	char		buff[128];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -78,14 +93,26 @@ int shm_rmid(int ipcid)
 			if (EPERM != errno)
 			{
 				save_errno = errno;
-				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl(IPC_RMID)"), CALLFROM, save_errno);
+				SNPRINTF(buff, 128, "semctl(IPC_RMID, %d)", ipcid);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
+				errno = save_errno;
 				return -1;
 			} else
 			{
-				if (0 != REMIPC(REMOVE_SHM, ipcid))
+				if (0 != (status = REMIPC(REMOVE_SHM, ipcid)))
+				{
+					errno = status;
 					return -1;
+				}
 			}
 		}
-	} DEBUG_ONLY(else if (0 != REMIPC(REMOVE_SHM, ipcid)) return -1);
+	}
+#	ifdef DEBUG
+	else if (0 != (status = REMIPC(REMOVE_SHM, ipcid)))
+	{
+		errno = status;
+		return -1;
+	}
+#	endif
 	return 0;
 }

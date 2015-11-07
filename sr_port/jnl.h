@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -139,7 +139,9 @@ error_def(ERR_JNLENDIANLITTLE);
 #endif
 /* one more disk-block for PBLK record header/footer */
 #define MAX_JNL_REC_SIZE		(MAX_LOGI_JNL_REC_SIZE + DISK_BLOCK_SIZE)
-#define MAX_PHY_JNL_REC_SIZE(csd)	(csd->blk_size + DISK_BLOCK_SIZE)
+/* Very large records require spanning nodes, which only happen in TP. */
+#define MAX_NONTP_JNL_REC_SIZE(BSIZE)	((BSIZE) + DISK_BLOCK_SIZE)
+#define MAX_MAX_NONTP_JNL_REC_SIZE	MAX_NONTP_JNL_REC_SIZE(MAX_DB_BLK_SIZE)
 
 #ifdef GTM_TRIGGER
 /* Define maximum size that $ZTWORMHOLE can be. Since $ZTWORMHOLE should be able to fit in a journal record and the
@@ -762,13 +764,13 @@ typedef struct jnl_format_buff_struct
 #	endif
 	enum jnl_record_type		rectype;
 	int4				record_size;
+	int4				hi_water_bsize;
 	char 				*buff;
 	uint4				checksum;
 	jnl_action			ja;
 #	ifdef GTM_CRYPT
 	char				*alt_buff; /* for storing the unencrypted jnl *SET and *KILL records to be pushed
 						    * into the jnl pool. */
-	NON_GTM64_ONLY(int4		dummy_filler;) /* for alignment in 32 bit machines. */
 #	endif
 } jnl_format_buffer;
 
@@ -1215,10 +1217,11 @@ typedef struct
  * But to write it out, we should have it already built before bg_update().
  * Hence, we pre-build the block here itself before invoking t_end().
  */
-#define	BUILD_AIMG_IF_JNL_ENABLED(CSD, JFB, TN)									\
+#define	BUILD_AIMG_IF_JNL_ENABLED(CSD, TN)									\
 {														\
 	GBLREF	cw_set_element   	cw_set[];								\
 	GBLREF	unsigned char		cw_set_depth;								\
+	GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;							\
 														\
 	cw_set_element			*cse;									\
 														\
@@ -1226,7 +1229,7 @@ typedef struct
 	{													\
 		assert(1 == cw_set_depth); /* Only DSE uses this macro and it updates one block at a time */	\
 		cse = (cw_set_element *)(&cw_set[0]);								\
-		cse->new_buff = JFB;										\
+		cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;						\
 		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, TN);						\
 		cse->done = TRUE;										\
 	}													\
@@ -1305,19 +1308,19 @@ typedef struct
 #define	ASSERT_JNLFILEID_NOT_NULL(csa) assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)));
 #define NULLIFY_JNL_FILE_ID(csa) memset(&csa->nl->jnl_file.jnl_file_id, 0, SIZEOF(gds_file_id))
 #endif
-#define JNL_INIT(csa, reg, csd)												\
-{															\
-	csa->jnl_state = csd->jnl_state;										\
-	csa->jnl_before_image = csd->jnl_before_image;									\
-	csa->repl_state = csd->repl_state;										\
-	if JNL_ALLOWED(csa)												\
-	{														\
-		JPC_ALLOC(csa);												\
-		csa->jnl->region = reg;											\
-		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)((sm_uc_ptr_t)(csa->nl) + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);	\
-		csa->jnl->channel = NOJNL;										\
-	} else														\
-		csa->jnl = NULL;											\
+#define JNL_INIT(csa, reg, csd)													\
+{																\
+	csa->jnl_state = csd->jnl_state;											\
+	csa->jnl_before_image = csd->jnl_before_image;										\
+	csa->repl_state = csd->repl_state;											\
+	if JNL_ALLOWED(csa)													\
+	{															\
+		JPC_ALLOC(csa);													\
+		csa->jnl->region = reg;												\
+		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)((sm_uc_ptr_t)(csa->nl) + NODE_LOCAL_SPACE(csd) + JNL_NAME_EXP_SIZE);	\
+		csa->jnl->channel = NOJNL;											\
+	} else															\
+		csa->jnl = NULL;												\
 }
 #define	JNL_FD_CLOSE(CHANNEL, RC)										\
 {														\
@@ -1434,6 +1437,13 @@ typedef struct
 		jnl_buffer_adj_value -= jnl_buffer_decr_step;						\
 	DEST = jnl_buffer_adj_value;									\
 }
+
+#ifdef UNIX
+# define CURRENT_JNL_IO_WRITER(JB)	JB->io_in_prog_latch.u.parts.latch_pid
+# define CURRENT_JNL_FSYNC_WRITER(JB)	JB->fsync_in_prog_latch.u.parts.latch_pid
+#else
+# define CURRENT_JNL_IO_WRITER(JB)	JB->now_writer
+#endif
 
 /* jnl_ prototypes */
 uint4	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size);

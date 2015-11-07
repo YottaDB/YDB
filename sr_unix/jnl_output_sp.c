@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		return ERR_JNLWRTDEFER;
 	}
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number))
+	/* When jnl_sub_qio_start() is called as part of WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP white-box test case,
+	 * aligned_write should always be FALSE. But depending upon the filesystem block size, it is possible that
+	 * the function could also be called with aligned_write being TRUE. This could lead to sending SIGTSTP
+	 * twice. Hence ensure that SIGTSTP is sent only for the unaligned write.
+	 */
+	if (gtm_white_box_test_case_enabled && (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)
+				&& !aligned_write)
 		kill(process_id, SIGTSTP);
 #	endif
 	if (jb->dsk != (jb->dskaddr % jb->size))
@@ -128,8 +134,8 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			jnl_qio_in_prog--;
 			assert(0 <= jnl_qio_in_prog);
 			/* DBFSYNCERR can potentially cause syslog flooding. Remove the following line if we it becomes an issue. */
-			send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
-			rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 			assert(FALSE);	/* should not come here as the rts_error above should not return */
 			return ERR_DBFSYNCERR;	/* ensure we do not fall through to the code below as we no longer have the lock */
 		}

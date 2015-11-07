@@ -1,0 +1,38 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+ddpobj/lib
+gtmshr/share
+gtmsecshr/share
+symbol_vector=( -
+	gvusr_init	= PROCEDURE, -
+	gvusr_rundown	= PROCEDURE, -
+	gvusr_data	= PROCEDURE, -
+	gvusr_order	= PROCEDURE, -
+	gvusr_query	= PROCEDURE, -
+	gvusr_zprevious	= PROCEDURE, -
+	gvusr_get	= PROCEDURE, -
+	gvusr_kill	= PROCEDURE, -
+	gvusr_put	= PROCEDURE, -
+	gvusr_lock	= PROCEDURE, -
+	gvusr_unlock	= PROCEDURE -
+	)
+gsmatch=lequal,4,0
+! Because the linker creates image sections on a per-cluster
+! basis, create a cluster for all of the code Psect's (whose
+! pages can be shared among processes) and collect all of the
+! code Psect's into it so the pages corresponding to that image
+! section can be shared.  Note the MACRO/MIGRATION compiler
+! names its code Psect "$CODE" (as do most of the VAX compilers),
+! while the AXP C compiler and MACRO assembler name their code
+! Psect's "$CODE$".
+cluster = code_clust
+collect = code_clust,$CODE,$CODE$

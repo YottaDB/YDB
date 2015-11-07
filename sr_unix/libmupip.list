@@ -190,7 +190,6 @@ mur_validate_checksum
 mur_ztp_lookback
 murgetlst
 read_db_files_from_gld
-recvpool_init
 repl_comm
 repl_filter
 repl_inst_create

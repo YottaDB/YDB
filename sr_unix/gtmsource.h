@@ -178,7 +178,7 @@ typedef struct
 	boolean_t		pool_initialized;	/* Set to TRUE only after completely finished with initialization.
 							 * Anyone who does a "jnlpool_init" before this will issue a error.
 							 */
-	uint4			filler_8byte_align;
+	uint4			jnlpool_creator_pid;	/* DEBUG-ONLY field used for fake ENOSPC testing */
 	repl_conn_info_t	this_side;		/* Replication connection details of this side/instance */
 	seq_num			strm_seqno[MAX_SUPPL_STRMS];		/* the current jnl seqno of each stream */
 	volatile uint4		onln_rlbk_pid;		/* process ID of currently running ONLINE ROLLBACK. 0 if none. */
@@ -382,7 +382,7 @@ typedef gtmsource_local_struct *gtmsource_local_ptr_t;
 /* Push the jnldata_base_off to be aligned to (~JNL_WRT_END_MASK + 1)-byte boundary */
 
 #define JNLPOOL_CTL_SIZE	ROUND_UP(SIZEOF(jnlpool_ctl_struct), CACHELINE_SIZE)	/* align crit semaphore at cache line */
-#define	JNLPOOL_CRIT_SIZE	(CRIT_SPACE + SIZEOF(mutex_spin_parms_struct) + SIZEOF(node_local))
+#define	JNLPOOL_CRIT_SIZE	(JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct) + SIZEOF(node_local))
 #define JNLDATA_BASE_OFF	(JNLPOOL_CTL_SIZE + JNLPOOL_CRIT_SIZE + REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + GTMSOURCE_LOCAL_SIZE)
 
 #ifdef VMS
@@ -471,27 +471,6 @@ typedef struct
 	char		secondary_instname[MAX_INSTNAME_LEN];	/* instance name specified in -INSTSECONDARY qualifier */
 	char		freeze_comment[MAX_FREEZE_COMMENT_LEN];
 } gtmsource_options_t;
-
-#define ASSERT_VALID_JNLPOOL(CSA)										\
-{														\
-	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;								\
-	GBLREF	jnlpool_addrs		jnlpool;								\
-														\
-	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
-	assert(jnlpool_ctl && (jnlpool_ctl == jnlpool.jnlpool_ctl));						\
-	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
-	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + CRIT_SPACE				\
-		+ SIZEOF(mutex_spin_parms_struct)));								\
-	assert(jnlpool_ctl->filehdr_off);									\
-	assert(jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);				\
-	assert(jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);			\
-	assert(jnlpool.repl_inst_filehdr == (repl_inst_hdr_ptr_t) ((sm_uc_ptr_t)jnlpool_ctl			\
-			+ jnlpool_ctl->filehdr_off));								\
-	assert(jnlpool.gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool_ctl				\
-			+ jnlpool_ctl->srclcl_array_off));							\
-	assert(jnlpool.gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool_ctl		\
-					+ jnlpool_ctl->sourcelocal_array_off));					\
-}
 
 /********** Source server function prototypes **********/
 int		gtmsource(void);

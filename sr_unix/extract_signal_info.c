@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,35 +33,40 @@
 
 #include "gtmsiginfo.h"
 
+/* GCC on HPPA does not have SI_USER defined */
+#if !defined(SI_USER) && defined(__GNUC__)
+#  define SI_USER 0
+#endif
+
 /* OS/390 (R7) does not define SI_USER but for code expansions purposes, define the value it uses
    in its place */
 #if !defined(SI_USER) && defined(__MVS__)
 #  define SI_USER 0
 #endif
 
+error_def(ERR_SIGACCERR);
+error_def(ERR_SIGADRALN);
+error_def(ERR_SIGADRERR);
+error_def(ERR_SIGBADSTK);
+error_def(ERR_SIGCOPROC);
+error_def(ERR_SIGFLTDIV);
+error_def(ERR_SIGFLTINV);
+error_def(ERR_SIGFLTOVF);
+error_def(ERR_SIGFLTRES);
+error_def(ERR_SIGFLTUND);
+error_def(ERR_SIGILLADR);
+error_def(ERR_SIGILLOPC);
+error_def(ERR_SIGILLOPN);
+error_def(ERR_SIGILLTRP);
+error_def(ERR_SIGINTDIV);
+error_def(ERR_SIGINTOVF);
+error_def(ERR_SIGMAPERR);
+error_def(ERR_SIGOBJERR);
+error_def(ERR_SIGPRVOPC);
+error_def(ERR_SIGPRVREG);
+
 void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gtmsiginfo_t *gtmsi)
 {
-	error_def(ERR_SIGILLOPC);
-	error_def(ERR_SIGILLOPN);
-	error_def(ERR_SIGILLADR);
-	error_def(ERR_SIGILLTRP);
-	error_def(ERR_SIGPRVOPC);
-	error_def(ERR_SIGPRVREG);
-	error_def(ERR_SIGCOPROC);
-	error_def(ERR_SIGBADSTK);
-	error_def(ERR_SIGADRALN);
-	error_def(ERR_SIGADRERR);
-	error_def(ERR_SIGOBJERR);
-	error_def(ERR_SIGINTDIV);
-	error_def(ERR_SIGINTOVF);
-	error_def(ERR_SIGFLTDIV);
-	error_def(ERR_SIGFLTOVF);
-	error_def(ERR_SIGFLTUND);
-	error_def(ERR_SIGFLTRES);
-	error_def(ERR_SIGFLTINV);
-	error_def(ERR_SIGMAPERR);
-	error_def(ERR_SIGACCERR);
-
 	memset(gtmsi, 0, SIZEOF(*gtmsi));
 	gtmsi->signal = sig;
 	if (NULL != info)
@@ -90,7 +95,7 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 				gtmsi->infotype |= GTMSIGINFO_BADR;
 				if (NULL != context)
 				{
-#ifndef __ia64
+#if !defined(__ia64) && !defined(__GNUC__)
 					if (0 == (context->uc_mcontext.ss_flags & SS_NARROWISINVALID))
 					{
 						/* Interrupt location is in narrow area */

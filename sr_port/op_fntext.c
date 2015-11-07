@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,6 @@
 
 GBLREF spdesc stringpool;
 
-error_def(ERR_TXTNEGLIN);
 error_def(ERR_TXTSRCMAT);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
@@ -42,7 +41,9 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	uint4		stat;
 	rhdtyp		*rtn_vector;
 	boolean_t	is_trigger;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(label);
 	MV_FORCE_STR(rtn);
 	temp_rtn = &temp_mval;
@@ -56,8 +57,16 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 		stat = ZEROLINE;
 	else
 	{
-		GTMTRIG_ONLY(if (is_trigger) DBGTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n")));
+#ifdef GTM_TRIGGER
+		if (is_trigger)
+		{
+			DBGTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n"));
+			assert(FALSE == TREF(in_op_fntext));
+			TREF(in_op_fntext) = TRUE;
+		}
+#endif
 		stat = get_src_line(temp_rtn, label, int_exp, &sld, VERIFY);
+		GTMTRIG_ONLY(TREF(in_op_fntext) = FALSE);
 	}
 	if (0 == (stat & (CHECKSUMFAIL | NEGATIVELINE)))
 	{

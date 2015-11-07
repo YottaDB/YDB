@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,14 @@
  ****************************************************************/
 
  /* General repository for global variable definitions. This keeps us from
-   pulling in modules and all their references when all we wanted was the
-   global data def.. */
+  * pulling in modules and all their references when all we wanted was the
+  * global data def.
+  *
+  * Note, all GBLDEF fields are automatically cleared to zeroes. No initialization to
+  * zero (0) or NULL or any other value that translates to zeroes is necessary on these
+  * fields and should be avoided as it creates extra linker and image startup processing
+  * that can only slow things down even if only by a little.
+  */
 
 #include "mdef.h"
 
@@ -31,6 +37,9 @@
 # include <ssdef.h>
 # include <fab.h>
 # include "desblk.h"
+#endif
+#ifdef GTM_PTHREAD
+# include <pthread.h>
 #endif
 #include "cache.h"
 #include "hashtab_addr.h"
@@ -92,16 +101,13 @@
 #include "mmemory.h"
 #include "have_crit.h"
 #include "alias.h"
-
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
-
 /* FOR MERGE RELATED GLOBALS */
 #include "gvname_info.h"
 #include "op_merge.h"
-
 #ifdef UNIX
 #include "cli.h"
 #include "invocation_mode.h"
@@ -111,34 +117,27 @@
 #include "gtm_zlib.h"
 #include "anticipatory_freeze.h"
 #endif
-
 #include "jnl_typedef.h"
 #include "repl_ctl.h"
-
 #ifdef VMS
 #include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
 #endif
-
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
-
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
 #endif
-
 # ifdef GTM_CRYPT
 # include "gtmcrypt.h"
 # include "gdsblk.h"
 # include "muextr.h"
 # endif
-
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
-
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 
@@ -158,7 +157,6 @@ GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if de
 GBLDEF	bool		prin_in_dev_failure;
 GBLDEF	bool		prin_out_dev_failure;
 GBLDEF	io_desc		*active_device;
-
 GBLDEF	bool		error_mupip,
 			file_backed_up,
 			gv_replopen_error,
@@ -176,7 +174,6 @@ GBLDEF	bool		error_mupip,
 	                view_debug4,
 			mupip_error_occurred,
 	                dec_nofac;
-
 GBLDEF	boolean_t	is_updproc,
 			is_updhelper,
 			mupip_jnl_recover,
@@ -197,7 +194,6 @@ GBLDEF	VSIG_ATOMIC_T	forced_exit;		/* Asynchronous signal/interrupt handler sets
 						 * hence the VSIG_ATOMIC_T type in the definition.
 						 */
 GBLDEF	intrpt_state_t	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* any other value implies it is not ok to interrupt */
-
 GBLDEF	unsigned char	*msp,
 			*mubbuf,
 			*restart_ctxt,
@@ -242,7 +238,6 @@ GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 GBLDEF	boolean_t	dollar_zquit_anyway;
-
 GBLDEF	mv_stent	*mv_chain;
 GBLDEF	sgm_info	*first_sgm_info;	/* List of participating regions in the TP transaction with NO ftok ordering */
 GBLDEF	sgm_info	*first_tp_si_by_ftok;	/* List of participating regions in the TP transaction sorted on ftok order */
@@ -250,7 +245,7 @@ GBLDEF	spdesc		indr_stringpool,
 			rts_stringpool,
 			stringpool;
 GBLDEF	stack_frame	*frame_pointer;
-GBLDEF	stack_frame	*zyerr_frame = NULL;
+GBLDEF	stack_frame	*zyerr_frame;
 GBLDEF	symval		*curr_symval;
 GBLDEF	tp_frame	*tp_pointer;
 GBLDEF	tp_region	*halt_ptr,
@@ -262,14 +257,12 @@ GBLDEF	gv_namehead	*gv_target_list;	/* List of ALL gvts that were allocated (in 
 GBLDEF	gv_namehead	*gvt_tp_list;		/* List of gvts that were referenced in the current TP transaction */
 GBLDEF	gvt_container	*gvt_pending_list;	/* list of gvts that need to be re-examined/re-allocated when region is opened */
 GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory for gv_targets to be re-examined/allocated */
-
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
 GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
-GBLDEF	boolean_t	sem_incremented;
 GBLDEF	rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLDEF	int4		break_message_mask;
 GBLDEF	bool		rc_locked;
@@ -307,9 +300,7 @@ GBLDEF 	char		cg_phase;       /* code generation phase */
 /* Previous code generation phase: Only used by emit_code.c to initialize the push list at the
  * beginning of each phase (bug fix: C9D12-002478) */
 GBLDEF 	char		cg_phase_last;
-
 GBLDEF	int		cmd_cnt;
-
 GBLDEF	command_qualifier	glb_cmd_qlf = { CQ_DEFAULT },
 				cmd_qlf = { CQ_DEFAULT };
 #ifdef __osf__
@@ -320,12 +311,10 @@ GBLDEF	char		**cmd_arg;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-
 #ifdef UNIX
-GBLDEF	volatile uint4	heartbeat_counter = 0;
+GBLDEF	volatile uint4	heartbeat_counter;
 GBLDEF	boolean_t	heartbeat_started;
 #endif
-
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
@@ -340,9 +329,7 @@ GBLDEF	boolean_t		tp_restart_fail_sig_used;
 #else
 # error "Unsupported Platform"
 #endif
-
-GBLDEF	volatile	int4		fast_lock_count = 0;	/* Used in wcs_stale */
-
+GBLDEF	volatile	int4	fast_lock_count;	/* Used in wcs_stale */
 /* REPLICATION RELATED GLOBALS */
 GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;
@@ -363,7 +350,6 @@ GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the 
 GBLDEF	boolean_t		mu_rndwn_process;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
-
 #ifdef UNIX
 GBLDEF	struct sockaddr_un	gtmsecshr_sock_name;
 GBLDEF	struct sockaddr_un	gtmsecshr_cli_sock_name;
@@ -394,16 +380,15 @@ GBLDEF	mmseg			*mmseg_head;
 GBLDEF	ua_list			*first_ua, *curr_ua;
 GBLDEF	char			*update_array, *update_array_ptr;
 GBLDEF	int			gv_fillfactor = 100,
-				rc_set_fragment;       /* Contains offset within data at which data fragment starts */
-GBLDEF	uint4			update_array_size = 0,
-				cumul_update_array_size = 0;    /* the current total size of the update array */
+				rc_set_fragment;       		/* Contains offset within data at which data fragment starts */
+GBLDEF	uint4			update_array_size,
+				cumul_update_array_size;	/* the current total size of the update array */
 GBLDEF	kill_set		*kill_set_tail;
-GBLDEF	boolean_t		pool_init = FALSE;
-GBLDEF	boolean_t		is_src_server = FALSE;
-GBLDEF	boolean_t		is_rcvr_server = FALSE;
-GBLDEF	jnl_format_buffer	*non_tp_jfb_ptr = NULL;
-GBLDEF	unsigned char		*non_tp_jfb_buff_ptr;
-GBLDEF	boolean_t		dse_running = FALSE;
+GBLDEF	boolean_t		pool_init;
+GBLDEF	boolean_t		is_src_server;
+GBLDEF	boolean_t		is_rcvr_server;
+GBLDEF	jnl_format_buffer	*non_tp_jfb_ptr;
+GBLDEF	boolean_t		dse_running;
 GBLDEF	jnlpool_addrs		jnlpool;
 GBLDEF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLDEF	jnlpool_ctl_struct	temp_jnlpool_ctl_struct;
@@ -412,9 +397,8 @@ GBLDEF	sm_uc_ptr_t		jnldata_base;
 GBLDEF	int4			jnlpool_shmid = INVALID_SHMID;
 GBLDEF	recvpool_addrs		recvpool;
 GBLDEF	int			recvpool_shmid = INVALID_SHMID;
-GBLDEF	int			gtmsource_srv_count = 0;
-GBLDEF	int			gtmrecv_srv_count = 0;
-
+GBLDEF	int			gtmsource_srv_count;
+GBLDEF	int			gtmrecv_srv_count;
 /* The following _in_prog counters are needed to prevent deadlocks while doing jnl-qio (timer & non-timer). */
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
@@ -438,22 +422,19 @@ GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, l
 GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
-GBLDEF	char			*cli_err_str_ptr = NULL;
-GBLDEF	boolean_t		gtm_pipe_child = FALSE;
+GBLDEF	char			*cli_err_str_ptr;
+GBLDEF	boolean_t		gtm_pipe_child;
 #endif
-GBLDEF	io_desc			*gtm_err_dev = NULL;
-
+GBLDEF	io_desc			*gtm_err_dev;
 /* this array is indexed by file descriptor */
-GBLDEF	boolean_t		*lseekIoInProgress_flags = (boolean_t *)0;
-
+GBLDEF	boolean_t		*lseekIoInProgress_flags;
 #if defined(UNIX)
 /* Latch variable for Unix implementations. Used in SUN and HP */
 GBLDEF	global_latch_t		defer_latch;
 #endif
-
 GBLDEF	int			num_additional_processors;
 GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error */
-GBLDEF	int4			error_condition = 0;
+GBLDEF	int4			error_condition;
 GBLDEF	global_tlvl_info	*global_tlvl_info_head;
 GBLDEF	buddy_list		*global_tlvl_info_list;
 GBLDEF	boolean_t		job_try_again;
@@ -461,17 +442,15 @@ GBLDEF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLDEF	d_socket_struct		*socket_pool;
 GBLDEF	boolean_t		mu_star_specified;
 GBLDEF	backup_reg_list		*mu_repl_inst_reg_list;
-
 #ifndef VMS
 GBLDEF	volatile int		suspend_status = NO_SUSPEND;
 #endif
-
 GBLDEF	gv_namehead		*reset_gv_target = INVALID_GV_TARGET;
-GBLDEF	VSIG_ATOMIC_T		util_interrupt = 0;
+GBLDEF	VSIG_ATOMIC_T		util_interrupt;
 GBLDEF	sgmnt_addrs		*kip_csa;
 GBLDEF	boolean_t		need_kip_incr;
-GBLDEF	int			merge_args = 0;
-GBLDEF	merge_glvn_ptr		mglvnp = NULL;
+GBLDEF	int			merge_args;
+GBLDEF	merge_glvn_ptr		mglvnp;
 GBLDEF	int			ztrap_form;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
@@ -494,47 +473,39 @@ GBLDEF	int	cs_parscan;			/* number of partial scans (partial cache hits) */
 GBLDEF	int	c_clear;			/* cleared due to (possible) value change */
 GBLDEF	boolean_t	setp_work;
 #endif
-GBLDEF z_records	zbrk_recs = {NULL, NULL, NULL};
-
+GBLDEF z_records	zbrk_recs;
 #ifdef UNIX
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
-GBLDEF	gd_region	*ftok_sem_reg = NULL;	/* Last region for which ftok semaphore is grabbed */
+GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grabbed */
 GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 #endif
-
 #ifdef VMS
 /* Following global variables store the state of an erroring sys$qio just before a GTMASSERT in the CHECK_CHANNEL_STATUS macro */
-GBLDEF	uint4	check_channel_status = 0;	/* stores the qio return status */
-GBLDEF	uint4	check_channel_id = 0;		/* stores the qio channel id */
+GBLDEF	uint4	check_channel_status;		/* stores the qio return status */
+GBLDEF	uint4	check_channel_id;		/* stores the qio channel id */
 #endif
-
-GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
+GBLDEF	boolean_t		write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int			iott_write_error;
 GBLDEF	int4			write_filter;
-GBLDEF	boolean_t		need_no_standalone = FALSE;
-
+GBLDEF	boolean_t		need_no_standalone;
 GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval	dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-
-GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
+GBLDEF	int * volatile		var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	hash_table_int4		cw_stagnate;
-GBLDEF	boolean_t		cw_stagnate_reinitialized = FALSE;
+GBLDEF	boolean_t		cw_stagnate_reinitialized;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
 GBLDEF	mstr_len_t	sizeof_pat_everything = SIZEOF(pat_everything);
-
 GBLDEF	uint4		*pattern_typemask;
 GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
-
 /* Unicode related data */
 GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set; Set only after ICU initialization */
 GBLDEF	boolean_t	is_gtm_chset_utf8;	/* Is gtm_chset environment variable set to UTF8 */
 GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
-GBLDEF	boolean_t	badchar_inhibit = FALSE;/* Suppress malformed UTF-8 characters by default */
+GBLDEF	boolean_t	badchar_inhibit;	/* Suppress malformed UTF-8 characters by default */
 GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
 GBLDEF  MSTR_DEF(dollar_zpatnumeric, 1, "M");
-
 /* Standard MUMPS pattern-match table.
  * This table holds the current pattern-matching attributes of each ASCII character.
  * Bits 0..23 of each entry correspond with the pattern-match characters, A..X.
@@ -548,7 +519,6 @@ GBLDEF pattern mumps_pattern = {
 	1,			/* namlen */
 	{'M', '\0'}		/* name */
 };
-
 /* mapbit is used by pattab.c and patstr.c. Note that patstr.c uses only entries until PATM_X */
 GBLDEF	readonly uint4	mapbit[] =
 {
@@ -557,7 +527,6 @@ GBLDEF	readonly uint4	mapbit[] =
 	PATM_Q, PATM_R, PATM_S, PATM_T, PATM_U, PATM_V, PATM_W, PATM_X,
 	PATM_YZ1, PATM_YZ2, PATM_YZ3, PATM_YZ4
 };
-
 LITDEF	uint4	typemask[PATENTS] =
 {
 	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 00-07 : ASCII characters */
@@ -593,9 +562,7 @@ LITDEF	uint4	typemask[PATENTS] =
 	PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex F0-F7 : non-ASCII characters */
 	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_P, PATM_C	/* hex F8-FF : non-ASCII characters */
 };
-
 GBLDEF	uint4		pat_allmaskbits;	/* universal set of valid pattern bit codes for currently active pattern table */
-
 /* globals related to caching of pattern evaluation match result.
  * for a given <strptr, strlen, patptr, depth> tuple, we store the evaluation result.
  * in the above,
@@ -669,8 +636,8 @@ GBLDEF	uint4			lnkrel_cnt;		/* number of entries in linkage Psect to relocate */
 GBLDEF  int4			sym_table_size;		/* size of the symbol table during compilation */
 GBLDEF	boolean_t		stop_non_mandatory_expansion, non_mandatory_expansion; /* Used in stringpool managment */
 GBLDEF	jnl_fence_control	jnl_fence_ctl;
-GBLDEF	jnl_process_vector	*prc_vec = NULL;		/* for current process */
-GBLDEF	jnl_process_vector	*originator_prc_vec = NULL;	/* for client/originator */
+GBLDEF	jnl_process_vector	*prc_vec;		/* for current process */
+GBLDEF	jnl_process_vector	*originator_prc_vec;	/* for client/originator */
 LITDEF	char	*jrt_label[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	label,
@@ -730,7 +697,6 @@ GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply da
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
-
 GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply database cache related problem */
 {	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
 #define	CDB_SC_NUM_ENTRY(code, value)
@@ -741,7 +707,6 @@ GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply da
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
-
 GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change GDS block (and therefore no PBLK journal
 						 * records will be written) although the database transaction number will be
 						 * incremented and logical SET journal records will be written. By default, this
@@ -753,26 +718,21 @@ UNIX_ONLY(GBLDEF int4	gtm_shmflags;)		/* Extra flags for shmat */
 GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_NOACCESS_ADDR logicals which are defined */
 GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
 #endif
-
-GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
-
-
-GBLDEF	boolean_t	in_gvcst_incr = FALSE;	/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
+GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
+GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
 GBLDEF	mval		*post_incr_mval;	/* mval pointing to the post-$INCR value */
 GBLDEF	mval		increment_delta_mval;	/* mval holding the INTEGER increment value, set by gvcst_incr,
 						 * used by gvcst_put/gvincr_recompute_upd_array which is invoked by t_end */
-GBLDEF	boolean_t	is_dollar_incr = FALSE;	/* valid only if gvcst_put is in the call-stack (i.e. t_err == ERR_GVPUTFAIL);
+GBLDEF	boolean_t	is_dollar_incr;		/* valid only if gvcst_put is in the call-stack (i.e. t_err == ERR_GVPUTFAIL);
 						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
 GBLDEF	int		indir_cache_mem_size;	/* Amount of memory currently in use by indirect cache */
 GBLDEF	hash_table_objcode cache_table;
 GBLDEF  int		cache_hits, cache_fails;
-
 /* The alignment feature is disabled due to some issues in stringpool garbage collection.
  * TODO: When we sort out stringpool issues, change mstr_native_align to TRUE below */
-GBLDEF	boolean_t	mstr_native_align = FALSE;
+GBLDEF	boolean_t	mstr_native_align;
 GBLDEF boolean_t	save_mstr_native_align;
-
 GBLDEF	mvar		*mvartab;
 GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
 GBLDEF	mlabel		*mlabtab;
@@ -799,46 +759,35 @@ VMS_ONLY(
 	GBLDEF char		object_file_name[256];
 	GBLDEF struct FAB	obj_fab;	/* file access block for the object file */
 )
-
 GBLDEF	int4		curr_addr, code_size;
 GBLDEF	mident_fixed	zlink_mname;
-
 GBLDEF	sm_uc_ptr_t	reformat_buffer;
 GBLDEF	int		reformat_buffer_len;
 GBLDEF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
-
 GBLDEF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLDEF	boolean_t	mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
 GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by MUPIP REORG {UP,DOWN}GRADE */
-
 GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
 GBLDEF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed */
-
 GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
 GBLDEF	boolean_t	disk_blk_read;
-
-GBLDEF	boolean_t	gtm_dbfilext_syslog_disable = FALSE;	/* by default, log every file extension message */
-
+GBLDEF	boolean_t	gtm_dbfilext_syslog_disable;	/* by default, log every file extension message */
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
-
 GBLDEF	uint4		log_interval;
-
 #ifdef UNIX
 GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
-GBLDEF	boolean_t	in_repl_inst_edit = FALSE;	/* used by an assert in repl_inst_read/repl_inst_write */
+GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held
 								 * by the current process or not. */
 GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */
 GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
-
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
 GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
 #endif
-
 #ifdef UNICODE_SUPPORTED
 /* Unicode line terminators.  In addition to the following
  * codepoints, the sequence CR LF is considered a single
@@ -854,7 +803,6 @@ LITDEF UChar32 u32_line_term[] =
 	UTF_PARA_SEPARATOR,	/* Paragraph Separator */
 	0x0000
 };
-
 /* Given the first byte in a UTF-8 representation, the following array returns the total number of bytes in the encoding
  *	00-7F : 1 byte
  *	C2-DF : 2 bytes
@@ -874,7 +822,6 @@ LITDEF unsigned int utf8_bytelen[] =
 	1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* C0-DF */
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* E0-FF */
 };
-
 /* Given the first byte in a UTF-8 representation, the following array returns the number of bytes to follow
  *	00-7F :  0 byte
  *	C2-DF :  1 byte
@@ -894,46 +841,34 @@ LITDEF signed int utf8_followlen[] =
 	-1,-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* C0-DF */
 	 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, /* E0-FF */
 };
-
 GBLDEF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment in gtm_utf8.h about this typedef */
 #endif
-
 GBLDEF	uint4			gtm_max_sockets;	/* Maximum sockets per socket device supported by this process */
 GBLDEF	d_socket_struct		*newdsocket;		/* Commonly used temp socket area */
-
 GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
-
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLDEF	uint4	process_id;
 GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
-
 GBLDEF  size_t  totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
 GBLDEF  size_t  totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
 GBLDEF  size_t  totalUsed;                              /* Sum of user allocated portions (totalAlloc - overhead) */
-
 GBLDEF	size_t	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
 GBLDEF	size_t  totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
 GBLDEF	size_t  totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */
-
 GBLDEF	volatile char		*outOfMemoryMitigation;	/* Cache that we will freed to help cleanup if run out of memory */
 GBLDEF	uint4			outOfMemoryMitigateSize;/* Size of above cache (in Kbytes) */
-
 GBLDEF	int 			mcavail;
 GBLDEF	mcalloc_hdr 		*mcavailptr, *mcavailbase;
-
 GBLDEF	uint4			max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLDEF	uint4			max_cache_entries;	/* Maximum number of cached indirect compilations */
-
 GBLDEF  void            (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 UNIX_ONLY(GBLDEF ch_ret_type (*ht_rhash_ch)());         /* Function pointer to hashtab_rehash_ch */
 UNIX_ONLY(GBLDEF ch_ret_type (*jbxm_dump_ch)());        /* Function pointer to jobexam_dump_ch */
 UNIX_ONLY(GBLDEF ch_ret_type (*stpgc_ch)());		/* Function pointer to stp_gcol_ch */
-
 #ifdef VMS
 GBLDEF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
-
 GBLDEF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
 GBLDEF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
 GBLDEF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
@@ -946,7 +881,6 @@ GBLDEF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when 
 GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
 GBLDEF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
 GBLDEF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
-
 GBLDEF	zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 GBLDEF	uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
 GBLDEF	uint4		tstartcycle;			/* lv_val cycle for tstart operations */
@@ -963,9 +897,7 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 #ifdef DEBUG_ALIAS
 GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
 #endif
-
 GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
-
 #ifdef UNIX
 GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
 GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
@@ -975,12 +907,10 @@ GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in
 GBLDEF	zlib_cmp_func_t		zlib_compress_fnptr;
 GBLDEF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
 #endif
-
 GBLDEF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
-
 #ifdef UNIX
 /* Initialized blockalrm, block_ttinout and block_sigsent can be used by all threads */
-GBLDEF	boolean_t	blocksig_initialized = FALSE;	/* set to TRUE when blockalrm and block_sigsent are initialized */
+GBLDEF	boolean_t	blocksig_initialized;		/* set to TRUE when blockalrm and block_sigsent are initialized */
 GBLDEF	sigset_t	blockalrm;
 UNIX_ONLY(GBLDEF	sigset_t	block_ttinout;)
 GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
@@ -988,17 +918,14 @@ GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
 GBLDEF  char            *gtm_core_file;
 GBLDEF  char            *gtm_core_putenv;
 #endif
-
 #ifdef __MVS__
 GBLDEF	char		*gtm_utf8_locale_object;
 GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
 #endif
-
 #ifdef GTM_CRYPT
 LITDEF	char			gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
 GBLDEF	boolean_t		gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
 GBLDEF	char			dl_err[MAX_ERRSTR_LEN];
-
 GBLDEF	gtmcrypt_init_t			gtmcrypt_init_fnptr;
 GBLDEF  gtmcrypt_close_t        	gtmcrypt_close_fnptr;
 GBLDEF  gtmcrypt_hash_gen_t		gtmcrypt_hash_gen_fnptr;
@@ -1008,20 +935,19 @@ GBLDEF	gtmcrypt_getkey_by_hash_t	gtmcrypt_getkey_by_hash_fnptr;
 GBLDEF	gtmcrypt_getkey_by_name_t	gtmcrypt_getkey_by_name_fnptr;
 GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
 #endif /* GTM_CRYPT */
-
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
-GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
-GBLDEF	int		gtm_white_box_test_case_number = 0;
-GBLDEF	int		gtm_white_box_test_case_count = 0;
-GBLDEF	int 		gtm_wbox_input_test_case_count = 0; /* VMS allows maximum 31 characters for external identifer */
-GBLDEF	boolean_t	stringpool_unusable = FALSE;	/* Set to TRUE by any function that does not expect any of its function
+GBLDEF	boolean_t	gtm_white_box_test_case_enabled;
+GBLDEF	int		gtm_white_box_test_case_number;
+GBLDEF	int		gtm_white_box_test_case_count;
+GBLDEF	int 		gtm_wbox_input_test_case_count; /* VMS allows maximum 31 characters for external identifer */
+GBLDEF	boolean_t	stringpool_unusable;		/* Set to TRUE by any function that does not expect any of its function
 							 * callgraph to use/expand the stringpool. */
-GBLDEF	boolean_t	stringpool_unexpandable = FALSE;/* Set to TRUE by any function for a small period when it has ensured
+GBLDEF	boolean_t	stringpool_unexpandable;	/* Set to TRUE by any function for a small period when it has ensured
 							 * enough space in the stringpool so it does not expect any more garbage
 							 * collections or expansions.
 							 */
-GBLDEF	boolean_t	donot_INVOKE_MUMTSTART = FALSE;	/* Set to TRUE whenever an implicit TSTART is done in gvcst_put/kill as
+GBLDEF	boolean_t	donot_INVOKE_MUMTSTART;		/* Set to TRUE whenever an implicit TSTART is done in gvcst_put/kill as
 							 * part of an explicit + trigger update. In this situation, we dont expect
 							 * MUM_TSTART macro to be invoked at all (see skip_INVOKE_RESTART below
 							 * for description on why this is needed). So we keep this debug-only
@@ -1030,7 +956,6 @@ GBLDEF	boolean_t	donot_INVOKE_MUMTSTART = FALSE;	/* Set to TRUE whenever an impl
 							 * an rts_error) checks it never gets invoked while this is set.
 							 */
 #endif
-
 GBLDEF	boolean_t	block_is_free;			/* Set to TRUE if the caller wants to let t_qread know that the block it is
 							 * attempting to read is actually a FREE block
 							 */
@@ -1038,7 +963,6 @@ GBLDEF	int4		gv_keysize;
 GBLDEF	gd_addr		*gd_header;
 GBLDEF	gd_binding	*gd_map;
 GBLDEF	gd_binding	*gd_map_top;
-
 #ifdef GTM_TRIGGER
 GBLDEF	int4		gtm_trigger_depth;		/* 0 if no trigger, 1 if inside trigger; 2 if inside nested trigger etc. */
 GBLDEF	int4		tstart_trigger_depth;		/* gtm_trigger_depth at the time of the outermost "op_tstart"
@@ -1059,7 +983,7 @@ GBLDEF	mval		*dollar_ztdata,
 			dollar_ztslate = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			gtm_trigger_etrap;  		/* Holds $ETRAP value for inside trigger */
 GBLDEF	int		tprestart_state;		/* When triggers restart, multiple states possible. See tp_restart.h */
-GBLDEF	boolean_t	skip_INVOKE_RESTART = FALSE;	/* set to TRUE if caller of op_tcommit/t_retry does not want it to
+GBLDEF	boolean_t	skip_INVOKE_RESTART;		/* set to TRUE if caller of op_tcommit/t_retry does not want it to
 							 * use the INVOKE_RESTART macro (which uses an rts_error to trigger
 							 * the restart) instead return code. The reason we dont want to do
 							 * rts_error is that this is an implicit tstart situation where we
@@ -1081,15 +1005,13 @@ GBLDEF	boolean_t	explicit_update_repl_state;	/* Initialized just before an expli
 							 * Value stays untouched across nested trigger invocations.
 							 */
 #endif
-
-GBLDEF	boolean_t	skip_dbtriggers = FALSE;	/* Set to FALSE by default (i.e. triggers are invoked). Set to TRUE
+GBLDEF	boolean_t	skip_dbtriggers;		/* Set to FALSE by default (i.e. triggers are invoked). Set to TRUE
 							 * unconditionally by MUPIP LOAD as it always skips triggers. Also set
 							 * to TRUE by journal recovery/update-process only when they encounter
 							 * updates done by MUPIP LOAD so they too skip trigger processing. In the
 							 * case of update process, this keeps primary/secondary in sync. In the
 							 * case of journal recovery, this keeps the db and jnl in sync.
 							 */
-
 GBLDEF	boolean_t	expansion_failed;		/* used by string pool when trying to expand */
 GBLDEF	boolean_t	retry_if_expansion_fails;	/* used by string pool when trying to expand */
 
@@ -1099,7 +1021,7 @@ GBLDEF	boolean_t	mupip_exit_status_displayed;	/* TRUE if mupip_exit has already 
 							 * invoked but we will still go through mur_close_files e.g. if exit is
 							 * done directly without invoking mupip_exit).
 							 */
-GBLDEF	boolean_t	implicit_trollback = FALSE;	/* Set to TRUE by OP_TROLLBACK macro before calling op_trollback. Set
+GBLDEF	boolean_t	implicit_trollback;		/* Set to TRUE by OP_TROLLBACK macro before calling op_trollback. Set
 							 * to FALSE by op_trollback. Used to indicate op_trollback as to
 							 * whether it is being called from generated code (opp_trollback.s)
 							 * or from C runtime code.
@@ -1109,9 +1031,7 @@ GBLDEF	boolean_t	ok_to_UNWIND_in_exit_handling;	/* see gtm_exit_handler.c for co
 GBLDEF	boolean_t	skip_block_chain_tail_check;
 GBLDEF	boolean_t	in_mu_rndwn_file;		/* TRUE if we are in mu_rndwn_file (holding standalone access) */
 #endif
-
 GBLDEF	char		gvcst_search_clue;
-
 #ifdef UNIX
 /* The following are replication related global variables. Ideally if we had a repl_gbls_t structure (like jnl_gbls_t)
  * this would be a member in that. But since we dont have one and since we need to initialize this specificially to a
@@ -1139,18 +1059,15 @@ GBLDEF  repl_conn_info_t        *this_side, *remote_side;
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
 #endif
-
 GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-existent nodes will continue to
 							 * write jnl records and increment the db curr_tn even though they dont
 							 * touch any GDS blocks in the db (i.e. treat it as a duplicate kill).
 							 * Set to TRUE for the update process & journal recovery currently.
 							 * Set to FALSE otherwise.
 							 */
-
-GBLDEF	boolean_t	donot_fflush_NULL = FALSE;	/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
+GBLDEF	boolean_t	donot_fflush_NULL;		/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
 							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
 							 */
-
 #ifdef UNIX
 GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time (eg., for
 							 * anticipatory freeze supported configurations). The variable is set
@@ -1159,11 +1076,16 @@ GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at
 GBLDEF	boolean_t	span_nodes_disallowed; 		/* Indicates whether spanning nodes are not allowed. For example,
 							 * they are not allowed for GT.CM OMI and GNP. */
 GBLDEF	boolean_t	argumentless_rundown;
-
 GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
+GBLDEF	boolean_t				is_jnlpool_creator;
+GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
 #endif
-
-GBLDEF	boolean_t	in_jnl_file_autoswitch;	/* set to TRUE for a short window inside jnl_file_extend when we are about to
-						 * autoswitch; used by jnl_write.
-						 */
+GBLDEF	boolean_t	in_jnl_file_autoswitch;	/* Set to TRUE for a short window inside jnl_file_extend when we are about to
+						 * autoswitch; used by jnl_write. */
+#ifdef GTM_PTHREAD
+GBLDEF	pthread_t	gtm_main_thread_id;		/* ID of the main GT.M thread. */
+GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is set. */
+GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
+#endif
+GBLDEF	size_t		gtm_max_storalloc;	/* Maximum that GTM allows to be allocated - used for testing */

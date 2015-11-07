@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,9 +50,7 @@ void op_setfnretin2alsct(mval *srcmv, lv_val *dstlv)
 	assert(srcmv == alias_retarg);
 	assert(!LV_IS_BASE_VAR(dstlv));	/* Verify subscripted var */
 	assert(srcmv->mvtype & MV_ALIASCONT);
-	/* Verify is a temp mval */
-	assert((char *)srcmv >= (char *)frame_pointer->temps_ptr
-	       && (char *)srcmv < ((char *)frame_pointer->temps_ptr + (SIZEOF(char *) * frame_pointer->temp_mvals)));
+	assert(MVAL_IN_RANGE(srcmv, frame_pointer->temps_ptr, frame_pointer->temp_mvals));	/* Verify is a temp mval */
 	assert(MV_IS_STRING(srcmv) && (0 == srcmv->str.len));
 	src_lvref = (lv_val *)srcmv->str.addr;
 	assert(src_lvref);

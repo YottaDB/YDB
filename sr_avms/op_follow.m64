@@ -1,0 +1,69 @@
+;#################################################################
+;#                                                               #
+;#      Copyright 2006, 2008 Fidelity Information Services, Inc  #
+;#                                                               #
+;#      This source code contains the intellectual property      #
+;#      of its copyright holder(s), and is made available        #
+;#      under a license.  If you do not know the terms of        #
+;#      the license, please stop and do not read further.        #
+;#                                                               #
+;#################################################################
+	.title	op_follow
+
+;	op_follow implements the MUMPS string relational operator "]" ("follows"):
+;
+;		lhs ] rhs
+;
+;	lhs ("left-hand-side") and rhs ("right-hand-side") are expressions interpreted
+;	as strings.  If lhs follows rhs in the ASCII collaring sequence, the resulting
+;	relation is true, otherwise, false (actually, this function differs slightly --
+;	see description of exit conditions below).
+;
+;	According to the ANSI standard, ANSI/MDC X11.1-1990, the relation is true iff
+;	any of the following is true:
+;
+;		a.  rhs is empty and lhs is not.
+;		b.  neither lhs nor rhs is empty and the leftmost character of lhs
+;		    follows (has numeric code greater than) the leftmost character of rhs.
+;		c.  There exists a positive integer n such that lhs and rhs have
+;		    identical heads of length n (i.e., $E(lhs,1,n)=$E(rhs,1,n)) and the
+;		    remainder of lhs follows the remainder of rhs.
+;
+;	Entry:
+;		r0 -> lhs mval
+;		r1 -> rhs mval
+;
+;	Exit:
+;		r0 =	>0, if lhs follows rhs
+;			 0, if lhs equals rhs
+;			<0, if rhs follows lhs (allows reversal of operands and subsequent test)
+
+
+	MVAL$DEF
+
+
+	$routine	name=op_follow, entry=op_follow_ca, kind=stack, saved_regs=<r2, r3, r13, fp>
+
+	mov	r27, r13
+	.base	r13, $ls
+
+;	Make sure both lhs and rhs are strings.
+	mov	r0, r2		; r2 <- address of lhs mval
+	mov	r1, r3		; r3 <- address of rhs mval
+	mv_force_defined r2
+	mv_force_str (r2)
+	mv_force_defined r3
+	mv_force_str (r3)
+
+;	Obtain string lengths.
+	ldl	r17, mval$l_strlen(r2)
+	ldl	r19, mval$l_strlen(r3)
+
+	$call	memvcmp, args=<mval$a_straddr(r2)/L, r17, mval$a_straddr(r3)/L, r19>, set_arg_info=false
+
+	mov	r0, r24		; set condition code (emulator) according to function result
+	$return
+
+	$end_routine
+
+	.end

@@ -1,0 +1,253 @@
+
+1 Overview
+ Overview
+   The principle components of GT.CX  are  the  CCP  and  the  utility
+   program,   CCE.   The  CCE  examines  and  changes  conditions  for
+   clustered operation.  Use the CCE to:
+
+    o  Change database files to and from clustered operation
+    o  Control the time processes will wait without reporting an error
+       for access to clustered files
+    o  Examine the status of files, locks and the CCP
+    o  Stop the CCP
+
+2 Use of CCE
+ Use of CCE
+   CCE prompts for all  required  information.   Use  HELP  to  invoke
+   online information about CCE.  SET FILE /CLUSTER to change a new or
+   previously non-clustered file to  clustered  operation.   SET  FILE
+   /NORESPONSE  to  make cluster access failures hang processes rather
+   than giving  errors.   STOP  the  CCP  when  terminating  clustered
+   operation.  When the CCE session is complete, EXIT.
+1 Commands
+ Commands
+   CCE commands can be entered at the CCE> prompt or as parameters  to
+   the CCE command when CCE is defined as a foreign command.
+
+   Example:
+
+   $ CCE
+   CCE> STOP
+   CCE>
+
+   or
+
+   $ CCE STOP
+   $
+
+   CCE commands, command parameters and qualifiers may be  abbreviated
+   using  enough  characters  from  the  beginning  of  the command to
+   unambiguously identify the keyword.  CCE  keywords  can  always  be
+   abbreviated  to  4  characters  or  less.  The description for each
+   command identifies the current minimum abbreviations by showing the
+   optional part of the keyword in square brackets ([]).
+1 EXIT
+ E[XIT]
+   The EXIT command terminates an CCE session.   The  syntax  for  the
+   EXIT command is:
+
+       E[XIT]
+
+   Example:
+
+   CCE> EXIT
+   $
+
+1 HELP
+ H[ELP]
+   The HELP command displays online information about CCE commands and
+   qualifiers,  using  the  VMS help facility.  HELP takes an optional
+   parameter which specifies a topic on which you desire  help.   Exit
+   from HELP by entering <RET> enough times to leave all nested levels
+   or by entering <CTRL Z>.  The syntax for the HELP command is:
+
+       H[ELP] [topic]
+
+   Example:
+
+   CCE> HELP SET
+
+   This command would display help on the SET command.
+1 QUIT
+ Q[UIT]
+   The QUIT command is synonymous with the EXIT command and terminates
+   CCE.  The syntax for the QUIT command is:
+
+       Q[UIT]
+
+1 SET
+ SE[T]
+   The SET command changes clustering characteristics.  The syntax for
+   the SET command is:
+
+       SE[T] F[ILE] file-spec set-file-qualifier
+
+   SET FILE makes a file clustered or non-clustered and/or alters  the
+   cluster  timers.   The  set-file-qualifiers determine the exact SET
+   FILE action
+
+   Several set-file-qualifiers have time  arguments  which  share  the
+   following characteristics:
+    o  they accept a VMS delta-time.
+    o  the maximum time accepted is 00:59:59.99.  Because  the  format
+       is hh:mm:ss, normally it is specified as 00:00:ss.
+    o  if no argument is supplied, the default value is reestablished.
+
+2 /CLUSTER
+ /C[LUSTER]
+   The /CLUSTER qualifier controls whether a file is non-clustered  or
+   clustered.  The syntax for the CLUSTER qualifier is:
+
+       /[NO]C[LUSTER]
+
+   In order for SET FILE/[NO]CLUSTER to  successfully  switch  a  file
+   between  modes  of  operation, the file must be quiescent, i.e.  no
+   process may currently be accessing the file.
+
+   A clustered file is open to all members of the cluster  which  have
+   active  CCPs.   A non-clustered file is restricted to access by the
+   first node of the cluster to open the file.  Only databases with BG
+   access  method  can  be clustered.  When files are created by MUPIP
+   CREATE they are non-clustered.
+2 /QUANTUM_INTERVAL
+ /QUANTUM_INTERVAL
+   The /QUANTUM_INTERVAL should only be changed on  instructions  from
+   Greystone.  The syntax for the /QUANTUM_INTERVAL qualifier is:
+
+       /Q[UANTUM_INTERVAL]=delta-time
+
+2 /RESPONSE_INTERVAL
+ /RESPONSE_INTERVAL
+   The /RESPONSE_INTERVAL qualifier controls how long a  GT.M  process
+   will  wait  for  a response from the CCP before reporting an error.
+   The syntax for the /RESPONSE_INTERVAL qualifier is:
+
+       /[NO]R[ESPONSE_INTERVAL]=delta-time
+
+   If a member  of  the  cluster  has  a  capacity  problem  seriously
+   affecting  response  time,  increasing  the  RESPONSE_INTERVAL  may
+   prevent database timeout errors.
+
+   If a database cannot be accessed within the RESPONSE_INTERVAL,  the
+   default  error  handling  strategy  is  to  inform  the application
+   program with an error.  The application program may then notify the
+   user  and/or  operator  and retry or halt.  /NORESPONSE_INTERVAL or
+   RESPONSE_INTERVAL=0 permit the alternate approach of suspending the
+   application  program  until the problem is resolved by an operator.
+   In this case CCP operator messages or stalling of  normal  activity
+   are relied upon to signal the error.
+
+   The default RESPONSE_INTERVAL is 1 minute.
+2 /STALE_INTERVAL
+ /STALE_INTERVAL
+   The /STALE_INTERVAL qualifier controls how long  a  cluster  member
+   not  active  in  updating the file may operate before verifying any
+   local  copies  of  database  information.   The  syntax   for   the
+   /STALE_INTERVAL qualifier is:
+
+       /[NO]S[TALE_INTERVAL]=delta-time
+
+   Increasing the STALE_INTERVAL may slightly reduce system overhead.
+
+   A cluster member updating a file or LOCKing a name mapped to a file
+   is  forced  to constantly verify synchronization with that file.  A
+   cluster member exclusively reading a file is allowed to have  local
+   copies  of  database  information  which  may  not be current.  The
+   STALE_INTERVAL controls how "out of date" local copies can be.
+
+   /NOSTALE_INTERVAL or  /STALE_INTERVAL=0  turns  off  the  staleness
+   timer.   This is appropriate only if all cluster members constantly
+   mix reads and writes or if a cluster member exclusively reading can
+   function properly using perceptibly out of date information.
+
+   The default STALE_INTERVAL is 5 seconds.
+2 /TICK_INTERVAL
+ /TICK_INTERVAL
+   The /TICK_INTERVAL should only  be  changed  on  instructions  from
+   Greystone.  The syntax for the /TICK_INTERVAL qualifier is:
+
+       /T[ICK_INTERVAL]=delta-time
+
+2 Examples
+ Examples
+
+   CCE>SET FILE MUMPS.DAT/CLUSTER/STALE=00:00:10
+
+   This command would make the file MUMPS.DAT clustered and change the
+   STALE_TIMER to 10 seconds.
+
+   CCE>SET FILE TEMP.DAT/NOCLUSTER
+
+   This command would make the file TEMP.DAT non-clustered.
+1 SHOW
+ SH[OW]
+   The SHOW command displays information on locks, database  files  or
+   CCP activity.  The syntax for the SHOW command is:
+
+   SH[OW] C[CP] | F[ILE] file-spec 
+          | L[OCKS] | T[RANSACTIONS] [ /O[UT]=file-spec ] 
+
+2 CCP
+ C[CP]
+   SHOW CCP displays the status  of  the  CCP  for  the  node  in  the
+   cluster.   If  a  CCP  is  running  and the CCE user has the SYSLCK
+   privilege, this command reports the PID of the  CCP  and  how  many
+   processes are accessing clustered databases.
+
+   Example:
+
+   CCE>SHOW CCP
+
+   %GTM-I-CCENOCCP, The cluster control program is not running on this
+   node
+
+2 FILE
+ F[ILE]
+   SHOW FILE displays the clustering status of a database  file.   The
+   status  includes  whether  the  file  is  clustered  and  the timer
+   intervals for that file.
+
+   Example:
+
+   CCE>SHOW FILE MUMPS.DAT
+
+   Database file MUMPS.DAT is a cluster database
+   STALE_INTERVAL      00:00:05.00                    
+   RESPONSE_INTERVAL   00:01:00.00                    
+   QUANTUM_INTERVAL    00:00:01.00                    
+   TICK_INTERVAL       00:00:00.10                    
+
+2 LOCKS
+ L[OCKS]
+   SHOW LOCKS displays the VMS locks used by GT.CX  and  GT.M  on  the
+   node.   SHOW  LOCKS does not display locks the CCE process does not
+   have privileges to examine.  The meaning of the lock display is not
+   documented  for  the user and this command is intended for use only
+   under the direction of Greystone.
+2 TRANSACTIONS
+ T[RANSACTIONS]
+   SHOW TRANSACTIONS displays the 100 most recent  CCP  actions.   The
+   meaning  of  the transaction display is not documented for the user
+   and this command is intended for use only under  the  direction  of
+   Greystone.
+2 /OUT
+ /O[UT]
+   SHOW LOCKS and SHOW TRANSACTIONS accept  the  /OUT=  qualifier  for
+   directing the display to a file.  By default the output is directed
+   to SYS$OUTPUT.
+1 STOP
+ ST[OP]
+   The  STOP  command  terminates  the  Cluster  Control  Program  and
+   therefore  all  access  from this node to clustered databases.  The
+   syntax for the STOP command is:
+
+       ST[OP]
+
+   If possible, use this command after  application  procedures  cause
+   all processes to drop their interest in the clustered file(s).
+
+   Example:
+
+   CCE>STOP
+
+   This command would stop the CCP.

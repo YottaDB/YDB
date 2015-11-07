@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 
 error_def(ERR_JOBLABOFF);
 
-void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
+boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
 {
 	rhdtyp		*rt_hdr;
 	int4		*lp;
@@ -38,7 +38,7 @@ void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
 		/* Label offset with routine compiled with NOLINE_ENTRY should cause error. */
 		lp = find_line_addr(rt_hdr, label, offset, NULL);
 	if (!lp)
-		rts_error(VARLSTCNT(1) ERR_JOBLABOFF);
+		return (FALSE);
 	/* Set the pointer to address / offset for line number entry storage in lab_proxy. */
 	USHBIN_ONLY((TREF(lab_proxy)).lnr_adr = lp;)
 	/* On non-shared-binary, calculcate the offset to the corresponding lnr_tabent record by subtracting
@@ -49,4 +49,5 @@ void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
 	if (NULL != labaddr)
 		*labaddr = (char *)LINE_NUMBER_ADDR(rt_hdr, lp);
 	*hdr = (char *)rt_hdr;
+	return (TRUE);
 }

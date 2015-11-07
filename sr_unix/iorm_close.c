@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,23 +91,23 @@ void iorm_close(io_desc *iod, mval *pp)
 				path = iod->trans_name->dollar_io;
 				FSTAT_FILE(rm_ptr->fildes, &fstatbuf, fstat_res);
 				if (-1 == fstat_res)
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 					if (UNLINK(path) == -1)
-						rts_error(VARLSTCNT(1) errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			case iop_rename:
 				path = iod->trans_name->dollar_io;
 				path2 = (char*)(pp->str.addr + p_offset + 1);
 				FSTAT_FILE(rm_ptr->fildes, &fstatbuf, fstat_res);
 				if (-1 == fstat_res)
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 				{
 					/* make a copy of path2 so we can null terminate it */
@@ -121,9 +121,9 @@ void iorm_close(io_desc *iod, mval *pp)
 					assert(stringpool.free >= stringpool.base);
 					assert(stringpool.free <= stringpool.top);
 					if (LINK(path, savepath2) == -1)
-						rts_error(VARLSTCNT(1) errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 					if (UNLINK(path) == -1)
-						rts_error(VARLSTCNT(1) errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				}
 				break;
 			case iop_destroy:
@@ -181,7 +181,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			save_fd = rm_ptr->fildes;
 			CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
 			if (0 != rc)
-				rts_error(VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
 		}
 		if (rm_ptr->filstr != NULL)
 		{
@@ -194,7 +194,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			save_fd = rm_ptr->read_fildes;
 			CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
 			if (0 != rc)
-				rts_error(VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
 		}
 		if (rm_ptr->read_filstr != NULL)
 		{

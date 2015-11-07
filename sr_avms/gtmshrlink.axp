@@ -1,0 +1,74 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+objlib/lib
+symbol_vector=( -
+	gtm$compile	= PROCEDURE, -
+	gtm$startup	= PROCEDURE, -
+	gtm$gblget	= PROCEDURE, -
+	gtm$gblput	= PROCEDURE, -
+	gtm$gblnext	= PROCEDURE, -
+	gtm$gblorder	= PROCEDURE, -
+	gtm$gblprevious	= PROCEDURE, -
+	gtm$gbldata	= PROCEDURE, -
+	gtm$gblkill	= PROCEDURE, -
+	gtm$gblquery	= PROCEDURE, -
+	gtm$lock	= PROCEDURE, -
+	gtm$inclock	= PROCEDURE, -
+	gtm$declock	= PROCEDURE, -
+	gtm$zalloc	= PROCEDURE, -
+	gtm$zdealloc	= PROCEDURE, -
+	gtm$setgbldir	= PROCEDURE, -
+	gtm$ztstart	= PROCEDURE, -
+	gtm$ztcommit	= PROCEDURE, -
+	gtm$interrupt	= PROCEDURE, -
+	gtm$fgncall	= PROCEDURE, -
+	gtm$mval2subsc	= PROCEDURE, -
+	gtm$gblwithdraw	= PROCEDURE, -
+	gtm$lclget	= PROCEDURE, -
+	gtm$lclkill	= PROCEDURE, -
+	gtm$lclput	= PROCEDURE, -
+	gtm$lclwithdraw	= PROCEDURE, -
+	gtm$lcldata	= PROCEDURE, -
+	gtm$lclquery	= PROCEDURE, -
+	gtm$lclorder	= PROCEDURE, -
+	gtm$lclprevious	= PROCEDURE, -
+	gtm$xecute	= PROCEDURE, -
+	gtm$rundown	= PROCEDURE, -
+	gtm$get		= PROCEDURE, -
+	gtm$kill	= PROCEDURE, -
+	gtm$put		= PROCEDURE, -
+	gtm$withdraw	= PROCEDURE, -
+	gtm$data	= PROCEDURE, -
+	gtm$query	= PROCEDURE, -
+	gtm$order	= PROCEDURE, -
+	gtm$previous	= PROCEDURE, -
+	gtm$zkill	= PROCEDURE, -
+	gtm$lock2	= PROCEDURE, -
+	gtm$zdealloc2	= PROCEDURE, -
+	gtm$ce_establish	= PROCEDURE,-
+	gtm$ce_getinfo	= PROCEDURE, -
+	gtm$dyn_ch	= PROCEDURE, -
+	gtm_malloc	= PROCEDURE, -
+	gtm_free	= PROCEDURE, -
+	gtm$zstatus	= PROCEDURE -
+	)
+gsmatch=lequal,11,0
+! Because the linker creates image sections on a per-cluster
+! basis, create a cluster for all of the code Psect's (whose
+! pages can be shared among processes) and collect all of the
+! code Psect's into it so the pages corresponding to that image
+! section can be shared.  Note the MACRO/MIGRATION compiler
+! names its code Psect "$CODE" (as do most of the VAX compilers),
+! while the AXP C compiler and MACRO assembler name their code
+! Psect's "$CODE$".
+cluster = code_clust
+collect = code_clust,$CODE,$CODE$

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,8 +151,8 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 				LEN_AND_STR(replpool_id->now_running), shm_id, LEN_AND_STR(instfilename));
 		DETACH_AND_RETURN(start_addr, shm_id, instfilename);
 	}
-	/* Assert that if we haven't yet attached to the journal pool yet, we have the corresponding global vars set to NULL */
-	assert((JNLPOOL_SEGMENT != pool_type) || ((NULL == jnlpool.jnlpool_ctl) && (NULL == jnlpool_ctl)));
+	/* Assert that if we haven't yet attached to the journal pool yet, jnlpool_ctl better be NULL */
+	assert((JNLPOOL_SEGMENT != pool_type) || (NULL == jnlpool.jnlpool_ctl));
 	if (JNLPOOL_SEGMENT == pool_type)
 	{	/* Initialize variables to simulate a "jnlpool_init". This is required by "repl_inst_flush_jnlpool" called below */
 		jnlpool_ctl = jnlpool.jnlpool_ctl = (jnlpool_ctl_ptr_t)start_addr;
@@ -160,7 +160,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 		csa = &udi->s_addrs;
 		csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE);
-		csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE + SIZEOF(mutex_spin_parms_struct));
+		csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct));
 		/* secshr_db_clnup uses this relationship */
 		assert(jnlpool.jnlpool_ctl->filehdr_off);
 		assert(jnlpool.jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);
@@ -191,7 +191,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 			assert(!jnlpool.repl_inst_filehdr->crash || anticipatory_freeze_available);
 			/* Refresh local copy (repl_inst_filehdr) with the copy that was just flushed (jnlpool.repl_inst_filehdr) */
 			memcpy(repl_inst_filehdr, jnlpool.repl_inst_filehdr, SIZEOF(repl_inst_hdr));
-			if (!anticipatory_freeze_available)
+			if (!anticipatory_freeze_available || argumentless_rundown)
 			{ 	/* Now that jnlpool has been flushed and there is going to be no journal pool, reset
 				 * "jnlpool.repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
 				 * affected by whether this is NULL or not.
@@ -205,7 +205,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 			}
 		} /* else we are ONLINE ROLLBACK. repl_inst_flush_jnlpool will be done later after gvcst_init in mur_open_files */
 	}
-	if ((0 == nattch) && (!anticipatory_freeze_available || (RECVPOOL_SEGMENT == pool_type)))
+	if ((0 == nattch) && (!anticipatory_freeze_available || argumentless_rundown || (RECVPOOL_SEGMENT == pool_type)))
 	{
 		if (-1 == shmdt((caddr_t)start_addr))
 		{
@@ -227,6 +227,11 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 		{
 			repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
 			repl_inst_filehdr->recvpool_shmid_ctime = 0;
+			if (NULL != jnlpool.repl_inst_filehdr)
+			{
+				jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
+				jnlpool.repl_inst_filehdr->recvpool_shmid_ctime = 0;
+			}
 			*ipc_rmvd = TRUE;
 		}
 	} else

@@ -1,0 +1,19 @@
+	.title	gtm_zc	GTM ZCALL PSECT DEFINITIONS
+
+	.psect gtm$zcalltabaaa	pic,ovr,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	.long	0
+gtm$startzc::
+
+	.psect gtm$zcalltabaac	pic,ovr,rel,gbl,shr,noexe,rd,nowrt,novec,byte
+gtm$endzc::
+	.byte	0
+
+	.psect gtm$zcallpackaa	pic,ovr,rel,gbl,shr,noexe,rd,nowrt,novec,long
+	.long	0
+gtm$startzcpack::
+
+	.psect gtm$zcallpackac	pic,ovr,rel,gbl,shr,noexe,rd,nowrt,novec,byte
+gtm$endzcpack::
+	.byte	0
+
+	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -344,6 +344,7 @@ enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, int *nLevl_pt
 	}
 	pCurr->cse = NULL;
 	pCurr->blk_num = nBlkId;
+	pCurr->buffaddr = pBlkBase;
 	pCurr->tn = tn;
 	pCurr->cycle = cycle;
 	pCurr->cr = cr;

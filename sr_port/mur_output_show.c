@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include <jpidef.h>
 #endif
 #include "real_len.h"		/* for real_len() prototype */
+#include "have_crit.h"
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	reg_ctl_list	*mur_ctl;
@@ -133,7 +134,7 @@ int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_
 		short_time = MID_TIME(proc_time);
 	else
 		short_time = (time_t)proc_time;
-	tsp = localtime((const time_t *)&short_time);
+	GTM_LOCALTIME(tsp, (const time_t *)&short_time);
 	SPRINTF(string, "%04d/%02d/%02d %02d:%02d:%02d", (1900 + tsp->tm_year), (1 + tsp->tm_mon), tsp->tm_mday,
 			tsp->tm_hour, tsp->tm_min, tsp->tm_sec);
 	assert(LENGTH_OF_TIME >= strlen(string));

@@ -1,0 +1,305 @@
+
+1 Overview
+  The MUMPS LOCK Utility
+   The GT.M LOCK Utility, LKE, provides a tool  for  examining  and  changing
+   the GT.M LOCK environment. In MUMPS, the  LOCK  command  reserves  one  or
+   more resource names. Only one process at a time  can  reserve  a  resource
+   name. No other process  sharing  the  same  environment  can  successfully
+   LOCK that resource name  at  the  same  time.  MUMPS  code  commonly  uses
+   LOCKs as flags  controlling  access  to  global  data.  Generally  a  LOCK
+   specifies the same as the  name  of  the  global  variable  that  requires
+   protected access. However, this is only  a  convention.  A  LOCK  argument
+   may contain any  subscripted  or  unsubscripted  MUMPS  name  including  a
+   name with no preceding caret (^). Because  they  have  the  appearance  of
+   local variable names, resource names  with  no  preceding  caret  (^)  are
+   commonly referred to as "local LOCKs."
+
+   The  ZALLOCATE  and   ZDEALLOCATE   commands   provide   an   alternative,
+   non-standard, mechanism for managing LOCKs.
+
+2 Functions
+  Functions
+   The two primary functions of the MUMPS LOCK Utility (LKE) are:
+
+   o   SHOW all or specified LOCKs currently active on the system
+
+   o   CLEAR all or specified LOCKs currently active on the system
+
+   When debugging a MUMPS application, you may  use  LKE  to  identify  and
+   clear a  possible  deadlock  situation,  i.e.,  two  or  more  processes
+   have LOCKs  and  are  waiting  to  add  resource  names  LOCKed  by  the
+   other(s).
+
+   When  used  with  GT.CX  and/or  GT.CM,  LKE  may  display  and   change
+   information on other nodes of a distributed database system.
+
+2 LOCK_database
+  MUMPS LOCKs and Global Directories
+   GT.M  distributes  the  LOCK   database   among   the   database   files
+   identified  by  the  Global  Directory  (GD).   The   Global   Directory
+   Editor (GDE) creates and maintains Global Directories.
+
+   GT.M maps LOCKs of resource names starting  with  a  caret  (^)  to  the
+   database file  used  to  map  variables  with  the  same  name.  If  the
+   Global Directory maps the name A to file  A.DAT,  GT.M  maps  all  LOCKs
+   on resource name ^A to file A.DAT.
+
+   GT.M maps  LOCKs  on  names  not  starting  with  a  caret  (^)  to  the
+   region of the database specified with  the  GDE  command  LOCK  /REGION.
+   By default, GDE  creates  Global  Directories  mapping  local  LOCKs  to
+   the region $DEFAULT.
+
+   These two factors result in the following:
+
+   o   ^ LOCKs automatically intersect for  all  users  of  the  same  data
+       in any database file,  because  GT.M  stores  the  ^  LOCKs  in  the
+       same file as the data
+
+   o   "local"  LOCKs  intersect  dependent  on   the   Global   Directory,
+       because users may  access  the  database  through  different  Global
+       Directories.
+
+2 Global_Directories
+  Establishing a Global Directory
+   GDE and LKE use the logical  name  GTM$GBLDIR  to  identify  which  file
+   to use for  the  Global  Directory.  Define  GTM$GBLDIR  using  the  DCL
+   command DEFINE. The system manager may  define  GTM$GBLDIR  in  a  GROUP
+   or SYSTEM  logical  name  table,  allowing  many  users  access  to  the
+   logical name. Individual users  define  GTM$GBLDIR  in  their  LOGIN.COM
+   or other command files.
+
+   Example
+
+   $ DEFINE GTM$GBLDIR PROD.GLD
+
+   When a process  invokes  a  GT.M  image,  GT.M  identifies  the  current
+   Global Directory by the  logical  name  GTM$GBLDIR.  Within  MUMPS,  SET
+   $ZGBLDIR=expr changes the Global Directory. $ZGBLDIR is an
+   intrinsic  special  variable.   An   individual   LOCK,   ZALLOCATE   or
+   ZDEALLOCATE  argument  may  specify  a   Global   Directory   with   the
+   extended global syntax.
+
+1 CLEAR
+  C[LEAR]
+   The  CLEAR  command  removes  active  LOCKs.  The  format  of  the   CLEAR
+   command is:
+
+   C[LEAR] [/qualifier...]
+
+   The optional CLEAR command qualifiers are:
+
+   /A[LL]
+   /I[NTERACTIVE]
+   /O[UTPUT]=file-spec
+   /P[ID]=pid
+   /R[EGION]=region-name
+
+   By default, CLEAR operates interactively (/INTERACTIVE).
+
+2 Qualifiers
+/ALL
+  /A[LL]
+   Specifies  the  removal  of  all  current  LOCKs.  If  used  with  the
+   /REGION qualifier /ALL removes  all  LOCKs  in  the  region.  Issue  a
+   CLEAR /ALL  only  when  there  are  no  active  GT.M  processes  using
+   LOCKs or when you can predict the effect on the application.
+
+   The   /ALL   qualifier   is   incompatible   with   the   /INTERACTIVE
+   qualifier.
+
+/INTERACTIVE
+  /I[NTERACTIVE]
+   Clears  one  LOCK  at  a  time  interactively.   LKE   displays   each
+   current LOCK with the  PID  of  the  owner  process  and  prompts  for
+   verification  that  the  LOCK  should  be  cleared.  LKE  retains  the
+   LOCK for any response other than Y[ES].
+
+   The   /INTERACTIVE   qualifier   is   incompatible   with   the   /ALL
+   qualifier.
+
+   By default, CLEAR operates interactively (/INTERACTIVE).
+
+/OUTPUT
+  /OUTPUT=file-spec
+   Directs the  reporting  of  all  cleared  LOCKs.  If  you  specify  an
+   existing file, LKE creates a new version of that file.
+
+   The /OUTPUT qualifier is compatible with all other qualifiers.
+
+   By default, CLEAR sends its messages to SYS$OUTPUT.
+
+/PID
+  /P[ID]=pid
+   Clears   all   LOCKs   associated   with   the    specified    process
+   identification  number.  LKE  interprets  the  PID  as  a  hexadecimal
+   number.  This  command  provides  a  means  for  directing  CLEAR   to
+   LOCKs held by a process that is behaving abnormally.
+
+   The /PID qualifier is compatible with all other qualifiers.
+
+/REGION
+  /R[EGION]=region-name
+   Clears LOCKs mapped by  the  current  Global  Directory  to  a  region
+   specified by the region-name.
+
+   The /REGION qualifier is compatible with all other qualifiers.
+
+   By     default,     CLEAR     /REGION=     operates      interactively
+   (/INTERACTIVE).
+
+1 EXIT
+  E[XIT]
+   The EXIT command ends an LKE session.  The  format  of  the  EXIT  command
+   is:
+
+   E[XIT]
+
+1 HELP
+  H[ELP]
+   The HELP command explains LKE commands. The format  of  the  HELP  command
+   is:
+
+   H[ELP] [options...]
+
+   The  HELP  command  uses  similar  conventions   to   the   VAX/VMS   help
+   facility. Enter the LKE command for which  you  want  information  at  the
+   Topic prompt(s). Use <RETURN> or <CTRL Z> to return to the LKE prompt.
+
+   Example
+
+   LKE> HELP SHOW
+
+   This command displays help for the SHOW command.
+
+
+1 SHOW
+  SH[OW]
+   The SHOW command provides a  status  report  on  the  LOCK  mechanism  and
+   the LOCK database. The format of the SHOW command is:
+
+   SH[OW] [/qualifier...]
+
+   By default, SHOW displays /ALL.
+
+   The  SHOW  command  reports  active  LOCKs.  Information  displayed  about
+   specific  LOCKs  includes  the  LOCK  resource  name   and   the   process
+   identification (PID) of the LOCK owner. The  VMS  privileges  of  the  LKE
+   process  determine  whether  LKE  can  display  the  state  of  any  other
+   process. The results of a SHOW may  be  immediately  "outdated"  by  MUMPS
+   LOCK activity.
+
+   When LKE encounters a LOCK  held  by  a  process  on  another  node  in  a
+   VAXcluster, it displays a  message  identifying  the  name  of  the  node,
+   however it does not display the  process  state.  When  LKE  displays  the
+   message identifying the LOCK as belonging to a  process  on  a  node  with
+   no name, it means  a  process  abandoned  the  LOCK  due  to  an  abnormal
+   termination,  and  the  node  that  held  that  process  no  longer  holds
+   active membership in the VAXcluster  or  has  been  assigned  a  new  node
+   identifier during a reboot.
+
+2 Qualifiers
+/ALL
+  /A[LL]
+   Specifies  a  display  of  all  current  LOCKs  in  all  regions   and
+   information about the state  of  processes  owning  these  LOCKs.  The
+   /ALL  qualifier  is  compatible  with  all  other   qualifiers.   SHOW
+   /ALL /WAIT displays both /ALL and /WAIT information.
+
+   By default, SHOW displays /ALL.
+
+/OUTPUT
+  /OUTPUT=file-spec
+   Directs the reporting  of  the  current  LOCKs.  When  you  specify  a
+   file, LKE overwrites that file.
+
+   The /OUTPUT qualifier is compatible with all other qualifiers.
+
+   By default, SHOW directs all messages to SYS$OUTPUT.
+
+/PID
+  /P[ID]=process-identification
+   Displays all LOCKs owned by the specified PID.
+
+   The /PID qualifier is compatible with all other qualifiers.
+
+   By default, SHOW displays the LOCKs for all PIDs.
+
+/REGION
+  /R[EGION]=region-name
+   Displays LOCKs for the specified region.
+
+   The /REGION qualifier is compatible with all other qualifiers.
+
+   By default, SHOW displays the LOCKs for all regions.
+
+/WAIT
+  /W[AIT]
+   Displays   the   LOCK   resource   name   and   the   process    state
+   information of all processes waiting  for  the  LOCK  to  be  granted.
+   LKE  does  not  display  the  owner  of  the  LOCK.  SHOW  /ALL  /WAIT
+   displays both /ALL and /WAIT information.
+
+2 process_status
+  Some VMS Process Status Codes
+   When you use the SHOW command  to  display  all  LOCKs  on  the  system,
+   LKE also displays  the  status  of  the  process  that  owns  the  LOCK.
+   The  common  VMS  process  status  codes  and  their  meanings  are   as
+   follows:
+
+   CUR - VMS  process  status  indicating  that  the  LOCK  is  held  by  a
+   "current" process.
+
+   COM - VMS  process  status  indicating  that  the  LOCK  is  held  by  a
+   process ready to use the processor.
+
+   HIB - VMS  process  status  indicating  that  the  LOCK  is  held  by  a
+   process in "hibernation" (i.e.,  waiting  for  time  to  pass).  Such  a
+   process may be waiting to LOCK  a  resource  name  presently  LOCKed  by
+   another process.
+
+   LEF - VMS  process  status  indicating  that  the  LOCK  is  held  by  a
+   process waiting for  an  asynchronous  event  ("local  event  flag").  A
+   process waiting for terminal input waits in a LEF state.
+
+   A nonexistent process  -  the  process  that  set  the  LOCK  no  longer
+   exists.
+
+   A process on a remote node -  the  LOCK  exists  on  a  remote  node  so
+   the system is unable to determine its exact status.
+
+   A process on a cluster node  -  the  LOCK  exists  on  another  node  in
+   the  VAXcluster  so  the  system  is  unable  to  determine  its   exact
+   status.
+
+   A GT.CM server - the LOCK was set on behalf  of  a  process  on  another
+   node via the GT.CM software.
+
+   No  privilege  -  you  do  not  have  the  appropriate   VMS   privilege
+   required to view the status.
+
+   For additional  information  on  these  and  other  VMS  process  status
+   categories, refer to the VMS Monitor Utility Manual.
+
+1 SPAWN
+  SP[AWN]
+   The SPAWN command creates a sub-process for access  to  VMS  CLI  (usually
+   DCL) without terminating  the  current  LKE  environment.  Use  the  SPAWN
+   command to suspend a session and issue  DCL  commands  such  as  DIRECTORY
+   or SHOW LOGICAL. The SPAWN command  accepts  an  optional  command  string
+   for execution by  the  spawned  sub-process.  If  the  SPAWN  has  command
+   string  parameter,  the  created  sub-process  prompts  and  accepts   any
+   legal CLI command.  To  terminate  the  sub-process  use  the  LOGOUT  DCL
+   command.
+
+   The format of the SPAWN command is:
+
+   SP[AWN] [DCL command]
+
+   Example
+
+   LKE> SPAWN "DIR *.DAT"
+
+   This command  invokes  a  VMS  directory  listing  of  all  files  in  the
+   current  default  directory  with  a  .DAT  extension.   The   sub-process
+   terminates when the directory listing completes.
+

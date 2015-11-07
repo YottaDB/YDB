@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -297,4 +297,9 @@ XFER(xf_stoglvn, op_stoglvn),
 XFER(xf_rfrshgvn, op_rfrshgvn),
 XFER(xf_indfnname2, op_indfnname2),
 XFER(xf_indget2, op_indget2),
-XFER(xf_indmerge2, op_indmerge2)
+XFER(xf_indmerge2, op_indmerge2),
+#ifdef UNIX
+XFER(xf_fnzpeek, op_fnzpeek),
+#endif
+XFER(xf_litc, op_litc),
+XFER(xf_stolitc, op_stolitc)

@@ -26,7 +26,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.0-001)
+set(version GTM_RELEASE_VERSION)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -56,6 +56,7 @@ set(gtm_osarch_libs "")
 # Define these ahead of establishing platforms
 set(gt_src_list)
 set(sources_used "")
+set(extralibs "")
 set(is_encryption_supported 1)
 set(libmumpsrestoreregex "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
@@ -374,6 +375,7 @@ foreach(lib
   mupip
   stub
   mumps
+  ${extralibs}
   )
   add_library(lib${lib} STATIC ${lib${lib}_SOURCES})
   set_property(TARGET lib${lib} PROPERTY OUTPUT_NAME ${lib})
@@ -441,7 +443,7 @@ target_link_libraries(ftok 		libmumps libstub)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
   add_executable(gtm_svc		${gtm_svc_SOURCES})
-  target_link_libraries(gtm_svc		libmumps libcmisockettcp libgnpclient libgtmrpc)
+  target_link_libraries(gtm_svc		libmumps libgnpclient libcmisockettcp libgtmrpc)
 endif()
 foreach(t ${with_export})
   set_target_properties(${t} PROPERTIES
@@ -465,9 +467,7 @@ if(is_encryption_supported)
   # Iterate over the list of GPG related libraries
   foreach(gpglib gpg-error gpgme gcrypt)
     # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
-    find_library(GPGLIB_${gpglib}
-      NAME ${gpglib}
-      PATHS ${CMAKE_LIBRARY_PATH} /usr/local/lib64 /usr/local/lib)
+    find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
     # Append the found library to the list
     set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
   endforeach()

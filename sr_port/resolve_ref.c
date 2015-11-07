@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,11 +35,11 @@ error_def(ERR_ACTLSTTOOLONG);
 
 int resolve_ref(int errknt)
 {
-	triple	*curtrip, *tripref, *chktrip;
+	triple	*curtrip, *tripref, *chktrip, *ref, *y;
 	tbp	*tripbp;
 	mline	*mxl;
 	mlabel	*mlbx;
-	oprtype *opnd;
+	oprtype *opnd, *j, *k;
 	int	actcnt;
 	DCL_THREADGBL_ACCESS;
 
@@ -50,6 +50,73 @@ int resolve_ref(int errknt)
 		walktree((mvar *)mlabtab, resolve_lab, (char *)&errknt);
 	} else
 	{
+		if (!run_time && (cmd_qlf.qlf & CQ_DYNAMIC_LITERALS))
+		{	/* OC_LIT --> OC_LITC wherever OC_LIT is actually used, i.e. not a dead end */
+			dqloop(&t_orig, exorder, curtrip)
+			{
+				switch (curtrip->opcode)
+				{	/* Do a few literal optimizations typically done later in alloc_reg. It's convenient to
+					 * check for OC_LIT parameters here, before we start sliding OC_LITC opcodes in the way.
+					 */
+					case OC_NOOP:
+					case OC_PARAMETER:
+					case OC_LITC:	/* possibly already inserted in bx_boolop */
+						continue;
+					case OC_STO:	/* see counterpart in alloc_reg.c */
+						if ((cmd_qlf.qlf & CQ_INLINE_LITERALS)
+						    && (TRIP_REF == curtrip->operand[1].oprclass)
+						    && (OC_LIT == curtrip->operand[1].oprval.tref->opcode))
+						{
+							curtrip->opcode = OC_STOLITC;
+							continue;
+						}
+						break;
+					case OC_EQU:	/* see counterpart in alloc_reg.c */
+						if ((TRIP_REF == curtrip->operand[0].oprclass)
+						    && (OC_LIT == curtrip->operand[0].oprval.tref->opcode)
+						    && (0 == curtrip->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len))
+						{
+							curtrip->operand[0] = curtrip->operand[1];
+							curtrip->operand[1].oprclass = NO_REF;
+							curtrip->opcode = OC_EQUNUL;
+							continue;
+						} else if ((TRIP_REF == curtrip->operand[1].oprclass)
+						    && (OC_LIT == curtrip->operand[1].oprval.tref->opcode)
+						    && (0 == curtrip->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len))
+						{
+							curtrip->operand[1].oprclass = NO_REF;
+							curtrip->opcode = OC_EQUNUL;
+							continue;
+						}
+						break;
+				}
+				for (j = curtrip->operand, y = curtrip; j < ARRAYTOP(y->operand); )
+				{	/* Iterate over all parameters of the current triple */
+					k = j;
+					while (INDR_REF == k->oprclass)
+						k = k->oprval.indr;
+					if (TRIP_REF == k->oprclass)
+					{
+						tripref = k->oprval.tref;
+						if (OC_PARAMETER == tripref->opcode)
+						{
+							y = tripref;
+							j = y->operand;
+							continue;
+						}
+						if (OC_LIT == tripref->opcode)
+						{	/* Insert an OC_LITC to relay the OC_LIT result to curtrip */
+							ref = maketriple(OC_LITC);
+							ref->src = tripref->src;
+							ref->operand[0] = put_tref(tripref);
+							dqins(curtrip->exorder.bl, exorder, ref);
+							*k = put_tref(ref);
+						}
+					}
+					j++;
+				}
+			}
+		}
 		COMPDBG(PRINTF(" ************************************* Begin resolve_ref scan ******************************\n"););
 		dqloop(&t_orig, exorder, curtrip)
 		{

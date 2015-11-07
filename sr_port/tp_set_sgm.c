@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,8 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
+error_def(ERR_MMREGNOACCESS);
+
 void tp_set_sgm(void)
 {
 	sgm_info	*si;
@@ -49,6 +51,9 @@ void tp_set_sgm(void)
 	si = csa->sgm_info_ptr;
 	assert(si->tp_csa == csa);
 	assert(si->tp_csd == cs_data);
+	assert(csa->hdr == cs_data);
+	if ((NULL == csa->db_addrs[0]) && (dba_mm == cs_data->acc_meth))
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region), DB_LEN_STR(csa->region));
 	if (!si->tp_set_sgm_done)
 	{
 		si->next_sgm_info = first_sgm_info;

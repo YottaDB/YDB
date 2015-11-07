@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,9 +47,10 @@
 	pars.str.len = SIZEOF(no_param);				\
 	pars.str.addr = (char *)&no_param;				\
 	val.mvtype = MV_STR;						\
-									\
 	val.str.len = ((unix_file_info *)file_info)->fn_len;		\
 	val.str.addr = (char *) (((unix_file_info *)(file_info))->fn);	\
+	if (NULL == val.str.addr)					\
+		continue;						\
 	op_close(&val, &pars);						\
 }
 #elif defined(VMS)

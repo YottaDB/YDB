@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ void	grab_lock(gd_region *reg, uint4 onln_rlbk_action)
 		assert(0 == crit_count);
 		crit_count++;	/* prevent interrupts */
 		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE);
+		mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
 			/* This assumes that mutex_spin_parms_t is located immediately after the crit structures */
 		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
 		status = mutex_lockw(reg, mutex_spin_parms, 0);

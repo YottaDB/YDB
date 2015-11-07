@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,8 @@ static	int	ftok_ver[FTOK_ID_CNT] = {0, 0, 1};
 
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_DBOPNERR);
+error_def(ERR_FTOKKEY);
+error_def(ERR_SEMID);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 ZOS_ONLY(error_def(ERR_BADTAG);)
@@ -105,9 +107,11 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			*/
 			if (EEXIST == save_errno || EAGAIN == save_errno || EINVAL == save_errno)
 				/* Semaphore already exists and/or is locked-- likely rundown needed */
-				rts_error(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn));
+				rts_error(VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
+						save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 			else
-				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
+				rts_error(VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno, 0,
+						ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 		}
 		SEMOP(sem_inf[i].sem_id, sop, 4, rc, NO_WAIT);
 		if (-1 == rc)
@@ -115,9 +119,12 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			save_errno = errno;
 			mu_all_version_release_standalone(sem_inf);
 			if (EAGAIN == save_errno)
-				rts_error(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn));
+				rts_error(VARLSTCNT(12) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
+						save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key,
+						ERR_SEMID, 1, sem_inf[i].sem_id);
 			else
-				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+				rts_error(VARLSTCNT(15) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno, 0,
+						ERR_FTOKKEY, 1, sem_inf[i].ftok_key, ERR_SEMID, 1, sem_inf[i].sem_id);
 		}
 	}
 
@@ -159,7 +166,8 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	if (-1 != shmid)
 	{
 		mu_all_version_release_standalone(sem_inf);
-		rts_error(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn));
+		rts_error(VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
+				save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 	}
 }
 

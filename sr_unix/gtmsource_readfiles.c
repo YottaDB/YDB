@@ -58,6 +58,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "gtmdbgflags.h"
 
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
@@ -1245,16 +1246,19 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 			lo_addr = ctl->min_seqno_dskaddr;
 			hi_addr = b->recaddr + b->reclen;
 		} else
-		{ /* trying to locate min, better to do linear search */
+		{	/* trying to locate min, better to do linear search */
 			srch_func = do_linear_search;
 			lo_addr = ctl->min_seqno_dskaddr;
 			hi_addr = MAXUINT4;
-			if (read_seqno == ctl->seqno) /* we are positioned where we want to be, no need for read */
-			{
-				assert(lo_addr == b->recaddr);
+			/* read_seqno == ctl->seqno == ctl->min_seqno is a special case. But, don't know how that can happen without
+			 * lookback set and hence the assert below.
+			 */
+			assert((read_seqno != ctl->seqno) || ctl->lookback);
+			if ((read_seqno == ctl->seqno) && (lo_addr == b->recaddr))
+			{	/* we are positioned where we want to be, no need for a read */
 				assert(MIN_JNLREC_SIZE <= b->reclen);
-				DEBUG_ONLY(jrec = (jnl_record *)b->recbuff;)
-				DEBUG_ONLY(rectype = (enum jnl_record_type)jrec->prefix.jrec_type;)
+				DEBUG_ONLY(jrec = (jnl_record *)b->recbuff);
+				DEBUG_ONLY(rectype = (enum jnl_record_type)jrec->prefix.jrec_type);
 				assert(b->reclen == jrec->prefix.forwptr);
 				assert(IS_VALID_JNLREC(jrec, rb->fc->jfh));
 				assert(IS_REPLICATED(rectype));
@@ -1265,13 +1269,13 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 			}
 		}
 	}
-#if defined(GTMSOURCE_READFILES_LINEAR_SEARCH_TEST)
+#	if defined(GTMSOURCE_READFILES_LINEAR_SEARCH_TEST)
 	srch_func = do_linear_search;
 	hi_addr = MAXUINT4;
-#elif defined(GTMSOURCE_READFILES_BINARY_SEARCH_TEST)
+#	elif defined(GTMSOURCE_READFILES_BINARY_SEARCH_TEST)
 	srch_func = do_binary_search;
 	hi_addr = rb->fc->eof_addr;
-#endif
+#	endif
 	REPL_DPRINT6("position_read: Using %s search to locate %llu in %s between %u and %u\n",
 			(srch_func == do_linear_search) ? "linear" : "binary", read_seqno, ctl->jnl_fn, lo_addr, hi_addr);
 	found = srch_func(ctl, lo_addr, hi_addr, read_seqno, &srch_status);
@@ -1776,9 +1780,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	gtmsource_local->read_addr = read_addr;
 	assert(read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
 	gtmsource_local->read_jnl_seqno = read_jnl_seqno;
-#ifdef GTMSOURCE_ALWAYS_READ_FILES
-	gtmsource_local->read_state = read_state = READ_FILE;
-#endif
+	GTMDBGFLAGS_NOFREQ_ONLY(GTMSOURCE_FORCE_READ_FILE_MODE, gtmsource_local->read_state = read_state = READ_FILE);
 	if (read_state == READ_POOL)
 	{
 		gtmsource_ctl_close(); /* no need to keep files open now that we are going to read from pool */

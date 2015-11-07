@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,6 +94,7 @@ void mupip_exit_handler(void)
 {
 	char		err_log[1024];
 	FILE		*fp;
+	boolean_t	files_closed = TRUE;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
@@ -101,7 +102,7 @@ void mupip_exit_handler(void)
 	SET_PROCESS_EXITING_TRUE;
 	if (jgbl.mupip_journal)
 	{
-		mur_close_files();
+		files_closed = mur_close_files();
 		mupip_jnl_recover = FALSE;
 	}
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
@@ -152,6 +153,8 @@ void mupip_exit_handler(void)
 		++core_in_progress;
 		DUMP_CORE;	/* This will not return */
 	}
+	if (!files_closed)
+		_exit(EXIT_FAILURE);
 }
 
 void close_repl_logfiles()

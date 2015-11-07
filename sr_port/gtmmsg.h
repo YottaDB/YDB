@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,10 +15,13 @@
 #ifdef VMS
 void gtm_getmsg(uint4 msgnum, mstr *msgbuf);
 void gtm_putmsg(int4 msgid, ...);
+#define gtm_putmsg_csa	gtm_putmsg
 #elif defined(UNIX)
 void gtm_getmsg(int4 msgnum, mstr *msgbuf);
 void gtm_putmsg(int argcnt, ...);
+void gtm_putmsg_csa(void *, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
 void gtm_putmsg_noflush(int argcnt, ...);
+void gtm_putmsg_noflush_csa(void *, int argcnt, ...);
 
 # define GET_MSG_IDX(MSG_ID, CTL, IDX)										\
 {														\

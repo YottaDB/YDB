@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,15 +113,15 @@ error_def(ERR_ZDEFACTIVE);
 #define WRITE_LITERAL(x) (outval.str.len = SIZEOF(x) - 1, outval.str.addr = (x), op_write(&outval))
 
 /* if changing noisolation status within TP and already referenced the global, then error */
-#define SET_GVNH_NOISOLATION_STATUS(gvnh, status)							\
-{													\
-	GBLREF	uint4			dollar_tlevel;							\
-													\
-	if (!dollar_tlevel || gvnh->read_local_tn != local_tn || status == gvnh->noisolation)		\
-		gvnh->noisolation = status;								\
-	else												\
-		rts_error(VARLSTCNT(6) ERR_ISOLATIONSTSCHN, 4, gvnh->gvname.var_name.len, 		\
-			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
+#define SET_GVNH_NOISOLATION_STATUS(gvnh, status)								\
+{														\
+	GBLREF	uint4			dollar_tlevel;								\
+														\
+	if (!dollar_tlevel || gvnh->read_local_tn != local_tn || status == gvnh->noisolation)			\
+		gvnh->noisolation = status;									\
+	else													\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ISOLATIONSTSCHN, 4, gvnh->gvname.var_name.len, 	\
+			gvnh->gvname.var_name.addr, gvnh->noisolation, status);					\
 }
 
 void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
@@ -374,14 +374,15 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 								UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr));
 							} else
 							{
-								send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-									ERR_TEXT, 2,
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
+									JNL_LEN_STR(csd), ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error with journal flush during op_view"),
 									jnl_status);
 								assert(FALSE);
 							}
 						} else
-							send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+									DB_LEN_STR(reg));
 					}
 					if (!was_crit)
 						rel_crit(reg);
@@ -437,7 +438,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			if (0 == status)
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len, parmblk.value->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len,
+						parmblk.value->str.addr);
 			}
 			break;
 		case VTK_RESETGVSTATS:
@@ -481,7 +483,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			if (TREF(view_ydirt_str_len) > MAX_YDIRTSTR)
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_YDIRTSZ);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDIRTSZ);
 			}
 			if (TREF(view_ydirt_str_len) > 0)
 				memcpy(TREF(view_ydirt_str), parmblk.value->str.addr, TREF(view_ydirt_str_len));
@@ -514,7 +516,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			else
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_REQDVIEWPARM);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REQDVIEWPARM);
 			}
 			nextarg = NULL;
 			ncol = -1;
@@ -538,7 +540,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				if ((lct < MIN_COLLTYPE) || (lct > MAX_COLLTYPE))
 				{
 					va_end(var);
-					rts_error(VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 				}
 			}
 			/* at this point, verify that there is no local data with subscripts */
@@ -553,7 +555,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						if (lv && LV_HAS_CHILD(lv))
 						{
 							va_end(var);
-							rts_error(VARLSTCNT(1) ERR_COLLDATAEXISTS);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_COLLDATAEXISTS);
 						}
 					}
 				}
@@ -566,7 +568,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					if (0 == new_lcl_collseq)
 					{
 						va_end(var);
-						rts_error(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 					}
 					TREF(local_collseq) = new_lcl_collseq;
 				} else
@@ -590,7 +592,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			if (!load_pattern_table(parmblk.value->str.len, parmblk.value->str.addr))
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(4) ERR_PATLOAD, 2, parmblk.value->str.len, parmblk.value->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATLOAD, 2, parmblk.value->str.len,
+						parmblk.value->str.addr);
 			}
 			break;
 		case VTK_NOUNDEF:
@@ -607,7 +610,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			if (zdefactive)
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_ZDEFACTIVE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZDEFACTIVE);
 			}
 			zdefactive = TRUE;
 			tmpzdefbufsiz = MV_FORCE_INT(parmblk.value);
@@ -629,7 +632,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				if (2 > numarg)
 				{
 					va_end(var);
-					rts_error(VARLSTCNT(1) ERR_TRACEON);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRACEON);
 				}
 				arg = va_arg(var, mval *);
 				MV_FORCE_STR(arg);
@@ -653,7 +656,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					if (!IS_VALID_ZDIR_FORM(testvalue))
 					{
 						va_end(var);
-						rts_error(VARLSTCNT(3) ERR_INVZDIRFORM, 1, testvalue);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INVZDIRFORM, 1, testvalue);
 					}
 				} else
 					testvalue = ZDIR_FORM_FULLPATH;
@@ -796,7 +799,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 #		endif
 		default:
 			va_end(var);
-			rts_error(VARLSTCNT(1) ERR_VIEWCMD);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWCMD);
 	}
 	va_end(var);
 	return;

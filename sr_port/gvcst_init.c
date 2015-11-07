@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,6 @@ GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
@@ -187,9 +186,10 @@ void	assert_jrec_member_offsets(void)
 	/* Assumption about the structures in code */
 	assert(0 == MIN_ALIGN_RECLEN % JNL_REC_START_BNDRY);
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
-	assert((MAX_JNL_REC_SIZE - MAX_LOGI_JNL_REC_SIZE) > MIN_PBLK_RECLEN);
+	assert((SIZEOF(jnl_record) + MAX_LOGI_JNL_REC_SIZE + SIZEOF(jrec_suffix)) < MAX_JNL_REC_SIZE);
 	assert((DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) >= MAX_JNL_REC_SIZE);/* default alignsize supports max jnl record length */
-	assert(MAX_DB_BLK_SIZE < MAX_JNL_REC_SIZE);	/* Ensure a PBLK record can accommodate a full GDS block */
+	assert(MAX_MAX_NONTP_JNL_REC_SIZE <= MAX_JNL_REC_SIZE);
+	assert(MAX_DB_BLK_SIZE < MAX_MAX_NONTP_JNL_REC_SIZE);	/* Ensure a PBLK record can accommodate a full GDS block */
 	assert(MAX_JNL_REC_SIZE <= (1 << 24));
 		/* Ensure that the 24-bit length field in the journal record can accommodate the maximum journal record size */
 	assert(tcom_record.prefix.forwptr == tcom_record.suffix.backptr);
@@ -206,6 +206,8 @@ void gvcst_init(gd_region *greg)
 	sgmnt_data_ptr_t	temp_cs_data;
 #	endif
 	uint4			segment_update_array_size;
+	int4			bsize;
+	boolean_t		realloc_alt_buff;
 	file_control		*fc;
 	gd_region		*prev_reg, *reg_top;
 #	ifdef DEBUG
@@ -243,8 +245,9 @@ void gvcst_init(gd_region *greg)
 	assert(SIZEOF(th_rec) == (SIZEOF(bt_rec) - SIZEOF(bt->blkque)));
 	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + SIZEOF(cr->blkque)));
 	DEBUG_ONLY(assert_jrec_member_offsets();)
+	assert(MAX_DB_BLK_SIZE < (1 << NEXT_OFF_MAX_BITS));	/* Ensure a off_chain record's next_off member
+								 * can work with all possible block sizes */
         set_num_additional_processors();
-
 	DEBUG_ONLY(
 		/* Note that the "block" member in the blk_ident structure in gdskill.h has 30 bits.
 		 * Currently, the maximum number of blocks is 2**30. If ever this increases, something
@@ -368,9 +371,9 @@ void gvcst_init(gd_region *greg)
         csa->jnl = NULL;
 	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 	csa->regcnt = 1;	/* At this point, only one region points to this csa */
-#	ifdef VMS
 	csa->db_addrs[0] = csa->db_addrs[1] = NULL;
 	csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
+#	ifdef VMS
 	greg_acc_meth = greg->dyn.addr->acc_meth;
 	assert(dba_cm != greg_acc_meth);
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
@@ -490,17 +493,6 @@ void gvcst_init(gd_region *greg)
 	/* set csd and fill in selected fields */
 	assert(greg->dyn.addr->acc_meth == csd->acc_meth); /* db_init should have made sure this assert holds good */
 	greg_acc_meth = csd->acc_meth;
-	switch (greg_acc_meth)
-	{
-	case dba_mm:
-		csa->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);
-		break;
-	case dba_bg:
-		db_csh_ini(csa);
-		break;
-	default:
-		GTMASSERT;
-	}
 	/* It is necessary that we do the pending gv_target list reallocation BEFORE db_common_init as the latter resets
 	 * greg->max_key_size to be equal to the csd->max_key_size and hence process_gvt_pending_list might wrongly conclude
 	 * that NO reallocation (since it checks greg->max_key_size with csd->max_key_size) is needed when in fact a
@@ -573,22 +565,37 @@ void gvcst_init(gd_region *greg)
 	assert(global_tlvl_info_list || !csa->sgm_info_ptr);
 	if (JNL_ALLOWED(csa))
 	{
+		bsize = csd->blk_size;
+		realloc_alt_buff = FALSE;
 		if (NULL == non_tp_jfb_ptr)
 		{
 			non_tp_jfb_ptr = (jnl_format_buffer *)malloc(SIZEOF(jnl_format_buffer));
-			non_tp_jfb_buff_ptr =  (unsigned char *)malloc(MAX_JNL_REC_SIZE);
-			non_tp_jfb_ptr->buff = (char *)non_tp_jfb_buff_ptr;
-			/* If the journal records need to be encrypted in the journal file and if replication is in use,
-			 * we will need access to both the encrypted (for the journal file) and unencrypted (for the
-			 * journal pool) journal record contents. Since this code is executed only once (for the first
-			 * journaled database opened) by this process, we will have to allocate an alternate buffer
-			 * for this purpose (to hold the unencrypted data) as long as this GT.M version supports encryption.
-			 */
-			GTMCRYPT_ONLY(
-				non_tp_jfb_ptr->alt_buff = (char *)malloc(MAX_JNL_REC_SIZE);
-			)
+			non_tp_jfb_ptr->hi_water_bsize = bsize;
+			non_tp_jfb_ptr->buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(bsize));
 			non_tp_jfb_ptr->record_size = 0;	/* initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
+			GTMCRYPT_ONLY(non_tp_jfb_ptr->alt_buff = NULL);
+		} else if (bsize > non_tp_jfb_ptr->hi_water_bsize)
+		{	/* Need a larger buffer to accommodate larger non-TP journal records */
+			non_tp_jfb_ptr->hi_water_bsize = bsize;
+			free(non_tp_jfb_ptr->buff);
+			non_tp_jfb_ptr->buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(bsize));
+#			ifdef GTM_CRYPT
+			if (NULL != non_tp_jfb_ptr->alt_buff)
+			{
+				free(non_tp_jfb_ptr->alt_buff);
+				realloc_alt_buff = TRUE;
+			}
+#			endif
 		}
+		/* If the journal records need to be encrypted in the journal file and if replication is in use,
+		 * we will need access to both the encrypted (for the journal file) and unencrypted (for the
+		 * journal pool) journal record contents. Allocate an alternative buffer if any open journaled region
+		 * is encrypted.
+		 */
+#		ifdef GTM_CRYPT
+		if (realloc_alt_buff || (csd->is_encrypted && (NULL == non_tp_jfb_ptr->alt_buff)))
+			non_tp_jfb_ptr->alt_buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(non_tp_jfb_ptr->hi_water_bsize));
+#		endif
 		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP transaction.
 		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
 		 * one set of fixed size jnl records written.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		 * issues. However, to ensure that a concurrent argument-less rundown doesn't remove these semaphores (in case they
 		 * are orphaned), increment the counter semaphore.
 		 */
-		if (0 != (status = grab_sem(RECV, RECV_SERV_COUNT_SEM)))
+		if (0 != (status = incr_sem(RECV, RECV_SERV_COUNT_SEM)))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool counter semaphore : %s. "
@@ -118,7 +118,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool access control semaphore : %s. "
 							"Shutdown did not complete\n", STRERROR(save_errno));
 			repl_inst_ftok_sem_release(); /* see comment above for why this is okay */
-			status = rel_sem(RECV, RECV_SERV_COUNT_SEM);
+			status = decr_sem(RECV, RECV_SERV_COUNT_SEM);
 			assert(0 == status);
 			return ABNORMAL_SHUTDOWN;
 		}
@@ -157,12 +157,12 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool access control semaphore : %s. "
 							"Shutdown did not complete\n", STRERROR(save_errno));
 			repl_inst_ftok_sem_release();
-			status = rel_sem(RECV, RECV_SERV_COUNT_SEM);
+			status = decr_sem(RECV, RECV_SERV_COUNT_SEM);
 			assert(0 == status);
 			return ABNORMAL_SHUTDOWN;
 		}
 		/* Now that semaphores are acquired, decrement the counter semaphore */
-		if (0 != (status = rel_sem(RECV, RECV_SERV_COUNT_SEM)))
+		if (0 != (status = decr_sem(RECV, RECV_SERV_COUNT_SEM)))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool counter semaphore : %s. "
@@ -182,8 +182,8 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	{	/* Release all semaphores */
 		if (!auto_shutdown)
 		{
-			rel_sem_immediate(RECV, UPD_PROC_COUNT_SEM);
-			rel_sem_immediate(RECV, RECV_SERV_COUNT_SEM);
+			decr_sem(RECV, UPD_PROC_COUNT_SEM);
+			decr_sem(RECV, RECV_SERV_COUNT_SEM);
 		}
 		rel_sem_immediate( RECV, RECV_POOL_ACCESS_SEM);
 	} else

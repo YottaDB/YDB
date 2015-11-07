@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -168,17 +168,8 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 				}
 			}
 			if (!all_dead)
-			{
-#				if defined(DEBUG)
-				if (ANTICIPATORY_FREEZE_AVAILABLE && TREF(gtm_test_fake_enospc))
-					/* Check every 5 seconds just in case ENOSPC test for instance freeze is active */
-					LONG_SLEEP(5);
-				else
-					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_SHUTDOWN);
-#				else
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_SHUTDOWN);
-#				endif
-			} else
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_SHUTDOWN)
+			else
 				break;
 		}
 		if (GTMSOURCE_MAX_SHUTDOWN_WAITLOOP < lcnt)

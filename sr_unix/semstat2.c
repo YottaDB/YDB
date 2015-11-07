@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ int main (int argc, char *argv[])
 	if (argc == 1)
 	{
 		usage(argv[0]);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	semarg.buf = &semstat;
 	for(i=1; i< argc; i++)
@@ -110,5 +110,5 @@ int main (int argc, char *argv[])
 			PRINTF("sempid=%d)\n", sempid);
 		}
 	}
-	exit(0);
+	exit(EXIT_SUCCESS);
 }

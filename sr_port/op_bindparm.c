@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,9 +69,12 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 		prev_count = *prev_count_ptr;
 		/* If we were dealing with a new job, then push_parm would not have been called if the number of
 		 * actuals was 0; so, by checking for proper frame value stored in the parameter pool we ensure
-		 * that we are not looking at some uninitialized value here.
+		 * that we are not looking at some uninitialized value here. Note that although we protect against
+		 * fall-throughs into labels with a formallist now, in case two consecutive invocations to
+		 * op_bindparm happen without a push_parm in between, do not attempt to use a previously utilized
+		 * parameter set.
 		 */
-		if (PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer)
+		if ((PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer) || (SAFE_TO_OVWRT <= prev_count))
 			actc = 0;
 		else
 		{	/* Acquire mask, actual count, and pointer to actual list from the parameter pool. */
@@ -91,7 +94,7 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 	{
 		error = TRUE;
 		*prev_count_ptr += SAFE_TO_OVWRT;
-		rts_error(VARLSTCNT(1) ERR_ACTLSTTOOLONG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ACTLSTTOOLONG);
 	}
 	VAR_START(var, frmp_arg);
 	for (i = 0; i < frmc; i++, frmp = va_arg(var, int4), actp++)

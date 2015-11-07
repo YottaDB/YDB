@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,10 @@
 #include "gtm_stdio.h"	/* this is here due to the need for an SPRINTF,
 			 * which is in turn due the kudge that is the current double2mval routine
 			 */
-#ifdef GTM64
 /* we return strings for >18 digit 64-bit numbers, so pull in stringpool */
 #include "stringpool.h"
+
 GBLREF spdesc   stringpool;
-#endif
 
 LITREF int4 ten_pwr[];
 
@@ -68,9 +67,9 @@ void i2smval(mval *v, uint4 i)
 	assert(v->m[1] < MANT_HI);
 }
 
-void	xi2mval(mval *v, unsigned int i);
+void xi2mval(mval *v, unsigned int i);
 
-void	i2usmval(mval *v, unsigned int i)
+void i2usmval(mval *v, unsigned int i)
 {
 	v->mvtype = MV_NM;
 	v->sgn = 0;
@@ -78,7 +77,7 @@ void	i2usmval(mval *v, unsigned int i)
 	xi2mval(v, i);
 }
 
-void	i2mval(mval *v, int i)
+void i2mval(mval *v, int i)
 {
 	int4	n;
 
@@ -100,7 +99,7 @@ void	i2mval(mval *v, int i)
  * The primary routines set the sgn flag and pass the absolute value
  * to xi2mval. */
 
-void	xi2mval(mval *v, unsigned int i)
+void xi2mval(mval *v, unsigned int i)
 {
 	int	exp;
 
@@ -128,20 +127,19 @@ void	xi2mval(mval *v, unsigned int i)
 	}
 }
 
-#ifdef GTM64
-void	xl2mval(mval *v, unsigned long i);
+void xi82mval(mval *v, gtm_uint64_t i);
 
-void	ul2mval(mval *v, unsigned long i)
+void ui82mval(mval *v, gtm_uint64_t i)
 {
 	v->mvtype = MV_NM;
 	v->sgn = 0;
 
-	xl2mval(v, i);
+	xi82mval(v, i);
 }
 
-void	l2mval(mval *v, long i)
+void i82mval(mval *v, gtm_int64_t i)
 {
-	gtm_uint8	absi;
+	gtm_uint64_t	absi;
 
 	v->mvtype = MV_NM;
 	if (i < 0)
@@ -154,21 +152,19 @@ void	l2mval(mval *v, long i)
 		absi = i;
 	}
 
-	xl2mval(v, absi);
+	xi82mval(v, absi);
 }
 
-/* xl2mval does the bulk of the conversion for l2mval and ul2mval.
- * The primary routines set the sgn flag and pass the absolute value
- * to xl2mval. In the case of a >18 digit number, xl2mval examines the
- * sgn flag to determine whether to convert back to signed before string
- * conversion. */
-
-void	xl2mval(mval *v, unsigned long i)
+/* This function does the bulk of the conversion for i82mval and ui82mval. The primary routines set the sgn flag and pass the
+ * absolute value to xi82mval(). In the case of a >18 digit number, xi82mval() examines the sgn flag to determine whether to
+ * switch back to a signed value before string conversion.
+ */
+void xi82mval(mval *v, gtm_uint64_t i)
 {
 	int	exp;
 	uint4	low;
 	uint4	high;
-	char    buf[21];    /* [possible] sign, [up to] 19L/20UL digits, and terminator */
+	char    buf[21];	/* [possible] sign, [up to] 19L/20UL digits, and terminator. */
 	int	len;
 
 	if (i < INT_HI)
@@ -190,43 +186,38 @@ void	xl2mval(mval *v, unsigned long i)
 			v->e = exp;
 			v->m[0] = low;
 			v->m[1] = high;
-		} else if (i < (unsigned long)MANT_HI*MANT_HI)
+		} else if (i < (gtm_uint64_t)MANT_HI * MANT_HI)
 		{
 			low = i % MANT_HI;
 			high = i / MANT_HI;
 			exp = EXP_IDX_BIAL + 9;
-
 			while (high < MANT_LO)
 			{
-				high = high*10 + low/MANT_LO;
-				low = low%MANT_LO * 10;
+				high = (high * 10) + (low / MANT_LO);
+				low = (low % MANT_LO) * 10;
 				exp--;
 			}
 			v->e = exp;
 			v->m[0] = low;
 			v->m[1] = high;
 		} else
-		{
-			/* the value won't fit in 18 digits, so return a string */
+		{	/* The value won't fit in 18 digits, so return a string. */
 			if (v->sgn)
-				len = SPRINTF(buf, "%ld", -(long)i);
+				len = SPRINTF(buf, "%lld", -(gtm_int64_t)i);
 			else
-				len = SPRINTF(buf, "%lu", i);
-
+				len = SPRINTF(buf, "%llu", i);
+			assert(18 < len);
 			ENSURE_STP_FREE_SPACE(len);
 			memcpy(stringpool.free, buf, len);
-
 			v->mvtype = MV_STR;
 			v->str.len = len;
 			v->str.addr = (char *)stringpool.free;
-
 			stringpool.free += len;
 		}
-		assert(v->mvtype != MV_NM || v->m[1] < MANT_HI);
-		assert(v->mvtype != MV_NM || v->m[1] >= MANT_LO);
+		assert((v->mvtype != MV_NM) || (v->m[1] < MANT_HI));
+		assert((v->mvtype != MV_NM) || (v->m[1] >= MANT_LO));
 	}
 }
-#endif
 
 double mval2double(mval *v)
 {
@@ -241,7 +232,7 @@ double mval2double(mval *v)
 	{
 		exp = v->e;
 		y = v->m[0];
-		y = y/MANT_HI;
+		y = y / MANT_HI;
 		while (exp > EXP_IDX_BIAL)
 		{
 			x *= MANT_HI;
@@ -262,11 +253,17 @@ double mval2double(mval *v)
 	return x;
 }
 
-/* a (barely suitable) double2mval */
-void     double2mval(mval *dst, double src)
+void float2mval(mval *dst, float src)
 {
-        char    buf[67];    /* [possible] sign, decimal-point, [up to] 64 digits, and terminator */
-	SPRINTF(buf, "%lf", src);
+        char    buf[16];	/* The maximum-length value in the 'F' representation would look like -0.123457 (that is,
+				 * sign[1] + zero[1] + dot[1] + digits[6] = 9). Note that for values below -1 the number would
+				 * be shorter, since the integer part would be counted against the precision capacity. However,
+				 * a longer representation is possible in the 'E' format: -1.23456E+12 (that is, sign[1] +
+				 * digit[1] + dot[1] + digits[5] + E[1] + sign[1] + exp[2] = 12). Although we only need to
+				 * additionally worry about one termination character, we will be safe and allocate 16 bytes
+				 * instead of 13. */
+
+	SPRINTF(buf, "%.6G", src);
 	dst->mvtype = MV_STR;
 	dst->str.len = STRLEN(buf);
 	dst->str.addr = buf;
@@ -275,8 +272,26 @@ void     double2mval(mval *dst, double src)
 	return;
 }
 
+void double2mval(mval *dst, double src)
+{
+        char    buf[32];		/* The maximum-length value in the 'F' representation would look like -0.123456789012345
+					 * (that is, sign[1] + zero[1] + dot[1] + digits[15] = 18). Note that for values below -1
+					 * the number would be shorter, since the integer part would be counted against the
+					 * precision capacity. However, a longer representation is possible in the 'E' format:
+                                         * -1.234567890123456E+123 (that is, sign[1] + digit[1] + dot[1] + digits[14] + E[1] +
+					 * sign[1] + exp[3] = 23). Although we only need to additionally worry about one termination
+                                         * character, we will be safe and allocate 32 bytes instead of 24. */
 
-/* converts an mval into a 32-bit signed integer, or MAXPOSINT4 on overflow */
+	SPRINTF(buf, "%.15G", src);
+	dst->mvtype = MV_STR;
+	dst->str.len = STRLEN(buf);
+	dst->str.addr = buf;
+	s2n(dst);
+	dst->mvtype &= ~MV_STR;
+	return;
+}
+
+/* Converts an mval into a 32-bit signed integer, or MAXPOSINT4 on overflow. */
 int4 mval2i(mval *v)
 {
 	int4	i;
@@ -285,7 +300,7 @@ int4 mval2i(mval *v)
 
 	MV_FORCE_NUM(v);
 	if (v->mvtype & MV_INT)
-		i = v->m[1]/MV_BIAS;
+		i = v->m[1] / MV_BIAS;
 	else
 	{
 		exp = v->e;
@@ -301,7 +316,7 @@ int4 mval2i(mval *v)
 	return i;
 }
 
-/* converts an mval into a 32-bit unsigned integer, or MAXUINT4 on overflow */
+/* Converts an mval into a 32-bit unsigned integer, or MAXUINT4 on overflow. */
 uint4 mval2ui(mval *v)
 {
 	uint4	i;
@@ -310,7 +325,7 @@ uint4 mval2ui(mval *v)
 
 	MV_FORCE_NUM(v);
 	if (v->mvtype & MV_INT)
-		i = v->m[1]/MV_BIAS;
+		i = v->m[1] / MV_BIAS;
 	else
 	{
 		exp = v->e;
@@ -326,13 +341,79 @@ uint4 mval2ui(mval *v)
 	return i;
 }
 
+
+/* Converts an mval into a 64-bit unsigned integer. */
+gtm_uint64_t mval2ui8(mval *v)
+{
+	return (gtm_uint64_t)mval2i8(v);
+}
+
+gtm_int64_t mval2i8(mval *v)
+{
+	gtm_int64_t	x, y;
+	int		exp;
+
+	MV_FORCE_NUM(v);
+	if (v->mvtype & MV_INT)
+		x = v->m[1] / MV_BIAS;
+	else
+	{
+		exp = v->e;
+		if (exp > EXP_IDX_BIAL)
+		{	/* Case where to get the actual value we need to multiply by power of exponent. */
+			x = v->m[1];
+			y = v->m[0];
+			if (y > 0)
+			{	/* Both m[0] and m[1] are used, so multiply in parallel, but first ensure that the m[1] part has
+				 * a decimal exponent of MANT_HI order.
+				 */
+				x *= MANT_HI;
+				while (exp > EXP_IDX_BIAL + 18)
+				{	/* Keep multiplying by 10^9, but keep a precision "buffer" of 18 to prevent further
+					 * divisions, as we might otherwise compromise the available precision of mval.
+					 */
+					x *= MANT_HI;
+					y *= MANT_HI;
+					exp -= 9;
+				}
+				if (exp >= EXP_IDX_BIAL + 9)
+				{	/* Multiply by the remaining power of the exponent. */
+					x *= ten_pwr[exp - EXP_IDX_BIAL - 9];
+					y *= ten_pwr[exp - EXP_IDX_BIAL - 9];
+				} else
+				{	/* Case where exponent indicates a total power of less than 10^9, which, given that both
+					 * m[0] and m[1] are used and that x has already been multiplied by 10^9, requires a
+					 * division to make the sum of m[0] and m[1] represent the right number.
+					 */
+					x /= ten_pwr[EXP_IDX_BIAL + 9 - exp];
+					y /= ten_pwr[EXP_IDX_BIAL + 9 - exp];
+				}
+			} else
+			{	/* Since m[0] is not used, just multiply x by the excess power of the exponent. */
+				while (exp > EXP_IDX_BIAL + 9)
+				{
+					x *= MANT_HI;
+					exp -= 9;
+				}
+				x *= ten_pwr[exp - EXP_IDX_BIAL];
+			}
+
+			x = (v->sgn ? -x - y : x + y);
+		} else if (exp < MV_XBIAS)
+			x = 0;
+		else
+			x = (v->sgn ? -v->m[1] : v->m[1]) / ten_pwr[EXP_IDX_BIAL - exp];
+	}
+	return x;
+}
+
 /* isint == v can be represented as a 9 digit (or less) integer (positive or negative).
  * If return value is TRUE, then "*intval" contains the integer value stored in "v".
  * Note: "*intval" could have been updated even if return value is FALSE.
  */
 boolean_t isint(mval *v, int4 *intval)
 {
-	int			exp, m1, mvtype, divisor, m1_div, m1_sgn;
+	int			exp, m1, mvtype, divisor, m1_div;
 	DEBUG_ONLY(boolean_t	is_canonical;)
 
 	mvtype = v->mvtype;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "cmd_qlf.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "mdq.h"
@@ -18,6 +19,42 @@
 #include "fullbool.h"
 
 LITREF		octabstruct	oc_tab[];
+
+GBLREF boolean_t		run_time;
+GBLREF command_qualifier	cmd_qlf;
+
+#define STOTEMP_IF_NEEDED(REF0, I, T1, OPND)											\
+{	/* Input:														\
+	 * --- REF0:	a boolean triple, which may have either 1 input (OC_COBOOL) or 2 (other opcodes).			\
+	 * --- I:	whichever operand of REF0 we are STOTEMPing								\
+	 * --- T1:	STOTEMP triple. NOOPed if not needed									\
+	 * --- OPND:	operand referring to value we need need to pass as input into boolean operation				\
+	 * If OPND refers to a variable (OC_VAR), we need to STOTEMP it to protect it from subsequent side effects.		\
+	 * If it refers to a literal, and dynamic literals are enabled, we need to insert an OC_LITC anyway. Doing it		\
+	 * here in bx_boolop is convenient and ensures the OC_LITC is not skipped at run time.					\
+	 */															\
+	assert(TRIP_REF == OPND.oprclass);											\
+	switch (OPND.oprval.tref->opcode)											\
+	{															\
+		case OC_VAR:													\
+			T1->opcode = OC_STOTEMP;										\
+			T1->operand[0] = OPND;											\
+			REF0->operand[I] = put_tref(T1);									\
+			break;													\
+		case OC_LIT:													\
+			if (!run_time && (cmd_qlf.qlf & CQ_DYNAMIC_LITERALS))							\
+			{													\
+				T1->opcode = OC_LITC;										\
+				T1->operand[0] = OPND;										\
+				REF0->operand[I] = put_tref(T1);								\
+				break;												\
+			}													\
+		default:													\
+			T1->opcode = OC_NOOP;											\
+			T1->operand[0].oprclass = NO_REF;									\
+			REF0->operand[I] = put_tref(OPND.oprval.tref);								\
+	}															\
+}
 
 void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr)
 {
@@ -112,19 +149,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				dqins(ref1, exorder, ref0);
 				if (oc_tab[t1->operand[0].oprval.tref->opcode].octype & OCT_MVAL)
 				{						/* do we need a STOTEMP? */
-					switch (t1->operand[0].oprval.tref->opcode)
-					{
-						case OC_INDGLVN:		/* indirect actions not happy without STOTEMP */
-						case OC_INDNAME:
-						case OC_VAR:			/* variable could change so must save it */
-							t1->opcode = OC_STOTEMP;
-							ref0->operand[0] = put_tref(t1);/* new COBOOL points to this OC_STOTEMP */
-							break;
-						default:			/* else no temporary if it's mval */
-							ref0->operand[0] = put_tref(t1->operand[0].oprval.tref);
-							t1->opcode = OC_NOOP;
-							t1->operand[0].oprclass = NO_REF;
-					}
+					STOTEMP_IF_NEEDED(ref0, 0, t1, t1->operand[0]);
 				} else
 				{						/* make it an mval instead of COBOOL now */
 					t1->opcode = OC_COMVAL;
@@ -146,30 +171,12 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				assert(TRIP_REF == t1->operand[0].oprclass);
 				assert(TRIP_REF == t1->operand[1].oprclass);
 				dqins(ref1, exorder, ref0);
-				if (OC_VAR == t1->operand[0].oprval.tref->opcode)
-				{						/* VAR could change so must save it */
-					t1->opcode = OC_STOTEMP;		/* overlay the original op with a STOTEMP */
-					ref0->operand[0] = put_tref(t1);	/* new op points to thi STOTEMP */
-				} else
-				{						/* no need for a temporary unless it's a VAR */
-					ref0->operand[0] = put_tref(t1->operand[0].oprval.tref);
-					t1->opcode = OC_NOOP;
-				}
+				STOTEMP_IF_NEEDED(ref0, 0, t1, t1->operand[0]);
 				ref1 = t1;
 				t1 = t1->exorder.fl;
 				ref2 = maketriple(t1->opcode);			/* copy jmp */
 				ref2->operand[0] = t1->operand[0];
-				if (OC_VAR == ref1->operand[1].oprval.tref->opcode)
-				{						/* VAR could change so must save it */
-					ref0->operand[1] = put_tref(t1);	/* new op points to STOTEMP overlaying the jmp  */
-					t1->operand[0] = ref1->operand[1];
-					t1->opcode = OC_STOTEMP;		/* overlay jmp with 2nd STOTEMP */
-				} else
-				{						/* no need for a temporary unless it's a VAR */
-					ref0->operand[1] = put_tref(ref1->operand[1].oprval.tref);
-					t1->opcode = OC_NOOP;
-					t1->operand[0].oprclass = NO_REF;
-				}
+				STOTEMP_IF_NEEDED(ref0, 1, t1, ref1->operand[1]);
 				if (OC_NOOP == ref1->opcode)			/* does op[0] need cleanup? */
 					ref1->operand[0].oprclass = ref1->operand[1].oprclass = NO_REF;
 				ref0 = ref2;
@@ -186,7 +193,8 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 			default:
 				assertpro(FALSE);
 		}
-		assert((OC_STOTEMP == t1->opcode) || (OC_NOOP == t1->opcode) || (OC_COMVAL == t1->opcode));
+		assert((OC_STOTEMP == t1->opcode) || (OC_NOOP == t1->opcode) || (OC_COMVAL == t1->opcode)
+			  || (OC_LITC == t1->opcode));
 		assert(oc_tab[ref0->opcode].octype & OCT_JUMP);
 		ref1 = (TREF(boolchain_ptr))->exorder.bl;
 		dqins(ref1, exorder, ref0);					/* common insert for new jmp */

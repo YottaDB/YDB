@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,6 @@ error_def(ERR_SIDEEFFECTEVAL);
 	int actuallist (oprtype *opr)
 {
 	boolean_t	se_warn;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	int		i, j, mask, parmcount;
 	oprtype		ot;
 	triple		*counttrip, *masktrip, *ref0, *ref1, *ref2;
@@ -120,11 +119,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 					ref0->operand[0].oprval.tref = ref1;
 					dqins(ref0, exorder, ref1); 	/* NOTE:this violates information hiding */
 					if (se_warn)
-					{
-						TREF(last_source_column) = ref0->src.column;
-						show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-						dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
-					}
+						ISSUE_SIDEEFFECTEVAL_WARNING(ref0->src.column);
 				}
 			}
 			/* the following asserts check we're getting only TRIP_REF or empty operands */

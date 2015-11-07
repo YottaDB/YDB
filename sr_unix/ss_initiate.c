@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,10 +187,7 @@ void	ss_initiate_call_on_signal(void)
 
 	csa = &FILE_INFO(gv_cur_region)->s_addrs;
 	call_on_signal = NULL;	/* Do not recurse via call_on_signal if there is an error */
-	process_exiting = TRUE; /* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are anyways exiting.
-				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
-				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
-				 */
+	assert(process_exiting);	/* Set by generic_signal_handler() */
 	assert(NULL != csa->ss_ctx);
 	ss_release(&csa->ss_ctx);
 	return;
@@ -387,7 +384,12 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	FSTAT_FILE(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	assert(-1 != fstat_res);
 	if (-1 != fstat_res)
-		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+	{
+		/* Even though the temporary snapshot file is a physical file, we give it a relaxed IPC permissions to allow
+		 * INTEG started by read-only processes to create snapshot files that are writable by processes having write
+		 * permissions on the database file.
+		 */
+		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_IPC, &pdd) < 0)
 		{
 			send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
@@ -400,7 +402,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;
 		}
-
+	}
 	if ((-1 == fstat_res) || (-1 == FCHMOD(shdw_fd, perm))
 		|| ((-1 != group_id) && (-1 == fchown(shdw_fd, -1, group_id))))
 	{

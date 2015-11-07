@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,6 @@ void mur_init(void)
 	 */
 	for (index = 0; index < CDB_STAGNATE; index++)
 		t_fail_hist[index] = '0';
-	call_on_signal = mur_close_files;
 	DEBUG_ONLY(assert_jrec_member_offsets();)
 }
 

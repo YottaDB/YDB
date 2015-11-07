@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,12 +42,23 @@ typedef struct
 #define CQ_ALIGN_STRINGS	(1 << 11)	/* 0x0800 */
 #define CQ_UTF8			(1 << 12)	/* 0x1000 */
 #define CQ_NAMEOFRTN		(1 << 13)	/* 0x2000 */
+#define CQ_DYNAMIC_LITERALS	(1 << 14)	/* 0x4000 -- Set via environmental variable gtm_dynamic_literals (gtm_logicals.h) */
 
 /* TODO: add CQ_ALIGN_STRINGS to the default list below when alignment is supported */
 #define CQ_DEFAULT (CQ_WARNINGS | CQ_OBJECT | CQ_IGNORE | CQ_LOWER_LABELS | CQ_LINE_ENTRY | CQ_INLINE_LITERALS)
 
 #define LISTTAB 10
 #define PG_WID 132
+
+#define INIT_CMD_QLF_STRINGS(CMD_QLF, OBJ_FILE, LIST_FILE, CEPREP_FILE, SIZE)		\
+{											\
+	CMD_QLF.object_file.str.addr = OBJ_FILE;					\
+	CMD_QLF.object_file.str.len = SIZE;						\
+	CMD_QLF.list_file.str.addr = LIST_FILE;						\
+	CMD_QLF.list_file.str.len = SIZE;						\
+	CMD_QLF.ceprep_file.str.addr = CEPREP_FILE;					\
+	CMD_QLF.ceprep_file.str.len = SIZE;						\
+}
 
 typedef struct src_line_type
 {

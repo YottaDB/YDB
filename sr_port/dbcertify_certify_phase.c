@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,7 +129,7 @@ void dbcertify_certify_phase(void)
 	if (CLI_PRESENT == cli_present("BLOCKS"))
 	{
 		if (!cli_get_hex("BLOCKS", &psa->blocks_to_process))
-			exit(1);		/* Error message already raised */
+			exit(EXIT_FAILURE);		/* Error message already raised */
 	} else
 		psa->blocks_to_process = MAXTOTALBLKS_V4;
 	if (CLI_PRESENT == cli_present("TEMPFILE_DIR"))

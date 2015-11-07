@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -181,27 +181,9 @@ chmod 444 $readme_txt
 # Set the open source flag and set lib_specific to the platform specific directories that needs to
 # be copied as a part of open source distribution (down the script)
 set open_source = 0
-set GNU_COPYING_license = ""
-set OPENSOURCE_build_README = ""
-if ("$osname" == "linux" && ( "$arch" == "i686" || "x8664" == "$arch" )) then
+set GNU_COPYING_license = "${gtm_com}/COPYING"
+if (("$osname" == "linux" && ( "$arch" == "i686" || "x8664" == "$arch" )) || ("$osname" == "osf1" && "$arch" == "alpha")) then
 	set open_source = 1
-	set lib_specific = ($s_linux)
-	if ("x8664" == "$arch" ) set lib_specific = ($s_linux64)
-
-	set GNU_COPYING_license = "${gtm_com}/COPYING"
-	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
-	chmod 444 $GNU_COPYING_license
-
-	# create README with current year in it
-	set OPENSOURCE_build_README = "${gtm_com}/README"
-	sed "s/#YEAR#/$year/" $cms_tools/opensource_README > $OPENSOURCE_build_README
-	chmod 444 $OPENSOURCE_build_README
-endif
-if ("$osname" == "osf1" && "$arch" == "alpha") then
-	set open_source = 1
-	set lib_specific = "$s_dux"
-
-	set GNU_COPYING_license = "${gtm_com}/COPYING"
 	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
 	chmod 444 $GNU_COPYING_license
 endif
@@ -221,18 +203,8 @@ if (-d $dist || -d $tmp_dist || -d $install) then
 endif
 
 echo ""
-if ("$GNU_COPYING_license" != "") then
-	if (! -r "$GNU_COPYING_license") then
-		echo "Could not locate GNU Copying license at $GNU_COPYING_license. Exiting..."
-		exit 4
-	endif
-	if ("$OPENSOURCE_build_README" != "") then
-		if (! -r $OPENSOURCE_build_README) then
-			echo "Could not locate Open Source Build README at $OPENSOURCE_build_README. Exiting..."
-			exit 4
-		endif
-	endif
-	set opensource_dist = "${dist}/opensource"
+set opensource_dist = "${dist}/opensource"
+if (1 == $open_source) then
 	echo "Creating $dist (for non open source customers) and $opensource_dist (for open source)"
 	mkdir -p $opensource_dist || exit 4
 else
@@ -240,23 +212,6 @@ else
 	mkdir $dist || exit 4
 endif
 
-if ("$GNU_COPYING_license" != "") then
-	if (! -e ${dist}/README) then
-		cat > ${dist}/README << OPENSOURCE_EOF
-For paying customers, distribute files in ${dist}
-For non paying customers (Sourceforge) who use the Open Source version,
-distribute files in ${opensource_dist}
-The Open Source binary distribution includes the GNU License (file $GNU_COPYING_license:t)
-The Open Source source distribution includes the GNU License (file $GNU_COPYING_license:t)
-OPENSOURCE_EOF
-		if ("$OPENSOURCE_build_README" != "") then
-			cat >> ${dist}/README << OPENSOURCE_EOF
-and the build procedure documentation (file $OPENSOURCE_build_README:t)
-OPENSOURCE_EOF
-		endif
-		chmod a-xw ${dist}/README
-	endif
-endif
 foreach image ($imagetype)
 	echo ""
 	echo "Creating ${tmp_dist}/${image}"
@@ -294,7 +249,7 @@ foreach image ($imagetype)
 		$package $dist_file README.txt dbcertify V5CBSU.m || exit 10
 		echo "Gzipping $dist_file"
 		gzip $dist_file || exit 11
-		if ("$GNU_COPYING_license" != "") then
+		if (1 == $open_source) then
 			echo ""
 			echo "Creating dbcertify distribution for open source (includes GNU License)"
 			echo ""
@@ -327,7 +282,7 @@ foreach image ($imagetype)
 		$package $dist_file README.txt GTMDefinedTypesInit.m || exit 10
 		echo "Gzipping $dist_file"
 		gzip $dist_file || exit 11
-		if ("$GNU_COPYING_license" != "") then
+		if (1 == $open_source) then
 			echo ""
 			echo "Creating GTMDefinedTypesInit distribution for open source (includes GNU License)"
 			echo ""
@@ -376,7 +331,7 @@ foreach image ($imagetype)
 	echo ""
 	echo "Gzipping $dist_file"
 	gzip $dist_file || exit 11
-	if ("$GNU_COPYING_license" != "") then
+	if (1 == $open_source) then
 		echo ""
 		echo "Creating distribution for open source (includes GNU License)"
 		echo ""
@@ -394,91 +349,6 @@ foreach image ($imagetype)
 	endif
 end
 echo ""
-
-# create src tar only for linux and tru64
-if ("$GNU_COPYING_license" != "") then
-	cd ${opensource_dist}
-	if ("$OPENSOURCE_build_README" != "") then
-		echo "Creating source distribution for Opensource including $GNU_COPYING_license:t and $OPENSOURCE_build_README:t"
-	else
-		echo "Creating source distribution for Opensource including $GNU_COPYING_license:t"
-	endif
-	echo ""
-	# tar only the directories in ${liblist}
-	set liblist = ""
-	foreach libdir ($lib_specific)
-		set liblist = "$liblist $libdir:t"
-	end
-	echo ""
-	set src_tar="${opensource_dist}/${dist_prefix}_src.${package_ext}"
-	echo "Creating $src_tar"
-
-	echo "Copy in the original sources from ${version}"
-	mkdir ${version}
-	cp -r $lib_specific ./${version}/
-
-	# comlist.mk builds fail on newer 32bit versions of RHEL6 and Ubuntu
-	# 12.04 due to a bad interaction between the deprecated -I- option and
-	# GCC. See mails with the subject:
-	# 	[GTM-6465] [cmake] #include "" vs #include <>
-	# Keep in sync with test/manually_start/u_inref/makebuild.csh
-	echo "Massage the source files so that we can build on i386 Linux and other platforms without -I-"
-	set hdrlist="emit_code_sp.h|rtnhdr.h|auto_zlink.h|make_mode_sp.h|auto_zlink_sp.h|emit_code.h|mdefsp.h|incr_link_sp.h|gtm_mtio.h|obj_filesp.h|zbreaksp.h|gtm_registers.h|opcode_def.h"  #BYPASSOK line length
-	set sedlist=${hdrlist:as/|/ /:as/ /\|/} # fixing for use with SED requires some contortions - replace | with space and then space with \|
-	grep -rlE "#include .(${hdrlist})." sr_* > changefiles.list
-	foreach file (`cat changefiles.list`)
-		set orig=${file:h}/.${file:t}
-		mv ${file} {$orig}
-		sed "s/#include .\(${sedlist}\)./#include <\1>/g" ${orig} > ${file}
-		diff -u ${orig} ${file}
-		rm ${orig}
-	end
-
-	echo "Copy in the generated files"
-	set srdir = sr_${arch:s/i686/i386/:s/x8664/x86_64/}
-	cp ${gtm_ver}/src/ttt.c ${gtm_ver}/src/*_ctl.c ${gtm_ver}/inc/merrors_ansi.h ./$version/$srdir/ || exit 10
-
-	echo "Packaging the source from $version"
-	cd $version || exit 10
-	# Linux uses CMakeLists.txt, tru64 uses comlist.mk
-	if ("linux" == "$osname") then
-		# this lets the build override $cms_ver/sr_unix/CMakeLists.txt
-		sed "s/GTM_RELEASE_VERSION/${releasever}/" ${gtm_ver}/tools/CMakeLists.txt > CMakeLists.txt || exit 10
-		set liblist = "$liblist CMakeLists.txt"
-	endif
-	find . -exec chown 40535:40535 {} \;
-	$package $src_tar $liblist || exit 10
-
-	cd ${opensource_dist}
-	rm -rf ./$version
-
-	echo "Package the license and readme files"
-	cd $gtm_com || exit 10
-	if ("$OPENSOURCE_build_README" != "") then
-		$repackage $src_tar $GNU_COPYING_license:t $OPENSOURCE_build_README:t || exit 10
-	else
-		$repackage $src_tar $GNU_COPYING_license:t $readme_txt:t || exit 10
-	endif
-
-	echo ""
-	echo "Gzipping $src_tar"
-	gzip $src_tar || exit 11
-	echo ""
-	if ("$OPENSOURCE_build_README" != "") then
-		cat << EOF_MK
-############################################################################
-!!!!! TEST THE MAKEFILE !!!!!
-First untar the opensource files in a directory:
-mkdir ${opensource_dist}/build
-cd ${opensource_dist}/build
-tar zxvf $src_tar
-Then follow the instructions from $gtm_com/README:
-----------------------------------------------------------------------------
-`cat $gtm_com/README`
-############################################################################
-EOF_MK
-	endif
-endif
 
 find $dist -type f -exec chmod 444 {} \;
 find $dist -type d -exec chmod 755 {} \;

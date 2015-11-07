@@ -1,0 +1,27 @@
+	.title	OPP_INDFNNAME
+
+	G_MSF
+
+
+	$linkage_section
+a_frame_pointer:
+	.address  frame_pointer
+
+
+	$routine OPP_INDFNNAME, entry=OPP_INDFNNAME_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r3, (sp)
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+	$call	OP_INDFNNAME, args=<r16, r17, r18>, set_arg_info=false, nonstandard=true
+	getframe
+
+	ldq	r3, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

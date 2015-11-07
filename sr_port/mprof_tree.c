@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ mprof_tree *new_node(trace_entry *arg)
 	tree->e.rout_name = arg->rout_name;
 	tree->e.label_name = arg->label_name;
 	tree->e.line_num = arg->line_num;
-	tree->e.count = tree->e.usr_time = tree->e.sys_time = tree->e.loop_level = 0;
+	tree->e.count = tree->e.usr_time = tree->e.sys_time = tree->e.elp_time = tree->e.loop_level = 0;
 	tree->e.raddr = NULL;
 	tree->link[LEFT] = tree->link[RIGHT] = tree->loop_link = NULL;
 	tree->desc_dir = NEITHER;

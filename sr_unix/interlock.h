@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +43,6 @@
 	SET_LATCH_GLOBAL(&((X)->rip_latch), LOCK_AVAILABLE);							\
 }
 /* On HPPA, SET_LATCH_GLOBAL forces its available value, for others it is the same as SET_LATCH */
-
-#define INTERLOCK_INIT_MM(X)		(SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_CLEAR))
-					  /* similar to INTERLOCK_INIT except this is for a mmblk_rec */
 
 /* New buffer doesn't need interlocked operation.  */
 #define LOCK_NEW_BUFF_FOR_UPDATE(X)	(SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_SET))

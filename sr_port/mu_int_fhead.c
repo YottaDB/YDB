@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,6 @@ error_def(ERR_DBTTLBLK0);
 error_def(ERR_DBTNNEQ);
 error_def(ERR_DBMAXKEYEXC);
 error_def(ERR_DBMXRSEXCMIN);
-error_def(ERR_DBMAXRSEXBL);
 error_def(ERR_DBUNDACCMT);
 error_def(ERR_DBHEADINV);
 error_def(ERR_DBFGTBC);

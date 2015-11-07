@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,7 @@
 #include "trans_log_name.h"
 #include "gtmio.h"
 #include "gtm_logicals.h"
+#include "have_crit.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -708,24 +709,20 @@ void	util_out_send_oper(char *addr, unsigned int len)
 				}
 			}
 		}
+		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 		(void)OPENLOG(facility, LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
+		ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 	}
 	/*
 	 * When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
 	 * call.  But in libc the first syslog has grabbed a lock (syslog_lock), and now the other syslog call will
 	 * block waiting for that lock which can't be released since the first syslog was interrupted by the signal.
-	 * A work around is to temporarily block signals (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then
-	 * restore them after the syslog call returns.
-	 *
-	 * It is possible for early process startup code to invoke this function so blocksig_initialized might not yet be set.
-	 * An example C-stack is main/get_page_size/system-function interrupted by MUPIP STOP/generic_signal_handler/send_msg.
-	 * Therefore this does not have an assert(blocksig_initialized) that similar code in other places (e.g. dollarh.c) has.
+	 * We address this issue by deferring signals for the duration of the call; generic_signal_handler.c will also
+	 * skip send_msg invocations if the interrupt comes while INTRPT_IN_LOG_FUNCTION is set.
 	 */
-	if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
-		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
+	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 	SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
-	if (blocksig_initialized)
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
+	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 }
 
 void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
@@ -776,7 +773,8 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 				{
 					if (fmtc >= fmt_top2) /* Check if there is room for 2 bytes. If not stop copying */
 						break;
-					*fmtc++ = '%';	/* escape for '%' */
+					if (flush == SPRINT)
+						*fmtc++ = '%'; /* give buffered users what they expect %% */
 					*fmtc++ = '%';
 					(TREF(util_outptr))++;
 				} else if ('\n' == *(TREF(util_outptr)) && (OPER == flush || SPRINT == flush))
@@ -794,7 +792,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
-					FPRINTF(stderr, fmt_buff);
+					FPRINTF(stderr, "%s", fmt_buff);
 					break;
 				case OPER:
 					util_out_send_oper(fmt_buff, UINTCAST(fmtc - fmt_buff));

@@ -574,8 +574,8 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	for i in $gtmcryptsharedlibs
 	do
 		# Install only files (and not symlinks) that exist
-		if [ ! -e $plugin/$i -o -L $plugin/$i ]; then
-			# CMake builds generate only one library - GCRYPT with AES256CFB
+		#   CMake builds generate only one library - GCRYPT with AES256CFB
+		if [ -L $plugin/$i -o ! -f $plugin/$i ]; then
 			continue
 		elif [ $arch = "sun" -o $arch = "linux" ]; then
 			install -g $binuser -o $owner -m 755 $plugin/$i $gtmdist/$plugin

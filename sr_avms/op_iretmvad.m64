@@ -1,0 +1,29 @@
+	.title	OP_IRETMVAD
+
+	g_msf
+
+
+	$linkage_section
+a_frame_pointer:
+	.address  frame_pointer
+
+
+	$routine OP_IRETMVAD, entry=OP_IRETMVAD_CA, kind=null
+	lda	sp, -16(sp)
+	stq	r3, (sp)
+	stq	r1, 8(sp)	; save r1, restore into r0 later
+	mov	r27, r3
+	.base	r3, $ls
+
+	putframe
+	$call	OP_UNWIND, set_arg_info=false, nonstandard=true
+	getframe
+
+	ldq	r0, 8(sp)	; set r0 from saved r1
+	ldq	r3, (sp)
+	lda	sp, 16(sp)
+	ret	r26
+
+	$end_routine
+
+	.end

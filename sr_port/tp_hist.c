@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -343,7 +343,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						delete_hashtab_int4(si->blks_in_use,(uint4 *)&blk);
 						si->num_of_blks--;
 						assert(si->num_of_blks == si->tp_hist_size);
-						rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRANS2BIG, 2,
+								REG_LEN_STR(gv_cur_region));
 					}
 					/* Either history has a clue or not.
 					 * If yes, then it could have been constructed in an earlier

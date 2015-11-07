@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,7 @@ void	lke_clear(void)
 				locks = gtcmtr_lke_clearreq(gv_cur_region->dyn.addr->cm_blk, gv_cur_region->cmx_regnum,
 							    all, interactive, pid, &node);
 #				else
-				gtm_putmsg(VARLSTCNT(10) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("GT.CM region - locks must be cleared on the local node"),
 						ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 				continue;
@@ -117,18 +117,18 @@ void	lke_clear(void)
 					rel_crit(gv_cur_region);
 			} else
 			{
-				gtm_putmsg(VARLSTCNT(2) ERR_BADREGION, 0);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_BADREGION, 0);
 				locks = TRUE;
 			}
 
 			if (!locks)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_NOLOCKMATCH, 2, REG_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOLOCKMATCH, 2, REG_LEN_STR(gv_cur_region));
 			}
 		}
 	}
 
 	if (!match  &&  reg.len != 0)
-		rts_error(VARLSTCNT(4) ERR_NOREGION, 2, reg.len, reg.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, reg.len, reg.addr);
 
 }

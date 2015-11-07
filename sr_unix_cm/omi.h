@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,23 +57,26 @@
 	{								\
 		extern FILE	*omi_debug;				\
 		time_t		clock;					\
+		char		*time_ptr;				\
+									\
 		if (omi_debug)						\
 		{							\
 			clock = time((time_t *)0);			\
-			FPRINTF(omi_debug, "%s", ctime(&clock));	\
+			GTM_CTIME(time_ptr, &clock);			\
+			FPRINTF(omi_debug, "%s", time_ptr);		\
 			FFLUSH(omi_debug);				\
 		}							\
 	} while (0)
 
-#define OMI_DBG(X)				\
-	do					\
-	{					\
-		extern FILE	*omi_debug;	\
-		if (omi_debug)			\
-		{				\
-			FPRINTF X ;		\
-			FFLUSH(omi_debug);	\
-		}				\
+#define OMI_DBG(X)							\
+	do								\
+	{								\
+		extern FILE	*omi_debug;				\
+		if (omi_debug)						\
+		{							\
+			FPRINTF X ;					\
+			FFLUSH(omi_debug);				\
+		}							\
 	} while (0)
 
 

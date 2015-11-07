@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,6 +89,7 @@ void mupip_set(void)
 	    cli_present("RESERVED_BYTES")  	== CLI_PRESENT  ||
 	    cli_present("FLUSH_TIME")      	== CLI_PRESENT  ||
 	    cli_present("LOCK_SPACE")      	== CLI_PRESENT  ||
+	    cli_present("MUTEX_SLOTS")      	== CLI_PRESENT  ||
 	    cli_present("DEFER_TIME")      	== CLI_PRESENT  ||
 	    cli_present("WAIT_DISK")		== CLI_PRESENT  ||
 	    cli_present("PARTIAL_RECOV_BYPASS")	== CLI_PRESENT  ||

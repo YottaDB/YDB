@@ -1,0 +1,80 @@
+	.title	GTM_DYN_CH	dynamic condition handler interface
+
+;	WARNING: This condition handler uses an undocumented convention
+;	and library routine in Alpha VMS in order to emulate dynamic
+;	condition handlers for Alpha assembly language (MACRO) routines
+;	and GT.M-generated object modules.
+;
+;	This mechanism should be semantically identical to that of VAX VMS,
+;	whereby the address of the condition handler for a frame could be
+;	found in the longword at 0(FP) for that frame (0 => no condition
+;	handler in effect) at the time the condition occurred.  This
+;	allowed the condition handler for a frame to be changed by changing
+;	the value of that longword.
+;
+;	In order for a procedure P to support dynamic condition handler
+;	specifications for its activation stack frames:
+;
+;		1.  P must be a stack frame procedure
+;
+;		2.  P must establish GTM$DYN_CH as its static condition
+;		    handler (see OpenVMS Calling Standard and OpenVMS
+;		    Programming Concepts Manual)
+;
+;		3.  P must reserve the quadword at 8(FP) for the address
+;		    of the procedure value of the currently-active condition
+;		    handler; this quadword should be initialized to zero
+;		    (indicating no condition handler active) or to the
+;		    address of a real procedure value during the entry
+;		    prologue before setting FP to ensure a valid value is
+;		    always present.
+;
+;		4.  It is possible P should also reserve the quadword at
+;		    16(FP), although it need not be initialized.
+;
+;	It may be necessary to modify this at some future Alpha VMS
+;	operating system release to conform to any changes in the condition
+;	handler conventions.  In this instance, compile the following VAX
+;	MACRO program with:
+;
+;		macro/migration/machine/lis
+;
+;	and examine the resulting .LIS file to determine how the static
+;	condition handler works (use it as a basis for the changes to
+;	GTM$DYN_CH) and where to store the address of the dynamically-
+;	specified condition handler (mdb_condition_handler in the example):
+;
+;		.title	zero_fp
+;
+;		.psect	zero_fp pic,usr,rel,gbl,shr,exe,rd,nowrt,novec,quad
+;
+;		.call_entry	preserve=all,label=zero_fp
+;		movl	mdb_condition_handler, 0(fp)
+;		ret
+;		.end
+
+
+	$linkage_section
+
+l_ots$call_proc:
+	.linkage_pair	OTS$CALL_PROC
+
+
+	$routine	name=gtm$dyn_ch,entry=gtm$dym_ch_ca,kind=null
+
+	.base	r27, $ls
+
+	ldq	r28, 8(r17)	; 8(a1) = MCH_FRAME in the condition handler mechanism array (second argument)
+	ldl	r28, 8(r28)	; 8(establisher's FP) = A(currently established condition handler for that frame)
+	beq	r28, no_handler
+	mov	r28, r23	; t2 <- A(condition handler to invoke)
+	ldq	r28, l_ots$call_proc	; N.B., don't modify caller's r26
+	bis	r31, 1, r24	; t3 <- 1
+	lda	r27, l_ots$call_proc+8
+	jmp	r28		; goto OTS$CALL_PROC
+
+no_handler:			; no established condition handler for that frame
+	lda	r0, 2328(r31)	; r0 <- SS$_RESIGNAL
+	ret	r26
+
+	$end_routine	name=gtm$dyn_ch

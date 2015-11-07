@@ -1,0 +1,33 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                               ;
+;       Copyright 2001, 2011 Fidelity Information Services, Inc ;
+;                                                               ;
+;       This source code contains the intellectual property     ;
+;       of its copyright holder(s), and is made available       ;
+;       under a license.  If you do not know the terms of       ;
+;       the license, please stop and do not read further.       ;
+;                                                               ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	Restore registers from the current GT.M MUMPS stack frame.
+;	Note: This macro puts the code address into some register; you may specify one or it will default to r26.
+
+	.macro	getframe	reg=r26, ?label
+
+	; A_frame_pointer must be address of quadword containing the address of frame_pointer
+	ldq	r12, A_frame_pointer
+	ldl	r12, (r12)
+        lda     r8, msf$flags_off(r12)
+        ldq_u   r9, (r8)
+        extbl   r9, r8, r9
+        and     r9, sff_etrap_err, r9
+        beq     r9, label
+        $call   ERROR_RETURN, set_arg_info=false, nonstandard=true
+        ldq     r12, A_frame_pointer
+        ldl     r12, (r12)
+label:	ldl	r8,  msf$l_symtab_off(r12)
+	ldl	r9,  msf$temps_ptr_off(r12)
+	ldl	r13, msf$ctxt_off(r12)
+	ldl	r14, msf$literal_ptr_off(r12)
+	ldl	reg, msf$mpc_off(r12)
+
+	.endm

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ enum dse_fmt
 {											\
 	if(!cli_get_str("CONFIRMATION",(X),&(Y)))					\
 	{										\
-		rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEWCINITCON);		\
 		return;									\
 	}										\
 }
@@ -119,22 +119,18 @@ enum dse_fmt
 	GET_CONFIRM(confirm, len);							\
 	if (confirm[0] != 'Y' && confirm[0] != 'y')					\
 	{										\
-		rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEWCINITCON);		\
 		return;									\
 	}										\
 }
 
-#define DSE_WCREINIT(CS_ADDRS)								\
-{											\
-	assert(CS_ADDRS->now_crit);							\
-	bt_init(CS_ADDRS);								\
-	if (CS_ADDRS->hdr->acc_meth == dba_bg)						\
-	{										\
-		bt_refresh(CS_ADDRS, TRUE);						\
-		db_csh_ini(CS_ADDRS);							\
-		db_csh_ref(CS_ADDRS, TRUE);						\
-		send_msg(VARLSTCNT(4) ERR_DSEWCREINIT, 2, DB_LEN_STR(gv_cur_region));	\
-	}										\
+#define DSE_WCREINIT(CS_ADDRS)										\
+{													\
+	assert(CS_ADDRS->now_crit);									\
+	if (CS_ADDRS->hdr->acc_meth == dba_bg)								\
+		bt_refresh(CS_ADDRS, TRUE);								\
+	db_csh_ref(CS_ADDRS, TRUE);									\
+	send_msg_csa(CSA_ARG(CS_ADDRS) VARLSTCNT(4) ERR_DSEWCREINIT, 2, DB_LEN_STR(gv_cur_region));	\
 }
 
 void dse_ctrlc_setup(void);

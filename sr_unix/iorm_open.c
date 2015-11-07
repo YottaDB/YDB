@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "iormdef.h"
 #include "io_params.h"
 #include "eintr_wrappers.h"
+#include "have_crit.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
@@ -85,6 +86,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
+		d_rm->follow = FALSE;
 	} else
 		d_rm = (d_rm_struct *)iod->dev_sp;
 	if (dev_closed == iod->state)
@@ -94,19 +96,21 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->crlast = FALSE;
 		d_rm->done_1st_read = FALSE;
 		d_rm->done_1st_write = FALSE;
+		d_rm->follow = FALSE;
 		assert(0 <= fd);
 		d_rm->fildes = fd;
 		FSTAT_FILE(fd, &statbuf, fstat_res);
 		if (-1 == fstat_res)
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-					LEN_AND_LIT("Error in fstat"), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+				      dev_name->dollar_io, ERR_TEXT, 2,	LEN_AND_LIT("Error in fstat"), errno);
 		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); )
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
 				if (!d_rm->fifo && !d_rm->pipe && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_END)))
-					rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-						  ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+						      dev_name->dollar_io,
+						      ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
 				if (0 < statbuf.st_size)
 				{	/* Only disable BOM writing if there is something in the file already (not empty) */
 					d_rm->done_1st_read = FALSE;
@@ -121,7 +125,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		if (!d_rm->fifo && !d_rm->pipe && fd != 0)
 		{
 			if ((off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_CUR)))
-				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to the current position"), errno);
 			if (size == statbuf.st_size)
 				iod->dollar.zeof = TRUE;
@@ -132,9 +136,18 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		if (1 == fd)
 			d_rm->filstr = NULL;
-		else if (NULL == (d_rm->filstr = FDOPEN(fd, "r")) && NULL == (d_rm->filstr = FDOPEN(fd, "w")))
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
+		else
+		{
+			FDOPEN(d_rm->filstr, fd, "r");
+			if (NULL == d_rm->filstr)
+			{
+				FDOPEN(d_rm->filstr, fd, "w");
+				if (NULL == d_rm->filstr)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+						      dev_name->dollar_io, ERR_TEXT, 2,
+						      LEN_AND_LIT("Error in stream open"), errno);
+			}
+		}
 	}
 	recsize_before = d_rm->recordsize;
 	def_recsize_before = d_rm->def_recsize;
@@ -152,8 +165,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #ifdef __MVS__
 		/* need to get file tag info before set policy which can change what is returned */
 		if (-1 == gtm_zos_check_tag(fd, &file_tag, &text_tag))
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-				LEN_AND_LIT("Error in check_tag fstat"), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT,
+				      2, LEN_AND_LIT("Error in check_tag fstat"), errno);
 		SET_CHSET_FROM_TAG(file_tag, iod->file_chset);
 		iod->text_flag = text_tag;
 		if (!d_rm->pipe && 2 < fd)
@@ -172,8 +185,9 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				if (-1 == gtm_zos_set_tag(fd, file_tag, text_tag, TAG_FORCE, &realfiletag))
 				{
 					errmsg = STRERROR(errno);
-					rts_error(VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len, dev_name->dollar_io, realfiletag,
-						file_tag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len,
+						      dev_name->dollar_io, realfiletag, file_tag, ERR_TEXT, 2,
+						      RTS_ERROR_STRING(errmsg));
 				}
 				if (gtm_utf8_mode && gtm_tag_utf8_as_ascii && (CHSET_UTF8 == iod->ochset))
 					iod->process_chset = iod->ochset;
@@ -192,8 +206,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				if (-1 == (obtained_tag = gtm_zos_tag_to_policy(fd, file_tag, &realfiletag)))
 				{
 					errmsg = STRERROR(errno);
-					rts_error(VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len, dev_name->dollar_io, realfiletag,
-						file_tag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len, dev_name->dollar_io,
+						      realfiletag, file_tag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 				}
 				SET_CHSET_FROM_TAG(obtained_tag, iod->process_chset);
 			}

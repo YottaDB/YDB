@@ -1,0 +1,53 @@
+	.title	OP_FETCHINTRRPT
+
+	G_MSF
+
+	$linkage_section
+
+a_neterr_pending:
+	.address neterr_pending
+
+a_iott_write_error:
+	.address iott_write_error
+
+	$code_section
+
+	$routine OP_FETCHINTRRPT, entry=OP_FETCHINTRRPT_CA, kind=null
+stack_offset = 16
+	lda	sp, -stack_offset(sp)
+	stq	r13, (sp)
+	stq	r2, 8(sp)
+	mov	r27, r13
+	.base	r13, $ls
+
+	stl	r26, msf$mpc_off(r12)
+
+	fetch_args r2, stack_offset
+
+	ldq	r0, a_neterr_pending
+	ldq_u	r24, (r0)
+	extbl	r24, r0, r24
+	beq	r24, 10$
+
+	$call	outofband_clear, set_arg_info=false, nonstandard=true
+	$call	gvcmz_neterr, args=<0/a>, set_arg_info=false, nonstandard=true
+
+10$:	ldq	r0, a_iott_write_error
+	ldl	r24, (r0)
+	beq	r24, 15$
+
+	$call	outofband_clear, set_arg_info=false, nonstandard=true
+	$call	iott_wrterr, set_arg_info=false, nonstandard=true
+
+15$:	$call 	async_action, args=<1/a>, set_arg_info=false, nonstandard=true
+
+20$:	ldl	r28, msf$mpc_off(r12)
+
+	ldq	r13, (sp)
+	ldq	r2, 8(sp)
+	lda	sp, stack_offset(sp)
+	ret	r28
+
+	$end_routine
+
+	.end

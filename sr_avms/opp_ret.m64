@@ -1,0 +1,112 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	.title	OPP_RET
+
+	G_MSF
+
+	$linkage_section
+
+a_frame_pointer:
+	.address  frame_pointer
+
+a_skip_error_ret:
+	.address  skip_error_ret
+
+a_error_frame:
+	.address  error_frame
+
+a_is_tracing_on:
+	.address  is_tracing_on
+
+a_msp:
+	.address  msp
+
+a_mv_chain:
+	.address  mv_chain
+
+a_tp_pointer:
+	.address  tp_pointer
+
+L_ERR_STACKUNDERFLO:
+	.long	ERR_STACKUNDERFLO
+
+
+	$code_section
+
+	$routine OPP_RET, entry=OPP_RET_CA, kind=null
+	lda	sp, -8(sp)
+	stq	r3, (sp)
+	mov	r27, r3
+	.base	r3, $ls
+
+;	Since most QUITs will be simple, check to see if there's anything to unwind:
+	ldq	r28, a_mv_chain
+	ldl	r28, (r28)
+	cmpule	r12, r28, r24
+	blbc	r24, lbl20		; branch if frame_pointer > mv_chain
+
+	ldq	r28, a_tp_pointer
+	ldl	r26, (r28)
+	bne	r26, lbl20		; if there's a transaction on, go do unwind
+
+	ldq	r28, a_skip_error_ret
+	ldl	r26, (r28)
+	bne	r26, lbl20		; if skip_error_ret is TRUE, go do unwind (at least to reset it to FALSE)
+
+	ldq	r28, a_error_frame
+	ldl	r26, (r28)
+	bne	r26, lbl20		; if error_frame is non-NULL, go do unwind
+
+;	Check the frame pointer type if it requires special handling by op_unwind
+	ldl	r28, msf$typ_off(r12)	; contains msf$flags
+	srl	r28, 16, r28		; shift flags byte to low order
+	and	r28, sff_indce, r28	; isolate indirect bit
+	bne	r28, lbl20		; go do the long version
+
+	ldq	r28, a_is_tracing_on
+	ldl	r26, (r28)
+	bne	r26, lbl20		; if m-profiling is on, go do unwind
+
+;	The frame_pointer is <= the mv_chain, so there's nothing to do but set up
+;	the new frame pointer and stack pointer:
+
+	addl	r12, msf$frame_size, r26
+	ldq	r28, a_msp
+	stl	r26, (r28)
+
+	ldl	r12, msf$old_frame_off(r12)
+	beq	r12, lbl90
+
+	ldq	r28, a_frame_pointer
+	stl	r12, (r28)
+	getframe
+	mov	r13, r27
+
+	ldq	r3, (sp)
+	lda	sp, 8(sp)
+	jmp	r26
+
+
+lbl20:	$call	OP_UNWIND, set_arg_info=false, nonstandard=true
+
+	getframe
+
+	ldq	r3, (sp)
+	lda	sp, 8(sp)
+	ret	r26
+
+
+;	Note that LIB$SIGNAL does not return:
+lbl90:	$call	LIB$SIGNAL, args=<L_ERR_STACKUNDERFLO/L>, nonstandard=true
+
+	$end_routine
+
+	.end

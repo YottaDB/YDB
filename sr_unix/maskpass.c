@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -220,7 +220,7 @@ int main()
 	{
 		printf("libgcrypt version mismatch. %s or higher is required.\n",
 				GCRYPT_VERSION);
-				exit(1);
+				exit(EXIT_FAILURE);
 	}
 	/* Since we will just be hashing, secure memory is not needed. */
 	if (!(err = gcry_control(GCRYCTL_DISABLE_SECMEM,0)))
@@ -228,7 +228,7 @@ int main()
 	if (GPG_ERR_NO_ERROR != err)
 	{
 		printf("Libgcrypt error: %s\n", gcry_strerror(err));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 #	endif
 
@@ -238,7 +238,7 @@ int main()
 
 	if (get_hash_via_env_var(hash))
 		if (get_hash_via_username_and_inode(hash, passwd, &passwd_len))
-			exit(1);
+			exit(EXIT_FAILURE);
 	if ((size_t)-1 == passwd_len)
 	{
 		prompt_passwd(passwd);

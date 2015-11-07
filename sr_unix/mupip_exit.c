@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void mupip_exit(int4 stat)
 	{
 		if (error_condition != stat)		/* If message not already put out.. */
 		{
-			gtm_putmsg(VARLSTCNT(1) stat);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 			tmp_severity =  SEVMASK(stat);
 		} else
 			tmp_severity = severity;

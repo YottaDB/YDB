@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "parse_file.h"
 #include "list_file.h"
 #include "op.h"
+#include "have_crit.h"
 
 #define LISTEXT ".lis"
 
@@ -97,7 +98,7 @@ void open_list_file(void)
 	dev_in_use = io_curr_device;
 	op_use(&file,&parms);
 	clock = time(0);
-	p = GTM_CTIME(&clock);
+	GTM_CTIME(p, &clock);
 	memcpy (print_time_buf, p + 4, SIZEOF(print_time_buf));
 	list_head(0);
 	return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ void stx_error(int in_error, ...)
 			arg3 = va_arg(args, VA_ARG_TYPE);
 			arg4 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
-			rts_error(VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
 		} else if ((ERR_LABELMISSING == in_error)
 			|| (ERR_FMLLSTMISSING == in_error)
 			|| (ERR_ACTLSTTOOLONG == in_error)
@@ -110,18 +110,18 @@ void stx_error(int in_error, ...)
 			arg1 = va_arg(args, VA_ARG_TYPE);
 			arg2 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
-			rts_error(VARLSTCNT(4) in_error, cnt, arg1, arg2);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) in_error, cnt, arg1, arg2);
 		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error) || (ERR_FOROFLOW == in_error))
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 1);
 			arg1 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
-			rts_error(VARLSTCNT(3) in_error, cnt, arg1);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) in_error, cnt, arg1);
 		} else
 		{
 			va_end(args);
-			rts_error(VARLSTCNT(1) in_error);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) in_error);
 		}
 	} else if ((CGP_PARSE == cg_phase) && (ERR_INVCMD != in_error))	/* if INVCMD has morphed into an error, won't match here */
 		ins_errtriple(in_error);
@@ -152,8 +152,7 @@ void stx_error(int in_error, ...)
 		warn = FALSE;		/* if listing is going to $P, don't double output */
 	if (ERR_BADCHAR == in_error)
 	{
-		memset(buf, ' ', LISTTAB);
-		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
+		show_source_line(warn);
 		cnt = va_arg(args, VA_ARG_TYPE);
 		assert(cnt == 4);
 		arg1 = va_arg(args, VA_ARG_TYPE);
@@ -165,8 +164,6 @@ void stx_error(int in_error, ...)
 			dec_err(VARLSTCNT(6) in_error, 4, arg1, arg2, arg3, arg4);
 			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
 		}
-		if (list)
-			list_line(buf);
 		arg1 = arg2 = arg3 = arg4 = 0;
 	} else if ((ERR_LABELMISSING == in_error)
 		|| (ERR_FMLLSTMISSING == in_error)
@@ -185,8 +182,7 @@ void stx_error(int in_error, ...)
 		}
 	} else
 	{
-		memset(buf, ' ', LISTTAB);
-		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
+		show_source_line(warn);
 		if (warn)
 		{
 			if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error) && (ERR_FOROFLOW != in_error))
@@ -199,8 +195,6 @@ void stx_error(int in_error, ...)
 				dec_err(VARLSTCNT(3) in_error, 1, arg1);
 			}
 		}
-		if (list)
-			list_line(buf);
 		arg1 = arg2 = 0;
 	}
 	va_end(args);

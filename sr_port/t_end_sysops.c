@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,6 +107,7 @@
 #endif
 
 error_def(ERR_DBFILERR);
+error_def(ERR_FREEBLKSLOW);
 error_def(ERR_GBLOFLOW);
 UNIX_ONLY(error_def(ERR_TEXT);)
 error_def(ERR_WCBLOCKED);
@@ -135,8 +136,10 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region);
 	/* For fast integ, do NOT write the data block in global variable tree to snapshot file */ 				\
 	blk_hdr			*blk_hdr_ptr;											\
 	boolean_t		is_in_gv_tree;											\
-	 /* level-0 block in DIR tree was already processed */									\
+																\
+	/* level-0 block in DIR tree was already processed */									\
 	assert((CSE_LEVEL_DRT_LVL0_FREE != cs->level) || (gds_t_writemap == cs->mode));						\
+	assert(blkid < lcl_ss_ctx->total_blks);											\
 	blk_hdr_ptr = (blk_hdr_ptr_t)old_block;											\
 	if (WAS_FREE(cs->blk_prior_state))											\
 		write_to_snapshot_file = FALSE;											\
@@ -147,15 +150,12 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region);
 		is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));					\
 		write_to_snapshot_file = !((0 == blk_hdr_ptr->levl) && is_in_gv_tree);						\
 	}															\
-	/* For recycled block: If we decide to write the before image to the snapshot file, we will mark the shadow bitmap 	\
-	 * right then. If we decide not to, we will still mark the shadow bitmap. This is so we prevent writing			\
-	 * the before-image to the snapshot file after the recycled block becomes a busy block.					\
-	 * For free block: Similar reason as above										\
-	 * For busy block: level-0 block in gv_tree may change level after swapping with another block, if it's not marked in	\
-	 * shadow bitmap, when it is updated again, it would be mistakenly required to be written to snapshot file		\
+	/* If we decide not to write this block to snapshot file, then mark it as written in the snapshot file anyways because:	\
+	 * (a) For free and recycled blocks, we prevent writing the before-image later when this block becomes busy		\
+	 * (b) For busy blocks, level-0 block in GV tree may change level after swapping with another block. So, by marking it	\
+	 * in the shadow bitmap, we prevent writing the before-image later.							\
 	 */															\
-	if (!write_to_snapshot_file && (blkid < lcl_ss_ctx->total_blks)								\
-					&& !ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid))					\
+	if (!write_to_snapshot_file && !ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid))					\
 		ss_set_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid);								\
 }
 
@@ -204,25 +204,26 @@ void fileheader_sync(gd_region *reg)
 #	if defined(UNIX)
 	size_t			flush_len, sync_size, rounded_flush_len;
 	int4			save_errno;
-	unix_db_info		*gds_info;
+	unix_db_info		*udi;
 #	elif defined(VMS)
 	file_control		*fc;
 	int4			flush_len;
-	vms_gds_info		*gds_info;
+	vms_gds_info		*udi;
 #	endif
 
-	gds_info = FILE_INFO(reg);
-	csa = &gds_info->s_addrs;
+	udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
 	csd = csa->hdr;
 	assert(csa->now_crit);	/* only way high water mark code works is if in crit */
 				/* Adding lock code to it would remove this restriction */
+	assert(!reg->read_only);
 	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
 	cnl = csa->nl;
 	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
 	cnl->highest_lbm_blk_changed = -1;			/* Reset to initial value */
 	flush_len = SGMNT_HDR_LEN;
-	if (0 <= high_blk)					/* If not negative, flush at least one map block */
+	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
 	if (csa->do_fullblockwrites)
 	{	/* round flush_len up to full block length. This is safe since we know that
@@ -240,48 +241,14 @@ void fileheader_sync(gd_region *reg)
 	fc->op_pos = 1;
 	dbfilop(fc);
 #	elif defined(UNIX)
-	if (dba_mm != csd->acc_meth)
+	DB_LSEEKWRITE(csa, udi->fn, udi->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
+	if (0 != save_errno)
 	{
-		DB_LSEEKWRITE(csa, gds_info->fn, gds_info->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
-		if (0 != save_errno)
-		{
-			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
-		}
-		return;
-	} else
-	{
-		UNTARGETED_MSYNC_ONLY(
-			cti = csa->ti;
-			if (cti->last_mm_sync != cti->curr_tn)
-			{
-				sync_size = (size_t)ROUND_UP((size_t)csa->db_addrs[0] + flush_len, MSYNC_ADDR_INCS)
-						- (size_t)csa->db_addrs[0];
-				if (-1 == msync((caddr_t)csa->db_addrs[0], sync_size, MS_ASYNC))
-				{
-					rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("Error during file msync for fileheader"), errno);
-				}
-				cti->last_mm_sync = cti->curr_tn;	/* save when did last full sync */
-			}
-		)
-		TARGETED_MSYNC_ONLY(
-                        if (-1 == msync((caddr_t)csa->db_addrs[0], (size_t)ROUND_UP(flush_len, MSYNC_ADDR_INCS), MS_ASYNC))
-                        {
-                                rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-                                        ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file msync for fileheader"), errno);
-                        }
-		)
- 		REGULAR_MSYNC_ONLY(
-			DB_LSEEKWRITE(csa, gds_info->fn, gds_info->fd, 0, csa->db_addrs[0], flush_len, save_errno);
-			if (0 != save_errno)
-			{
-				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
-			}
-		)
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+			ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
 	}
 #	endif
+	return;
 }
 
 /* update a bitmap */
@@ -330,6 +297,10 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 		{
 			bit_clear(blkid / bplmap, MM_ADDR(csd));
 			change_bmm = TRUE;
+			if ((0 == csd->extension_size)	/* no extension and less than a bit map or less than 1/32 (3.125%) */
+				&& ((BLKS_PER_LMAP > cti->free_blocks) || ((cti->total_blks >> 5) > cti->free_blocks)))
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FREEBLKSLOW, 4, cti->free_blocks, cti->total_blks,
+					 DB_LEN_STR(gv_cur_region));
 		}
 	} else if (0 > reference_cnt)
 	{	/* blocks were freed up in this bitmap. check if local bitmap became non-full as a result. if so update mastermap */
@@ -387,35 +358,13 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
-#ifdef GTM_SNAPSHOT
+#	ifdef GTM_SNAPSHOT
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
-#endif
+#	endif
 #	if defined(VMS)
 	unsigned int		status;
 	io_status_block_disk	iosb;
-#	endif
-#	if defined(UNIX)
-#	  if !defined(UNTARGETED_MSYNC) && !defined(NO_MSYNC)
-	/* The earlier_dirty and mmblkr arrays should be declared as
-	 *     boolean_t    earlier_dirty[DIVIDE_ROUND_UP(MAX_DB_BLK_SIZE, MSYNC_ADDR_INCS) + 1]
-	 * but MSYNC_ADDR_INCS is based on OS_PAGE_SIZE which reduces to a function call and therefore can't be
-	 * used for an array declaration.  The alternative is to use a value that is larger than what will be needed.
-	 * Since DISK_BLOCK_SIZE will always be smaller than OS_PAGE_SIZE and the array isn't very large anyway, use
-	 * DISK_BLOCK_SIZE instead.  This assumption is checked with an assert.
-	 */
-	boolean_t		earlier_dirty[DIVIDE_ROUND_UP(MAX_DB_BLK_SIZE, DISK_BLOCK_SIZE) + 1];
-	mmblk_rec_ptr_t		mmblkr[DIVIDE_ROUND_UP(MAX_DB_BLK_SIZE, DISK_BLOCK_SIZE) + 1];
-	uint4			indx;
-	int4			lcnt, ocnt, n, blk, blk_first_piece, blk_last_piece;
-	uint4			max_ent;
-#		if defined(TARGETED_MSYNC)
-		sm_uc_ptr_t	desired_first, desired_last;
-#		else
-		unix_db_info	*udi;
-		int4		save_errno;
-#		endif
-#	  endif
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -425,131 +374,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bgmm_updates, 1);
 	blkid = cs->blk;
 	assert((0 <= blkid) && (blkid < cs_addrs->ti->total_blks));
-	db_addr[0] = cs_addrs->acc_meth.mm.base_addr + (sm_off_t)cs_data->blk_size * (blkid);
-
-#	if defined(UNIX) && !defined(UNTARGETED_MSYNC) && !defined(NO_MSYNC)
-	if (0 < cs_data->defer_time)
-	{
-		TARGETED_MSYNC_ONLY(
-			desired_first = db_addr[0];
-			desired_last = desired_first + (sm_off_t)(cs_data->blk_size) - 1;
-			blk_first_piece = DIVIDE_ROUND_DOWN(desired_first - cs_addrs->db_addrs[0], MSYNC_ADDR_INCS);
-			blk_last_piece = DIVIDE_ROUND_DOWN(desired_last - cs_addrs->db_addrs[0], MSYNC_ADDR_INCS);
-		)
-		REGULAR_MSYNC_ONLY(
-			blk_first_piece = blkid;
-			blk_last_piece = blkid;
-		)
-		assert(DISK_BLOCK_SIZE <= MSYNC_ADDR_INCS);
-		assert((DIVIDE_ROUND_UP(MAX_DB_BLK_SIZE, DISK_BLOCK_SIZE) + 1) >= (blk_last_piece - blk_first_piece));
-		for (blk = blk_first_piece, indx = 0; blk <= blk_last_piece; blk++, indx++)
-		{
-			mmblkr[indx] = (mmblk_rec_ptr_t)db_csh_get(blk);
-			earlier_dirty[indx] = FALSE;
-
-			if (NULL == mmblkr[indx])
-			{
-				mmblk_rec_ptr_t		hdr, cur_mmblkr, start_mmblkr, q0;
-
-				max_ent = cs_addrs->hdr->n_bts;
-				cur_mmblkr = (mmblk_rec_ptr_t)GDS_REL2ABS(cs_addrs->nl->cur_lru_cache_rec_off);
-				hdr = cs_addrs->acc_meth.mm.mmblk_state->mmblk_array + (blk % cs_addrs->hdr->bt_buckets);
-				start_mmblkr = cs_addrs->acc_meth.mm.mmblk_state->mmblk_array + cs_addrs->hdr->bt_buckets;
-
-				for (lcnt = 0; lcnt <= (MAX_CYCLES * max_ent); )
-				{
-					cur_mmblkr++;
-					assert(cur_mmblkr <= (start_mmblkr + max_ent));
-					if (cur_mmblkr >= start_mmblkr + max_ent)
-						cur_mmblkr = start_mmblkr;
-					if (cur_mmblkr->refer)
-					{
-						lcnt++;
-						cur_mmblkr->refer = FALSE;
-						continue;
-					}
-					if ((blk_first_piece <= cur_mmblkr->blk) && (blk_last_piece >= cur_mmblkr->blk))
-					{	/* If we've already claimed and locked this cache record for another OS block
-						 * in the current DB block; or we'll be finding it soon, we need to keep looking.
-						 */
-						lcnt++;
-						continue;
-					}
-					if (0 != cur_mmblkr->dirty)
-						wcs_get_space(gv_cur_region, 0, (cache_rec_ptr_t)cur_mmblkr);
-					cur_mmblkr->blk = blk;
-					q0 = (mmblk_rec_ptr_t)((sm_uc_ptr_t)cur_mmblkr + cur_mmblkr->blkque.fl);
-					shuffqth((que_ent_ptr_t)q0, (que_ent_ptr_t)hdr);
-					cs_addrs->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cur_mmblkr);
-
-					earlier_dirty[indx] = FALSE;
-					mmblkr[indx] = cur_mmblkr;
-					/* Here we cannot call LOCK_NEW_BUFF_FOR_UPDATE directly, because in wcs_wtstart
-					 * csr->dirty is reset before it releases the LOCK in the buffer.
-					 * To avoid this very small window followings are needed.
-					 */
-					for (ocnt = 1; ; ocnt++)
-					{
-						LOCK_BUFF_FOR_UPDATE(mmblkr[indx], n, &cs_addrs->nl->db_latch);
-						if (!OWN_BUFF(n))
-						{
-							if (BUF_OWNER_STUCK < ocnt)
-							{
-								assert(FALSE);
-								if (0 == mmblkr[indx]->dirty)
-								{
-									LOCK_NEW_BUFF_FOR_UPDATE(mmblkr[indx]);
-									break;
-								} else
-									return cdb_sc_comfail;
-							}
-							if (WRITER_STILL_OWNS_BUFF(mmblkr[indx], n))
-								wcs_sleep(ocnt);
-						} else
-						{
-							break;
-						}
-					}
-					break;
-				}
-				assert(lcnt <= (MAX_CYCLES * max_ent));
-			} else if ((mmblk_rec_ptr_t)CR_NOTVALID == mmblkr[indx])
-			{	/* ------------- yet to write recovery mechanisms if hashtable is corrupt ------*/
-				/* ADD CODE LATER */
-				GTMASSERT;
-			} else
-			{	/* See comment (few lines above) about why LOCK_NEW_BUFF_FOR_UPDATE cannot be called here */
-				for (ocnt = 1; ; ocnt++)
-				{
-					LOCK_BUFF_FOR_UPDATE(mmblkr[indx], n, &cs_addrs->nl->db_latch);
-					if (!OWN_BUFF(n))
-					{
-						if (BUF_OWNER_STUCK < ocnt)
-						{
-							assert(FALSE);
-							if (0 == mmblkr[indx]->dirty)
-							{
-								LOCK_NEW_BUFF_FOR_UPDATE(mmblkr[indx]);
-								break;
-							} else
-								return cdb_sc_comfail;
-						}
-						if (WRITER_STILL_OWNS_BUFF(mmblkr[indx], n))
-							wcs_sleep(ocnt);
-					} else
-					{
-						break;
-					}
-				}
-
-				if (0 != mmblkr[indx]->dirty)
-					earlier_dirty[indx] = TRUE;
-				else
-					earlier_dirty[indx] = FALSE;
-			}
-		}
-	}
-#	endif
+	db_addr[0] = MM_BASE_ADDR(cs_addrs) + (sm_off_t)cs_data->blk_size * (blkid);
 	/* check for online backup -- ATTN: this part of code is similar to the BG_BACKUP_BLOCK macro */
 	if ((blkid >= cs_addrs->nl->nbb) && (NULL != cs->old_block)
 		&& (0 == cs_addrs->shmpool_buffer->failed)
@@ -567,29 +392,20 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	{
 		lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
 		assert(lcl_ss_ctx);
-		if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		if (blkid < lcl_ss_ctx->total_blks)
 		{
-			DO_FAST_INTEG_CHECK(db_addr[0], cs_addrs, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
-		} else
-			write_to_snapshot_file = TRUE;
-		if (write_to_snapshot_file)
-			WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
-		/* If the block id is greater than the db size at the start of the snapshot, no before image is written by
-		 *   either fast or regular integ
-		 * If regular MUPIP INTEG is in progress then the current block better be before imaged in the snapshot file.
-	 	 *   Only exception is when the current block transaction number is greater than or equal to the snapshot
-		 *   transaction number in which case the before image will not be written to the snapshot file.
-		 * If fast MUPIP INTEG is in progress, we dont write before-image in various cases (e.g. data block in GV tree,
-		 *   or if block was free etc.) even if the block transaction number is less than the snapshot tn. But in those
-		 *   cases write_to_snapshot is set to FALSE. So we can still assert that as long as write_to_snapshot is true,
-		 *   the block must have been before-imaged to the snapshot file.
-	 	 */
-		assert((blkid >= lcl_ss_ctx->total_blks)
-		    || !FASTINTEG_IN_PROG(lcl_ss_ctx)
-			 && (((blk_hdr_ptr_t)db_addr[0])->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
-				 || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)
-		    || FASTINTEG_IN_PROG(lcl_ss_ctx)
-			&& (!write_to_snapshot_file || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+			if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+			{
+				DO_FAST_INTEG_CHECK(db_addr[0], cs_addrs, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
+			} else
+				write_to_snapshot_file = TRUE;
+			if (write_to_snapshot_file)
+				WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
+			assert(!FASTINTEG_IN_PROG(lcl_ss_ctx) || !write_to_snapshot_file
+					|| ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid));
+			assert(FASTINTEG_IN_PROG(lcl_ss_ctx) || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)
+					|| ((blk_hdr_ptr_t)(db_addr[0]))->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn);
+		}
 	}
 #	endif
 	if (gds_t_writemap == cs->mode)
@@ -681,74 +497,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			if (SS$_NOTMODIFIED != status)		/* don't expect notmodified, but no harm to go on */
 				return cdb_sc_comfail;
 		}
-#		elif defined(UNTARGETED_MSYNC)
-		if (cs_addrs->ti->last_mm_sync != cs_addrs->ti->curr_tn)
-		{	/* msync previous transaction as part of updating first block in the current transaction */
-			if (-1 == msync((caddr_t)cs_addrs->db_addrs[0],
-					(size_t)(cs_addrs->db_addrs[1] - cs_addrs->db_addrs[0]), MS_SYNC))
-			{
-				assert(FALSE);
-				return cdb_sc_comfail;
-			}
-			cs_addrs->ti->last_mm_sync = cs_addrs->ti->curr_tn;	/* Save when did last full sync */
-		}
-#		elif defined(TARGETED_MSYNC)
-		caddr_t start;
-
-		start = (caddr_t)ROUND_DOWN2((sm_off_t)db_addr[0], MSYNC_ADDR_INCS);
-		if (-1 == msync(start,
-			(size_t)ROUND_UP((sm_off_t)((caddr_t)db_addr[0] - start) + cs_data->blk_size, MSYNC_ADDR_INCS), MS_SYNC))
-		{
-			assert(FALSE);
-			return cdb_sc_comfail;
-		}
-#		elif !defined(NO_MSYNC)
-		udi = FILE_INFO(gv_cur_region);
-		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (db_addr[0] - (sm_uc_ptr_t)cs_data),
-									db_addr[0], cs_data->blk_size, save_errno);
-		if (0 != save_errno)
-		{
-			gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Error during MM Block Write"), save_errno);
-			assert(FALSE);
-			return cdb_sc_comfail;
-		}
 #		endif
 	}
-#	if defined(UNIX) && !defined(UNTARGETED_MSYNC) && !defined(NO_MSYNC)
-	if (0 < cs_data->defer_time)
-	{
-		int4	n;
-
-		for (blk = blk_first_piece, indx = 0; blk <= blk_last_piece; blk++, indx++)
-		{
-			mmblkr[indx]->dirty = cs_addrs->ti->curr_tn;
-			mmblkr[indx]->refer = TRUE;
-
-			if (FALSE == earlier_dirty[indx])
-			{
-				ADD_ENT_TO_ACTIVE_QUE_CNT(&cs_addrs->nl->wcs_active_lvl, &cs_addrs->nl->wc_var_lock);
-				DECR_CNT(&cs_addrs->nl->wc_in_free, &cs_addrs->nl->wc_var_lock);
-				if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)&mmblkr[indx]->state_que,
-							     (que_head_ptr_t)&cs_addrs->acc_meth.mm.mmblk_state->mmblkq_active))
-				{
-					assert(FALSE);
-					return cdb_sc_comfail;
-				}
-			}
-			RELEASE_BUFF_UPDATE_LOCK(mmblkr[indx], n, &cs_addrs->nl->db_latch);
-			if (WRITER_BLOCKED_BY_PROC(n))
-			{	/* it's off the active queue, so put it back at the head */
-				if (INTERLOCK_FAIL == INSQHI((que_ent_ptr_t)&mmblkr[indx]->state_que,
-							     (que_head_ptr_t)&cs_addrs->acc_meth.mm.mmblk_state->mmblkq_active))
-				{
-					assert(FALSE);
-					return cdb_sc_comfail;
-				}
-			}
-		}
-	}
-#	endif
 	return cdb_sc_normal;
 }
 
@@ -846,7 +596,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					}
 				)
 				BG_TRACE_PRO(wcb_t_end_sysops_nocr_invcr);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
 				return cdb_sc_cacheprob;
 			}
@@ -857,7 +607,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		{
 			assert(gtm_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_t_end_sysops_cr_invcr);
-			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr_invcr"),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr_invcr"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
 			return cdb_sc_cacheprob;
 		} else if (-1 != cr->read_in_progress)
@@ -871,7 +621,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			if (!read_finished)
 			{
 				BG_TRACE_PRO(wcb_t_end_sysops_rip_wait);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_rip_wait"),
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_rip_wait"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
 				return cdb_sc_cacheprob;
 			}
@@ -894,26 +644,27 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
 			LOCK_NEW_BUFF_FOR_UPDATE(cr);		/* not on the active queue and this process is crit */
 		)
-		UNIX_ONLY(
-			/* Since the only case where the write interlock is not clear in Unix is a two-instruction window
-			 * (described in the above comment), we dont expect the lock-not-clear situation to be frequent.
-			 * Hence, for performance reasons we do the check before invoking the wcs_write_in_progress_wait function
-			 * (instead of moving the if check into the function which would mean an unconditional function call).
-			 */
-			if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
+#		ifdef UNIX
+		/* Since the only case where the write interlock is not clear in Unix is a two-instruction window
+		 * (described in the above comment), we dont expect the lock-not-clear situation to be frequent.
+		 * Hence, for performance reasons we do the check before invoking the wcs_write_in_progress_wait function
+		 * (instead of moving the if check into the function which would mean an unconditional function call).
+		 */
+		if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
+		{
+			write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK1);
+			if (!write_finished)
 			{
-				write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK1);
-				if (!write_finished)
-				{
-					assert(gtm_white_box_test_case_enabled);
-					BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck1);
-					send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"),
-						process_id, &ctn, DB_LEN_STR(gv_cur_region));
-					return cdb_sc_cacheprob;
-				}
-			} else
-				LOCK_NEW_BUFF_FOR_UPDATE(cr);	/* writer has released interlock and this process is crit */
-		)
+				assert(gtm_white_box_test_case_enabled);
+				BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck1);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
+						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"), process_id, &ctn,
+						DB_LEN_STR(gv_cur_region));
+				return cdb_sc_cacheprob;
+			}
+		} else
+			LOCK_NEW_BUFF_FOR_UPDATE(cr);	/* writer has released interlock and this process is crit */
+#		endif
 		assert(LATCH_SET <= WRITE_LATCH_VAL(cr));
 		BG_TRACE(new_buff);
 		cr->bt_index = GDS_ABS2REL(bt);
@@ -939,8 +690,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			{
 				assert(gtm_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_intend_wait);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_intend_wait"),
-					process_id, &ctn, DB_LEN_STR(gv_cur_region));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
+						6, LEN_AND_LIT("wcb_t_end_sysops_intend_wait"),
+						process_id, &ctn, DB_LEN_STR(gv_cur_region));
 				return cdb_sc_cacheprob;
 			}
 		}
@@ -961,8 +713,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			{
 				assert(gtm_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck2);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
-					process_id, &ctn, DB_LEN_STR(gv_cur_region));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
+						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
+						process_id, &ctn, DB_LEN_STR(gv_cur_region));
 				return cdb_sc_cacheprob;
 			}
 		}
@@ -1010,8 +763,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						}
 					)
 					BG_TRACE_PRO(wcb_t_end_sysops_dirty_invcr);
-					send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_dirty_invcr"),
-						process_id, &ctn, DB_LEN_STR(gv_cur_region));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
+							6, LEN_AND_LIT("wcb_t_end_sysops_dirty_invcr"),
+							process_id, &ctn, DB_LEN_STR(gv_cur_region));
 					return cdb_sc_cacheprob;
 				}
 				assert(NULL != cr1);
@@ -1046,7 +800,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 							{
 								assert(gtm_white_box_test_case_enabled);
 								BG_TRACE_PRO(wcb_t_end_sysops_wtfini_fail);
-								send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 									LEN_AND_LIT("wcb_t_end_sysops_wtfini_fail"),
 									process_id, &ctn, DB_LEN_STR(gv_cur_region));
 								return cdb_sc_cacheprob;
@@ -1072,7 +826,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 							{
 								status = sys$dclast(wcs_wtstart, gv_cur_region, 0);
 								if (SS$_NORMAL != status)
-									send_msg(VARLSTCNT(6) ERR_DBFILERR, 2,
+									send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERR, 2,
 										DB_LEN_STR(gv_cur_region), 0, status);
 								wcs_sleep(lcnt);
 							}
@@ -1084,7 +838,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 								{
 									assert(gtm_white_box_test_case_enabled);
 									BG_TRACE_PRO(wcb_t_end_sysops_twin_stuck);
-									send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
+									send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 										LEN_AND_LIT("wcb_t_end_sysops_twin_stuck"),
 										process_id, &ctn, DB_LEN_STR(gv_cur_region));
 									return cdb_sc_cacheprob;
@@ -1171,7 +925,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			{
 				assert(gtm_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_dirtyripwait);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 					LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
 				return cdb_sc_cacheprob;
@@ -1249,7 +1003,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					INCR_BLKS_TO_UPGRD(csa, csd, 1);
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE);
 		}
 	}
 	assert((gds_t_writemap != mode) || dse_running /* generic dse_running variable is used for caller = dse_maps */
@@ -1405,35 +1159,25 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
 #	ifdef GTM_SNAPSHOT
-	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block))
+	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
 	{
 		lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
 		assert(lcl_ss_ctx);
-		if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		if (blkid < lcl_ss_ctx->total_blks)
 		{
-			DO_FAST_INTEG_CHECK(blk_ptr, csa, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
-		} else
-			write_to_snapshot_file = TRUE;
-		if (write_to_snapshot_file)
-			WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
-		/* If the block id is greater than the db size at the start of the snapshot, no before image is written by
-		 *   either fast or regular integ
-		 * If regular MUPIP INTEG is in progress then the current block better be before imaged in the snapshot file.
-	 	 *   Only exception is when the current block transaction number is greater than or equal to the snapshot
-		 *   transaction number in which case the before image will not be written to the snapshot file.
-		 * If fast MUPIP INTEG is in progress, we dont write before-image in various cases (e.g. data block in GV tree,
-		 *   or if block was free etc.) even if the block transaction number is less than the snapshot tn. But in those
-		 *   cases write_to_snapshot is set to FALSE. So we can still assert that as long as write_to_snapshot is true,
-		 *   the block must have been before-imaged to the snapshot file.
-	 	 */
-		assert((blkid >= lcl_ss_ctx->total_blks)
-		    || !FASTINTEG_IN_PROG(lcl_ss_ctx)
-			 && (((blk_hdr_ptr_t)blk_ptr)->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
-				 || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)
-		    || FASTINTEG_IN_PROG(lcl_ss_ctx)
-			&& (!write_to_snapshot_file || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+			if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+			{
+				DO_FAST_INTEG_CHECK(blk_ptr, csa, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
+			} else
+				write_to_snapshot_file = TRUE;
+			if (write_to_snapshot_file)
+				WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
+			assert(!FASTINTEG_IN_PROG(lcl_ss_ctx) || !write_to_snapshot_file
+					|| ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid));
+			assert(FASTINTEG_IN_PROG(lcl_ss_ctx) || ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid)
+					|| ((blk_hdr_ptr_t)(blk_ptr))->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn);
+		}
 	}
-
 #	endif
 	SET_DATA_INVALID(cr);	/* data_invalid should be set signaling intent to update contents of a valid block */
 	if (gds_t_writemap == mode)
@@ -1544,7 +1288,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		{
 			assert(gtm_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_bg_update_lckfail1);
-			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail1"),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail1"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
 			return cdb_sc_cacheprob;
 		}
@@ -1578,7 +1322,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		{
 			assert(gtm_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_bg_update_lckfail2);
-			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail2"),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail2"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
 			return cdb_sc_cacheprob;
 		}
@@ -1797,43 +1541,23 @@ void	wcs_stale(gd_region *reg)
 		BG_TRACE_PRO_ANY(csa, stale);
 		switch (acc_meth)
 		{
-		    case dba_bg:
-			/* Flush at least some of our cache */
-			UNIX_ONLY(wcs_wtstart(reg, 0);)
-			VMS_ONLY(wcs_wtstart(reg);)
-			/* If there is no dirty buffer left in the active queue, then no need for new timer */
-			if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
+			case dba_bg:
+				/* Flush at least some of our cache */
+				UNIX_ONLY(wcs_wtstart(reg, 0);)
+				VMS_ONLY(wcs_wtstart(reg);)
+				/* If there is no dirty buffer left in the active queue, then no need for new timer */
+				if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
+					need_new_timer = FALSE;
+				break;
+#    			if defined(UNIX)
+			case dba_mm:
+				wcs_wtstart(reg, 0);
+				assert(csd == csa->hdr);
 				need_new_timer = FALSE;
-			break;
-
-#		    if defined(UNIX)
-		    case dba_mm:
-#			if defined(UNTARGETED_MSYNC)
-			if (csa->ti->last_mm_sync != csa->ti->curr_tn)
-			{
-				boolean_t	was_crit;
-
-				was_crit = csa->now_crit;
-				if (FALSE == was_crit)
-					grab_crit(reg);
-				msync((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]),
-				      MS_SYNC);
-				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
-				if (FALSE == was_crit)
-					rel_crit(reg);
-				need_new_timer = FALSE; /* All sync'd up -- don't need another one */
-			}
-#			else
-			/* note that wcs_wtstart is called for TARGETED_MSYNC or FILE_IO */
-			wcs_wtstart(reg, 0);
-			assert(csd == csa->hdr);
-			if (0 == csa->acc_meth.mm.mmblk_state->mmblkq_active.fl)
-				need_new_timer = FALSE;
+				break;
 #			endif
-			break;
-#		    endif
-		    default:
-		    	break;
+			default:
+				break;
 		}
 	} else
 	{

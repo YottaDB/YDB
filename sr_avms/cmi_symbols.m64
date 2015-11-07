@@ -1,0 +1,13 @@
+	.title	CMI_SYMBOLS  "Bind CMISHR at run time"
+
+	bndsym	CMI_CLOSE,	CMISHR
+	bndsym	CMI_INIT,	CMISHR
+	bndsym	CMI_OPEN,	CMISHR
+	bndsym	CMI_READ,	CMISHR
+	bndsym	CMI_WRITE,	CMISHR
+	bndsym	CMI_WRITE_INT,	CMISHR
+	bndsym	CMU_GETCLB,	CMISHR
+	bndsym	CMU_MAKCLB,	CMISHR
+	bndsym	CMU_NTDROOT,	CMISHR
+
+	.end

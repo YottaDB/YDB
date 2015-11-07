@@ -1,0 +1,51 @@
+	.macro	create_base_frame
+
+;	create_base_frame is the routine prologue code that sets up the machine
+;	stack frame in which all GT.M MUMPS object code executes.
+
+	.if	ne,$SIZE,STACK_SIZE
+		.error	"The stack frame size computed by $routine (%integer(%SIZE)) differs from that defined in the -
+base_frame macro (%integer(STACK_SIZE))."
+	.endc
+
+	.if	ne,$SIZE-56,ARG_OFFSET
+		.error	"The homed argument list offset computed by $routine (%integer($SIZE-56)) differs from -
+that expected (%integer(ARG_OFFSET))."
+	.endc
+
+	lda	sp,  -$SIZE(sp)
+	stq	r27, (sp)		; linkage Psect pointer
+	stq	r26, $RSA_OFFSET(sp)
+	stq	r2,  $RSA_OFFSET+8(sp)
+     	stq	r3,  $RSA_OFFSET+16(sp)
+	stq	r4,  $RSA_OFFSET+24(sp)
+	stq	r5,  $RSA_OFFSET+32(sp)
+	stq	r6,  $RSA_OFFSET+40(sp)
+	stq	r7,  $RSA_OFFSET+48(sp)
+	stq	r8,  $RSA_OFFSET+56(sp)
+	stq	r9,  $RSA_OFFSET+64(sp)
+	stq	r10, $RSA_OFFSET+72(sp)
+	stq	r11, $RSA_OFFSET+80(sp)
+	stq	r12, $RSA_OFFSET+88(sp)
+	stq	r13, $RSA_OFFSET+96(sp)
+	stq	r14, $RSA_OFFSET+104(sp)
+	stq	r15, $RSA_OFFSET+112(sp)
+	stq	fp,  $RSA_OFFSET+120(sp)
+	stq	r31, 8(sp)		; establish no condition handler
+
+;	Copy the register arguments onto the stack (a la varargs).
+	stq	r21, $SIZE-8(sp)
+	stq	r20, $SIZE-16(sp)
+	stq	r19, $SIZE-24(sp)
+	stq	r18, $SIZE-32(sp)
+	stq	r17, $SIZE-40(sp)
+	stq	r16, $SIZE-48(sp)
+	stq	r25, $SIZE-56(sp)
+
+	trapb				; synchronize exceptions
+	mov	sp,  fp			; establish existence of stack frame
+$end_prologue
+
+	lda	sp,  -ARG_AREA_SZ(sp)	; extend for argument push area
+
+	.endm	create_base_frame

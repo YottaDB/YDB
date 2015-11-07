@@ -1,0 +1,61 @@
+; ################################################################
+; #                                                              #
+; #      Copyright 2001, 2008 Fidelity Information Services, Inc #
+; #                                                              #
+; #      This source code contains the intellectual property     #
+; #      of its copyright holder(s), and is made available       #
+; #      under a license.  If you do not know the terms of       #
+; #      the license, please stop and do not read further.       #
+; #                                                              #
+; ################################################################
+
+	.title	OP_EQUNUL "Compare mval to null string"
+
+	mval$def
+
+
+	$linkage_section
+
+a_undef_inhibit:
+	.address undef_inhibit
+
+
+	$code_section
+
+	$routine OP_EQUNUL, entry=OP_EQUNUL_CA, kind=null
+	.base	r27, $ls
+
+	mv_if_notdefined (r0), 30$
+
+	mv_if_notstring (r0), 20$
+	ldl	r28, mval$l_strlen(r0)
+	bne	r28, 20$
+
+;	Mval is a null string
+10$:	mov	1, r24
+	ret	r26
+
+;	Mval is not a null string
+20$:	clr	r24
+	ret	r26
+
+;	If undef_inhibit is set, then all undefined values are equal to the null string:
+30$:	ldq	r28, a_undef_inhibit
+	ldq_u	r24, (r28)
+	extbl	r24, r28, r24
+	bne	r24, 10$		; it's set;  treat mval as a null string
+
+;	It's not set, so issue a message:
+	lda	sp, -8(sp)	; but first,
+	stq	r26, (sp)	; save the return address
+	mov	r0, r16
+	$call	UNDERR, args=<r16>, set_arg_info=false, nonstandard=true
+
+	ldq	r26, (sp)	; restore our return address
+	lda	sp, 8(sp)
+
+	ret	r26
+
+	$end_routine
+
+	.end

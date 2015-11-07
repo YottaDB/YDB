@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -594,8 +594,9 @@ static	CLI_PARM	mup_rundown_parm[] = {
 };
 
 static	CLI_ENTRY	mup_rundown_qual[] = {
-	{ "FILE",   mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "REGION", mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "FILE",   	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "OVERRIDE",	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+	{ "REGION", 	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ 0 }
 };
 
@@ -622,6 +623,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "JOURNAL",              mupip_set, 0, 0,                  mup_set_journal_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0 },
 { "KEY_SIZE",             mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "LOCK_SPACE",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ "MUTEX_SLOTS",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "PREVJNLFILE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "QDBRUNDOWN",           mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED,	1, NEG,     VAL_N_A,  0 },

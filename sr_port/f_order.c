@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,10 +43,9 @@ LITDEF	opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
 int f_order(oprtype *a, opctype op)
 {
 	boolean_t	ok, used_glvn_slot;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	enum order_dir	direction;
 	enum order_obj	object;
-	int4		dummy_intval;
+	int4		intval;
 	opctype		gv_oc;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	short int	column;
@@ -97,6 +96,7 @@ int f_order(oprtype *a, opctype op)
 	{
 		if (NULL != oldchain)
 			setcurtchain(oldchain);
+		stx_error(ERR_VAREXPECTED);
 		return FALSE;
 	}
 	if (TK_COMMA != TREF(window_token))
@@ -119,11 +119,9 @@ int f_order(oprtype *a, opctype op)
 		triptr = dir_oprptr->oprval.tref;
 		if (OC_LIT == triptr->opcode)
 		{	/* if direction is a literal - pick it up and stop flailing about */
-			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &dummy_intval)
-					&& ((MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1])
-					||  (-MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1])))
+			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
 			{
-				direction = (MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1]) ? FORWARD : BACKWARD;
+				direction = (1 == intval) ? FORWARD : BACKWARD;
 				sav_ref->opcode = OC_NOOP;
 				sav_ref = NULL;
 			} else

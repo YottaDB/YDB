@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,12 +86,20 @@ typedef struct st_timer_alloc
 #define MAX_TIMER_HNDLRS	10	/* Max # of safe timer handlers */
 #define GT_WAKE
 
+/* Set each timer request to go for 10ms more than requested, since the
+ * interval timer alarm will sometimes go off early on many UNIX systems.
+ * 10ms is more than enough for all systems tested so far (SunOS, Solaris,
+ * HP/UX, NonStop/UX)
+ */
+#define SLACKTIME		10
+
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
 void		cancel_timer(TID tid);
 void		clear_timers(void);
 void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
+void		gtm_start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
 void		sys_get_curr_time(ABS_TIME *atp);
@@ -105,12 +113,14 @@ void		sys_canc_timer(void);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);
-STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
+STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+	void *hdata, boolean_t safe_timer);
 STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)());
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
 STATICFNDCL void	timer_handler(int why);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
-STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
+STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+	void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
 STATICFNDCL void 	uninit_all_timers(void);
 STATICFNDCL void	cancel_all_timers(void);

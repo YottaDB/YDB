@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,8 +109,8 @@ uint4 mur_prev_rec(jnl_ctl_list **jjctl)
 			if (JRT_EOF != mur_desc->jnlrec->prefix.jrec_type)
 				return SS_NORMAL;
 			/* unexpected EOF record in the middle of the file */
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset,
-					ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [prev_rec]"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [prev_rec]"));
 			status = ERR_JNLBADRECFMT;
 		}
 		if (ERR_JNLBADRECFMT != status)
@@ -128,8 +128,8 @@ uint4 mur_prev_rec(jnl_ctl_list **jjctl)
 			 * Notice that the offset jctl->rec_offset points to a good record. The badly formatted
 			 * journal record is actually one record BEFORE the printed offset.
 			 */
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset,
-				ERR_TEXT, 2, LEN_AND_LIT("Error accessing previous record"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Error accessing previous record"));
 		} else
 		{	/* offset is at tail of journal file after crash. Caller could be backward recovery or
 			 * forward recovery or even extract/verify/show if they are in tail_analysis. We expect
@@ -192,8 +192,8 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 			assert(jctl->rec_offset <= jctl->lvrec_off);
 			if (JRT_EOF != mur_desc->jnlrec->prefix.jrec_type || jctl->rec_offset == jctl->lvrec_off)
 				return SS_NORMAL;
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset,
-					ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [next_rec]"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [next_rec]"));
 			status = ERR_JNLBADRECFMT;
 		}
 		if (ERR_JNLBADRECFMT != status)
@@ -206,8 +206,8 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 			/* continue in distress, look for other valid records */
 			return mur_valrec_next(jctl, jctl->rec_offset + rec_size);
 		}
-		gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset,
-					ERR_TEXT, 2, LEN_AND_LIT("Error accessing next record"));
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+				jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Error accessing next record"));
 		return status;
 	}
 	assert(jctl->rec_offset == jctl->lvrec_off);
@@ -248,16 +248,16 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 		assert(dskaddr >= JNL_HDR_LEN);
 		if (dskaddr >= jctl->eof_addr || dskaddr < JNL_HDR_LEN)
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn, dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Requested offset out of range [prev]"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					dskaddr, ERR_TEXT, 2, LEN_AND_LIT("Requested offset out of range [prev]"));
 			return (dskaddr >= jctl->eof_addr ? ERR_JNLREADEOF : ERR_JNLREADBOF);
 		}
 		assert(dskaddr == ROUND_UP2(dskaddr, JNL_REC_START_BNDRY)); /* dskaddr must be aligned at JNL_REC_START_BNDRY */
 		MUR_FREAD_CANCEL(jctl, mur_desc, status);
 		if (SS_NORMAL != status)
 		{
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Could not cancel prior read [prev]"), jctl->status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					dskaddr, ERR_TEXT, 2, LEN_AND_LIT("Could not cancel prior read [prev]"), jctl->status);
 			return jctl->status;
 		}
 		mur_desc->buff_index = 1;
@@ -270,8 +270,9 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 			/* we rely on reading at least up to the record length field (forwptr) */
 		if (SS_NORMAL != (status = mur_freadw(jctl, mur_desc->cur_buff)))
 		{
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->cur_buff->dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Error from synchronous read into cur_buff [prev]"), status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
+					LEN_AND_LIT("Error from synchronous read into cur_buff [prev]"), status);
 			return status;
 		}
 		mur_desc->jnlrec = (jnl_record *)(mur_desc->cur_buff->base + buff_offset);
@@ -285,8 +286,8 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-					   	mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+						jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
 					   	LEN_AND_LIT("Could not initiate read into sec_buff in [prev] (dskaddr > 0)"),
 						status);
 					return status;
@@ -305,15 +306,15 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				{
 					if (SS_NORMAL != (status = mur_freadw(jctl, &mur_desc->aux_buff2)))
 					{
-						gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-							   mur_desc->aux_buff2.dskaddr, ERR_TEXT, 2,
-							   LEN_AND_LIT("Error in synchronous read into aux_buff [prev]"), status);
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3,
+							jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->aux_buff2.dskaddr, ERR_TEXT, 2,
+							LEN_AND_LIT("Error in synchronous read into aux_buff [prev]"), status);
 						return status;
 					}
 				} else
 				{
-					gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
-						jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3,
+						jctl->jnl_fn_len, jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
 						LEN_AND_LIT("Requested offset beyond end of file [prev] (dskaddr > 0)"));
 					return ERR_JNLBADRECFMT;
 				}
@@ -338,10 +339,9 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-						   mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
-						   LEN_AND_LIT("Could not initiate read into sec_buff [prev] (dskaddr == 0)"),
-						   status);
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+						jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+						LEN_AND_LIT("Could not initiate read into sec_buff [prev] (dskaddr == 0)"), status);
 					return status;
 				}
 			}
@@ -361,8 +361,8 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_WAIT(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-							mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+							jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
 							LEN_AND_LIT("Error waiting for sec_buff read to complete [prev]"),
 							status);
 					return status;
@@ -378,8 +378,8 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->cur_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-							mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+							jctl->jnl_fn, mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
 							LEN_AND_LIT("Could not initiate read into cur_buff [prev]"), status);
 					return status;
 				}
@@ -399,9 +399,9 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 			mur_desc->jreclen = suffix->backptr;
 			if (jctl->rec_offset < mur_desc->jreclen + JNL_HDR_LEN)
 			{
-				gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-					   jctl->rec_offset, ERR_TEXT, 2,
-					   LEN_AND_LIT("Requested offset beyond beginning of file [prev]"));
+				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
+						jctl->jnl_fn, jctl->rec_offset, ERR_TEXT, 2,
+						LEN_AND_LIT("Requested offset beyond beginning of file [prev]"));
 				return ERR_JNLBADRECFMT;
 			}
 		}
@@ -437,16 +437,16 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 		assert(dskaddr >= JNL_HDR_LEN);
 		if (dskaddr >= jctl->eof_addr || dskaddr < JNL_HDR_LEN)
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn, dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Requested offset out of range [next]"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					dskaddr, ERR_TEXT, 2, LEN_AND_LIT("Requested offset out of range [next]"));
 			return (dskaddr >= jctl->eof_addr ? ERR_JNLREADEOF : ERR_JNLREADBOF);
 		}
 		assert(dskaddr == ROUND_UP2(dskaddr, JNL_REC_START_BNDRY)); /* dskaddr must be aligned at JNL_REC_START_BNDRY */
 		MUR_FREAD_CANCEL(jctl, mur_desc, status);
 		if (SS_NORMAL != status)
 		{
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Could not cancel prior read [next]"), jctl->status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					dskaddr, ERR_TEXT, 2, LEN_AND_LIT("Could not cancel prior read [next]"), jctl->status);
 			return jctl->status;
 		}
 		mur_desc->buff_index = 0;
@@ -459,9 +459,9 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 											     * the record length field (forwptr) */
 		if (SS_NORMAL != (status = mur_freadw(jctl, mur_desc->cur_buff)))
 		{
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->cur_buff->dskaddr,
-					ERR_TEXT, 2, LEN_AND_LIT("Error from synchronous read into cur_buff [next]"),
-					status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
+					LEN_AND_LIT("Error from synchronous read into cur_buff [next]"), status);
 			return status;
 		}
 		mur_desc->jnlrec = (jnl_record *)(mur_desc->cur_buff->base + buff_offset);
@@ -475,8 +475,8 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-							mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+							jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
 							LEN_AND_LIT("Could not initiate read into sec_buff [next] (dskaddr > 0)"),
 							status);
 					return status;
@@ -487,10 +487,11 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 					MUR_FREAD_WAIT(jctl, mur_desc->sec_buff, status);
 					if (SS_NORMAL != status)
 					{
-						gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-						    mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
-						    LEN_AND_LIT("Error waiting for sec_buff read to complete [next] (dskaddr > 0)"),
-						    status);
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3,
+							jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+							LEN_AND_LIT("Error waiting for sec_buff read to complete [next] "
+								    "(dskaddr > 0)"),
+							status);
 						return status;
 					}
 					/* is the record available in its entirety? */
@@ -502,8 +503,9 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 					/* is the record available in its entirety? */
 			if (!good_prefix)
 			{
-				gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn, dskaddr,
-					   ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr > 0)"));
+				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
+						jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
+						LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr > 0)"));
 				return ERR_JNLBADRECFMT;
 			}
 		} /* end good_prefix */
@@ -528,10 +530,10 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-						   mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
-						   LEN_AND_LIT("Could not initiate read into sec_buff [next] (dskaddr == 0)"),
-						   status);
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+							jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+							LEN_AND_LIT("Could not initiate read into sec_buff [next] (dskaddr == 0)"),
+							status);
 					return status;
 				}
 			}
@@ -551,10 +553,10 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_WAIT(jctl, mur_desc->sec_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-						   mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
-						   LEN_AND_LIT("Error waiting for sec_buff read to complete [next] (dskaddr == 0)"),
-						   status);
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+						jctl->jnl_fn, mur_desc->sec_buff->dskaddr, ERR_TEXT, 2,
+						LEN_AND_LIT("Error waiting for sec_buff read to complete [next] (dskaddr == 0)"),
+						status);
 					return status;
 				}
 			}
@@ -568,8 +570,8 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 				MUR_FREAD_START(jctl, mur_desc->cur_buff, status);
 				if (SS_NORMAL != status)
 				{
-					gtm_putmsg(VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-							mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLREAD, 3, jctl->jnl_fn_len,
+							jctl->jnl_fn, mur_desc->cur_buff->dskaddr, ERR_TEXT, 2,
 							LEN_AND_LIT("Could not initiate read into cur_buff [next]"), status);
 					return status;
 				}
@@ -593,7 +595,7 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 		{
 			if (!jctl->tail_analysis)
 			{
-				gtm_putmsg(VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
+				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
 					jctl->jnl_fn, jctl->rec_offset,
 					ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr == 0)"));
 				return ERR_JNLBADRECFMT;
@@ -786,8 +788,8 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 		mur_desc->random_buff.blen = blen;
 		if (SS_NORMAL != (status = mur_read(jctl)))
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->random_buff.dskaddr,
-					status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					mur_desc->random_buff.dskaddr, status);
 			return status;
 		}
 		rec = (jnl_record *)mur_desc->random_buff.base;
@@ -839,7 +841,7 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 	rec_offset = jctl->rec_offset;
 	if (SS_NORMAL != (status = mur_next(jctl, rec_offset)))
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, rec_offset,
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, rec_offset,
 			ERR_TEXT, 2, LEN_AND_LIT("Error received from mur_valrec_prev calling mur_next(rec_offset)"));
 		return status;
 	}
@@ -959,14 +961,15 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		 */
 		jfh->data_file_name_length = 0;
 		if (ERR_JNLINVALID == jctl->status)
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn, jfh->data_file_name_length,
-					jfh->data_file_name, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
+					jfh->data_file_name_length, jfh->data_file_name, ERR_TEXT, 2,
 					LEN_AND_LIT("Journal file does not have complete file header"));
 		else if (SS_NORMAL != jctl->status2)
-			gtm_putmsg(VARLSTCNT1(7) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status,
-					PUT_SYS_ERRNO(jctl->status2));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT1(7) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0,
+					jctl->status, PUT_SYS_ERRNO(jctl->status2));
 		else
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0,
+					jctl->status);
 		return FALSE;
 	}
 	if (SS_NORMAL == jctl->status)
@@ -984,12 +987,13 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		DO_FILE_READ(jctl->channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, jctl->status, jctl->status2);
 		if (SS_NORMAL != jctl->status)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, JNL_HDR_LEN, jctl->status);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					JNL_HDR_LEN, jctl->status);
 			return FALSE;
 		}
 	} else
 	{
-		gtm_putmsg(VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
 			jfh->data_file_name_length, jfh->data_file_name,
 			ERR_TEXT, 2, LEN_AND_LIT("File size is less than minimum expected for a valid journal file"));
 		return FALSE;
@@ -999,10 +1003,12 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
 		if (mur_options.rollback_losttnonly)
 		{	/* Already prepared for a LOSTTNONLY rollback. Allow NOBEFORE_IMAGE journal file but issue a warning. */
-			gtm_putmsg(VARLSTCNT(4) ERR_RLBKJNLNOBIMG, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_RLBKJNLNOBIMG, 2, jctl->jnl_fn_len,
+					jctl->jnl_fn);
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLNOBIJBACK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_JNLNOBIJBACK, 2, jctl->jnl_fn_len,
+					jctl->jnl_fn);
 			return FALSE;
 		}
 	}
@@ -1010,14 +1016,14 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	assert(REPL_ALLOWED(jfh) == REPL_ENABLED(jfh));
 	if (!REPL_ENABLED(jfh) && mur_options.rollback)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_REPLNOTON, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_REPLNOTON, 2, jctl->jnl_fn_len, jctl->jnl_fn);
 		return FALSE;
 	}
 	jrec = (jnl_record *)jrecbuf;
 	if (!IS_VALID_JNLREC(jrec, jfh) || JRT_PINI != jrec->prefix.jrec_type)
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, JNL_HDR_LEN,
-				ERR_TEXT, 2, LEN_AND_LIT("Invalid or no PINI record found"));
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+				JNL_HDR_LEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no PINI record found"));
 		return FALSE;
 	}
 	/* We have at least one good record */
@@ -1026,27 +1032,29 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		jrec = (jnl_record *)((char *)jrec + PINI_RECLEN);
 		if (!IS_VALID_JNLREC(jrec, jfh) || JRT_EPOCH != jrec->prefix.jrec_type)
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, JNL_HDR_LEN + PINI_RECLEN,
-					ERR_TEXT, 2, LEN_AND_LIT("Invalid or no EPOCH record found"));
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					JNL_HDR_LEN + PINI_RECLEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no EPOCH record found"));
 			return FALSE;
 		}
 		/* We have at least one valid EPOCH */
 	}
 	if (mur_options.update && jfh->bov_tn > jfh->eov_tn)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_BOVTNGTEOVTN, 4, jctl->jnl_fn_len, jctl->jnl_fn, &jfh->bov_tn, &jfh->eov_tn);
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_BOVTNGTEOVTN, 4, jctl->jnl_fn_len, jctl->jnl_fn,
+				&jfh->bov_tn, &jfh->eov_tn);
 		return FALSE;
 	}
 	if (jfh->bov_timestamp > jfh->eov_timestamp)
 	{	/* This is not a severe error to exit, may be user changed system time which we do not allow now.
-		 * But we can still try to continue recovery. We already removed time continuty check from mur_fread_eof().
+		 * But we can still try to continue recovery. We already removed time continuity check from mur_fread_eof().
 		 * So if error limit allows, we will continue recovery  */
 		if (!mur_report_error(jctl, MUR_BOVTMGTEOVTM))
 			return FALSE;
 	}
 	if (mur_options.rollback && (jfh->start_seqno > jfh->end_seqno))
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_BEGSEQGTENDSEQ, 4, jctl->jnl_fn_len, jctl->jnl_fn, &jfh->start_seqno, &jfh->end_seqno);
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_BEGSEQGTENDSEQ, 4, jctl->jnl_fn_len, jctl->jnl_fn,
+				&jfh->start_seqno, &jfh->end_seqno);
 		return FALSE;
 	}
 	init_hashtab_int4(&jctl->pini_list, MUR_PINI_LIST_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
@@ -1084,6 +1092,7 @@ boolean_t mur_fclose(jnl_ctl_list *jctl)
 		return TRUE;
 	UNIX_ONLY(jctl->status = errno;)
 	assert(FALSE);
-	gtm_putmsg(VARLSTCNT(5) ERR_JNLFILECLOSERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
+	gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(5) ERR_JNLFILECLOSERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,
+			jctl->status);
 	return FALSE;
 }

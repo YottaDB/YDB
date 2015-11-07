@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "cmd_qlf.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "hashtab_mname.h"
@@ -188,47 +189,45 @@ bool zlput_rname (rhdtyp *hdr)
 				tabent->value = NULL;
 			}
 		}
-		NON_USHBIN_ONLY(
-			hdr->old_rhead_ptr = (int4)old_rhead;
-			if (!old_rhead->old_rhead_ptr)
-			{
-			        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
-					  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
-			}
-		)
-		USHBIN_ONLY(
-			if (!old_rhead->shlib_handle)
-		        { 	/* Migrate text literals pointing into text area we are about to throw away into the stringpool.
-				   We also can release the read-only releasable segment as it is no longer needed.
+#		ifndef USHBIN_SUPPORTED
+		hdr->old_rhead_ptr = (int4)old_rhead;
+		if (!old_rhead->old_rhead_ptr)
+		{
+		        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
+				  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
+		}
+#		else /* USHBIN_SUPPORTED */
+		if (!old_rhead->shlib_handle)
+	        { 	/* Migrate text literals pointing into text area we are about to throw away into the stringpool.
+			   We also can release the read-only releasable segment as it is no longer needed.
+			*/
+			stp_move((char *)old_rhead->literal_text_adr,
+				 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
+			if (tabent)
+			{	/* There was (at one time) a $TEXT source section for this routine. We may have just
+				   released it but whether the source was for the routine just replaced or for an earlier
+				   replacement, the key for that segment is pointing into the readonly storage we
+				   are just about to release. Replace the key with the current one for this routine.
 				*/
-				stp_move((char *)old_rhead->literal_text_adr,
-					 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
-				if (tabent)
-				{	/* There was (at one time) a $TEXT source section for this routine. We may have just
-					   released it but whether the source was for the routine just replaced or for an earlier
-					   replacement, the key for that segment is pointing into the readonly storage we
-					   are just about to release. Replace the key with the current one for this routine.
-					*/
-					assert(MSTR_EQ(&tabent->key.var_name, rtn_name));
-					tabent->key.var_name = *rtn_name;	/* Update key with newly saved mident */
-				}
-				zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
-				GTM_TEXT_FREE(old_rhead->ptext_adr);
-				/* Reset the routine header pointers to the sections we just freed up.
-				 * NOTE: literal_text_adr shouldn't be reset as it points to the label area malloc'd
-				 * in zlmov_lnames() */
-				old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
-				old_rhead->lnrtab_adr = NULL;
+				assert(MSTR_EQ(&tabent->key.var_name, rtn_name));
+				tabent->key.var_name = *rtn_name;	/* Update key with newly saved mident */
 			}
-			urx_remove(old_rhead);
-			free(old_rhead->literal_adr);	/* Release the read-write releasable segments */
-			old_rhead->literal_adr = NULL;
-			old_rhead->vartab_adr = NULL;
-
-			free(old_rhead->linkage_adr);	/* Release the old linkage section */
-			old_rhead->linkage_adr = NULL;
-			hdr->old_rhead_adr = old_rhead;
-		)
+			zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
+			GTM_TEXT_FREE(old_rhead->ptext_adr);
+			/* Reset the routine header pointers to the sections we just freed up.
+			 * NOTE: literal_text_adr shouldn't be reset as it points to the label area malloc'd
+			 * in zlmov_lnames() */
+			old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
+			old_rhead->lnrtab_adr = NULL;
+		}
+		urx_remove(old_rhead);
+		free(RW_REL_START_ADR(old_rhead));	/* Release the read-write releasable segments */
+		old_rhead->literal_adr = NULL;
+		old_rhead->vartab_adr = NULL;
+		free(old_rhead->linkage_adr);		/* Release the old linkage section */
+		old_rhead->linkage_adr = NULL;
+		hdr->old_rhead_adr = old_rhead;
+#		endif
 		mid->rt_name = *rtn_name;
 	}
 	mid->rt_adr= hdr;

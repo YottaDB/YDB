@@ -1,0 +1,54 @@
+	.title	OP_CALLSP
+; ###############################################################
+; #								#
+; #	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+; #								#
+; #	This source code contains the intellectual property	#
+; #	of its copyright holder(s), and is made available	#
+; #	under a license.  If you do not know the terms of	#
+; # 	the license, please stop and do not read further.	#
+; #								#
+; ###############################################################
+
+	G_MSF
+
+
+	$linkage_section
+
+a_frame_pointer:
+	.address frame_pointer
+
+
+	$code_section
+
+	$routine OP_CALLSPB, entry=OP_CALLSP_CA, aliases=<OP_CALLSPW, OP_CALLSPL>, kind=null
+
+	lda	sp, -16(sp)
+	stq	r3, 8(sp)
+	stq	r26, (sp)
+	mov	r27, r3
+	.base	r3, $ls
+
+	ldq	r1, a_frame_pointer
+	ldl	r1, (r1)
+
+;	Bump the return PC past the branch instruction following the jsr that got us here:
+	addl	r26, r16, r26		; length of branch sequence
+	stl	r26, msf$mpc_off(r1)	; and store it in the Mumps stack frame
+
+	$call	EXFUN_FRAME, set_arg_info=false, nonstandard=true
+	ldl	r16, 0(r10)		; Value of $TEST
+	$call	PUSH_TVAL, args=<r16>, set_arg_info=false, nonstandard=true
+
+	ldq	r12, a_frame_pointer
+	ldl	r12, (r12)
+	ldl	r9, msf$temps_ptr_off(r12)
+
+	ldq	r28, (sp)
+	ldq	r3, 8(sp)
+	lda	sp, 16(sp)
+	ret	r28
+
+	$end_routine
+
+	.end

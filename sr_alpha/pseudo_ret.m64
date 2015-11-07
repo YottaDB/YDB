@@ -1,0 +1,37 @@
+; ################################################################
+; #                                                              #
+; #      Copyright 2001, 2008 Fidelity Information Services, Inc #
+; #                                                              #
+; #      This source code contains the intellectual property     #
+; #      of its copyright holder(s), and is made available       #
+; #      under a license.  If you do not know the terms of       #
+; #      the license, please stop and do not read further.       #
+; #                                                              #
+; ################################################################
+
+	.title	PSEUDO_RET
+
+;	PSEUDO_RET calls opp_ret (which doesn't return).  It executes in a
+;	GT.M MUMPS stack frame and is, in fact, normally entered via a
+;	getframe/ret instruction sequence.
+;
+;	entry:
+;		r13 -	address of PSEUDO_RET's procedure descriptor (not r27)
+;
+;	WARNING: because PSEUDO_RET is designed to be invoked from a GT.M
+;	MUMPS stack frame, it does not conform to the Alpha calling
+;	standard and cannot be invoked from any high-level language.  The
+;	invoker should load the address of PSEUDO_RET's procedure descriptor
+;	into r13, not r27.
+
+
+	$code_section
+
+	$routine	PSEUDO_RET, entry=PSEUDO_RET_CA, kind=null
+	.base	r13, $ls
+
+	$call	opp_ret, set_arg_info=false, nonstandard=true
+
+	$end_routine
+
+	.end

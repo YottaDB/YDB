@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,24 +11,53 @@
 
 #include "mdef.h"
 
-unsigned int asc_hex2i(p,len)
-char *p;
-int  len;
+LITREF unsigned char lower_to_upper_table[];
+
+unsigned int asc_hex2i(uchar_ptr_t p, int len)
 {
-	char	*c;
-	int	ret;
+	uchar_ptr_t	c;
+	unsigned char	ch;
+	int		ret;
 
 	ret = 0;
 	for (c = p + len; c > p; p++)
 	{
-		if (*p >= '0' && *p <= '9')
-			ret = ret * 16 + *p - '0';
-		else if (*p >= 'a' && *p <= 'f')
-			ret = ret * 16 + *p - 'a' + 10;
-		else if (*p >= 'A' && *p <= 'F')
-			ret = ret * 16 + *p - 'A' + 10;
+		if (('0' <= *p) && ('9' >= *p))
+			ret = (ret << 4) + (*p - '0');
 		else
-			return (uint4)-1;
+		{
+			ch = lower_to_upper_table[*p];
+			if (('A' <= ch) && ('F' >= ch))
+				ret = (ret << 4) + ch - 'A' + 10;
+			else
+				return (unsigned int)-1;
+		}
 	}
 	return ret;
 }
+
+#ifndef VMS
+/* Routine identical to asc_hex2i() but with 8 byte accumulator and return type */
+gtm_uint64_t  asc_hex2l(uchar_ptr_t p, int len)
+{
+	uchar_ptr_t	c;
+	unsigned char	ch;
+	gtm_uint64_t	ret;
+
+	ret = 0;
+	for (c = p + len; c > p; p++)
+	{
+		if (('0' <= *p) && ('9' >= *p))
+			ret = (ret << 4) + (*p - '0');
+		else
+		{
+			ch = lower_to_upper_table[*p];
+			if (('A' <= ch) && ('F' >= ch))
+				ret = (ret << 4) + ch - 'A' + 10;
+			else
+				return (gtm_uint64_t)-1;
+		}
+	}
+	return ret;
+}
+#endif

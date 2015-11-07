@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "gtmio.h"
 #include "repl_sp.h"
 #include "iosp.h"	/* for SS_NORMAL */
+#include "wbox_test_init.h"
 
 GBLREF 	jnl_gbls_t		jgbl;
 
@@ -54,7 +55,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	set_jnl_info(reg, &create);
 	create.no_prev_link = TRUE;
 	create.no_rename = FALSE;
-	assert(!jgbl.forw_phase_recovery);
+	assert(!jgbl.forw_phase_recovery || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
 	if (!jgbl.dont_reset_gbl_jrec_time)
 		SET_GBL_JREC_TIME;	/* needed for cre_jnl_file() */
 	/* else mur_output_record() would have already set jgbl.gbl_jrec_time */
@@ -70,7 +71,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 		csa->hdr->jnl_checksum = create.checksum;
 		csa->hdr->jnl_eovtn = csa->hdr->trans_hist.curr_tn;
 	}
-	send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
 	assert(csa->hdr->jnl_file_len == create.jnl_len);
 	assert(0 == memcmp(csa->hdr->jnl_file_name, create.jnl, create.jnl_len));
 	return 0;

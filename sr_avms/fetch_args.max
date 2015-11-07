@@ -1,0 +1,50 @@
+	.macro	fetch_args sp_save_reg, stack_offset, ?loop, ?skip
+
+; This macro is used to call routine GTM_FETCH, passing a variable-length argument list
+; in which the first argument (i.e. R16) is the argument count.  It moves the argument
+; count from R16 to the Argument Information register, R25, and then moves the remaining
+; arguments down one slot in the argument list.  Since any arguments after the first six
+; would have been passed on the stack, it also must move these arguments from their
+; position above the current routine's save area to new slots below it.
+;
+; Arguments to this macro are:
+;
+;	sp_save_reg	: a register in which to save the current value of SP, and from
+;			  which SP will be restored when done.  This register must be
+;			  one which is normally saved across routine calls, i.e. in the
+;			  range of R2 to R15.
+;
+;	stack_offset	: the size, in bytes, of the current routine's save area.  This
+;			  value plus the current value of SP will be the address of the
+;			  first stacked argument.
+;
+; Registers R16 through R21 and R25 through R28 are modified by this macro.
+
+	mov	r16, r25		; argument count
+	mov	r17, r16		; arg1 (to GTM_FETCH)
+	mov	r18, r17		; arg2
+	mov	r19, r18		; arg3
+	mov	r20, r19		; arg4
+	mov	r21, r20		; arg5
+	ldq	r21, stack_offset(sp)	; arg6 was on the stack
+
+	subq	r25, 6, r28		; r28 = the number of arguments left on the stack
+	mov	sp, sp_save_reg		; save the current stack pointer
+	ble	r28, skip		; skip if no arguments left
+
+	sll	r28, 3, r27		; r27 = the number of arguments to move, times 8 bytes
+	addq	r27, stack_offset, r27	; account for the saved registers
+	addq	r27, sp, r27		; r27 -> ArgN
+loop:
+	ldq	r26, (r27)
+	lda	sp, -8(sp)
+	lda	r27, -8(r27)
+	subq	r28, 1, r28
+	stq	r26, (sp)
+	bgt	r28, loop
+
+skip:	$call	gtm_fetch, set_arg_info=false, nonstandard=true
+
+	mov	sp_save_reg, sp		; restore the stack
+
+	.endm	fetch_args

@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,15 @@
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
 #include "cli.h"
 #include "mupip_exit.h"
+#include "have_crit.h"
 
 GBLREF	mur_opt_struct	mur_options;
+
+error_def (ERR_JNLTMQUAL1);
+error_def (ERR_JNLTMQUAL2);
+error_def (ERR_JNLTMQUAL3);
+error_def (ERR_JNLTMQUAL4);
+error_def (ERR_MUNOACTION);
 
 #ifdef VMS
 static	int4	mur_rel2abstime(jnl_proc_time deltatime, jnl_proc_time basetime, boolean_t roundup)
@@ -106,12 +113,6 @@ static	int4	mur_rel2abstime(jnl_proc_time deltatime, jnl_proc_time basetime, boo
 void mur_process_timequal(jnl_tm_t max_lvrec_time, jnl_tm_t min_bov_time)
 {
 	char				time_str1[LENGTH_OF_TIME + 1], time_str2[LENGTH_OF_TIME + 1];
-
-	error_def (ERR_JNLTMQUAL1);
-	error_def (ERR_JNLTMQUAL2);
-	error_def (ERR_JNLTMQUAL3);
-	error_def (ERR_JNLTMQUAL4);
-	error_def (ERR_MUNOACTION);
 
 	/* All time qualifiers are specified in delta time or absolute time.
 	 *	mur_options.since_time == 0 means no since time was specified

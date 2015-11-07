@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,23 +82,21 @@ error_def(ERR_DBBDBALLOC);
 #define TEXT4 ", "
 
 #define MAX_UTIL_LEN 40
-#define	RTS_ERROR_FUNC(err, buff)	\
-{					\
-	if (gtmassert_on_error)		\
-		GTMASSERT;		\
-	rts_error_func(err, buff);	\
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF)									\
+{													\
+	if (gtmassert_on_error)										\
+		GTMASSERT;										\
+	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
 }
-
-void rts_error_func(int err, uchar_ptr_t buff);
 
 int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boolean_t gtmassert_on_error)
 {
 	block_id		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
 	int			num_subscripts;
-	uint4			bplmap, mask1, offset;
+	uint4			bplmap, mask1, offset, rec_offset, rec_size;
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
-	uint4			chunk;
+	uint4			chunk, blk_size;
 	sm_uc_ptr_t		blk_top, blk_id_ptr, next_tp_child_ptr, key_base, mp, b_ptr;
 	unsigned short		rec_cmpc, min_cmpc;	/* the minimum cmpc expected in any record (except star-key) in a gvt */
 	int			tmp_cmpc;
@@ -106,7 +104,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	unsigned int		prior_expkeylen;
 	unsigned short		temp_ushort;
 	int			blk_levl;
-	int			blk_size, rec_size, comp_length, rec_offset, key_size;
+	int			comp_length, key_size;
 	unsigned char		util_buff[MAX_UTIL_LEN];
 	int			util_len;
 	off_chain		chain;
@@ -146,18 +144,18 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
 		{
-			RTS_ERROR_FUNC(MAKE_MSG_INFO(ERR_DBLVLINC), util_buff);
+			RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_DBLVLINC), util_buff);
 			return FALSE;
 		}
 		if (blk_size != BM_SIZE(bplmap))
 		{
-			RTS_ERROR_FUNC(ERR_DBBMSIZE, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMSIZE, util_buff);
 			return FALSE;
 		}
 		mp = (sm_uc_ptr_t)bp + SIZEOF(blk_hdr);
 		if ((*mp & 1) != 0)
 		{	/* bitmap doesn't protect itself */
-			RTS_ERROR_FUNC(ERR_DBBMBARE, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMBARE, util_buff);
 			return FALSE;
 		}
 		full = TRUE;
@@ -181,14 +179,14 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			mask1 &= chunk;				/* check against the original contents */
 			if (mask1 != 0)				/* busy and reused should never appear together */
 			{
-				RTS_ERROR_FUNC(ERR_DBBMINV, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBBMINV, util_buff);
 				return FALSE;
 			}
 
 		}
 		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, MM_ADDR(csd), MASTER_MAP_BITS_PER_LMAP)))
 		{
-			RTS_ERROR_FUNC(ERR_DBBMMSTR, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMMSTR, util_buff);
 			/* DSE CACHE -VERIFY used to fail occasionally with the DBBMMSTR error because of passing
 			 * an older twin global buffer that contained stale bitmap information. That is now fixed.
 			 * So we dont expect any more such failures. Assert accordingly.
@@ -200,37 +198,37 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	}
 	if (blk_levl > MAX_BT_DEPTH)
 	{
-		RTS_ERROR_FUNC(ERR_DBBLEVMX, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBLEVMX, util_buff);
 		return FALSE;
 	}
 	if (blk_levl < 0)
 	{
-		RTS_ERROR_FUNC(ERR_DBBLEVMN, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBLEVMN, util_buff);
 		return FALSE;
 	}
 	if (blk_levl == 0)
 	{	/* data block */
 		if ((DIR_ROOT == blk) || (blk == root))
 		{	/* headed for where an index block should be */
-			RTS_ERROR_FUNC(ERR_DBROOTBURN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBROOTBURN, util_buff);
 			return FALSE;
 		}
-		if (blk_size < SIZEOF(blk_hdr))
+		if (blk_size < (uint4)SIZEOF(blk_hdr))
 		{
-			RTS_ERROR_FUNC(ERR_DBBSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff);
 			return FALSE;
 		}
 	} else
 	{	/* index block */
-		if (blk_size < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id)))
+		if (blk_size < (uint4)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id)))
 		{	/* must have at least one record */
-			RTS_ERROR_FUNC(ERR_DBBSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff);
 			return FALSE;
 		}
 	}
-	if (blk_size > csd->blk_size)
+	if (blk_size > (uint4)csd->blk_size)
 	{
-		RTS_ERROR_FUNC(ERR_DBBSIZMX, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBSIZMX, util_buff);
 		return FALSE;
 	}
 	if (0 == root)
@@ -259,7 +257,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
 	{
 		GET_RSIZ(rec_size, rp);
-		rec_offset = (int)((sm_ulong_t)rp - (sm_ulong_t)bp);
+		rec_offset = (uint4)((sm_ulong_t)rp - (sm_ulong_t)bp);
 		/*add util_buff here*/
 
 		util_len=0;
@@ -275,14 +273,14 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		util_len += SIZEOF(TEXT2) - 1;
 		util_buff[util_len] = 0;
 
-		if (rec_size <= SIZEOF(rec_hdr))
+		if (rec_size <= (uint4)SIZEOF(rec_hdr))
 		{
-			RTS_ERROR_FUNC(ERR_DBRSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBRSIZMN, util_buff);
 			return FALSE;
 		}
-		if (rec_size > (unsigned short)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
+		if (rec_size > (uint4)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
 		{
-			RTS_ERROR_FUNC(ERR_DBRSIZMX, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBRSIZMX, util_buff);
 			return FALSE;
 		}
 		r_top = (rec_hdr_ptr_t)((sm_ulong_t)rp + rec_size);
@@ -291,7 +289,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		{
 			if (rec_cmpc)
 			{
-				RTS_ERROR_FUNC(ERR_DBCMPNZRO, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBCMPNZRO, util_buff);
 				return FALSE;
 			}
 			if (0 == blk_levl)
@@ -305,12 +303,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		{	/* star key */
 			if (rec_size != SIZEOF(rec_hdr) + SIZEOF(block_id))
 			{
-				RTS_ERROR_FUNC(ERR_DBSTARSIZ, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBSTARSIZ, util_buff);
 				return FALSE;
 			}
 			if (rec_cmpc)
 			{
-				RTS_ERROR_FUNC(ERR_DBSTARCMP, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBSTARCMP, util_buff);
 				return FALSE;
 			}
 			blk_id_ptr = (sm_uc_ptr_t)rp + SIZEOF(rec_hdr);
@@ -324,7 +322,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				if (rec_cmpc >= prior_expkeylen)
 				{
-					RTS_ERROR_FUNC(ERR_DBCMPMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBCMPMX, util_buff);
 					return FALSE;
 				}
 				for (b_ptr = prior_expkey; b_ptr < (prior_expkey + rec_cmpc); b_ptr++)
@@ -355,7 +353,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 					prev_char_is_delimiter = FALSE;
 				if (blk_id_ptr >= (sm_uc_ptr_t)r_top)
 				{
-					RTS_ERROR_FUNC(ERR_DBKEYMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBKEYMX, util_buff);
 					return FALSE;
 				}
 			}
@@ -366,7 +364,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 				if (is_gvt)
 				{	/* this is a contradiction. a block cannot be a directory and gvt at the same time.
 					 * gvt should contain all keys with the same global name */
-					RTS_ERROR_FUNC(ERR_DBINVGBL, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBINVGBL, util_buff);
 					return FALSE;
 				}
 				is_directory = TRUE;	/* no need to do this if it was already TRUE but we save an if check */
@@ -376,19 +374,19 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 				if (is_directory)
 				{	/* this is a contradiction. a block cannot be a directory and gvt at the same time.
 					 * the directory tree should contain only name-level (i.e. unsubscripted) globals */
-					RTS_ERROR_FUNC(ERR_DBDIRTSUBSC, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBDIRTSUBSC, util_buff);
 					return FALSE;
 				}
 				is_gvt = TRUE;	/* no need to do this if it was already TRUE but we save an if check */
 			}
 			if (MAX_GVSUBSCRIPTS <= num_subscripts)
 			{
-				RTS_ERROR_FUNC(ERR_DBMAXNRSUBS, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBMAXNRSUBS, util_buff);
 				return FALSE;
 			}
 			if (blk_levl && (key_size != (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr))))
 			{
-				RTS_ERROR_FUNC(ERR_DBKEYMN, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBKEYMN, util_buff);
 				return FALSE;
 			}
 			assert(first_key || (rec_cmpc < prior_expkeylen));
@@ -396,12 +394,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				if (prior_expkey[rec_cmpc] == key_base[0])
 				{
-					RTS_ERROR_FUNC(ERR_DBCMPBAD, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBCMPBAD, util_buff);
 					return FALSE;
 				}
 				if (((unsigned int)prior_expkey[rec_cmpc] >= (unsigned int)key_base[0]))
 				{
-					RTS_ERROR_FUNC(ERR_DBKEYORD, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBKEYORD, util_buff);
 					return FALSE;
 				}
 			}
@@ -420,22 +418,22 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				if (child <= 0)
 				{
-					RTS_ERROR_FUNC(ERR_DBPTRNOTPOS, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
 				if (child > csa->ti->total_blks)
 				{
-					RTS_ERROR_FUNC(ERR_DBPTRMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff);
 					return FALSE;
 				}
 				if (!(child % bplmap))
 				{
-					RTS_ERROR_FUNC(ERR_DBPTRMAP, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRMAP, util_buff);
 					return FALSE;
 				}
 				if (child == prev_child)
 				{
-					RTS_ERROR_FUNC(ERR_DBBDBALLOC, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBBDBALLOC, util_buff);
 					return FALSE;
 				}
 				prev_child = child;
@@ -443,7 +441,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				if ((blk_id_ptr != next_tp_child_ptr) && (NULL != next_tp_child_ptr))
 				{
-					RTS_ERROR_FUNC(ERR_DBPTRNOTPOS, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
 				next_tp_child_ptr = blk_id_ptr + chain.next_off;
@@ -454,10 +452,4 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	}
 	assert(!is_directory || !is_gvt);	/* the block cannot be a directory AND gvt at the same time */
 	return TRUE;
-
-}
-
-void rts_error_func(int err, uchar_ptr_t buff)
-{
-	rts_error(VARLSTCNT(4) MAKE_MSG_INFO(err), 2, LEN_AND_STR((char_ptr_t)buff));
 }

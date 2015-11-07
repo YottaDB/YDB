@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,13 @@
 #include "gvcst_map_build.h"
 #include "mm_read.h"
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF cw_set_element	cw_set[];
-GBLREF unsigned char	rdfail_detail;
-GBLREF unsigned char    *non_tp_jfb_buff_ptr;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 
 void bm_setmap(block_id bml, block_id blk, int4 busy)
 {
@@ -96,8 +96,8 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	if (JNL_ENABLED(cs_data))
         {
                 cse = (cw_set_element *)(&cw_set[0]);
-                cse->new_buff = non_tp_jfb_buff_ptr;
-                memcpy(non_tp_jfb_buff_ptr, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
+                cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
+                memcpy(cse->new_buff, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
                 gvcst_map_build((uint4 *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
                 cse->done = TRUE;
         }

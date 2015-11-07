@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -435,7 +435,7 @@ void mupip_backup(void)
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
 		mubclnup(NULL, need_to_free_space);
-		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPCTRL);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 #	ifdef UNIX
@@ -450,12 +450,13 @@ void mupip_backup(void)
 		{	/* make sure backup files do not already exist */
 			if (FILE_PRESENT == (fstat_res = gtm_file_stat(replinstfile, NULL, NULL, FALSE, &ustatus)))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, LEN_AND_STR((char *)replinstfile->addr));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEEXISTS, 2,
+						LEN_AND_STR((char *)replinstfile->addr));
 				error_mupip = TRUE;
 			} else if (FILE_STAT_ERROR == fstat_res)
 			{	/* stat doesn't usually return with an error. Assert so we can analyze */
 				assert(FALSE);
-				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, ustatus);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, ustatus);
 				error_mupip = TRUE;
 			}
 		}
@@ -481,7 +482,7 @@ void mupip_backup(void)
 		{	/* make sure that backup won't be overwriting the database file itself */
 			if (TRUE == is_file_identical(file->addr, (char *)rptr->reg->dyn.addr->fname))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSELFBKUP, 2, DB_LEN_STR(rptr->reg));
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(4) ERR_MUSELFBKUP, 2, DB_LEN_STR(rptr->reg));
 				error_mupip = TRUE;
 			}
 #			ifdef UNIX
@@ -489,12 +490,14 @@ void mupip_backup(void)
 			{	/* make sure backup files do not already exist */
 				if (FILE_PRESENT == (fstat_res = gtm_file_stat(file, NULL, NULL, FALSE, &ustatus)))
 				{
-					gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, LEN_AND_STR((char *)file->addr));
+					gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(4) ERR_FILEEXISTS, 2,
+							LEN_AND_STR((char *)file->addr));
 					error_mupip = TRUE;
 				} else if (FILE_STAT_ERROR == fstat_res)
 				{	/* stat doesn't usually return with an error. Assert so we can analyze */
 					assert(FALSE);
-					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, ustatus);
+					gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("stat"), CALLFROM, ustatus);
 					error_mupip = TRUE;
 				}
 			}
@@ -513,7 +516,7 @@ void mupip_backup(void)
 			}
 		} else if (!incremental)
 		{ 	/* non-incremental backups to "exec" and "tcp" are not supported*/
-			gtm_putmsg(VARLSTCNT(1) ERR_NOTRNDMACC);
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(1) ERR_NOTRNDMACC);
 			error_mupip = TRUE;
 		}
 	}
@@ -582,7 +585,7 @@ void mupip_backup(void)
 		TP_CHANGE_REG(gv_cur_region);
 		if (gv_cur_region->read_only)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 			rptr->not_this_time = give_up_before_create_tempfile;
 			continue;
 		}
@@ -595,8 +598,8 @@ void mupip_backup(void)
 			 * overcome with more code to deal with the larger block sizes much like the regular
 			 * backup does but this is not being done as part of this (64bittn) project. SE 2/2005
 			 */
-			gtm_putmsg(VARLSTCNT(5) MAKE_MSG_TYPE(ERR_MUNOSTRMBKUP, ERROR), 3, DB_LEN_STR(gv_cur_region),
-				   32 * 1024 - DISK_BLOCK_SIZE);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) MAKE_MSG_TYPE(ERR_MUNOSTRMBKUP, ERROR), 3,
+					DB_LEN_STR(gv_cur_region), 32 * 1024 - DISK_BLOCK_SIZE);
 			rptr->not_this_time = give_up_before_create_tempfile;
 			continue;
 		}
@@ -637,7 +640,8 @@ void mupip_backup(void)
 			/* verify the accessibility of the tempdir */
 			if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &ustatus)))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, tempdir_trans.len, tempdir_trans.addr, ustatus);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, tempdir_trans.len,
+						tempdir_trans.addr, ustatus);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
@@ -655,7 +659,8 @@ void mupip_backup(void)
 				} else
 					util_out_print("!/Cannot create the temporary file in directory !AD for online backup",
 						TRUE, tempdir_trans.len, tempdir_trans.addr);
-				gtm_putmsg(VARLSTCNT(1) status);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
+				error_condition = status;
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -676,7 +681,8 @@ void mupip_backup(void)
 			{
 				status = errno;
 				util_out_print("!/Error re-opening temporary file created by mkstemp()!/", TRUE);
-				gtm_putmsg(VARLSTCNT(1) status);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
+				error_condition = status;
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -697,12 +703,12 @@ void mupip_backup(void)
 			if (-1 != fstat_res)
 				if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
 				{
-					send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 						RTS_ERROR_STRING(
 							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
 						PERMGENDIAG_ARGS(pdd));
-					gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 						RTS_ERROR_STRING(
 							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
@@ -717,7 +723,8 @@ void mupip_backup(void)
 				|| ((-1 != group_id) && (-1 == fchown(rptr->backup_fd, -1, group_id))))
 			{
 				status = errno;
-				gtm_putmsg(VARLSTCNT(1) status);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
+				error_condition = status;
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -745,7 +752,7 @@ void mupip_backup(void)
 			{
 				util_out_print("!/Unable to resolve concealed definition for file !AD ", TRUE,
 						temp_file_name_len, tempfilename);
-				gtm_putmsg(VARLSTCNT(1) ustatus);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ustatus);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_MUNOACTION);
 			}
@@ -778,7 +785,7 @@ void mupip_backup(void)
 				{
 					util_out_print("!/Cannot create the temporary file !AD for online backup.", TRUE,
 							LEN_AND_STR(tempfilename));
-					gtm_putmsg(VARLSTCNT(1) status);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
 					mubclnup(rptr, need_to_del_tempfile);
 					mupip_exit(ERR_MUNOACTION);
 				}
@@ -796,7 +803,7 @@ void mupip_backup(void)
 				if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
 				{
 					mubclnup(rptr, need_to_del_tempfile);
-					gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
 					mupip_exit(ERR_MUNOFINISH);
 				}
 			}
@@ -808,7 +815,7 @@ void mupip_backup(void)
 	if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
 	{
 		mubclnup(rptr, need_to_del_tempfile);
-		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPCTRL);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 #	ifdef UNIX
@@ -861,14 +868,14 @@ void mupip_backup(void)
 			{
 				if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
 				{
-					gtm_putmsg(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done1;
 				}
 				decr_cnt = TRUE;
 			} else if (!ftok_sem_lock(reg, FALSE, FALSE))
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			}
@@ -878,7 +885,7 @@ void mupip_backup(void)
 			assert(udi->ftok_semid && (INVALID_SEMID != udi->ftok_semid));
 			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			}
@@ -896,11 +903,11 @@ void mupip_backup(void)
 		{
 			assert(inst_hdr->crash);
 			semarg.buf = &semstat;
-			if (-1 == semctl(sem_id, 0, IPC_STAT, semarg))
+			if (-1 == semctl(sem_id, DB_CONTROL_SEM, IPC_STAT, semarg))
 			{
 				save_errno = errno;
 				SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SEMID (%d)", sem_id);
-				gtm_putmsg(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 						ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
@@ -908,7 +915,7 @@ void mupip_backup(void)
 			{
 				SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Journal Pool SEMID (%d) is %d; Expected %d",
 						sem_id, semarg.buf->sem_ctime, inst_hdr->jnlpool_semid_ctime);
-				gtm_putmsg(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 						ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
@@ -918,13 +925,14 @@ void mupip_backup(void)
 			if (SS_NORMAL != status)
 			{
 				save_errno = errno;
-				gtm_putmsg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Error with journal pool access semaphore"),
 						UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			}
 			udi->grabbed_access_sem = TRUE;
+			udi->counter_acc_incremented = TRUE;
 		}
 		/* At this point, we either hold the access control lock on the journal pool OR the journal pool
 		 * semaphore doesn't exist. In either case, we can proceed with the "cp" of the instance file
@@ -933,7 +941,7 @@ void mupip_backup(void)
 		if (inst_hdr->file_corrupt)
 		{
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 					ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 			error_mupip = TRUE;
 		}
@@ -1055,7 +1063,7 @@ repl_inst_bkup_done1:
 				}
 				assert(!kip_count);
 				UNIX_ONLY(GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 2, MAX_KIP_PID_SLOTS));
-				gtm_putmsg(VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
 			}
 			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
 			 * adjusted (to ensure time ordering of journal records within this region's journal file).
@@ -1121,9 +1129,9 @@ repl_inst_bkup_done1:
 					if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
 					{
 						save_errno = errno;
-						gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
 								RTS_ERROR_STRING(udi->fn));
-						gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 								RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);
 						error_mupip = TRUE;
 						goto repl_inst_bkup_done2;
@@ -1131,10 +1139,10 @@ repl_inst_bkup_done1:
 					if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
 					{
 						save_errno = errno;
-						gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
 								RTS_ERROR_STRING(udi->fn));
-						gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmat()"), CALLFROM,
-								save_errno);
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+								RTS_ERROR_LITERAL("shmat()"), CALLFROM, save_errno);
 						error_mupip = TRUE;
 						goto repl_inst_bkup_done2;
 					}
@@ -1165,7 +1173,7 @@ repl_inst_bkup_done1:
 					assert(!csa->hold_onto_crit);
 					jnlpool.jnlpool_ctl = (jnlpool_ctl_ptr_t)start_addr;
 					csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE);
-					csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE
+					csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE
 										+ SIZEOF(mutex_spin_parms_struct));
 					/* Do the per process initialization of mutex stuff (needed before grab_lock is done) */
 					csa->onln_rlbk_cycle = jnlpool.jnlpool_ctl->onln_rlbk_cycle;
@@ -1196,10 +1204,10 @@ repl_inst_bkup_done1:
 					if (-1 == shmdt((caddr_t)start_addr))
 					{
 						save_errno = errno;
-						gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id,
 								RTS_ERROR_STRING(udi->fn));
-						gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM,
-								save_errno);
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+								RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
 						error_mupip = TRUE;
 						goto repl_inst_bkup_done2;
 					}
@@ -1278,7 +1286,7 @@ repl_inst_bkup_done2:
 			{
 				if (0 != cs_addrs->hdr->abandoned_kills)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
 						LEN_AND_LIT("backup database could have incorrectly marked busy integrity errors"));
 				}
 				sbufh_p = cs_addrs->shmpool_buffer;
@@ -1287,7 +1295,7 @@ repl_inst_bkup_done2:
 					if (TRUE == is_proc_alive(sbufh_p->backup_pid, sbufh_p->backup_image_count))
 					{
 					    	/* someone else is doing the backup */
-						gtm_putmsg(VARLSTCNT(5) ERR_BKUPRUNNING, 3,
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_BKUPRUNNING, 3,
 								sbufh_p->backup_pid, REG_LEN_STR(rptr->reg));
 						rptr->not_this_time = give_up_after_create_tempfile;
 						/* Decerement counter so that inhibited KILLs can now proceed */
@@ -1325,7 +1333,7 @@ repl_inst_bkup_done2:
 							{
 								util_out_print("!/Journal file !AD not closed:",
 									TRUE, jnl_info.jnl_len, jnl_info.jnl);
-								gtm_putmsg(VARLSTCNT(1) status);
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
 								rptr->not_this_time = give_up_after_create_tempfile;
 								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);
@@ -1340,7 +1348,7 @@ repl_inst_bkup_done2:
 							if (FILE_STAT_ERROR == (jnl_fstat =
 									gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus)))
 							{
-								gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_JNLFNF, 2,
 									filestr.len, filestr.addr, ustatus);
 								rptr->not_this_time = give_up_after_create_tempfile;
 								DECR_INHIBIT_KILLS(cs_addrs->nl);
@@ -1365,15 +1373,15 @@ repl_inst_bkup_done2:
 								jnl_info.jnl_state = jnl_open;
 								jnl_info.repl_state = repl_open;
 								jnl_info.no_prev_link = TRUE;
-								gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATE, 6,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_REPLSTATE, 6,
 									LEN_AND_LIT(FILE_STR), DB_LEN_STR(gv_cur_region),
 									LEN_AND_STR(repl_state_lit[repl_open]));
-								gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLSTATE, 6,
 									LEN_AND_LIT(FILE_STR), DB_LEN_STR(gv_cur_region),
 									LEN_AND_STR(jnl_state_lit[jnl_open]));
 							} else if (!REPL_ALLOWED(cs_data))
 							{
-								gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATEERR, 2,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_REPLSTATEERR, 2,
 									DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
 									LEN_AND_LIT("Standalone access required"));
 								rptr->not_this_time = give_up_after_create_tempfile;
@@ -1386,7 +1394,7 @@ repl_inst_bkup_done2:
 						{ /* Do not switch journal file when replication was turned
 						     OFF by jnl_file_lost() */
 							assert(cs_data->jnl_state == jnl_closed);
-							gtm_putmsg(VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8,
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8,
 									LEN_AND_STR(jnl_state_lit[jnl_open]),
 									DB_LEN_STR(gv_cur_region),
 									LEN_AND_STR(repl_state_lit[repl_closed]),
@@ -1406,7 +1414,7 @@ repl_inst_bkup_done2:
 						if (EXIT_NRM == cre_jnl_file(&jnl_info))
 						{
 							if (jnl_info.no_prev_link && (save_no_prev_link != jnl_info.no_prev_link))
-								gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
 									JNL_LEN_STR(cs_data), DB_LEN_STR(rptr->reg));
 							memcpy(cs_data->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);
 							cs_data->jnl_file_name[jnl_info.jnl_len] = '\0';
@@ -1421,12 +1429,13 @@ repl_inst_bkup_done2:
 								cs_data->jnl_sync_io = sync_io;
 							cs_data->jnl_checksum = jnl_info.checksum;
 							cs_data->jnl_eovtn = cs_data->trans_hist.curr_tn;
-							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
-								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_JNLCREATE, 8,
+								jnl_info.jnl_len, jnl_info.jnl, LEN_AND_LIT("region"),
+								REG_LEN_STR(gv_cur_region),
 								LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
 							if (JNL_ENABLED(cs_data) &&
 								(jnl_options[jnl_noprevjnlfile] || !keep_prev_link))
-								gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT,
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_PREVJNLLINKCUT,
 									4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 							fc = gv_cur_region->dyn.addr->file_cntl;
 							fc->op = FC_WRITE;
@@ -1436,9 +1445,11 @@ repl_inst_bkup_done2:
 							status = dbfilop(fc);
 							if (SS_NORMAL != status)
 							{
-								UNIX_ONLY(gtm_putmsg(VARLSTCNT(7) ERR_DBFILERR, 2,
+								UNIX_ONLY(gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7)
+										ERR_DBFILERR, 2,
 										DB_LEN_STR(gv_cur_region), 0, status, 0);)
-								VMS_ONLY(gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2,
+								VMS_ONLY(gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9)
+										ERR_DBFILERR, 2,
 										DB_LEN_STR(gv_cur_region), 0, status, 0,
 										gds_info->fab->fab$l_stv, 0);)
 								rptr->not_this_time = give_up_after_create_tempfile;
@@ -1448,13 +1459,15 @@ repl_inst_bkup_done2:
 								continue;
 							}
 						} else
-							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+									jnl_info.jnl_len, jnl_info.jnl);
 					} else
-						gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_JNLDISABLE),
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) MAKE_MSG_WARNING(ERR_JNLDISABLE),
 										2, DB_LEN_STR(gv_cur_region));
 				} else if (replication_on && !REPL_ENABLED(cs_data))
 				{
-					gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATEERR, 2, DB_LEN_STR(gv_cur_region),
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8)
+						ERR_REPLSTATEERR, 2, DB_LEN_STR(gv_cur_region),
 						ERR_TEXT, 2,
 						LEN_AND_LIT("Cannot turn replication ON without also switching journal file"));
 					rptr->not_this_time = give_up_after_create_tempfile;
@@ -1465,7 +1478,7 @@ repl_inst_bkup_done2:
 				}
 				if (FALSE == shmpool_lock_hdr(gv_cur_region))
 				{
-					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
 					rptr->not_this_time = give_up_after_create_tempfile;
 					DECR_INHIBIT_KILLS(cs_addrs->nl);
@@ -1548,7 +1561,7 @@ repl_inst_bkup_done2:
 			}
 			if (jnl_options[jnl_off] || bkdbjnl_off_specified ||
 					jnl_options[jnl_disable] || bkdbjnl_disable_specified)
-				gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6, LEN_AND_LIT(FILE_STR),
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(8) ERR_JNLSTATE, 6, LEN_AND_LIT(FILE_STR),
 					rptr->backup_file.len, rptr->backup_file.addr,
 					LEN_AND_STR(jnl_state_lit[rptr->backup_hdr->jnl_state]));
 		}
@@ -1567,7 +1580,7 @@ repl_inst_bkup_done2:
 				 * In either case, the BACKUP is unreliable. Cleanup and exit
 				 */
 				error_mupip = TRUE;
-				gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 				break;
 			}
 #			endif
@@ -1586,7 +1599,7 @@ repl_inst_bkup_done2:
 	} else
 	{
 		mubclnup((backup_reg_list *)halt_ptr, need_to_rel_crit);
-		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPCTRL);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 	/* =============================== STEP 5. clean up  ============================================== */
@@ -1594,7 +1607,7 @@ repl_inst_bkup_done2:
 	REVERT;
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPCTRL);
 		ret = ERR_MUNOFINISH;
 	} else if (TRUE == error_mupip)
 		ret = ERR_MUNOFINISH;

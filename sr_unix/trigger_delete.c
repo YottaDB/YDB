@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,19 +68,20 @@ error_def(ERR_TRIGMODREGNOTRW);
 #define MAX_CMD_LEN		20	/* Plenty of room for S,K,ZK,ZTK */
 
 /* This error macro is used for all definition errors where the target is ^#t("TRHASH",<HASH>) */
-#define TRHASH_DEFINITION_RETRY_OR_ERROR(HASH)						\
+#define TRHASH_DEFINITION_RETRY_OR_ERROR(HASH, CSA)					\
 {											\
 	if (CDB_STAGNATE > t_tries)							\
 		t_retry(cdb_sc_triggermod);						\
 	else										\
 	{										\
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);	\
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
-			LEN_AND_LIT("\"#TRHASH\""),HASH->str.len, HASH->str.addr);	\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len,	\
+				trigvn, LEN_AND_LIT("\"#TRHASH\""),HASH->str.len,	\
+				HASH->str.addr);					\
 	}										\
 }
 
-#define SEARCH_AND_KILL_BY_HASH(TRIGVN, TRIGVN_LEN, HASH, TRIG_INDEX)								\
+#define SEARCH_AND_KILL_BY_HASH(TRIGVN, TRIGVN_LEN, HASH, TRIG_INDEX, CSA)							\
 {																\
 	mval			mv_hash_indx;											\
 	mval			mv_hash_val;											\
@@ -94,7 +95,7 @@ error_def(ERR_TRIGMODREGNOTRW);
 		gvcst_kill(FALSE);												\
 	} else															\
 	{	/* There has to be a #TRHASH entry */										\
-		TRHASH_DEFINITION_RETRY_OR_ERROR(HASH);										\
+		TRHASH_DEFINITION_RETRY_OR_ERROR(HASH, CSA);									\
 	}															\
 }
 
@@ -116,14 +117,14 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 	SWITCH_TO_DEFAULT_REGION;
 	assert(0 != gv_target->root);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
-		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, set_hash, match_index)
+		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, set_hash, match_index, csa)
 	}
 	if (del_kill_hash)
 	{
-		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, kill_hash, match_index);
+		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, kill_hash, match_index, csa);
 	}
 	RESTORE_TRIGGER_REGION_INFO;
 }
@@ -165,7 +166,7 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 	if (0 != gv_target->root)
 	{
 		if (gv_cur_region->read_only)
-			rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 		if (is_auto_name)
 		{
 			/* $get(^#t("#TNAME",<trunc_name>,"#TNCOUNT")) */
@@ -226,7 +227,7 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
 	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
@@ -237,7 +238,8 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 		else
 		{
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error(VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""), trig_name_len - 1, trig_name);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""), trig_name_len - 1,
+					trig_name);
 		}
 	}
 	len = STRLEN(trig_gbl.str.addr) + 1;
@@ -278,20 +280,20 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
 		if (!search_trigger_hash(trigvn, trigvn_len, set_hash, old_trig_index, &hash_index))
 		{	/* There has to be an entry with the old hash value, we just looked it up */
-			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash);
+			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash, csa);
 		}
 		MV_FORCE_UMVAL(&mv_hash, set_hash->hash_code);
 		MV_FORCE_MVAL(&mv_hash_indx, hash_index);
 		BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry */
-			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash);
+			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash, csa);
 		}
 		assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
 		len = STRLEN(key_val.str.addr);
@@ -311,14 +313,14 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	}
 	if (!search_trigger_hash(trigvn, trigvn_len, kill_hash, old_trig_index, &hash_index))
 	{	/* There has to be an entry with the old hash value, we just looked it up */
-		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash);
+		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash, csa);
 	}
 	MV_FORCE_UMVAL(&mv_hash, kill_hash->hash_code);
 	MV_FORCE_MVAL(&mv_hash_indx, hash_index);
 	BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
 	if (!gvcst_get(&key_val))
 	{	/* There has to be a #TRHASH entry */
-		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash);
+		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash, csa);
 	}
 	assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
 	len = STRLEN(key_val.str.addr);
@@ -385,7 +387,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	/* $data(^#t) */
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
@@ -416,7 +418,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			gbl_name.len = trigvn_len;
 			GV_BIND_NAME_ONLY(gd_header, &gbl_name);
 			if (gv_cur_region->read_only)
-				rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 			csa = gv_target->gd_csa;
 			SETUP_TRIGGER_GLOBAL;
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
@@ -638,8 +640,8 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 						else
 						{
 							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-							rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
-									trigvn_len, trigvn, trigvn_len, trigvn,
+							rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
+									6, trigvn_len, trigvn, trigvn_len, trigvn,
 									STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
 						}
 					}
@@ -729,11 +731,11 @@ void trigger_delete_all(void)
 	for (gvt = gv_target_list; NULL != gvt; gvt = gvt->next_gvnh)
 	{
 		if (gvt->trig_local_tn == local_tn)
-			rts_error(VARLSTCNT(1) ERR_TRIGMODINTP);
+			rts_error_csa(CSA_ARG(gvt->gd_csa) VARLSTCNT(1) ERR_TRIGMODINTP);
 	}
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 != gv_target->root)
 	{
@@ -759,7 +761,7 @@ void trigger_delete_all(void)
 			 * of triggers.
 			 */
 			if (reg->read_only)
-				rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, REG_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, REG_LEN_STR(reg));
 			/* Kill all descendents of ^#t(trigvn, indx) where trigvn is any global with a trigger,
 			 * but skip the "#XYZ" entries. setup ^#t(trigvn,"$") as the PREV key for op_gvorder
 			 */
@@ -788,7 +790,7 @@ void trigger_delete_all(void)
 							else
 							{
 								assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-								rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6,
+								rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_TRIGDEFBAD, 6,
 										curr_gbl_name.str.len, curr_gbl_name.str.addr,
 										curr_gbl_name.str.len, curr_gbl_name.str.addr,
 										LEN_AND_LIT("\"#CYCLE\""),
