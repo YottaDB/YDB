@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,19 +64,20 @@
  * the algorithm-specific (such as OpenSSL or GCRYPT) encryption or decryption state object, initialization vector (used only when
  * initializing the encryption / decryption state) and a pointer back to its respective key structure. An example is given below:
  *
- *                       ____________________________________________
- *                      |     cipher_head          db_cipher_entry   |
- *                .---> | (gtm_cipher_ctx_t *)  (gtm_cipher_ctx_t *) |
- *               |      |___/__________________________|_____________|
- *               |         /                           |
- *               |        /                        (DB ENCR) ---> (DB DECR)
- *               |   ____/____      _________      ____|____      _________
- *               |  |  prev   | <--|- prev   | <--|- prev   | <--|- prev   |
- *               |  |  next --|--> |  next --|--> |  next --|--> |  next   |
- *               |  |  store  |    |  store  |    |  store  |    |  store  |
- *               |  |____|____|    |____|____|    |____|____|    |____|____|
- *               |       |              |              |              |
- *               `-------'--------------'--------------'--------------`
+ *                     ___________________________________________________
+ *                    |     cipher_head                db_cipher_entry    |
+ *                .-->| (gtm_cipher_ctx_t *)         (gtm_cipher_ctx_t *) |
+ *               |    |________|_______________________________|__________|
+ *               |             |                               |
+ *               |             |                           (DB ENCR) ----> (DB DECR)
+ *               |             |                               |
+ *               |         ____v____       _________       ____v____       _________
+ *               |        |  prev   |<----|- prev   |<----|- prev   |<----|- prev   |
+ *               |        |  next --|---->|  next --|---->|  next --|---->|  next   |
+ *               |        |  store  |     |  store  |     |  store  |     |  store  |
+ *               |        |____|____|     |____|____|     |____|____|     |____|____|
+ *               |             |               |               |               |
+ *               `-------------'---------------'---------------'---------------'
  *
  * For the actual implementation of the above design please refer to gtmcrypt_dbk_ref.c.
  */
@@ -153,20 +154,24 @@ typedef struct gtm_keystore_unres_key_link_struct
 STATICFNDEF int			keystore_refresh();
 STATICFNDEF int 		read_files_section(config_t *cfgp);
 STATICFNDEF int 		read_database_section(config_t *cfgp);
-STATICFNDEF void		gtm_keystore_cleanup_node(gtm_keystore_t *);
-void				gtm_keystore_cleanup_all(void);
-STATICFNDEF void		gtm_keystore_cleanup_hash_tree(gtm_keystore_hash_link_t *entry);
+STATICFNDEF int			gtm_keystore_cleanup_node(gtm_keystore_t *);
+int				gtm_keystore_cleanup_all(void);
+STATICFNDEF int			gtm_keystore_cleanup_hash_tree(gtm_keystore_hash_link_t *entry);
 STATICFNDEF void		gtm_keystore_cleanup_keyname_tree(gtm_keystore_keyname_link_t *entry);
-STATICFNDEF void		gtm_keystore_cleanup_unres_key_list(gtm_keystore_unres_key_link_t *entry);
-int				gtmcrypt_getkey_by_keyname(char *keyname, int length, gtm_keystore_t **entry, int database);
-int				gtmcrypt_getkey_by_hash(unsigned char *hash, gtm_keystore_t **entry);
+STATICFNDEF void		gtm_keystore_cleanup_keypath_tree(gtm_keystore_keypath_link_t *entry);
+STATICFNDEF void		gtm_keystore_cleanup_unres_key_list(void);
+int				gtmcrypt_getkey_by_keyname(char *keyname, char *keypath, gtm_keystore_t **entry, int database);
+int				gtmcrypt_getkey_by_hash(unsigned char *hash, char *dbpath, gtm_keystore_t **entry);
 STATICFNDEF gtm_keystore_t	*gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length);
+STATICFNDEF void		insert_unresolved_key_link(char *keyname, char *keypath, int index, int status);
 STATICFNDEF gtm_keystore_t	*keystore_lookup_by_hash(unsigned char *hash);
-STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname(char *keyname, int length);
-STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keypath(char *keypath, int length);
-STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_unres_key(char *search_field, int search_len, int hash,
-				int database, int *error);
+STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname(char *keyname);
+STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname_plus(char *keyname, char *search_field, int search_type);
+STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keypath(char *keypath);
+STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_unres_key(char *search_field1, int search_field1_type,
+				char *search_field2, int search_field2_type, int database, int *error);
 int 				keystore_new_cipher_ctx(gtm_keystore_t *entry, char *iv, int length, int action);
-void 				keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx);
+int				keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx);
+STATICFNDEF void		print_debug(void);
 
 #endif /* GTMCRYPT_DBK_REF_H */

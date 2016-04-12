@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -402,7 +402,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CCECLSTPRCS */
 	   0,	/* ZSHOWBADFUNC */
 	   0,	/* NOTALLJNLEN */
-	   0,	/* ZSHOWGLOSMALL */
+	   0,	/* UNUSEDMSG570 */
 	   0,	/* NOLBRSRC */
 	   0,	/* INVZSTEP */
 	   0,	/* ZSTEPARG */
@@ -502,7 +502,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CETOOLONG */
 	   0,	/* CENOINDIR */
 	   0,	/* COLLATIONUNDEF */
-	   0,	/* RBWRNNOTCHG */
+	   0,	/* UNUSEDMSG670 */
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */
@@ -510,8 +510,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOPRINCIO */
 	   0,	/* INVPORTSPEC */
 	   0,	/* INVADDRSPEC */
-	  78,	/* UNUSEDMSG678 */
-	   0,	/* UNUSEDMSG679 */
+	   0,	/* MUREENCRYPTEND */
+	   0,	/* CRYPTJNLMISMATCH */
 	  80,	/* SOCKWAIT */
 	  81,	/* SOCKACPT */
 	  80,	/* SOCKINIT */
@@ -732,7 +732,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
 	   0,	/* RELINKCTLFULL */
-	   0,	/* UNUSEDMSG900 */
+	   0,	/* MUPIPSET2BIG */
 	   0,	/* DBBADNSUB */
 	   0,	/* DBBADKYNM */
 	   0,	/* DBBADPNTR */
@@ -783,7 +783,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBMBPFRINT */
 	   0,	/* DBMAXKEYEXC */
 	   0,	/* DBMXRSEXCMIN */
-	   0,	/* UNUSEDMSG951 */
+	   0,	/* MUPIPSET2SML */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
 	   0,	/* DBVERPERFWARN2 */
@@ -1148,11 +1148,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTDLNOOPEN */
 	   0,	/* CRYPTNOV4 */
 	   0,	/* CRYPTNOMM */
-	   0,	/* CRYPTJNLWRONGHASH */
+	   0,	/* UNUSEDMSG1316 */
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
-	   0,	/* UNUSEDMSG1320 */
+	   0,	/* CRYPTNOKEY */
 	   0,	/* BADTAG */
 	   0,	/* ICUVERLT36 */
 	   0,	/* ICUSYMNOTFOUND */
@@ -1422,7 +1422,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* RLNKRECLATCH */
 	   0,	/* RLNKSHMLATCH */
 	   0,	/* JOBLVN2LONG */
-	   0,	/* JOBLVNDETAIL */
+	   0,	/* NLRESTORE */
 	   0,	/* PREALLOCATEFAIL */
 	   0,	/* NODFRALLOCSUPP */
 	   0,	/* LASTWRITERBYPAS */
@@ -1433,4 +1433,21 @@ const static readonly int error_ansi[] = {
 	   0,	/* INVTMPDIR */
 	   0,	/* ARCTLMAXHIGH */
 	   0,	/* ARCTLMAXLOW */
+	   0,	/* NONTPRESTART */
+	   0,	/* PBNPARMREQ */
+	   0,	/* PBNNOPARM */
+	   0,	/* PBNUNSUPSTRUCT */
+	   0,	/* PBNINVALID */
+	   0,	/* PBNNOFIELD */
+	   0,	/* JNLDBSEQNOMATCH */
+	   0,	/* MULTIPROCLATCH */
+	   0,	/* INVLOCALE */
+	   0,	/* NOMORESEMCNT */
+	   0,	/* SETQUALPROB */
+	   0,	/* EXTRINTEGRITY */
+	   0,	/* CRYPTKEYRELEASEFAILED */
+	   0,	/* MUREENCRYPTSTART */
+	   0,	/* MUREENCRYPTV4NOALLOW */
+	   0,	/* ENCRYPTCONFLT */
+	   0,	/* JNLPOOLRECOVERY */
 	};

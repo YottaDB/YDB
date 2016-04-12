@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +43,7 @@ error_def(ERR_JNLCYCLE);
 error_def(ERR_JNLTNOUTOFSEQ);
 error_def(ERR_MUJNLPREVGEN);
 
-
+/* #GTM_THREAD_SAFE : The below function (mur_insert_prev) is thread-safe */
 boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 {
 	reg_ctl_list	*rctl;
@@ -59,7 +60,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 	memcpy(new_jctl->jnl_fn, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length);
 	new_jctl->jnl_fn_len = jctl->jfh->prev_jnl_file_name_length;
 	assert(0 != new_jctl->jnl_fn_len);
-	if (FALSE == mur_fopen(new_jctl))
+	if (SS_NORMAL != mur_fopen(new_jctl, rctl))
 	{
 		free(new_jctl);
 		return FALSE;	/* "mur_fopen" would have printed the appropriate error message */
@@ -103,8 +104,9 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 			return FALSE;
 		}
 	}
-	if ((rctl->gd->dyn.addr->fname_len != new_jctl->jfh->data_file_name_length) ||
-		(0 != memcmp(new_jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname, rctl->gd->dyn.addr->fname_len)))
+	if ((rctl->gd->dyn.addr->fname_len != new_jctl->jfh->data_file_name_length)
+		|| (0 != memcmp(new_jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname,
+								rctl->gd->dyn.addr->fname_len)))
 	{
 		for (rl_ptr = mur_options.redirect;  (NULL != rl_ptr);  rl_ptr = rl_ptr->next)
 		{
@@ -134,18 +136,16 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		}
 		if (new_jctl->jfh->turn_around_offset && cur_jctl->jfh->turn_around_offset)
 		{
-			if (rctl->recov_interrupted)
-			{	/* Possible if a first recovery with a turn-around-point (T2) got interrupted and a second
-				 * recovery with a new turn-around-point (T1 which is in a previous generation journal file)
-				 * was re-interrupted while in the middle of mur_process_intrpt_recov just after it had
-				 * recorded the new turn-around-point (T1) but before it had erased the former one (T2).
-				 * In this case, erase the turn-around-point T2 so this recovery goes back to T1. Here we
-				 * erase the value only in memory. The value on disk is reset later in mur_process_intrpt_recov.
-				 */
-				cur_jctl->jfh->turn_around_offset = 0;
-				cur_jctl->jfh->turn_around_time = 0;
-			} else
-				GTMASSERT; /* out of design situation */
+			assertpro(rctl->recov_interrupted);	/* else it is an out-of-design situation */
+			/* Possible if a first recovery with a turn-around-point (T2) got interrupted and a second
+			 * recovery with a new turn-around-point (T1 which is in a previous generation journal file)
+			 * was re-interrupted while in the middle of mur_process_intrpt_recov just after it had
+			 * recorded the new turn-around-point (T1) but before it had erased the former one (T2).
+			 * In this case, erase the turn-around-point T2 so this recovery goes back to T1. Here we
+			 * erase the value only in memory. The value on disk is reset later in mur_process_intrpt_recov.
+			 */
+			cur_jctl->jfh->turn_around_offset = 0;
+			cur_jctl->jfh->turn_around_time = 0;
 		}
 	}
 	new_jctl->prev_gen = NULL;

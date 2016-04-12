@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@
  *
  * Returns:	0 if the initialization succeeded; -1 otherwise.
  */
-int gc_sym_init()
+int gc_sym_init(void)
 {
 	gcry_error_t rv;
 
@@ -65,49 +66,65 @@ int gc_sym_init()
  * Destroy the specified encryption / decryption state object.
  *
  * Arguments:	handle	Encryption / decryption state object to destroy.
+ *
+ * Returns:	1 if the cipher handle was successfully destroyed; -1 otherwise.
  */
-void gc_sym_destroy_cipher_handle(crypt_key_t handle)
+int gc_sym_destroy_cipher_handle(crypt_key_t handle)
 {
 #	ifdef USE_OPENSSL
-	EVP_CIPHER_CTX_cleanup(&handle);
+	if (!EVP_CIPHER_CTX_cleanup(&handle))
+	{
+		GC_APPEND_OPENSSL_ERROR("Failed to destroy encryption key handle.");
+		return -1;
+	}
 #	endif
 #	ifdef USE_GCRYPT
 	if (handle)
 		gcry_cipher_close(handle);
 #	endif
+	return 0;
 }
 
 /*
- * Create an encryption / decryption state object based on the specified key and IV and assign it to the passed pointer.
+ * Create an encryption / decryption state object based on the specified key and IV and assign it to the passed pointer. If the
+ * reuse flag is TRUE, then the passed cipher state is not recreated but reinitialized with the specified IV. Note that for a
+ * successful reuse of the state object with OpenSSL the *same* raw key needs to be provided as during its creation.
  *
  * Arguments:	raw_key		Raw contents of the symmetric key to use.
  * 		iv		Initialization vector to use.
  * 		handle		Pointer to assign the newly created encryption / decryption state object to.
  * 		direction	Indicator of whether encryption or decryption state object is to be constructed.
+ * 		reuse		Indicator of whether the state object should be reused or recreated.
  *
  * Returns:	0 if the state object was successfully constructed; -1 otherwise.
  */
-int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt_key_t *handle, int direction)
+int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt_key_t *handle, int direction, int reuse)
 {
 	int rv, plain_text_length;
 
 #	ifdef USE_OPENSSL
-	EVP_CIPHER_CTX_init(handle);
-	if (!EVP_CipherInit(handle, ALGO, raw_key, iv, direction))
+	if (!reuse)
+	{
+		EVP_CIPHER_CTX_init(handle);
+	}
+	if (!EVP_CipherInit_ex(handle, ALGO, NULL, raw_key, iv, direction))
 	{
 		GC_APPEND_OPENSSL_ERROR("Failed to initialize encryption key handle.");
 		return -1;
 	}
 #	else
-	if (0 != (rv = gcry_cipher_open(handle, ALGO, MODE, 0)))
+	if (!reuse)
 	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_open').");
-		return -1;
-	}
-	if (0 != (rv = gcry_cipher_setkey(*handle, raw_key, SYMMETRIC_KEY_MAX)))
-	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_setkey').");
-		return -1;
+		if (0 != (rv = gcry_cipher_open(handle, ALGO, MODE, 0)))
+		{
+			GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_open').");
+			return -1;
+		}
+		if (0 != (rv = gcry_cipher_setkey(*handle, raw_key, SYMMETRIC_KEY_MAX)))
+		{
+			GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_setkey').");
+			return -1;
+		}
 	}
 	gcry_cipher_setiv(*handle, iv, GTMCRYPT_IV_LEN);
 #	endif
@@ -156,9 +173,9 @@ int gc_sym_encrypt_decrypt(crypt_key_t *key, unsigned char *in_block, int in_blo
 		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherUpdate' failed.")
 		return -1;
 	}
-	if (!EVP_CipherFinal(key, out_block + out_block_len, &tmp_len))
+	if (!EVP_CipherFinal_ex(key, out_block + out_block_len, &tmp_len))
 	{
-		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherFinal' failed.")
+		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherFinal_ex' failed.")
 		return -1;
 	}
 #	endif

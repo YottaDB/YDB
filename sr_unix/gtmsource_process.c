@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,10 +25,10 @@
 #include "gtm_unistd.h"
 #include "gtm_time.h"
 #include "gtm_stat.h"
+#include "gtm_signal.h"
 #include <sys/time.h>
 
 #include <errno.h>
-#include <signal.h>
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -53,7 +54,6 @@
 #include "repl_filter.h"
 #include "repl_log.h"
 #include "min_max.h"
-#include "rel_quant.h"
 #include "copy.h"
 #include "ftok_sems.h"
 #include "repl_instance.h"
@@ -216,6 +216,18 @@ GBLREF	uint4			process_id;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	uint4			heartbeat_counter;
 
+STATICDEF	boolean_t	xon_wait_logged = FALSE;
+STATICDEF	boolean_t	already_communicated = FALSE;
+STATICDEF	seq_num		recvd_seqno = 0;
+STATICDEF	int		recvd_start_flags = START_FLAG_NONE;
+STATICDEF	int		poll_time = REPL_POLL_NOWAIT;
+#ifdef GTM_TLS
+STATICDEF	uint4		next_renegotiate_hrtbt = 0;
+#ifdef DEBUG
+STATICDEF	boolean_t	renegotiation_pending = 0;
+#endif
+#endif
+
 error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
 error_def(ERR_REPLCOMM);
@@ -341,38 +353,327 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 	}
 }
 
+/* Returns TRUE if the state changed to a transitional state while handling control messages */
+boolean_t gtmsource_recv_ctl_nowait(void)
+{
+	gtmsource_state_t	gtmsource_state_sav;
+	int			poll_time_sav;
+
+	GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
+	poll_time_sav = poll_time;
+	poll_time = REPL_POLL_NOWAIT;
+	gtmsource_recv_ctl();
+	/* If we changed state, keep the poll_time associated with the new state.
+	 * However, TLS messaging changes poll_time without changing state, so restore poll_time to match the prior state.
+	 */
+	if (!GTMSOURCE_CHANGED_STATE(gtmsource_state_sav))
+		poll_time = poll_time_sav;
+	return (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav));
+}
+
+void gtmsource_recv_ctl(void)
+{
+	gtmsource_local_ptr_t		gtmsource_local;
+	repl_msg_t			renegotiate_msg;
+	repl_msg_t			xoff_ack;
+	repl_heartbeat_msg_ptr_t	heartbeat_msg;
+	repl_msg_t			recv_msg, *recv_msgp;			/* gtmsource_msgp may be in use; use this instead */
+	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
+	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
+	boolean_t			msg_is_cross_endian;
+	seq_num				tmp_seqno;
+	gtm_time4_t			tmp_time4;
+	int				index;
+	char				err_string[1024];
+
+	/* Check if receiver sent us any control message. Typically, the traffic from receiver to source is very
+	 * low compared to traffic in the other direction. More often than not, there will be nothing on the pipe
+	 * to receive. Ideally, we should let TCP notify us when there is data on the pipe (async I/O on Unix and
+	 * VMS). But, we are not there yet. Since we do a select() before a recv(), we won't block if there is
+	 * nothing in the pipe. So, it shouldn't be an expensive operation even if done before every send. Also,
+	 * in doing so, we react to an XOFF sooner than later.
+	 */
+	/* Make sure we don't sleep for an extended period of time if there is something to be sent across */
+	assert((GTMSOURCE_SENDING_JNLRECS != gtmsource_state)
+			|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time))
+			GTMTLS_ONLY(DEBUG_ONLY(|| renegotiation_pending)));
+	if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+		return;
+	if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+		return;
+#	ifdef GTM_TLS
+	assert(repl_tls.enabled || (REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state));
+	if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state)
+		&& (heartbeat_counter >= next_renegotiate_hrtbt))
+	{	/* Time to renegotiate the TLS/SSL parameters. */
+		heartbeat_stalled = TRUE;	/* Defer heartbeats until renegotiation is done. */
+		DEBUG_ONLY(renegotiation_pending = TRUE);
+		/* Send REPL_RENEG_ACK_ME message to the receiver. */
+		renegotiate_msg.type = REPL_RENEG_ACK_ME;
+		renegotiate_msg.len = MIN_REPL_MSGLEN;
+		gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_ACK_ME",
+						MAX_SEQNO, INVALID_SUPPL_STRM);
+		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+			return;
+		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+			return;
+		/* We now have to wait for REPL_RENEG_ACK from the receiver. Until then we defer sending journal
+		 * records to the other side. This way, we don't end up having outbound data in the TCP/IP pipe
+		 * during the time of renegotiation. TLS/SSL protocol doesn't handle application data when it is
+		 * in the middle of renegotiation. Similarly, the receiver on receipt of the REPL_RENEG_ACK_ME
+		 * message will defer sending any more messages to us until the renegotiation is completed.
+		 */
+		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_ACK;
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for REPL_RENEG_ACK\n");
+		poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_RENEG_ACK */
+	}
+#	endif
+	recv_msgp = &recv_msg;
+	REPL_RECV_LOOP(gtmsource_sock_fd, recv_msgp, MIN_REPL_MSGLEN, poll_time)
+	{
+		if (0 == recvd_len) /* nothing received in the first attempt, let's try again later */
+			break;
+		gtmsource_poll_actions(TRUE);
+		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+			return;
+		else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+			break;
+	}
+	gtmsource_local = jnlpool.gtmsource_local;
+	if ((SS_NORMAL == status) && (0 != recvd_len))
+	{	/* Process the received control message */
+		assert(MIN_REPL_MSGLEN == recvd_len);
+		REPL_DPRINT3("gtmsource_process: %d bytes received, type is %d\n", recvd_len, recv_msgp->type);
+		/* One is not always guaranteed the received message is in source native endian format.
+		 * See endianness related comments in gtmsource_recv_restart for why. So be safe and handle
+		 * it just like how gtmsource_recv_restart does. The below check works as all messages we
+		 * expect at this point have a fixed length of MIN_REPL_MSGLEN.
+		 */
+		msg_is_cross_endian = (((unsigned)MIN_REPL_MSGLEN < (unsigned)recv_msgp->len)
+				&& ((unsigned)MIN_REPL_MSGLEN == GTM_BYTESWAP_32((unsigned)recv_msgp->len)));
+		if (msg_is_cross_endian)
+		{
+			recv_msgp->type = GTM_BYTESWAP_32(recv_msgp->type);
+			recv_msgp->len = GTM_BYTESWAP_32(recv_msgp->len);
+		}
+		assert(MIN_REPL_MSGLEN == recv_msgp->len);
+		assert(remote_side->endianness_known);
+		switch(recv_msgp->type)
+		{
+			case REPL_XOFF:
+			case REPL_XOFF_ACK_ME:
+				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_XON;
+				poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_XON */
+				repl_log(gtmsource_log_fp, TRUE, TRUE,
+					 "REPL_XOFF/REPL_XOFF_ACK_ME received. Send stalled...\n");
+				xon_wait_logged = FALSE;
+				if (REPL_XOFF_ACK_ME == recv_msgp->type)
+				{
+					xoff_ack.type = REPL_XOFF_ACK;
+					tmp_seqno = *(seq_num *)&recv_msgp->msg[0];
+					if (msg_is_cross_endian)
+						tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
+					*(seq_num *)&xoff_ack.msg[0] = tmp_seqno;
+					xoff_ack.len = MIN_REPL_MSGLEN;
+					gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK",
+						MAX_SEQNO, INVALID_SUPPL_STRM);
+					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						return;	/* "gtmsource_repl_send" did not complete */
+					if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+						break;	/* "gtmsource_repl_send" did not complete */
+					/* REPL_XOFF_ACK_ME is always followed by either a REPL_START_JNL_SEQNO,
+					 * REPL_CMP2UNCMP or REPL_BADTRANS. We don't want to be doing TLS/SSL
+					 * renegotiation in the middle of these messages as the logic on the
+					 * receiver side is complicated enough to include TLS/SSL renegotiation.
+					 * In all three cases, we go break out of this loop and redo the replication
+					 * handshake. So, set the state to skip renegotiation in the mean time.
+					 */
+#					ifdef GTM_TLS
+					if (repl_tls.enabled)
+						repl_tls.renegotiate_state = REPLTLS_SKIP_RENEGOTIATION;
+#					endif
+				}
+				break;
+			case REPL_XON:
+				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
+				poll_time = REPL_POLL_NOWAIT; /* because we received XON and data ready for send */
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_XON received\n");
+				GTMTLS_ONLY(if (REPLTLS_WAITING_FOR_RENEG_ACK != repl_tls.renegotiate_state))
+					heartbeat_stalled = FALSE;
+				REPL_DPRINT1("Restarting HEARTBEAT\n");
+				break;
+			case REPL_BADTRANS:
+			case REPL_CMP2UNCMP:
+			case REPL_START_JNL_SEQNO:
+				/* A REPL_XOFF_ACK_ME must have been sent before. Ensure by asserting that we are
+				 * waiting for an XON.
+				 */
+				assert(GTMSOURCE_WAITING_FOR_XON == gtmsource_state);
+				QWASSIGN(recvd_seqno, *(seq_num *)&recv_msgp->msg[0]);
+				if (msg_is_cross_endian)
+					recvd_seqno = GTM_BYTESWAP_64(recvd_seqno);
+				gtmsource_state = gtmsource_local->gtmsource_state
+					= GTMSOURCE_SEARCHING_FOR_RESTART;
+				if ((REPL_BADTRANS == recv_msgp->type)
+					|| (REPL_CMP2UNCMP == recv_msgp->type))
+				{
+					already_communicated = TRUE;
+					recvd_start_flags = START_FLAG_NONE;
+					if (REPL_BADTRANS == recv_msgp->type)
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_BADTRANS "
+							"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
+							recvd_seqno, recvd_seqno);
+					else
+					{
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_CMP2UNCMP "
+							"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
+							recvd_seqno, recvd_seqno);
+						repl_log(gtmsource_log_fp, TRUE, FALSE,
+							"Defaulting to NO compression for this connection\n");
+						gtmsource_received_cmp2uncmp_msg = TRUE;
+					}
+				} else
+				{
+					recvd_start_flags = ((repl_start_msg_ptr_t)recv_msgp)->start_flags;
+					if (msg_is_cross_endian)
+						recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
+					already_communicated = FALSE;
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+						"Received REPL_START_JNL_SEQNO message with SEQNO "INT8_FMT" "
+						INT8_FMTX". Possible crash of recvr/update process\n",
+						recvd_seqno, recvd_seqno);
+				}
+				break;
+			case REPL_HEARTBEAT:
+				if (msg_is_cross_endian)
+				{
+					heartbeat_msg = (repl_heartbeat_msg_ptr_t)recv_msgp;
+					tmp_seqno = *(seq_num *)&heartbeat_msg->ack_seqno[0];
+					tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
+					*(seq_num *)&heartbeat_msg->ack_seqno[0] = tmp_seqno;
+					tmp_time4 = *(gtm_time4_t *)&heartbeat_msg->ack_time[0];
+					tmp_time4 = GTM_BYTESWAP_32(tmp_time4);
+					*(gtm_time4_t *)&heartbeat_msg->ack_time[0] = tmp_time4;
+				}
+				gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)recv_msgp);
+				break;
+#			ifdef GTM_TLS
+			case REPL_RENEG_ACK:
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
+				REPLTLS_RENEGOTIATE(repl_tls.sock, status);
+				poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
+				if (0 != status)
+				{
+					assert(GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state);
+					break;
+				}
+				/* Send the REPL_RENEG_COMPLETE message. */
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_RENEG_COMPLETE\n");
+				renegotiate_msg.type = REPL_RENEG_COMPLETE;
+				renegotiate_msg.len = MIN_REPL_MSGLEN;
+				gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_COMPLETE",
+								MAX_SEQNO, INVALID_SUPPL_STRM);
+				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					return;
+				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					break;
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RENEG_COMPLETE message."
+						" TLS/SSL connection successfully renegotiated.\n");
+				assert(heartbeat_stalled);
+				if (GTMSOURCE_WAITING_FOR_XON != gtmsource_state)
+					heartbeat_stalled = FALSE;
+				/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
+				DEBUG_ONLY(renegotiation_pending = FALSE);
+				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
+				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
+				break;
+#			endif
+			default:
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d of length %d "
+					"bytes received; hex dump follows\n", recv_msgp->type, recvd_len);
+				for (index = 0; index < MIN(recvd_len, gtmsource_msgbufsiz - REPL_MSG_HDRLEN); )
+				{
+					repl_log(gtmsource_log_fp, FALSE, FALSE, "%.2x ",
+							recv_msgp->msg[index]);
+					if ((++index) % MAX_HEXDUMP_CHARS_PER_LINE == 0)
+						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
+				}
+				repl_log(gtmsource_log_fp, FALSE, TRUE, "\n"); /* flush BEFORE the assert */
+				assert(FALSE);
+				break;
+		}
+#		ifdef GTM_TLS
+		/* On receipt of a REPL_XOFF_ACK_ME, we should no longer wait-for/attempt TLS/SSL
+		 * renegotiation.
+		 */
+		assert((REPL_XOFF_ACK_ME != recv_msgp->type)
+				|| !repl_tls.enabled || (REPLTLS_SKIP_RENEGOTIATION == repl_tls.renegotiate_state));
+#		endif
+	} else if (SS_NORMAL != status)
+	{
+		if (EREPL_RECV == repl_errno)
+		{
+			if (REPL_CONN_RESET(status))
+			{
+				/* Connection reset */
+				repl_log(gtmsource_log_fp, TRUE, TRUE,
+					"Connection reset while attempting to receive from secondary."
+					" Status = %d ; %s\n", status, STRERROR(status));
+				repl_close(&gtmsource_sock_fd);
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+				gtmsource_state = gtmsource_local->gtmsource_state
+					= GTMSOURCE_WAITING_FOR_CONNECTION;
+				return;
+			} else
+			{
+				SNPRINTF(err_string, SIZEOF(err_string),
+						"Error receiving Control message from Receiver. Error in recv : %s",
+						STRERROR(status));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						 LEN_AND_STR(err_string));
+			}
+		} else if (EREPL_SELECT == repl_errno)
+		{
+			SNPRINTF(err_string, SIZEOF(err_string),
+					"Error receiving Control message from Receiver. Error in select : %s",
+					STRERROR(status));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					 LEN_AND_STR(err_string));
+		}
+	}
+}
+
 /* The work-horse of the Source Server */
 int gtmsource_process(void)
 {
 	gtmsource_local_ptr_t		gtmsource_local;
 	jnlpool_ctl_ptr_t		jctl;
-	seq_num				recvd_seqno, sav_read_jnl_seqno;
+	seq_num				sav_read_jnl_seqno;
 	seq_num				recvd_jnl_seqno, tmp_read_jnl_seqno;
 	int				data_len, srch_status;
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
-	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tot_tr_len, send_tr_len, remaining_len, pre_cmpmsglen;
-	int				recvd_msg_type, recvd_start_flags;
+	int				recvd_msg_type;
 	uchar_ptr_t			in_buff, out_buff, out_buffmsg;
 	uint4				in_buflen, out_buflen, out_bufsiz;
 	seq_num				log_seqno, diff_seqno, pre_read_seqno, post_read_seqno, jnl_seqno;
 	char				err_string[1024];
-	boolean_t			xon_wait_logged, already_communicated;
 	double				time_elapsed;
 	seq_num				resync_seqno, zqgblmod_seqno, filter_seqno;
 	gd_region			*reg, *region_top;
 	sgmnt_addrs			*csa, *repl_csa;
 	qw_num				delta_sent_cnt, delta_data_sent, delta_msg_sent;
 	time_t				prev_now;
-	int				index, poll_time;
+	int				index;
 	uint4				temp_ulong;
 	unix_db_info			*udi;
 	repl_histinfo			remote_histinfo, local_histinfo;
 	int4				num_histinfo, max_epoch_interval;
 	seq_num				local_jnl_seqno, tmp_seqno;
-	repl_msg_t			xoff_ack, instnohist_msg, losttncomplete_msg;
+	repl_msg_t			instnohist_msg, losttncomplete_msg;
 	repl_msg_ptr_t			send_msgp;
 	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
@@ -383,14 +684,8 @@ int gtmsource_process(void)
 	int4				msghdrlen;
 	Bytef				*cmpbufptr;
 	char				histdetail[256];
-	gtm_time4_t			tmp_time4;
-	repl_heartbeat_msg_ptr_t	heartbeat_msg;
 	sm_global_latch_ptr_t		gtmsource_srv_latch;
-#	ifdef GTM_TLS
-	repl_msg_t			renegotiate_msg;
-	uint4				next_renegotiate_hrtbt;
-	DEBUG_ONLY(boolean_t		renegotiation_pending;)
-#	endif
+	gtmsource_state_t		gtmsource_state_sav;
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
@@ -649,10 +944,14 @@ int gtmsource_process(void)
 				gtmsource_poll_actions(FALSE);
 				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 					return (SS_NORMAL);
+				else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					break; /* Break this loop */
 				num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
 				if (num_histinfo)	/* Number of histinfos is non-zero */
 					break;
 			} while (TRUE);
+			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				continue; /* Restart the outer loop */
 			repl_log(gtmsource_log_fp, TRUE, TRUE,
 				"First history record written by update process. Source server proceeding.\n");
 		}
@@ -977,13 +1276,17 @@ int gtmsource_process(void)
 				REPL_DPRINT2(", curr_seqno is "INT8_FMT"\n", jctl->jnl_seqno);
 				if (zqgblmod_seqno > resync_seqno)
 				{	/* reset "zqgblmod_seqno" and "zqgblmod_tn" in all fileheaders to "resync_seqno" */
+					GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 					if (SS_NORMAL != gtmsource_update_zqgblmod_seqno_and_tn(resync_seqno))
 					{
 						assert(GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state);
 						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 							continue;
 					}
-
+					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						return (SS_NORMAL);
+					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+						continue;
 				}
 			}
 			/* Could send a REPL_CLOSE_CONN message here */
@@ -1058,7 +1361,7 @@ int gtmsource_process(void)
 			 * Indicate that they have to be repositioned into the past.
 			 */
 			assert(READ_FILE == gtmsource_local->read_state);
-			gtmsource_set_lookback();
+			gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
 		}
 		/* The variable poll_time indicates if we should wait for the receive pipe to be I/O ready and should be set to
 		 * a non-zero value ONLY if the source server has nothing to send. At this point we have data to send and so
@@ -1116,6 +1419,8 @@ int gtmsource_process(void)
 			gtmsource_poll_actions(TRUE);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
+			else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				break; /* The outerloop will continue */
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
 			if (gtmsource_local->send_losttn_complete)
@@ -1159,254 +1464,15 @@ int gtmsource_process(void)
 					gtmsource_alloc_msgbuff(MAX_REPL_MSGLEN, TRUE); /* will also allocate filter buffer */
 				}
 			}
-			/* Check if receiver sent us any control message. Typically, the traffic from receiver to source is very
-			 * low compared to traffic in the other direction. More often than not, there will be nothing on the pipe
-			 * to receive. Ideally, we should let TCP notify us when there is data on the pipe (async I/O on Unix and
-			 * VMS). But, we are not there yet. Since we do a select() before a recv(), we won't block if there is
-			 * nothing in the pipe. So, it shouldn't be an expensive operation even if done before every send. Also,
-			 * in doing so, we react to an XOFF sooner than later.
+			/* GTMSOURCE_SAVE_STATE() and GTMSOURCE_NOW_TRANSITIONAL() check are not needed
+			 * here as the existing logic handles transitions.
 			 */
-			/* Make sure we don't sleep for an extended period of time if there is something to be sent across */
-			assert((GTMSOURCE_SENDING_JNLRECS != gtmsource_state)
-					|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time))
-					GTMTLS_ONLY(DEBUG_ONLY(|| renegotiation_pending)));
-#			ifdef GTM_TLS
-			assert(repl_tls.enabled || (REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state));
-			if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state)
-				&& (heartbeat_counter >= next_renegotiate_hrtbt))
-			{	/* Time to renegotiate the TLS/SSL parameters. */
-				heartbeat_stalled = TRUE;	/* Defer heartbeats until renegotiation is done. */
-				DEBUG_ONLY(renegotiation_pending = TRUE);
-				/* Send REPL_RENEG_ACK_ME message to the receiver. */
-				renegotiate_msg.type = REPL_RENEG_ACK_ME;
-				renegotiate_msg.len = MIN_REPL_MSGLEN;
-				gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_ACK_ME",
-								MAX_SEQNO, INVALID_SUPPL_STRM);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-					return SS_NORMAL;
-				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-					break;
-				/* We now have to wait for REPL_RENEG_ACK from the receiver. Until then we defer sending journal
-				 * records to the other side. This way, we don't end up having outbound data in the TCP/IP pipe
-				 * during the time of renegotiation. TLS/SSL protocol doesn't handle application data when it is
-				 * in the middle of renegotiation. Similarly, the receiver on receipt of the REPL_RENEG_ACK_ME
-				 * message will defer sending any more messages to us until the renegotiation is completed.
-				 */
-				repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_ACK;
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for REPL_RENEG_ACK\n");
-				poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_RENEG_ACK */
-			}
-#			endif
-			REPL_RECV_LOOP(gtmsource_sock_fd, gtmsource_msgp, MIN_REPL_MSGLEN, poll_time)
-			{
-				if (0 == recvd_len) /* nothing received in the first attempt, let's try again later */
-					break;
-				gtmsource_poll_actions(TRUE);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-					return (SS_NORMAL);
-				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-					break;
-			}
-			if ((SS_NORMAL == status) && (0 != recvd_len))
-			{	/* Process the received control message */
-				assert(MIN_REPL_MSGLEN == recvd_len);
-				REPL_DPRINT3("gtmsource_process: %d bytes received, type is %d\n", recvd_len, gtmsource_msgp->type);
-				/* One is not always guaranteed the received message is in source native endian format.
-				 * See endianness related comments in gtmsource_recv_restart for why. So be safe and handle
-				 * it just like how gtmsource_recv_restart does. The below check works as all messages we
-				 * expect at this point have a fixed length of MIN_REPL_MSGLEN.
-				 */
-				msg_is_cross_endian = (((unsigned)MIN_REPL_MSGLEN < (unsigned)gtmsource_msgp->len)
-						&& ((unsigned)MIN_REPL_MSGLEN == GTM_BYTESWAP_32((unsigned)gtmsource_msgp->len)));
-				if (msg_is_cross_endian)
-				{
-					gtmsource_msgp->type = GTM_BYTESWAP_32(gtmsource_msgp->type);
-					gtmsource_msgp->len = GTM_BYTESWAP_32(gtmsource_msgp->len);
-				}
-				assert(MIN_REPL_MSGLEN == gtmsource_msgp->len);
-				assert(remote_side->endianness_known);
-				switch(gtmsource_msgp->type)
-				{
-					case REPL_XOFF:
-					case REPL_XOFF_ACK_ME:
-						gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_XON;
-						poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_XON */
-						repl_log(gtmsource_log_fp, TRUE, TRUE,
-							 "REPL_XOFF/REPL_XOFF_ACK_ME received. Send stalled...\n");
-						xon_wait_logged = FALSE;
-						if (REPL_XOFF_ACK_ME == gtmsource_msgp->type)
-						{
-							xoff_ack.type = REPL_XOFF_ACK;
-							tmp_seqno = *(seq_num *)&gtmsource_msgp->msg[0];
-							if (msg_is_cross_endian)
-								tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
-							*(seq_num *)&xoff_ack.msg[0] = tmp_seqno;
-							xoff_ack.len = MIN_REPL_MSGLEN;
-							gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK",
-								MAX_SEQNO, INVALID_SUPPL_STRM);
-							if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-								return (SS_NORMAL);	/* "gtmsource_repl_send" did not complete */
-							if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-								break;	/* "gtmsource_repl_send" did not complete */
-							/* REPL_XOFF_ACK_ME is always followed by either a REPL_START_JNL_SEQNO,
-							 * REPL_CMP2UNCMP or REPL_BADTRANS. We don't want to be doing TLS/SSL
-							 * renegotiation in the middle of these messages as the logic on the
-							 * receiver side is complicated enough to include TLS/SSL renegotiation.
-							 * In all three cases, we go break out of this loop and redo the replication
-							 * handshake. So, set the state to skip renegotiation in the mean time.
-							 */
-#							ifdef GTM_TLS
-							if (repl_tls.enabled)
-								repl_tls.renegotiate_state = REPLTLS_SKIP_RENEGOTIATION;
-#							endif
-						}
-						break;
-					case REPL_XON:
-						gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
-						poll_time = REPL_POLL_NOWAIT; /* because we received XON and data ready for send */
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_XON received\n");
-						GTMTLS_ONLY(if (REPLTLS_WAITING_FOR_RENEG_ACK != repl_tls.renegotiate_state))
-							heartbeat_stalled = FALSE;
-						REPL_DPRINT1("Restarting HEARTBEAT\n");
-						break;
-					case REPL_BADTRANS:
-					case REPL_CMP2UNCMP:
-					case REPL_START_JNL_SEQNO:
-						/* A REPL_XOFF_ACK_ME must have been sent before. Ensure by asserting that we are
-						 * waiting for an XON.
-						 */
-						assert(GTMSOURCE_WAITING_FOR_XON == gtmsource_state);
-						QWASSIGN(recvd_seqno, *(seq_num *)&gtmsource_msgp->msg[0]);
-						if (msg_is_cross_endian)
-							recvd_seqno = GTM_BYTESWAP_64(recvd_seqno);
-						gtmsource_state = gtmsource_local->gtmsource_state
-							= GTMSOURCE_SEARCHING_FOR_RESTART;
-						if ((REPL_BADTRANS == gtmsource_msgp->type)
-							|| (REPL_CMP2UNCMP == gtmsource_msgp->type))
-						{
-							already_communicated = TRUE;
-							recvd_start_flags = START_FLAG_NONE;
-							if (REPL_BADTRANS == gtmsource_msgp->type)
-								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_BADTRANS "
-									"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
-									recvd_seqno, recvd_seqno);
-							else
-							{
-								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_CMP2UNCMP "
-									"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
-									recvd_seqno, recvd_seqno);
-								repl_log(gtmsource_log_fp, TRUE, FALSE,
-									"Defaulting to NO compression for this connection\n");
-								gtmsource_received_cmp2uncmp_msg = TRUE;
-							}
-						} else
-						{
-							recvd_start_flags = ((repl_start_msg_ptr_t)gtmsource_msgp)->start_flags;
-							if (msg_is_cross_endian)
-								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
-							already_communicated = FALSE;
-							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Received REPL_START_JNL_SEQNO message with SEQNO "INT8_FMT" "
-								INT8_FMTX". Possible crash of recvr/update process\n",
-								recvd_seqno, recvd_seqno);
-						}
-						break;
-					case REPL_HEARTBEAT:
-						if (msg_is_cross_endian)
-						{
-							heartbeat_msg = (repl_heartbeat_msg_ptr_t)gtmsource_msgp;
-							tmp_seqno = *(seq_num *)&heartbeat_msg->ack_seqno[0];
-							tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
-							*(seq_num *)&heartbeat_msg->ack_seqno[0] = tmp_seqno;
-							tmp_time4 = *(gtm_time4_t *)&heartbeat_msg->ack_time[0];
-							tmp_time4 = GTM_BYTESWAP_32(tmp_time4);
-							*(gtm_time4_t *)&heartbeat_msg->ack_time[0] = tmp_time4;
-						}
-						gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)gtmsource_msgp);
-						break;
-#					ifdef GTM_TLS
-					case REPL_RENEG_ACK:
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
-						REPLTLS_RENEGOTIATE(repl_tls.sock, status);
-						poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
-						if (0 != status)
-						{
-							assert(GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state);
-							break;
-						}
-						/* Send the REPL_RENEG_COMPLETE message. */
-						renegotiate_msg.type = REPL_RENEG_COMPLETE;
-						renegotiate_msg.len = MIN_REPL_MSGLEN;
-						gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_COMPLETE",
-										MAX_SEQNO, INVALID_SUPPL_STRM);
-						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-							return SS_NORMAL;
-						if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-							break;
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RENEG_COMPLETE message."
-								" TLS/SSL connection successfully renegotiated.\n");
-						assert(heartbeat_stalled);
-						if (GTMSOURCE_WAITING_FOR_XON != gtmsource_state)
-							heartbeat_stalled = FALSE;
-						/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
-						DEBUG_ONLY(renegotiation_pending = FALSE);
-						REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
-						repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
-						break;
-#					endif
-					default:
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d of length %d "
-							"bytes received; hex dump follows\n", gtmsource_msgp->type, recvd_len);
-						for (index = 0; index < MIN(recvd_len, gtmsource_msgbufsiz - REPL_MSG_HDRLEN); )
-						{
-							repl_log(gtmsource_log_fp, FALSE, FALSE, "%.2x ",
-									gtmsource_msgp->msg[index]);
-							if ((++index) % MAX_HEXDUMP_CHARS_PER_LINE == 0)
-								repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
-						}
-						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n"); /* flush BEFORE the assert */
-						assert(FALSE);
-						break;
-				}
-#				ifdef GTM_TLS
-				/* On receipt of a REPL_XOFF_ACK_ME, we should no longer wait-for/attempt TLS/SSL
-				 * renegotiation.
-				 */
-				assert((REPL_XOFF_ACK_ME != gtmsource_msgp->type)
-						|| !repl_tls.enabled || (REPLTLS_SKIP_RENEGOTIATION == repl_tls.renegotiate_state));
-#				endif
-			} else if (SS_NORMAL != status)
-			{
-				if (EREPL_RECV == repl_errno)
-				{
-					if (REPL_CONN_RESET(status))
-					{
-						/* Connection reset */
-						repl_log(gtmsource_log_fp, TRUE, TRUE,
-							"Connection reset while attempting to receive from secondary."
-							" Status = %d ; %s\n", status, STRERROR(status));
-						repl_close(&gtmsource_sock_fd);
-						SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-						gtmsource_state = gtmsource_local->gtmsource_state
-							= GTMSOURCE_WAITING_FOR_CONNECTION;
-						break;
-					} else
-					{
-						SNPRINTF(err_string, SIZEOF(err_string),
-								"Error receiving Control message from Receiver. Error in recv : %s",
-								STRERROR(status));
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-								 LEN_AND_STR(err_string));
-					}
-				} else if (EREPL_SELECT == repl_errno)
-				{
-					SNPRINTF(err_string, SIZEOF(err_string),
-							"Error receiving Control message from Receiver. Error in select : %s",
-							STRERROR(status));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-							 LEN_AND_STR(err_string));
-				}
-			}
+			gtmsource_recv_ctl();
+			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+				return SS_NORMAL;
+			if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+				break;
 #			ifdef GTM_TLS
 			/* If we are waiting for a REPL_RENEG_ACK from the receiver, don't send any more messages (even journal
 			 * records) before completing the renegotiation.
@@ -1423,12 +1489,6 @@ int gtmsource_process(void)
 					REPL_DPRINT1("Stalling HEARTBEAT\n");
 					xon_wait_logged = TRUE;
 				}
-				if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
-				{
-					gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
-					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
-						break; /* the outerloop will continue */
-				}
 				continue;
 			}
 			if ((GTMSOURCE_SEARCHING_FOR_RESTART  == gtmsource_state)
@@ -1441,6 +1501,7 @@ int gtmsource_process(void)
 							HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				break; /* the outerloop will continue */
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
 							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN,
 							   !(gtmsource_filter & EXTERNAL_FILTER));
@@ -1452,6 +1513,8 @@ int gtmsource_process(void)
 				return (SS_NORMAL);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
+			if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+				continue;
 			if (GTMSOURCE_SEND_NEW_HISTINFO == gtmsource_state)
 			{	/* This is a signal from "gtmsource_get_jnlrecs" to send a REPL_HISTREC message first
 				 * before sending any more seqnos across. Set "gtmsource_local->send_new_histrec" to TRUE.
@@ -1459,6 +1522,7 @@ int gtmsource_process(void)
 				assert(0 == tot_tr_len);
 				gtmsource_local->send_new_histrec = TRUE; /* Will cause a new histinfo record to be sent first */
 				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
+				poll_time = REPL_POLL_NOWAIT;
 				continue;	/* Send a REPL_HISTREC message first and then send journal records */
 			}
 			post_read_seqno = gtmsource_local->read_jnl_seqno;
@@ -1593,8 +1657,8 @@ int gtmsource_process(void)
 					 * resync_seqno on the primary side to be a little more than the actual value as long as
 					 * the secondary side has an accurate value of resync_seqno. This is because the
 					 * resync_seqno of the system is the minimum of the resync_seqno of both primary
-					 * and secondary). This is done by the call to gtmsource_flush_fh() done within the
-					 * REPL_SEND_LOOP macro as well as in the (SS_NORMAL != status) if condition below.
+					 * and secondary). This is done by the call to gtmsource_flush_fh() done within
+					 * gtmsource_poll_actions() as well as in the (SS_NORMAL != status) if condition below.
 					 * Note that all of this is applicable only in a dualsite replication scenario. In
 					 * case of a multisite scenario, it is always the receiver server that tells the
 					 * sequence number from where the source server should start sending. So, even if
@@ -1607,15 +1671,12 @@ int gtmsource_process(void)
 					{
 						gtmsource_poll_actions(FALSE);
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-						{
-							gtmsource_flush_fh(post_read_seqno);
-							if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
-								break;
 							return (SS_NORMAL);
-						}
+						else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+							break;
 					}
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
-						break; /* the outerloop will continue */
+						break; /* The outerloop will continue */
 					if (SS_NORMAL != status)
 					{
 						gtmsource_flush_fh(post_read_seqno);
@@ -1662,12 +1723,6 @@ int gtmsource_process(void)
 						INT_FILTER_RTS_ERROR(filter_seqno, repl_errno); /* no return */
 					}
 					jnlpool.gtmsource_local->read_jnl_seqno = post_read_seqno;
-					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
-					{
-						gtmsource_flush_fh(post_read_seqno);
-						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
-							break; /* the outerloop will continue */
-					}
 					repl_source_cmp_sent += (qw_num)send_tr_len;
 					repl_source_msg_sent += (qw_num)pre_cmpmsglen;
 					repl_source_data_sent += (qw_num)(pre_cmpmsglen)

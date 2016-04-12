@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,23 +16,23 @@
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-#include <signal.h>
+#include "gtm_signal.h"	/* for SIGPROCMASK */
 
 #include "error.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 void gtm_dump_core(void)
 {
 	struct sigaction        act;
 	char                    newname[20];
-	int                     suffix, status;
+	int                     rc, suffix, status;
 	struct stat             fs1;
 	sigset_t		unblock_sigquit;
 
 	/* Scrub any encryption related information before taking a core dump */
-	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
+#	ifndef DEBUG_NOSCRUB
+	GTMCRYPT_CLOSE;
+#	endif
 
 	sigemptyset(&act.sa_mask);
 #	ifdef _AIX
@@ -62,9 +63,14 @@ void gtm_dump_core(void)
 	/* Even if signals are disabled at this point (for instance online rollback), the SIGQUIT below will be useless. So,
 	 * unblock SIGQUIT unconditionally as we are anyways about to die.
 	 */
+	sigemptyset(&unblock_sigquit);
 	sigaddset(&unblock_sigquit, SIGQUIT);
-	sigprocmask(SIG_UNBLOCK, &unblock_sigquit, NULL);
+	SIGPROCMASK(SIG_UNBLOCK, &unblock_sigquit, NULL, rc);
 	kill(getpid(), SIGQUIT);
-	sleep(60);	/* In case of async kill */
-	_exit(EXIT_FAILURE);
+	/* The below sleep function should NOT be converted to LONG_SLEEP() despite what ftpput says. This sleep is just
+	 * waiting for the preceding signal to take effect so it should not run hiber_start() since this is NOT the main
+	 * process but a fork-inspired facsimile spawned for the sole purpose of generating an appropriate core.
+	 */
+	sleep(60);	/* BYPASSOK */
+	UNDERSCORE_EXIT(EXIT_FAILURE);
 }

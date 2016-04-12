@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,7 +158,7 @@ int gtm_image_path(char *realpath)
 	assertpro(status != 0); /* Can only happen if the path name is not in the system cache */
 	if (status < 0) /* errno is set */
 		return status;
-#elif defined(__linux__) || defined(__sparc) ||  defined(_AIX)
+#elif defined(__linux__) || defined(__sparc) ||  defined(_AIX) || defined(__CYGWIN__)
 	SNPRINTF(realpath, GTM_PATH_MAX, PROCSELF, process_id);
 #else
 #	error "Unsupported platform : no way to determine the true exe path"

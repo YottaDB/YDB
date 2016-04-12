@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,22 +16,31 @@
 #include "gtm_unistd.h"	/* for "getpid" */
 #endif
 
+#include "gtm_facility.h"
+#include "gdsroot.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
 #include "interlock.h"
 #include "performcaslatchcheck.h"
-#include "rel_quant.h"
+#include "gtm_rel_quant.h"
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
 #include "min_max.h"
+#include "gt_timer.h"
 
 GBLREF	int		num_additional_processors;
 GBLREF	uint4		process_id;
 GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our parts exposed */
 
 /* Grab a latch. If cannot get it in the approximate time requested, return FALSE, else TRUE.
+ * originally intended to protect verify_queue which only runs in debug
+ * but adopted by some auto-relink code - not clear that's appropriate
  */
 boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 {
-	int	max_retries, retries, spins, maxspins;
+	ABS_TIME	cur_time, end_time, remain_time;
+	int		maxspins, retries, spins;
+	int4		max_sleep_mask;
 
 	assert(process_id == getpid());	/* Make sure "process_id" global variable is reliable (used below in an assert) */
 	if (process_id == latch->u.parts.latch_pid)
@@ -39,18 +48,15 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 		assert(FALSE);	/* Don't expect caller to call us if we hold the lock already. in pro be safe and return */
 		return TRUE;
 	}
-	++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */
-	/* Compute "max_retries" so total sleep time is "max_timeout_in_secs" seconds */
-	max_retries = max_timeout_in_secs * LOCK_TRIES_PER_SEC;
-	/* Some DEBUG build calls have 0 timeout so want just one iteration but since we subtract one from the max to
-	 * avoid sleeping the first round, make it 2.
-	 */
-	DEBUG_ONLY(max_retries = MAX(max_retries, 2));
+	sys_get_curr_time(&cur_time);
+	add_int_to_abs_time(&cur_time, max_timeout_in_secs * 1000, &end_time);
+	remain_time.at_sec = 0;		/* ensure one try */
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = max_retries - 1; 0 < retries; retries--)	/* Subtract 1 so don't do sleep till 3rd pass */
+	for (retries = 1; 0 <= remain_time.at_sec ; retries++)
 	{
-		for (spins = maxspins; 0 < spins; spins--)
+		++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */
+		for (spins = maxspins; spins > 0 ; spins--)
 		{	/* We better not hold it if trying to get it */
 			assert(latch->u.parts.latch_pid != process_id);
                         if (GET_SWAPLOCK(latch))
@@ -60,19 +66,11 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 				return TRUE;
 			}
 		}
-		if (retries & 0x3)
-			/* On all but every 4th pass, do a simple rel_quant */
-			rel_quant();	/* Release processor to holder of lock (hopefully) */
-		else
-		{
-			/* On every 4th pass, take a cat-nap */
-			wcs_sleep(LOCK_SLEEP);
-			/* Check if we're due to check for lock abandonment check or holder wakeup */
-			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
-				performCASLatchCheck(latch, TRUE);
-		}
+		--fast_lock_count;
+		REST_FOR_LATCH(latch, USEC_IN_NSEC_MASK, retries);
+		sys_get_curr_time(&cur_time);
+		remain_time = sub_abs_time(&end_time, &cur_time);
 	}
-	--fast_lock_count;
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return FALSE;

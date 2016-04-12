@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,9 @@
 #include "tp.h"
 #include "t_begin.h"
 #include "have_crit.h"
+#ifdef DEBUG
+#include "tp_frame.h"
+#endif
 
 GBLREF	short			crash_count;
 GBLREF	trans_num		start_tn;
@@ -43,6 +47,9 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		mu_reorg_process;
+#ifdef DEBUG
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+#endif
 
 error_def(ERR_MMREGNOACCESS);
 
@@ -54,13 +61,21 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!dollar_tlevel); /* if in TP, the T_BEGIN_xxx_NONTP_OR_TP macro should have been used and we will not be here */
-	/* any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
+	assert(NULL == reorg_encrypt_restart_csa);
+	/* The wcs_wtstart and dsk_read functions rely on the update_trans global to detect whether they are inside a read-write
+	 * non-TP transaction, in which case they may trigger a restart if encryption settings have been concurrently modified by
+	 * MUPIP REORG -ENCRYPT. We verify below that update_trans is not set prior to a transaction, as otherwise it would be
+	 * possible to attempt a transaction restart inside wcs_wtstart or dsk_read (by doing, say, VIEW "FLUSH") while not being in
+	 * a transaction.
+	 */
+	assert(!update_trans);
+	/* The update_trans global should not be set at the start of the transaction because otherwise it would cause
+	 * csd->kill_in_prog to be incorrectly incremented for the current transaction.
+	 */
+	assert(!upd_trans || !need_kip_incr);
+	/* Any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
 	update_trans = upd_trans;
-	assert(!update_trans || !need_kip_incr);	/* should not begin an update transaction with a non-zero value of this
-							 * variable as it will then cause csd->kill_in_prog to be incorrectly
-							 * incremented for the current transaction.
-							 */
 	t_err = err;
 	if ((NULL == cs_addrs->db_addrs[0]) && (dba_mm == cs_addrs->hdr->acc_meth))
 	{

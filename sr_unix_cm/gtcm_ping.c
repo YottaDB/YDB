@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_unistd.h"		/* for getpid() */
 
 #include <errno.h>
@@ -135,7 +136,7 @@ int icmp_ping(int conn)
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
-		exit(1);
+		EXIT(1);
 	}
 	if (getpeername(conn, (struct sockaddr *)&paddr, (GTM_SOCKLEN_TYPE *)&paddr_len) < 0)
 	{
@@ -195,7 +196,7 @@ int get_ping_rsp(void)
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
-		exit(1);
+		EXIT(1);
 	}
 	/* SIZEOF() does not provide correct fromlen.
 	 * fromlen in fact decided by recvfrom() below, so no need getaddrinfo() is needed to obtain the correct fromlen

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +89,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		if (!get_full_path((char *)seg->fname, (unsigned int)seg->fname_len,
 					(char *)&db_fname[0], &db_fname_len, MAX_FN_LEN, &ustatus))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname, seg->fname_len, ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname_len, seg->fname, ustatus);
 			return NULL;
 		}
 		assert(db_fname_len);
@@ -106,11 +107,11 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 					(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &ustatus))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr - cptr_last, cptr_last, ustatus);
 			return NULL;
 		}
 		cptr++;	/* skip separator */
-		if (!mur_fopen_sp(jctl))
+		if (SS_NORMAL != mur_fopen_sp(jctl, NULL))
 			return NULL;
 		jctl->jfh = (jnl_file_header *)malloc(REAL_JNL_HDR_LEN);
 		jfh = jctl->jfh;

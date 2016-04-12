@@ -27,7 +27,7 @@
 #include "copy.h"
 #include "wcs_sleep.h"
 #include "caller_id.h"
-#include "rel_quant.h"
+#include "gtm_rel_quant.h"
 #include "sleep_cnt.h"
 #include "interlock.h"
 #include "is_proc_alive.h"
@@ -40,7 +40,7 @@
 #include "ss_lock_facility.h"
 
 GBLREF	volatile int4		fast_lock_count;
-GBLREF	pid_t			process_id;
+GBLREF	uint4			process_id;
 GBLREF	uint4			image_count;
 GBLREF	int			num_additional_processors;
 GBLREF	node_local_ptr_t	locknl;
@@ -51,6 +51,7 @@ GBLREF	gd_region		*gv_cur_region;
 boolean_t ss_get_lock(gd_region *reg)
 {
 	int			retries, spins, maxspins;
+	int4			max_sleep_mask;
 	sm_global_latch_ptr_t	latch;
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
@@ -58,11 +59,12 @@ boolean_t ss_get_lock(gd_region *reg)
 	csa = &FILE_INFO(reg)->s_addrs;
 	cnl = csa->nl;
 	latch = &cnl->snapshot_crit_latch;
-	++fast_lock_count;			 /* Disable wcs_stale for duration */
+	max_sleep_mask = -1;	/* initialized to -1 to defer memory reference until needed */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	/* Since LOCK_TRIES is approx 50 seconds, give us 4X that long since IO is involved */
-	for (retries = (LOCK_TRIES * 4) - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
-	{
+	++fast_lock_count;			 /* Disable wcs_stale for duration */
+	for (retries = (LOCK_TRIES * 4) - 1; 0 < retries; retries--)
+	{	/* this should use a mutex rather than a spin lock */
 		for (spins = maxspins; 0 < spins; spins--)
 		{	/* We better not hold it if trying to get it */
 			assert(latch->u.parts.latch_pid != process_id
@@ -78,17 +80,7 @@ boolean_t ss_get_lock(gd_region *reg)
 				return TRUE;
 			}
 		}
-		if (retries & 0x3)
-		{	/* On all but every 4th pass, do a simple rel_quant */
-			rel_quant();	/* Release processor to holder of lock (hopefully) */
-		} else
-		{
-			/* On every 4th pass, we bide for awhile */
-			wcs_sleep(LOCK_SLEEP);
-			/* Check if we're due to check for lock abandonment check or holder wakeup */
-			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
-				performCASLatchCheck(latch, TRUE);
-		}
+		REST_FOR_LATCH(latch, (-1 == max_sleep_mask) ? SPIN_SLEEP_MASK(csa->hdr) : max_sleep_mask, retries);
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;

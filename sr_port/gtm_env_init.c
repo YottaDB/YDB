@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +14,11 @@
 
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
+
 #include <stddef.h>		/* For offsetof macro */
 
 #include "gtm_logicals.h"
+#include "gtm_multi_thread.h"
 #include "logical_truth_value.h"
 #include "trans_numeric.h"
 #include "trans_log_name.h"
@@ -44,6 +47,7 @@
 #include "jnl.h"
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "cli.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -85,7 +89,9 @@ void	gtm_env_init(void)
 	mstr			val, trans;
 	boolean_t		ret, is_defined;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
+	uint4			max_threads, max_procs;
 	int4			status;
+	int			status2;
 	char			buf[MAX_TRANS_NAME_LEN];
 	DCL_THREADGBL_ACCESS;
 
@@ -295,17 +301,29 @@ void	gtm_env_init(void)
 			&& (TPNOTACID_MAX_TIME >= status) && is_defined)
 				TREF(tpnotacidtime) = status;	 /* NOTE assignment above */
 		/* Initialize $gtm_tprestart_log_first */
-		val.addr = GTM_TPRESTART_LOG_LIMIT;
-		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
-		TREF(tprestart_syslog_limit) = trans_numeric(&val, &is_defined, TRUE);
-		if (0 > TREF(tprestart_syslog_limit))
-			TREF(tprestart_syslog_limit) = 0;
+		val.addr = GTM_TPRESTART_LOG_FIRST;
+		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
+		TREF(tprestart_syslog_first) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(tprestart_syslog_first))
+			TREF(tprestart_syslog_first) = 0;
 		/* Initialize $gtm_tprestart_log_delta */
 		val.addr = GTM_TPRESTART_LOG_DELTA;
 		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
 		TREF(tprestart_syslog_delta) = trans_numeric(&val, &is_defined, TRUE);
 		if (0 > TREF(tprestart_syslog_delta))
 			TREF(tprestart_syslog_delta) = 0;
+		/* Initialize $gtm_nontprestart_log_first */
+		val.addr = GTM_NONTPRESTART_LOG_FIRST;
+		val.len = STR_LIT_LEN(GTM_NONTPRESTART_LOG_FIRST);
+		TREF(nontprestart_log_first) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(nontprestart_log_first))
+			TREF(nontprestart_log_first) = 0;
+		/* Initialize $gtm_nontprestart_log_delta */
+		val.addr = GTM_NONTPRESTART_LOG_DELTA;
+		val.len = STR_LIT_LEN(GTM_NONTPRESTART_LOG_DELTA);
+		TREF(nontprestart_log_delta) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(nontprestart_log_delta))
+			TREF(nontprestart_log_delta) = 0;
 		/* See if this is a GT.M Development environment, not a production environment */
 		if (GETENV("gtm_environment_init"))
 			TREF(gtm_environment_init) = TRUE; /* in-house */
@@ -352,6 +370,12 @@ void	gtm_env_init(void)
 		val.addr = GTM_MAX_STORALLOC;
 		val.len = SIZEOF(GTM_MAX_STORALLOC) - 1;
 		gtm_max_storalloc = trans_numeric(&val, &is_defined, TRUE);
+		/* See if $gtm_mupjnl_parallel is set */
+		val.addr = GTM_MUPJNL_PARALLEL;
+		val.len = SIZEOF(GTM_MUPJNL_PARALLEL) - 1;
+		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+			gtm_mupjnl_parallel = 1;
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

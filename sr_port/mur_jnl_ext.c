@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,13 +56,13 @@ error_def(ERR_TEXT);
 
 /* This routine formats and outputs journal extract records
    corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER commands, $ZTRIGGER function (LGTRIG) and $ZTWORMHOLE */
-void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	enum jnl_record_type	rectype;
 	int			max_blen, actual, extract_len, val_extr_len, val_len;
 	char			*val_ptr, *ptr, *buff;
 	jnl_string		*keystr;
-	boolean_t		do_format2zwr, is_ztstart;
+	boolean_t		do_format2zwr, is_ztstart, jnlext_write_done;
 
 	if (!mur_options.detail)
 		extract_len = 0;
@@ -102,8 +103,10 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
 		if (!is_ztstart)
 			EXT_STRM_SEQNO(rec->jrec_set_kill.strm_seqno);
-		jnlext_write(fi, murgbl.extr_buff, extract_len);
-	}
+		jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
+		jnlext_write_done = TRUE;
+	} else
+		jnlext_write_done = FALSE;
 	/* Output the SET or KILL or ZKILL or ZTWORMHOLE or LGTRIG or ZTRIG record */
 	if (!mur_options.detail)
 	{
@@ -147,11 +150,7 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
-	if (IS_ZTP(rectype))
-	{
-		EXTQW(rec->jrec_set_kill.token_seq.token);
-	} else
-		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
+	EXTQW(rec->jrec_set_kill.token_seq.token);
 	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_ztworm.strm_seqno);
 	assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_lgtrig.strm_seqno);
@@ -212,10 +211,10 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		}
 	}
 	murgbl.extr_buff[extract_len++] = '\\';
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, (!jnlext_write_done ? rec : NULL), recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_null(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_null(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int			extract_len;
 	char			*ptr;
@@ -235,10 +234,10 @@ void	mur_extract_null(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 	EXTPID(plst);
 	EXTQW(rec->jrec_null.jnl_seqno);
 	EXT_STRM_SEQNO(rec->jrec_null.strm_seqno);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_align(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_align(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len;
 	char	*ptr;
@@ -251,10 +250,10 @@ void	mur_extract_align(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_li
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_blk(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len;
 	blk_hdr	pblk_head;
@@ -273,10 +272,10 @@ void	mur_extract_blk(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 	memcpy((char*)&pblk_head, (char*)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
 	EXTQW(pblk_head.tn);
 	EXTINT(rec->jrec_pblk.ondsk_blkver);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len, idx;
 	seq_num	strm_seqno;
@@ -308,10 +307,10 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_li
 		}
 	}
 #	endif
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void    mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
         int		extract_len;
         char		*ptr;
@@ -329,7 +328,7 @@ void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini
 	opcode = rec->jrec_inctn.detail.blknum_struct.opcode;
 	EXTINT(opcode);
 	/* Any changes to the switch block here (e.g. new inctn opcodes) needs corresponding changes in jnl_write_inctn_rec.c */
-	switch(opcode)
+	switch (opcode)
 	{
 		case inctn_bmp_mark_free_gtm:
 		case inctn_bmp_mark_free_mu_reorg:
@@ -338,6 +337,7 @@ void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini
 		case inctn_blkupgrd_fmtchng:
 		case inctn_blkdwngrd_fmtchng:
 		case inctn_blkmarkfree:
+		case inctn_blkreencrypt:
 			EXTINT(rec->jrec_inctn.detail.blknum_struct.blknum);
 			break;
 		case inctn_gdsfilext_gtm:
@@ -349,10 +349,10 @@ void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini
 			EXTINT(0);	/* nothing to extract in this case */
 			break;
 	}
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_eof(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_eof(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int			extract_len = 0;
 	char			*ptr;
@@ -370,10 +370,10 @@ void	mur_extract_eof(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_eof.jnl_seqno);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void    mur_extract_trunc(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void    mur_extract_trunc(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int		extract_len = 0;
 	char		*ptr;
@@ -389,10 +389,10 @@ void    mur_extract_trunc(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini
 	EXTINT(rec->jrec_trunc.orig_total_blks);
 	EXTINT(rec->jrec_trunc.orig_free_blocks);
 	EXTINT(rec->jrec_trunc.total_blks_after_trunc);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_pfin(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_pfin(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len;
 	char	*ptr;
@@ -410,10 +410,10 @@ void	mur_extract_pfin(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void	mur_extract_pini(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_pini(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len = 0;
 	char			*ptr;
@@ -431,11 +431,11 @@ void	mur_extract_pini(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 		EXTINT(rec->prefix.checksum);
 	extract_len = extract_process_vector((jnl_process_vector *)&rec->jrec_pini.process_vector[CURR_JPV], extract_len);
 	extract_len = extract_process_vector((jnl_process_vector *)&rec->jrec_pini.process_vector[ORIG_JPV], extract_len);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
 /* This routine formats and outputs journal extract records corresponding to M TCOMMIT and ZTCOMMIT commands */
-void	mur_extract_tcom(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_tcom(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	actual, extract_len = 0;
 	char	*ptr;
@@ -467,7 +467,7 @@ void	mur_extract_tcom(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 		EXTTXT((unsigned char *)&rec->jrec_tcom.jnl_tid[0], SIZEOF(rec->jrec_tcom.jnl_tid));
 	} else
 		EXTINT(rec->jrec_ztcom.participants);
-	jnlext_write(fi, murgbl.extr_buff, extract_len);
+	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
 int extract_process_vector(jnl_process_vector *pv, int extract_len)

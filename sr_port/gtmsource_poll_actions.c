@@ -53,6 +53,7 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF	int			gtmsource_filter;
+GBLREF	time_t			gtmsource_last_flush_time;
 GBLREF	volatile time_t		gtmsource_now;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	uint4			log_interval;
@@ -87,7 +88,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
-#	ifdef UNIX
 	if (jnlpool.jnlpool_ctl->freeze != last_seen_freeze_flag)
 	{
 		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
@@ -106,7 +106,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 	}
-#	endif
 	if (GTMSOURCE_START == gtmsource_state)
 		return (SS_NORMAL);
 	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE_REQUESTED == gtmsource_local->mode)
@@ -115,6 +114,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		gtmsource_state = GTMSOURCE_CHANGING_MODE;
 		gtmsource_local->mode = GTMSOURCE_MODE_PASSIVE;
 		UNIX_ONLY(gtmsource_local->gtmsource_state = gtmsource_state;)
+		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno); /* Force the update on a transition */
 		return (SS_NORMAL);
 	}
 	if (poll_secondary && GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state)
@@ -129,16 +129,9 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			GTM_CTIME(time_ptr, &temp_time);
 			memcpy(time_str, time_ptr, CTIME_BEFORE_NL);
 			time_str[CTIME_BEFORE_NL] = '\0';
-			VMS_ONLY(SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO %llu in %0.f seconds. "
-					"Closing connection\n", time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0],
-				 	difftime(now, temp_time)));
-			NON_GTM64_ONLY(SPRINTF(msg_str,
-					"No response received for heartbeat sent at %s with SEQNO %llu in %0.f seconds. "
-					"Closing connection\n", time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0],
-				 	difftime(now, temp_time)));
-			GTM64_ONLY(SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO %lu in %0.f seconds. "
-					"Closing connection\n", time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0],
-				 	difftime(now, temp_time)));
+			SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO "
+					GTM64_ONLY("%lu") NON_GTM64_ONLY("%llu") " in %0.f seconds. Closing connection\n",
+					time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0], difftime(now, temp_time));
 			sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			repl_close(&gtmsource_sock_fd);
@@ -151,10 +144,17 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		if (GTMSOURCE_IS_HEARTBEAT_DUE(&now) && !heartbeat_stalled)
 		{
 			gtmsource_send_heartbeat(&now);
-			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state ||
-		    	    GTMSOURCE_CHANGING_MODE == gtmsource_state)
+			if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);
 		}
+	}
+	if ((GTMSOURCE_SENDING_JNLRECS == gtmsource_state) /* Flush the file header only with an active connection */
+			&& (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time)))
+	{
+		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				return (SS_NORMAL);
 	}
 	if (0 != gtmsource_local->changelog)
 	{

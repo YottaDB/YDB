@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,8 +84,9 @@ void repl_inst_create(void)
 	uint4			status2;
 	jnl_tm_t		now;
 
-	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
-		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error)); /* rts_error should prevent
+												* return if there is a problem.
+												*/
 	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot
 	 * more since the input instance name might be longer. Hence inst_name (containing MAX_FN_LEN+1 = 257 bytes) is used.
 	 */
@@ -93,7 +95,7 @@ void repl_inst_create(void)
 	{
 		inst_name_len = SIZEOF(inst_name);
 		if (!cli_get_str("NAME", &inst_name[0], &inst_name_len))
-			rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
 	} else
 	{
 		log_nam.addr = GTM_REPL_INSTNAME;
@@ -103,14 +105,15 @@ void repl_inst_create(void)
 								dont_sendmsg_on_log2long)))
 		{
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
 			else
-				rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
 		}
 		inst_name_len = trans_name.len;
 	}
 	if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
-		rts_error(VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
 	inst_name[inst_name_len] = '\0';
 	buff_8byte_aligned = &buff_unaligned[0];
 	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
@@ -118,44 +121,48 @@ void repl_inst_create(void)
 	gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)&buff_8byte_aligned[REPL_INST_HDR_SIZE];
 	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
-		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	STAT_FILE(inst_fn, &stat_buf, status);
 	if (-1 != status)
 	{
 		if (cli_present("NOREPLACE"))	/* the file exists, so error out */
-			rts_error(VARLSTCNT(4) ERR_FILEEXISTS, 2, inst_fn_len, inst_fn);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEEXISTS, 2, inst_fn_len, inst_fn);
 		in_repl_inst_create = TRUE;	/* used by an assert in the call to "repl_inst_read" below */
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)repl_instance, SIZEOF(repl_inst_hdr));
 		in_repl_inst_create = FALSE;
 		if ((INVALID_SEMID != repl_instance->jnlpool_semid) || (INVALID_SHMID != repl_instance->jnlpool_shmid)
 			|| (INVALID_SEMID != repl_instance->recvpool_semid) || (INVALID_SHMID != repl_instance->recvpool_shmid))
 		{
-			rts_error(VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
 			assert(FALSE);
 		}
 		JNL_SHORT_TIME(now);
 		if (SS_NORMAL != (status = prepare_unique_name((char *)inst_fn, inst_fn_len, "", "",
 				rename_fn, &rename_fn_len, now, &status2)))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Error preparing unique name for renaming instance file"));
+			gtm_putmsg_csa(CSA_ARG(NULL)
+				VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Error preparing unique name for renaming instance file"));
 			if (SS_NORMAL != status2)
-				rts_error(VARLSTCNT(7) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status, 0, status2);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(7) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status, 0, status2);
 			else
-				rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
 		}
 		if (SS_NORMAL != (status = gtm_rename((char *)inst_fn, (int)inst_fn_len,
 								(char *)rename_fn, rename_fn_len, &status2)))
 		{
 			if (SS_NORMAL != status2)
-				rts_error(VARLSTCNT(9) ERR_RENAMEFAIL, 4, inst_fn_len, inst_fn,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_RENAMEFAIL, 4, inst_fn_len, inst_fn,
 						rename_fn_len, rename_fn, status, 0, status2);
 			else
-				rts_error(VARLSTCNT(7) ERR_RENAMEFAIL, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn, status);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(7) ERR_RENAMEFAIL, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn, status);
 		} else	/* successfully renamed the existing file; print a message */
-			gtm_putmsg(VARLSTCNT(6) ERR_FILERENAME, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn);
+			gtm_putmsg_csa(CSA_ARG(NULL)
+				VARLSTCNT(6) ERR_FILERENAME, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn);
 
 	} else if (ENOENT != errno) /* some error happened */
-		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
 	/* The instance file consists of 3 parts.
 	 *	File header ("repl_inst_hdr" structure)
 	 *	Array of 16 "gtmsrc_lcl" structures
@@ -199,6 +206,7 @@ void repl_inst_create(void)
 	repl_instance->crash = FALSE;
 	repl_instance->was_rootprimary = FALSE;
 	repl_instance->is_supplementary = cli_present("SUPPLEMENTARY");
+	repl_instance->qdbrundown = (CLI_PRESENT == cli_present("QDBRUNDOWN"));
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 		repl_instance->last_histinfo_num[idx] = INVALID_HISTINFO_NUM;
 	/* strm_seqno[] and strm_group_info[] are already initialized to 0 as part of the memset above. Nothing more needed

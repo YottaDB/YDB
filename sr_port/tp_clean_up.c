@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>             /* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"	/* needed for VSIG_ATOMIC_T */
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -32,6 +33,7 @@
 #include "error.h"
 #include "have_crit.h"
 #include "min_max.h"
+#include "tp_frame.h"
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
@@ -56,6 +58,8 @@ GBLREF	int			process_exiting;
 GBLREF	block_id		tp_allocation_clue;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	uint4			update_trans;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -83,19 +87,25 @@ void	tp_clean_up(boolean_t rollback_flag)
 	block_id	cseblk, histblk;
 	cache_rec_ptr_t	cr;
 	int4		upd_trans;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
-	DEFER_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP);
+	DEFER_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP, prev_intrpt_state);
 
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
-	DEBUG_ONLY(
-		if (rollback_flag)
-			TREF(donot_commit) = FALSE;
-		assert(!TREF(donot_commit));
-	)
+#	ifdef DEBUG
+	if (rollback_flag)
+		TREF(donot_commit) = FALSE;
+	assert(!TREF(donot_commit));
+#	endif
+	if (tp_pointer->implicit_tstart)
+	{	/* Resetting this is necessary to avoid blowing an assert in t_begin that it is 0 at the start of a transaction. */
+		update_trans = 0;
+	} else
+		assert(!update_trans);
 	if (NULL != first_sgm_info)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
 		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
@@ -447,7 +457,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 	 */
 	assert(rollback_flag || (NULL == first_tp_si_by_ftok));
 	first_tp_si_by_ftok = NULL;
-	ENABLE_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP);	/* check if any MUPIP STOP/signals were deferred while in this function */
+	ENABLE_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP, prev_intrpt_state);	/* Allow MUPIP STOP/signals from now on */
 #	ifdef GTM_TRIGGER
 	if (!rollback_flag)
 	{

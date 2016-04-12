@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +20,13 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_time.h"		/* for time() */
 #include "gtm_fcntl.h"
 #include "gtm_string.h"		/* for strerror() */
+#include "gtm_signal.h"
+
 #include <sys/types.h>
-#include <signal.h>
 #include <errno.h>
 
 #include "gtcm.h"
@@ -84,13 +86,13 @@ int main(int argc, char_ptr_t argv[])
 		{
 			PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
 			       STRERROR(errno));
-			exit(-1);
+			EXIT(-1);
 		}
 	} else
 	{
 		PRINTF("%s: bad command line arguments\n\t%s [ filename ]\n",
 		       argv[0], argv[0]);
-		exit(-1);
+		EXIT(-1);
 	}
 	/*  Initialize everything but the network */
 	err_init(gtcm_exit_ch);
@@ -102,7 +104,7 @@ int main(int argc, char_ptr_t argv[])
 #	endif
 	REVERT;
 	if (omi_errno != OMI_ER_NO_ERROR)
-		exit(omi_errno);
+		EXIT(omi_errno);
 	/*  Initialize the connection structure */
 	conn.next   = (omi_conn *)0;
 	conn.bsiz   = OMI_BUFSIZ;

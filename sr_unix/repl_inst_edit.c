@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,26 +44,26 @@ error_def(ERR_SIZENOTVALID8);
 void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *value, boolean_t *value_present)
 {
 	if (!cli_get_hex("OFFSET", offset))
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!cli_get_hex("SIZE", size))
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!((SIZEOF(char) == *size) || (SIZEOF(short) == *size) || (SIZEOF(int4) == *size) || (SIZEOF(gtm_int64_t) == *size)))
-                rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
 	if (0 > (int4)*size)
 	{
 		util_out_print("Error: SIZE specified cannot be negative", TRUE);
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (0 != (*offset % *size))
 	{
 		util_out_print("Error: OFFSET [0x!XL] should be a multiple of Size [!UL]", TRUE, *offset, *size);
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (CLI_PRESENT == cli_present("VALUE"))
 	{
 		*value_present = TRUE;
 		if (!cli_get_hex64("VALUE", value))
-			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	} else
 		*value_present = FALSE;
 }
@@ -133,12 +134,13 @@ void	repl_inst_edit(void)
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
 	uint4			offset, size;
 	gtm_uint64_t		value;
-	boolean_t		value_present;
+	boolean_t		value_present, name_present;
+	int			qdbrundown_status;
 
-	in_repl_inst_edit = TRUE;
+	in_repl_inst_edit = IN_REPL_INST_EDIT_TRUE;	/* Indicate to "repl_inst_read" we are in MUPIP REPLIC -EDITINSTANCE */
 	inst_fn_len = MAX_FN_LEN;
 	if (!cli_get_str("INSTFILE", inst_fn, &inst_fn_len) || (0 == inst_fn_len))
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	inst_fn[inst_fn_len] = '\0';
 	buff = &buff_unaligned[0];
 	buff = (char *)ROUND_UP2((INTPTR_T)buff, 8);
@@ -156,32 +158,53 @@ void	repl_inst_edit(void)
 		repl_inst_dump_history_records(inst_fn, repl_instance->num_histinfo);
 	}
 	if (CLI_PRESENT == cli_present("CHANGE"))
-	{
+	{	/* Indicate to "repl_inst_read" that we are in a MUPIP REPLIC -EDITINSTANCE -CHANGE command by modifying
+		 * the global variable "in_repl_inst_edit" to a more specific value for the duration of the CHANGE command.
+		 */
+		assert(IN_REPL_INST_EDIT_CHANGE_OFFSET != IN_REPL_INST_EDIT_TRUE);
+		assert(IN_REPL_INST_EDIT_CHANGE_OFFSET != IN_REPL_INST_EDIT_FALSE);
+		in_repl_inst_edit = IN_REPL_INST_EDIT_CHANGE_OFFSET;	/* needed by "repl_inst_read" to avoid errors */
 		mupcli_get_offset_size_value(&offset, &size, &value, &value_present);
 		assert(size <= REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
 		repl_inst_read(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
 		mupcli_edit_offset_size_value((sm_uc_ptr_t)buff, offset, size, value, value_present);
 		repl_inst_write(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
+		in_repl_inst_edit = IN_REPL_INST_EDIT_TRUE;
 	}
-	if (CLI_PRESENT == cli_present("NAME"))
-	{	/* Edit the instance name */
-		instname_len = MAX_INSTNAME_LEN;
-		assert(MAX_INSTNAME_LEN == SIZEOF(instname));
-		if (!cli_get_str("NAME", instname, &instname_len))
-			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
-		assert(MAX_INSTNAME_LEN >= instname_len);
-		if (MAX_INSTNAME_LEN == instname_len)
-		{
-			util_out_print("Error: Instance name length can be at most 15", TRUE);
-			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	name_present = (CLI_PRESENT == cli_present("NAME"));
+	qdbrundown_status = cli_present("QDBRUNDOWN");
+	if (name_present || qdbrundown_status)
+	{
+		if (name_present)
+		{	/* Edit the instance name */
+			instname_len = MAX_INSTNAME_LEN;
+			assert(MAX_INSTNAME_LEN == SIZEOF(instname));
+			if (!cli_get_str("NAME", instname, &instname_len))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+			assert(MAX_INSTNAME_LEN >= instname_len);
+			if (MAX_INSTNAME_LEN == instname_len)
+			{
+				util_out_print("Error: Instance name length can be at most 15", TRUE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+			}
 		}
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE);
 		repl_instance = (repl_inst_hdr_ptr_t)&buff[0];
-		util_out_print("HDR Instance Name changing from !AZ to !AZ",
-			TRUE, repl_instance->inst_info.this_instname, instname);
-		assert('\0' == instname[instname_len]);
-		memcpy(repl_instance->inst_info.this_instname, instname, instname_len + 1);
+		if (name_present)
+		{
+			util_out_print("HDR Instance Name changing from !AZ to !AZ",
+					TRUE, repl_instance->inst_info.this_instname, instname);
+			assert('\0' == instname[instname_len]);
+			memcpy(repl_instance->inst_info.this_instname, instname, instname_len + 1);
+		}
+		if (qdbrundown_status)
+		{
+			util_out_print("HDR Quick database rundown is active changing from !AZ to !AZ",
+					TRUE, repl_instance->qdbrundown ? "TRUE" : "FALSE",
+					(CLI_PRESENT == qdbrundown_status) ? "TRUE" : "FALSE");
+			repl_instance->qdbrundown = (CLI_PRESENT == qdbrundown_status);
+		}
 		repl_inst_write(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE);
 	}
-	in_repl_inst_edit = FALSE;
+	in_repl_inst_edit = IN_REPL_INST_EDIT_FALSE;
 }

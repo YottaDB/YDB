@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +67,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		gv_cur_region->dyn.addr->fname_len = header->data_file_name_length;
 		if (!STANDALONE(gv_cur_region))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
 	}
@@ -80,12 +81,12 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		}
 		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, SIZEOF(full_buf), &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
 		if (!get_full_path(STR_AND_LEN(jnl_fname), jnl_fn, &jnl_fn_len, SIZEOF(jnl_fn), &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(jnl_fname), ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(jnl_fname), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
 		jnlfile.addr = full_buf;
@@ -93,7 +94,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		jnldef.addr = JNL_EXT_DEF;
 		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_PRESENT != gtm_file_stat(&jnlfile, &jnldef, NULL, FALSE, &ustatus))
-			gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2, buf_len, buf, ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLFNF, 2, buf_len, buf, ustatus);
 		if (jnl_fn_len == full_buf_len && (0 == memcmp(jnl_fn, full_buf, jnl_fn_len)))
 		{
 			util_out_print("Error : PREVJNLFILE !AD cannot link to itself", TRUE, jnl_fn_len, jnl_fn);
@@ -109,14 +110,22 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		}
 		header->prev_jnl_file_name_length = full_buf_len;
 		memcpy(header->prev_jnl_file_name, full_buf, full_buf_len);
-		gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf, header->prev_jnl_file_name_length,
-			header->prev_jnl_file_name);
-		send_msg(VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf, header->prev_jnl_file_name_length,
-			header->prev_jnl_file_name);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf,
+			header->prev_jnl_file_name_length, header->prev_jnl_file_name);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf,
+			header->prev_jnl_file_name_length, header->prev_jnl_file_name);
 	} else if (CLI_NEGATED == cli_present("PREVJNLFILE"))
 	{
-		util_out_print("prev_jnl_file name changed from !AD to NULL", TRUE,
-				header->prev_jnl_file_name_length, header->prev_jnl_file_name);
+		if (0 == header->prev_jnl_file_name_length)
+		{
+			prev_buf_len = SIZEOF("NULL") - 1;
+			memcpy(prev_buf, "NULL", prev_buf_len);
+		} else
+		{
+			prev_buf_len = header->prev_jnl_file_name_length;
+			memcpy(prev_buf, header->prev_jnl_file_name, prev_buf_len);
+		}
+		util_out_print("prev_jnl_file name changed from !AD to NULL", TRUE, prev_buf_len, prev_buf);
 	 	memset(header->prev_jnl_file_name, 0, header->prev_jnl_file_name_length);
          	header->prev_jnl_file_name_length = (unsigned short)0;
 	}
@@ -130,7 +139,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		}
 		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, JNL_NAME_SIZE, &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
 		if ((header->data_file_name_length == full_buf_len) &&

@@ -14,12 +14,13 @@
 
 #include <sys/ioctl.h>
 #include <errno.h>
+
 #include "gtm_fcntl.h"
-#include <signal.h>
 #include "gtm_string.h"
 #include "gtm_iconv.h"
 #include "gtm_termios.h"
 #include "gtm_unistd.h"
+#include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
 
 #include "io_params.h"
 #include "io.h"

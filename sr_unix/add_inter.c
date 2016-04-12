@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,25 +35,25 @@ GBLREF	int		num_additional_processors;
    on HPUX-HPPA.
 */
 
+error_def(ERR_DBCCERR);
+error_def(ERR_ERRCALL);
+
 int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 {
 	int4			cntrval, newcntrval, spins, maxspins, retries;
 	boolean_t		cswpsuccess;
 	sm_int_ptr_t volatile	cntrval_p;
 
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
-
 	++fast_lock_count;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	cntrval_p = addr;	/* Need volatile context especially on Itanium */
         for (retries = LOCK_TRIES - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
-        {
+        {	/* seems like a legitinate spin which could take advantage of transactional memory */
 		for (spins = maxspins; 0 < spins; spins--)
 		{
 			cntrval = *cntrval_p;
 			newcntrval = cntrval + val;
-			/* This is (currently as of 08/2007) the only non-locking usage of compswap in GTM. We
+			/* This is (currently as of 08/2007) the only non-locking usage of compswap in GT.M. We
 			   are not passing compswap an actual sm_global_latch_ptr_t addr like its function would
 			   normally dictate. However, since the address of the field we want to deal with is the
 			   first int in the global_latch_t, we just pass our int address properly cast to the
@@ -81,6 +82,6 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 	}
 	--fast_lock_count;
 	assert(FALSE);
-	rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, LEN_AND_LIT("*unknown*"), ERR_ERRCALL, 3, CALLFROM);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DBCCERR, 2, LEN_AND_LIT("*unknown*"), ERR_ERRCALL, 3, CALLFROM);
 	return 0; /* To keep the compiler quiet */
 }

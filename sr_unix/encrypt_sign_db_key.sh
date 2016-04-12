@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc #
+# Copyright (c) 2010-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -16,7 +17,7 @@
 #	The file is signed by the key provider.
 #
 #       Arguments:
-#               $1 -    Input file with symmetric encryption key protected wiht user
+#               $1 -    Input file with symmetric encryption key protected with user's private key.
 #               $2 -    Path of the output file.
 #               $3 -    Email address of the public key's owner.
 #		Rest of line is comment for the output file
@@ -42,8 +43,8 @@ if [ $# -lt 3 ]; then
 fi
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-elif [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Confirm existence of and ability to read input file
@@ -68,5 +69,6 @@ comment="$*" ; if [ -z "$comment" ] ; then comment="$output_file created from $i
 $ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
 
 # Yes, providing the passphrase on the command line to the second gpg command is not ideal, but that
-# but that is the best we can do with this reference implementation.  Otherwise it must prompt twice.
-echo $passphrase | $gpg --batch --passphrase-fd 0 --quiet --decrypt $input_file | $gpg --encrypt --armor --sign --output $output_file --comment "$comment" --recipient $recipient --batch --passphrase "$passphrase"
+# is the best we can do with this reference implementation.  Otherwise it must prompt twice.
+echo $passphrase | $gpg --batch --passphrase-fd 0 --quiet --decrypt $input_file | \
+  $gpg --encrypt --armor --sign --output $output_file --comment "$comment" --recipient $recipient --batch --passphrase "$passphrase"

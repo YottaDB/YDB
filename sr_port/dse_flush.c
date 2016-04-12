@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,15 +27,15 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF short		crash_count;
 GBLREF sgmnt_addrs	*cs_addrs;
 
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEONLYBGMM);
+
 void dse_flush(void)
 {
 	boolean_t	was_crit;
 
-	error_def(ERR_DSEONLYBGMM);
-	error_def(ERR_DBRDONLY);
-
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{
@@ -44,13 +45,13 @@ void dse_flush(void)
 			crash_count = cs_addrs->critical->crashcnt;
 		was_crit = cs_addrs->now_crit;
 		if (!was_crit)
-			grab_crit(gv_cur_region);
+			grab_crit_encr_cycle_sync(gv_cur_region);
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 		break;
 	default:
-		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("BUFFER_FLUSH"));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("BUFFER_FLUSH"));
 		break;
 	}
 	return;

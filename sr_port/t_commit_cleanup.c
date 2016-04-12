@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +55,7 @@ GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the T
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
@@ -250,7 +251,8 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * the transaction.
 		 */
 		assert(0 == signal);
-		send_msg(VARLSTCNT(8) ERR_DBCOMMITCLNUP, 6, process_id, process_id, signal, trstr, DB_LEN_STR(xactn_err_region));
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCOMMITCLNUP, 6, process_id, process_id, signal, trstr,
+				DB_LEN_STR(xactn_err_region));
 		/* if t_ch() (a condition handler) was driving this routine, then doing send_msg() here is not a good idea
 		 * as it will overlay the current error message string driving t_ch(), but this case is an exception since
 		 * we currently do not know of any way by which we will be in this "update_underway == TRUE" code if t_ch()

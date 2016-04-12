@@ -205,7 +205,7 @@ set dist = "$gtm_ver/dist"
 set tmp_dist = "$gtm_ver/tmp_dist"
 set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
-set notdistributed = '_*.o GDE*.m *.log map obj'
+set notdistributed = '_*.o GDE*.m *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass'
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
 
 if (-d $dist || -d $tmp_dist || -d $install) then

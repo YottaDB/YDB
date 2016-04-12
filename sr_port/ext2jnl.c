@@ -121,7 +121,6 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 	int		keylength, keystate, len, i, reclen, temp_reclen, val_len;
 	bool		keepgoing;
 	mstr		src, des;
-	jnl_record	*temp_rec;
 	muextract_type	exttype;
 	enum jnl_record_type	rectype;
 	jrec_suffix	*suffix;
@@ -129,7 +128,6 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 	DEBUG_ONLY(uint4	tcom_num = 0;)
 
 	ext_stop = ptr + strlen(ptr) + 1;
-	temp_rec = rec;
 
 	exttype = (muextract_type)MUEXTRACT_TYPE(ptr);
 	assert((exttype >= 0) && (exttype < MUEXT_MAX_TYPES));

@@ -54,7 +54,8 @@ int	gtm_reg(int vax_reg);
 #if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64)) \
 	|| defined(__MVS__)
 #  define TRUTH_IN_REG
-#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)
+#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390) \
+	|| (defined(__CYGWIN__) && defined(__x86_64__))
 #  undef TRUTH_IN_REG
 #else
 #  error UNSUPPORTED PLATFORM

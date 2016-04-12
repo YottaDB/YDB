@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,8 @@
 #include "dbfilop.h"
 #include "gdsblk.h"
 #include "gds_blk_downgrade.h"
+#include "gtmcrypt.h"
+#include "min_max.h"
 #include "mupint.h"
 
 GBLREF	sm_uc_ptr_t	reformat_buffer;
@@ -29,9 +32,14 @@ GBLREF	int4		mu_int_ovrhd;
 GBLREF	sgmnt_data	mu_int_data;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	volatile int4	fast_lock_count;
+GBLREF	enc_handles	mu_int_encr_handles;
+GBLREF	mstr		pvt_crypt_buf;
 
 void mu_int_write(block_id blk, uchar_ptr_t ptr)
 {
+	int		in_len, gtmcrypt_errno;
+	char		*in, *out;
+	gd_segment	*seg;
 	file_control	*fc;
 
 	assert(0 == fast_lock_count);
@@ -56,15 +64,41 @@ void mu_int_write(block_id blk, uchar_ptr_t ptr)
 	}
 	fc = gv_cur_region->dyn.addr->file_cntl;
 	fc->op = FC_WRITE;
-	fc->op_buff = ptr;
-	/* Previously, fc->op_len was set to mu_int_data.blk_size. Although only the transaction number in the block header is
-	 * going to be reset, we were writing the entire buffer (mu_int_data.blk_size). This demanded a encryption
-	 * of the buffer before being written to the disk. To avoid an encryption, we are only going to write the block header
-	 * in the desired offset(op_pos). Note that since mu_int_write is called just after an mu_int_read, the block previously
-	 * read will be in the OS cache and hence won't cause performance issues due to unaligned writes. When the  database is
-	 * not fully upgraded from V4 to V5, we will be writing the entrie block size. This is due to the block upgrades between
-	 * V4 and V5 that can happen in the unencrypted versions of the database. */
-	fc->op_len = UNIX_ONLY(mu_int_data.fully_upgraded ? SIZEOF(blk_hdr) : ) mu_int_data.blk_size;
+	/* In case the block whose header we touched is encrypted, we need to reencrypt its entire content (unless using null IV),
+	 * since we have practically altered the IV and so the ciphertext would be different as well. If, however, the block is not
+	 * encrypted, we can get away with writing only the header portion. Note that since mu_int_write is called just after
+	 * mu_int_read, the block previously read will be in the OS cache and hence will not cause performance issues due to
+	 * unaligned writes. When the database is not fully upgraded from V4 to V5, we will be writing the entrie block size. This
+	 * is due to the block upgrades between V4 and V5 that can happen in the unencrypted versions of the database.
+	 */
+	in_len = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)ptr)->bsiz) - SIZEOF(blk_hdr);
+	/* We disallow the use of TN_RESET when database (re)encryption is in progress. */
+	assert(!USES_NEW_KEY(&mu_int_data));
+	if (BLK_NEEDS_ENCRYPTION3(IS_ENCRYPTED(mu_int_data.is_encrypted), (((blk_hdr_ptr_t)ptr)->levl), in_len)
+			&& mu_int_data.non_null_iv)
+	{	/* The below assert cannot be moved before BLK_NEEDS_ENCRYPTION3 check done above as ptr could potentially point to
+		 * a V4 block in which case the assert might fail when a V4 block is casted to a V5 block header.
+		 */
+		assert(((blk_hdr_ptr_t)ptr)->bsiz <= mu_int_data.blk_size);
+		assert(((blk_hdr_ptr_t)ptr)->bsiz >= SIZEOF(blk_hdr));
+		REALLOC_CRYPTBUF_IF_NEEDED(mu_int_data.blk_size);
+		memcpy(pvt_crypt_buf.addr, ptr, SIZEOF(blk_hdr));
+		in = (char *)(ptr + SIZEOF(blk_hdr));
+		out = (char *)pvt_crypt_buf.addr + SIZEOF(blk_hdr);
+		GTMCRYPT_ENCRYPT(csa, mu_int_data.non_null_iv, mu_int_encr_handles.encr_key_handle, in, in_len, out,
+				ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		}
+		fc->op_len = in_len + SIZEOF(blk_hdr);
+		fc->op_buff = (unsigned char *)pvt_crypt_buf.addr;
+	} else
+	{
+		fc->op_len = mu_int_data.fully_upgraded ? SIZEOF(blk_hdr) : mu_int_data.blk_size;
+		fc->op_buff = ptr;
+	}
 	fc->op_pos = mu_int_ovrhd + ((gtm_int64_t)mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
 	dbfilop(fc);
 	DEBUG_ONLY(reformat_buffer_in_use--;)

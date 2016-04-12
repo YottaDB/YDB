@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@
 # endif
 #  include "gtm_stat.h"
 #  include <errno.h>
-#  include <signal.h>
+#  include "gtm_signal.h"
 #elif defined(VMS)
 #  include <fab.h>
 #  include <iodef.h>
@@ -514,8 +515,9 @@ void wcs_recover(gd_region *reg)
 			}	/* end of bitmap processing */
 			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, FALSE))
 			{	/* always check the block and return - no assertpro, so last argument is FALSE */
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
-					DB_LEN_STR(reg), cr->blk);
+				if (!jgbl.mur_rollback)
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+						DB_LEN_STR(reg), cr->blk);
 				assert(gtm_white_box_test_case_enabled);
 			}
 			bt = bt_put(reg, cr->blk);
@@ -641,8 +643,9 @@ void wcs_recover(gd_region *reg)
 			 * In Unix, no rebuild would have been attempted since no kernel extension routine currently available.
 			 * In either case, we do not want to discard this buffer so send a warning to the user and proceed.
 			 */
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
-					DB_LEN_STR(reg), cr->blk);
+			if (!jgbl.mur_rollback)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+						DB_LEN_STR(reg), cr->blk);
 			cr->data_invalid = 0;
 		}
 		if (cr->in_tend)

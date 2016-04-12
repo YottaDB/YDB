@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,7 @@ typedef char	keyword[MAX_KEY] ;
 #define	MAX_KEY_LEN	20	/* maximum length across all keywords in the key[] array below */
 
 error_def	(ERR_BADJPIPARAM);
+error_def	(ERR_SYSCALL);
 
 static keyword	key[]= {
 	"CPUTIM",
@@ -59,7 +61,7 @@ enum 	kwind {
 void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 {
 	struct tms	proc_times;
-	int4		info, sc_clk_tck;
+	gtm_uint64_t	info, sc_clk_tck;
 	int		keywd_indx;
 	char		upcase[MAX_KEY_LEN];
 
@@ -69,10 +71,10 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	MV_FORCE_STR(kwd);
 	if (kwd->str.len == 0)
-		rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
 
 	if (MAX_KEY < kwd->str.len)
-		rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 
 	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, (int)kwd->str.len);
 
@@ -87,12 +89,12 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	if( keywd_indx == MAX_KEY )
         {
-                 rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+                 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
         }
 
 	if ((kw_isprocalive != keywd_indx) && ((unsigned int)-1 == times(&proc_times)))
 	{
-		rts_error(VARLSTCNT(1) errno);	/* need a more specific GTM error message in addition to errno */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("clock_gettime"), CALLFROM, errno);
 		return;
 	}
 	switch (keywd_indx)
@@ -117,13 +119,14 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 			break;
 		case kw_end:
 		default:
-			rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 			return;
 	}
 	if (kw_isprocalive != keywd_indx)
 	{
 		SYSCONF(_SC_CLK_TCK, sc_clk_tck);
-		info = (int4)((info * 100) / sc_clk_tck);	/* Convert to standard 100 ticks per second */
+		GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_CNTS, info, info << 31);
+		info = (gtm_uint64_t)((info * 100) / sc_clk_tck);	/* Convert to standard 100 ticks per second */
 	}
-	i2mval(ret, info);
+	ui82mval(ret, info);
 }

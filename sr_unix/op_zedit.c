@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +12,13 @@
 
 #include "mdef.h"
 
-#include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
+
+#include <sys/wait.h>
+#include <errno.h>
 
 #include "io.h"
 #include "parse_file.h"
@@ -190,6 +192,6 @@ void op_zedit(mval *v, mval *p)
 		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))
 			STRCPY(editor.addr, "");
 		EXECL(editor.addr, editor.addr, es, 0);
-		_exit(-1);
+		UNDERSCORE_EXIT(-1);
 	}
 }

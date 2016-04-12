@@ -58,6 +58,7 @@ mu_all_version_standalone
 mu_clsce
 mu_cre_file
 mu_cre_structs
+mu_decrypt
 mu_dwngrd_header
 mu_extr_gblout
 mu_extr_getblk
@@ -77,11 +78,12 @@ mu_int_maps
 mu_int_read
 mu_int_reg
 mu_int_reg_ch
+mu_int_wait_rdonly
 mu_int_write
-mu_interactive
 mu_op_open
 mu_outofband_setup
 mu_put_gvdata
+mu_put_gvn_fragment
 mu_reduce_level
 mu_reorg
 mu_reorg_upgrd_dwngrd
@@ -89,9 +91,9 @@ mu_replpool_grab_sem
 mu_replpool_release_sem
 mu_rndwn_all
 mu_rndwn_file
-mu_rndwn_rlnkctl
 mu_rndwn_repl_instance
 mu_rndwn_replpool
+mu_rndwn_rlnkctl
 mu_signal_process
 mu_size_arsample
 mu_size_impsample
@@ -115,6 +117,7 @@ mup_bak_sys
 mupip_backup
 mupip_cmd_disallow
 mupip_create
+mupip_crypt
 mupip_ctrl
 mupip_cvtgbl
 mupip_cvtpgm
@@ -125,6 +128,7 @@ mupip_exit_handler
 mupip_extend
 mupip_freeze
 mupip_ftok
+mupip_hash
 mupip_help
 mupip_integ
 mupip_intrpt
@@ -132,6 +136,7 @@ mupip_quit
 mupip_rctldump
 mupip_recover
 mupip_reorg
+mupip_reorg_encrypt
 mupip_restore
 mupip_rundown
 mupip_set
@@ -168,6 +173,7 @@ mur_init
 mur_insert_prev
 mur_jctl_from_next_gen
 mur_jnl_ext
+mur_merge_sort_extfmt
 mur_multi_rehash
 mur_open_files
 mur_output_record
@@ -188,6 +194,7 @@ mur_sort_files
 mur_token_lookup
 mur_tp_resolve_time
 mur_validate_checksum
+mur_write_header_extfmt
 mur_ztp_lookback
 murgetlst
 read_db_files_from_gld

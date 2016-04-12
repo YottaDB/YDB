@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,16 +12,13 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_string.h"
 
 #include "gtmimagename.h"
 #include "send_msg.h"
 #include "getzposition.h"
 
-#ifdef VMS
-#  include <ssdef.h>
-#endif
 #include "op.h"
 
 LITREF	gtmImageName	gtmImageNames[];
@@ -29,9 +27,6 @@ error_def(ERR_PROCTERM);
 
 void op_halt(void)
 {
-#ifdef VMS
-	sys$exit(SS$_NORMAL);
-#else
 #	ifdef GTM_TRIGGER
 	mval	zposition;
 
@@ -47,6 +42,5 @@ void op_halt(void)
 			 0, zposition.str.len, zposition.str.addr);
 	}
 #	endif
-	exit(EXIT_SUCCESS);
-#endif
+	EXIT(EXIT_SUCCESS);
 }

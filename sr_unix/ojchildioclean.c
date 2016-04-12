@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +26,7 @@
 #include "jnl.h"
 #include "jobsp.h"
 #include "gtmio.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include <rtnhdr.h>
 #include "relinkctl.h"
 
@@ -46,7 +45,7 @@ void ojchildioclean(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Close any encryption related fds that the plug-in might have opened */
-	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
+	GTMCRYPT_CLOSE;
 	/* Run through the list of databases to simply close them out (still open by parent) */
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{

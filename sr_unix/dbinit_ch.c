@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +52,12 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
 	int			rc, lcl_new_dbinit_ipc;
+	boolean_t		ftok_counter_halted = FALSE, access_counter_halted = FALSE;
 
+	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in db_init().Because
+	 * we don't have access to file header, we can not know if counters are disabled so we go by our best guess, not disabled,
+	 * during cleanup.
+	 */
 	assert(NULL != db_init_region);
 	seg = db_init_region->dyn.addr;
 	udi = NULL;
@@ -75,6 +81,11 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			free(csa->jnl);
 			csa->jnl = NULL;
 		}
+		if (NULL != csa->hdr)
+		{
+			ftok_counter_halted = csa->hdr->ftok_counter_halted;
+			access_counter_halted = csa->hdr->access_counter_halted;
+		}
 		if (csa->nl)
 		{
 			shmdt((caddr_t)csa->nl);
@@ -94,10 +105,11 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
 		}
-		if (udi->counter_acc_incremented)
+		if (udi->counter_acc_incremented && !access_counter_halted)
 		{
 			assert((INVALID_SEMID != udi->semid) && !db_init_region->read_only);
-			do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT);	/* decrement the read-write sem */
+			/* decrement the read-write sem */
+			do_semop(udi->semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT);
 			udi->counter_acc_incremented = FALSE;
 		}
 		if (udi->grabbed_access_sem)
@@ -106,10 +118,10 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			udi->grabbed_access_sem = FALSE;
 		}
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(db_init_region, udi->counter_ftok_incremented, TRUE);
-		else if (udi->counter_ftok_incremented)
-			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT);
-		udi->counter_ftok_incremented =FALSE;
+			ftok_sem_release(db_init_region, udi->counter_ftok_incremented && !ftok_counter_halted, TRUE);
+		else if (udi->counter_ftok_incremented && !ftok_counter_halted)
+			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT);
+		udi->counter_ftok_incremented = FALSE;
 		udi->grabbed_ftok_sem = FALSE;
 		if (!IS_GTCM_GNP_SERVER_IMAGE && !retry_dbinit) /* gtcm_gnp_server reuses file_cntl */
 		{
@@ -118,7 +130,11 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			seg->file_cntl = NULL;
 		}
 	}
-	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error. */
+	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
+	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
+	 * the corresponding DEFER_INTERRUPTS happened in gvcst_init.c (a different function) so we have an assert
+	 * there that the previous state was INTRPT_OK_TO_INTERRUPT and use that instead of prev_intrpt_state here.
+	 */
 	if (!retry_dbinit)
-		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
+		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
 }

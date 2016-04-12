@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,13 +71,8 @@ uint4 mur_process_intrpt_recov()
 	uint4				status, status2;
 	uint4				max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
 	sgmnt_data_ptr_t		csd;
-	UNIX_ONLY(
-		jnl_private_control	*jpc;
-		jnl_buffer_ptr_t	jbp;
-	)
-	VMS_ONLY(
-		io_status_block_disk	iosb;
-	)
+	jnl_private_control		*jpc;
+	jnl_buffer_ptr_t		jbp;
 	boolean_t			jfh_changed;
 	jnl_record			*jnlrec;
 	jnl_file_header			*jfh;
@@ -291,11 +286,16 @@ uint4 mur_process_intrpt_recov()
 		jfh = jctl->jfh;
 		jfh->turn_around_offset = jctl->turn_around_offset;	/* save progress in file header for 	*/
 		jfh->turn_around_time = jctl->turn_around_time;		/* possible re-issue of recover 	*/
-		UNIX_ONLY(
-			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-				jfh->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
-		)
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+			jfh->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 		jfh_changed = TRUE;
+		/* We are about to update the journal file header of the turnaround-point journal file to store the
+		 * non-zero jfh->turn_around_offset. Ensure corresponding database is considered updated.
+		 * This is needed in case journal recovery/rollback terminates abnormally and we go to mur_close_files.
+		 * We need to ensure csd->recov_interrupted does not get reset to FALSE even if this region did not have
+		 * have any updates to the corresponding database file otherwise. (GTM-8394)
+		 */
+		rctl->db_updated = TRUE;
 		for ( ; NULL != jctl; jctl = jctl->next_gen)
 		{	/* setup the next_jnl links. note that in the case of interrupted recovery, next_jnl links
 			 * would have been already set starting from the turn-around point journal file of the
@@ -346,18 +346,16 @@ uint4 mur_process_intrpt_recov()
 							jctl->jnl_fn, jctl->status, PUT_SYS_ERRNO(jctl->status2));
 					return jctl->status;
 				}
-				UNIX_ONLY(
-					GTM_JNL_FSYNC(rctl->csa, jctl->channel, jctl->status);
-					if (-1 == jctl->status)
-					{
-						jctl->status2 = errno;
-						assert(FALSE);
-						gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
-							jctl->jnl_fn_len, jctl->jnl_fn,
-							ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), jctl->status2);
-						return ERR_JNLFSYNCERR;
-					}
-				)
+				GTM_JNL_FSYNC(rctl->csa, jctl->channel, jctl->status);
+				if (-1 == jctl->status)
+				{
+					jctl->status2 = errno;
+					assert(FALSE);
+					gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
+						jctl->jnl_fn_len, jctl->jnl_fn,
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), jctl->status2);
+					return ERR_JNLFSYNCERR;
+				}
 			}
 			jfh_changed = FALSE;
 		}

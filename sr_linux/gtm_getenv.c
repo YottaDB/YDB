@@ -16,6 +16,7 @@
  * only sees the Windows variables.					*
 */
 
+#include "gtm_common_defs.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,9 +53,9 @@ GBLREF	gtmsource_state_t	gtmsource_state;
 
 int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at)
 {
-	uint4 			jnldata_len, read_size, read, jnlpool_size, avail_data;
+	uint4 			jnldata_len, read_size, jnlpool_size, avail_data;
 	uint4			first_tr_len, num_tr_read, tr_len;
-	int4			wrap_size;
+	int64_t			read, wrap_size; /* This can be negative. Must handle a signed 4G value */
 	uchar_ptr_t		buf_top, tr_p;
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -108,7 +109,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 				read_size = jnldata_len - SIZEOF(jnldata_hdr_struct);
 				if (0 < read_size && read_size <= maxbufflen)
 				{
-					if (0 < (wrap_size = (int4)(read - (jnlpool_size - jnldata_len))))
+					if (0 < (wrap_size = ((int64_t)read - (jnlpool_size - jnldata_len))))
 						read_size -= wrap_size;
 					memcpy(buff, (sm_uc_ptr_t)jnl_header + SIZEOF(jnldata_hdr_struct), read_size);
 					if (0 < wrap_size)
@@ -184,11 +185,11 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 								}
 							)
 							jnldata_len = (uint4)((tr_p - buff) + SIZEOF(jnldata_hdr_struct));
-							wrap_size = (int4)(read - (jnlpool_size - jnldata_len));
+							wrap_size = ((int64_t)read - (jnlpool_size - jnldata_len));
 						}
 						REPL_DPRINT4("Pool read seqno : "INT8_FMT" Num Tr read : %d Total Tr len : %d\n",
 						       INT8_PRINT(read_jnl_seqno), num_tr_read, jnldata_len);
-						REPL_DPRINT4("Read %u : Next read : %u : %s\n", read,
+						REPL_DPRINT4("Read %u : Next read : %ld : %s\n", read,
 							(0 > wrap_size) ? read + jnldata_len : wrap_size,
 							(0 > wrap_size) ? "" : " READ WRAPPED");
 						assert(next_read_seqno <= next_histinfo_seqno);

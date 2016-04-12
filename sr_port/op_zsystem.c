@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +60,7 @@ void op_zsystem(mval *v)
 {
 	int		len;
 #ifdef UNIX
-	char		*sh, cmd_buf[MAXZSYSSTRLEN], *cmd;
+	char		*sh, cmd_buf[MAXZSYSSTRLEN + 1], *cmd;
 #ifdef _BSD
         union wait      wait_stat;
 #else
@@ -77,15 +78,17 @@ void op_zsystem(mval *v)
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 #ifdef UNIX
-	if (v->str.len > (MAXZSYSSTRLEN - 32 - 1)) /* 32 char for shell name, remaining for ZSYSTEM command */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len, (MAXZSYSSTRLEN - 32 - 1));
 	/* get SHELL environment */
 	sh = GETENV("SHELL");
+	len = ((sh)? STRLEN(sh):STRLEN("/bin/sh")) + STRLEN(" -c ''"); /* Include the command " -c ''" string */
+	if (v->str.len > (MAXZSYSSTRLEN - len))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len,
+				(MAXZSYSSTRLEN > len)? (MAXZSYSSTRLEN - len) : 0);
 	/* use bourn shell as default */
 	if (!sh)
-		strcpy(cmd_buf, "/bin/sh");
+		strncpy(cmd_buf, "/bin/sh", STRLEN("/bin/sh"));
 	else
-		strcpy(cmd_buf, sh);
+		strncpy(cmd_buf, sh, len); /* sh is null terminated, using len is ok even though it's longer */
 	cmd = cmd_buf;
 	if (v->str.len)
 	{

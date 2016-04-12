@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +62,7 @@ typedef mstr cmi_descriptor;
 #include "gtm_unistd.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"	/* for sockaddr_storage */
+#include "gtm_signal.h"
 
 typedef struct
 {
@@ -162,16 +164,9 @@ struct NTD
 #define CMI_CLB_ERROR(c)	(CMI_ERROR(CMI_CLB_IOSTATUS(c)))
 #define CMI_MAKE_STATUS(s)	(s)
 
-#define CMI_MUTEX_DECL sigset_t _cmi_oset_
-#define CMI_MUTEX_BLOCK sigprocmask(SIG_BLOCK, &ntd_root->mutex_set, &_cmi_oset_)
-#define CMI_MUTEX_RESTORE sigprocmask(SIG_SETMASK, &_cmi_oset_, NULL)
-
-#define CMI_CALLBACK(pclb) \
-	{ \
-		CMI_MUTEX_DECL; \
-		(*(pclb)->ast)(pclb); \
-		CMI_MUTEX_RESTORE; \
-	}
+#define CMI_MUTEX_DECL(RC)	sigset_t _cmi_oset_; int RC
+#define CMI_MUTEX_BLOCK(RC)	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &_cmi_oset_, RC)
+#define CMI_MUTEX_RESTORE(RC)	SIGPROCMASK(SIG_SETMASK, &_cmi_oset_, NULL, RC)
 
 /* All TCP/IP GNP messages have a 2 byte length before the message itself */
 #define CMI_TCP_PREFIX_LEN	2

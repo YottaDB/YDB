@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +44,7 @@
 #include "t_abort.h"
 #include "gvcst_blk_build.h"	/* for the BUILD_AIMG_IF_JNL_ENABLED macro */
 #include "gtmmsg.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	char			*update_array, *update_array_ptr;

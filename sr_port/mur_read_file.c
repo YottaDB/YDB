@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,18 +13,11 @@
 #include "mdef.h"
 
 #include <stddef.h>	/* for offsetof macro */
-#if defined(UNIX)
+
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#elif defined(VMS)
-#include <rms.h>
-#include <iodef.h>
-#include <psldef.h>
-#include <ssdef.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
 
+#include "gtm_multi_thread.h"
 #include "min_max.h"
 #include "gtm_string.h"
 #include "gtmio.h"
@@ -43,17 +37,15 @@
 #include "mur_read_file.h"
 #include "iosp.h"
 #include "copy.h"
-#include "eintr_wrappers.h"
 #include "util.h"
 #include "gtmmsg.h"
 #include "mur_validate_checksum.h"
 #include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #include "error.h"
-#endif
 
 error_def(ERR_BEGSEQGTENDSEQ);
+error_def(ERR_BOVTMGTEOVTM);
 error_def(ERR_BOVTNGTEOVTN);
 error_def(ERR_GTMASSERT);
 error_def(ERR_JNLBADRECFMT);
@@ -71,13 +63,10 @@ error_def(ERR_REPLNOTON);
 error_def(ERR_RLBKJNLNOBIMG);
 error_def(ERR_TEXT);
 
-GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	mur_gbls_t	murgbl;
 GBLREF	gd_region	*gv_cur_region;
-GTMCRYPT_ONLY(
-	GBLREF	int	process_exiting;
-)
+GBLREF	int		process_exiting;
 
 /*
  * Function name: mur_prev_rec
@@ -90,6 +79,7 @@ GTMCRYPT_ONLY(
  * 		  It can open previous generation journal and update rctl->jctl and passed in "jjctl" to reflect new jctl
  * 		  It issues error message here as appropriate, so caller will not need to print the error again.
  */
+/* #GTM_THREAD_SAFE : The below function (mur_prev_rec) is thread-safe */
 uint4 mur_prev_rec(jnl_ctl_list **jjctl)
 {
 	jnl_ctl_list	*jctl;
@@ -173,6 +163,7 @@ uint4 mur_prev_rec(jnl_ctl_list **jjctl)
  * 		  It can open next generation journal and update rctl->jctl and passed in "jjctl" to reflect new jctl
  * 		  It issues error message here when necessary, so caller does not need to print the error again.
  */
+/* #GTM_THREAD_SAFE : The below function (mur_next_rec) is thread-safe */
 uint4 mur_next_rec(jnl_ctl_list **jjctl)
 {
 	jnl_ctl_list	*jctl;
@@ -232,6 +223,7 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
  * Pre-Condition: Always first call to a journal file is mur_prev(jctl, n > 0).
  *		  Then all following calls are mur_prev(jctl, 0) to read records sequentially backward.
  */
+/* #GTM_THREAD_SAFE : The below function (mur_prev) is thread-safe */
 uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 {
 	off_jnl_t	buff_offset;
@@ -419,6 +411,7 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
  * Pre-Condition: Always first call to a journal file is mur_next(jctl, n > 0).
  *		  Then all following calls are mur_next(jctl, 0) to read records sequentially.
  */
+/* #GTM_THREAD_SAFE : The below function (mur_next) is thread-safe */
 uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 {
 	jrec_prefix	*prefix;
@@ -615,6 +608,7 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
  * This function is called when reads are not sequential and double buffering will not help.
  * Also this only reads raw data without doing any record validation or processing.
  */
+/* #GTM_THREAD_SAFE : The below function (mur_read) is thread-safe */
 uint4 mur_read(jnl_ctl_list *jctl)
 {
 	mur_buff_desc_t	*random_buff;
@@ -635,6 +629,7 @@ uint4 mur_read(jnl_ctl_list *jctl)
  * This function reads synchronously
  * The caller function will set buff->blen, buff->dskaddr and check error status
  */
+/* #GTM_THREAD_SAFE : The below function (mur_freadw) is thread-safe */
 uint4 mur_freadw(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 {
 	assert(jctl->eof_addr > buff->dskaddr); /* should never be reading at or beyond end of file */
@@ -655,17 +650,27 @@ uint4 mur_freadw(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
  * 		jctl->eof_addr
  * 		jctl->lvrec_time
  */
+/* #GTM_THREAD_SAFE : The below function (mur_fread_eof) is thread-safe */
 uint4	mur_fread_eof(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 {
 	jnl_record	*rec;
 	jnl_file_header	*jfh;
 	uint4		status, lvrec_off;
 
+	/* jctl->reg_ctl should have been already filled in by mur_fopen_sp (invoked from mur_fopen called before mur_fread_eof.
+	 * Assert that. The only exception is if the mur_fopen/mur_fopen_sp call was made when rctl was not known but was
+	 * later known at mur_fread_eof time. In that case, we want jctl->reg_ctl to be set.
+	 */
+	assert((NULL == jctl->reg_ctl) || (rctl == jctl->reg_ctl));
 	jctl->reg_ctl = rctl;	/* fill in reg_ctl backpointer from jctl to rctl */
+	jfh = jctl->jfh;
+	if ((NULL != rctl->csd) && !SAME_ENCRYPTION_SETTINGS(jfh, rctl->csd))
+		jctl->same_encryption_settings = FALSE;
+	else
+		jctl->same_encryption_settings = TRUE;
 	if (mur_options.show_head_only) /* only SHOW HEADER, no need for time consuming search for valid eof */
 		return SS_NORMAL;
 	jctl->tail_analysis = TRUE;
-	jfh = jctl->jfh;
 	if (0 != jfh->prev_recov_end_of_data)
 	{ 	/* regardless of jfh->crash, prev_recov_end_of_data and end_of_data must point to valid records since
 		 * earlier recovery processed the file to determine these values */
@@ -711,6 +716,7 @@ uint4	mur_fread_eof(jnl_ctl_list *jctl, reg_ctl_list *rctl)
  * Return: SS_NORMAL on success else failure status
  * Description: This routine is same as mur_fread_eof except it is called when journal is improper for a crash
  */
+/* #GTM_THREAD_SAFE : The below function (mur_fread_eof_crash) is thread-safe */
 uint4 mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 {
 	uint4		status;
@@ -742,6 +748,7 @@ uint4 mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off
  * 	jctl->rec_offset as the offset of the valid record of that journal file
  * 	"mur_fread_eof" and "mur_prev" call this function
  */
+/* #GTM_THREAD_SAFE : The below function (mur_valrec_prev) is thread-safe */
 uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 {
 	off_jnl_t	mid_off, new_mid_off, rec_offset, mid_further;
@@ -885,6 +892,7 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
  * Return: SS_NORMAL on succees, error status if unsuccessful
  * mur_next() calls this function
  */
+/* #GTM_THREAD_SAFE : The below function (mur_valrec_next) is thread-safe */
 uint4 mur_valrec_next(jnl_ctl_list *jctl, off_jnl_t lo_off)
 {
 	jnl_file_header	*jfh;
@@ -924,21 +932,24 @@ uint4 mur_valrec_next(jnl_ctl_list *jctl, off_jnl_t lo_off)
 /*
  * Function name: mur_fopen
  * Input: jnl_ctl_list *
- * Return value : TRUE or False
+ * Return value : 0 (SS_NORMAL) for success; Non-zero for failure
  * This function opens the journal file , checks JNLLABEL in header, endianness etc.
  */
-boolean_t mur_fopen(jnl_ctl_list *jctl)
+/* #GTM_THREAD_SAFE : The below function (mur_fopen) is thread-safe */
+uint4	mur_fopen(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 {
 	jnl_file_header	*jfh;
 	char		jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN];
 	jnl_record	*jrec;
 	int		cre_jnl_rec_size;
-#	ifdef GTM_CRYPT
+	boolean_t	was_holder;
+	uint4		status;
+	sgmnt_addrs	*csa;
 	int		gtmcrypt_errno;
-#	endif
 
-	if (!mur_fopen_sp(jctl))
-		return FALSE;
+	status = mur_fopen_sp(jctl, rctl);
+	if (SS_NORMAL != status)
+		return status;
 	jctl->eof_addr = jctl->os_filesize;
 	assert(NULL == jctl->jfh);
 	jfh = jctl->jfh = (jnl_file_header *)malloc(REAL_JNL_HDR_LEN);
@@ -955,22 +966,25 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		 */
 		jfh->data_file_name_length = 0;
 		if (ERR_JNLINVALID == jctl->status)
+		{
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
 					jfh->data_file_name_length, jfh->data_file_name, ERR_TEXT, 2,
 					LEN_AND_LIT("Journal file does not have complete file header"));
+			return ERR_JNLINVALID;
+		}
 		else if (SS_NORMAL != jctl->status2)
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT1(7) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0,
 					jctl->status, PUT_SYS_ERRNO(jctl->status2));
 		else
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0,
 					jctl->status);
-		return FALSE;
+		return ERR_JNLREAD;
 	}
 	if (SS_NORMAL == jctl->status)
 	{
 		CHECK_JNL_FILE_IS_USABLE(jfh, jctl->status, TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
 		if (SS_NORMAL != jctl->status)
-			return FALSE;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */
+			return jctl->status;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */
 	}
 	/* Now that we know for sure, jfh is of the format we expect it to be, we can safely access fields inside it */
 	cre_jnl_rec_size = JNL_HAS_EPOCH(jfh)
@@ -983,18 +997,17 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		{
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn,
 					JNL_HDR_LEN, jctl->status);
-			return FALSE;
+			return ERR_JNLREAD;
 		}
 	} else
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
 			jfh->data_file_name_length, jfh->data_file_name,
 			ERR_TEXT, 2, LEN_AND_LIT("File size is less than minimum expected for a valid journal file"));
-		return FALSE;
+		return ERR_JNLINVALID;
 	}
 	if (!mur_options.forward && !jfh->before_images)
 	{
-		VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
 		if (mur_options.rollback_losttnonly)
 		{	/* Already prepared for a LOSTTNONLY rollback. Allow NOBEFORE_IMAGE journal file but issue a warning. */
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_RLBKJNLNOBIMG, 2, jctl->jnl_fn_len,
@@ -1003,7 +1016,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		{
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_JNLNOBIJBACK, 2, jctl->jnl_fn_len,
 					jctl->jnl_fn);
-			return FALSE;
+			return ERR_JNLNOBIJBACK;
 		}
 	}
 	assert(!REPL_WAS_ENABLED(jfh));	/* a journal file can never be created if replication is in WAS_ON state */
@@ -1011,14 +1024,14 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	if (!REPL_ENABLED(jfh) && mur_options.rollback)
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_REPLNOTON, 2, jctl->jnl_fn_len, jctl->jnl_fn);
-		return FALSE;
+		return ERR_REPLNOTON;
 	}
 	jrec = (jnl_record *)jrecbuf;
 	if (!IS_VALID_JNLREC(jrec, jfh) || JRT_PINI != jrec->prefix.jrec_type)
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
 				JNL_HDR_LEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no PINI record found"));
-		return FALSE;
+		return ERR_JNLBADRECFMT;
 	}
 	/* We have at least one good record */
 	if (JNL_HAS_EPOCH(jfh))
@@ -1028,7 +1041,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		{
 			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
 					JNL_HDR_LEN + PINI_RECLEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no EPOCH record found"));
-			return FALSE;
+			return ERR_JNLBADRECFMT;
 		}
 		/* We have at least one valid EPOCH */
 	}
@@ -1036,41 +1049,45 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_BOVTNGTEOVTN, 4, jctl->jnl_fn_len, jctl->jnl_fn,
 				&jfh->bov_tn, &jfh->eov_tn);
-		return FALSE;
+		return ERR_BOVTNGTEOVTN;
 	}
 	if (jfh->bov_timestamp > jfh->eov_timestamp)
 	{	/* This is not a severe error to exit, may be user changed system time which we do not allow now.
 		 * But we can still try to continue recovery. We already removed time continuity check from mur_fread_eof().
 		 * So if error limit allows, we will continue recovery  */
 		if (!mur_report_error(jctl, MUR_BOVTMGTEOVTM))
-			return FALSE;
+			return ERR_BOVTMGTEOVTM;
 	}
 	if (mur_options.rollback && (jfh->start_seqno > jfh->end_seqno))
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_BEGSEQGTENDSEQ, 4, jctl->jnl_fn_len, jctl->jnl_fn,
 				&jfh->start_seqno, &jfh->end_seqno);
-		return FALSE;
+		return ERR_BEGSEQGTENDSEQ;
 	}
 	init_hashtab_int4(&jctl->pini_list, MUR_PINI_LIST_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
-	/* Please investigate if murgbl.max_extr_record_length is more than what a VMS record (in a line) can handle ??? */
 	if (murgbl.max_extr_record_length < ZWR_EXP_RATIO(jctl->jfh->max_jrec_len))
-		murgbl.max_extr_record_length = ZWR_EXP_RATIO(jctl->jfh->max_jrec_len);
-#	ifdef GTM_CRYPT
-	jctl->is_same_hash_as_db = TRUE;
-	if (!process_exiting && jfh->is_encrypted)
 	{
-		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
+		PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
+		/* Check if after getting the thread lock, the global is still lesser. If so update it. */
+		if (murgbl.max_extr_record_length < ZWR_EXP_RATIO(jctl->jfh->max_jrec_len))
+			murgbl.max_extr_record_length = ZWR_EXP_RATIO(jctl->jfh->max_jrec_len);
+		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
+	}
+	if (!process_exiting && USES_ANY_KEY(jfh))
+	{
+		csa = JCTL2CSA(jctl);	/* need JCTL2CSA macro instead of jctl->reg_ctl->csa because rctl could be NULL */
+		PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
+		INIT_PROC_ENCRYPTION(csa, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
-			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(cs_addrs, jfh->encryption_hash, jctl->encr_key_handle, gtmcrypt_errno);
+			INIT_DB_OR_JNL_ENCRYPTION(jctl, jfh, 0, NULL, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(gtmcrypt_errno), gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
-		if (NULL != mur_ctl->csd && (0 != memcmp(mur_ctl->csd->encryption_hash, jfh->encryption_hash, GTMCRYPT_HASH_LEN)))
-			jctl->is_same_hash_as_db = FALSE;
+		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
 	}
-#	endif
-	return TRUE;
+	return SS_NORMAL;
 }
 
+/* #GTM_THREAD_SAFE : The below function (mur_fclose) is thread-safe */
 boolean_t mur_fclose(jnl_ctl_list *jctl)
 {
 	if (NOJNL == jctl->channel) /* possible if mur_fopen() errored out */
@@ -1084,7 +1101,7 @@ boolean_t mur_fclose(jnl_ctl_list *jctl)
 	JNL_FD_CLOSE(jctl->channel, jctl->status);	/* sets jctl->channel to NOJNL */
 	if (SS_NORMAL == jctl->status)
 		return TRUE;
-	UNIX_ONLY(jctl->status = errno;)
+	jctl->status = errno;
 	assert(FALSE);
 	gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(5) ERR_JNLFILECLOSERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,
 			jctl->status);

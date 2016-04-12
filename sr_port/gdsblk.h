@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -192,7 +193,7 @@ typedef rec_hdr *rec_hdr_ptr_t;
 # endif
 #endif
 
-#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_rec_size - SIZEOF(blk_hdr))
+#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_key_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr)) /* anything past key can span */
 #define CHKRECLEN(r,b,n) ((unsigned int)((n) + (uchar_ptr_t)(r) - (uchar_ptr_t)(b)) <= (unsigned int)((blk_hdr_ptr_t)(b))->bsiz)
 
 /*********************************************************************

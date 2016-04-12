@@ -14,16 +14,21 @@
 . ./arch.gtc
 
 # Path to the correct echo program
+# depending on the list of locales configured, locale -a might be considered a binary output.
+# grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
 	echo=/usr/5bin/echo
 	# Solaris 11 does not have /usr/5bin/echo
 	if [ ! -f $echo ]; then
 		echo=/usr/bin/echo
 	fi
+	binaryopt=""
 elif [ $arch = "linux" ]; then
 	echo="/bin/echo -e"
+	binaryopt="-a"
 else
 	echo=/bin/echo
+	binaryopt=""
 fi
 
 # add path to strip for solaris
@@ -198,10 +203,10 @@ else
 
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		mkdir -p $gtmdist/plugin/r $gtmdist/plugin/o
-		chmod 0755 $gtmdist
-		chown $owner $gtmdist
-		chgrp $bingroup $gtmdist
+		mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
+		chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+		chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+		chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
 	else
 		exit
 	fi
@@ -338,7 +343,7 @@ if [ -d "utf8" ]; then
 			fi
 		fi
 		# Look for locale
-		utflocale=`locale -a | grep -iE '\.utf.?8$' | head -n1`
+		utflocale=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 		if [ "$utflocale" = "" ] ; then
 			$echo "WARNING: UTF8 locale not found. Not installing UTF-8 support."
 		fi
@@ -475,17 +480,6 @@ fi
 plugin="plugin"
 plugin_gtmcrypt="$plugin/gtmcrypt"
 
-# Gtmcrypt files used to build (and install)
-gtmcryptbldfiles="Makefile"
-
-# Gtmcrypt Binaries
-gtmcryptbinaries="maskpass"
-
-# Gtmcrypt shared library
-gtmcryptsharedlibs="libgtmcrypt_openssl_BLOWFISHCFB$ext libgtmcrypt_openssl_AES256CFB$ext"
-gtmcryptsharedlibs="$gtmcryptsharedlibs libgtmcrypt_gcrypt_AES256CFB$ext libgtmcrypt$ext"
-gtmcryptsharedlibs="$gtmcryptsharedlibs libgtmtls$ext libgtmcryptutil$ext"
-
 # Gtmcrypt scripts
 gtmcryptscripts="gen_sym_key.sh encrypt_sign_db_key.sh gen_keypair.sh pinentry-gtm.sh"
 gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh show_install_config.sh"
@@ -494,10 +488,10 @@ gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh show_in
 gtmcryptmfile="pinentry.m"
 
 # Gtmcrypt source files
-gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
+gtmcryptsrcfiles="Makefile README gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c gtm_tls_interface.h gtm_tls_impl.h"
-gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptbldfiles $gtmcryptmfile"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptmfile"
 
 dogtmcrypt=0
 if [ -d "$plugin_gtmcrypt" ]; then
@@ -511,72 +505,45 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	chown $owner $gtmdist/plugin/gtmcrypt/
 	chgrp $bingroup $gtmdist/plugin/gtmcrypt
 
-
-	#Install the plugin related scripts
-	for i in $gtmcryptscripts
-	do
-		cp -p $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt/$i
-		chmod 0755 $gtmdist/$plugin_gtmcrypt/$i
-		chown $owner $gtmdist/$plugin_gtmcrypt/$i
-		chgrp $bingroup $gtmdist/$plugin_gtmcrypt/$i
-	done
-
-	# Install the plugin binaries
-	for i in $gtmcryptbinaries
-	do
-		if [ $arch = "sun" -o $arch = "linux" ]; then
-			install -g $bingroup -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
-		elif [ $arch = "ibm" ]; then
-			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G $bingroup $plugin_gtmcrypt/$i
-		elif [ -x /usr/sbin/install ]; then
-			/usr/sbin/install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g $bingroup \
-				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
-		else
-			install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g $bingroup \
-				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
-		fi
-	done
-
-	# Install the different flavors of encryption plugin (OpenSSL and Gcrypt)
-	for i in $gtmcryptsharedlibs
-	do
-		# Install only files (and not symlinks) that exist
-		#   CMake builds generate only one library - GCRYPT with AES256CFB
-		if [ -L $plugin/$i -o ! -f $plugin/$i ]; then
-			continue
-		elif [ $arch = "sun" -o $arch = "linux" ]; then
-			install -g $bingroup -o $owner -m 755 $plugin/$i $gtmdist/$plugin
-		elif [ $arch = "ibm" ]; then
-			/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $bingroup $plugin/$i
-		elif [ -x /usr/sbin/install ]; then
-			/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g $bingroup $plugin/$i $gtmdist/$plugin
-		else
-			install -f $gtmdist/$plugin -m 755 -u $owner -g $bingroup $plugin/$i $gtmdist/$plugin
-		fi
-	done
-
-	# Install the Symbolic link only if one exists (tarball has it, CMake builds do not)
-	if [ -L $plugin/libgtmcrypt$ext ]; then
-		currentlink=`ls -l $plugin/libgtmcrypt$ext | awk '{print $NF}'`
-		ln -s $currentlink $gtmdist/$plugin/libgtmcrypt$ext
-	fi
-
-	# Install the plugin related M file
-	cp -p $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chgrp $bingroup $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-
-	# Install gpgagent.tab
-	# This is an external call table so the path to the shared library has to be adjusted
-	echo "${install_dest}/plugin/libgtmcryptutil$ext" > $gtmdist/$plugin/gpgagent.tab
-	cat $plugin/gpgagent.tab | sed 1d >> $gtmdist/$plugin/gpgagent.tab
-
 	# Tar the source files
-	(cd $plugin_gtmcrypt; chmod 0644 $gtmcryptsrcfiles; chown $owner $gtmcryptsrcfiles; chgrp $bingroup $gtmcryptsrcfiles)
-	(cd $plugin_gtmcrypt; chmod 0555 $gtmcryptbldfiles; chown $owner $gtmcryptbldfiles; chgrp $bingroup $gtmcryptbldfiles)
-	(cd $plugin_gtmcrypt; tar -cvf source.tar $gtmcryptsrcfiles >/dev/null 2>&1; mv source.tar $gtmdist/$plugin_gtmcrypt)
-	(cd $gtmdist/$plugin_gtmcrypt; chmod 0644 source.tar; chown $owner source.tar; chgrp $bingroup source.tar)
+	cat > $plugin_gtmcrypt/README << EOF
+#
+# WARNING: This file was generated by the GT.M install script at install time.
+#
+# Dependency information:
+#  Please install a compiler toolchain and libgcrypt, libgpgme, libconfig, and
+#  libssl development libraries. On Debian you can do:
+#    sudo apt-get install libgcrypt11-dev libgpgme11-dev libconfig-dev libssl-dev
+#
+# Installation instructions:
+#  You may need to edit the Makefile to add include (IFLAGS) and library paths
+#  (LIBFLAGS) for your system.
+#
+#  The commands below to compile, install and set the file permissions on the
+#  encryption plugin libraries make the following assumptions:
+#    - The shell is bourne shell compatible
+#    - The user is root
+#    - The permissions defined for the gtm installation are appropriate for the
+#      plug-in
+#
+#  You should be able to cut and paste the following commands
+#
+gtm_dist="$gtmdist"
+export gtm_dist
+make && make install && make clean
+find \$gtm_dist/plugin -type f -exec chown ${owner}:${bingroup} {} +
+EOF
+	if [ "$group" != "" ] ; then
+		echo "chmod -R o-rwx \$gtm_dist/plugin" >> $plugin_gtmcrypt/README
+	fi
+	(cd $plugin_gtmcrypt			&& \
+	 chmod 0644 $gtmcryptsrcfiles		&& \
+	 chmod 0755 $gtmcryptscripts 		&& \
+	 chown ${owner}:${bingroup} *		&& \
+	 tar -cvf $gtmdist/$plugin_gtmcrypt/source.tar $gtmcryptsrcfiles $gtmcryptscripts >/dev/null 2>&1)
+	chmod 0644 $gtmdist/$plugin_gtmcrypt/source.tar
+	chown ${owner}:${bingroup} $gtmdist/$plugin_gtmcrypt/source.tar
+	rm $plugin_gtmcrypt/README
 fi
 
 # Install GDE, GTMHELP, and all the percent routines
@@ -657,7 +624,7 @@ if [ "$doutf8" -ne 0 ]; then
 	# Enclose UTF-8 operations inside a subshell. This avoids changing the current M mode execution
 	(
 		# Ensure we ARE in UTF-8 mode
-		utflocale=`locale -a | grep -iE '\.utf.?8$' | head -n1`
+		utflocale=`locale -a | grep $binaryopt -iE 'en_us\.utf.?8$' | head -n1`
 		if [ $utflocale = "" ]; then
 			# If no locale defined, try C.UTF-8
 			utflocale="C.UTF-8"
@@ -705,12 +672,6 @@ if [ "$doutf8" -ne 0 ]; then
 	chgrp $bingroup $gtmdist/utf8/*.txt
 fi
 
-if [ "$dogtmcrypt" -ne 0 ]; then
-	chmod 0644 $gtmdist/plugin/gtmcrypt/*.m
-	chown $owner $gtmdist/plugin/gtmcrypt/*.m
-	chgrp $bingroup $gtmdist/plugin/gtmcrypt/*.m
-fi
-
 gtm_dist=$gtmdist
 export gtm_dist
 
@@ -721,8 +682,8 @@ else
 fi
 export gtmroutines
 
-other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHLPLD.o GTMTHREADGBLASM.o LOAD.o LOADOP.o"
-other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
+other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMDEFINEDTYPESTODB.o GTMHLPLD.o GTMTHREADGBLASM.o LOAD.o"
+other_object_files="$other_object_files LOADOP.o LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
 csh_script_files=""
 
 # make database files read only

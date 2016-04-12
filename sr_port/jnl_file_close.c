@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +17,6 @@
 #include "gtm_time.h"
 #include "gtm_string.h"
 
-#if defined(UNIX)
 #include "gtm_unistd.h"
 #include "aswp.h"
 #include "lockconst.h"
@@ -26,14 +26,6 @@
 #include "wcs_sleep.h"
 #include "gt_timer.h"
 #include "wbox_test_init.h"
-#elif defined(VMS)
-#include <rms.h>
-#include <iodef.h>
-#include <psldef.h>
-#include <ssdef.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -55,11 +47,6 @@
 
 #ifdef UNIX
 #include "wcs_clean_dbsync.h"
-#endif
-
-#if defined(VMS)
-GBLREF	short	astq_dyn_avail;
-static	const	unsigned short	zero_fid[3];
 #endif
 
 GBLREF 	jnl_gbls_t		jgbl;
@@ -85,7 +72,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	uint4			status, read_write_size;
 	int			rc, save_errno, idx;
 	uint4			jnl_fs_block_size;
-	boolean_t		was_in_jnl_file_autoswitch, was_last_eof_written, in_tail;
+	boolean_t		was_in_jnl_file_autoswitch, write_eof, in_tail;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -95,18 +82,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			ASSERT_JNLFILEID_NOT_NULL(csa);
 	)
 	jpc = csa->jnl;
-#if defined(UNIX)
 	if (csa->dbsync_timer)
 		CANCEL_DBSYNC_TIMER(csa);
-#elif defined(VMS)
-	/* See comment about ordering of the two statements below, in similar code in gds_rundown */
-	if (csa->dbsync_timer)
-	{
-		csa->dbsync_timer = FALSE;
-		++astq_dyn_avail;
-	}
-	sys$cantim(csa, PSL$C_USER);	/* cancel all dbsync-timers for this region */
-#endif
 	if ((NULL == jpc) || (NOJNL == jpc->channel))
 		return;
 	jb = jpc->jnl_buff;
@@ -114,8 +91,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
 	if (clean)
 	{
-		was_last_eof_written = jb->last_eof_written;
-		if (!jgbl.mur_extract && !was_last_eof_written)
+		write_eof = !jb->last_eof_written;
+		if (!jgbl.mur_extract && write_eof)
 		{
 			was_in_jnl_file_autoswitch = in_jnl_file_autoswitch;
 			/* We don't want to switch while closing, so set in_jnl_file_autoswitch,
@@ -139,14 +116,20 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			 * However, if we are already in the tail due to a prior disruption, skip the
 			 * pini/pfin and just write the eof.
 			 */
-			DEBUG_ONLY(jpc->status = SS_NORMAL);
-			in_tail = (jb->freeaddr > jb->filesize - JNL_FILE_TAIL_PRESERVE);
-			if ((0 == jpc->pini_addr) && !in_tail)
+			if (jb->freeaddr != jb->end_of_data_at_open)
 			{
-				jnl_put_jrt_pini(csa);
-				jnl_put_jrt_pfin(csa);
+				DEBUG_ONLY(jpc->status = SS_NORMAL);
+				in_tail = ((off_t)jb->freeaddr > ((off_t)DISK_BLOCK_SIZE * jb->filesize) - JNL_FILE_TAIL_PRESERVE);
+				if ((0 == jpc->pini_addr) && !in_tail)
+				{
+					jnl_put_jrt_pini(csa);
+					jnl_put_jrt_pfin(csa);
+				}
+				jnl_write_eof_rec(csa, &eof_record);
+			} else
+			{	/* No journal records got written since jnl file was opened in shm. No need to write EOF record */
+				write_eof = FALSE;
 			}
-			jnl_write_eof_rec(csa, &eof_record);
 			if (!was_in_jnl_file_autoswitch)
 			{
 				jgbl.dont_reset_gbl_jrec_time = jgbl.save_dont_reset_gbl_jrec_time;
@@ -172,15 +155,15 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		assert(jb->dskaddr == jb->freeaddr);
 		UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
 		UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
-		eof_addr = jb->freeaddr - EOF_RECLEN;
 		read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
 		assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_base));
 		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 		if (SYSCALL_SUCCESS(jpc->status))
 		{
-			if (!jgbl.mur_extract && !was_last_eof_written)
+			if (!jgbl.mur_extract && write_eof)
 			{
-				/* If was_last_eof_written is TRUE, we didn't write an eof, so nothing to update. */
+				/* If write_eof is FALSE, we didn't write an eof, so nothing to update. */
+				eof_addr = jb->freeaddr - EOF_RECLEN;
 				assert(header->end_of_data <= eof_addr);
 				header->end_of_data = eof_addr;
 				header->eov_timestamp = eof_record.prefix.time;
@@ -228,11 +211,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		jb->cycle++;	/* increment shared cycle so all future callers of jnl_ensure_open recognize journal switch */
 	}
 	JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
-#ifdef UNIX
 	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, rc, EIO);
-#endif
 	jpc->cycle--;	/* decrement cycle so jnl_ensure_open() knows to reopen the journal */
-	VMS_ONLY(jpc->qio_active = FALSE;)
 	jpc->pini_addr = 0;
 	if (clean && (SS_NORMAL != jpc->status || SS_NORMAL != rc))
 	{

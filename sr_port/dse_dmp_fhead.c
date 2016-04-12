@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@
 #include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
 #include "op.h"
 #include "shmpool.h"	/* Needed for the shmpool structures */
+#include "mutex.h"
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
@@ -114,13 +115,7 @@ void dse_dmp_fhead (void)
 	csd = csa->hdr;
 	cnl = csa->nl;
         jnl_state = (enum jnl_state_codes)csd->jnl_state;
-	VMS_ONLY(
-		memset(&zero_fid, 0, SIZEOF(zero_fid));
-		jnl_buff_open = (0 != memcmp(cnl->jnl_file.jnl_file_id.fid, zero_fid.fid, SIZEOF(zero_fid.fid)));
-	)
-	UNIX_ONLY(
-		jnl_buff_open = (0 != cnl->jnl_file.u.inode);
-	)
+	jnl_buff_open = (0 != cnl->jnl_file.u.inode);
 	if (is_dse_all || (CLI_NEGATED != cli_present("BASIC")))
 	{
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
@@ -160,7 +155,7 @@ void dse_dmp_fhead (void)
 		else
 			util_out_print("  Number of local maps            ??", TRUE);
 		util_out_print("  Last Bytestream Backup 0x!16@XQ", FALSE, &csd->last_inc_backup);
-		util_out_print("  Lock space              0x!XL", TRUE, csd->lock_space_size/OS_PAGELET_SIZE);
+		util_out_print("  Lock space              0x!XL", TRUE, csd->lock_space_size / OS_PAGELET_SIZE);
 		util_out_print("  In critical section            0x!XL", FALSE, cnl->in_crit);
 		util_out_print("  Timers pending        !12UL", TRUE, cnl->wcs_timers + 1);
 		if (FROZEN_BY_ROOT == csd->freeze)
@@ -204,7 +199,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  Wait Disk             !12UL", TRUE, csd->wait_disk_space);
 		util_out_print("  Journal State               !AD", (jnl_notallowed == jnl_state), 13,
 				(jnl_notallowed != jnl_state) ?
-				((jnl_state == jnl_closed) ? "          OFF"
+				((jnl_closed == jnl_state) ? "          OFF"
 				 : (jnl_buff_open ? "           ON" : "[inactive] ON")) : "     DISABLED");
 		if (jnl_notallowed != jnl_state)
 		{
@@ -216,14 +211,9 @@ void dse_dmp_fhead (void)
 			util_out_print("  Journal Alignsize     !12UL", TRUE, csd->alignsize / DISK_BLOCK_SIZE);
 			util_out_print("  Journal AutoSwitchLimit !17UL", FALSE, csd->autoswitchlimit);
 			util_out_print("  Journal Epoch Interval!12UL", TRUE, EPOCH_SECOND2SECOND(csd->epoch_interval));
-#			ifdef UNIX
 			util_out_print("  Journal Yield Limit   !19UL", FALSE, csd->yield_lmt);
 			util_out_print("  Journal Sync IO              !AD", TRUE, 5,
 				(csd->jnl_sync_io ? " TRUE" : "FALSE"));
-#			elif VMS
-			util_out_print("  Journal NOCACHE IO           !AD", TRUE, 12,
-				(csd->jnl_sync_io ? "        TRUE" : "       FALSE"));
-#			endif
 			util_out_print("  Journal File: !AD", TRUE, JNL_LEN_STR(csd));
 		}
 		if (BACKUP_NOT_IN_PROGRESS != cnl->nbb)
@@ -237,30 +227,17 @@ void dse_dmp_fhead (void)
 			(csd->repl_state == repl_closed ? "          OFF"
 			: (csd->repl_state == repl_open ? "           ON" : " [WAS_ON] OFF")));
 		util_out_print("  Region Seqno    0x!16@XQ", TRUE, &csd->reg_seqno);
-		VMS_ONLY(
-			util_out_print("  Resync Seqno           0x!16@XQ", FALSE, &csd->resync_seqno);
-			util_out_print("  Resync trans    0x!16@XQ", TRUE, &csd->resync_tn);
-		)
-		UNIX_ONLY(
-			util_out_print("  Zqgblmod Seqno         0x!16@XQ", FALSE, &csd->zqgblmod_seqno);
-			util_out_print("  Zqgblmod Trans  0x!16@XQ", TRUE, &csd->zqgblmod_tn);
-		)
-		util_out_print("  Endian Format                      !6AZ", UNIX_ONLY(FALSE) VMS_ONLY(TRUE), ENDIANTHISJUSTIFY);
-		UNIX_ONLY(
+		util_out_print("  Zqgblmod Seqno         0x!16@XQ", FALSE, &csd->zqgblmod_seqno);
+		util_out_print("  Zqgblmod Trans  0x!16@XQ", TRUE, &csd->zqgblmod_tn);
+		util_out_print("  Endian Format                      !6AZ", FALSE, ENDIANTHISJUSTIFY);
 		util_out_print("  Commit Wait Spin Count!12UL", TRUE, csd->wcs_phase2_commit_wait_spincnt);
-		)
-		util_out_print("  Database file encrypted             !AD", UNIX_ONLY(FALSE) VMS_ONLY(TRUE), 5,
-				  csd->is_encrypted ? " TRUE" : "FALSE");
-		UNIX_ONLY(
+		util_out_print("  Database file encrypted             !AD", FALSE, 5,
+				  IS_ENCRYPTED(csd->is_encrypted) ? " TRUE" : "FALSE");
 		util_out_print("  Inst Freeze on Error         !AD", TRUE, 5, csd->freeze_on_fail ? " TRUE" : "FALSE");
-		)
-		UNIX_ONLY(
 		util_out_print("  Spanning Node Absent                !AD", FALSE, 5, csd->span_node_absent ? " TRUE" : "FALSE");
-		)
-		UNIX_ONLY(
 		util_out_print("  Maximum Key Size Assured     !AD", TRUE, 5, csd->maxkeysz_assured ? " TRUE" : "FALSE");
-		)
-		util_out_print("  Defer allocation                    !AD", TRUE, 5, csd->defer_allocate ? " TRUE" : "FALSE");
+		util_out_print("  Defer allocation                    !AD", FALSE, 5, csd->defer_allocate ? " TRUE" : "FALSE");
+		util_out_print("  Spin sleep time mask    0x!8XL", TRUE, SPIN_SLEEP_MASK(csd));
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -279,17 +256,27 @@ void dse_dmp_fhead (void)
 		util_out_print("  Phase2 commit pid count 0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);
 		util_out_print("  Dirty Global Buffers           0x!XL", FALSE, cnl->wcs_active_lvl);
 		util_out_print("  Write cache timer count 0x!XL", TRUE, cnl->wcs_timers);
-		util_out_print("  Free  Global Buffers           0x!XL", FALSE, cnl->wc_in_free);
+		new_line = FALSE;
+		for (index = 0; MAX_WT_PID_SLOTS > index; index++)
+		{
+			pid = cnl->wt_pid_array[index];
+			if (0 != pid)
+			{
+				util_out_print("  wcs_timer pid [!2UL] !AD !14UL", new_line, index,
+					new_line ? 0 : 7, new_line ? "" : "       ", pid);
+				new_line = !new_line;
+			}
+		}
+		util_out_print(0, new_line);
+		util_out_print("  Free Global Buffers            0x!XL", FALSE, cnl->wc_in_free);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
 		util_out_print("  Write Cache is Blocked              !AD", FALSE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
 		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
-#		ifdef UNIX
 		util_out_print(0, TRUE);
 		util_out_print("  Quick database rundown is active    !AD", TRUE, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
 		util_out_print("  Access control rundown bypasses !9UL", FALSE, cnl->dbrndwn_access_skip);
 		util_out_print("  FTOK rundown bypasses   !10UL", TRUE, cnl->dbrndwn_ftok_skip);
 		util_out_print("  Epoch taper    !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
-#		endif
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)
 		{
@@ -311,11 +298,19 @@ void dse_dmp_fhead (void)
 		util_out_print("  DB Trigger cycle of ^#t      !12UL", TRUE, csd->db_trigger_cycle);
 		util_out_print(0, TRUE);
 		util_out_print("  MM defer_time                       !5SL", TRUE, csd->defer_time);
-		/* Print the database encryption hash information */
+		/* Print various database encryption information */
+		util_out_print(0, TRUE);
+		util_out_print("  DB is (re)encryptable               !AD", TRUE, 5,
+				TO_BE_ENCRYPTED(csd->is_encrypted) ? " TRUE" : "FALSE");
+		util_out_print("  DB encryption null IV mode          !AD", TRUE, 5,
+				(csd->non_null_iv ? "FALSE" : " TRUE"));
+		util_out_print("  DB encryption hash cutoff    !12SL", TRUE, csd->encryption_hash_cutoff);
+		util_out_print("  DB encr hash2 start TN 0x!16@XQ", TRUE, &csd->encryption_hash2_start_tn);
 		GET_HASH_IN_HEX(csd->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
-		util_out_print("  Database file encryption hash  !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+		util_out_print("  Database file encryption hash           !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+		GET_HASH_IN_HEX(csd->encryption_hash2, outbuf, GTMCRYPT_HASH_HEX_LEN);
+		util_out_print("  Database file encryption hash2          !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 	}
-#	ifdef UNIX
 	if (NEED_TO_DUMP("SUPPLEMENTARY"))
 	{
                 util_out_print(0, TRUE);
@@ -326,7 +321,6 @@ void dse_dmp_fhead (void)
 				util_out_print("  Stream !2UL: Reg Seqno   0x!16@XQ", TRUE, index, &csd->strm_reg_seqno[index]);
 		}
 	}
-#	endif
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
                 util_out_print(0, TRUE);
@@ -407,11 +401,10 @@ void dse_dmp_fhead (void)
 		util_out_print("      ", FALSE);
 		util_out_print("  Epoch_tn        0x!16@XQ", TRUE, &jb->epoch_tn);
 		util_out_print("  Io_in_progress               !AD", FALSE, 5,
-		  (jb->UNIX_ONLY(io_in_prog_latch.u.parts.latch_pid)VMS_ONLY(io_in_prog) ? " TRUE" : "FALSE"));
+		  (jb->io_in_prog_latch.u.parts.latch_pid ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  Epoch_Interval        !12UL", TRUE, EPOCH_SECOND2SECOND(jb->epoch_interval));
-		util_out_print("  Now_writer            !12UL", FALSE,
-			       (jb->UNIX_ONLY(io_in_prog_latch.u.parts.latch_pid)VMS_ONLY(now_writer)));
+		util_out_print("  Now_writer            !12UL", FALSE, jb->io_in_prog_latch.u.parts.latch_pid);
 		util_out_print("      ", FALSE);
 		util_out_print("  Image_count           !12UL", TRUE, jb->image_count);
 		util_out_print("  fsync_in_prog                !AD", FALSE, 5,
@@ -441,7 +434,6 @@ void dse_dmp_fhead (void)
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT repl_state     !12UL", TRUE, csd->intrpt_recov_repl_state);
 		util_out_print("  INTRPT seqno    0x!16@XQ", TRUE, &csd->intrpt_recov_resync_seqno);
-		UNIX_ONLY(
 			for (index = 0; index < MAX_SUPPL_STRMS; index++)
 			{
 				if (csd->intrpt_recov_resync_strm_seqno[index])
@@ -454,7 +446,6 @@ void dse_dmp_fhead (void)
 					util_out_print("  SAVE   strm_seqno :   Stream #  !2UL        Region Seqno    0x!16@XQ",
 						TRUE, index, &csd->save_strm_reg_seqno[index]);
 			}
-		)
 	}
 	if (NEED_TO_DUMP("BACKUP"))
 	{
@@ -473,9 +464,6 @@ void dse_dmp_fhead (void)
 		util_out_print("  Shmpool crit holder   !12UL", FALSE, bptr->shmpool_crit_latch.u.parts.latch_pid);
 		util_out_print("      ", FALSE);
 		util_out_print("  Backup_errno          !12UL", TRUE, bptr->backup_errno);
-#		ifdef VMS
-		util_out_print("  Shmpool crit imgcnt   !12UL", TRUE, bptr->shmpool_crit_latch.u.parts.latch_image_count);
-#		endif
 		util_out_print("  Backup Process ID     !12UL", FALSE, bptr->backup_pid);
 		util_out_print("      ", FALSE);
 		util_out_print("  Backup TN       0x!16@XQ", TRUE, &bptr->backup_tn);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,13 +59,14 @@
 #include "error.h"
 #include "anticipatory_freeze.h"
 
+GBLREF	boolean_t		argumentless_rundown;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	jnl_gbls_t		jgbl;
+GBLREF	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	uint4			process_id;
-GBLREF	mur_gbls_t		murgbl;
-GBLREF	boolean_t		argumentless_rundown;
 
 LITREF char             	gtm_release_name[];
 LITREF int4             	gtm_release_name_len;
@@ -89,7 +91,7 @@ error_def(ERR_TEXT);
 int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t repl_inst_filehdr, int shm_id, boolean_t *ipc_rmvd,
 			   char *instfilename, sm_uc_ptr_t start_addr, int nattch)
 {
-	int			save_errno;
+	int			save_errno, status;
 	char			pool_type;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
@@ -210,12 +212,33 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 			*ipc_rmvd = TRUE;
 		}
 	} else
-	{	/* Else we are ONLINE ROLLBACK or anticipatory freeze is in effect and so we want to keep the journal pool available
-		 * for the duration of the rollback. Do not remove and/or reset the fields in the file header
-	   	 */
+	{
 		assert((JNLPOOL_SEGMENT != pool_type) || ((NULL != jnlpool.jnlpool_ctl) && (NULL != jnlpool_ctl)));
 		if (JNLPOOL_SEGMENT == pool_type)
+		{
 			*ipc_rmvd = FALSE;
+			/* Caller can be MUPIP RUNDOWN (-reg * OR argumentless) or MUPIP ROLLBACK (online or standalone flavor).
+			 * In all cases except the argumentless MUPIP RUNDOWN case return with jnlpool_ctl as is. Here is why.
+			 * In the rollback case, we are ONLINE ROLLBACK OR anticipatory freeze is in effect and so we want to
+			 * keep the journal pool available for the duration of the rollback (to record errors and trigger instance
+			 * freeze). Do not detach from the journal pool in that case.
+			 * In the rundown -reg * case, anticipatory freeze is in effect and we want to keep the journal pool
+			 * available for the duration of the rundown (to record errors and trigger instance freeze). The actual
+			 * jnlpool detach will happen in the caller ("mupip_rundown") once all regions have been rundown.
+			 * In the argumentless rundown case, detach from the jnlpool. This does not honor the custom errors scheme
+			 * and we do not want to be attached to a LOT of journal pools as the argumentless rundown proceeds
+			 * (virtual memory bloat etc.).
+			 */
+			if (argumentless_rundown)
+			{
+				JNLPOOL_SHMDT(status, save_errno);
+				assert(0 == status);	/* even if shmdt fails, there is not much we can do so move on in pro */
+				jnlpool.gtmsrc_lcl_array = NULL;
+				jnlpool.gtmsource_local_array = NULL;
+				jnlpool.jnldata_base = NULL;
+				jnlpool.repl_inst_filehdr = NULL;
+			}
+		}
 		if (RECVPOOL_SEGMENT == pool_type)
 			*ipc_rmvd = FALSE;
 	}
@@ -236,6 +259,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 	assert(INVALID_SHMID != shm_id);
 	instfilename = replpool_id->instfilename;
 	assert((JNLPOOL_SEGMENT == replpool_id->pool_type) || (RECVPOOL_SEGMENT == replpool_id->pool_type));
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	force_attach = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && INST_FREEZE_ON_ERROR_POLICY));
 	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
 	{

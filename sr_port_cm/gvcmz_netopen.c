@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +89,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	c->mbl = CM_MINBUFSIZE;
 	ptr = c->mbf;
 	*ptr++ = CMMS_S_INITPROC;
+	assertpro(!second_attempt);
 	if (!second_attempt)
 	{
 		proto_str = (unsigned char *)&myproto;
@@ -107,24 +109,8 @@ void gvcmz_netopen_attempt(struct CLB *c)
 #else
 		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
 #endif
-	} else
-	{
-#ifdef VMS
-		/* We connected with V010 server; let's behave like a V010 client. */
-		proto_str = (unsigned char *)S_PROTOCOL;
-		assert(prc_vec);
-		assert(SIZEOF(*prc_vec) > v010_jnl_process_vector_size());
-		v010_jnl_prc_vector(prc_vec);
-		prc_vec_size = v010_jnl_process_vector_size();
-		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
-#elif defined(UNIX)
-		GTMASSERT;
-#else
-#error Unsupported platform
-#endif
 	}
 	memcpy(ptr, proto_str, S_PROTSIZE);
-	ptr += S_PROTSIZE;
 	c->cbl = S_HDRSIZE + S_PROTSIZE + prc_vec_size;
 	status = cmi_write(c);	/* INITPROC */
 	if (CMI_ERROR(status))

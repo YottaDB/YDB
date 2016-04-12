@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,11 +142,17 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				 * data block and NOT if a KILL happens. Usually this is done by a t_write(GDS_WRITE_KILLTN)
 				 * call but since in this case the entire block is being freed, "t_write" wont be invoked
 				 * so we need to explicitly set GDS_WRITE_KILLTN like t_write would have (GTM-8269).
+				 * Note: blkhist->first_tp_srch_status is not reliable outside of TP. Thankfully the recompute
+				 * list is also maintained only in case of TP so a check of dollar_tlevel is enough to
+				 * dereference both "first_tp_srch_status" and "recompute_list_head".
 				 */
-				t1 = blkhist->first_tp_srch_status ? blkhist->first_tp_srch_status : blkhist;
-				cse = t1->cse;
-				if ((NULL != cse) && cse->recompute_list_head)
-					cse->write_type |= GDS_WRITE_KILLTN;
+				if (dollar_tlevel)
+				{
+					t1 = blkhist->first_tp_srch_status ? blkhist->first_tp_srch_status : blkhist;
+					cse = t1->cse;
+					if ((NULL != cse) && cse->recompute_list_head)
+						cse->write_type |= GDS_WRITE_KILLTN;
+				}
 				return cdb_sc_delete_parent;
 			}
 		}

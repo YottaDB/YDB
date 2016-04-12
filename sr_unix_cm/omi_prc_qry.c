@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +107,6 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
 	grl    = (int)(sbsp - (uns_char *)bptr);
 	OMI_SI_WRIT(grl, bgn2);
 	bptr  += grl;
-	sbsp  += grl + 1;
     }
 
 /*  Length of the global reference */

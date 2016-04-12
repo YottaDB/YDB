@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,12 +49,14 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	boolean_t	freeze_cleared;
 	char		wait_comment[MAX_FREEZE_COMMENT_LEN];
 	sgmnt_addrs	*repl_csa;
+	intrpt_state_t	prev_intrpt_state;
 #	ifdef DEBUG
 		uint4	lcl_lseekwrite_target;
 #	endif
 	DCL_THREADGBL_ACCESS;	/* needed by ANTICIPATORY_FREEZE_AVAILABLE macro */
 
 	SETUP_THREADGBL_ACCESS;	/* needed by ANTICIPATORY_FREEZE_AVAILABLE macro */
+	assert(!multi_thread_in_use);	/* the below uses functions like "grab_lock" etc. which are not thread-safe */
 #	ifdef DEBUG
 		/* Reset global to safe state after noting it down in a local (just in case there are errors in this function) */
 		lcl_lseekwrite_target = lseekwrite_target; lseekwrite_target = LSEEKWRITE_IS_TO_NONE;
@@ -97,7 +100,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	 * who set the freeze in the first place, the auto-clearing of freeze (on disk space freeup) will no longer work in that
 	 * case. Hence the reason not to allow interrupts.
 	 */
-	DEFER_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE);
+	DEFER_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE, prev_intrpt_state);
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn); /* this should set the instance freeze */
 	/* Make a copy of the freeze comment which would be set by the previous message. */
 	GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_DSKNOSPCAVAIL);
@@ -115,7 +118,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-			exit(-exi_condition);
+			EXIT(-exi_condition);
 		}
 		/* Sleep for a while before retrying the write. Do not use "hiber_start" as that
 		 * uses timers and if we are already in a timer handler now, nested timers wont work.
@@ -147,7 +150,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
 	}
 	*save_errno = tmp_errno;
-	ENABLE_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE);
+	ENABLE_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE, prev_intrpt_state);
 	if (!was_crit)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	return;

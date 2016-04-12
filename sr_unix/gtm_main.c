@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +44,7 @@
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
 #endif
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
@@ -95,9 +94,7 @@ int gtm_main (int argc, char **argv, char **envp)
 {
 	char			*ptr, *eq, **p;
 	int             	eof, parse_ret;
-#	ifdef GTM_CRYPT
 	int			gtmcrypt_errno;
-#	endif
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	int			status;
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -149,7 +146,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
-#	if defined(GTM_CRYPT) || defined(GTM_TLS)
+#	ifdef GTM_TLS
 	if (MUMPS_COMPILE != invocation_mode)
 	{
 		if ((NULL != (ptr = (char *)getenv(GTM_PASSWD_ENV))) && (0 == strlen(ptr)))

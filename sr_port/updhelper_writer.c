@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,6 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "cdb_sc.h"
 #include "gtm_string.h"
@@ -48,22 +46,11 @@
 #include "repl_shutdcode.h"
 #include "repl_sp.h"
 #include "jnl_write.h"
-#ifdef UNIX
 #include "gtmio.h"
-#endif
+#include "wcs_flu.h"
+#include "wcs_mm_recover.h"
+#include "wcs_timer_start.h"
 
-#ifdef VMS
-#include <ssdef.h>
-#include <fab.h>
-#include <rms.h>
-#include <iodef.h>
-#include <secdef.h>
-#include <psldef.h>
-#include <lckdef.h>
-#include <syidef.h>
-#include <xab.h>
-#include <prtdef.h>
-#endif
 #include "ast.h"
 #include "util.h"
 #include "op.h"
@@ -78,7 +65,10 @@
 #include "change_reg.h"
 
 #define UPDHELPER_SLEEP 30
+#define UPDHELPER_EARLY_EPOCH 5
 #define THRESHOLD_FOR_PAUSE 10
+
+GBLDEF	jnlpool_addrs		jnlpool;
 
 GBLREF	void			(*call_on_signal)();
 GBLREF	recvpool_addrs		recvpool;
@@ -90,21 +80,36 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	int4			strm_index;
+#ifdef DEBUG
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+#endif
 
 int updhelper_writer(void)
 {
 	uint4			pre_read_offset;
 	int			lcnt;
-	int4			dummy_errno;
+	int4			dummy_errno, buffs_per_flush, flush_target;
 	gd_region		*reg, *r_top;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 	boolean_t		flushed;
 
 	call_on_signal = updhelper_writer_sigstop;
 	updhelper_init(UPD_HELPER_WRITER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper writer started. PID %d [0x%X]\n", process_id, process_id);
+	/* Since we might write epoch records (through wcs_flu/wcs_clean_dbsync), make sure "strm_end_seqno"
+	 * for streams #0 thru #15 are written out to jnl file header in "jnl_write_epoch_rec".
+	 * Set global variable "strm_index" to 0 to ensure this happens. Note that the actual "strm_index" of the
+	 * update process corresponding to this helper writer process could be INVALID_SUPPL_STRM or 1,2, etc.
+	 * but it is not easy to keep accurate track of that and that is not needed anyways. All we need is for
+	 * strm_index to be not INVALID_SUPPL_STRM and a value of 0 achieves that easily.
+	 */
+	strm_index = 0;
 	for (lcnt = 0; (NO_SHUTDOWN == helper_entry->helper_shutdown); )
 	{
 		flushed = FALSE;
@@ -114,13 +119,44 @@ int updhelper_writer(void)
 			csa = &FILE_INFO(reg)->s_addrs;
 			cnl = csa->nl;
 			csd = csa->hdr;
-			if (reg->open && !reg->read_only &&
-				(cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0))
+			if (reg->open && !reg->read_only)
 			{
 				TP_CHANGE_REG(reg); /* for jnl_ensure_open() */
-				JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, dummy_errno);
-				flushed = TRUE;
-			}
+				if (dba_mm == REG_ACC_METH(reg))
+				{
+					/* Handle MM file extensions so that the flush timer can function properly. */
+					MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
+				}
+				wcs_timer_start(reg, TRUE);
+				if (cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0)
+				{
+					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, dummy_errno);
+					flushed = TRUE;
+				}
+				assert(NULL == reorg_encrypt_restart_csa); /* ensure above wcs_wtstart call does not set it */
+				if (JNL_ENABLED(csd))
+				{
+					jpc = csa->jnl;
+					jbp = jpc->jnl_buff;
+					/* Open the journal so the flush timer can flush journal records. */
+					if ((NOJNL == jpc->channel) || JNL_FILE_SWITCHED(jpc))
+						ENSURE_JNL_OPEN(csa, reg);
+					SET_GBL_JREC_TIME;
+					assert(jgbl.gbl_jrec_time);
+					if ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH <= jgbl.gbl_jrec_time)
+						 && grab_crit_immediate(reg))
+					{
+						if (jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH <= jgbl.gbl_jrec_time)
+						{
+							ENSURE_JNL_OPEN(csa, reg);
+							wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SPEEDUP_NOBEFORE
+								| WCSFLU_SYNC_EPOCH);
+							assert(NULL == reorg_encrypt_restart_csa);
+						}
+						rel_crit(reg);
+				 	}
+				 }
+			 }
 		}
 		if (!flushed)
 		{

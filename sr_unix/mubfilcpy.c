@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 #include <errno.h>
+#include <libgen.h>	/* needed for basename */
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -46,9 +47,20 @@
 #include "wcs_phase2_commit_wait.h"
 
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
+#define TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
 #define	COMMAND_ARRAY_SIZE	1024
 #define	MV_CMD			"mv "
-#define	CP_CMD			"cp "
+#define	MKDIR_CMD		"mkdir "
+#define	RMDIR_CMD		"rm -r "
+#define	CD_CMD			"cd "
+#define CMD_SEPARATOR		" && "
+#ifdef __linux__
+#	define	CP_CMD		"cp --sparse=always "
+#elif defined(_AIX)
+#	define	CP_CMD		"pax -r -w "
+#else
+#	define	CP_CMD		"cp "
+#endif
 
 #define	FREE_COMMAND_STR_IF_NEEDED		\
 {						\
@@ -62,11 +74,29 @@
 #define	CLEANUP_AND_RETURN_FALSE								\
 {												\
 	int	rc;										\
+	int4	rv2, tmpcmdlen;									\
+	char	tmpcmd[MAX_FN_LEN + STR_LIT_LEN(RMDIR_CMD) + 1];				\
 												\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
 	if (!debug_mupip)									\
-		UNLINK(tempfilename);								\
+	{ /* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
+		MEMCPY_LIT(tmpcmd, RMDIR_CMD);							\
+		tmpcmdlen = STR_LIT_LEN(RMDIR_CMD);						\
+		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen);					\
+		tmpcmdlen += tmpdirlen;								\
+		rv2 = SYSTEM((char *)tmpcmd);							\
+		if (0 != rv2)									\
+		{										\
+			if (-1 == rv2)								\
+			{									\
+				save_errno = errno;						\
+				errptr = (char *)STRERROR(save_errno);				\
+				util_out_print("system : !AZ", TRUE, errptr);			\
+			}									\
+			util_out_print("Error removing temp dir !AD.", TRUE, tmpcmdlen, tmpcmd);\
+		}										\
+	}											\
 	return FALSE;										\
 }
 
@@ -96,11 +126,13 @@ bool	mubfilcpy (backup_reg_list *list)
 	sgmnt_data_ptr_t	header_cpy;
 	int4			backup_fd = FD_INVALID, counter, hdrsize, rsize, ntries;
 	ssize_t                 status;
-	int4			blk_num, cmdlen, rv, save_errno, tempfilelen, tmplen;
+	int4			blk_num, cmdlen, rv, save_errno, tempfilelen, tmpdirlen, tmplen;
+	int4			sourcefilelen, sourcedirlen, realpathlen;
 	struct stat		stat_buf;
 	off_t			filesize, offset;
-	char 			*inbuf, *zero_blk, *ptr, *errptr;
+	char 			*inbuf, *zero_blk, *ptr, *errptr, *sourcefilename, *sourcedirname;
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
+	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
 	int                     fstat_res;
 	uint4			ustatus, size;
 	muinc_blk_hdr_ptr_t	sblkh_p;
@@ -168,23 +200,58 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 		ntries++;
 	}
-	/* Calculate total line length for "cp" command. If cannot fit in local variable array, malloc space */
 	tmplen = gv_cur_region->dyn.addr->fname_len;
+	/* basename() may modify the argument passed to it. so pass it a temp string */
+	memcpy(tmpsrcfname, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
+	tmpsrcfname[gv_cur_region->dyn.addr->fname_len] = 0;
+	sourcefilename = basename((char *)tmpsrcfname);
+	sourcefilelen = STRLEN(sourcefilename);
+	/* dirname() may modify its argument too. Also, basename() above may've m odified tmp str. reset it */
+	memcpy(tmpsrcdirname, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
+	tmpsrcdirname[gv_cur_region->dyn.addr->fname_len] = 0;
+	sourcedirname = dirname((char *)tmpsrcdirname);
+	sourcedirlen = STRLEN(sourcedirname);
+	/* Right now, "tempfilename" is the temporary directory under which the *.dat files will get created. *
+	 * Save this directory into tempdir, which will later be used to remove the temp dir. */
 	tempfilelen = STRLEN(tempfilename);
-	cmdlen = STR_LIT_LEN(CP_CMD) + tmplen + 1 /* space */ + tempfilelen + 1 /* terminating NULL byte */;
+	memcpy(tempdir, tempfilename, tempfilelen);
+	tmpdirlen = tempfilelen;
+	/* mkdir tempdir*/
+	if (0 != MKDIR(tempfilename, TMPDIR_CREATE_MODE))
+	{
+		util_out_print("Temporary directory !AD could not be created.", TRUE, tempfilelen, tempfilename);
+		CLEANUP_AND_RETURN_FALSE;
+	}
+	realpath(tempfilename, realpathname);
+	realpathlen = STRLEN(realpathname);
+	/* Calculate total line length for commands to execute (pushd + cp). *
+ 	 * If cannot fit in local variable array, malloc space *
+	 * commands to be executed :
+ 		pushd sourcedir && CP_CMD fname tempfilename
+	*/
+	cmdlen = STR_LIT_LEN(CD_CMD) + sourcedirlen + STR_LIT_LEN(CMD_SEPARATOR);
+	cmdlen += STR_LIT_LEN(CP_CMD) + sourcefilelen + 1 /* space */ + realpathlen + 1 /* terminating NULL byte */;
 	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
-	MEMCPY_LIT(command, CP_CMD);
-	cmdlen = STR_LIT_LEN(CP_CMD);
-	memcpy(&command[cmdlen], gv_cur_region->dyn.addr->fname, tmplen);
-	cmdlen += tmplen;
+	/* pushd */
+	MEMCPY_LIT(command, CD_CMD);
+	cmdlen = STR_LIT_LEN(CD_CMD);
+	memcpy(&command[cmdlen], sourcedirname, sourcedirlen);
+	cmdlen += sourcedirlen;
+	MEMCPY_LIT(&command[cmdlen], CMD_SEPARATOR);
+	cmdlen += STR_LIT_LEN(CMD_SEPARATOR);
+	/* cp */
+	MEMCPY_LIT(&command[cmdlen], CP_CMD);
+	cmdlen += STR_LIT_LEN(CP_CMD);
+	memcpy(&command[cmdlen], sourcefilename, sourcefilelen);
+	cmdlen += sourcefilelen;
 	command[cmdlen++] = ' ';
-	memcpy(&command[cmdlen], tempfilename, tempfilelen);
-	cmdlen += tempfilelen;
+	memcpy(&command[cmdlen], realpathname, realpathlen);
+	cmdlen += realpathlen;
 	command[cmdlen] = 0;
 	if (debug_mupip)
 		util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
-	rv = SYSTEM(((char *)command));
+	rv = SYSTEM((char *)command);
 	if (0 != rv)
 	{
 		if (-1 == rv)
@@ -202,6 +269,12 @@ bool	mubfilcpy (backup_reg_list *list)
 	FREE_COMMAND_STR_IF_NEEDED;
 	assert(command == &cmdarray[0]);
 
+	/* tempfilename currently contains the name of temporary directory created.  *
+	 * add the DB filename (only the final filename, without the pathname) to point to tmpfilename */
+	tempfilename[tempfilelen++] = '/';
+	memcpy(&tempfilename[tempfilelen], sourcefilename, STRLEN(sourcefilename));
+	tempfilelen += STRLEN(sourcefilename);
+	tempfilename[tempfilelen] = 0;
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	OPENFILE(tempfilename, O_RDWR, backup_fd);
 	if (FD_INVALID == backup_fd)
@@ -463,9 +536,11 @@ bool	mubfilcpy (backup_reg_list *list)
 	/* Calculate total line length for "mv" command. If cannot fit in local variable array, malloc space */
 	assert(command == &cmdarray[0]);
 	tmplen = file->len;
+	/* Command to be executed : mv tempfilename backup_file */
 	cmdlen = STR_LIT_LEN(MV_CMD) + tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
 	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
+	/* mv tmpfile destfile */
 	MEMCPY_LIT(command, MV_CMD);
 	cmdlen = STR_LIT_LEN(MV_CMD);
 	memcpy(&command[cmdlen], tempfilename, tempfilelen);
@@ -476,7 +551,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	command[cmdlen] = 0;
 	if (debug_mupip)
 		util_out_print("MUPIP INFO:   !AD", TRUE, cmdlen, command);
-	rv = SYSTEM(((char *)command));
+	rv = SYSTEM((char *)command);
 	if (0 != rv)
 	{
 		if (-1 == rv)
@@ -486,6 +561,14 @@ bool	mubfilcpy (backup_reg_list *list)
 			util_out_print("system : !AZ", TRUE, errptr);
 		}
 		util_out_print("Error executing command : !AD", TRUE, cmdlen, command);
+		FREE_COMMAND_STR_IF_NEEDED;
+		CLEANUP_AND_RETURN_FALSE;
+	}
+	/* rm tempdir */
+	tempdir[tmpdirlen] = 0;
+	if (0 != rmdir(tempdir))
+	{
+		util_out_print("Error removing temp dir : !AD", TRUE, tmpdirlen, tempdir);
 		FREE_COMMAND_STR_IF_NEEDED;
 		CLEANUP_AND_RETURN_FALSE;
 	}

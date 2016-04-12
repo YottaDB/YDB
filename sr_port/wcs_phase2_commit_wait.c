@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -234,7 +235,9 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			BG_TRACE_PRO_ANY(csa, phase2_commit_wait_pidcnt);
 		}
 		if (use_heartbeat)
-		{
+		{	/* this seems like a nanosleep would be better than a rel_quant,
+			 * but a wake mechanism, perhaps using a queue shared by all phase 2 blockers might be better still
+			 */
 			if (PHASE2_COMMIT_WAIT_HTBT < heartbeat_delta)
 				break;
 			DEBUG_ONLY(half_time = (phase2_commit_half_wait == heartbeat_delta));

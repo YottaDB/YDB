@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include "compiler.h"
 #include "mdq.h"
@@ -22,18 +23,24 @@
 #include "resolve_lab.h"
 #include "cdbg_dump.h"
 #include "gtmdbglvl.h"
+#include "stringpool.h"
 
 GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF mlabel			*mlabtab;
 GBLREF triple			t_orig;
 GBLREF uint4			gtmDebugLevel;
+GBLREF spdesc			stringpool;
+GBLREF src_line_struct          src_head;
+GBLREF mident			routine_name;
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_LABELMISSING);
 error_def(ERR_LABELNOTFND);
 error_def(ERR_LABELUNKNOWN);
+
+STATICFNDCL bool do_optimize(triple *curtrip);
 
 int resolve_ref(int errknt)
 {
@@ -56,6 +63,14 @@ int resolve_ref(int errknt)
 		{	/* OC_LIT --> OC_LITC wherever OC_LIT is actually used, i.e. not a dead end */
 			dqloop(&t_orig, exorder, curtrip)
 			{
+				if (do_optimize(curtrip))
+				{	/* Attempt optimization without checking if's; there are too many conditions to check here,
+					   and we will be adding more in the near future
+					*/
+					/* Backup the pointer so that we rescan after changing the triple */
+					curtrip = curtrip->exorder.bl;
+					continue;
+				}
 				switch (curtrip->opcode)
 				{	/* Do a few literal optimizations typically done later in alloc_reg. It's convenient to
 					 * check for OC_LIT parameters here, before we start sliding OC_LITC opcodes in the way.
@@ -121,7 +136,17 @@ int resolve_ref(int errknt)
 		}
 		COMPDBG(PRINTF("\n\n\n********************* New Compilation -- Begin resolve_ref scan **********************\n"););
 		dqloop(&t_orig, exorder, curtrip)
-		{
+		{	/* If the optimization was not executed earlier */
+			if (!run_time && !(cmd_qlf.qlf & CQ_DYNAMIC_LITERALS))
+			{
+				if (do_optimize(curtrip))
+				{	/* Attempt optimization without checking if's; there are too many conditions to check here,
+					   and we will be adding more in the near future
+					*/
+					curtrip = curtrip->exorder.bl;
+					continue;
+				}
+			}
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(curtrip, 0););
 			for (opnd = curtrip->operand; opnd < ARRAYTOP(curtrip->operand); opnd++)
@@ -278,4 +303,128 @@ void resolve_tref(triple *curtrip, oprtype *opnd)
 	tripbp = (tbp *)mcalloc(SIZEOF(tbp));
 	tripbp->bpt = curtrip;
 	dqins(&opnd->oprval.tref->backptr, que, tripbp);
+}
+
+STATICFNDCL bool do_optimize(triple *curtrip)
+{
+	int	i;
+	mstr	*source_line;
+	mval	tmp_mval;
+	tbp	*b;
+	triple	*ref, *y, *triple_temp;
+	triple	*line_offset, *label, *routine;
+	src_line_struct	*cur_line;
+	boolean_t negative, optimized = FALSE;
+	/* If we are resolving indirect's or something of the sort, die sadly */
+	assert(NULL != src_head.que.fl);
+	switch (curtrip->opcode)
+	{
+	case OC_FNTEXT:
+		/* If this is a OC_FNTEXT for the current routine, we can
+			optimize it by simply inserting the text string from
+			src_line_struct.que
+		*/
+		assert(OC_LITC != curtrip->operand[0].oprval.tref->opcode);
+		routine = curtrip->operand[1].oprval.tref->operand[1].oprval.tref;
+		line_offset = curtrip->operand[1].oprval.tref->operand[0].oprval.tref;
+		label = curtrip->operand[0].oprval.tref;
+		/* TODO: there should be a routine to verify literals for a given function */
+		if (MLIT_REF != routine->operand[0].oprclass)
+			break;
+		if (!WANT_CURRENT_RTN(&routine->operand[0].oprval.mlit->v))
+			break;
+		if (MLIT_REF != label->operand[0].oprclass)
+			break;
+		if (ILIT_REF != line_offset->operand[0].oprclass)
+			break;
+		/* If we're here, we have a $TEXT with all literals for the current routine */
+		source_line = (mstr *)mcalloc(SIZEOF(mstr));
+		/* Special case; label == "" && +0 means file name */
+		if (0 == label->operand[0].oprval.mlit->v.str.len
+			&& 0 == line_offset->operand[0].oprval.ilit)
+		{	/* Get filename, replace thing */
+			/* Find last /; this is the start of the filename */
+			source_line->len = routine_name.len;
+			source_line->addr = malloc(source_line->len);
+			memcpy(source_line->addr, routine_name.addr, source_line->len);
+		} else
+		{	/* Search through strings for label; if label == "" skip */
+			cur_line = src_head.que.fl;
+			negative = (0 > line_offset->operand[0].oprval.ilit);
+			if (0 != label->operand[0].oprval.mlit->v.str.len && cur_line != cur_line->que.fl)
+			{
+				for (i = 0; cur_line != &src_head; cur_line = cur_line->que.fl)
+				{
+					if (label->operand[0].oprval.mlit->v.str.len > cur_line->str.len)
+						continue;
+					if (strncmp(label->operand[0].oprval.mlit->v.str.addr, cur_line->str.addr,
+						label->operand[0].oprval.mlit->v.str.len) == 0)
+						break;
+				}
+				if (&src_head == cur_line)
+					break;
+					/* Error; let the runtime program deal with it for now */
+			} else
+			{	/* We need a special case to handle +0; if no label, it means start at top of file
+					and we begin counting on 1,
+					otherwise, it means the line that the label is on
+				*/
+				i = 1;
+			}
+			/* We could mod the offset by the size of the file, but hopefully no one is dumb enough to say +100000 */
+			/* Counting the number of lines in the file will be O(n), not worth it */
+			for (; i < (negative ? -1 : 1) * line_offset->operand[0].oprval.ilit && cur_line != &src_head; i++)
+			{
+				cur_line = (negative ? cur_line->que.bl : cur_line->que.fl);
+			}
+			/* If we went through all nodes and i is less than the line we are looking for, use an empty source line */
+			if (&src_head == cur_line)
+			{	/* Special case; we were counting backward, hit the end of the file, but we are done counting */
+				/* This means we should output the name of the routine */
+				if (i == (negative ? -1 : 1) * line_offset->operand[0].oprval.ilit
+					&& negative)
+				{
+					source_line->len = routine_name.len;
+					source_line->addr = malloc(source_line->len);
+					memcpy(source_line->addr, routine_name.addr, source_line->len);
+				} else
+				{
+					source_line->len = 0;
+					source_line->addr = 0;
+				}
+			} else
+			{
+				source_line->len = cur_line->str.len;
+				source_line->addr = malloc(source_line->len);
+				memcpy(source_line->addr, cur_line->str.addr, cur_line->str.len);
+			}
+		}
+		/* Insert literal into triple tree */
+		tmp_mval.mvtype = MV_STR;
+		/* Minus one so we don't copy newline character */
+		tmp_mval.str.len = (source_line->len == 0 ? 0 :
+			source_line->len - (source_line->addr[source_line->len-1] == '\n' ? 1 : 0));
+		ENSURE_STP_FREE_SPACE(tmp_mval.str.len);
+		tmp_mval.str.addr = (char *)stringpool.free;
+		memcpy(tmp_mval.str.addr, source_line->addr, tmp_mval.str.len);
+		/* Replace tab characters with spaces */
+		for (i = 0; i < tmp_mval.str.len && tmp_mval.str.addr[i] != ';'; i++)
+		{
+			if ('\t' == tmp_mval.str.addr[i])
+				tmp_mval.str.addr[i] = ' ';
+		}
+		stringpool.free += tmp_mval.str.len;
+		if (source_line->addr != 0)
+			free(source_line->addr);
+		/* Update all things that referenced this value */
+		curtrip->opcode = OC_LIT;
+		put_lit_s(&tmp_mval, curtrip);
+		label->opcode = OC_NOOP;
+		line_offset = OC_NOOP;
+		routine->opcode = OC_NOOP;
+		optimized = TRUE;
+		break;
+		/* If no cases no optimizations to perform.... yet */
+	}
+	return optimized;
 }

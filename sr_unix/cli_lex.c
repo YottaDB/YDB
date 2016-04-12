@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -375,7 +376,8 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 	UChar		*uc_fgets_ret;
 	UChar32		uc32_cp;
 	UChar		cli_fgets_Ubuffer[MAX_LINE];
-	UFILE		*u_fp;
+	static UFILE	*u_fp;	/* Only used in this routine so not using STATICDEF */
+	static FILE	*save_fp; /* Only used in this routine so not using STATICDEF */
 #	endif
 
 #	ifdef UNICODE_SUPPORTED
@@ -384,7 +386,15 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 		cli_fgets_Ubuffer[0] = 0;
 		if (!cli_lex_str)
 			assert(MAX_LINE >= buffersize);
-		u_fp = u_finit(fp, NULL, UTF8_NAME);
+		if (NULL == save_fp)
+			save_fp = fp;
+		/* there should be no change in fp as it is currently stdin */
+		assert(save_fp == fp);
+		/* retain the fact that u_finit has been called once without an intervening
+		 * u_fclose so that multiple lines can be read over a pipe on hpux and solaris
+		 */
+		if (NULL == u_fp)
+			u_fp = u_finit(fp, NULL, UTF8_NAME);
 		if (NULL != u_fp)
 		{
 			do
@@ -397,6 +407,9 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				if (cli_lex_str)
 					cli_lex_in_ptr->tp = NULL;
 				u_fclose(u_fp);
+				/* clear u_fp in case we enter again */
+				u_fp = NULL;
+				save_fp = NULL;
 				return NULL;
 			}
 			in_len = u_strlen(cli_fgets_Ubuffer);
@@ -441,7 +454,6 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				retptr = destbuffer;	/* Repoint to new home */
 			if (cli_lex_str)
 				cli_lex_in_ptr->tp = retptr;
-			u_fclose(u_fp);
 		} else if (cli_lex_str)
 			cli_lex_in_ptr->tp = NULL;
 	} else

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +43,6 @@ void lke_setgdr(void)
 {
 	gd_region 	*r_top;
 	mval		reset;
-	bool		def;
 	short		len;
 	char		buf[256];
 	int4		rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
@@ -50,7 +50,6 @@ void lke_setgdr(void)
 
 	gvcmy_rundown();
 	gv_cur_region = gd_header->regions;
-	r_top = gv_cur_region + gd_header->n_regions;
 	for (gv_cur_region = gd_header->regions,
 	  r_top = gv_cur_region + gd_header->n_regions;
 	  gv_cur_region < r_top;
@@ -61,12 +60,11 @@ void lke_setgdr(void)
 	}
 
 	if (EXIT_NRM != rundown_status)
-		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 
 	if (cli_present("gld"))
 	{
 		cli_get_value("gld", buf) ;
-		def = FALSE;
 		reset.mvtype = MV_STR;
 		reset.str.len = STRLEN(buf);
 		reset.str.addr = buf;

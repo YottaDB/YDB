@@ -22,7 +22,7 @@
 #include "io.h"
 #include "iormdef.h"
 #include "io_params.h"
-#include "eintr_wrappers.h"
+#include "gtm_signal.h"
 #include "gtmio.h"
 #include "iosp.h"
 #include "string.h"
@@ -63,7 +63,7 @@ void iorm_close(io_desc *iod, mval *pp)
         int4            wait_status;
 #endif
 
-	int  		status;
+	int  		rc, status;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
 	char 		*savepath2 = 0;
@@ -247,11 +247,11 @@ void iorm_close(io_desc *iod, mval *pp)
 			{
 				if (!process_exiting)
 				{	/* Find out whether timers are available. If not, instead of scheduling one to interrupt
-					 * waitpid, simply invoke it with WNOHANG flag instead. Note that sigprocmask below is
+					 * waitpid, simply invoke it with WNOHANG flag instead. Note that SIGPROCMASK below is
 					 * operating on an empty signal set and so is not blocking any signals.
 					 */
 					sigemptyset(&empty_set);
-					sigprocmask(SIG_BLOCK, &empty_set, &old_set);
+					SIGPROCMASK(SIG_BLOCK, &empty_set, &old_set, rc);
 					use_timer = !sigismember(&old_set, SIGALRM);
 				} else
 					use_timer = FALSE;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,19 +16,15 @@
 
 void wcs_sleep(unsigned int sleepfactor)
 {
+	int	slpfctr;
+
 	/* wcs_sleep provides a layer over hiber_start that produces a varying to a maximum sleep time
 	 * it is intended to be used in as part of a database spin wait
 	 * where the argument is a loop counter
 	 * if the counter starts at 0, the invocation would typically be:
 	 * if (count) wcs_sleep(count);
 	 */
-
-	if (sleepfactor > MAXSLPTIME)
-		sleepfactor = MAXSLPTIME;
-	if (1000 > sleepfactor)			/* Use simpler sleep for shorties */
-	{
-		SHORT_SLEEP(sleepfactor);
-	} else
-		assert(FALSE);
+	slpfctr = (sleepfactor > MAXSLPTIME) ? MAXSLPTIME : sleepfactor;
+	SHORT_SLEEP(slpfctr);
 	return;
 }

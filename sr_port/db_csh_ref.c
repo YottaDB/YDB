@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +27,10 @@
 error_def(ERR_WCFAIL);
 
 GBLREF int4		process_id;
-#if defined(UNIX) && defined(DEBUG)
+#ifdef DEBUG
 GBLREF jnl_gbls_t	jgbl;
 #endif
+
 /* Refresh the database cache records in the shared memory. If init = TRUE, do the longset and initialize all the latches and
  * forward and backward links. If init = FALSE, just increment the cycle and set the blk to CR_BLKEMPTY.
  */
@@ -70,14 +72,11 @@ void	db_csh_ref(sgmnt_addrs *csa, boolean_t init)
 	}
 	bp = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
 	bp_top = bp + (gtm_uint64_t)csd->n_bts * buffer_size;
-	GTMCRYPT_ONLY(
-		if (csd->is_encrypted)
-		{	/* In case of an encrypted database, bp_top is actually the beginning of the encrypted global buffer
-			 * array (an array maintained parallely with the regular unencrypted global buffer array.
-			 */
-			cnl->encrypt_glo_buff_off = (sm_off_t)((sm_uc_ptr_t)bp_top - (sm_uc_ptr_t)bp);
-		}
-	)
+	/* In case of an encrypted database, bp_top is actually the beginning of the encrypted global buffer array (an array
+	 * maintained parallely with the regular unencrypted global buffer array.
+	 */
+	if (USES_ENCRYPTION(csd->is_encrypted))
+		cnl->encrypt_glo_buff_off = (sm_off_t)((sm_uc_ptr_t)bp_top - (sm_uc_ptr_t)bp);
 	for (;  cr < cr_top;  cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + rec_size),
 		     cr1 = (cache_rec_ptr_t)((sm_uc_ptr_t)cr1 + rec_size))
 	{

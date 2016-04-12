@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,6 @@
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
-#include "eintr_wrappers.h"
 #include "gtm_aio.h"
 #include "gtmio.h"
 #ifdef __MVS__
@@ -42,6 +42,9 @@
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 
+error_def(ERR_JNLFILEOPNERR);
+error_def(ERR_SYSCALL);
+
 #ifdef MUR_USE_AIO
 
 /****************************************************************************************
@@ -51,6 +54,7 @@ GBLREF 	mur_gbls_t	murgbl;
  *          error status on unsuccessful
  * This function starts an asynchronous read in a given buffer
  ****************************************************************************************/
+/* #GTM_THREAD_SAFE : The below function (mur_fread_start) is thread-safe */
 uint4 mur_fread_start(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 {
 	buff->aiocbp->aio_offset = buff->dskaddr;
@@ -71,11 +75,10 @@ uint4 mur_fread_start(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
  * Purpose: The purpose of this routine is to make sure that a previously issued asysnchronous read
  *          in a given buffer has completed
  **************************************************************************************/
+/* #GTM_THREAD_SAFE : The below function (mur_fread_wait) is thread-safe */
 uint4 mur_fread_wait(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 {
 	ssize_t	nbytes;
-
-	error_def(ERR_PREMATEOF);
 
 	assert(buff->read_in_progress);
 	buff->read_in_progress = FALSE;
@@ -101,6 +104,7 @@ uint4 mur_fread_wait(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 	return (jctl->status = errno);
 }
 
+/* #GTM_THREAD_SAFE : The below function (mur_fread_cancel) is thread-safe */
 /* cancel asynchronous read */
 uint4 mur_fread_cancel(jnl_ctl_list *jctl)
 {
@@ -134,19 +138,18 @@ uint4 mur_fread_cancel(jnl_ctl_list *jctl)
 
 #endif /* MUR_USE_AIO */
 
-boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
+/* #GTM_THREAD_SAFE : The below function (mur_fopen_sp) is thread-safe */
+/* Returns 0 (SS_NORMAL) for success; Non-zero for failure */
+uint4	mur_fopen_sp(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 {
 	struct stat		stat_buf;
 	int			status, perms;
+	sgmnt_addrs		*csa;
 	ZOS_ONLY(int		realfiletag;)
-
-	error_def(ERR_JNLFILEOPNERR);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	perms = O_RDONLY;
 	jctl->read_only = TRUE;
+	jctl->reg_ctl = rctl;	/* fill in reg_ctl backpointer from jctl to rctl. Note: rctl could be NULL */
 	/* Both for recover and rollback open in read/write mode. We do not need to write in journal file
 	 * for mupip journal extract/show/verify or recover -forward.  So open it as read-only
 	 */
@@ -161,22 +164,23 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 		FSTAT_FILE(jctl->channel, &stat_buf, status);
 		if (-1 != status)
 		{
-#ifdef __MVS__
+#			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(jctl->channel, TAG_BINARY, &realfiletag))
 				TAG_POLICY_GTM_PUTMSG((char *)jctl->jnl_fn, errno, realfiletag, TAG_BINARY);
-#endif
+#			endif
 			jctl->os_filesize = (off_jnl_t)stat_buf.st_size;
-			return TRUE;
+			return SS_NORMAL;
 		}
 		jctl->status = errno;
 		JNL_FD_CLOSE(jctl->channel, status);	/* sets jctl->channel to NOJNL */
 	} else
 		jctl->status = errno;
 	assert(NOJNL == jctl->channel);
+	csa = JCTL2CSA(jctl);	/* need JCTL2CSA macro instead of jctl->reg_ctl->csa because rctl could be NULL */
 	if (ENOENT == jctl->status)	/* File Not Found is a common error, so no need for SYSCALL */
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
 	else
-		gtm_putmsg(VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, ERR_SYSCALL, 5,
-			LEN_AND_STR((-1 == jctl->channel) ? "open" : "fstat"), CALLFROM, jctl->status);
-	return FALSE;
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,
+			ERR_SYSCALL, 5, LEN_AND_STR((-1 == jctl->channel) ? "open" : "fstat"), CALLFROM, jctl->status);
+	return ERR_JNLFILEOPNERR;
 }

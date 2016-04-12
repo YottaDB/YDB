@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,14 +55,13 @@
 #include "tp_change_reg.h"
 #include "is_file_identical.h"
 #include "get_fs_block_size.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
 
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
+GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;
 
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF seq_num			seq_num_zero;
@@ -125,10 +125,9 @@ int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *
 	memcpy(tmp_ctl->jnl_fn, jnl_fn, jnl_fn_len);
 	tmp_ctl->jnl_fn[jnl_fn_len] = '\0';
 	status = SS_NORMAL;
-
 	/* Open Journal File */
 #	ifdef UNIX
-	OPENFILE(tmp_ctl->jnl_fn, O_RDONLY, tmp_fd);
+	OPENFILE_CLOEXEC(tmp_ctl->jnl_fn, O_RDONLY, tmp_fd);
 	if (0 > tmp_fd)
 	{
 		status = errno;
@@ -279,7 +278,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			rel_crit(reg);
 		gv_cur_region = r_save;
 		tp_change_reg();
-		assert(NOJNL != tmp_fd);
+		assert((NOJNL != tmp_fd)
+				|| ((status != SS_NORMAL) && gtm_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 	} else
 		status = repl_open_jnl_file_by_name(tmp_ctl, jnl_fn_len, jnl_fn, &tmp_fd, &stat_buf);
 	if (status == SS_NORMAL)
@@ -329,15 +330,13 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl->repl_buff->fc->jfh_base = tmp_jfh_base;
 	tmp_ctl->repl_buff->fc->jfh = tmp_jfh;
 	tmp_ctl->repl_buff->fc->fd = tmp_fd;
-#	ifdef GTM_CRYPT
-	if (tmp_jfh->is_encrypted)
+	if (USES_ANY_KEY(tmp_jfh))
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init (gtmsource() -> gvcst_init() -> db_init()) */
-		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(csa, tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, gtmcrypt_errno);
+		INIT_DB_OR_JNL_ENCRYPTION(tmp_ctl, tmp_jfh, reg->dyn.addr->fname_len, (char *)reg->dyn.addr->fname, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, tmp_ctl->jnl_fn_len, tmp_ctl->jnl_fn);
 	}
-#	endif
 	if (did_jnl_ensure_open)
 	{
 		F_COPY_GDID(tmp_ctl->repl_buff->fc->id, JNL_GDID_PVT(csa));
@@ -360,7 +359,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl->first_read_done = FALSE;
 	tmp_ctl->eof_addr_final = FALSE;
 	tmp_ctl->max_seqno_final = FALSE;
-	tmp_ctl->read_complete = FALSE;
 	tmp_ctl->min_seqno_dskaddr = 0;
 	tmp_ctl->max_seqno_dskaddr = 0;
 	tmp_ctl->next = tmp_ctl->prev = NULL;
@@ -369,22 +367,25 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	return (SS_NORMAL);
 }
 
+/* Setup ctl for reading from journal files */
 int gtmsource_ctl_init(void)
 {
-	/* Setup ctl for reading from journal files */
-
 	gd_region		*region_top, *reg;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	repl_ctl_element	*tmp_ctl, *prev_ctl;
+	repl_rctl_elem_t	*repl_rctl, *last_rctl;
+#	ifdef DEBUG
+	repl_rctl_elem_t	*tmp_rctl;
+#	endif
 	int			jnl_file_len, status;
 
 	repl_ctl_list = (repl_ctl_element *)malloc(SIZEOF(repl_ctl_element));
 	memset((char_ptr_t)repl_ctl_list, 0, SIZEOF(*repl_ctl_list));
 	prev_ctl = repl_ctl_list;
-
 	UNIX_ONLY(assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state)); /* can't come here without handling online rollback */
 	region_top = gd_header->regions + gd_header->n_regions;
+	last_rctl = NULL;
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
 		assert(reg->open);
@@ -402,6 +403,28 @@ int gtmsource_ctl_init(void)
 			tmp_ctl->prev = prev_ctl;
 			tmp_ctl->next = NULL;
 			prev_ctl = tmp_ctl;
+			repl_rctl = (repl_rctl_elem_t *)csa->miscptr;
+			if (NULL == repl_rctl)
+			{
+#				ifdef DEBUG
+				tmp_rctl = repl_rctl_list;
+				while ((NULL != tmp_rctl) && (NULL != tmp_rctl->next))
+					tmp_rctl = tmp_rctl->next;
+				assert(last_rctl == tmp_rctl);
+#				endif
+				repl_rctl = (repl_rctl_elem_t *)malloc(SIZEOF(repl_rctl_elem_t));
+				repl_rctl->next = NULL;
+				repl_rctl->prev = last_rctl;
+				if (NULL == repl_rctl_list)
+					repl_rctl_list = repl_rctl;
+				else
+					last_rctl->next = repl_rctl;
+				last_rctl = repl_rctl;
+				csa->miscptr = (void *)repl_rctl;
+			}
+			repl_rctl->ctl_start = tmp_ctl;
+			/* repl_rctl->read_complete is later initialized in function "read_and_merge" */
+			tmp_ctl->repl_rctl = repl_rctl;
 		}
 	}
 	/* This function should never be invoked unless there is at least one replicated region. */
@@ -416,6 +439,7 @@ int repl_ctl_close(repl_ctl_element *ctl)
 
 	if (NULL != ctl)
 	{
+		REPL_DPRINT2("CTL CLOSE : Close of file %s\n", ctl->jnl_fn);
 		if (NULL != ctl->repl_buff)
 		{
 			for (index = REPL_MAINBUFF; REPL_NUMBUFF > index; index++)
@@ -441,6 +465,7 @@ int gtmsource_ctl_close(void)
 	repl_ctl_element	*ctl;
 	sgmnt_addrs		*csa;
 	int			status;
+	repl_rctl_elem_t	*repl_rctl;
 
 	UNIX_ONLY(gtmsource_stop_jnl_release_timer();)
 	if (repl_ctl_list)
@@ -465,6 +490,8 @@ int gtmsource_ctl_close(void)
 		repl_ctl_list = NULL;
 		free(ctl);
 	}
+	for (repl_rctl = repl_rctl_list; NULL != repl_rctl; repl_rctl = repl_rctl->next)
+		repl_rctl->ctl_start = NULL;
 	return (SS_NORMAL);
 }
 

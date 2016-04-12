@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +113,7 @@ void dse_maps(void)
 			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, csa->ti->curr_tn);
 		if (!was_crit)
 		{
-			grab_crit(gv_cur_region);
+			grab_crit_encr_cycle_sync(gv_cur_region);
 			csa->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
 		}
 		blk = get_dir_root();
@@ -181,7 +182,7 @@ void dse_maps(void)
 	if (CLI_PRESENT == cli_present("MASTER"))
 	{
 		if (!was_crit)
-			grab_crit(gv_cur_region);
+			grab_crit_encr_cycle_sync(gv_cur_region);
 		bml_blk = blk / bplmap * bplmap;
 		if (dba_mm == csd->acc_meth)
 			bp = MM_BASE_ADDR(csa) + (off_t)bml_blk * blk_size;
@@ -213,7 +214,7 @@ void dse_maps(void)
 	util_len += SIZEOF(" is marked !AD in its local bit map.!/") - 1;
 	util_buff[util_len] = 0;
 	if (!was_crit)
-		grab_crit(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region);
 	util_out_print(util_buff, TRUE, 4, dse_is_blk_free(blk, &dummy_int, &dummy_cr) ? "free" : "busy");
 	if (!was_crit)
 		rel_crit(gv_cur_region);

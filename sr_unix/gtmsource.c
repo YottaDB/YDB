@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,7 @@
 #include "repl_comm.h"
 #include "repl_instance.h"
 #include "ftok_sems.h"
+#include "ftok_sem_incrcnt.h"
 #include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) */
 #include "init_secshr_addrs.h"
 #include "mutex.h"
@@ -115,13 +116,14 @@ int gtmsource()
 	char			print_msg[1024], tmpmsg[1024];
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
-	boolean_t		all_files_open, isalive;
+	boolean_t		all_files_open, isalive, ftok_counter_halted;
 	pid_t			pid, ppid, procgp;
 	seq_num			read_jnl_seqno, jnl_seqno;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
 	boolean_t		this_side_std_null_coll;
 	int			null_fd, rc;
+	uint4			shutdowntime = 0;
 
 	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
@@ -129,18 +131,40 @@ int gtmsource()
 	if (-1 == gtmsource_get_opt())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	if (gtmsource_options.shut_down)
-	{	/* Wait till shutdown time nears even before going to "jnlpool_init". This is because the latter will return
-		 * with the ftok semaphore and access semaphore held and we do not want to be holding those locks (while
-		 * waiting for the user specified timeout to expire) as that will affect new GTM processes and/or other
-		 * MUPIP REPLIC commands that need these locks for their function.
-		 */
-		if (0 < gtmsource_options.shutdown_time)
+	{
+		if (gtmsource_options.zerobacklog)
 		{
-			repl_log(stdout, TRUE, TRUE, "Waiting for %d seconds before signalling shutdown\n",
-												gtmsource_options.shutdown_time);
+			gtmsource_options.shut_down = FALSE; /* for getbacklog need init but can't hold ftok for time */
+			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator);
+			gtmsource_options.shut_down = TRUE; /* restore actual value after the jnlpool_init */
+			if (0 < gtmsource_options.shutdown_time)
+			{
+				for (shutdowntime = gtmsource_options.shutdown_time; shutdowntime; shutdowntime--)
+				{
+					if (0 == gtmsource_checkforbacklog())
+					{
+						repl_log(stdout, TRUE, TRUE, "Shutting down with zero backlog\n");
+						break;
+					}
+					LONG_SLEEP(1);
+				}
+				if (0 == shutdowntime)
+				{
+					repl_log(stdout, TRUE, TRUE, "Shutting down with a backlog due to timeout\n");
+				}
+			}
+			jnlpool_detach(); /* reattach below so as to hold the semaphores */
+			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+					ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Error from rel_sem in Source Server shutdown attempt"), save_errno);
+		} else if (0 < gtmsource_options.shutdown_time)
+		{
+			repl_log(stdout, TRUE, TRUE, "Waiting for %d second(s) before forcing shutdown\n",
+					gtmsource_options.shutdown_time);
 			LONG_SLEEP(gtmsource_options.shutdown_time);
 		} else
-			repl_log(stdout, TRUE, TRUE, "Signalling shutdown immediate\n");
+			repl_log(stdout, TRUE, TRUE, "Forcing immediate shutdown\n");
 	} else if (gtmsource_options.start)
 	{
 		repl_log(stdout, TRUE, TRUE, "Initiating START of source server for secondary instance [%s]\n",
@@ -203,6 +227,7 @@ int gtmsource()
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
+	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	FORK(pid);
 	if (0 > pid)
 	{
@@ -228,7 +253,12 @@ int gtmsource()
 			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
-			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+			/* If the child source server process got a ftok counter overflow, it would have recorded that in
+			 * jnlpool.repl_inst_filehdr->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
+			 * child process got a counter overflow.
+			 */
+			ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented
+									&& !jnlpool.repl_inst_filehdr->ftok_counter_halted, TRUE);
 		} else
 		{	/* Child source server process errored out at startup and is no longer alive.
 			 * If we were the one who created the journal pool, let us clean it up.
@@ -259,7 +289,6 @@ int gtmsource()
 	 * to ensure they do not misrepresent the holder of those semaphores.
 	 */
 	ftok_sem_reg = NULL;
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	assert(udi->grabbed_ftok_sem);
 	udi->grabbed_ftok_sem = FALSE;
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
@@ -349,7 +378,7 @@ int gtmsource()
 	 * for the replication instance file. But the source server process (the child) that comes here would not have done
 	 * that. Do that while the parent is still holding on to the ftok semaphore waiting for our okay.
 	 */
-	if (!ftok_sem_incrcnt(jnlpool.jnlpool_dummy_reg))
+	if (!ftok_sem_incrcnt(jnlpool.jnlpool_dummy_reg, FILE_TYPE_REPLINST, &ftok_counter_halted))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Increment the source server count semaphore */
 	status = incr_sem(SOURCE, SRC_SERV_COUNT_SEM);

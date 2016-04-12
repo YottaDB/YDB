@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +30,7 @@
 #include "jnl_write_aimg_rec.h"
 #include "jnl_get_checksum.h"
 #include "min_max.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	mstr			pvt_crypt_buf;
@@ -47,11 +46,10 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	jnl_private_control	*jpc;
 	sgmnt_data_ptr_t	csd;
 	uint4			cursum;
-#	ifdef GTM_CRYPT
 	char			*in, *out;
 	int			in_len, gtmcrypt_errno;
 	gd_segment		*seg;
-#	endif
+	boolean_t		use_new_key;
 
 	csd = csa->hdr;
 	assert(csa->now_crit);
@@ -82,9 +80,8 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	save_buffer = buffer;
-#	ifdef GTM_CRYPT
 	in_len = aimg_record.bsiz - SIZEOF(*buffer);
-	if (BLK_NEEDS_ENCRYPTION3(csd->is_encrypted, buffer->levl, in_len))
+	if (IS_BLK_ENCRYPTED(buffer->levl, in_len) && USES_ANY_KEY(csd))
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;
 		assert(aimg_record.bsiz <= csa->hdr->blk_size);
@@ -92,7 +89,10 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 		memcpy(pvt_crypt_buf.addr, buffer, SIZEOF(blk_hdr));	/* copy the block header */
 		in = (char *)(buffer + 1);	/* + 1 because `buffer' is of type blk_hdr_ptr_t */
 		out = pvt_crypt_buf.addr + SIZEOF(blk_hdr);
-		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+		use_new_key = USES_NEW_KEY(csd);
+		GTMCRYPT_ENCRYPT(csa, (use_new_key ? TRUE : csd->non_null_iv),
+				(use_new_key ? csa->encr_key_handle2 : csa->encr_key_handle),
+				in, in_len, out, buffer, SIZEOF(blk_hdr), gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			seg = csa->region->dyn.addr;
@@ -100,9 +100,8 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 		}
 		buffer = (blk_hdr_ptr_t)pvt_crypt_buf.addr;
 	}
-#	endif
-	cursum = jnl_get_checksum((uint4 *)buffer, NULL, aimg_record.bsiz);
+	cursum = jnl_get_checksum(buffer, NULL, aimg_record.bsiz);
 	COMPUTE_AIMG_CHECKSUM(cursum, &aimg_record, com_csum, aimg_record.prefix.checksum);
-	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer, &blk_trailer);
+	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer, &blk_trailer, NULL);
 	buffer = save_buffer;
 }

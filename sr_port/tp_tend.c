@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,19 +13,12 @@
 #include "mdef.h"
 
 #include <stddef.h>		/* for offsetof macro */
-#include <signal.h>		/* for VSIG_ATOMIC_T type */
 
-#ifdef UNIX
 #include "gtm_stdio.h"
-#endif
-
 #include "gtm_time.h"
-#include "gtm_inet.h"	/* Required for gtmsource.h */
+#include "gtm_inet.h"		/* Required for gtmsource.h */
 #include "gtm_string.h"
-
-#ifdef VMS
-#include <descrip.h>	/* Required for gtmsource.h */
-#endif
+#include "gtm_signal.h"		/* for VSIG_ATOMIC_T type */
 
 #include "gtm_ctype.h"
 #include "cdb_sc.h"
@@ -55,7 +48,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "t_commit_cleanup.h"
-#include "mupipbckup.h"
 #include "gvcst_blk_build.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk prototype */
 #include "cache.h"
@@ -63,12 +55,10 @@
 #include "wcs_flu.h"
 #include "jnl_write_pblk.h"
 #include "jnl_write.h"
-#include "process_deferred_stale.h"
 #include "wcs_backoff.h"
 #include "mm_update.h"
 #include "bg_update.h"
 #include "wcs_get_space.h"
-#include "wcs_timer_start.h"
 #include "send_msg.h"
 #include "add_inter.h"
 #include "t_qread.h"
@@ -93,6 +83,7 @@
 #include "db_snapshot.h"
 #endif
 #include "is_proc_alive.h"
+#include "process_reorg_encrypt_restart.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -108,7 +99,7 @@ GBLREF	int4			n_pvtmods, n_blkmods;
 GBLREF	unsigned int		t_tries;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		is_updproc;
 GBLREF	boolean_t		is_replicator;
 GBLREF	seq_num			seq_num_zero;
@@ -117,7 +108,6 @@ GBLREF	int			gv_fillfactor;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	int			rc_set_fragment;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
-GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	boolean_t		certify_all_blocks;
@@ -125,10 +115,10 @@ GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but no
 GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	uint4			process_id;
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int4			strm_index;
-GBLREF	uint4			update_trans;
 #endif
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
@@ -139,16 +129,19 @@ GBLREF	int4			gtm_trigger_depth;
 #endif
 #ifdef DEBUG
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	boolean_t		multi_proc_in_use;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG ENCRYPT is in progress */
 #endif
 
 error_def(ERR_DLCKAVOIDANCE);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_JNLPOOLRECOVERY);
 error_def(ERR_JNLTRANS2BIG);
 error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TEXT);
 
-#define	SET_REG_SEQNO_IF_REPLIC(CSA, TJPL, SUPPLEMENTARY, NEXT_STRM_SEQNO)			\
+#define	SET_REG_SEQNO_IF_REPLIC(CSA, SEQNO, SUPPLEMENTARY, NEXT_STRM_SEQNO)			\
 {												\
 	GBLREF	jnl_gbls_t		jgbl;							\
 	GBLREF	boolean_t		is_updproc;						\
@@ -156,8 +149,8 @@ error_def(ERR_TEXT);
 												\
 	if (REPL_ALLOWED(CSA) && is_replicator)							\
 	{											\
-		assert(CSA->hdr->reg_seqno < TJPL->jnl_seqno);					\
-		CSA->hdr->reg_seqno = TJPL->jnl_seqno;						\
+		assert(CSA->hdr->reg_seqno < SEQNO);						\
+		CSA->hdr->reg_seqno = SEQNO;							\
 		UNIX_ONLY(									\
 			if (SUPPLEMENTARY)							\
 			{									\
@@ -179,10 +172,12 @@ boolean_t	tp_crit_all_regions()
 	int			lcnt;
 	boolean_t		x_lock;
 	tp_region		*tr;
-	sgmnt_addrs		*tmpcsa, *frozen_csa;
+	sgmnt_addrs		*tmpcsa, *frozen_csa, *encr_csa;
 	sgm_info		*tmpsi;
 	sgmnt_data_ptr_t	tmpcsd;
 	gd_region		*reg;
+	enc_info_t		*encr_ptr;
+	enum cdb_sc		status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -198,6 +193,8 @@ boolean_t	tp_crit_all_regions()
 	for (lcnt = 0; ;lcnt++)
 	{
 		x_lock = TRUE;		/* Assume success */
+		frozen_csa = NULL;
+		encr_csa = NULL;
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 		{
 			reg = tr->reg;
@@ -213,13 +210,29 @@ boolean_t	tp_crit_all_regions()
 			)
 			assert(!tmpcsa->hold_onto_crit);
 			if (!tmpcsa->now_crit)
-				grab_crit(reg);
+				grab_crit(reg);	/* In "t_retry", we used "grab_crit_encr_cycle_sync" to ensure encryption
+						 * cycles are in sync and crit is obtained. We cannot do that here as with TP
+						 * and multiple regions, we might end up calling "grab_crit_encr_cycle_sync"
+						 * for a region while holding crit on one or more previous regions and the
+						 * encryption keys need to be resynced. We dont want to do that while holding
+						 * crit on any region. So take care of that explicitly here just like csd->freeze.
+						 */
 			assert(!(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
 			if (tmpcsd->freeze && tmpsi->update_trans)
 			{
-				tr = tr->fPtr;		/* Increment so we release the lock we actually got */
+				tr = tr->fPtr;		/* Increment so we release the crit lock we actually got */
 				x_lock = FALSE;
 				frozen_csa = tmpcsa;
+				break;
+			}
+			encr_ptr = tmpcsa->encr_ptr;
+			if ((NULL != encr_ptr) && (tmpcsa->nl->reorg_encrypt_cycle != encr_ptr->reorg_encrypt_cycle))
+			{
+				tr = tr->fPtr;		/* Increment so we release the crit lock we actually got */
+				x_lock = FALSE;
+				encr_csa = tmpcsa;
+				SIGNAL_REORG_ENCRYPT_RESTART(mu_reorg_encrypt_in_prog, reorg_encrypt_restart_csa,
+						tmpcsa->nl, tmpcsa, tmpcsd, status, process_id);
 				break;
 			}
 		}
@@ -234,8 +247,16 @@ boolean_t	tp_crit_all_regions()
 			if (tmpcsa->now_crit)
 				rel_crit(tr->reg);
 		}
-		/* Wait for region to be unfrozen before re-grabbing crit on ALL regions */
-		WAIT_FOR_REGION_TO_UNFREEZE(frozen_csa, tmpcsd);
+		if (NULL != frozen_csa)
+		{	/* Wait for region to be unfrozen before re-grabbing crit on ALL regions */
+			WAIT_FOR_REGION_TO_UNFREEZE(frozen_csa, tmpcsd);
+		}
+		if (NULL != encr_csa)
+		{
+			assert(encr_csa == reorg_encrypt_restart_csa);
+			process_reorg_encrypt_restart();
+			assert(NULL == reorg_encrypt_restart_csa);
+		}
 	}	/* for (;;) */
 	return TRUE;
 }
@@ -274,7 +295,8 @@ boolean_t	tp_tend()
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size, in_tend;
 	uint4			update_trans;
-	jnlpool_ctl_ptr_t	jpl, tjpl;
+	jnlpool_ctl_ptr_t	jpl;
+	jnlpool_write_ctx_t 	jplctx;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
@@ -284,13 +306,13 @@ boolean_t	tp_tend()
 	gv_namehead		*prev_target, *curr_target;
 	jnl_tm_t		save_gbl_jrec_time;
 	enum gds_t_mode		mode;
-#	ifdef GTM_CRYPT
-	DEBUG_ONLY(
-		blk_hdr_ptr_t	save_old_block;
-	)
+#	ifdef DEBUG
+	blk_hdr_ptr_t		save_old_block;
 #	endif
 	boolean_t		ss_need_to_restart, new_bkup_started;
 	uint4			com_csum;
+	seq_num			temp_jnl_seqno;
+	qw_off_t		jnlpool_overflow_size;
 	DEBUG_ONLY(
 		int		tmp_jnl_participants;
 		uint4		upd_num;
@@ -480,16 +502,6 @@ boolean_t	tp_tend()
 				rel_crit(tr->reg);
 			}
 		} /* else we are online rollback and we already hold crit on all regions */
-		/* Must be done after REVERT since we are no longer in crit */
-		if (unhandled_stale_timer_pop)
-			process_deferred_stale();
-		for (si = first_sgm_info;  (NULL != si);  si = si->next_sgm_info)
-		{
-			csa = si->tp_csa;
-			cnl = csa->nl;
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
-		}
 		return TRUE;
 	}
 	/* Because secshr_db_clnup uses first_tp_si_by_ftok to determine if a TP transaction is underway and expects
@@ -627,20 +639,27 @@ boolean_t	tp_tend()
 				goto failed;
 			}
 #			endif
+			if ((NULL != csa->encr_ptr) && (csa->encr_ptr->reorg_encrypt_cycle != cnl->reorg_encrypt_cycle))
+			{
+				assert(csa->now_crit);
+				SIGNAL_REORG_ENCRYPT_RESTART(mu_reorg_encrypt_in_prog, reorg_encrypt_restart_csa,
+						cnl, csa, csd, status, process_id);
+				goto failed;
+			}
 			if (update_trans)
 			{
 				assert((NULL == first_cw_set) || (0 != si->cw_set_depth));
-				DEBUG_ONLY(
-					/* Recompute # of replicated regions inside of crit */
-					if (REPL_ALLOWED(csa))
-					{
-						tmp_jnl_participants++;
-					} else if (JNL_ENABLED(csa))
-					{
-						assert(!replication); /* should have issued a REPLOFFJNLON error outside of crit */
-						tmp_jnl_participants++;
-					}
-				)
+#				ifdef DEBUG
+				/* Recompute # of replicated regions inside of crit */
+				if (REPL_ALLOWED(csa))
+				{
+					tmp_jnl_participants++;
+				} else if (JNL_ENABLED(csa))
+				{
+					assert(!replication); /* should have issued a REPLOFFJNLON error outside of crit */
+					tmp_jnl_participants++;
+				}
+#				endif
 				if (JNL_ALLOWED(csa))
 				{
 					if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
@@ -1183,12 +1202,12 @@ boolean_t	tp_tend()
 							assert(SIZEOF(bsiz) == SIZEOF(old_block->bsiz));
 							bsiz = old_block->bsiz;
 							assert(bsiz <= csd->blk_size);
-							cse->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
+							cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
 						}
 						DEBUG_ONLY(
 						else
 							assert(cse->blk_checksum ==
-									jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz));
+									jnl_get_checksum(old_block, csa, old_block->bsiz));
 						)
 						assert(cse->cr->blk == cse->blk);
 					}	/* end if acquired block */
@@ -1255,7 +1274,6 @@ boolean_t	tp_tend()
 	if (replication)
 	{
 		jpl = jnlpool_ctl;
-		tjpl = temp_jnlpool_ctl;
 		if (!repl_csa->hold_onto_crit)
 			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 #		ifdef UNIX
@@ -1266,26 +1284,26 @@ boolean_t	tp_tend()
 			goto failed;
 		}
 #		endif
-		tjpl->write_addr = jpl->write_addr;
-		tjpl->write = jpl->write;
-		tjpl->jnl_seqno = jpl->jnl_seqno;
+		jplctx.write = jpl->write;
+		jplctx.write_total = 0;
+		temp_jnl_seqno = jpl->jnl_seqno;
 #		ifdef UNIX
 		if (INVALID_SUPPL_STRM != strm_index)
 		{	/* Need to also update supplementary stream seqno */
 			supplementary = TRUE;
 			assert(0 <= strm_index);
-			/* assert(strm_index < ARRAYSIZE(tjpl->strm_seqno)); */
 			strm_seqno = jpl->strm_seqno[strm_index];
 			ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
 		} else
 			supplementary = FALSE;
 #		endif
-		INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size));
-		tjpl->write += SIZEOF(jnldata_hdr_struct);
-		if (tjpl->write >= tjpl->jnlpool_size)
+		INT8_ONLY(assert(jplctx.write == jpl->write_addr % jpl->jnlpool_size));
+		jplctx.write += SIZEOF(jnldata_hdr_struct);
+		jplctx.write_total += SIZEOF(jnldata_hdr_struct);
+		if (jplctx.write >= jpl->jnlpool_size)
 		{
-			assert(tjpl->write == tjpl->jnlpool_size);
-			tjpl->write = 0;
+			assert(jplctx.write == jpl->jnlpool_size);
+			jplctx.write = 0;
 		}
 		assert(jgbl.cumul_jnl_rec_len);
 		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * jnl_participants + SIZEOF(jnldata_hdr_struct);
@@ -1357,7 +1375,9 @@ boolean_t	tp_tend()
 	 * region-by-region order (not necessarily upd_num order across all regions). Until then they
 	 * are played as multiple single-region transactions. Also if -fences=none is specified, then
 	 * ALL multi-region TP transactions (even those after resolve time) are played as multiple
-	 * single-region TP transactions. Assert accordingly.
+	 * single-region TP transactions. And if "multi_proc_in_use" is TRUE, ALL multi-region TP
+	 * transactions could be played as multiple single-region TP transactions depending on which
+	 * regions get assigned to which process. Assert accordingly.
 	 */
 	max_upd_num = jgbl.tp_ztp_jnl_upd_num;
 	if (jgbl.forw_phase_recovery)
@@ -1394,7 +1414,7 @@ boolean_t	tp_tend()
 				{
 					assert((TRUE == upd_num_seen[upd_num])
 						|| (jgbl.forw_phase_recovery && ((jgbl.gbl_jrec_time < jgbl.mur_tp_resolve_time)
-											|| jgbl.mur_fences_none)));
+						|| jgbl.mur_fences_none || multi_proc_in_use)));
 					upd_num_seen[upd_num] = FALSE;
 				} else
 					assert(FALSE == upd_num_seen[upd_num]);
@@ -1472,27 +1492,21 @@ boolean_t	tp_tend()
 							|| (epoch_tn >= si->start_tn));
 						assert(old_block->bsiz <= csd->blk_size);
 						if (!cse->blk_checksum)
-							cse->blk_checksum = jnl_get_checksum((uint4 *)old_block,
-											     csa,
-											     old_block->bsiz);
+							cse->blk_checksum = jnl_get_checksum(old_block, csa, old_block->bsiz);
 						else
-							assert(cse->blk_checksum == jnl_get_checksum((uint4 *)old_block,
-												     csa,
-												     old_block->bsiz));
-#						ifdef GTM_CRYPT
-						if (csd->is_encrypted)
+							assert(cse->blk_checksum == jnl_get_checksum(old_block, csa,
+												     	old_block->bsiz));
+						if (NEEDS_ANY_KEY(csd, old_block->tn))
 						{
 							DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
 							DEBUG_ONLY(save_old_block = old_block;)
 							old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block, csa);
-							/* Ensure that the unencrypted block and it's twin counterpart are in
-							 * sync. */
+							/* Ensure that unencrypted block and its twin counterpart are in sync. */
 							assert(save_old_block->tn == old_block->tn);
 							assert(save_old_block->bsiz == old_block->bsiz);
 							assert(save_old_block->levl == old_block->levl);
 							DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
 						}
-#						endif
 						jnl_write_pblk(csa, cse, old_block, com_csum);
 						cse->jnl_freeaddr = jbp->freeaddr;
 					} else
@@ -1508,7 +1522,7 @@ boolean_t	tp_tend()
 				assert(!jgbl.forw_phase_recovery);
 				if (replication)
 				{
-					jnl_fence_ctl.token = tjpl->jnl_seqno;
+					jnl_fence_ctl.token = temp_jnl_seqno;
 					UNIX_ONLY(
 						if (supplementary)
 							jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
@@ -1533,7 +1547,7 @@ boolean_t	tp_tend()
 			DEBUG_ONLY(++tmp_jnl_participants;)
 			do
 			{
-				jnl_write_logical(csa, jfb, com_csum);
+				jnl_write_logical(csa, jfb, com_csum, &jplctx);
 				jfb = jfb->next;
 			} while (NULL != jfb);
 		}
@@ -1548,7 +1562,7 @@ boolean_t	tp_tend()
 	if (replication)
 	{
 		assert(!jgbl.forw_phase_recovery);
-		tjpl->jnl_seqno++;
+		temp_jnl_seqno++;
 		UNIX_ONLY(
 			if (supplementary)
 				next_strm_seqno = strm_seqno + 1;
@@ -1569,15 +1583,16 @@ boolean_t	tp_tend()
 		tcom_record.prefix.pini_addr = jpc->pini_addr;
 		tcom_record.prefix.tn = csa->ti->curr_tn;
 		tcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
-		UNIX_ONLY(SET_REG_SEQNO_IF_REPLIC(csa, tjpl, supplementary, next_strm_seqno);)
+		UNIX_ONLY(SET_REG_SEQNO_IF_REPLIC(csa, temp_jnl_seqno, supplementary, next_strm_seqno);)
 		VMS_ONLY(SET_REG_SEQNO_IF_REPLIC(csa, tjpl, supplementary, 0);)
 		/* Switch to current region. Not using TP_CHANGE_REG macros since we already have csa and csa->hdr available. */
 		gv_cur_region = jpc->region;
 		cs_addrs = csa;
 		cs_data = csa->hdr;
 		/* Note tcom_record.jnl_tid was set in op_tstart or updproc */
-		tcom_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&tcom_record, SIZEOF(struct_jrec_tcom));
-		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
+		tcom_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+									(unsigned char *)&tcom_record, SIZEOF(struct_jrec_tcom));
+		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL, &jplctx);
 		DEBUG_ONLY(tmp_jnl_participants++;)
 	}
 	assert(jnl_participants == tmp_jnl_participants);
@@ -1762,7 +1777,7 @@ boolean_t	tp_tend()
 	if (replication)
 	{
 		assert(jgbl.cumul_index == jgbl.cu_jnl_index);
-		assert((jpl->write + jgbl.cumul_jnl_rec_len) % jpl->jnlpool_size == tjpl->write);
+		assert((jpl->write + jgbl.cumul_jnl_rec_len) % jpl->jnlpool_size == jplctx.write);
 		assert(jpl->early_write_addr > jpl->write_addr);
 		jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jpl->write);	/* Begin atomic stmnts */
 		jnl_header->jnldata_len = jgbl.cumul_jnl_rec_len;
@@ -1780,11 +1795,33 @@ boolean_t	tp_tend()
 		 * shared memory updates related to a transaction before the change in write_addr
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
-		jpl->write = tjpl->write;
+		jpl->write = jplctx.write;
 		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup relies on this */
-		jpl->write_addr += jnl_header->jnldata_len;
-		jpl->jnl_seqno = tjpl->jnl_seqno;			/* End atomic stmnts */
+		jpl->write_addr += jplctx.write_total;
+		if ((jplctx.write_total != jnl_header->jnldata_len)
+				DEBUG_ONLY(|| ((0 != TREF(gtm_test_jnlpool_sync))
+						&& (0 == (temp_jnl_seqno % TREF(gtm_test_jnlpool_sync))))))
+		{	/* Our accounting got out of sync somehow. Drop a core and force the journal pool to overflow. */
+			if (!jpl->outofsync_core_generated
+					DEBUG_ONLY(&& ((0 == TREF(gtm_test_jnlpool_sync))
+							|| (0 != (temp_jnl_seqno % TREF(gtm_test_jnlpool_sync))))))
+			{
+				jpl->outofsync_core_generated = TRUE;
+				gtm_fork_n_core();
+			}
+			/* The source server considers an increment to early_write_addr greater than the jnlpool_size as
+			 * an overflow, so add twice the jnlpool_size to early_write_addr and write_addr to keep them aligned
+			 * with each other and with write.
+			 */
+			jnlpool_overflow_size = jpl->jnlpool_size * 2ull;	/* Use ull to force 64-bit multiplication */
+			jpl->early_write_addr += jnlpool_overflow_size;
+			jpl->write_addr += jnlpool_overflow_size;
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLPOOLRECOVERY, 3, jplctx.write_total, jnl_header->jnldata_len,
+									jpl->jnlpool_id.instfilename);
+		}
+		jpl->jnl_seqno = temp_jnl_seqno;			/* End atomic stmnts */
 		assert(jpl->early_write_addr == jpl->write_addr);
+		assert(jplctx.write == (jpl->write_addr % jpl->jnlpool_size));
 		assert(NULL != repl_csa);
 		if (!repl_csa->hold_onto_crit)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
@@ -1878,7 +1915,7 @@ failed:
 		si_last = (NULL == si_not_validated) ? NULL : si_not_validated->next_tp_si_by_ftok;
 		/* Free up all pinnned cache-records and release crit */
 		release_crit = (NEED_TO_RELEASE_CRIT(t_tries, status) UNIX_ONLY(&& !jgbl.onlnrlbk));
-		for (si = first_tp_si_by_ftok;  (si_last != si);  si = si->next_tp_si_by_ftok)
+		for (si = first_tp_si_by_ftok; si_last != si; si = si->next_tp_si_by_ftok)
 		{
 			assert(si->tp_csa->now_crit);
 			tp_cr_array = si->cr_array;
@@ -1957,30 +1994,8 @@ failed:
 skip_failed:
 	REVERT;
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
-	/* Must be done after REVERT since we are no longer in crit */
 	if (cdb_sc_normal == status)
-	{	/* keep this out of the loop above so crits of all regions are released without delay */
-		/* Take this moment of non-critness to check if we had an unhandled IO timer pop. */
-		if (unhandled_stale_timer_pop)
-			process_deferred_stale();
-		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
-		{
-			csa = si->tp_csa;
-			cnl = csa->nl;
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
-			if (!si->update_trans)
-			{
-				INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
-				continue;
-			}
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readwrite, 1);
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkwrite, si->cw_set_depth);
-			GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, si->start_tn);
-			TP_TEND_CHANGE_REG(si);
-			wcs_timer_start(gv_cur_region, TRUE);
-			if (si->backup_block_saved)
-				backup_buffer_flush(gv_cur_region);
-		}
+	{
 		first_tp_si_by_ftok = NULL; /* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
 		return TRUE;
 	}
@@ -2017,6 +2032,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	rec_hdr_ptr_t		curr_rec_hdr, next_rec_hdr, rp;
 	sm_uc_ptr_t		cp1, buffaddr;
 	unsigned short		rec_size;
+	unsigned int		bsiz;
 	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
 	gv_namehead		*gvt;
@@ -2217,10 +2233,17 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	if (!WAS_FREE(cse->blk_prior_state) && (NULL != cse->old_block) && JNL_ENABLED(csa) && csa->jnl_before_image)
 	{
 		old_block = (blk_hdr_ptr_t)cse->old_block;
-		assert(old_block->bsiz <= csa->hdr->blk_size);
 		if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-			cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
-		else
+		{
+			bsiz = old_block->bsiz;
+			/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
+			if (bsiz > csa->hdr->blk_size)
+			{	/* This is a restartable condition. Restart */
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_mkblk;
+			}
+			cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+		} else
 			cse->blk_checksum = 0;
 	}
 	return cdb_sc_normal;
@@ -2333,10 +2356,17 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				old_block = (blk_hdr_ptr_t)cse->old_block;
 				if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
 				{
-					assert(old_block->bsiz <= csd->blk_size);
 					if (old_block->tn < jbp->epoch_tn)
 					{
+						/* See comment before similar check in "gvincr_recompute_upd_array"
+						 * for why this check is needed.
+						 */
 						bsiz = old_block->bsiz;
+						if (bsiz > csd->blk_size)
+						{
+							assert(CDB_STAGNATE > t_tries);
+							return FALSE;	/* This is a restartable condition. Restart */
+						}
 						JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_block, bsiz);
 					} else
 						cse->blk_checksum = 0;
@@ -2368,8 +2398,16 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if (NULL != jbp)
 		{	/* recompute CHECKSUM for the modified bitmap block before-image */
 			if (old_block->tn < jbp->epoch_tn)
-				bml_cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
-			else
+			{
+				bsiz = old_block->bsiz;
+				/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
+				if (bsiz > csd->blk_size)
+				{
+					assert(CDB_STAGNATE > t_tries);
+					return FALSE;	/* This is a restartable condition. Restart */
+				}
+				bml_cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+			} else
 				bml_cse->blk_checksum = 0;
 		}
 		if (!is_mm)

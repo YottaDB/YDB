@@ -22,47 +22,18 @@
 #define OMAGIC	GTM_OMAGIC		/* non-native doesn't have to worry here */
 #endif
 
-/* The Object file label is composed of a platform-generic part and platform-specific part.
+/* The Object file label used to be a composite of a platform-generic part and platform-specific part, which is no longer the case
  *
  * 	OBJ_LABEL = (OBJ_UNIX_LABEL << n) + OBJ_PLATFORM_LABEL
  *      (n = 8 previously now n = 4 to allow more binary versions)
  *
- * For every object format change that spans across all platforms, we increment the platform-generic part OBJ_UNIX_LABEL.
- * For every platform-specific object format change, we increment the platform-specific part OBJ_PLATFORM_LABEL
- * 	(only on the platform of change)
- *
- * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
+ * For every object format change, we increment OBJ_UNIX_LABEL.
+ * Note that OBJ_UNIX_LABEL should not exceed 4095 on 64 bit platforms and 255 on 32 bit platforms.
+ * If the 32bit platform limit would be exceeded, start bumping the OBJ_PLATFORM_LABEL value - but only for 32 bit Linux.
  */
 
-#define OBJ_UNIX_LABEL	30	/* When changed, be sure to zero the platform specific numbers below (if any non-0) */
-
-#if defined(__osf__)
-#	define	OBJ_PLATFORM_LABEL	0		/* Alpha/Tru64 */
-#elif defined(_AIX)
-#	define	OBJ_PLATFORM_LABEL	0		/* AIX/pSeries */
-#elif defined(__linux__) && defined(Linux390)
-#	define	OBJ_PLATFORM_LABEL	0		/* s390 Linux */
-#elif defined(__linux__) && defined(__ia64)
-#	define	OBJ_PLATFORM_LABEL	0		/* Itanium Linux */
-#elif defined(__linux__) && defined(__i386__)
-#	define	OBJ_PLATFORM_LABEL	0		/* i386 Linux */
-#elif defined(__linux__) && defined(__x86_64)
-#       define  OBJ_PLATFORM_LABEL      0               /* x86_64 Linux */
-#elif defined(__MVS__)
-#	define	OBJ_PLATFORM_LABEL	0		/* OS390 aka z/OS */
-#elif defined(__hpux) && defined(__ia64)
-#	define	OBJ_PLATFORM_LABEL	0		/* Itanium HP-UX */
-#elif defined(__hpux) && defined(__hppa)
-#	define	OBJ_PLATFORM_LABEL	0		/* HPPA HP-UX */
-#elif defined(SUNOS)
-#	define	OBJ_PLATFORM_LABEL	0		/* Solaris/Sparc */
-#elif defined(__CYGWIN__)
-#	define OBJ_PLATFORM_LABEL	0		/* CYGWIN on Windows i386 */
-#elif defined(VMS)
-#	define OBJ_PLATFORM_LABEL	0		/* Alpha/VMS */
-#else
-#error UNSUPPORTED PLATFORM
-#endif
+#define OBJ_UNIX_LABEL	31
+#define	OBJ_PLATFORM_LABEL	0
 
 #ifdef USHBIN_SUPPORTED
 #  define OBJ_LABEL		((OBJ_UNIX_LABEL << 4) + (OBJ_PLATFORM_LABEL))

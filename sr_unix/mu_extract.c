@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,62 +56,73 @@
 #include "change_reg.h"		/* for change_reg call in DO_OP_GVNAME macro */
 #include "mu_getlst.h"
 #include "gdskill.h"		/* needed for tp.h */
-#include "jnl.h"			/* needed for tp.h */
-#include "gdscc.h"			/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
+#include "gdscc.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "gtmcrypt.h"
+#include "is_proc_alive.h"
 
-GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF	bool		mu_ctrlc_occurred;
-GBLREF	bool		mu_ctrly_occurred;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	gd_addr		*gd_header;
-GBLREF	io_pair          io_curr_device;
-GBLREF	io_desc          *active_device;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	boolean_t	jnlpool_init_needed;
-GBLREF	mstr		sys_output;
-GBLREF	tp_region	*grlist;
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	bool			mu_ctrlc_occurred;
+GBLREF	bool			mu_ctrly_occurred;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_addr			*gd_header;
+GBLREF	io_pair         	 io_curr_device;
+GBLREF	io_desc         	 *active_device;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	mstr			sys_output;
+GBLREF	tp_region		*grlist;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
+error_def(ERR_DBNOREGION);
 error_def(ERR_EXTRACTCTRLY);
 error_def(ERR_EXTRACTFILERR);
+error_def(ERR_ENCRYPTCONFLT);
+error_def(ERR_EXTRFILEXISTS);
+error_def(ERR_EXTRINTEGRITY);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NOSELECT);
 error_def(ERR_NULLCOLLDIFF);
 error_def(ERR_RECORDSTAT);
-error_def(ERR_EXTRFILEXISTS);
-error_def(ERR_DBNOREGION);
+error_def(ERR_TEXT);
 
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1,
 						      BIN_HEADER_DATEFMT, 0, 0);
 
-LITREF mstr		chset_names[];
+LITREF mstr	chset_names[];
 
-static readonly unsigned char	datefmt_txt[] = "DD-MON-YEAR  24:60:SS";
-static readonly unsigned char	select_text[] = "SELECT";
-static readonly mval		datefmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(datefmt_txt) - 1, (char *)datefmt_txt, 0, 0);
-static readonly mval		null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
-static char			outfilename[256];
-static unsigned short		filename_len;
-static unsigned char		ochset_set = FALSE;
-static readonly unsigned char	open_params_list[] =
+STATICDEF readonly unsigned char	datefmt_txt[] = "DD-MON-YEAR  24:60:SS";
+STATICDEF readonly unsigned char	select_text[] = "SELECT";
+STATICDEF readonly mval			datefmt =
+					DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(datefmt_txt) - 1, (char *)datefmt_txt, 0, 0);
+STATICDEF readonly mval			null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
+STATICDEF char				outfilename[256];
+STATICDEF unsigned short		filename_len;
+STATICDEF unsigned char			ochset_set = FALSE;
+STATICDEF readonly unsigned char	open_params_list[] =
 {
 	(unsigned char)iop_noreadonly,
 	(unsigned char)iop_m,
 	(unsigned char)iop_stream,
 	(unsigned char)iop_nowrap,
+	(unsigned char)iop_buffered, 1, 0x03,
 	(unsigned char)iop_eol
 };
-static readonly unsigned char	use_params[] =
+STATICDEF readonly unsigned char	use_params[] =
 {
 	(unsigned char)iop_nowrap,
 	(unsigned char)iop_eol
 };
 
-static readonly unsigned char no_param = (unsigned char)iop_eol;
+STATICDEF readonly unsigned char	no_param = (unsigned char)iop_eol;
+STATICDEF boolean_t 			is_binary_format;
+STATICDEF gd_region			**opened_regions;
+STATICDEF uint4				opened_region_count;
 
 #define BINARY_FORMAT_STRING	"BINARY"
 #define ZWR_FORMAT_STRING	"ZWR"
@@ -130,7 +141,29 @@ static readonly unsigned char no_param = (unsigned char)iop_eol;
 }
 
 #define GET_BIN_HEADER_SIZE(LABEL) (SIZEOF(LABEL) + SIZEOF(BIN_HEADER_DATEFMT) - 1 + 4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ)
+
 CONDITION_HANDLER(mu_extract_handler)
+{
+	int			i;
+	gd_region		*reg;
+	node_local_ptr_t	cnl;
+
+	START_CH(TRUE);
+	if (is_binary_format)
+	{
+		for (i = 0; i < opened_region_count; i++)
+		{
+			reg = opened_regions[i];
+			cnl = (&FILE_INFO(reg)->s_addrs)->nl;
+			grab_crit(reg);
+			cnl->mupip_extract_count--;
+			rel_crit(reg);
+		}
+	}
+	NEXTCH;
+}
+
+CONDITION_HANDLER(mu_extract_handler1)
 {
 	mval				op_val, op_pars;
 	unsigned char			delete_params[2] = { (unsigned char)iop_delete, (unsigned char)iop_eol };
@@ -148,7 +181,7 @@ CONDITION_HANDLER(mu_extract_handler)
 	NEXTCH;
 }
 
-CONDITION_HANDLER(mu_extract_handler1)
+CONDITION_HANDLER(mu_extract_handler2)
 {
 	START_CH(TRUE);
 	util_out_print("!/MUPIP is not able to complete the extract due the the above error!/", TRUE);
@@ -159,10 +192,10 @@ CONDITION_HANDLER(mu_extract_handler1)
 
 void mu_extract(void)
 {
-	int 				stat_res, truncate_res;
+	int				stat_res, truncate_res, index, index2;
 	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
 	int				iter, format, local_errno, int_nlen;
-	boolean_t			freeze = FALSE, logqualifier, success, success2;
+	boolean_t			freeze, override, logqualifier, success, success2;
 	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
 					label_buff[LABEL_STR_MAX_SIZE];
 	glist				gl_head, *gl_ptr, *next_gl_ptr;
@@ -178,17 +211,23 @@ void mu_extract(void)
 	gtm_chset_t 			saved_out_set;
 	coll_hdr			extr_collhdr;
 	int				bin_header_size;
-	boolean_t			is_any_file_encrypted = FALSE;
+	boolean_t			any_file_encrypted, any_file_uses_non_null_iv, null_iv;
 	gvnh_reg_t			*gvnh_reg;
 	gvnh_spanreg_t			*gvspan, *last_gvspan;
 	boolean_t 			region;
-#	ifdef GTM_CRYPT
-	unsigned short			encrypted_hash_array_len;
-	unsigned char			*curr_hash_ptr, *encrypted_hash_array_ptr;
+	unsigned short			hash_array_len, hash2_index_array_len, null_iv_array_len;
+	uint4				*curr_hash2_index_ptr, *hash2_index_array_ptr;
+	unsigned char			*curr_hash_ptr, *hash_array_ptr, *null_iv_array_ptr;
 	sgmnt_data_ptr_t		csd;
 	sgmnt_addrs			*csa;
-#	endif
+	node_local_ptr_t		cnl;
+	int				use_null_iv;
+	tp_region			*rptr;
+	uint4				pid;
 
+	freeze = override = FALSE;
+	any_file_encrypted = FALSE;
+	any_file_uses_non_null_iv = FALSE;
 	/* Initialize all local character arrays to zero before using */
 	memset(cli_buff, 0, SIZEOF(cli_buff));
 	memset(outfilename, 0, SIZEOF(outfilename));
@@ -221,7 +260,7 @@ void mu_extract(void)
 	region = FALSE;
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
-		gvinit(); /*side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code)*/
+		gvinit(); /* side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code) */
 		mu_getlst("REGION", SIZEOF(tp_region));
 		if (!grlist)
 		{
@@ -233,6 +272,14 @@ void mu_extract(void)
 	logqualifier = (CLI_NEGATED != cli_present("LOG"));
 	if (CLI_PRESENT == cli_present("FREEZE"))
 		freeze = TRUE;
+	if (CLI_PRESENT == cli_present("OVERRIDE"))
+		override = TRUE;
+	if (CLI_PRESENT == cli_present("NULL_IV"))
+		use_null_iv = 1;
+	else if (CLI_NEGATED == cli_present("NULL_IV"))
+		use_null_iv = 0;
+	else
+		use_null_iv = -1;
 	n_len = SIZEOF(format_buffer);
 	if (FALSE == cli_get_str("FORMAT", format_buffer, &n_len))
 	{
@@ -252,8 +299,10 @@ void mu_extract(void)
 		}
 		format = MU_FMT_GO;
 	} else if (0 == memcmp(format_buffer, BINARY_FORMAT_STRING, n_len))
+	{
 		format = MU_FMT_BINARY;
-	else
+		is_binary_format = TRUE;
+	} else
 	{
 		util_out_print("Extract error: bad format type", TRUE);
 		mupip_exit(ERR_MUPCLIERR);
@@ -280,16 +329,21 @@ void mu_extract(void)
 				insert_region(reg, &(grlist), NULL, SIZEOF(tp_region));
 		}
 	}
+	ESTABLISH(mu_extract_handler);
+	opened_regions = (gd_region **)malloc(SIZEOF(gd_region *) * gd_header->n_regions);
 	/* For binary format, check whether all regions have same null collation order */
 	if (MU_FMT_BINARY == format)
 	{
-#		ifdef GTM_CRYPT
-		encrypted_hash_array_len = GTMCRYPT_HASH_LEN * gd_header->n_regions;
-		encrypted_hash_array_ptr = malloc(encrypted_hash_array_len);
-		memset(encrypted_hash_array_ptr, 0, encrypted_hash_array_len);
-#		endif
-		tp_region *rptr;
-		for (rptr = grlist, reg_std_null_coll = -1; NULL != rptr; rptr = rptr->fPtr)
+		hash_array_len = GTMCRYPT_HASH_LEN * gd_header->n_regions;
+		hash_array_ptr = malloc(hash_array_len * 2);
+		memset(hash_array_ptr, 0, hash_array_len * 2);
+		hash2_index_array_len = gd_header->n_regions * SIZEOF(uint4);
+		hash2_index_array_ptr = malloc(hash2_index_array_len);
+		memset(hash2_index_array_ptr, 0, hash2_index_array_len);
+		null_iv_array_len = gd_header->n_regions;
+		null_iv_array_ptr = malloc(null_iv_array_len);
+		memset(null_iv_array_ptr, 0, null_iv_array_len);
+		for (rptr = grlist, reg_std_null_coll = -1, index = 0; NULL != rptr; rptr = rptr->fPtr, index++)
 		{
 			reg = rptr->reg;
 			if (reg->open)
@@ -304,16 +358,50 @@ void mu_extract(void)
 						mupip_exit(ERR_NULLCOLLDIFF);
 					}
 				}
-#				ifdef GTM_CRYPT
 				csa = &FILE_INFO(reg)->s_addrs;
 				csd = csa->hdr;
-				if (csd->is_encrypted)
+				cnl = csa->nl;
+				grab_crit(reg);
+				pid = cnl->reorg_encrypt_pid;
+				if (pid && is_proc_alive(pid, 0))
 				{
-					curr_hash_ptr = encrypted_hash_array_ptr + (GTMCRYPT_HASH_LEN * find_reg_hash_idx(reg));
-					memcpy(curr_hash_ptr, csd->encryption_hash, GTMCRYPT_HASH_LEN);
-					is_any_file_encrypted = TRUE;
+					rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(8) ERR_ENCRYPTCONFLT, 6,
+					RTS_ERROR_LITERAL("MUPIP EXTRACT -FORMAT=BIN"), REG_LEN_STR(reg), DB_LEN_STR(reg));
+					mupip_exit(ERR_ENCRYPTCONFLT);
 				}
-#				endif
+				cnl->mupip_extract_count++;
+				opened_regions[opened_region_count++] = reg;
+				rel_crit(reg);
+				if (!freeze && !override && (!csd->span_node_absent || USES_NEW_KEY(csd)))
+				{
+					rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(8) ERR_EXTRINTEGRITY, 2, DB_LEN_STR(reg),
+							ERR_TEXT, 2, LEN_AND_LIT("Use the -FREEZE qualifier to freeze the "
+							"database(s) or -OVERRIDE qualifier to proceed without a freeze"));
+					mupip_exit(ERR_EXTRINTEGRITY);
+				}
+				if (IS_ENCRYPTED(csd->is_encrypted))
+				{
+					curr_hash_ptr = hash_array_ptr + (GTMCRYPT_HASH_LEN * index);
+					memcpy(curr_hash_ptr, csd->encryption_hash, GTMCRYPT_HASH_LEN);
+					any_file_encrypted = TRUE;
+				}
+				if (USES_NEW_KEY(csd))
+				{
+					curr_hash_ptr = hash_array_ptr + hash_array_len;
+					memcpy(curr_hash_ptr, csd->encryption_hash2, GTMCRYPT_HASH_LEN);
+					curr_hash2_index_ptr = hash2_index_array_ptr + index;
+					*curr_hash2_index_ptr = hash_array_len / GTMCRYPT_HASH_LEN;
+					hash_array_len += GTMCRYPT_HASH_LEN;
+					any_file_encrypted = TRUE;
+				}
+				if ((1 == use_null_iv) || (!USES_NEW_KEY(csd)
+						&& (!IS_ENCRYPTED(csd->is_encrypted) || !csd->non_null_iv)))
+					*(null_iv_array_ptr + index) = '1';
+				else
+				{
+					*(null_iv_array_ptr + index) = '0';
+					any_file_uses_non_null_iv = TRUE;
+				}
 			}
 		}
 		assert(-1 != reg_std_null_coll);
@@ -347,7 +435,7 @@ void mu_extract(void)
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
 	(*op_open_ptr)(&op_val, &op_pars, 0, 0);
-	ESTABLISH(mu_extract_handler);
+	ESTABLISH(mu_extract_handler1);
 	op_pars.str.len = SIZEOF(use_params);
 	op_pars.str.addr = (char *)&use_params;
 	op_use(&op_val, &op_pars);
@@ -360,10 +448,17 @@ void mu_extract(void)
 		outbuf = (unsigned char *)malloc(SIZEOF(BIN_HEADER_LABEL) + SIZEOF(BIN_HEADER_DATEFMT) - 1 +
 				4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
-		if (is_any_file_encrypted)
+		if (any_file_encrypted)
 		{
-			MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR_INDEX);
-			outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR_INDEX);
+			if (any_file_uses_non_null_iv)
+			{
+				MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR_IV);
+				outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR_IV);
+			} else
+			{
+				MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR_INDEX);
+				outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR_INDEX);
+			}
 		} else
 		{
 			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
@@ -425,19 +520,24 @@ void mu_extract(void)
 		op_val.str.addr = (char *)outbuf;
 		op_val.str.len = label_len;
 		op_write(&op_val);
-#		ifdef GTM_CRYPT
-		if (is_any_file_encrypted)
+		if (any_file_encrypted)
 		{
-			op_val.str.addr = (char *)(&encrypted_hash_array_len);
-			op_val.str.len = SIZEOF(encrypted_hash_array_len);
+			op_val.str.addr = (char *)(&hash_array_len);
+			op_val.str.len = SIZEOF(hash_array_len);
 			op_write(&op_val);
-			op_val.str.addr = (char *)encrypted_hash_array_ptr;
-			op_val.str.len = encrypted_hash_array_len;
+			op_val.str.addr = (char *)hash_array_ptr;
+			op_val.str.len = hash_array_len;
 			op_write(&op_val);
+			if (any_file_uses_non_null_iv)
+			{
+				op_val.str.addr = (char *)(&null_iv_array_len);
+				op_val.str.len = SIZEOF(null_iv_array_len);
+				op_write(&op_val);
+				op_val.str.addr = (char *)null_iv_array_ptr;
+				op_val.str.len = null_iv_array_len;
+				op_write(&op_val);
+			}
 		}
-		assert(NULL != encrypted_hash_array_ptr);
-		free(encrypted_hash_array_ptr);
-#		endif
 	} else
 	{
 		assert((MU_FMT_GO == format) || (MU_FMT_ZWR == format));
@@ -472,15 +572,15 @@ void mu_extract(void)
 		op_wteol(1);
 	}
 	REVERT;
-	ESTABLISH(mu_extract_handler1);
+	ESTABLISH(mu_extract_handler2);
 	success = TRUE;
 	gvspan = NULL;
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = next_gl_ptr)
 	{
 		if (mu_ctrly_occurred)
 			break;
+		/* Sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr. */
 		DO_OP_GVNAME(gl_ptr);
-			/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 		if (MU_FMT_BINARY == format)
 		{
 			label_len = SIZEOF(extr_collhdr);
@@ -495,11 +595,25 @@ void mu_extract(void)
 			op_val.str.len = SIZEOF(extr_collhdr);
 			op_write(&op_val);
 		}
-#		ifdef GTM_CRYPT
-		success2 = mu_extr_gblout(gl_ptr, &global_total, format, is_any_file_encrypted);
-#		else
-		success2 = mu_extr_gblout(gl_ptr, &global_total, format);
-#		endif
+		if ((MU_FMT_BINARY == format) && any_file_encrypted && USES_ANY_KEY(cs_data))
+		{	/* The index variable should still be set properly. */
+			for (rptr = grlist, index = 0; ; rptr = rptr->fPtr, index++)
+			{
+				assert(NULL != rptr);
+				if (&FILE_INFO(gv_cur_region)->fileid == &FILE_INFO(rptr->reg)->fileid)
+					break;
+			}
+			index2 = *(hash2_index_array_ptr + index);
+			null_iv = *(null_iv_array_ptr + index) == '1';
+			if (!IS_ENCRYPTED(cs_data->is_encrypted))
+				index = -1;
+			if (!USES_NEW_KEY(cs_data))
+				index2 = -1;
+			success2 = mu_extr_gblout(gl_ptr, &global_total, format, TRUE,
+					any_file_uses_non_null_iv, index, index2, null_iv);
+		} else
+			success2 = mu_extr_gblout(gl_ptr, &global_total, format, any_file_encrypted,
+					any_file_uses_non_null_iv, -1, -1, FALSE);
 		success = success2 && success;
 		gvnh_reg = gl_ptr->gvnh_reg;
 		last_gvspan = gvspan;
@@ -529,6 +643,16 @@ void mu_extract(void)
 	op_pars.str.addr = (char *)&no_param;
 	op_close(&op_val, &op_pars);
 	REVERT;
+	REVERT;
+	if (MU_FMT_BINARY == format)
+	{
+		assert(NULL != hash_array_ptr);
+		assert(NULL != null_iv_array_ptr);
+		assert(NULL != hash2_index_array_ptr);
+		free(hash_array_ptr);
+		free(null_iv_array_ptr);
+		free(hash2_index_array_ptr);
+	}
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXTRACTCTRLY);

@@ -51,6 +51,7 @@
 #include "error.h"
 #include "jnl.h"
 #include "trans_log_name.h"
+#include "have_crit.h"
 #include "dbcertify.h"
 
 #define FILETAB		"File  	"
@@ -102,7 +103,7 @@ void dbc_open_command_file(phase_static_area *psa)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
 	assert(0 < gtm_dist_path.len);
 	VMS_ONLY(dbc_remove_command_file(psa));	/* If we don't do this, the command files versions pile up fast */
-	psa->tcfp = Fopen((char_ptr_t)psa->tmpcmdfile, "w");
+	Fopen(psa->tcfp, (char_ptr_t)psa->tmpcmdfile, "w");
 	if (NULL == psa->tcfp)
 	{
 		save_errno = errno;
@@ -147,9 +148,11 @@ void dbc_write_command_file(phase_static_area *psa, char_ptr_t cmd)
 /* Close the temporary command file */
 void dbc_close_command_file(phase_static_area *psa)
 {
+	int status;
+
 	assert(NULL != psa && NULL != psa->tcfp);
 	assert(psa->tmp_file_names_gend);
-	fclose(psa->tcfp);
+	FCLOSE(psa->tcfp, status);
 	psa->tcfp = NULL;
 }
 
@@ -216,7 +219,7 @@ void dbc_open_result_file(phase_static_area *psa)
 
 	assert(NULL != psa && NULL == psa->trfp);
 	assert(psa->tmp_file_names_gend);
-	psa->trfp = Fopen((char_ptr_t)psa->tmprsltfile, "r");
+	Fopen(psa->trfp, (char_ptr_t)psa->tmprsltfile, "r");
 	if (0 == psa->trfp)
 	{
 		save_errno = errno;
@@ -257,7 +260,7 @@ uchar_ptr_t dbc_read_result_file(phase_static_area *psa, int rderrmsg, uchar_ptr
 					  RTS_ERROR_TEXT(emsg));
 			}
 		}
-		exit(EXIT_FAILURE);	/* We shouldn't come here but in case... */
+		EXIT(EXIT_FAILURE);	/* We shouldn't come here but in case... */
 	}
 	return (uchar_ptr_t)fgs;
 }
@@ -265,8 +268,10 @@ uchar_ptr_t dbc_read_result_file(phase_static_area *psa, int rderrmsg, uchar_ptr
 /* Close the temporary command file */
 void dbc_close_result_file(phase_static_area *psa)
 {
+	int status;
+
 	assert(NULL != psa && NULL != psa->trfp);
-	fclose(psa->trfp);
+	FCLOSE(psa->trfp, status);
 	psa->trfp = NULL;
 }
 

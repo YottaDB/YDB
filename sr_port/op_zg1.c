@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +55,7 @@ void op_zg1(int4 level)
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
 		if ((-level) > curlvl)
-			rts_error(VARLSTCNT(1) ERR_ZGOTOLTZERO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
 		unwlevels = -level;	/* Level to seek relative to current level */
 		level += curlvl;
 	} else
@@ -62,7 +63,7 @@ void op_zg1(int4 level)
 		unwlevels = curlvl - level;
 		if (0 > unwlevels)
 			/* Couldn't get to the level we were trying to unwind to */
-			rts_error(VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
 	/* For ZGOTO 0, if we are running in GTM's runtime (via mumps executable), we allow this to proceed with the
 	 * unwind and return back to the caller. However if this is MUPIP, we will exit after sending an oplog message
@@ -73,9 +74,9 @@ void op_zg1(int4 level)
 		zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
 		getzposition(&zposition);
 		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-		send_msg(VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
 			 ERR_PROCTERM, zposition.str.len, zposition.str.addr);
-		exit(ERR_PROCTERM);
+		EXIT(ERR_PROCTERM);
 	}
 	/* Find the frame we are unwinding to while counting the frames we need to unwind (which we will feed to
 	 * GOFRAMES(). As we unwind, keep track of how many trigger base frames we encounter (if triggers are supported)
@@ -125,7 +126,7 @@ void op_zg1(int4 level)
 		 gtm_trigger_depth, unwtrglvls, fp));
 	if ((0 != level) && (0 < dollar_ecode.index) && (0 < gtm_trigger_depth)
 	    && ((0 >= (gtm_trigger_depth - unwtrglvls)) || ((1 == gtm_trigger_depth) && (SFT_TRIGR & fp->type))))
-		rts_error(VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
 #	endif
 	/* Perform actual unwinding of the frames */
 	GOFRAMES(unwframes, FALSE, TRUE);

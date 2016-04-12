@@ -25,6 +25,7 @@
 # selected is PRO_BUILD is defined (set by gtm_malloc_dbg.c).
 #
 # Makefile builds don't have a bunch of stuff
+source $gtm_tools/gtm_env.csh
 setenv includge ""
 if ($#argv > 1) then
 	setenv gtm_ver $1

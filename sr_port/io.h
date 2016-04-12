@@ -217,9 +217,6 @@ void io_init(boolean_t term_ctrl);
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
-#ifdef UNIX
-bool io_is_tt(char *name);
-#endif
 bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace);
 enum io_dev_type io_type(mstr *tn);
 void io_init_name(void);
@@ -430,12 +427,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF io_pair		io_std_device;											\
 	GBLREF boolean_t	in_prin_gtmio;											\
 																\
+	intrpt_state_t		prev_intrpt_state;										\
+																\
 	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 		ESTABLISH(gtmio_ch);												\
 		SET_CH = TRUE;													\
 		in_prin_gtmio = TRUE;												\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 	} else															\
 		SET_CH = FALSE;													\
 }
@@ -446,12 +447,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF io_pair		io_std_device;											\
 	GBLREF boolean_t	in_prin_gtmio;											\
 																\
+	intrpt_state_t		prev_intrpt_state;										\
+																\
 	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 		ESTABLISH_RET(gtmio_ch, VALUE);											\
 		SET_CH = TRUE;													\
 		in_prin_gtmio = TRUE;												\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 	} else															\
 		SET_CH = FALSE;													\
 }
@@ -462,12 +467,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF boolean_t		in_prin_gtmio;										\
 	DEBUG_ONLY(GBLREF io_pair	io_std_device;)										\
 																\
+	intrpt_state_t		prev_intrpt_state;										\
+																\
 	if (SET_CH)														\
 	{															\
 		assert((&gtmio_ch == active_ch->ch) && (NULL != (IOD)->out)							\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out));					\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 		in_prin_gtmio = FALSE;												\
 		REVERT;														\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
 	}															\
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,14 +71,14 @@ typedef struct
 	uint4		datalen;
 } mu_extr_stats;
 
-#define	MU_EXTR_STATS_INIT(TOT)					\
-{								\
-	TOT.recknt = TOT.reclen = TOT.keylen = TOT.datalen = 0;	\
+#define	MU_EXTR_STATS_INIT(TOT)								\
+{											\
+	(TOT).recknt = (TOT).reclen = (TOT).keylen = (TOT).datalen = 0;			\
 }
 
 #define	MU_EXTR_STATS_ADD(DST, SRC)							\
 {											\
-	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_EXTRACT, SRC.recknt, (SRC.recknt << 31));	\
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_CNTS, SRC.recknt, (SRC.recknt << 31));	\
 	assert((DST.recknt + SRC.recknt) >= DST.recknt);	/* overflow check */	\
 	DST.recknt += SRC.recknt;							\
 	if (DST.reclen < SRC.reclen)							\
@@ -121,11 +121,14 @@ typedef struct coll_hdr_struct
 #define BIN_HEADER_VERSION  		"6" /* Spanning nodes allow max_rec_len to 7 digits. */
 #define BIN_HEADER_LABEL        	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
 
-#define BIN_HEADER_VERSION_ENCR		"7" /* Same as 6 but encrypted. */
+#define BIN_HEADER_VERSION_ENCR		"7" /* Follow convention of low bit of version indicating encryption. */
 #define BIN_HEADER_LABEL_ENCR   	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION_ENCR
 
 #define BIN_HEADER_VERSION_ENCR_INDEX	"8" /* Same as 6 but encrypted and with unconditional encryption handle index. */
 #define BIN_HEADER_LABEL_ENCR_INDEX   	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION_ENCR_INDEX
+
+#define BIN_HEADER_VERSION_ENCR_IV	"9" /* Same as 8 but supporting non-null IVs and two keys as well as blocks with headers. */
+#define BIN_HEADER_LABEL_ENCR_IV	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION_ENCR_IV
 
 #define BIN_HEADER_SZ			100
 #define BIN_HEADER_NUMSZ		7
@@ -140,17 +143,16 @@ typedef struct coll_hdr_struct
 					/* the assumption here is - level wont go beyond a single char representation */
 #define MAX_BIN_WRT			ROUND_DOWN(MAX_RMS_RECORDSIZE, SIZEOF(int))
 
-char *mu_extr_ident(mstr *a);
-void  mu_extract(void);
-int mu_extr_getblk(unsigned char *ptr, unsigned char *encrypted_buff_ptr);
-int find_reg_hash_idx(gd_region *reg);
-#if defined(GTM_CRYPT)
-boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t is_any_file_encrypted);
-#elif defined(UNIX)
-boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format);
-#else	/* VMS */
-boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, int format);
-#endif
+#define ENCRYPTED_WITH_HASH1		1
+#define ENCRYPTED_WITH_HASH2		2
+#define NEEDS_ENCRYPTION		3
+#define NEEDS_NO_ENCRYPTION		4
+
+char		*mu_extr_ident(mstr *a);
+void		mu_extract(void);
+int		mu_extr_getblk(unsigned char *ptr, unsigned char *encr_ptr, boolean_t use_null_iv, int *got_encrypted_block);
+boolean_t	mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t any_file_encrypted,
+		boolean_t any_file_uses_non_null_iv, int hash1_index, int hash2_index, boolean_t use_null_iv);
 
 #define WRITE_BIN_EXTR_BLK(BUFF, BSIZE, WRITE_4MORE_BYTES, CRYPT_INDEX)		\
 {										\

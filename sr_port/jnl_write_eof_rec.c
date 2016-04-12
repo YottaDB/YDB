@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +13,6 @@
 #include "mdef.h"
 
 #include "gtm_inet.h"
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gtm_time.h"
 #include "gdsroot.h"
@@ -39,7 +37,8 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
-	assert((0 != jpc->pini_addr) || (jpc->jnl_buff->freeaddr > jpc->jnl_buff->filesize - JNL_FILE_TAIL_PRESERVE));
+	assert((0 != jpc->pini_addr)
+		|| ((off_t)jpc->jnl_buff->freeaddr > ((off_t)DISK_BLOCK_SIZE * jpc->jnl_buff->filesize) - JNL_FILE_TAIL_PRESERVE));
 	eof_record->prefix.jrec_type = JRT_EOF;
 	eof_record->prefix.forwptr = eof_record->suffix.backptr = EOF_RECLEN;
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
@@ -50,16 +49,17 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	assert(jgbl.gbl_jrec_time);
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
 	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between seqno of filehdr and jnlpool */
-	UNIX_ONLY(
-		/* In UNIX, mur_close_files, at the beginning sets both jgbl.mur_jrec_seqno and csa->hdr->reg_seqno to
-		 * murgbl.consist_jnl_seqno. Assert that this is indeed the case. However, csa->hdr->reg_seqno is NOT
-		 * maintained by rollback during forward phase of recovery and is set only at mur_close_files whereas
-		 * jgbl.mur_jrec_seqno is maintained all along. So, unless we are called from mur_close_files, we cannot
-		 * rely csa->hdr->reg_seqno and so we can do the equality check only if we are called from mur_close_files
-		 */
-		assert(!jgbl.forw_phase_recovery || !jgbl.mur_rollback || (jgbl.mur_jrec_seqno == csa->hdr->reg_seqno)
-			|| !process_exiting);
-	)
+	/* In UNIX, mur_close_files, at the beginning sets both jgbl.mur_jrec_seqno and csa->hdr->reg_seqno to
+	 * murgbl.consist_jnl_seqno. Assert that this is indeed the case. However, csa->hdr->reg_seqno is NOT
+	 * maintained by rollback during forward phase of recovery and is set only at mur_close_files whereas
+	 * jgbl.mur_jrec_seqno is maintained all along. So, unless we are called from mur_close_files, we cannot
+	 * rely csa->hdr->reg_seqno and so we can do the equality check only if we are called from mur_close_files
+	 */
+	assert(!jgbl.forw_phase_recovery || !jgbl.mur_rollback || (jgbl.mur_jrec_seqno == csa->hdr->reg_seqno) || !process_exiting);
+	/* If caller is MUPIP JOURNAL ROLLBACK, it cannot be FORWARD rollback since that runs with journaling turned off
+	 * and we are writing journal records here. Assert accordingly.
+	 */
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward);
 	if (!jgbl.forw_phase_recovery)
 	{
 		if (REPL_ALLOWED(csa))
@@ -70,6 +70,6 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	} else
 		QWASSIGN(eof_record->jnl_seqno, jgbl.mur_jrec_seqno);
 	eof_record->filler = 0;
-	eof_record->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)eof_record, SIZEOF(struct_jrec_eof));
-	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL, NULL);
+	eof_record->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)eof_record, SIZEOF(struct_jrec_eof));
+	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL, NULL, NULL);
 }

@@ -15,7 +15,7 @@
 
 #ifdef MUTEX_MSEM_WAKE
 #ifdef POSIX_MSEM
-#include <semaphore.h>
+#include "gtm_semaphore.h"
 #else
 #include <sys/mman.h>
 #endif
@@ -44,6 +44,7 @@
 
 #define HUNDRED_MSEC 			100000
 #define E_4				10000
+#define ONE_MILLION 			1000000
 
 typedef struct
 {

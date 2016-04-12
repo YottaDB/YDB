@@ -1,6 +1,7 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +12,8 @@
 
 #include "mdef.h"
 
-#include <errno.h>
 #include "gtm_unistd.h"	/* DB_FSYNC macro needs this */
 #include "gtm_string.h"
-
 #include "gtmio.h"	/* this has to come in before gdsfhead.h, for all "open" to be defined
 				to "open64", including the open in header files */
 #include "aswp.h"
@@ -33,7 +32,7 @@
 #include "gdsbgtr.h"
 #include "is_file_identical.h"
 #include "dpgbldir.h"
-#include "rel_quant.h"
+#include "gtm_rel_quant.h"
 #include "repl_sp.h"	/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 #include "memcoherency.h"
 #include "gtm_dbjnl_dupfd_check.h"
@@ -53,7 +52,6 @@ error_def(ERR_JNLWRTNOWWRTR);
 error_def(ERR_PREMATEOF);
 
 uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write);
-void jnl_mm_timer_write(void);
 
 /* If the second argument is TRUE, then the jnl write is done only upto the previous aligned boundary.
  * else the write is done upto the freeaddr */
@@ -280,7 +278,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 uint4 jnl_qio_start(jnl_private_control *jpc)
 {
 	unsigned int		yield_cnt, status;
-	uint4			target_freeaddr, lcl_dskaddr, old_freeaddr;
+	uint4			lcl_dskaddr, old_freeaddr, spin_sleep_mask, target_freeaddr;
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
@@ -306,14 +304,15 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	} /* else, data does not cross/touch an alignment boundary, yield and see if someone else
 	   * does the dirty job more efficiently
 	   */
+	spin_sleep_mask = csa->hdr->mutex_spin_parms.mutex_spin_sleep_mask;
 	for (yield_cnt = 0; yield_cnt < csa->hdr->yield_lmt; yield_cnt++)
-	{	/* yield() until someone has finished your job or no one else is active on the jnl file */
+	{	/* wait until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
-		rel_quant();
+		GTM_REL_QUANT(spin_sleep_mask);
 		/* Purpose of this memory barrier is to get a current view of asyncrhonously changed fields
 		 * like whether the jnl file was switched, the write position in the journal file and the
 		 * write address in the journal buffer for all the remaining statements in this loop because
-		 * the rel_quant call above allows any and all of them to change and we aren't under any
+		 * the GTM_REL_QUANT invocation above allows any and all of them to change and we aren't under any
 		 * locks while in this loop. This is not a correctness issue as we would either eventually
 		 * see the updates or it means we are writing what has already been written. It is a performance
 		 * issue keeping more current with state changes done by other processes on other processors.
@@ -331,42 +330,4 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	if (target_freeaddr > jb->dskaddr)
 		status = jnl_sub_qio_start(jpc, FALSE);
 	return status;
-}
-
-static boolean_t	jnl_timer;
-void jnl_mm_timer_write(void)
-{	/* While this should work by region and use baton passing to more accurately and efficiently perform its task,
-	 * it is currently a blunt instrument
-	 */
-	gd_region	*reg, *r_top;
-	gd_addr		*addr_ptr;
-	sgmnt_addrs	*csa;
-
-	for (addr_ptr = get_next_gdr(NULL);  NULL != addr_ptr;  addr_ptr = get_next_gdr(addr_ptr))
-	{	/* since the unix timers don't provide an argument, for now write all regions */
-		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions;  reg < r_top; reg++)
-		{
-			if ((dba_mm == reg->dyn.addr->acc_meth) && reg->open)
-			{
-				csa = &FILE_INFO(reg)->s_addrs;
-				if ((NULL != csa->jnl) && (NOJNL != csa->jnl->channel))
-					jnl_qio_start(csa->jnl);
-			}
-		}
-	}
-	jnl_timer = FALSE;
-	return;
-}
-
-void jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg)
-{	/* While this should work by region and use baton passing to more accurately and efficiently perform its task,
-	 * it is currently a blunt instrument.
-	 */
-	assert(reg->open);
-	if (FALSE == jnl_timer)
-	{
-		jnl_timer = TRUE;
-		start_timer((TID)jnl_mm_timer, csa->hdr->flush_time[0], &jnl_mm_timer_write, 0, NULL);
-	}
-	return;
 }

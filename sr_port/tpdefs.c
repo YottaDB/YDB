@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 #include "gdsroot.h"
 
 GBLDEF uint4		dollar_tlevel;
+GBLDEF uint4		bml_save_dollar_tlevel; /* if non-zero holds actual dollar_tlevel */
 GBLDEF uint4		dollar_trestart;
 GBLDEF unsigned char	*tpstackbase, *tpstacktop, *tpstackwarn, *tp_sp;
 GBLDEF block_id		tp_allocation_clue;

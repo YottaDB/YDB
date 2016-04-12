@@ -153,7 +153,7 @@ void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 #ifdef UNIX
 void	op_fnzwidth(mval *str, mval *dst);
 #endif
-void	op_fnzwrite(mval *str, mval *dst);
+void	op_fnzwrite(boolean_t direction, mval *str, mval *dst);
 int	op_forchk1();
 #ifdef UNIX
 int	op_forintrrpt();

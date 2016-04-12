@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "gtm_utf8.h"
 
 GBLREF	boolean_t	badchar_inhibit;
+GBLREF boolean_t        gtm_utf8_mode;
 
 /* Returns the Unicode code point of a character in a string at a given index */
 void	op_fnascii(int4 num, mval* in, mval* out)
@@ -25,15 +27,22 @@ void	op_fnascii(int4 num, mval* in, mval* out)
 	unsigned int code;
 	char	*in_ptr, *in_top;
 
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+
+	/* We should never check badchar_inhibit if we are in compile_time and have badchar's;
+		ie, we should never get this far with badchar's during compile time */
+	assert(!TREF(compile_time) || valid_utf_string(&in->str));
+
 	num--;	/* make it a 0-index based */
-	if (MV_IS_SINGLEBYTE(in))
+	if (!gtm_utf8_mode || MV_IS_SINGLEBYTE(in))
 	{ /* Fast path evaluation for strings with no multi-byte characters */
 		assert(MV_IS_STRING(in));  /* MV_UTF_LEN must subsume MV_STR */
 		if ((num < in->str.len) && (num >= 0))
 		{
 			if ((code = *(unsigned char *)(in->str.addr + num)) > ASCII_MAX)
-			{
-				if (badchar_inhibit) /* Isolated bytes in the range [0x80,0xFF] must be considered illegal */
+			{	/* Isolated bytes in the range [0x80,0xFF] must be considered illegal */
+				if (!gtm_utf8_mode || badchar_inhibit)
 					code = (unsigned int)-1;
 				else
 					UTF8_BADCHAR(1, in->str.addr + num, NULL, 0, NULL);

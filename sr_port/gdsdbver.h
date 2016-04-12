@@ -31,6 +31,8 @@
 #  define GDS_V50	"03"
 #endif
 #define GDS_CURR	GDS_V50
+#define MAX_DB_VER_LEN		2
+#define GDSVCURR ((enum db_ver)(GDSVLAST - 1))
 
 /* Database major version as an enum quantity. Used to index the dbversion table in mtables.c */
 enum db_ver
@@ -41,7 +43,8 @@ enum db_ver
 	GDSV6 = 1, /*GDSV5 and GDSV6 have same value because block format is same for these two version*/
 	GDSVLAST
 };
-#define GDSVCURR ((enum db_ver)(GDSVLAST - 1))
+
+#define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
  * releases as it is only added to when a file-header field is added or changed or if there is a
@@ -49,31 +52,11 @@ enum db_ver
  * at the end, just before GDSMVLAST. Note these entries need corresponding updates in
  * db_auto_upgrade.c.
  */
+#define ENUM_ENTRY(ENUMNAME)	ENUMNAME
 enum mdb_ver
 {
-	GDSMV4,		/* Applies to all V4 versions (no minor versions defined) */
-	GDSMV50000,
-	GDSMV51000,	/* Multi-site available (for databases created by V51000 - see V51000ALT */
-	GDSMV51000ALT,	/* Upgrade from a previous version upgraded to this value for V51000 due to bug */
-	GDSMV52000,	/* Unicode .. no real header changes but db contents could be unusable by previous versions */
-	GDSMV53000,	/* M-Itanium release. secshr_ops_array and index is been copied from sgmnt_data to node_local. */
-	GDSMV53003,	/* ZSHOW "G" release: Db Statistics rearranged in file header */
-	GDSMV53004,	/* New fields(is_encrypted, encryption_hash) for encryption */
-	GDSMV54000,	/* New fields(db_trigger_cycle) for triggers */
-	GDSMV54002,	/* New statistical counter field for ZTRIGGER command */
-	GDSMV54002B,	/* New fields(turn_around_point, jnl_eovtn) for backward recovery */
-	GDSMV55000,	/* New fields(strm_reg_seqno, save_strm_reg_seqno, intrpt_recov_resync_strm_seqno)
-			 * 	for supplementary instances.
-			 * New fields(before_trunc_total_blks, after_trunc_total_blks, before_trunc_free_blocks
-			 *	before_trunc_file_size) for fixing interrupted MUPIP REORG -TRUNCATE.
-			 */
-	GDSMV60000,	/* New freeze_on_fail field for anticipatory freeze; the wc_blocked field moved to shared memory */
-	GDSMV60001,
-	GDSMV60002,	/* New field mutex_spin_parms.mutex_que_entry_space_size for configurable mutex queue size */
-	GDSMV62001,	/* New field hasht_upgrade_needed for ^#t upgrade */
-	GDSMV62002,	/* New field defer_allocate needed for database file preallocation and ^#t upgrade */
-	GDSMVLAST
+#include "gdsdbver_sp.h"
 };
-#define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
+#undef ENUM_ENTRY
 
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +14,6 @@
  * in the programmer's guide. the reason behind the non-documentation is indicated across each such entry with a "nodoc :" prefix.
  */
 /*      KEYWORD			PARAMETER-TYPE			KEYCODE		RESULT-TYPE */
-VIEWTAB("0",			VTP_NULL,			VTK_GDSCERT0,		MV_STR),
-VIEWTAB("1",			VTP_NULL,			VTK_GDSCERT1,		MV_STR),
 VIEWTAB("BADCHAR",		VTP_NULL,			VTK_BADCHAR,		MV_NM),
 VIEWTAB("BREAKMSG",		VTP_NULL | VTP_VALUE,		VTK_BREAKMSG,		MV_NM),
 VIEWTAB("DBFLUSH",		VTP_DBREGION | VTP_NULL,	VTK_DBFLUSH,		MV_STR),
@@ -56,6 +55,7 @@ VIEWTAB("JNLWAIT",		VTP_NULL,			VTK_JNLWAIT,		MV_STR),
 VIEWTAB("JOBPID",		VTP_VALUE | VTP_NULL,		VTK_JOBPID,		MV_STR),
 VIEWTAB("LABELS",		VTP_VALUE | VTP_NULL,		VTK_LABELS,		MV_NM),
 VIEWTAB("LINK",			VTP_VALUE | VTP_NULL,		VTK_LINK,		MV_STR),
+VIEWTAB("LOGNONTP",		VTP_VALUE | VTP_NULL,		VTK_LOGNONTP,		MV_NM),
 VIEWTAB("LOGTPRESTART",		VTP_VALUE | VTP_NULL,		VTK_LOGTPRESTART,	MV_NM),
 #ifdef DEBUG
 VIEWTAB("LVDMP",		VTP_LVN,			VTK_LVDMP,		MV_NM),
@@ -78,6 +78,7 @@ VIEWTAB("NOBADCHAR",		VTP_NULL,			VTK_NOBADCHAR,		MV_NM),
 VIEWTAB("NODMTERM",		VTP_NULL,			VTK_NODMTERM,		MV_NM),
 VIEWTAB("NOFULL_BOOLEAN",	VTP_NULL,			VTK_NOFULLBOOL,		MV_STR),
 VIEWTAB("NOISOLATION",		VTP_NULL | VTP_DBKEYLIST,	VTK_NOISOLATION,	MV_NM),
+VIEWTAB("NOLOGNONTP",		VTP_NULL,			VTK_NOLOGNONTP,		MV_NM),
 VIEWTAB("NOLOGTPRESTART",	VTP_NULL,			VTK_NOLOGTPRESTART,	MV_NM),
 VIEWTAB("NOLVNULLSUBS",		VTP_NULL,			VTK_NOLVNULLSUBS,	MV_NM),
 VIEWTAB("NOUNDEF",		VTP_NULL,			VTK_NOUNDEF,		MV_NM),

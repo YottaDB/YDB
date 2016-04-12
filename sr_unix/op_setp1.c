@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,18 +24,11 @@ GBLREF boolean_t	gtm_utf8_mode;		/* We are indeed doing the UTF8 thang */
 GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
 
 #ifdef DEBUG
-GBLREF	boolean_t	setp_work;
-GBLREF	int		cs_small;			/* scanned small string brute force */
-GBLREF	int		cs_small_pcs;			/* chars scanned by small scan */
 #  define SETWON setp_work = TRUE;
 #  define SETWOFF setp_work = FALSE;
-#  define COUNT_EVENT(x) ++x;
-#  define INCR_COUNT(x,y) x += y;
 #else
 #  define SETWON
 #  define SETWOFF
-#  define COUNT_EVENT(x)
-#  define INCR_COUNT(x,y)
 #endif
 
 error_def(ERR_MAXSTRLEN);
@@ -183,7 +177,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	{	/* Scan the line isolating prefix piece, and end of the
 		 * piece being replaced
 		 */
-		COUNT_EVENT(cs_small);
+		COUNT_EVENT(small);
 		end_pfx = start_sfx = (unsigned char *)src->str.addr + pfx_scan_offset;
 		end_src = (unsigned char *)src->str.addr + src->str.len;
 		/* The compiler would unroll this loop this way anyway but we want to
@@ -246,7 +240,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			if (0 < delim_cnt)
 				--delim_cnt;
 		}
-		INCR_COUNT(cs_small_pcs, (int)((size_t)ind - delim_cnt));
+		INCR_COUNT(small_pcs, (int)((size_t)ind - delim_cnt));
 		/* Now having the following situation:
 		 * end_pfx	-> end of the prefix piece including delimiter
 		 * start_sfx	-> start of suffix piece (with delimiter) or = end_pfx/src->str.addr if none

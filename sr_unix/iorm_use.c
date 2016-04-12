@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,8 @@
 #endif
 #include "gtmcrypt.h"
 #include "error.h"
+#include "send_msg.h"
+#include "get_fs_block_size.h"
 
 /* Only want to do fstat() once on this file, not on every use. */
 #define FSTAT_CHECK(GETMODE)										\
@@ -158,6 +160,7 @@ enum
 	SEEK_ABS	/* seek absolute position from start of file */
 };
 
+error_def(ERR_CRYPTKEYRELEASEFAILED);
 error_def(ERR_CRYPTKEYTOOBIG);
 error_def(ERR_CRYPTNOKEYSPEC);
 error_def(ERR_CRYPTNOOVERRIDE);
@@ -202,6 +205,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 	mstr		input_iv, output_iv, input_key, output_key;
 	char		error_str[MAX_ERROR_SIZE];
 	boolean_t	ch_set;
+	int		disk_block_multiple;
+	size_t		fwrite_buffer_size;
 
 	p_offset = 0;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
@@ -915,6 +920,39 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_output_key:
 			GET_KEY_AND_IV(output);
 			break;
+		case iop_buffered:
+			disk_block_multiple = (int)*((unsigned char *)(pp->str.addr + p_offset + 1));
+			/* Not enabled for stdout (initially) */
+			if (1 == rm_ptr->fildes)
+				break;
+			assert(rm_ptr->filstr);
+			/* No change, do nothing */
+			if (rm_ptr->fsblock_buffer_size == disk_block_multiple)
+				break;
+			/* Simple buffering request - handles both enable and disable */
+			if (2 > disk_block_multiple)
+			{
+				rm_ptr->fsblock_buffer_size = disk_block_multiple;
+				if (NULL != rm_ptr->fsblock_buffer)
+					free(rm_ptr->fsblock_buffer);
+				break;
+			}
+			/* Request to buffer with buffer size different from before; clear out existing buffer */
+			if (NULL != rm_ptr->fsblock_buffer)
+				free(rm_ptr->fsblock_buffer);
+			/* Grab the FS block size */
+			fwrite_buffer_size = (size_t)get_fs_block_size(rm_ptr->fildes);
+			fwrite_buffer_size = (size_t)(fwrite_buffer_size << disk_block_multiple);
+			rm_ptr->fsblock_buffer = (char *)malloc(fwrite_buffer_size);
+			if (setvbuf(rm_ptr->filstr, rm_ptr->fsblock_buffer, _IOFBF, fwrite_buffer_size))
+			{	/* Non-fatal error. Continue to use buffered IO */
+				free(rm_ptr->fsblock_buffer);
+				rm_ptr->fsblock_buffer_size = 1;
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("setvbuff"), CALLFROM, errno);
+				break;
+			}
+			rm_ptr->fsblock_buffer_size = fwrite_buffer_size;
+			break;
 		default:
 			break;
 		}
@@ -984,7 +1022,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 					rm_ptr->input_encrypted = FALSE;
 					reset_input_encryption = init_input_encryption = FALSE;
 					if (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle)
-						GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle);
+					{
+						GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle, rv);
+						if (0 != rv)
+							GTMCRYPT_REPORT_ERROR(rv, rts_error, dev_name->len, dev_name->dollar_io);
+					}
 				}
 			}
 		}
@@ -1029,7 +1071,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 					rm_ptr->output_encrypted = FALSE;
 					reset_output_encryption = init_output_encryption = FALSE;
 					if (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle)
-						GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle);
+					{
+						GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle, rv);
+						if (0 != rv)
+							GTMCRYPT_REPORT_ERROR(rv, rts_error, dev_name->len, dev_name->dollar_io);
+					}
 				}
 			}
 		}
@@ -1060,7 +1106,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 	}
 	if (reset_input_encryption && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle))
 	{
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle);
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle, rv);
+		if (0 != rv)
+			GTMCRYPT_REPORT_ERROR(rv, rts_error, dev_name->len, dev_name->dollar_io);
 	}
 	if (init_input_encryption)
 	{	/* Get the key handle corresponding to the keyname provided. */
@@ -1079,7 +1127,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 	}
 	if (reset_output_encryption && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
 	{
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle);
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle, rv);
+		if (0 != rv)
+			GTMCRYPT_REPORT_ERROR(rv, rts_error, dev_name->len, dev_name->dollar_io);
 	}
 	if (init_output_encryption)
 	{	/* Get the key handle corresponding to the keyname provided. */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +22,15 @@
 
 #define MAX_C_STACK_TRACES_FOR_SEMWAIT	2
 
-#define DB_CONTROL_SEM	0
-#define DB_COUNTER_SEM	1
+#define DB_CONTROL_SEM		0
+#define DB_COUNTER_SEM		1
+#define	DEFAULT_DB_COUNTER_SEM_INCR	1
+#ifdef DEBUG
+GBLREF	int	gtm_db_counter_sem_incr;
+# define	DB_COUNTER_SEM_INCR	gtm_db_counter_sem_incr
+#else
+#define		DB_COUNTER_SEM_INCR	DEFAULT_DB_COUNTER_SEM_INCR
+#endif
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILERR);
@@ -60,8 +68,8 @@ typedef struct semwait_status_struct
 	enum sem_syscalls	op;
 } semwait_status_t;
 
-boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr,
-				semwait_status_t *status, gd_region *reg, boolean_t *bypass);
+boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr, semwait_status_t *status, gd_region *reg,
+			    boolean_t *bypass, boolean_t *sem_halted, sgmnt_data_ptr_t tsd);
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 {																 \
@@ -117,27 +125,29 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 		if (0 == RETSTAT->status1)									\
 		{												\
 				GET_OP_STR(RETSTAT, op);							\
-				rts_error(VARLSTCNT(16) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG), 		\
-					SYSCALL_PARAMS(RETSTAT, op), RETSTAT->save_errno);			\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(16) DBFILERR_PARAMS(REG),			\
+					CRITSEMFAIL_PARAMS(REG), SYSCALL_PARAMS(RETSTAT, op),			\
+					RETSTAT->save_errno);							\
 		} else if (ERR_SEMKEYINUSE == RETSTAT->status1)							\
 		{												\
-			rts_error(VARLSTCNT(11) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG),			\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG),\
 				SEMKEYINUSE_PARAMS(UDI));							\
 		} else												\
 			assertpro(FALSE);									\
 	} else if (ERR_MAXSEMGETRETRY == RETSTAT->status2)							\
 	{													\
-		rts_error(VARLSTCNT(7) DBFILERR_PARAMS(REG), ERR_MAXSEMGETRETRY, 1, MAX_SEMGET_RETRIES);	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) DBFILERR_PARAMS(REG), ERR_MAXSEMGETRETRY, 1,		\
+				MAX_SEMGET_RETRIES);								\
 	} else if (ERR_FTOKERR == RETSTAT->status2)								\
 	{													\
-		rts_error(VARLSTCNT(9) DBFILERR_PARAMS(REG), ERR_FTOKERR, 2, DB_LEN_STR(REG), 			\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) DBFILERR_PARAMS(REG), ERR_FTOKERR, 2, DB_LEN_STR(REG), \
 				RETSTAT->save_errno);								\
 	} else if (0 == RETSTAT->status2)									\
 	{													\
 		assert(ERR_SEMWT2LONG == RETSTAT->status1);							\
 		assert(RETSTAT->sem_pid && (-1 != RETSTAT->sem_pid));						\
 		tot_wait_time = TREF(dbinit_max_hrtbt_delta) * HEARTBEAT_INTERVAL_IN_SECS;			\
-		rts_error(VARLSTCNT(13) DBFILERR_PARAMS(REG),							\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) DBFILERR_PARAMS(REG),					\
 			SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, tot_wait_time));				\
 	} else													\
 		assertpro(FALSE);										\
@@ -155,6 +165,9 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	RC = semctl(SEMID, FTOK_SEM_PER_ID - 1, SETVAL, semarg);							\
 }
 
+#define	FTOK_SOPCNT_NO_INCR_COUNTER	2
+#define	FTOK_SOPCNT_INCR_COUNTER	3
+
 /* Set up typical GT.M semaphore (access control semaphore and/or ftok semaphore) */
 #define SET_GTM_SOP_ARRAY(SOP, SOPCNT, INCR_CNT, SEMFLG)									\
 {																\
@@ -165,22 +178,28 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	SOP[1].sem_num = DB_CONTROL_SEM; SOP[1].sem_op = 1;	/* Then lock it */						\
 	if (INCR_CNT)														\
 	{															\
-		SOP[2].sem_num = DB_COUNTER_SEM; SOP[2].sem_op = 1;	/* Increment counter semaphore */			\
-		SOPCNT = 3;													\
+		assert(2 == FTOK_SOPCNT_NO_INCR_COUNTER);									\
+		SOP[2].sem_num = DB_COUNTER_SEM; SOP[2].sem_op = DB_COUNTER_SEM_INCR;/* Increment counter semaphore */		\
+		SOPCNT = FTOK_SOPCNT_INCR_COUNTER;										\
 	} else															\
-		SOPCNT = 2;													\
+		SOPCNT = FTOK_SOPCNT_NO_INCR_COUNTER;										\
 	SOP[0].sem_flg = SOP[1].sem_flg = SOP[2].sem_flg = SEMFLG;								\
+}
+
+#define SET_SEMWAIT_FAILURE_RETSTAT(RETSTAT, ERRNO, OP, STATUS1, STATUS2, SEMPID)					\
+{															\
+	(RETSTAT)->line_no = __LINE__;											\
+	(RETSTAT)->save_errno = ERRNO;											\
+	(RETSTAT)->op = OP;												\
+	(RETSTAT)->status1 = STATUS1;											\
+	(RETSTAT)->status2 = STATUS2;											\
+	(RETSTAT)->sem_pid = SEMPID;											\
+	(RETSTAT)->module = __FILE__;											\
 }
 
 #define RETURN_SEMWAIT_FAILURE(RETSTAT, ERRNO, OP, STATUS1, STATUS2, SEMPID)						\
 {															\
-	RETSTAT->line_no = __LINE__;											\
-	RETSTAT->save_errno = ERRNO;											\
-	RETSTAT->op = OP;												\
-	RETSTAT->status1 = STATUS1;											\
-	RETSTAT->status2 = STATUS2;											\
-	RETSTAT->sem_pid = SEMPID;											\
-	RETSTAT->module = __FILE__;											\
+	SET_SEMWAIT_FAILURE_RETSTAT(RETSTAT, ERRNO, OP, STATUS1, STATUS2, SEMPID);					\
 	return FALSE;													\
 }
 

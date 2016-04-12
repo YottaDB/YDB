@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +46,7 @@ GBLREF uint4 csum_table[SLICE_BY][TABLE_SIZE];
 {															\
 	uint4 tmpsum_tn;												\
 	ADJUST_CHECKSUM(cursum, *(uint4 *)tn, tmpsum_tn);								\
-	ADJUST_CHECKSUM(tmpsum_tn, *(uint4 *)((char *)tn+SIZEOF(uint4)), newsum);					\
+	ADJUST_CHECKSUM(tmpsum_tn, *(uint4 *)((char *)tn + SIZEOF(uint4)), newsum);					\
 }
 
 #define COMPUTE_COMMON_CHECKSUM(common_cksum, prefix)									\
@@ -90,7 +91,7 @@ GBLREF uint4 csum_table[SLICE_BY][TABLE_SIZE];
 	 * if recomputation of checksum is necessary). For BG, we have two-phase commit where				\
 	 * phase2 is done outside of crit. So it is possible that we note down the current database			\
 	 * tn and then compute checksums outside of crit and then get crit and yet in the validation			\
-	 * logic find the block header tn is LESSER than the noted dbtn (even though the block				\
+	 * logic find that the block header tn is LESS than the noted dbtn (even though the block			\
 	 * contents changed after the noted dbtn). This will cause us to falsely validate this block			\
 	 * as not needing checksum recomputation. To ensure the checksum is recomputed inside crit,			\
 	 * we note down a tn of 0 in case the block is locked for update (cr->in_tend is non-zero).			\
@@ -106,24 +107,27 @@ GBLREF uint4 csum_table[SLICE_BY][TABLE_SIZE];
 	/* In rare cases cse->cr can be NULL even though this block is an acquired block. This is 			\
 	 * possible if we are in TP and this block was part of the tree in the initial phase of the			\
 	 * transaction but was marked free (by another process concurrently) in the later phase of			\
-	 * the same TP transaction. But this case is a sureshot restart situation so be safe and 			\
-	 * ensure recomputation happens inside of crit just in case we dont restart. Also add asserts			\
-	 * (using donot_commit variable) to ensure we do restart this transaction.					\
+	 * the same TP transaction. But this case is a sure restart situation, so be safe and 				\
+	 * ensure recomputation happens inside of crit just in case we do not restart. Also add				\
+	 * asserts (using donot_commit variable) to ensure we do restart this transaction.				\
 	 */														\
 	cr = cse->cr;													\
 	cr_is_null = (NULL == cr);											\
 	assert(!cr_is_null || dollar_tlevel);										\
 	DEBUG_ONLY(if (cr_is_null) TREF(donot_commit) |= DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR;)				\
 	cse->tn = ((cr_is_null || cr->in_tend) ? 0 : csd->trans_hist.curr_tn);						\
-	/* If cr is NULL, it is a restartable situation. So dont waste time computing checksums. Also			\
-	 * if the db is encrypted, we cannot get at the encryption global buffer (jnl_get_checksum			\
-	 * requires this) since we dont even have a regular global buffer corresponding to this block			\
-	 * so there is no way jnl_get_checksum can proceed in that case. So it is actually necessary			\
-	 * to avoid computing checksums if cr is NULL.									\
+	/* If cr is NULL, it is a restartable situation, so do not waste time computing checksums.			\
+	 * If the db is encrypted, we cannot get at the encryption global buffer (jnl_get_checksum			\
+	 * requires this) since we do not even have a regular global buffer corresponding to this			\
+	 * block, so there is no way jnl_get_checksum can proceed in that case. Hence it is actually			\
+	 * necessary to avoid computing checksums if cr is NULL.							\
 	 */														\
-	cse->blk_checksum = !cr_is_null ? jnl_get_checksum((uint4 *)(old_blk), csa, (bsize)) : 0;			\
+	cse->blk_checksum = !cr_is_null ? jnl_get_checksum((blk_hdr_ptr_t)old_blk, csa, (bsize)) : 0;			\
 }
-uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen);
-uint4 compute_checksum(uint4 init_sum, uint4 *buff, int bufflen);
+
+#include "gdsblk.h"
+
+uint4 jnl_get_checksum(blk_hdr_ptr_t buff, sgmnt_addrs *csa, int bufflen);
+uint4 compute_checksum(uint4 init_sum, unsigned char *buff, int bufflen);
 
 #endif

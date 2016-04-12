@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@ GBLREF struct NTD *ntd_root;
 
 void cmj_select(int signo)
 {
-	int count, local_errno;
+	int count;
 	int rsfd;
 	int wsfd;
 	int esfd;
@@ -36,10 +37,6 @@ void cmj_select(int signo)
 	{
 		count = select(n, &myrs, &myws, &myes, &t);
 	} while (0 > count && (EINTR == errno || EAGAIN == errno));
-	if (0 > count)
-	{
-		local_errno = errno;
-	}
 
 	while (0 < count) {
 		/* decode */
@@ -86,9 +83,5 @@ void cmj_select(int signo)
 		{
 			count = select(n, &myrs, &myws, NULL, &t);
 		} while (0 > count && (EINTR == errno || EAGAIN == errno));
-		if (0 > count)
-		{
-			local_errno = errno;
-		}
 	}
 }

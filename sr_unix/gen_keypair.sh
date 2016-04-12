@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc       #
+# Copyright (c) 2010-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -51,8 +52,8 @@ fi
 email=$1 ; shift
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-elif [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Default file for exported public key, if not specified
@@ -116,10 +117,10 @@ fi
 $ECHO "pinentry-program $dir/pinentry-gtm.sh" >$gtm_gpghome/gpg-agent.conf
 
 $gpg --homedir $gtm_gpghome --list-keys | grep "$email" >> $tmp_file
-if [ $? ]; then
-    $gpg --homedir $gtm_gpghome --export --armor -o $gtm_pubkey
-    $gpg --homedir $gtm_gpghome --list-keys --fingerprint
-    $ECHO "Key pair created and public key exported in ASCII to $gtm_pubkey"
+if [ $? -eq 0 ]; then
+	$gpg --homedir $gtm_gpghome --export --armor -o $gtm_pubkey
+	$gpg --homedir $gtm_gpghome --list-keys --fingerprint
+	$ECHO "Key pair created and public key exported in ASCII to $gtm_pubkey"
 else
 	$ECHO "Error creating public key/private key pairs."
 	cat $tmp_file

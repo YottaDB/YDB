@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -316,10 +316,10 @@ void	gvcst_put(mval *val)
 		 * (see comment in errorsp.h), an attempt to invoke a restart returns us back to the mdb_condition_handler created
 		 * by the initial dm-start. Unwinding from there returns to the OS -- i.e., the process silently dies.
 		 * Also note that we need to ensure the retry logic at the bottom of gvcst_put2 is executed in case a restart
-		 * happens within a trigger invocation. We want to return from gvtr_match_n_invoke so we can goto retry.
+		 * happens within a trigger invocation. We want to return from gvtr_match_n_invoke, so we can goto retry.
 		 */
 		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);
-		frame_pointer->flags |= SFF_IMPLTSTART_CALLD;
+		frame_pointer->flags |= SSF_NORET_VIA_MUMTSTART;
 		assert(!donot_INVOKE_MUMTSTART);
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		ESTABLISH_NORET(gvcst_put_ch, est_first_pass);

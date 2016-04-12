@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,9 @@
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
 #define MAX_TLSKEY_LEN			32
 #define MAX_FILTER_CMD_LEN		512
-#define MIN_JNLPOOL_SIZE		(1 * 1024 * 1024)
+#define DEFAULT_JNLPOOL_SIZE		(2 << 25)		/* 64MiB */
+#define MIN_JNLPOOL_SIZE		(2 << 19)		/* 1MiB */
+#define MAX_JNLPOOL_SIZE		0xFFFFFFF8LL		/* 4GiB - 8 == JNL_WRT_END_MASK */
 #define MAX_FREEZE_COMMENT_LEN		1024
 /* We need space in the journal pool to let other processes know which error messages should trigger anticipatory freeze.
  * Instead of storing them as a list, allocate one byte for each error message. Currently, the only piece of information
@@ -76,16 +79,18 @@ typedef enum
 	GTMSOURCE_NUM_STATES
 } gtmsource_state_t;
 
-#define GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT     5 /* seconds */
-#define GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN  (1000 - 1) /* ms */
-#define GTMSOURCE_WAIT_FOR_JNLOPEN              10 /* ms */
-#define GTMSOURCE_WAIT_FOR_JNL_RECS             1 /* ms */
-#define GTMSOURCE_WAIT_FOR_SRV_START		10 /* ms */
-#define GTMSOURCE_WAIT_FOR_MODE_CHANGE		(1000 - 1) /* ms, almost 1 sec */
-#define GTMSOURCE_WAIT_FOR_SHUTDOWN		(1000 - 1) /* ms, almost 1 sec */
-#define GTMSOURCE_WAIT_FOR_SOURCESTART		(1000 - 1) /* ms, almost 1 sec */
+#define	GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT	5 /* seconds */
+#define	GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN	(1000 - 1) /* ms */
+#define	GTMSOURCE_WAIT_FOR_JNLOPEN		10 /* ms */
+#define	LOG_WAIT_FOR_JNLOPEN_PERIOD		(50 * 1000) /* ms */
+#define	GTMSOURCE_WAIT_FOR_JNL_RECS		1 /* ms */
+#define	LOG_WAIT_FOR_JNL_RECS_PERIOD		(50 * 1000) /* ms */
+#define	GTMSOURCE_WAIT_FOR_SRV_START		10 /* ms */
+#define	GTMSOURCE_WAIT_FOR_MODE_CHANGE		(1000 - 1) /* ms, almost 1 sec */
+#define	GTMSOURCE_WAIT_FOR_SHUTDOWN		(1000 - 1) /* ms, almost 1 sec */
+#define	GTMSOURCE_WAIT_FOR_SOURCESTART		(1000 - 1) /* ms, almost 1 sec */
 #define	GTMSOURCE_WAIT_FOR_FIRSTHISTINFO	(1000 - 1) /* ms, almost 1 sec */
-#define LOG_WAIT_FOR_JNLOPEN_TIMES		5 /* Number of times the source logs wait_for_jnlopen */
+#define	LOG_WAIT_FOR_JNLOPEN_TIMES		5 /* Number of times the source logs wait_for_jnlopen */
 
 /* Wait for a max of 2 minutes on a single region database as all the source server shutdown
  * timeouts seen so far have been on a single region database. For multi-region databases, wait
@@ -179,9 +184,11 @@ typedef struct
 	char			freeze_comment[MAX_FREEZE_COMMENT_LEN];	/* Text explaining reason for freeze */
 	boolean_t		instfreeze_environ_inited;
 	unsigned char		merrors_array[MERRORS_ARRAY_SZ];
+	boolean_t		outofsync_core_generated;
 	/* Note: while adding fields to this structure, keep in mind that it needs to be 16-byte aligned so add filler bytes
 	 * as necessary
 	 */
+	char			filler_16bytealign[12];
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -280,6 +287,44 @@ enum
 	gtmsource_repl_send((repl_msg_ptr_t)&histrec_msg, "REPL_HISTREC", GTMSRCLCL->read_jnl_seqno, INVALID_SUPPL_STRM);	\
 }
 
+/* Macro for use before calling a routine (gtmsource_recv_ctl_nowait(), gtmsource_poll_actions()),
+ * directly or indirectly, which may cause a switch to a different state. For now we only care about
+ * occurrences which affect call paths through gtmsource_readfiles.
+ * We treat GTMSOURCE_SEARCHING_FOR_RESTART differently than other states, as there is some special
+ * handling to do. However, we only enter this state in gtmsource_recv_ctl() (which is called by
+ * gtmsource_recv_ctl_nowait()) when the prior state was GTMSOURCE_WAITING_FOR_XON, as is asserted
+ * there. Since we don't send transactions while in GTMSOURCE_WAITING_FOR_XON, we won't be in that
+ * state in gtmsource_readfiles, so it will never be the prior state. We assert this fact before
+ * saving the prior state here. Since GTMSOURCE_WAITING_FOR_XON was not the prior state at the
+ * points where we save it, we can skip checking for the GTMSOURCE_SEARCHING_FOR_RESTART state below.
+ * Similarly, repl_tls.renegotiate_state should not be REPLTLS_WAITING_FOR_RENEG_ACK while sending
+ * transactions, so assert the fact and skip saving this state.
+ */
+#define GTMSOURCE_SAVE_STATE(STATEVAR)							\
+MBSTART {										\
+	assert(GTMSOURCE_WAITING_FOR_XON != gtmsource_state);				\
+	assert(REPLTLS_WAITING_FOR_RENEG_ACK != repl_tls.renegotiate_state);		\
+	STATEVAR = gtmsource_state;							\
+} MBEND
+
+/* Macros for use in a test after calling a routine (gtmsource_recv_ctl_nowait(), gtmsource_poll_actions()),
+ * directly or indirectly, which may cause a switch to a different state.
+ * For now we only care about occurrences which affect call paths through gtmsource_readfiles.
+ * See above comments about GTMSOURCE_SEARCHING_FOR_RESTART and REPLTLS_WAITING_FOR_RENEG_ACK.
+ */
+#define GTMSOURCE_CHANGED_STATE(STATEVAR)	(((STATEVAR) != gtmsource_state) && ((STATEVAR) != GTMSOURCE_DUMMY_STATE))
+/* By "transitional" state here we mean a state which may result from the above mentioned
+ * routines when called while sending journal records which cause us to stop sending journal
+ * records.
+ */
+#define GTMSOURCE_IS_TRANSITIONAL_STATE()								\
+		((GTMSOURCE_CHANGING_MODE == gtmsource_state) 						\
+			|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)			\
+			|| (GTMSOURCE_WAITING_FOR_XON == gtmsource_state))
+#define GTMSOURCE_NOW_TRANSITIONAL(STATEVAR)								\
+		((GTMSOURCE_CHANGED_STATE(STATEVAR) && GTMSOURCE_IS_TRANSITIONAL_STATE())		\
+			GTMTLS_ONLY(|| (REPLTLS_WAITING_FOR_RENEG_ACK == repl_tls.renegotiate_state))	\
+		 	|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 /* The following structure contains data items local to one Source Server.
  * It is maintained in the journal pool to provide for persistence across
  * instantiations of the Source Server (due to crashes).
@@ -445,9 +490,10 @@ typedef struct
 	boolean_t	freezeval;	/* TRUE for -FREEZE=ON, FALSE for -FREEZE=OFF */
 	boolean_t	setcomment;	/* TRUE if -COMMENT was specified, FALSE otherwise */
 	boolean_t	jnlfileonly;	/* TRUE if -JNLFILEONLY was specified, FALSE otherwise */
+	boolean_t	zerobacklog;   	/* TRUE if -ZEROBACKLOG was specified, FALSE otherwise */
 	int4		cmplvl;
 	int4		shutdown_time;
-	int4		buffsize;
+	uint4		buffsize;
 	int4		mode;
 	int4		secondary_port;
 	uint4		src_log_interval;
@@ -486,6 +532,8 @@ int		gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_
 int		gtmsource_mode_change(int to_mode);
 int		gtmsource_poll_actions(boolean_t poll_secondary);
 int		gtmsource_process(void);
+void		gtmsource_recv_ctl(void);
+boolean_t	gtmsource_recv_ctl_nowait(void);
 int		gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
 int		gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at);
 int		gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags);
@@ -519,6 +567,7 @@ int		gtmsource_stop_jnl_release_timer(void);
 void		gtmsource_onln_rlbk_clnup(void);
 int		gtmsource_showfreeze(void);
 int		gtmsource_setfreeze(void);
+seq_num 	gtmsource_checkforbacklog(void);
 #ifdef GTM_TLS
 boolean_t	gtmsource_exchange_tls_info(void);
 #endif

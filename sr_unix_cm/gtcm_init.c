@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,13 +20,13 @@
 
 #include "mdef.h"
 
-#include <sys/types.h>
-#include <errno.h>
-#include <signal.h>
-
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_signal.h"
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"		/* for getpid() */
+
+#include <sys/types.h>
+#include <errno.h>
 
 #include "gtcm.h"
 #include "stp_parms.h"
@@ -106,10 +107,10 @@ void gtcm_init(int argc, char_ptr_t argv[])
 		save_errno = errno;
 		SPRINTF(msg, "Unable to detach %s from controlling tty", SRVR_NAME);
 		gtcm_rep_err(msg, save_errno);
-		exit(-1);
+		EXIT(-1);
 	}
 	else if (0 < pid)
-		exit(0);
+		EXIT(0);
 	(void) setpgrp();
 #	endif
 	/* Initialize logging */
@@ -145,7 +146,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 #	endif
 	/*  Initialize the process flags */
 	if (0 != gtcm_prsopt(argc, argv))
-		exit(-1);
+		EXIT(-1);
 	/* Write down pid into log file */
 	 OMI_DBG((omi_debug, "GTCM_SERVER pid : %d\n", omi_pid));
 	/* Initialize history mechanism */
@@ -163,7 +164,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	if ((maxfds = getmaxfds()) < 0)
 	{
 		gtcm_rep_err("Unable to get system resource limits", errno);
-		exit(errno);
+		EXIT(errno);
 	}
 	assert(SIZEOF(gtcm_ast_avail) == 2);	/* check that short is size 2 bytes as following code relies on that */
 	gtcm_ast_avail = (maxfds > MAXINT2) ? MAXINT2 : maxfds;
@@ -196,5 +197,5 @@ void gtcm_fail(int sig)
 	def.sa_handler = SIG_DFL;
 	(void) sigaction(SIGQUIT, &def, 0);
 	kill(getpid(),SIGQUIT);
-        exit(sig);
+        EXIT(sig);
 }

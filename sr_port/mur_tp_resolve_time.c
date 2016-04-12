@@ -1,6 +1,7 @@
 /****************************************************************
  *
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,12 +37,31 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 	int 		reg_total;
 	reg_ctl_list	*rctl, *rctl_top;
 	jnl_tm_t	reg_tp_resolve_time;
+	boolean_t	all_reg_before_image;
 
 	reg_total = murgbl.reg_total;
 	if (mur_options.forward)
 	{
-		if (!mur_options.verify)
+		if (mur_options.verify)
 		{
+			jgbl.mur_tp_resolve_time = 0; /* verify continues till the beginning of journal file */
+			return;
+		}
+		/* Determine if ALL journal files across ALL regions have before-image journaling ON.
+		 * If so, use the better tp_resolve_time calculation algorithm that takes into account
+		 * an idle/free EPOCH gets written. If not, we have to stick with a pessimistic calculation.
+		 */
+		all_reg_before_image = TRUE;
+		for (rctl = mur_ctl, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
+		{
+			if (!rctl->jctl->jfh->before_images)
+			{
+				all_reg_before_image = FALSE;
+				break;
+			}
+		}
+		if (!all_reg_before_image)
+		{	/* Use pessimistic calculation */
 			jgbl.mur_tp_resolve_time = mur_ctl[0].lvrec_time;
 			for (rctl = mur_ctl + 1, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
 			{
@@ -49,13 +69,18 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 					jgbl.mur_tp_resolve_time = rctl->lvrec_time;
 			}
 			assert(jgbl.mur_tp_resolve_time);
-		} else
-			jgbl.mur_tp_resolve_time = 0; /* verify continues till the beginning of journal file */
-		return;
+			return;
+		}
 	}
+	/* Use better tp_resolve_time calculation algorithm if all jnl files have BEFORE image journaling turned ON */
 	mur_sort_files();
 	jgbl.mur_tp_resolve_time = MAXUINT4;
 	assert(max_lvrec_time == mur_ctl[reg_total - 1].lvrec_time);
+	if ((FENCE_NONE == mur_options.fences) && !mur_options.since_time_specified && !murgbl.intrpt_recovery)
+	{
+		jgbl.mur_tp_resolve_time = max_lvrec_time;
+		return;
+	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
 	{
 		/* Assumption : It is guaranteed to see an EPOCH in every
@@ -76,9 +101,10 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 			reg_tp_resolve_time = rctl->lvrec_time;
 		if (reg_tp_resolve_time < jgbl.mur_tp_resolve_time)
 			jgbl.mur_tp_resolve_time = reg_tp_resolve_time;
-		assert(!mur_options.update || NULL != rctl->csd);
-		if (mur_options.update && rctl->recov_interrupted && rctl->csd->intrpt_recov_tp_resolve_time &&
-				rctl->csd->intrpt_recov_tp_resolve_time < jgbl.mur_tp_resolve_time)
+		assert(!mur_options.update || (NULL != rctl->csd));
+		if (!mur_options.forward && mur_options.update && rctl->recov_interrupted
+				&& rctl->csd->intrpt_recov_tp_resolve_time
+				&& (rctl->csd->intrpt_recov_tp_resolve_time < jgbl.mur_tp_resolve_time))
 			/* Previous backward recovery/rollback was interrupted.
 			 * Update tp_resolve_time to reflect the minimum of the previous and
 			 * 	current recovery/rollback's turn-around-points.
@@ -88,8 +114,7 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 			 * but before mur_back_process() which would have set csd->intrpt_recov_tp_resolve_time */
 			jgbl.mur_tp_resolve_time = rctl->csd->intrpt_recov_tp_resolve_time;
 	}
-	if (mur_options.since_time < jgbl.mur_tp_resolve_time)
+	if (!mur_options.forward && (mur_options.since_time < jgbl.mur_tp_resolve_time))
 		jgbl.mur_tp_resolve_time = (jnl_tm_t)mur_options.since_time;
-	if (FENCE_NONE == mur_options.fences && !mur_options.since_time_specified && !murgbl.intrpt_recovery)
-		jgbl.mur_tp_resolve_time = max_lvrec_time;
+	return;
 }

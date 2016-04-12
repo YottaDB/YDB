@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>             /* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"	/* needed for VSIG_ATOMIC_T */
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
@@ -107,9 +108,10 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	boolean_t	restore_lv, rollback_locks;
 	int		elemindx, rc;
 	lvTree		*lvt_child;
+	intrpt_state_t	prev_intrpt_state;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
-	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND);
+	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);
 	/* Unwind the requested TP levels */
 #	if defined(DEBUG_REFCNT) || defined(DEBUG_ERRHND)
 	DBGFPF((stderr, "\ntp_unwind: Beginning TP unwind process - reason: %d\n", invocation_type));
@@ -141,7 +143,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	restore_lv = (RESTART_INVOCATION == invocation_type);
 	assert((tp_sp <= tpstackbase) && (tp_sp > tpstacktop));
 	assert((tp_pointer <= (tp_frame *)tpstackbase) && (tp_pointer > (tp_frame *)tpstacktop));
-	for (tl = dollar_tlevel;  tl > newlevel;  --tl)
+	for (tl = dollar_tlevel; tl > newlevel; --tl)
 	{
 		DBGRFCT((stderr, "\ntp_unwind: Unwinding level %d -- tp_pointer: 0x"lvaddr"\n", tl, tp_pointer));
 		assertpro(NULL != tp_pointer);
@@ -174,8 +176,9 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 				if (0 != rc)
 				{
 					dollar_tlevel = tl;			/* Record fact if we unwound some tp_frames */
-					ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND); /* drive any MUPIP STOP/signals deferred
-										 * while in this function */
+					ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);	/* drive any MUPIP STOP
+													 * or signals deferred
+													 * while in this function */
 					TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 					INVOKE_RESTART;
 				}
@@ -252,8 +255,8 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			if (0 != rc)
 			{
 				dollar_tlevel = tl;			/* Record fact if we unwound some levels */
-				ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND);	/* drive any MUPIP STOP/signals deferred while
-									 * in this function */
+				ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state); /* drive any MUPIP STOP/signals
+											    * deferred while in this function */
 				TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 				INVOKE_RESTART;
 			}
@@ -300,7 +303,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	}
 	DBGRFCT((stderr, "tp_unwind: Processing complete\n"));
 	dollar_tlevel = newlevel;
-	ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND);	/* check if any MUPIP STOP/signals were deferred while in this function */
+	ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);/* drive any MUPIP STOP/signals deferred while in this function */
 }
 
 

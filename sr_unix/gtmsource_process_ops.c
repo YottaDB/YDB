@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +80,8 @@
 	REPL_SEND_LOOP(gtmsource_sock_fd, &LOGFILE_MSG, len, REPL_POLL_NOWAIT)				\
 	{												\
 		gtmsource_poll_actions(FALSE);								\
-		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)						\
+		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state)					\
+				|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))			\
 			return SS_NORMAL;								\
 	}												\
 }
@@ -178,12 +180,12 @@ int gtmsource_est_conn()
 		else
 			LONG_SLEEP_MSEC(hardtries_period);
 		gtmsource_poll_actions(FALSE);
-		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
 		gtmsource_comm_init();
 	} while (++connection_attempts < hardtries_count);
 	gtmsource_poll_actions(FALSE);
-	if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 		return (SS_NORMAL);
 
 	if (hardtries_count <= connection_attempts)
@@ -214,7 +216,7 @@ int gtmsource_est_conn()
 			}
 			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
 			gtmsource_poll_actions(FALSE);
-			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);
 			gtmsource_comm_init();
 			connection_attempts++;
@@ -431,7 +433,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		REPL_RECV_LOOP(gtmsource_sock_fd, &msg, MIN_REPL_MSGLEN, REPL_POLL_WAIT)
 		{
 			gtmsource_poll_actions(FALSE);
-			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);
 		}
 		DEBUG_ONLY(remote_side_endianness_known = remote_side->endianness_known);
@@ -457,7 +459,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			REPL_RECV_LOOP(gtmsource_sock_fd, buffp, remaining_len, REPL_POLL_WAIT)
 			{
 				gtmsource_poll_actions(FALSE);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+				if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 					return SS_NORMAL;
 			}
 			if (SS_NORMAL != status)
@@ -635,7 +637,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len, REPL_POLL_NOWAIT)
 			{
 				gtmsource_poll_actions(FALSE);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+				if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 					return (SS_NORMAL);
 			}
 			log_waitmsg = TRUE;	/* Wait for REPL_START_JNL_SEQNO or REPL_FETCH_RESYNC */
@@ -850,6 +852,7 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 	gtmsource_local_ptr_t	gtmsource_local;
 	seq_num			jnl_seqno, read_jnl_seqno;
 	qw_num			write_addr, read_addr;
+	gtmsource_state_t	gtmsource_state_sav;
 
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
@@ -928,11 +931,12 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				gtmsource_ctl_init();
 				gtmsource_pool2file_transition = FALSE;
 			}
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			total_tr_len = gtmsource_readfiles(buff, data_len, maxbufflen, read_multiple);
+			if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+				return (0);	/* Control message triggered mode change while reading files */
 			if (GTMSOURCE_SEND_NEW_HISTINFO == gtmsource_state)
 				return (0); /* need to send REPL_HISTREC message before sending any more seqnos */
-			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-				return (0);	/* Connection got reset in call to "gtmsource_readfiles" */
 			if (0 < total_tr_len)
 				return (total_tr_len);
 			assertpro(0 < *data_len);
@@ -1583,9 +1587,8 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 	assert(SIZEOF(needhistinfo_msg) == MIN_REPL_MSGLEN);
 	needhistinfo_msg.type = REPL_NEED_HISTINFO;
 	needhistinfo_msg.len = MIN_REPL_MSGLEN;
-	/* No need to initialize the following as needhistinfo_msg.histinfo_num will override those.
-	 *	needhistinfo_msg.seqno = ...
-	 */
+	needhistinfo_msg.seqno = seqno;	/* this is not essential but helps debugging the handshake as this gets logged in
+					 * the receiver log so initialize it */
 	for (idx = 1; idx < MAX_SUPPL_STRMS; idx++)
 	{
 		lcl_histinfo_num = local_histinfo.last_histinfo_num[idx];
@@ -1656,8 +1659,9 @@ void	gtmsource_histinfo_get(int4 index, repl_histinfo *histinfo)
 	}
 }
 
-/* Given two histinfo records (one each from the primary and secondary) corresponding to the seqno "jnl_seqno-1", this function
- * compares if the history information in both histinfo records is the same. If so, it returns TRUE else it returns FALSE.
+/* Given two histinfo records (one each from the primary and secondary), this function compares if the history information
+ * in both histinfo records are the same. If so, it returns TRUE; otherwise it returns FALSE. The jnl_seqno is only used for
+ * logging and should refer to the resync seqno we are checking. Logging is only performed if ok_to_log is TRUE.
  */
 boolean_t	gtmsource_is_histinfo_identical(repl_histinfo *remote_histinfo, repl_histinfo *local_histinfo,
 										seq_num jnl_seqno, boolean_t ok_to_log)
@@ -1770,7 +1774,7 @@ seq_num	gtmsource_find_resync_seqno(repl_histinfo *local_histinfo, repl_histinfo
 		}
 		assert(local_histinfo->start_seqno < max_start_seqno);
 		assert(remote_histinfo->start_seqno < max_start_seqno);
-	} while (!gtmsource_is_histinfo_identical(remote_histinfo, local_histinfo, max_start_seqno - 1, OK_TO_LOG_TRUE));
+	} while (!gtmsource_is_histinfo_identical(remote_histinfo, local_histinfo, max_start_seqno, OK_TO_LOG_TRUE));
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "Resync Seqno determined is %llu [0x%llx]\n",  max_start_seqno, max_start_seqno);
 	/* "max_start_seqno-1" has same histinfo info in both primary and secondary. Hence "max_start_seqno" is the resync seqno. */
 	return max_start_seqno;

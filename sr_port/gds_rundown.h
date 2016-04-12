@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +16,10 @@
 #ifdef UNIX
 int4 gds_rundown(void);
 
-#define CAN_BYPASS(SEMVAL, CANCELLED_TIMER, INST_IS_FROZEN)									   \
-	(((IS_GTM_IMAGE && csd->mumps_can_bypass) && !CANCELLED_TIMER && (PROC_FACTOR * (num_additional_processors + 1) < SEMVAL)) \
-	|| ((2 < SEMVAL) && (IS_LKE_IMAGE || IS_DSE_IMAGE)) || INST_IS_FROZEN)
+#define CAN_BYPASS(SEMVAL, CSD, INST_IS_FROZEN)										\
+	(INST_IS_FROZEN													\
+		|| (IS_GTM_IMAGE && CSD->mumps_can_bypass && (PROC_FACTOR * (num_additional_processors + 1) < SEMVAL))	\
+		|| (((2 * DB_COUNTER_SEM_INCR) < SEMVAL) && (IS_LKE_IMAGE || IS_DSE_IMAGE)))
 
 #define CANCEL_DB_TIMERS(region, csa, cancelled_timer, cancelled_dbsync_timer)	\
 {										\
@@ -25,7 +27,10 @@ int4 gds_rundown(void);
 	{									\
 		cancel_timer((TID)region);					\
 		if (NULL != csa->nl)						\
+		{								\
 			DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);	\
+			REMOVE_WT_PID(csa);					\
+		}								\
 		cancelled_timer = TRUE;						\
 		csa->timer = FALSE;						\
 	}									\

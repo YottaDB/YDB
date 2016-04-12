@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +36,7 @@ GBLREF connection_struct *curr_entry;
 void gtcml_lklist(void)
 {
 	cm_region_list *reg_ref, *gtcm_find_region();
-	unsigned char *ptr, regnum, laflag, list_len, i, translev, subcnt;
+	unsigned char *ptr, regnum, list_len, i, translev, subcnt;
 	unsigned short top,len;
 	mlk_pvtblk *new_entry;
 	mlk_pvtblk *inlist1, *inlist2;
@@ -43,8 +44,7 @@ void gtcml_lklist(void)
 
 	ptr = curr_entry->clb_ptr->mbf;
 	ptr++; /* hdr */
-	laflag = *ptr++;
-	laflag &= ~INCREMENTAL;
+	ptr++; /* laflag */
 	ptr++; /* transaction number */
 
 	list_len = *ptr++;

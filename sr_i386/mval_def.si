@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -41,34 +42,23 @@ mval_m_sublit		=	0x040
 mval_m_retarg		=	0x080
 mval_m_utflen		=	0x100
 mval_m_aliascont	=	0x200
-
-#smw 99/7/12 Now using MS VC 5.0 so the following paragraph should
-#		be replaced.
-#	NOTE:  The SCO C compiler pads out bit fields to the length of
-#	the underlying type.  For example, a series of "unsigned int"
-#	bit fields will be padded out to a multiple of 4 bytes, even if
-#	they require less than one byte total, because the underlying
-#	type is "int".  Similarly, a series of "unsigned short" bit
-#	fields will be padded out to a multiple of 2 bytes, and a
-#	series of "unsigned char" will be padded out to a byte boundary.
-#	Also note the padding is not related to alignment, only to
-#	total length.
-#
-#smw 99/10/19 gcc on Linux doesn't do the above
 #
 #	Length of mval in bytes
-mval_byte_len		=	24
-
+#
+mval_byte_len		=	32
+#
 #	Offsets of type, exp, strlen, stradd, num in mval structure
+#
 mval_w_mvtype		=	0
 mval_b_exp		=	2
-mval_l_strlen		=	16
-mval_a_straddr		=	20
-
+mval_l_strlen		=	24
+mval_a_straddr		=	28
+#
 #	Address offset of number in mval
-mvalnm_offs		=	4
-mval_l_m0		=	4
-mval_l_m1		=	8
+#
+mvalnm_offs		=	12
+mval_l_m0		=	12
+mval_l_m1		=	16
 mval_esign_mask		=	0x080
 
 MV_BIAS			=	1000		# 10**3

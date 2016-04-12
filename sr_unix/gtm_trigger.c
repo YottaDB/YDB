@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,7 @@
 
 #ifdef GTM_TRIGGER
 #define PREFIX_SPACE		" "
+#define EMBED_SOURCE_PARM	" -EMBED_SOURCE "
 #define ERROR_CAUSING_JUNK	"XX XX XX XX"
 #define NEWLINE			"\n"
 #define OBJECT_PARM		" -OBJECT="
@@ -173,16 +174,8 @@ error_def(ERR_TRIGTLVLCHNG);
 	}												\
 }
 
-#if defined(__hpux) && defined(__hppa)
-/* HPUX-HPPA (PA-RISC) has an undetermined space register corruption issue with nested triggers. This
- * same issue would likely exist with call-ins except call-ins uses the slower longjmp() method to return.
- * For this one platform, we adopt the longjmp() return method to avoid the problems.
- */
-void ci_ret_code(void);		/* Defined in gtmci.h but want to avoid pulling that into this module */
-#else
 /* All other platforms use this much faster direct return */
 void gtm_levl_ret_code(void);
-#endif
 STATICFNDEF int gtm_trigger_invoke(void);
 
 /* gtm_trigger - saves (some of) current environment, sets up new environment and drives a trigger.
@@ -260,7 +253,7 @@ CONDITION_HANDLER(gtm_trigger_ch)
 	 * always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
 	 * errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
 	 */
-	START_CH(TRUE);
+	START_CH(TRUE);	/* Note: "prev_intrpt_state" variable is defined/declared inside START_CH macro */
 	DBGTRIGR((stderr, "gtm_trigger_ch: Failsafe condition cond handler entered with SIGNAL = %d\n", SIGNAL));
 	if (DUMPABLE)
 		/* Treat fatal errors thusly */
@@ -271,7 +264,8 @@ CONDITION_HANDLER(gtm_trigger_ch)
 	}
 	mumps_status = SIGNAL;
 	/* We are about to no longer have a trigger stack frame and thus re-enter trigger no-mans-land */
-	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);
+	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state); /* relied upon by ENABLE_INTERRUPTS in "gtm_trigger_invoke" */
 	gtm_trigger_depth--;	/* Bypassing gtm_trigger_invoke() so do maint on depth indicator */
 	assert(0 <= gtm_trigger_depth);
 	/* Return back to gtm_trigger with error code */
@@ -281,17 +275,24 @@ CONDITION_HANDLER(gtm_trigger_ch)
 STATICFNDEF int gtm_trigger_invoke(void)
 {	/* Invoke trigger M routine. Separate so error returns to gtm_trigger with proper retcode */
 	int		rc;
+	intrpt_state_t	prev_intrpt_state;
 
 	ESTABLISH_RET(gtm_trigger_ch, mumps_status);
 	gtm_trigger_depth++;
 	DBGTRIGR((stderr, "gtm_trigger: Dispatching trigger at depth %d\n", gtm_trigger_depth));
 	assert(0 < gtm_trigger_depth);
 	assert(GTM_TRIGGER_DEPTH_MAX >= gtm_trigger_depth);
-	/* Allow interrupts to occur while the trigger is running */
-	ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+	/* Allow interrupts to occur while the trigger is running.
+	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
+	 * the corresponding DEFER_INTERRUPTS happened in "gtm_trigger" or a different call to "gtm_trigger_invoke"
+	 * (in both cases, a different function) so we have an assert there that the previous state was INTRPT_OK_TO_INTERRUPT
+	 * and use that instead of prev_intrpt_state here.
+	 */
+	ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, INTRPT_OK_TO_INTERRUPT);
 	rc = dm_start();
 	/* Now that we no longer have a trigger stack frame, we are back in trigger no-mans-land */
-	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);
+	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state); /* relied upon by ENABLE_INTERRUPTS in "gtm_trigger_invoke" above */
 	gtm_trigger_depth--;
 	DBGTRIGR((stderr, "gtm_trigger: Trigger returns with rc %d\n", rc));
 	REVERT;
@@ -308,7 +309,8 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
 	char		rtnname[GTM_PATH_MAX + 1], rtnname_template[GTM_PATH_MAX + 1];
 	char		objname[GTM_PATH_MAX + 1];
-	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)];
+	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
+				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
 	int		rtnfd, rc, lenrtnname, lenobjname, len, retry, save_errno;
 	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2, *zcomp_parms_ptr;
@@ -376,7 +378,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	do
 	{
 		strcpy(rtnname, rtnname_template);
-		rtnfd = mkstemp(rtnname);
+		MKSTEMP(rtnname, rtnfd);
 	} while ((-1 == rtnfd) && (EEXIST == errno) && (0 < --retry));
 	if (-1 == rtnfd)
 	{
@@ -432,10 +434,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	lenobjname = lenrtnname + STRLEN(OBJECT_FTYPE);
 	memcpy(zcomp_parms_ptr, objname, lenobjname);
 	zcomp_parms_ptr += lenobjname;
-	*zcomp_parms_ptr++ = ' ';
+	MEMCPY_LIT(zcomp_parms_ptr, EMBED_SOURCE_PARM);
+	zcomp_parms_ptr += SIZEOF(EMBED_SOURCE_PARM) - 1;
 	memcpy(zcomp_parms_ptr, rtnname, lenrtnname);
 	zcomp_parms_ptr += lenrtnname;
-	*zcomp_parms_ptr = '\0';		/* Null tail */
+	*zcomp_parms_ptr = '\0';
 	len = INTCAST(zcomp_parms_ptr - zcomp_parms);
 	assert((SIZEOF(zcomp_parms) - 1) > len);	/* Verify no overflow */
 	zcompprm.mvtype = MV_STR;
@@ -510,6 +513,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	symval		*new_symval;
 	uint4		dollar_tlevel_start;
 	stack_frame	*fp;
+	intrpt_state_t	prev_intrpt_state;
 
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(trigdsc);
@@ -538,30 +542,21 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
 			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
-		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);
+		assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state); /* relied upon by ENABLE_INTERRUPTS in "gtm_trigger_invoke" */
 		/* The current frame invoked a trigger. We cannot return to it for a TP restart or other reason unless
 		 * either the total operation (including trigger) succeeds and we unwind normally or unless the mpc is reset
 		 * (like what happens in various error or restart conditions) because right now it returns to where a database
 		 * command (KILL, SET or ZTRIGGER) was entered. Set flag in the frame to prevent MUM_TSTART unless the frame gets
 		 * reset.
 		 */
-		frame_pointer->flags |= SFF_IMPLTSTART_CALLD;	/* Do not return to this frame via MUM_TSTART */
-		DBGTRIGR((stderr, "gtm_trigger: Setting SFF_IMPLTSTART_CALLD in frame 0x"lvaddr"\n", frame_pointer));
+		frame_pointer->flags |= SSF_NORET_VIA_MUMTSTART;	/* Do not return to this frame via MUM_TSTART */
+		DBGTRIGR((stderr, "gtm_trigger: Setting SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", frame_pointer));
 		base_frame(trigdsc->rtn_desc.rt_adr);
 		/* Finish base frame initialization - reset mpc/context to return to us without unwinding base frame */
 		frame_pointer->type |= SFT_TRIGR;
-#		if defined(__hpux) && defined(__hppa)
-		/* For HPUX-HPPA (PA-RISC), we use longjmp() to return to gtm_trigger() to avoid some some space register
-		 * corruption issues. Use call-ins already existing mechanism for doing this. Although we no longer support
-		 * HPUX-HPPA for triggers due to some unlocated space register error, this code (effectively always ifdef'd
-		 * out) left in in case it gets resurrected in the future (01/2010 SE).
-		 */
-		frame_pointer->mpc = CODE_ADDRESS(ci_ret_code);
-		frame_pointer->ctxt = GTM_CONTEXT(ci_ret_code);
-#		else
 		frame_pointer->mpc = CODE_ADDRESS(gtm_levl_ret_code);
 		frame_pointer->ctxt = GTM_CONTEXT(gtm_levl_ret_code);
-#		endif
 		/* This base stack frame is also where we save environmental info for all triggers invoked at this stack level.
 		 * Subsequent triggers fired at this level in this trigger invocation need only reinitialize a few things but
 		 * can avoid "the big save".
@@ -767,9 +762,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			{       /* Unusual case of trigger that died in no-mans-land before trigger base frame established.
 				 * Remove the "do not return to me" flag only on non-error unwinds */
 				assert(tp_pointer->implicit_tstart);
-				assert(SFF_IMPLTSTART_CALLD & frame_pointer->flags);
-				frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF;
-				DBGTRIGR((stderr, "gtm_trigger: turning off SFF_IMPLTSTART_CALLD (1) in frame 0x"lvaddr"\n",
+				assert(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags);
+				frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
+				DBGTRIGR((stderr, "gtm_trigger: turning off SSF_NORET_VIA_MUMTSTART (1) in frame 0x"lvaddr"\n",
 					  frame_pointer));
 				DBGTRIGR((stderr, "gtm_trigger: unwinding no-base-frame trigger for TP restart\n"));
 			}
@@ -820,9 +815,9 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	{	/* Remove the "do not return to me" flag only on non-error unwinds. Note this flag may have already been
 		 * turned off by an earlier tp_restart if this is not an implicit_tstart situation.
 		 */
-		assert(!tp_pointer->implicit_tstart || (SFF_IMPLTSTART_CALLD & frame_pointer->flags));
-		frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF;
-		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SFF_IMPLTSTART_CALLD (2) in frame 0x"lvaddr"\n", frame_pointer));
+		assert(!tp_pointer->implicit_tstart || (SSF_NORET_VIA_MUMTSTART & frame_pointer->flags));
+		frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
+		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SSF_NORET_VIA_MUMTSTART(2) in frame 0x"lvaddr"\n", frame_pointer));
 	} else
 	{	/* Error unwind, make sure certain cleanups are done */
 #		ifdef DEBUG
@@ -851,17 +846,22 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	}
 	DBGTRIGR((stderr, "gtm_trigger: Unwound to trigger invoking frame: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
 		  frame_pointer, ctxt));
-	/* Re-allow interruptions now that our base frame is gone */
+	/* Re-allow interruptions now that our base frame is gone.
+	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
+	 * the corresponding DEFER_INTERRUPTS happened in "gtm_trigger" or "gtm_trigger_invoke"
+	 * (in both cases, a different function) so we have an assert there that the previous state was INTRPT_OK_TO_INTERRUPT
+	 * and use that instead of prev_intrpt_state here.
+	 */
 	if (forced_unwind)
 	{	/* Since we are being force-unwound, we don't know the state of things except that it it should be either
 		 * the state we set it to or the ok-to-interrupt state. Assert that and if we are changing the state,
 		 * be sure to run the deferred handler.
 		 */
 		assert((INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state) || (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state));
-		ENABLE_INTERRUPTS(intrpt_ok_state);
+		ENABLE_INTERRUPTS(intrpt_ok_state, INTRPT_OK_TO_INTERRUPT);
 	} else
 	{	/* Normal unwind should be ok with this macro */
-		ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+		ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, INTRPT_OK_TO_INTERRUPT);
 	}
 }
 

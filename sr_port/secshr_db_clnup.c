@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -345,6 +346,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	VMS_ONLY(assert(rundown_process_id);)
 	VMS_ONLY(process_id = rundown_process_id;)	/* used by the UNPIN_CACHE_RECORD macro */
 	is_exiting = (ABNORMAL_TERMINATION == secshr_state) || (NORMAL_TERMINATION == secshr_state);
+	if (GTM_PROBE(SIZEOF(*start_tn_addrs), start_tn_addrs, READ))
+		currtn = *start_tn_addrs;
+	else
+	{	/* init_secshr_addrs did not even complete before we got a terminating signal so no database actions to clean up */
+		assert(NULL == start_tn_addrs);
+		assert(is_exiting);
+		return;
+	}
 	if (GTM_PROBE(SIZEOF(*dollar_tlevel_addrs), dollar_tlevel_addrs, READ))
 		dlr_tlevel = *dollar_tlevel_addrs;
 	else
@@ -472,6 +481,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					{
 						if (-1 < cnl->wcs_timers) /* private flag is optimistic: dont overdo */
 							PROBE_DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
+						REMOVE_WT_PID(csa);
 						csa->timer = FALSE;
 					}
 					if (csa->read_write && csa->ref_cnt)
@@ -527,15 +537,17 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				cr_top = start_cr + max_bts;
 				if (is_exiting)
 				{
-					for (cr = start_cr;  cr < cr_top;  cr++)
-					{	/* walk the cache looking for incomplete writes and reads issued by self */
-						VMS_ONLY(
-							if ((0 == cr->iosb.cond) && (cr->epid == rundown_process_id))
-						        {
-								cr->shmpool_blk_off = 0;	/* Cut link to reformat blk */
-								cr->wip_stopped = TRUE;
-							}
-						)
+#					ifdef DEBUG
+					if (gtm_white_box_test_case_enabled && (reg == gd_header->regions)
+						&& (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number))
+					{
+						assert((NULL != TREF(block_now_locked))
+							&& ((TREF(block_now_locked))->r_epid == rundown_process_id));
+					}
+#					endif
+					if (NULL != (cr = TREF(block_now_locked)))	/* done by region to ensure access */
+					{	/* The following is potentially thread-specific rather than process-specific */
+						TREF(block_now_locked) = NULL;
 						SALVAGE_UNIX_LATCH(&cr->rip_latch, is_exiting);
 						if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty) && (0 == cr->in_cw_set))
 						{	/* increment cycle for blk number changes (for tp_hist) */
@@ -548,6 +560,16 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							 * for the buffer */
 						}
 					}
+#					ifdef VMS	/* though gone could potentially be an async I/O issue on other platforms */
+					for (cr = start_cr;  cr < cr_top;  cr++)
+					{	/* walk the cache looking for incomplete writes and reads issued by self */
+						if ((0 == cr->iosb.cond) && (cr->epid == rundown_process_id))
+					        {
+							cr->shmpool_blk_off = 0;	/* Cut link to reformat blk */
+							cr->wip_stopped = TRUE;
+						}
+					}
+#					endif
 				}
 			}
 			first_cw_set = cs = NULL;
@@ -696,17 +718,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					currtn = csd->trans_hist.curr_tn;
 				else
 				{
-					if (!tp_update_underway)
-					{
-						if (GTM_PROBE(SIZEOF(*start_tn_addrs), start_tn_addrs, READ))
-							currtn = *start_tn_addrs;
-						else
-						{
-							assert(FALSE);
-							/* dont know how this is possible, but in this case use curr db tn - 1 */
-							currtn = csd->trans_hist.curr_tn - 1;
-						}
-					} else
+					if (tp_update_underway)		/* otherwise currtn initialized above from start_tn_addrs */
 						currtn = si->start_tn;
 					assert(currtn < csd->trans_hist.curr_tn);
 				}

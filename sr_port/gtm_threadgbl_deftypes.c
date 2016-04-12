@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,21 +20,11 @@
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 #include <sys/time.h>
-#ifdef UNIX
-# include "gtm_un.h"
-#endif
-#ifdef VMS
-# include <descrip.h>		/* Required for gtmsource.h */
-# include <ssdef.h>
-# include <fab.h>
-# include "desblk.h"
-#endif
-#ifdef UNIX
-# include <glob.h>
-#endif
+#include "gtm_un.h"
+#include <glob.h>
+
 #include "cache.h"
 #include "hashtab_addr.h"
 #include "hashtab_int4.h"
@@ -76,6 +66,7 @@
 #include "zwrite.h"
 #include "zbreak.h"
 #include "fnpc.h"
+#include "utfcgr.h"
 #include "mmseg.h"
 #ifndef VMS
 # include "gtmsiginfo.h"
@@ -135,11 +126,9 @@
 # include "gtm_utf8.h"
 #endif
 
-#ifdef GTM_CRYPT
-# include "gtmcrypt.h"
-# include "gdsblk.h"
-# include "muextr.h"
-#endif
+#include "gtmcrypt.h"
+#include "gdsblk.h"
+#include "muextr.h"
 
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"

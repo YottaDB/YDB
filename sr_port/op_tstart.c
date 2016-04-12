@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,6 +108,9 @@ LITREF	mval			literal_null;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
+#ifdef DEBUG
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+#endif
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -148,6 +152,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(NULL == reorg_encrypt_restart_csa);
 	implicit_tstart = 0 != (implicit_flag & IMPLICIT_TSTART);
 	GTMTRIG_ONLY(implicit_trigger = 0 != (implicit_flag & IMPLICIT_TRIGGER_TSTART));
 	GTMTRIG_ONLY(assert(!implicit_trigger || (implicit_trigger && implicit_tstart)));
@@ -219,7 +224,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			 */
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG) UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_trigger_upgrade)));
 		}
-#		ifdef GTM_TRIGGER
 		else
 		{
 			/* This is an implicit TP wrap created for an explicit update. In such case, we do not want to reset
@@ -238,9 +242,8 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			 * kicking in at all.
 			 */
 			 /* recovery logic does not invoke triggers */
-			assert(!(SFF_IMPLTSTART_CALLD & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
+			assert(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
 		}
-#		endif
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
 		{	/* start with empty list, place all existing entries on free list */
 			tp_reg_list = tr_next = tr->fPtr;	/* Remove from queue */

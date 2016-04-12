@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,8 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF  sgm_info                *first_sgm_info;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	uint4			bml_save_dollar_tlevel;
 
 /* container for all the common chores that need to be performed on error conditions */
 
@@ -70,6 +72,19 @@ void preemptive_db_clnup(int preemptive_severe)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Clear "inctn_opcode" global variable now that any in-progress transaction is aborted at this point.
+	 * Not doing so would cause future calls to "t_end" to get confused and skip writing logical jnl recs
+	 * and instead incorrectly write an INCTN record (GTM-8425).
+	 */
+	if (bml_save_dollar_tlevel)
+	{
+		assert(!dollar_tlevel);
+		dollar_tlevel = bml_save_dollar_tlevel;
+		bml_save_dollar_tlevel = 0;
+	}
+	assert(!dollar_tlevel || (inctn_invalid_op == inctn_opcode) || (inctn_bmp_mark_free_gtm == inctn_opcode));
+	assert(dollar_tlevel || update_trans || (inctn_invalid_op == inctn_opcode));
+	inctn_opcode = inctn_invalid_op;
 	if (!dollar_tlevel && update_trans)
 	{	/* It's possible we hit an error in the middle of an update, at which point we have
 		 * a valid clue and non-NULL cse. However, this causes problems for subsequent
@@ -82,6 +97,8 @@ void preemptive_db_clnup(int preemptive_severe)
 			CLEAR_CSE(gv_target->gd_csa->dir_tree);
 			GTMTRIG_ONLY(CLEAR_CSE(gv_target->gd_csa->hasht_tree));
 		}
+		/* Resetting this is necessary to avoid blowing an assert in t_begin that it is 0 at the start of a transaction. */
+		update_trans = 0;
 	}
 	if (INVALID_GV_TARGET != reset_gv_target)
 	{

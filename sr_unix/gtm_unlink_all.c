@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +119,7 @@ void gtm_unlink_all(void)
 	{	/* [0] is not used (for some reason) */
 		rtnhdr = rtab->rt_adr;
 		if ((0 == strcmp(rtnhdr->routine_name.addr, GTM_DMOD)) || (0 == strcmp(rtnhdr->routine_name.addr, GTM_CIMOD)))
-		{	/* If the routine is GTM$DMOD or GTM$CIMOD, it is allocated in one chunk by make_*mode(). Release it in
+		{	/* If the routine is GTM$DMOD or GTM$CI, it is allocated in one chunk by make_*mode(). Release it in
 			 * one chunk too.
 			 */
 			GTM_TEXT_FREE(rtnhdr);

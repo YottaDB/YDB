@@ -61,6 +61,7 @@ error_def(ERR_ZINTRECURSEIO);
 #define TLSLABEL	"tls: { "
 #define COLONBRACKET	": { "
 #define BRACKETSSEMIS	" }; };"
+#define RENEGOTIATE	"RENEGOTIATE"
 
 typedef enum
 {
@@ -72,13 +73,15 @@ typedef enum
 
 void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg)
 {
-	int4			length, flags, timeout, msec_timeout, status, status2, len, errlen, devlen, tls_errno, save_errno;
+	int4			length, flags, timeout, msec_timeout, status, status2, len, devlen, tls_errno, save_errno;
+	int4			errlen, errlen2;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
-	char			optionstr[MAX_TLSOPTION], idstr[MAX_TLSID_LEN], passwordstr[GTM_PASSPHRASE_MAX_ASCII + 1];
-	const char		*errp;
-	char			*extrastr, *extraptr;
+	char			optionstr[MAX_TLSOPTION], idstr[MAX_TLSID_LEN + SIZEOF(RENEGOTIATE) + 1];
+	char			passwordstr[GTM_PASSPHRASE_MAX_ASCII + 1];
+	const char		*errp, *errp2;
+	char			*extrastr, *extraptr, *charptr;
 	tls_option		option;
 	gtm_tls_socket_t	*tlssocket;
 	ABS_TIME		cur_time, end_time;
@@ -152,9 +155,9 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 	length = MIN((SIZEOF(optionstr) - 1), optionmval->str.len);
 	lower_to_upper((uchar_ptr_t)optionstr, (uchar_ptr_t)optionmval->str.addr, length);
 	optionstr[length] = '\0';
-	if (0 == memcmp(optionstr, "CLIENT", length))
+	if (0 == memcmp(optionstr, "CLIENT", MIN(length, STRLEN("CLIENT"))))
 		option = tlsopt_client;
-	else if (0 == memcmp(optionstr, "SERVER", length))
+	else if (0 == memcmp(optionstr, "SERVER", MIN(length, STRLEN("SERVER"))))
 		option = tlsopt_server;
 	else if (0 == memcmp(optionstr, "RENEGOTIATE", length))
 		option = tlsopt_renegotiate;
@@ -319,7 +322,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 					save_errno = errno;
 					if (EAGAIN == save_errno)
 					{
-						rel_quant();	/* allow resources to become available */
+						rel_quant();	/* allow resources to become available - likely sb nanosleep */
 						status2 = 0;	/* treat as timeout */
 					} else if (EINTR == save_errno)
 						status2 = 0;
@@ -416,10 +419,87 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 				RTS_ERROR_LITERAL("not allowed when client"));
 			return;
 		}
-		/* TODO: allow verify-mode options in idstr but only 32 chars */
-		/* TODO: if anything in input buffer or ready to be read then error */
-		/* TODO: should we flush output buffer first */
-		status = gtm_tls_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket);
+		if ((0 < socketptr->buffered_length) || (0 < gtm_tls_cachedbytes((gtm_tls_socket_t *)socketptr->tlssocket)))
+		{	/* if anything in input buffer or ready to be read then error */
+			len = SIZEOF(ONE_COMMA) - 1;
+			memcpy(iod->dollar.device, ONE_COMMA, len);
+			errp = "unread input";
+			errlen = STRLEN(errp);
+			devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+			memcpy(&iod->dollar.device[len], errp, devlen + 1);
+			if (devlen < errlen)
+				iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+			if (socketptr->ioerror)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
+					ERR_TEXT, 2, errlen, errp);
+			if (NO_M_TIMEOUT != timeoutarg)
+				dollar_truth = FALSE;
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
+			return;
+		}
+		if (0 < socketptr->obuffer_length)
+		{	/* flush pending output */
+			iosocket_flush(iod);
+			if (0 < socketptr->obuffer_length)
+			{ /* get obuffer_error as additional ERR_TEXT */
+				len = SIZEOF(ONE_COMMA) - 1;
+				memcpy(iod->dollar.device, ONE_COMMA, len);
+				errp = "unable to flush pending output";
+				errlen = STRLEN(errp);
+				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+				memcpy(&iod->dollar.device[len], errp, devlen + 1);
+				len += devlen;
+				if (-1 == socketptr->obuffer_errno)
+					errp2 = gtm_tls_get_error();
+				else
+					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
+				errlen2 = STRLEN(errp2);
+				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen2);
+				memcpy(&iod->dollar.device[len], errp2, devlen + 1);
+				if (devlen < errlen2)
+					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				if (socketptr->ioerror)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
+						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
+				if (NO_M_TIMEOUT != timeoutarg)
+					dollar_truth = FALSE;
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
+				return;
+			}
+		}
+		if (NULL != extraarg)
+		{
+			length = extraarg->str.len;
+			if ('\0' == idstr[0])
+			{	/* create new section from initial tlsid -renegotiate */
+				charptr = ((gtm_tls_socket_t *)socketptr->tlssocket)->tlsid;
+				len = STRLEN(charptr);
+				assertpro(MAX_TLSID_LEN >= len);
+				STRNCPY_STR(idstr, charptr, MAX_TLSID_LEN);
+				STRNCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
+				len += SIZEOF(RENEGOTIATE);	/* null accounts for dash */
+				idstr[len] = '\0';
+			} else
+				len = STRLEN(idstr);
+			extrastr = malloc(length + 1 + SIZEOF(TLSLABEL) - 1 + len + SIZEOF(COLONBRACKET) - 1
+				+ SIZEOF(BRACKETSSEMIS) - 1);
+			STRNCPY_LIT(extrastr, TLSLABEL);
+			extraptr = extrastr + SIZEOF(TLSLABEL) - 1;
+			STRCPY(extraptr, idstr);
+			extraptr += len;
+			STRNCPY_LIT(extraptr, COLONBRACKET);
+			extraptr = extraptr + SIZEOF(COLONBRACKET) - 1;
+			STRNCPY_STR(extraptr, extraarg->str.addr, length);
+			extraptr += length;
+			STRNCPY_LIT(extraptr, BRACKETSSEMIS);
+			extraptr += SIZEOF(BRACKETSSEMIS) - 1;
+			*extraptr = '\0';
+		} else
+			extrastr = NULL;
+		status = gtm_tls_renegotiate_options((gtm_tls_socket_t *)socketptr->tlssocket, msec_timeout, idstr,
+				extrastr, (NULL != tlsid));
+		if (NULL != extrastr)
+			free(extrastr);
 		if (0 != status)
 		{
 			tls_errno = gtm_tls_errno();

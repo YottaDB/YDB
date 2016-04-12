@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,20 +26,13 @@ typedef struct
 
 #define CRYPT_CHKSYSTEM { if (!licensed) 			\
 			  {					\
-				if ((lkid & 4) == 4)		\
-				{				\
-					GTMASSERT;		\
-				}				\
+				assertpro((lkid & 4) != 4);	\
 				lkid++;				\
 			  }					\
 			}
 #if defined (DEBUG) || defined (NOLICENSE)
-#define LP_LICENSED(a,b,c,d,e,f,g,h,i,j)  1 /* equivalent to  SS$_NORMAL */
-#if defined (VMS)
-#define LP_ACQUIRE(a,b,c,d)  lp_id(d)
-#else
+#define LP_LICENSED(a,b,c,d,e,f,g,h,i,j)  1
 #define LP_ACQUIRE(a,b,c,d)  1
-#endif
 #define LP_CONFIRM(a,b)      1
 #else
 #define LP_LICENSED(a,b,c,d,e,f,g,h,i,j)  lp_licensed(a,b,c,d,e,f,g,h,i,j)

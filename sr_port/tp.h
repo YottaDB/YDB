@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -373,13 +374,6 @@ typedef struct gv_orig_key_struct
 	gv_key	gv_orig_key[DBKEYALLOC(MAX_KEY_SZ)];
 }gv_orig_key_array;
 
-GBLREF	block_id	t_fail_hist_blk[];
-GBLREF	gd_region	*tp_fail_hist_reg[];
-GBLREF	gv_namehead	*tp_fail_hist[];
-GBLREF	int4		tp_fail_n;
-GBLREF	int4		tp_fail_level;
-GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
-
 #define TRANS_RESTART_HIST_ARRAY_SZ	512 /* See comment (6) in gtm_threadgbl_defs.h as to why this is not inside #ifdef DEBUG */
 #ifdef DEBUG
 /* The following structure stores information pertaining to the most recent invocation of t_retry OR tp_restart. Maintain a 512
@@ -432,6 +426,9 @@ typedef struct trans_restart_hist_struct
 
 #define TP_TRACE_HIST(X, Y) 										\
 {													\
+	GBLREF	gd_region	*tp_fail_hist_reg[];							\
+	GBLREF	gv_namehead	*tp_fail_hist[];							\
+	GBLREF	block_id	t_fail_hist_blk[];							\
 	DCL_THREADGBL_ACCESS;										\
 													\
 	SETUP_THREADGBL_ACCESS;										\
@@ -440,24 +437,6 @@ typedef struct trans_restart_hist_struct
 		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X); 						\
 		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL);	\
-	}												\
-}
-
-#define TP_TRACE_HIST_MOD(X, Y, N, CSD, HISTTN, BTTN, LEVEL)						\
-{													\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	if (TREF(tprestart_syslog_delta))								\
-	{												\
-		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
-		t_fail_hist_blk[t_tries] = ((block_id)X);						\
-		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL); 	\
-		(CSD)->tp_cdb_sc_blkmod[(N)]++;								\
-		tp_fail_n = (N);									\
-		tp_fail_level = (LEVEL);								\
-		tp_fail_histtn[t_tries] = (HISTTN);							\
-		tp_fail_bttn[t_tries] = (BTTN);								\
 	}												\
 }
 
@@ -959,3 +938,11 @@ boolean_t	tp_tend(void);
 boolean_t	tp_crit_all_regions(void);
 
 #endif
+
+#define	GVNAME_UNKNOWN		"*BITMAP"
+#define GVNAME_DIRTREE		"*DIR"
+
+static readonly char		gvname_unknown[] = GVNAME_UNKNOWN;
+static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
+static readonly char		gvname_dirtree[] = GVNAME_DIRTREE;
+static readonly int4		gvname_dirtree_len = STR_LIT_LEN(GVNAME_DIRTREE);

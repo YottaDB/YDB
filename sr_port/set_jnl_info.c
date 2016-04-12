@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +26,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "min_max.h"		/* for JNL_MAX_RECLEN macro */
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF 	jnl_gbls_t	jgbl;
 DEBUG_ONLY(GBLREF	boolean_t	mupip_jnl_recover;)
@@ -54,15 +53,13 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	/* note that csd->jnl_deq can be 0 since a zero journal extension size is accepted */
 	jnl_info->status = jnl_info->status2 = SS_NORMAL;
 	jnl_info->no_rename = jnl_info->no_prev_link = FALSE;
-	UNIX_ONLY(
-		if ((JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE) > csd->alignsize)
-		{	/* Possible due to the smaller JNL_MIN_ALIGNSIZE used in previous (pre-V60000) versions
-			 * as opposed to the current alignsize of 2MB. Fix fileheader to be
-			 * at least minimum (i.e. an on-the-fly upgrade of the db file header).
-			 */
-			csd->alignsize = (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE);
-		}
-	)
+	if ((JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE) > csd->alignsize)
+	{	/* Possible due to the smaller JNL_MIN_ALIGNSIZE used in previous (pre-V60000) versions
+		 * as opposed to the current alignsize of 2MB. Fix fileheader to be
+		 * at least minimum (i.e. an on-the-fly upgrade of the db file header).
+		 */
+		csd->alignsize = (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE);
+	}
 	jnl_info->alignsize = csd->alignsize;
 	jnl_info->before_images = csd->jnl_before_image;
 	jnl_info->buffer = csd->jnl_buffer_size;
@@ -79,15 +76,13 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	assert(JNL_ALLOWED(jnl_info));
 	jnl_info->repl_state = csd->repl_state;
 	JNL_MAX_RECLEN(jnl_info, csd);
-	UNIX_ONLY(
-		if (JNL_ALLOC_MIN > csd->jnl_alq)
-		{	/* Possible if a pre-V54001 journaled db (which allows allocation values as low as 10) is used
-			 * with V54001 and higher (where minimum allowed allocation value is 200). Fix fileheader to be
-			 * at least minimum (an on-the-fly upgrade of the db file header).
-			 */
-			csd->jnl_alq = JNL_ALLOC_MIN;
-		}
-	)
+	if (JNL_ALLOC_MIN > csd->jnl_alq)
+	{	/* Possible if a pre-V54001 journaled db (which allows allocation values as low as 10) is used
+		 * with V54001 and higher (where minimum allowed allocation value is 200). Fix fileheader to be
+		 * at least minimum (an on-the-fly upgrade of the db file header).
+		 */
+		csd->jnl_alq = JNL_ALLOC_MIN;
+	}
 	jnl_info->alloc = csd->jnl_alq;
 	jnl_info->extend = csd->jnl_deq;
 	/* ensure autoswitchlimit is aligned to the nearest extension boundary
@@ -113,7 +108,5 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	jnl_info->blks_to_upgrd = csd->blks_to_upgrd; /* will be copied over to EPOCH record in newly created journal */
 	jnl_info->free_blocks   = csd->trans_hist.free_blocks; /* will be copied over to EPOCH record in newly created journal */
 	jnl_info->total_blks    = csd->trans_hist.total_blks; /* will be copied over to EPOCH record in newly created journal */
-	GTMCRYPT_ONLY(
-		GTMCRYPT_COPY_HASH(csd, jnl_info);
-	)
+	GTMCRYPT_COPY_ENCRYPT_SETTINGS(csd, jnl_info);
 }

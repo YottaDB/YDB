@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,11 +28,7 @@
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 
-#if defined(UNIX)
 multi_struct *mur_token_lookup(token_num token, off_jnl_t rec_time, enum rec_fence_type fence)
-#elif defined(VMS)
-multi_struct *mur_token_lookup(token_num token, int4 image_count, off_jnl_t rec_time, enum rec_fence_type fence)
-#endif
 {
 	ht_ent_int8	*tabent;
 	multi_struct 	*multi;
@@ -46,7 +43,7 @@ multi_struct *mur_token_lookup(token_num token, int4 image_count, off_jnl_t rec_
 		}
 		for (multi = (multi_struct *)tabent->value; NULL != multi; multi = (multi_struct *)multi->next)
 		{
-			if (VMS_ONLY(multi->image_count == image_count &&) ((ZTPFENCE == fence) || (multi->time == rec_time)))
+			if ((ZTPFENCE == fence) || (multi->time == rec_time))
 				return multi;
 		}
 	}

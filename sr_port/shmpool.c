@@ -97,7 +97,6 @@ void shmpool_buff_init(gd_region *reg)
 	{	/* For each buffer in the pool (however many there are) */
 		sblkh_p->blktype = SHMBLK_FREE;
 		sblkh_p->valid_data = FALSE;
-		VMS_ONLY(sblkh_p->image_count = -1);
 		insqt(&sblkh_p->sm_que, (que_ent_ptr_t)&sbufh_p->que_free);
 		++sbufh_p->free_cnt;
 	}
@@ -217,7 +216,6 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 				/* Finish initializing block for return and queue to local queue to keep track of it */
 				sblkh_p->blktype = blktype;
 				sblkh_p->holder_pid = process_id;
-				VMS_ONLY(sblkh_p->image_count = image_count);
 				assert(FALSE == sblkh_p->valid_data); /* cleared when blocok was freed .. should still be free */
 				VMS_ONLY(if (SHMBLK_BACKUP == blktype))
 				{
@@ -290,14 +288,12 @@ void shmpool_blk_free(gd_region *reg, shmpool_blk_hdr_ptr_t sblkh_p)
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
 	/* Make sure we have lock coming in */
-	assert(sbufh_p->shmpool_crit_latch.u.parts.latch_pid == process_id
-	       VMS_ONLY(&& sbufh_p->shmpool_crit_latch.u.parts.latch_image_count == image_count));
+	assert(sbufh_p->shmpool_crit_latch.u.parts.latch_pid == process_id);
 	/* Verify queue only *AFTER* have the lock */
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
 	assert(VMS_ONLY(SHMBLK_REFORMAT == sblkh_p->blktype ||) SHMBLK_BACKUP == sblkh_p->blktype);
 	sblkh_p->holder_pid = 0;
 	sblkh_p->valid_data = FALSE;
-	VMS_ONLY(sblkh_p->image_count = -1);
 	sblkh_p2 = (shmpool_blk_hdr_ptr_t)remqt((que_ent_ptr_t)((char_ptr_t)sblkh_p + sblkh_p->sm_que.fl));
 	assert(sblkh_p2 == sblkh_p);	/* Check we dequ'd the element we want */
 	DEBUG_ONLY(sblkh_p->sm_que.fl = 0; sblkh_p->sm_que.bl = 0);
@@ -433,8 +429,7 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
 	/* Note we must hold the shmpool latch *before* calling this routine */
-	assert(process_id == sbufh_p->shmpool_crit_latch.u.parts.latch_pid
-	       VMS_ONLY(&& sbufh_p->shmpool_crit_latch.u.parts.latch_image_count == image_count));
+	assert(process_id == sbufh_p->shmpool_crit_latch.u.parts.latch_pid);
 	/* This check only runs a maximum of once every N block allocations where N is the
 	   number of blocks in this buffer pool.
 	*/
@@ -464,7 +459,6 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 			sblkh_p->holder_pid = 0;
 			sblkh_p->valid_data = FALSE;
 			sblkh_p->blktype = SHMBLK_FREE;
-			VMS_ONLY(sblkh_p->image_count = -1);
 			insqt(&sblkh_p->sm_que, &sbufh_p->que_free);
 			++sbufh_p->free_cnt;
 		} else if (SHMBLK_BACKUP == sblkh_p->blktype)
@@ -510,10 +504,8 @@ boolean_t shmpool_lock_hdr(gd_region *reg)
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{	/* We better not hold it if trying to get it */
-			assert(latch->u.parts.latch_pid != process_id
-			       VMS_ONLY(|| latch->u.parts.latch_image_count != image_count));
-
-                        if (GET_SWAPLOCK(latch))
+			assert(latch->u.parts.latch_pid != process_id);
+			if (GET_SWAPLOCK(latch))	/* seems this lock can be either short or long - two different forms? */
 			{
 				DEBUG_ONLY(locknl = csa->nl);
 				LOCK_HIST("OBTN", latch, process_id, retries);
@@ -558,7 +550,7 @@ boolean_t shmpool_lock_hdr_nowait(gd_region *reg)
 	latch = &sbufh_p->shmpool_crit_latch;
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	/* We better not hold it if trying to get it */
-	assert(latch->u.parts.latch_pid != process_id VMS_ONLY(|| latch->u.parts.latch_image_count != image_count));
+	assert(latch->u.parts.latch_pid != process_id);
 	if (GET_SWAPLOCK(latch))
 	{
 		DEBUG_ONLY(locknl = csa->nl);
@@ -589,7 +581,7 @@ void shmpool_unlock_hdr(gd_region *reg)
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
 	latch = &sbufh_p->shmpool_crit_latch;
-	assert(process_id == latch->u.parts.latch_pid VMS_ONLY(&& image_count == latch->u.parts.latch_image_count));
+	assert(process_id == latch->u.parts.latch_pid);
 	/* Quickly check if our counters are as we expect them to be. If not see if we need to run
 	   our recovery procedure (shmpool_blk_abandoned_chk()).
 	*/

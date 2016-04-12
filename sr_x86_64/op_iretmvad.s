@@ -25,9 +25,9 @@ ENTRY	op_iretmvad
 	addq    $8, REG_SP		# Burn return PC and 16 byte align stack
 	subq	$16, REG_SP		# Bump stack for 16 byte alignment and a save area
 	CHKSTKALIGN			# Verify stack alignment
-	movq	REG64_RET1, 0(REG_SP)
+	movq	REG64_RET1, 0(REG_SP)	# Save input mval* value across call to op_unwind
 	call	op_unwind
-	movq	0(REG_SP), REG64_RET0	# Return input parameter
+	movq	0(REG_SP), REG64_RET0	# Return input parameter via REG64_RET0
 	addq	$16, REG_SP		# Unwind C frame save area
 	getframe			# Pick up new stack frame regs & push return addr
 	ret

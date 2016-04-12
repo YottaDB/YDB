@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -202,7 +202,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 			sym1 = sym;
 			sym = sym->next;
 		}
-		if (!cmp && sym)
+		if (sym && !cmp)
 			return sym;
 	} else
 	{	/* Hashtable lookup  */

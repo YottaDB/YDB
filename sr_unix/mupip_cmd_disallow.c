@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2002-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +39,27 @@ boolean_t cli_disallow_mupip_backup(void)
 	disallow_return_value = d_c_cli_present("REPLICATION.OFF");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("REPLICATION.ON") && d_c_cli_negated("NEWJNLFILES"));
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}
+
+boolean_t cli_disallow_mupip_crypt(void)
+{
+	int disallow_return_value = 0;
+
+	*cli_err_str_ptr = 0;
+	disallow_return_value = !d_c_cli_present("DECRYPT") || !d_c_cli_present("FILE")
+		|| !d_c_cli_present("OFFSET") || !d_c_cli_present("LENGTH");
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}
+
+boolean_t cli_disallow_mupip_extract(void)
+{
+	int disallow_return_value = 0;
+
+	*cli_err_str_ptr = 0;
+	disallow_return_value = d_c_cli_present("NULL_IV") && !d_c_cli_present("BINARY");
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -102,16 +124,18 @@ boolean_t cli_disallow_mupip_journal(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("LOOKBACK_LIMIT") && d_c_cli_present("FORWARD");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("REDIRECT") && !d_c_cli_present("RECOVER");
-	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("CHECKTN") && d_c_cli_present("BACKWARD");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("RESYNC") && d_c_cli_present("FETCHRESYNC");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  (d_c_cli_present("RESYNC") || d_c_cli_present("FETCHRESYNC"))
+	disallow_return_value =  (d_c_cli_present("RESYNC") || d_c_cli_present("FETCHRESYNC") || d_c_cli_present("ONLINE"))
 					&& !d_c_cli_present("ROLLBACK");
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("FETCHRESYNC") || d_c_cli_present("ONLINE")) && d_c_cli_present("FORWARD");
+	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("RSYNC_STRM") && !d_c_cli_present("RESYNC");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("RSYNC_STRM") && d_c_cli_present("FORWARD");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("LOSTTRANS") && !(d_c_cli_present("RECOVER")
 									|| d_c_cli_present("ROLLBACK")
@@ -120,8 +144,6 @@ boolean_t cli_disallow_mupip_journal(void)
 	disallow_return_value =  d_c_cli_present("BROKENTRANS") && !(d_c_cli_present("RECOVER")
 									|| d_c_cli_present("ROLLBACK")
 									|| d_c_cli_present("EXTRACT"));
-	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("FORWARD") && d_c_cli_present("ROLLBACK");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("FULL") && (d_c_cli_present("RECOVER") || d_c_cli_present("ROLLBACK"));
 	CLI_DIS_CHECK_N_RESET;
@@ -145,15 +167,11 @@ boolean_t cli_disallow_mupip_journal(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("REDIRECT") && !d_c_cli_present("RECOVER");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("REDIRECT") && !d_c_cli_present("FORWARD");
+	disallow_return_value =  d_c_cli_present("REDIRECT") && d_c_cli_present("BACKWARD");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("BACKWARD") && d_c_cli_negated("CHAIN");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("CHECKTN") && d_c_cli_present("BACKWARD");
-	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("ROLLBACK") && (d_c_cli_present("AFTER")
-									|| d_c_cli_present("BEFORE")
-									|| d_c_cli_present("SINCE")
 									|| d_c_cli_present("LOOKBACK_LIMIT"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  (d_c_cli_present("GLOBAL")
@@ -162,8 +180,6 @@ boolean_t cli_disallow_mupip_journal(void)
 					|| d_c_cli_present("TRANSACTION")) && (d_c_cli_present("RECOVER")
 										|| d_c_cli_present("ROLLBACK")
 										|| d_c_cli_present("VERIFY"));
-	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  (d_c_cli_present("ONLINE") && !d_c_cli_present("ROLLBACK"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -174,6 +190,7 @@ boolean_t cli_disallow_mupip_reorg(void)
 
 	*cli_err_str_ptr = 0;
 	disallow_return_value = (d_c_cli_present("SELECT")
+				|| d_c_cli_present("ENCRYPT")
 				|| d_c_cli_present("EXCLUDE")
 				|| d_c_cli_present("FILL_FACTOR")
 				|| d_c_cli_present("INDEX_FILL_FACTOR")
@@ -191,6 +208,18 @@ boolean_t cli_disallow_mupip_reorg(void)
 				|| d_c_cli_present("STARTBLK")
 				|| d_c_cli_present("STOPBLK")) && !(d_c_cli_present("UPGRADE")
 									|| d_c_cli_present("DOWNGRADE"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("DOWNGRADE")
+				|| d_c_cli_present("EXCLUDE")
+				|| d_c_cli_present("FILL_FACTOR")
+				|| d_c_cli_present("INDEX_FILL_FACTOR")
+				|| d_c_cli_present("RESUME")
+				|| d_c_cli_present("SELECT")
+				|| d_c_cli_present("TRUNCATE")
+				|| d_c_cli_present("UPGRADE")
+				|| d_c_cli_present("USER_DEFINED_REORG")) && d_c_cli_present("ENCRYPT");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("ENCRYPT") && !d_c_cli_present("REGION");
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -226,8 +255,9 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 
 	*cli_err_str_ptr = 0;
 
-	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW or NAME */
-	disallow_return_value = !(d_c_cli_present("CHANGE") || d_c_cli_present("SHOW") || d_c_cli_present("NAME"));
+	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW or NAME or QDBRUNDOWN */
+	disallow_return_value = !(d_c_cli_present("CHANGE") || d_c_cli_present("SHOW") || d_c_cli_present("NAME")
+					|| (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
 	CLI_DIS_CHECK_N_RESET;
 	/* CHANGE and SHOW are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("SHOW"));
@@ -235,8 +265,14 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 	/* CHANGE and NAME are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("NAME"));
 	CLI_DIS_CHECK_N_RESET;
+	/* CHANGE and QDBRUNDOWN are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("CHANGE") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
+	CLI_DIS_CHECK_N_RESET;
 	/* SHOW and NAME are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("SHOW") && d_c_cli_present("NAME"));
+	CLI_DIS_CHECK_N_RESET;
+	/* SHOW and QDBRUNDOWN are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("SHOW") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
 	CLI_DIS_CHECK_N_RESET;
 	/* OFFSET, SIZE and VALUE is compatible only with CHANGE */
 	disallow_return_value = (!d_c_cli_present("CHANGE")

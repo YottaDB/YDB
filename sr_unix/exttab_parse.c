@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -440,7 +441,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		/* Environment variable for the package not found */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 	}
-	ext_table_file_handle = Fopen(ext_table_file_name, "r");
+	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (NULL == ext_table_file_handle)
 	{
 		/* Package's external call table could not be found */
@@ -700,7 +701,7 @@ callin_entry_list* citab_parse (void)
 	if (!ext_table_file_name) /* environment variable not set */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
 
-	ext_table_file_handle = Fopen(ext_table_file_name, "r");
+	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
 			  ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);

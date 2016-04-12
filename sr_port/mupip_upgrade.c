@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,6 +128,7 @@ void mupip_upgrade(void)
 	db_fn_len = SIZEOF(db_fn);
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
+	db_fn_len = MIN(db_fn_len, MAX_FN_LEN);
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
 	if (!mu_upgrd_dngrd_confirmed())
 	{

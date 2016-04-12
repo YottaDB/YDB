@@ -12,6 +12,7 @@
 
 /* gtm_logicals.h - Environment variables used by GT.M. */
 /* within each group, the entries are in alpha order of the third column */
+/* Warning: A consideration is that reordering these values reorders the output in v53003/D9I10002703 as well */
 /* -------------------------- Common to UNIX and VMS --------------------------  */
 
 #define	GTM_DIST_LOG			"$gtm_dist"
@@ -29,7 +30,9 @@
 #define	GTM_TP_ALLOCATION_CLUE		"$gtm_tp_allocation_clue"
 #define	GTM_TPNOTACIDTIME		"$gtm_tpnotacidtime"
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"
-#define	GTM_TPRESTART_LOG_LIMIT		"$gtm_tprestart_log_first"
+#define	GTM_TPRESTART_LOG_FIRST		"$gtm_tprestart_log_first"
+#define GTM_NONTPRESTART_LOG_DELTA	"$gtm_nontprestart_log_delta"
+#define	GTM_NONTPRESTART_LOG_FIRST	"$gtm_nontprestart_log_first"
 #define	GTM_ZMAXTPTIME			"$gtm_zmaxtptime"
 /* 	GTM_DIRTREE_COLLHDR_ALWAYS	"$gtm_dirtree_collhdr_always"	dbg-only use in gvcst_put hence no #define for it or
 									else the D9I10002703 subtest will need changes for this.
@@ -134,3 +137,7 @@
 #define GTM_MAX_STORALLOC		"$gtm_max_storalloc"
 #define GTM_IPV4_ONLY			"$gtm_ipv4_only"
 #define GTM_DMTERM			"$gtm_dmterm"
+#define	GTM_MUPJNL_PARALLEL		"$gtm_mupjnl_parallel"
+#define GTM_LOCALE			"$gtm_locale"
+#define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
+#define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"

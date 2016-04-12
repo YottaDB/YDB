@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002  Fidelity Information Services, Inc*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +49,8 @@
 #include "anticipatory_freeze.h"
 #include "wcs_recover.h"
 #include "wbox_test_init.h"
+#include "getzposition.h"
+#include "process_reorg_encrypt_restart.h"
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
@@ -55,6 +58,7 @@
 #include "gvcst_protos.h"
 #include "gtmimagename.h"
 #include "caller_id.h"
+#include "mupip_reorg_encrypt.h"
 #endif
 #ifdef DEBUG
 #include "repl_msg.h"
@@ -70,9 +74,11 @@
 			     && !redo_root_search_done					\
 			     && !TREF(in_gvcst_redo_root_search)			\
 			     && !mu_reorg_upgrd_dwngrd_in_prog				\
+			     && !mu_reorg_encrypt_in_prog				\
 			     && (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)	\
 			)
 
+GBLREF	boolean_t		caller_id_flag;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	short			crash_count;
@@ -85,11 +91,17 @@ GBLREF	trans_num		start_tn;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_dollar_incr;
 GBLREF	uint4			update_trans;
+GBLREF	block_id		t_fail_hist_blk[];
+GBLREF	int4			blkmod_fail_type;
+GBLREF	int4			blkmod_fail_level;
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
@@ -99,6 +111,7 @@ GBLDEF	unsigned char		t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
 GBLDEF	unsigned int		t_tries_dbg;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	uint4			process_id;
 #endif
 
 #ifdef UNIX
@@ -108,16 +121,15 @@ GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	jnlpool_addrs		jnlpool;
 #endif
 
-#ifdef UNIX
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVFAILCORE);
 error_def(ERR_REPLONLNRLBK);
-#endif
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVINCRFAIL);
 error_def(ERR_GVIS);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_TPRETRY);
+error_def(ERR_NONTPRESTART);
 
 void t_retry(enum cdb_sc failure)
 {
@@ -133,6 +145,9 @@ void t_retry(enum cdb_sc failure)
 	boolean_t		skip_invoke_restart;
 	boolean_t		redo_root_search_done = FALSE;
 	unsigned int		local_t_tries;
+	mstr			gvname_mstr, reg_mstr;
+	gd_region		*restart_reg;
+	mval			t_restart_entryref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -178,7 +193,7 @@ void t_retry(enum cdb_sc failure)
 		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, failure);	/* set wc_blocked if cache related status */
 		TREF(prev_t_tries) = t_tries;
 		TREF(rlbk_during_redo_root) = FALSE;
-		switch(t_tries)
+		switch (t_tries)
 		{
 			case 0:
 				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_0, 1);
@@ -196,6 +211,59 @@ void t_retry(enum cdb_sc failure)
 		}
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
+		if (TREF(nontprestart_log_delta) && (((TREF(nontprestart_count))++ < TREF(nontprestart_log_first)) ||
+		    (0 == ((TREF(nontprestart_count) - TREF(nontprestart_log_first)) % TREF(nontprestart_log_delta)))))
+		{
+			if (csa->dir_tree == gv_target)
+			{
+				gvname_mstr.addr = (char *)gvname_dirtree;
+				gvname_mstr.len = gvname_dirtree_len;
+			}
+			else if (NULL != gv_target)
+			{
+				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buff[MAX_ZWR_KEY_SZ - 1];
+				assert(buff[0] == '^');
+				/* ^ is in the error message itself so increase the head pointer by 1 below */
+				gvname_mstr.addr = (char*)(buff + 1);
+				gvname_mstr.len = end - buff - 1;
+			} else
+			{
+				gvname_mstr.addr = (char *)gvname_unknown;
+				gvname_mstr.len = gvname_unknown_len;
+			}
+			assert(gvname_mstr.len != 0);
+			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
+			restart_reg = gv_cur_region;
+			if (NULL != restart_reg)
+			{
+				reg_mstr.len = restart_reg->dyn.addr->fname_len;
+				reg_mstr.addr = (char *)restart_reg->dyn.addr->fname;
+			} else
+			{
+				reg_mstr.len = 0;
+				reg_mstr.addr = NULL;
+			}
+			if (IS_GTM_IMAGE)
+				getzposition(&t_restart_entryref);
+			else
+			{
+				t_restart_entryref.mvtype = MV_STR;
+				t_restart_entryref.str.addr = NULL;
+				t_restart_entryref.str.len = 0;
+			}
+			assert(('L' != t_fail_hist[t_tries]) || (0 != t_fail_hist_blk[t_tries]));
+			if (cdb_sc_blkmod != failure)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
+					     t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+					     0, tp_blkmod_nomod, t_restart_entryref.str.len, t_restart_entryref.str.addr);
+			else
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
+					     t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+					     blkmod_fail_level, blkmod_fail_type, t_restart_entryref.str.len,
+					     t_restart_entryref.str.addr);
+			caller_id_flag = TRUE;
+		}
 		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries
 		 * for these special codes just before incrementing it unconditionally. Note that this should be done ONLY IF
 		 * t_tries is CDB_STAGNATE or higher and not for lower values as otherwise it can cause livelocks (e.g.
@@ -227,11 +295,10 @@ void t_retry(enum cdb_sc failure)
 			 *     in the final retry.
 			 * (f) cdb_sc_instancefreeze : Instance freeze detected while crit held.
 			 * (g) cdb_sc_gvtrootmod2 : Similar to (e).
+			 * (h) cdb_sc_reorg_encrypt : Concurrent update of encryption settings due to MUPIP REORG -ENCRYPT.
 			 */
-			if ((cdb_sc_jnlstatemod == failure) || (cdb_sc_jnlclose == failure) || (cdb_sc_helpedout == failure)
-					|| (cdb_sc_needcrit == failure) || (cdb_sc_onln_rlbk1 == failure)
-					|| (cdb_sc_onln_rlbk2 == failure) || (cdb_sc_instancefreeze == failure)
-					|| (cdb_sc_gvtrootmod2 == failure))
+			assert(cdb_sc_optrestart != failure);
+			if (IS_FINAL_RETRY_CODE(failure))
 			{
 				/* t_tries should never be greater than t_tries_dbg. The only exception is if this is DSE or online
 				 * rollback operates with t_tries = CDB_STAGNATE and restarts if wc_blocked is set outside crit.
@@ -251,11 +318,48 @@ void t_retry(enum cdb_sc failure)
 				t_tries = CDB_STAGNATE - 1;
 			}
 		}
+		/* If failure code is "cdb_sc_reorg_encrypt", handle it before we get crit. Just like it is done in "tp_restart".
+		 * Note: It would be more consistent if we move the entire "switch (failure)" block of code below to happen
+		 * before we get crit (just like is done in "tp_restart") but not sure if there are any correctness issues there.
+		 */
+		if (failure == cdb_sc_reorg_encrypt)
+		{	/* Even though the failure code is "cdb_sc_reorg_encrypt", it is possible
+			 * "process_reorg_encrypt_restart" was already called from "t_qread" which then
+			 * returned "cdb_sc_reorg_encrypt" that ended up in tp_restart. "reorg_encrypt_restart_csa" would
+			 * have been reset to NULL after opening the new keys in that case so no need to call it again.
+			 */
+			if (NULL != reorg_encrypt_restart_csa)
+			{
+				assert(csa == reorg_encrypt_restart_csa);
+				if (!csa->now_crit)
+				{
+					process_reorg_encrypt_restart();
+					assert(NULL == reorg_encrypt_restart_csa);
+				} else
+				{	/* We are holding crit and need to do "process_reorg_encrypt_restart" (possible
+					 * if we noticed the "cdb_sc_reorg_encrypt" restart in the 2nd retry in "t_end".
+					 * In this case, we need to release crit to avoid heavyweight encryption handle
+					 * open operations inside crit. And need to reobtain crit afterwards. The
+					 * existing function "grab_crit_encr_cycle_sync" does exactly that.
+					 */
+					rel_crit(gv_cur_region);
+					process_reorg_encrypt_restart();
+					assert(NULL == reorg_encrypt_restart_csa);
+					grab_crit_encr_cycle_sync(gv_cur_region);
+				}
+			}
+		}
+		assert(NULL == reorg_encrypt_restart_csa);
 		if (CDB_STAGNATE <= ++t_tries)
 		{
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
+			/* Use "grab_crit_encr_cycle_sync" (and not "grab_crit") to grab crit. This way we are guaranteed the
+			 * encryption cycles are in sync at the start of the final retry and dont need to restart again while
+			 * holding crit because of that (and otherwise invoke heavyweight "process_reorg_encrypt_restart"
+			 * while holding crit).
+			 */
 			if (!csa->hold_onto_crit)
-				grab_crit(gv_cur_region);
+				grab_crit_encr_cycle_sync(gv_cur_region);
 			else if (cnl->wc_blocked)
 			{	/* Possible ONLY for online rollback or DSE that grabs crit during startup and never grabs again.
 				 * In such cases grab_crit (such as above) is skipped. As a result wcs_recover is also skipped.
@@ -329,10 +433,10 @@ void t_retry(enum cdb_sc failure)
 				}
 				UNIX_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
-#ifdef DEBUG
+#				ifdef DEBUG
 				/* Core is not needed. We intentionally create this error. */
 				if (!gtm_white_box_test_case_enabled)
-#endif
+#				endif
 				UNIX_ONLY(gtm_fork_n_core());
 				VMS_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff));
@@ -361,80 +465,84 @@ void t_retry(enum cdb_sc failure)
 		 */
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
-#		ifdef UNIX
-		if ((cdb_sc_onln_rlbk1 == failure) || (cdb_sc_onln_rlbk2 == failure))
-		{	/* restarted due to online rollback */
-			if (!redo_root_search_done)
-				RESET_ALL_GVT_CLUES;
-			if (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)
-			{	/* Handle cleanup beyond just resetting clues */
-				if (cdb_sc_onln_rlbk2 == failure)
-				{
-					if (IS_MCODE_RUNNING || TREF(issue_DBROLLEDBACK_anyways))
-					{	/* We are in Non-TP and an online rollback too the database to a prior state. If we
-						 * are in M code OR the caller has asked us to issue the DBROLLEDBACK rts_error
-						 * unconditionally (MUPIP LOAD for eg.), then issue the DBROLLEDBACK. If this is M
-						 * code we also increment $ZONLNRLBK ISV and do other necessary cleanup before
-						 * issuing the rts_error. Instead of checking for M code, do the cleanup anyways
-						 */
-						assert(!is_updproc);
-						(TREF(dollar_zonlnrlbk))++;
-						/* Since "only_reset_clues_if_onln_rlbk" is FALSE, we are NOT in the second phase of
-						 * KILL. So, assert that kip_csa is still NULL
-						 */
-						assert(NULL == kip_csa);
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
-					}
-				}
-				assert(!redo_root_search_done);
-				if (WANT_REDO_ROOT_SEARCH)
-					gvcst_redo_root_search();
-				if (is_updproc)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_REPLONLNRLBK);
-			}
-#			ifdef DEBUG
-			else
-			{	/* Detected ONLINE ROLLBACK during second phase of KILLs in which case we don't want to do increment
-				 * $ZONLNRLBK or SYNC cycles. Instead we will stop the second phase of the KILLs and return to the
-				 * caller to continue with the next transaction at which point we will detect ONLINE ROLLBACK again
-				 * and take the appropriate action.
-				 * Note: as long as we are in Non-TP, kip_csa will be NULL in second phase of KILL. Only exception
-				 * is if we started out as TP and did KILLs and after the commit, invoked gvcst_bmp_mark_free to
-				 * complete the second phase of the KILL. So, assert accordingly.
-				 */
-				assert((NULL != kip_csa) || ((NULL != sgm_info_ptr) && (NULL != sgm_info_ptr->kip_csa)));
-				/* Note: DECR_KIP done by gvcst_kill (in case of Non-TP) or op_tcommit (in case of TP) takes care
-				 * of resetting kip_csa and decrementing cs_data->kill_in_prog. So, we don't need to do it here
-				 * explicitly.
-				 */
-			}
-#			endif
-		}
-		if (cdb_sc_gvtrootmod == failure)	/* failure signaled by gvcst_kill */
-		{	/* If "gvcst_redo_root_search" has not yet been invoked in t_retry, do that now */
-			assert(NULL != gv_target);
-			if (!redo_root_search_done && (NULL != gv_target) && (DIR_ROOT != gv_target->root))
-				gvcst_redo_root_search();
-		}
-		if (cdb_sc_gvtrootmod2 == failure)
+		switch (failure)
 		{
-			if (!redo_root_search_done)
-				RESET_ALL_GVT_CLUES;
-			/* It is possible for a read-only transaction to release crit after detecting gvtrootmod2, during which time
-			 * yet another root block could have moved. In that case, the MISMATCH_ROOT_CYCLES check would have
-			 * already done the redo_root_search.
-			 */
-			assert(!redo_root_search_done || !update_trans);
-			if (WANT_REDO_ROOT_SEARCH)
-			{	/* Note: An online rollback can occur DURING gvcst_redo_root_search, which can remove gbls from db,
-				 * leading to gv_target->root being 0, even though failure code is not cdb_sc_onln_rlbk2
+			case cdb_sc_onln_rlbk1:
+			case cdb_sc_onln_rlbk2:
+				/* restarted due to online rollback */
+				if (!redo_root_search_done)
+					RESET_ALL_GVT_CLUES;
+				if (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)
+				{	/* Handle cleanup beyond just resetting clues */
+					if (cdb_sc_onln_rlbk2 == failure)
+					{
+						if (IS_MCODE_RUNNING || TREF(issue_DBROLLEDBACK_anyways))
+						{	/* We are in Non-TP and an online rollback took the database to a prior
+							 * state. If we are in M code OR the caller has asked us to issue the
+							 * DBROLLEDBACK rts_error unconditionally (MUPIP LOAD for eg.), then issue
+							 * the DBROLLEDBACK. If this is M code we also increment $ZONLNRLBK ISV and
+							 * do other necessary cleanup before issuing the rts_error. Instead of
+							 * checking for M code, do the cleanup anyways
+							 */
+							assert(!is_updproc);
+							(TREF(dollar_zonlnrlbk))++;
+							/* Since "only_reset_clues_if_onln_rlbk" is FALSE, we are NOT in the
+							 * second phase of KILL. So, assert that kip_csa is still NULL.
+							 */
+							assert(NULL == kip_csa);
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
+						}
+					}
+					assert(!redo_root_search_done);
+					if (WANT_REDO_ROOT_SEARCH)
+						gvcst_redo_root_search();
+					if (is_updproc)
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_REPLONLNRLBK);
+				}
+#				ifdef DEBUG
+				else
+				{	/* Detected ONLINE ROLLBACK during second phase of KILLs in which case we don't want to do
+					 * increment $ZONLNRLBK or SYNC cycles. Instead we will stop the second phase of the KILLs
+					 * and return to the caller to continue with the next transaction at which point we will
+					 * detect ONLINE ROLLBACK again and take the appropriate action.
+					 * Note: as long as we are in Non-TP, kip_csa will be NULL in second phase of KILL. Only
+					 * exception is if we started out as TP and did KILLs and after the commit, invoked
+					 * gvcst_bmp_mark_free to complete the second phase of the KILL. So, assert accordingly.
+					 */
+					assert((NULL != kip_csa) || ((NULL != sgm_info_ptr) && (NULL != sgm_info_ptr->kip_csa)));
+					/* Note: DECR_KIP done by gvcst_kill (in case of Non-TP) or op_tcommit (in case of TP) takes
+					 * care of resetting kip_csa and decrementing cs_data->kill_in_prog. So, we don't need to do
+					 * it here explicitly.
+					 */
+				}
+#				endif
+				break;
+			case cdb_sc_gvtrootmod:	/* failure signaled by gvcst_kill */
+				/* If "gvcst_redo_root_search" has not yet been invoked in t_retry, do that now */
+				assert(NULL != gv_target);
+				if (!redo_root_search_done && (NULL != gv_target) && (DIR_ROOT != gv_target->root))
+					gvcst_redo_root_search();
+				break;
+			case cdb_sc_gvtrootmod2:
+				if (!redo_root_search_done)
+					RESET_ALL_GVT_CLUES;
+				/* It is possible for a read-only transaction to release crit after detecting gvtrootmod2, during
+				 * which time yet another root block could have moved. In that case, the MISMATCH_ROOT_CYCLES check
+				 * would have already done the redo_root_search.
 				 */
-				gvcst_redo_root_search();
-			}
+				assert(!redo_root_search_done || !update_trans);
+				if (WANT_REDO_ROOT_SEARCH)
+				{	/* Note: An online rollback can occur DURING gvcst_redo_root_search, which can remove gbls
+					 * from db, leading to gv_target->root being 0, even though failure code is not
+					 * cdb_sc_onln_rlbk2
+					 */
+					gvcst_redo_root_search();
+				}
+				break;
 		}
-#		endif
+		assert(NULL == reorg_encrypt_restart_csa);
 	} else
-	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
+	{	/* for TP, do the minimum; most of the logic is in tp_restart, because it is also invoked directly from t_commit */
 		assert(failure == t_fail_hist[t_tries]);
 		assert((NULL == csa) || (NULL != csa->hdr));	/* both csa and csa->hdr should be NULL or non-NULL. */
 		if (NULL != csa)

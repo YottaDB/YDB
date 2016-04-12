@@ -333,14 +333,6 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		rm_ptr->file_pos += from_bom;
 		status = 0;
 	}
-	/* if outofband then we didn't finish so return 0 */
-	if (outofband)
-	{
-		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read: %d bytes_already_read: %d, zint_restart: %d\n",
-				  bytes2read,bytes_already_read,zint_restart); DEBUGPIPEFLUSH;);
-		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
-		return 0;
-	}
 	if (0 <= status && 0 < bytes2read)
 	{
 		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
@@ -417,12 +409,15 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 					break;
 				continue; /* for now try and read again if eof or no input ready */
 			} else		  /* error returned */
-				break;
+			{
+				if (errno != EINTR)
+					break;
+			}
 		} while (bytes_count < bytes2read);
 		status = bytes_count;
 	}
-	/* if outofband then we didn't finish so just adjust inbuf_top and inbuf_pos and return 0 */
-	if (outofband)
+	/* if outofband and we didn't finish the read, just adjust inbuf_top and inbuf_pos and return 0 */
+	if (outofband && (status < bytes2read))
 	{
 		PIPE_DEBUG(PRINTF("iorm_get_fol: outofband: bytes2read: %d status: %d tot_bytes_read: %d\n",
 				  bytes2read, status, *tot_bytes_read); DEBUGPIPEFLUSH;);
@@ -462,13 +457,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 			 */
 			PIPE_DEBUG(PRINTF("iorm_get_fol: bytes_read: %d bytes_already_read: %d, zint_restart: %d\n",
 					  bytes_read,bytes_already_read,zint_restart); DEBUGPIPEFLUSH;);
-			if (bytes_already_read)
-			{
-				tmp_bytes_read = bytes_read + bytes_already_read;
-			} else
-			{
-				tmp_bytes_read = bytes_read;
-			}
+			tmp_bytes_read = bytes_read + bytes_already_read;
 			rm_ptr->fol_bytes_read = tmp_bytes_read;
 			assert(tmp_bytes_read >= 2);
 			if (CHSET_UTF16LE == chset)
@@ -493,8 +482,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 			bytes_read = tmp_bytes_read;
 		} else
 		{	/* strip 1-byte PADCHAR in UTF-8 from tail of line */
-			if (bytes_already_read)
-				bytes_read = bytes_read + bytes_already_read;
+			bytes_read = bytes_read + bytes_already_read;
 
 			/* store total of bytes read */
 			rm_ptr->fol_bytes_read = bytes_read;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +12,13 @@
 
 #include "mdef.h"
 
-#include <stdarg.h>
 #include "gtm_stdio.h"
 
-#include "gtm_putmsg_list.h"
+#include <stdarg.h>
 #include <errno.h>
 
+#include "gtm_multi_thread.h"
+#include "gtm_putmsg_list.h"
 #include "gtmimagename.h"
 #include "error.h"
 #include "util.h"
@@ -63,7 +65,7 @@ int rts_error(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = CUSTOM_ERRORS_LOADED ? REG2CSA(gv_cur_region) : NULL;
+	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
@@ -81,6 +83,7 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	int 		msgid;
 	va_list		var_dup;
 	const err_ctl	*ctl;
+	boolean_t	was_holder;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -95,6 +98,13 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		assert(FALSE);
 	}
 #	endif
+	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
+	/* Note that rts_error does not return most of the times (control gets transferred somewhere else) so no point
+	 * unlocking thread mutex at the end of this function. This means that if one thread gets an error, the rest of
+	 * the threads might wait if/when they need to make a PTHREAD_MUTEX_LOCK_IF_NEEDED call. But that is considered
+	 * okay since the process is anyways going to terminate due to the error in one thread. This is at least true
+	 * for the current use of threads in mupip. If/when threads are used in GT.M this will need to be revisited.
+	 */
 	VAR_COPY(var_dup, var);
 	if (-1 == gtm_errno)
 		gtm_errno = errno;

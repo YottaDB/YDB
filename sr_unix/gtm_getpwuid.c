@@ -14,10 +14,9 @@
 
 #include "gtm_unistd.h"
 #include "gtm_pwd.h"
+#include "gtm_signal.h"	/* for SIGPROCMASK */
 
 #undef	getpwuid	/* since we are going to use the system level "getpwuid" function, undef the alias to "gtm_getpwuid" */
-
-#include <signal.h>
 
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF  sigset_t	block_sigsent;
@@ -29,8 +28,9 @@ GBLREF	struct		passwd getpwuid_struct;	/* cached copy of "getpwuid" to try avoid
  */
 struct passwd	*gtm_getpwuid(uid_t uid)
 {
-	struct passwd			*retval;
-	sigset_t			savemask;
+	struct passwd	*retval;
+	sigset_t	savemask;
+	int		rc;
 	DEBUG_ONLY(static boolean_t	first_time = TRUE;)
 
 	assert(!first_time || (INVALID_UID == getpwuid_struct.pw_uid));	/* assert we do the INVALID_UID init in gbldefs.c */
@@ -38,10 +38,10 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 	{
 		assert(blocksig_initialized);	/* the set of blocking signals should be initialized at process startup */
 		if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
-			sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
+			SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
 		retval = getpwuid(uid);
 		if (blocksig_initialized)
-			sigprocmask(SIG_SETMASK, &savemask, NULL);
+			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		if (NULL == retval)
 			return NULL;	/* error or "uid" record not found */
 		/* Cache return from "getpwuid" call and avoid future calls to this function */

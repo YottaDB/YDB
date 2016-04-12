@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,6 +153,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	gd_region		*reg;
 	repl_inst_hdr_ptr_t	replhdr;
 
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	/* Assert that except for MUPIP REPLIC -INSTANCE_CREATE or -EDITINSTANCE or MUPIP FTOK, all callers hold the FTOK semaphore
 	 * on the replication instance file OR the journal pool lock. Note that the instance file might be pointed to by one of the
 	 * two region pointers "jnlpool.jnlpool_dummy_reg" or "recvpool.recvpool_dummy_reg" depending on whether the journal pool
@@ -176,7 +177,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		udi = FILE_INFO(reg);
 		assert(udi->grabbed_ftok_sem || ((NULL != jnlpool.jnlpool_ctl) && udi->s_addrs.now_crit) || jgbl.mur_rollback);
 	}
-	OPENFILE(fn, O_RDONLY, fd);
+	OPENFILE_CLOEXEC(fn, O_RDONLY, fd);
 	if (FD_INVALID == fd)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	assert(0 < buflen);
@@ -184,8 +185,11 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	{
 		LSEEKREAD(fd, offset, buff, buflen, status);
 	} else
-	{	/* Read starts from the replication instance file header. Assert that the entire file header was requested. */
-		assert(REPL_INST_HDR_SIZE <= buflen);
+	{	/* Read starts from the replication instance file header. Assert that the entire file header was requested.
+		 * The only exception is MUPIP REPLIC -EDIT -CHANGE -OFFSET=0 -SIZE=xxx where xxx is < REPL_INST_HDR_SIZE.
+		 * "in_repl_inst_edit" being equal to IN_REPL_INST_EDIT_CHANGE_OFFSET identifies that situation.
+		 */
+		assert((REPL_INST_HDR_SIZE <= buflen) || (IN_REPL_INST_EDIT_CHANGE_OFFSET == in_repl_inst_edit));
 		/* Use LSEEKREAD_AVAILABLE macro instead of LSEEKREAD. This is because if we are not able to read the entire
 		 * fileheader, we still want to see if the "label" field of the file header got read in which case we can
 		 * do the format check first. It is important to do the format check before checking "status" returned from
@@ -193,38 +197,42 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		 * older format replication instance file being smaller than even the newer format instance file header.
 		 */
 		LSEEKREAD_AVAILABLE(fd, offset, buff, buflen, actual_readlen, status);
-		if (GDS_REPL_INST_LABEL_SZ <= actual_readlen)
-		{	/* Have read the entire label in the instance file header. Check if it is the right version */
-			if (memcmp(buff, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+		/* Skip error checking if we are inside a MUPIP REPLIC -EDITINSTANCE -CHANGE */
+		if (IN_REPL_INST_EDIT_CHANGE_OFFSET != in_repl_inst_edit)
+		{
+			if (GDS_REPL_INST_LABEL_SZ <= actual_readlen)
+			{	/* Have read the entire label in the instance file header. Check if it is the right version */
+				if (memcmp(buff, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
 					      GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1, buff);
+				}
 			}
-		}
-		if (0 == status)
-		{	/* Check a few other fields in the file-header for compatibility */
-			assert(actual_readlen == buflen);
-			replhdr = (repl_inst_hdr_ptr_t)buff;
-			/* Check endianness match */
-			if (GTM_IS_LITTLE_ENDIAN != replhdr->is_little_endian)
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
-					      LEN_AND_LIT(ENDIANTHIS), LEN_AND_LIT(ENDIANOTHER));
+			if (0 == status)
+			{	/* Check a few other fields in the file-header for compatibility */
+				assert(actual_readlen == buflen);
+				replhdr = (repl_inst_hdr_ptr_t)buff;
+				/* Check endianness match */
+				if (GTM_IS_LITTLE_ENDIAN != replhdr->is_little_endian)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+						      LEN_AND_LIT(ENDIANTHIS), LEN_AND_LIT(ENDIANOTHER));
+				}
+				/* Check 64bitness match */
+				if (GTM_IS_64BIT != replhdr->is_64bit)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+						      LEN_AND_LIT(GTM_BITNESS_THIS), LEN_AND_LIT(GTM_BITNESS_OTHER));
+				}
+				/* At the time of this writing, the only minor version supported is 1.
+				 * Whenever this gets updated, we need to add code to do the online upgrade.
+				 * Add an assert as a reminder to do this.
+				 */
+				assert(1 == replhdr->replinst_minorver);
+				/* Check if on-the-fly minor-version upgrade is necessary */
+				if (GDS_REPL_INST_MINOR_LABEL != replhdr->replinst_minorver)
+					assert(FALSE);
 			}
-			/* Check 64bitness match */
-			if (GTM_IS_64BIT != replhdr->is_64bit)
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
-					      LEN_AND_LIT(GTM_BITNESS_THIS), LEN_AND_LIT(GTM_BITNESS_OTHER));
-			}
-			/* At the time of this writing, the only minor version supported is 1.
-			 * Whenever this gets updated, we need to add code to do the online upgrade.
-			 * Add an assert as a reminder to do this.
-			 */
-			assert(1 == replhdr->replinst_minorver);
-			/* Check if on-the-fly minor-version upgrade is necessary */
-			if (GDS_REPL_INST_MINOR_LABEL != replhdr->replinst_minorver)
-				assert(FALSE);
 		}
 	}
 	assert((0 == status) || in_repl_inst_edit);
@@ -259,6 +267,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	gd_region	*reg;
 	ZOS_ONLY(int	realfiletag;)
 
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	/* Assert that except for MUPIP REPLIC -INSTANCE_CREATE or -EDITINSTANCE, all callers hold the FTOK semaphore on the
 	 * replication instance file OR the journal pool lock. Note that the instance file might be pointed to by one of the
 	 * two region pointers "jnlpool.jnlpool_dummy_reg" or "recvpool.recvpool_dummy_reg" depending on whether the journal pool
@@ -290,7 +299,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	oflag = O_RDWR;
 	if (in_repl_inst_create)
 		oflag |= (O_CREAT | O_EXCL);
-	OPENFILE3(fn, oflag, 0666, fd);
+	OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
 	if (FD_INVALID == fd)
 	{
 		if (!in_repl_inst_create)
@@ -347,7 +356,7 @@ void	repl_inst_sync(char *fn)
 		assert((NULL != jnlpool.jnlpool_ctl) && udi->s_addrs.now_crit);
 	)
 	oflag = O_RDWR;
-	OPENFILE3(fn, oflag, 0666, fd);
+	OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
 	if (FD_INVALID == fd)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	GTM_REPL_INST_FSYNC(fd, status);
@@ -367,7 +376,7 @@ void	repl_inst_sync(char *fn)
  * Return Value:
  *	None
  */
-void repl_inst_jnlpool_reset(void)
+void repl_inst_jnlpool_reset(boolean_t clear_ftok_halted)
 {
 	repl_inst_hdr	repl_instance;
 	unix_db_info	*udi;
@@ -376,6 +385,11 @@ void repl_inst_jnlpool_reset(void)
 	assert(udi->grabbed_ftok_sem);
 	if (NULL != jnlpool.repl_inst_filehdr)
 	{	/* If journal pool exists, reset sem/shm ids in the file header in the journal pool and flush changes to disk */
+		if (clear_ftok_halted)
+		{
+			assert(INVALID_SHMID == jnlpool.repl_inst_filehdr->recvpool_shmid);
+			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
+		}
 		jnlpool.repl_inst_filehdr->jnlpool_semid = INVALID_SEMID;
 		jnlpool.repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
 		jnlpool.repl_inst_filehdr->jnlpool_semid_ctime = 0;
@@ -384,6 +398,11 @@ void repl_inst_jnlpool_reset(void)
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
 		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+		if (clear_ftok_halted)
+		{
+			assert(INVALID_SHMID == repl_instance.recvpool_shmid);
+			repl_instance.ftok_counter_halted = FALSE;
+		}
 		repl_instance.jnlpool_semid = INVALID_SEMID;
 		repl_instance.jnlpool_shmid = INVALID_SHMID;
 		repl_instance.jnlpool_semid_ctime = 0;
@@ -399,7 +418,7 @@ void repl_inst_jnlpool_reset(void)
  * Return Value:
  *	None
  */
-void repl_inst_recvpool_reset(void)
+void repl_inst_recvpool_reset(boolean_t clear_ftok_halted)
 {
 	repl_inst_hdr	repl_instance;
 	unix_db_info	*udi;
@@ -408,6 +427,11 @@ void repl_inst_recvpool_reset(void)
 	assert(udi->grabbed_ftok_sem);
 	if (NULL != jnlpool.repl_inst_filehdr)
 	{	/* If journal pool exists, reset sem/shm ids in the file header in the journal pool and flush changes to disk */
+		if (clear_ftok_halted)
+		{
+			assert(INVALID_SHMID == jnlpool.repl_inst_filehdr->jnlpool_shmid);
+			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
+		}
 		jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;
 		jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
 		jnlpool.repl_inst_filehdr->recvpool_semid_ctime = 0;
@@ -416,6 +440,11 @@ void repl_inst_recvpool_reset(void)
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
 		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+		if (clear_ftok_halted)
+		{
+			assert(INVALID_SHMID == repl_instance.jnlpool_shmid);
+			repl_instance.ftok_counter_halted = FALSE;
+		}
 		repl_instance.recvpool_semid = INVALID_SEMID;
 		repl_instance.recvpool_shmid = INVALID_SHMID;
 		repl_instance.recvpool_semid_ctime = 0;
@@ -443,7 +472,7 @@ void	repl_inst_ftok_sem_lock(void)
 	if (!udi->grabbed_ftok_sem)
 	{
 		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-		if (!ftok_sem_lock(reg, FALSE, FALSE))
+		if (!ftok_sem_lock(reg, FALSE))
 		{
 			assert(FALSE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
@@ -496,6 +525,7 @@ int4	repl_inst_histinfo_get(int4 index, repl_histinfo *histinfo)
 	repl_inst_hdr_ptr_t	repl_inst_filehdr;
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(udi->s_addrs.now_crit || jgbl.mur_rollback);
 	if (0 > index)
 		return ERR_REPLINSTNOHIST;
@@ -548,6 +578,7 @@ int4	repl_inst_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_histinfo *
 	repl_inst_hdr_ptr_t	inst_hdr;
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(udi->s_addrs.now_crit || jgbl.mur_rollback);
 	assert(0 != seqno);
 	inst_hdr = jnlpool.repl_inst_filehdr;
@@ -599,6 +630,7 @@ int4	repl_inst_wrapper_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_hi
 	repl_histinfo	*next_histinfo;
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(udi->s_addrs.now_crit || jgbl.mur_rollback);
 	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */
 	assert((is_src_server && ((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index)))
@@ -820,6 +852,12 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 	if (jnlpool.repl_inst_filehdr->num_alloc_histinfo < histinfo_num)
 		jnlpool.repl_inst_filehdr->num_alloc_histinfo = histinfo_num;
 	jnlpool.repl_inst_filehdr->num_histinfo = histinfo_num;
+	/* Since we are going to flush the file header, take this opportunity to update the current jnl seqno in it.
+	 * Note that the current stream jnl seqnos are already udpated inside "repl_inst_flush_filehdr" by the
+	 * "COPY_JCTL_STRMSEQNO_TO_INSTHDR_IF_NEEDED" macro. We dont do the current jnl seqno to there because
+	 * "repl_inst_histinfo_truncate" invokes "repl_inst_flush_filehdr" with a different jnl seqno than the current.
+	 */
+	jnlpool.repl_inst_filehdr->jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
 	repl_inst_flush_filehdr();
 	jnlpool.jnlpool_ctl->last_histinfo_seqno = histinfo->start_seqno;
 	repl_inst_sync(udi->fn);	/* Harden the new histinfo to disk before any logical records for this arrive. */
@@ -851,6 +889,7 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 	seq_num			last_histinfo_seqno = 0;
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(in_backup || jgbl.mur_rollback); /* Only ROLLBACK or BACKUP calls this function */
 	assert(udi->s_addrs.now_crit || jgbl.mur_rollback);
 	inst_hdr = jnlpool.repl_inst_filehdr;
@@ -1008,6 +1047,7 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 		inst_hdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
 		inst_hdr->recvpool_semid_ctime = 0;
 		inst_hdr->recvpool_shmid_ctime = 0;
+		inst_hdr->ftok_counter_halted = FALSE;
 	} /* else for rollback, we reset the IPC fields in mu_replpool_release_sem() and crash in mur_close_files */
 	/* Flush all file header changes in jnlpool.repl_inst_filehdr to disk */
 	repl_inst_flush_filehdr();
@@ -1048,6 +1088,7 @@ void	repl_inst_flush_filehdr()
 	 *   Same as above.
 	 * So, in all cases, we are guaranteed that the following code is mutually exclusive (which is what we want).
 	 */
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(udi->s_addrs.now_crit || udi->grabbed_ftok_sem || (jgbl.mur_rollback && holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]));
 	if (jnlpool.jnlpool_dummy_reg->open)
 		COPY_JCTL_STRMSEQNO_TO_INSTHDR_IF_NEEDED; /* Keep the file header copy of "strm_seqno" uptodate with jnlpool_ctl */
@@ -1132,6 +1173,7 @@ void	repl_inst_flush_jnlpool(boolean_t reset_replpool_fields, boolean_t reset_cr
 			jnlpool.repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
 			jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;	/* Just in case it is not already reset */
 			jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
+			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
 		}
 	}
 	/* If the source server that created the journal pool died before it was completely initialized in "gtmsource_seqno_init"
@@ -1171,6 +1213,7 @@ boolean_t	repl_inst_was_rootprimary(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	if (NULL != jnlpool.jnlpool_ctl)
 	{	/* If the journal pool is available (indicated by NULL != jnlpool_ctl), we expect jnlpool_dummy_reg to be open.
 		 * The only exception is online rollback which doesn't do a jnlpool_init thereby leaving jnlpool_dummy_reg->open

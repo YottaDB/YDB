@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +24,12 @@
 #include "cws_insert.h"		/* for CWS_RESET macro */
 #include "gdsblkops.h"		/* for CHECK_AND_RESET_UPDATE_ARRAY macro */
 #include "t_abort.h"		/* for prototype of t_abort() */
+#include "process_reorg_encrypt_restart.h"
 
 GBLREF	unsigned char	cw_set_depth;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		update_trans;
+GBLREF sgmnt_addrs	*reorg_encrypt_restart_csa;
 
 void t_abort(gd_region *reg, sgmnt_addrs *csa)
 {
@@ -47,4 +50,13 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 	 */
 	if (csa->now_crit && !csa->hold_onto_crit)
 		rel_crit(reg);
+	/* If this transaction had a cdb_sc_reorg_encrypt restart, but we later decided to abort it, we still
+	 * need to finish off opening the new encryption keys and clear the "reorg_encrypt_restart_csa" global.
+	 */
+	if (NULL != reorg_encrypt_restart_csa)
+	{
+		assert(csa == reorg_encrypt_restart_csa);
+		process_reorg_encrypt_restart();
+		assert(NULL == reorg_encrypt_restart_csa);
+	}
 }

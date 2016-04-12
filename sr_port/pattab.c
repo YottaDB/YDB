@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,25 +71,12 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#ifdef VMS
-#include <lnmdef.h>
-#include <fab.h>
-#include <rab.h>
-#include <rmsdef.h>
-
-#include "vmsdtype.h"
-
-#else
 #include "gtm_stdio.h"
-#endif
 
 #include "patcode.h"
 #include "iosp.h"
 #include "io.h"
-#ifdef UNIX
 #include "eintr_wrappers.h"
-#endif
 #include "util.h"
 #include "trans_log_name.h"
 #include "gtm_logicals.h"
@@ -116,13 +104,7 @@ static	int		idlen;
 static	int		number, max_patents;
 static	char		*ch = NULL;
 static	char		patline[MAXPATNAM + 2];
-
-#ifdef VMS
-static struct FAB	fab;
-static struct RAB	rab;
-#else
-static FILE		*patfile;
-#endif
+static	FILE		*patfile;
 
 #ifdef DEBUG
 void dump_tables(void);
@@ -135,14 +117,12 @@ static	int	pat_lex(void);
 static	int	patcmp(unsigned char *str1, unsigned char *str2);
 static	void	pattab_error(int name_len, char *file_name, int linenum);
 
+error_def(ERR_PATTABSYNTAX);
+
 static void close_patfile(void)
 {
-#ifdef VMS
-	sys$close(&fab);
-#else
 	int fclose_res;
 	FCLOSE(patfile, fclose_res);
-#endif
 }
 
 #ifdef DEBUG
@@ -173,18 +153,10 @@ void dump_tables(void)
 static int getaline(void)
 {
 	int		status;
-
-#ifdef VMS
-	status = sys$get(&rab);
-	if (RMS$_EOF == status)
-		return 0;
-	patline[rab.rab$w_rsz] = '\n';
-	patline[rab.rab$w_rsz + 1] = '\0';
-#else
 	char		*fgets_res;
+
 	if (NULL == FGETS(patline, SIZEOF(patline), patfile, fgets_res))
 		return 0;
-#endif
 	return 1;
 }
 
@@ -408,29 +380,13 @@ static int open_patfile(int name_len, char *file_name)
 	int		status;
 	unsigned char	*name_copy;
 
-#	ifdef VMS
-	fab = cc$rms_fab;
-	fab.fab$l_fna = file_name;
-	fab.fab$b_fns = name_len;
-	status = sys$open(&fab);
-	if (!(status & 1))
-		return 0;
-	rab = cc$rms_rab;
-	rab.rab$l_fab = &fab;
-	rab.rab$l_ubf = patline;
-	rab.rab$w_usz = SIZEOF(patline);
-	status = sys$connect(&rab);
-	if (RMS$_NORMAL != status)
-		return 0;
-#	else
 	name_copy = malloc(name_len + 1);
 	memcpy(name_copy, file_name, name_len);
 	name_copy[name_len] = '\0';
-	patfile = Fopen((const char *)name_copy, "r");
+	Fopen(patfile, (const char *)name_copy, "r");
 	free(name_copy);
 	if (NULL == patfile)
 		return 0;
-#	endif
 	if (getaline())
 		ch = patline;
 	return 1;
@@ -519,10 +475,8 @@ static int patcmp(unsigned char *str1,unsigned char *str2)
 
 static void pattab_error(int name_len,char *file_name,int linenum)
 {
-	error_def	(ERR_PATTABSYNTAX);
-
 	close_patfile();
-	rts_error(VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
 }
 
 int setpattab(mstr *table_name)

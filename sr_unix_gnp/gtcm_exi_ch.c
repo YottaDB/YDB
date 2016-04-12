@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 
 #include "gtm_unistd.h"
 
+#include "gtm_multi_thread.h"
 #include "have_crit.h"
 #include "gtmio.h"
 #include "gtm_time.h"
@@ -43,8 +45,7 @@ error_def(ERR_TEXT);
 CONDITION_HANDLER(gtcm_exi_ch)
 {
 	int		rc;
-	now_t		now;	/* for GET_CUR_TIME macro */
-	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -52,18 +53,18 @@ CONDITION_HANDLER(gtcm_exi_ch)
 		gtcm_open_cmerrlog();
 	if (gtcm_errfile)
 	{
+		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		if (TREF(util_outptr) != TREF(util_outbuff_ptr))
 		{	/* msg yet to be flushed. Properly terminate it in the buffer. If msg has
 			   already been flushed (to stderr) then this has already been done. */
 			*(TREF(util_outptr)) = '\n';
 			*(TREF(util_outptr) + 1) = 0;
 		}
-		GET_CUR_TIME;
+		GET_CUR_TIME(time_str);
 		time_str[CTIME_BEFORE_NL] = 0;
 		FPRINTF(gtcm_errfs, "%s: %s", time_str, TREF(util_outbuff_ptr));
 		FFLUSH(gtcm_errfs);
 	}
-	send_msg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
-
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
 	PROCDIE(exi_condition);
 }

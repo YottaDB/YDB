@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,7 @@
 LITREF	octabstruct	oc_tab[];	/* op-code table */
 GBLREF	triple		t_orig;		/* head of triples */
 GBLREF	char		cg_phase;	/* code generation phase */
+GBLREF	command_qualifier	cmd_qlf;
 GBLREF	int4		curr_addr;	/* current address */
 GBLREF	src_line_struct	src_head;
 GBLREF	short		source_line;
@@ -55,7 +57,7 @@ void	code_gen(void)
 			ct->rtaddr = curr_addr;
 		else if (CGP_ASSEMBLY == cg_phase)
 		{
-			if (ct->src.line != old_line)
+			if (ct->src.line != old_line && (cmd_qlf.qlf & (CQ_LIST | CQ_CROSS_REFERENCE | CQ_EMBED_SOURCE)))
 			{
 				list_line("");
 				dqloop(&src_head, que, sl)

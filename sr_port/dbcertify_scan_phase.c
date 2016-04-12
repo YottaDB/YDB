@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -232,14 +233,14 @@ void dbcertify_scan_phase(void)
 		gtm_putmsg_csa(CSA_ARG(NULL)
 			VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
 		if (!psa->report_only)
-			exit(SS_NORMAL - 1);	/* Gives -1 on UNIX (failure) and 0 on VMS (failure) */
+			EXIT(SS_NORMAL - 1);	/* Gives -1 on UNIX (failure) and 0 on VMS (failure) */
 	}
 	if (psa->dbc_cs_data->max_rec_size > max_max_rec_size)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBMAXREC2BIG, 3,
 			psa->dbc_cs_data->max_rec_size, psa->dbc_cs_data->blk_size, max_max_rec_size);
 		if (!psa->report_only)
-			exit(SS_NORMAL - 1);
+			EXIT(SS_NORMAL - 1);
 	}
 	/* If not REPORT_ONLY, open the phase-1 output file and write header info. Note this will be
 	 * re-written at the completion of the process.
@@ -621,11 +622,9 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			 */
 			if (rec2_len)
 			{	/* There is a 2nd record */
-				rec_ptr = rec2_ptr;
 				key_pfx = "[2] ";
 			} else
 			{	/* No 2nd record, format 1st record instead */
-				rec_ptr = rec1_ptr;
 				key_pfx = "[1] ";
 			}
 			key_ptr = dbc_format_key(psa, (rec2_len ? rec2_ptr : rec1_ptr));

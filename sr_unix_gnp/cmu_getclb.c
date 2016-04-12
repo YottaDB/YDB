@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #include "mdef.h"
 #include "cmidef.h"
 #include "gtm_string.h"
-#include "eintr_wrappers.h"
+#include "gtm_signal.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 
@@ -43,7 +44,7 @@ struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 			p = QUEENT2CLB(qp, cqe);
 			if (0 == memcpy(ai_ptr->ai_addr, (sockaddr_ptr)(&p->peer_sas), ai_ptr->ai_addrlen))
 			{
-				sigprocmask(SIG_SETMASK, &oset, NULL);
+				SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 				return p;
 			}
 		}

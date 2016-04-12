@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -11,50 +12,51 @@
 
 #include "mdef.h"
 #include "compiler.h"
+#include "mmemory.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "mdq.h"
 #include "fullbool.h"
-
+#include "gtm_utf8.h"
+#include "advancewindow.h"
+#include "op.h"
+#include "stringpool.h"
 
 /* $ZWRITE(): Single parameter - string expression */
 int f_zwrite(oprtype *a, opctype op)
 {
-	triple		*oldchain, *r;
-	save_se		save_state;
+	mval		tmp_mval;
+	oprtype		*newop;
+	triple		*r;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (TK_ATSIGN != TREF(window_token))
+	r = maketriple(op);
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
+		return FALSE;
+	if (TK_COMMA != TREF(window_token))
+		r->operand[1] = put_ilit(0);
+	else
 	{
-		r = maketriple(op);
-		if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
+		advancewindow();
+		if (EXPR_FAIL == expr(&(r->operand[1]), MUMPS_INT))
 			return FALSE;
-		ins_triple(r);
-	} else
-	{
-		r = maketriple(OC_INDFUN);
-		if (SHIFT_SIDE_EFFECTS)
-		{
-			START_GVBIND_CHAIN(&save_state, oldchain);
-			if (!indirection(&(r->operand[0])))
-			{
-				setcurtchain(oldchain);
-				return FALSE;
-			}
-			r->operand[1] = put_ilit((mint)indir_fnzwrite);
-			ins_triple(r);
-			PLACE_GVBIND_CHAIN(&save_state, oldchain);
-		} else
-		{
-			if (!indirection(&(r->operand[0])))
-				return FALSE;
-			r->operand[1] = put_ilit((mint)indir_fnzwrite);
-			ins_triple(r);
-		}
 	}
+	/* This code tries to execute $ZWRITE at compile time if all parameters are literals */
+	if ((OC_LIT == r->operand[0].oprval.tref->opcode) && (ILIT_REF == r->operand[1].oprval.tref->operand->oprclass)
+		&& (!gtm_utf8_mode || valid_utf_string(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
+	{	/* We don't know how much space we will use; but we know it's based on the size of the current string */
+		op_fnzwrite(r->operand[1].oprval.tref->operand[0].oprval.ilit,
+			&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, &tmp_mval);
+		newop = (oprtype *)mcalloc(SIZEOF(oprtype));
+		*newop = put_lit(&tmp_mval);				/* Copies mval so stack var tmp_mval not an issue */
+		assert(TRIP_REF == newop->oprclass);
+		newop->oprval.tref->src = r->src;
+		*a = put_tref(newop->oprval.tref);
+		return TRUE;
+	}
+	ins_triple(r);
 	*a = put_tref(r);
 	return TRUE;
 }
-

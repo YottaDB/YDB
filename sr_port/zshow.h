@@ -34,8 +34,9 @@
 	}						\
 }
 
-#define	FIRST_LINE_OF_ZSHOW_OUTPUT(out)	(('G' != out->code) && ('g' != out->code)&& ('L' != out->code)&& ('l' != out->code) \
-						? (1 != out->line_num) : (0 != out->line_num))
+#define	NOT_FIRST_LINE_OF_ZSHOW_OUTPUT(out)	(('G' != out->code) && ('g' != out->code)			\
+							&& ('L' != out->code)&& ('l' != out->code) 		\
+								? (1 != out->line_num) : (0 != out->line_num))
 
 typedef struct
 {
@@ -57,10 +58,11 @@ typedef struct zshow_out_struct
 	int		size;		/* total size of the output buffer					*/
 	char		*buff;		/* output buffer							*/
 	char		*ptr;		/* end of current output line in output buffer				*/
-	int		len;		/* UTF-8 character length in the current buffer(ZSHOW_DEVICE)
-					   or maximum length of global output record (ZSHOW_GLOBAL) 		*/
+	int		len;		/* UTF-8 character length in the current buffer(ZSHOW_DEVICE)		*/
+					/* or maximum length of global output record (ZSHOW_GLOBAL)		*/
 	int		displen;	/* Display length of the current buffer(ZSHOW_DEVICE) unused otherwise	*/
 	int		line_num;	/* index for output variable starts at one				*/
+	int		line_cont;	/* undex for line continuations						*/
 	boolean_t	flush;		/* flush the buffer							*/
 	union
 	{

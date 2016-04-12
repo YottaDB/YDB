@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,11 +9,14 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #include "mdef.h"
 
 #include <errno.h>
 
 #include "gtm_string.h"
+
+#include "gtm_multi_thread.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
@@ -49,9 +53,11 @@
 #include "shmpool.h"
 
 error_def(ERR_DBFILERR);
+
 /* Minimal file extend. Called (at the moment) from mur_back_process.c when processing JRT_TRUNC record.
  * We want to avoid jnl and other interferences of gdsfilext.
  */
+/* #GTM_THREAD_SAFE : The below function (gdsfilext_nojnl) is thread-safe */
 int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 {
 	sgmnt_addrs		*csa;
@@ -70,7 +76,7 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 	WRITE_EOF_BLOCK(reg, csd, new_total, status);
 	if (0 != status)
 	{
-		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return status;
 	}
 	/* initialize the bitmap tn's to 0. */
@@ -83,7 +89,7 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 		DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, newmap, csd->blk_size, status);
 		if (0 != status)
 		{
-			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			free(newmap);
 			return status;
 		}

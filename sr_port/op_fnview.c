@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -714,6 +715,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case VTK_LOGTPRESTART:
 			n = TREF(tprestart_syslog_delta);
+			break;
+		case VTK_LOGNONTP:
+			n = TREF(nontprestart_log_delta);
 			break;
 #		ifdef UNIX
 		case VTK_JNLERROR:

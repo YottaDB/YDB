@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
+#include "gtm_limits.h"
 
 #include "gtm_time.h"
 #include "gtmio.h"
@@ -55,9 +57,9 @@ char *gtcm_hname(struct addrinfo *ai_ptr)
 	}
 	if(0 == (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, host, SIZEOF(host),
 					NULL, 0, NI_NAMEREQD)))
-		SPRINTF(name, "%s (%s)", host, ipname);
+		SNPRINTF(name, NI_MAXHOST + NI_MAXSERV + 4, "%s (%s)", host, ipname);
 	else
-		SPRINTF(name, "%s", ipname);
+		SNPRINTF(name, NI_MAXHOST + NI_MAXSERV + 4, "%s", ipname);
 	return name;
 }
 
@@ -72,7 +74,7 @@ void gtcm_cpktdmp(char *ptr, int length, char *msg)
 
     if (curr_conn && (512-strlen(msg)) > 25)
     {
-	SPRINTF(newmsg,"Conn: %s - %s",
+	SNPRINTF(newmsg, 512,"Conn: %s - %s",
 		gtcm_hname(&curr_conn->stats.ai), msg);
 
 	gtcm_pktdmp(ptr, length, newmsg);
@@ -92,41 +94,42 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	int offset = 0;
 	static int fileID = 0;
 	char tbuf[16];
-	char fileName[256];
+	char fileName[GTM_PATH_MAX];
 	time_t ctim;
 	struct tm *ltime;
 	FILE *fp;
 	char *gtm_dist;
+	int status;
 
 	ctim = time(0);
 	GTM_LOCALTIME(ltime, &ctim);
-	SPRINTF(tbuf, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
+	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
 	if (gtm_dist=getenv("gtm_dist"))
 	{
-	    	char subdir[256];
+	    	char subdir[GTM_PATH_MAX];
 		struct stat buf;
 
 		/* check for the subdirectory $gtm_dist/log/<omi_service>
 		 * If the subdirectory exists, place the log file there.
 		 * Otherwise...place the file in $gtm_dist/log.
 		 */
-		SPRINTF(subdir,"%s/log/%s", gtm_dist, omi_service);
+		SNPRINTF(subdir, GTM_PATH_MAX, "%s/log/%s", gtm_dist, omi_service);
 		if (stat(subdir,&buf) == 0
 		    && S_ISDIR(buf.st_mode))
 		{
-		    SPRINTF(fileName,"%s/%s_%s.%d", subdir, omi_service,
+		    SNPRINTF(fileName, GTM_PATH_MAX,"%s/%s_%s.%d", subdir, omi_service,
 			tbuf, fileID++);
 		}
 		else
 		{
-		    SPRINTF(fileName,"%s/log/%s_%s.%d", gtm_dist, omi_service,
+		    SNPRINTF(fileName, GTM_PATH_MAX,"%s/log/%s_%s.%d", gtm_dist, omi_service,
 			    tbuf, fileID++);
 		}
 	}
 	else
-		SPRINTF(fileName,"/usr/tmp/%s_%s.%d", omi_service,
+		SNPRINTF(fileName, GTM_PATH_MAX,"/usr/tmp/%s_%s.%d", omi_service,
 			tbuf, fileID++);
 
 #ifdef __MVS__
@@ -136,7 +139,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		perror(fileName);
 	}
 #endif
-	fp = fopen(fileName, "w");
+	Fopen(fp, fileName, "w");
 	if (fp == NULL)
 	{
 		FPRINTF(stderr,"Could not open packet dump file (%s).\n", fileName);
@@ -172,5 +175,5 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		FPRINTF(fp,"%16s %x\n", chr, offset);
 	    }
 	FFLUSH(fp);
-	fclose(fp);
+	FCLOSE(fp, status);
 }

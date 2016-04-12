@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,10 @@
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
-GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	int			process_exiting;
+GBLREF	boolean_t		is_src_server;
 
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 {
@@ -61,8 +65,9 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	 * prc_vec->jpv_time is for accounting purpose only. Usually it is kind of redundant too. */
 	if (!jgbl.forw_phase_recovery)
 	{
-		assert(NULL == jgbl.mur_pini_addr_reset_fnptr);
-		assert((NULL == csa->miscptr) || IS_DSE_IMAGE);
+		assert((NULL == jgbl.mur_pini_addr_reset_fnptr) || (IS_MUPIP_IMAGE && exit_handler_active && process_exiting));
+		assert((NULL == csa->miscptr) || IS_DSE_IMAGE || (IS_MUPIP_IMAGE && exit_handler_active && process_exiting)
+			|| is_src_server);
 		mur_plst = NULL;
 		if (IS_GTCM_GNP_SERVER_IMAGE && (NULL != originator_prc_vec))
 		{
@@ -86,8 +91,8 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	}
 	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
 	pini_record.filler = 0;
-	pini_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&pini_record, SIZEOF(struct_jrec_pini));
-	jnl_write(jpc, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
+	pini_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&pini_record, SIZEOF(struct_jrec_pini));
+	jnl_write(jpc, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL, NULL);
 	/* Note : jpc->pini_addr should not be updated until PINI record is written [C9D08-002376] */
 	jpc->pini_addr = jbp->freeaddr - PINI_RECLEN;
 	assert(jgbl.forw_phase_recovery || (NULL == mur_plst));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,10 +60,13 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	MV_FORCE_STR(start_label);
 	MV_FORCE_STR(end_label);
 	MV_FORCE_STR(rtn);
+	/* Note this initial setting of is_trigger is necessary (even though it gets replaced a few lines down) because
+	 * the macro DBGIFTRIGR uses it.
+	 */
 	DBGTRIGR_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
 	DBGIFTRIGR((stderr, "op_zprint: Performing zprint of a trigger $tlevel=%d $trestart=%d\n", dollar_tlevel, t_tries));
 	stat1 = get_src_line(rtn, start_label, start_int_exp, &src1, &rtn_vector);
-	DBGTRIGR_ONLY(is_trigger=((NULL != rtn_vector) && (NULL != rtn_vector->trigr_handle)));
+	DBGTRIGR_ONLY(is_trigger = ((NULL != rtn_vector) && (NULL != rtn_vector->trigr_handle)));
 	DBGIFTRIGR((stderr, "op_zprint: get_src_line returned %d for %lx\n", stat1, rtn_vector));
 	if (OBJMODMISS == stat1)
 	{

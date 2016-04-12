@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +12,7 @@
 
 #include "mdef.h"
 
-#if defined(VMS)
-#include <ssdef.h>
-#endif
-
-#if defined(UNIX)
-#include <signal.h>
-#endif
+#include "gtm_signal.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -38,16 +33,16 @@ GBLREF relque		action_que;
 GBLREF gd_region	*gv_cur_region;
 GBLREF struct NTD	*ntd_root;
 
+error_def(CMERR_CMINTQUE);
+
 void gtcml_chkprc(cm_lckblklck *lck)
 {
 	cm_lckblkprc	*prc, *prc1;
 	boolean_t	found;
 	long		status;
-	CMI_MUTEX_DECL;
+	CMI_MUTEX_DECL(cmi_mutex_rc);
 
-	error_def(CMERR_CMINTQUE);
-
-	CMI_MUTEX_BLOCK;
+	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 	found = FALSE;
 	prc = lck->prc;
 	/* it appears that the design assumes that prc should never be null, but we have empirical evidence that it happens.
@@ -86,7 +81,7 @@ void gtcml_chkprc(cm_lckblklck *lck)
 	{
 		status = gtcm_action_pending(prc->user);
 		if (INTERLOCK_FAIL == status)
-			rts_error(VARLSTCNT(1) CMERR_CMINTQUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
 		prc->next->last = prc->last;
 		prc->last->next = prc->next;
 		if (prc->next == prc)
@@ -95,5 +90,5 @@ void gtcml_chkprc(cm_lckblklck *lck)
 			lck->prc = prc->next;
 		free(prc);
 	}
-	CMI_MUTEX_RESTORE;
+	CMI_MUTEX_RESTORE(cmi_mutex_rc);
 }

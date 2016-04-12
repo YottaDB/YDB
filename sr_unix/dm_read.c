@@ -13,14 +13,16 @@
 /* WARNING: this module contains a mixture of ASCII and EBCDIC on S390*/
 #include "mdef.h"
 
-#include "gtm_string.h"
-#include <errno.h>
-#include <wctype.h>
-#include <wchar.h>
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_select.h"
+#include "gtm_string.h"
+
+#include <errno.h>
+#include <wctype.h>
+#include <wchar.h>
+
 #include "io.h"
 #include "trmdef.h"
 #include "iottdef.h"
@@ -381,7 +383,7 @@ void	dm_read (mval *v)
 				if (!prin_in_dev_failure)
 					prin_in_dev_failure = TRUE;
 				else
-					exit(errno);
+					EXIT(errno);
 			}
 			tt_ptr->discard_lf = FALSE;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,11 +18,8 @@
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_ctype.h"
-#if !defined(__MVS__) && !defined(VMS) && !defined(__CYGWIN__) && (!defined(__GNUC__) && defined(__hpux))
+#if !defined(__MVS__) && !defined(__CYGWIN__) && (!defined(__GNUC__) && defined(__hpux))
 #include <sys/socketvar.h>
-#endif
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
 #endif
 #include <errno.h>
 
@@ -51,7 +48,6 @@
 #endif
 
 #define MAX_SECONDARY_LEN 		(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and port number */
-#define DEFAULT_JNLPOOL_SIZE		(64 * 1024 * 1024)
 #define DEFAULT_SHUTDOWN_TIMEOUT	30
 #define GTMSOURCE_CONN_PARMS_LEN 	((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
 
@@ -69,27 +65,26 @@ error_def(ERR_TEXT);
 
 int gtmsource_get_opt(void)
 {
-	char		*connect_parm_token_str, *connect_parm, *strtokptr;
-	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
-	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
+	boolean_t	connect_parms_badval, dotted_notation, log, log_interval_specified, plaintext_fallback, secondary;
+	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
+	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
+	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
+	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
+	char		inst_name[MAX_FN_LEN + 1], *ip_end, *strtokptr;
+	char		secondary_sys[MAX_SECONDARY_LEN];
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
-	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
-	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
-	int		tries, index = 0, timeout_status, connect_parms_index, status, renegotiate_interval;
-	struct hostent	*sec_hostentry;
-	unsigned short	log_file_len, filter_cmd_len;
-	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
-	unsigned short	freeze_val_len, freeze_comment_len, tlsid_len;
-	int		errcode;
-	int		port_len;
-	char		*ip_end;
+	gtm_int64_t	buffsize;
+	int		connect_parms_index, errcode, index = 0, port_len, renegotiate_interval, status, tries, timeout_status;
 	mstr		log_nam, trans_name;
-	boolean_t	secondary, dotted_notation, log, log_interval_specified, connect_parms_badval, plaintext_fallback;
+	struct hostent	*sec_hostentry;
+	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
+	unsigned short	secondary_len, statslog_val_len, tlsid_len, update_val_len;
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
 	gtmsource_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
+	gtmsource_options.zerobacklog = (CLI_PRESENT == cli_present("ZEROBACKLOG"));
 	gtmsource_options.activate = (CLI_PRESENT == cli_present("ACTIVATE"));
 	gtmsource_options.deactivate = (CLI_PRESENT == cli_present("DEACTIVATE"));
 	gtmsource_options.checkhealth = (CLI_PRESENT == cli_present("CHECKHEALTH"));
@@ -219,15 +214,7 @@ int gtmsource_get_opt(void)
 				util_out_print("Error parsing CONNECTPARAMS qualifier", TRUE);
 				return(-1);
 			}
-#ifdef VMS
-			/* strip the quotes around the string. (DCL doesn't do it) */
-			assert('"' == tmp_connect_parms_str[0]);
-			assert('"' == tmp_connect_parms_str[connect_parms_str_len - 1]);
-			connect_parms_str = &tmp_connect_parms_str[1];
-			tmp_connect_parms_str[connect_parms_str_len - 1] = '\0';
-#else
 			connect_parms_str = &tmp_connect_parms_str[0];
-#endif
 			for (connect_parms_index =
 					GTMSOURCE_CONN_HARD_TRIES_COUNT,
 			     connect_parms_badval = FALSE,
@@ -237,7 +224,6 @@ int gtmsource_get_opt(void)
 			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
 			     connect_parms_index++,
 			     connect_parm_token_str = NULL)
-
 			{
 				errno = 0;
 				if ((0 == (gtmsource_options.connect_parms[connect_parms_index] = ATOI(connect_parm))
@@ -309,14 +295,18 @@ int gtmsource_get_opt(void)
 		assert(secondary || CLI_PRESENT == cli_present("PASSIVE"));
 		gtmsource_options.mode = ((secondary) ? GTMSOURCE_MODE_ACTIVE : GTMSOURCE_MODE_PASSIVE);
 		if (CLI_PRESENT == cli_present("BUFFSIZE"))
-		{
-			if (!cli_get_int("BUFFSIZE", &gtmsource_options.buffsize))
+		{	/* use a big conversion so we have a signed number for comparison */
+			if (!cli_get_int64("BUFFSIZE", &buffsize))
 			{
 				util_out_print("Error parsing BUFFSIZE qualifier", TRUE);
 				return(-1);
 			}
-			if (MIN_JNLPOOL_SIZE > gtmsource_options.buffsize)
+			if (MIN_JNLPOOL_SIZE > buffsize)
 				gtmsource_options.buffsize = MIN_JNLPOOL_SIZE;
+			else if ((gtm_int64_t)MAX_JNLPOOL_SIZE < buffsize)
+				gtmsource_options.buffsize = (uint4)MAX_JNLPOOL_SIZE;
+			else
+				gtmsource_options.buffsize = (uint4)buffsize;
 		} else
 			gtmsource_options.buffsize = DEFAULT_JNLPOOL_SIZE;
 		/* Round up buffsize to the nearest (~JNL_WRT_END_MASK + 1) multiple */
@@ -410,7 +400,7 @@ int gtmsource_get_opt(void)
 			util_out_print("Error parsing STATSLOG qualifier", TRUE);
 			return(-1);
 		}
-		UNIX_ONLY(cli_strupper(statslog_val);)
+		cli_strupper(statslog_val);
 		if (0 == STRCMP(statslog_val, "ON"))
 			gtmsource_options.statslog = TRUE;
 		else if (0 == STRCMP(statslog_val, "OFF"))

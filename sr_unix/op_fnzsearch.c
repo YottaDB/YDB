@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "mvalconv.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
+#include "have_crit.h"
 #include "op_fnzsearch.h"
 
 LITREF		mval	literal_null;
@@ -79,6 +80,11 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	plength		*match_len;
 	glob_t		globbuf;
 	boolean_t	absolute;
+	intrpt_state_t	prev_intrpt_state;
+#ifdef _AIX
+	boolean_t	use_stat;
+	struct		stat statbuf;
+#endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -142,14 +148,32 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 				/* Canonicalize the path by appropriately removing '.' and '..' path modifiers. */
 				CANONICALIZE_PATH(buf_ptr);
 				/* Do not sort the matches because we use $order() to obtain them from a local anyway. */
-				if (0 == (status = glob(sanitized_buf, LINUX_ONLY(GLOB_PERIOD | ) GLOB_NOSORT,
-						(int (*)(const char *, int))NULL, &globbuf)))
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+#ifdef _AIX
+				use_stat = !((pblk.fnb & (1 << V_WILD_NAME)) || (pblk.fnb & (1 << V_WILD_DIR)));
+				if (use_stat)
+				{
+					STAT_FILE(sanitized_buf, &statbuf, status);
+					if (!status)
+						globbuf.gl_pathc = 1;
+				}
+				else
+#endif
+					status = glob(sanitized_buf, LINUX_ONLY(GLOB_PERIOD | ) GLOB_NOSORT,
+							(int (*)(const char *, int))NULL, &globbuf);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				if (0 == status)
 				{
 					TREF(fnzsearch_globbuf_ptr) = &globbuf;
 					file.mvtype = MV_STR;
 					for (i = 0; i < globbuf.gl_pathc; i++)
 					{	/* We do not care for . and .. */
-						match = globbuf.gl_pathv[i];
+#ifdef _AIX
+						if (use_stat)
+							match = sanitized_buf;
+						else
+#endif
+							match = globbuf.gl_pathv[i];
 						length = STRLEN(match);
 						if ((length > 1) && ('.' == match[length - 1]) && (('/' == match[length - 2])
 								|| ((length > 2) && ('.' == match[length - 2])
@@ -168,18 +192,36 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 						match_len = (plength *)&(var_ref->v.m[1]);
 						SET_LENGTHS(match_len, file.str.addr, length, TRUE);
 					}
-					globfree(&globbuf);
-					TREF(fnzsearch_globbuf_ptr) = NULL;
+#ifdef _AIX
+					if (!use_stat)
+					{
+#endif
+						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						globfree(&globbuf);
+						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						TREF(fnzsearch_globbuf_ptr) = NULL;
+#ifdef _AIX
+					}
+#endif
 				} else
 				{
-					globfree(&globbuf);
-					TREF(fnzsearch_globbuf_ptr) = NULL;
-					if (GLOB_NOSPACE == status)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ENOMEM);	/* Ran out of memory. */
-					else if (GLOB_ABORTED == status)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) EACCES);	/* Access error. */
-					else
-						assert(GLOB_NOMATCH == status);				/* No matches found. */
+#ifdef _AIX
+					if (!use_stat)
+					{
+#endif
+						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						globfree(&globbuf);
+						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						TREF(fnzsearch_globbuf_ptr) = NULL;
+						if (GLOB_NOSPACE == status)
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ENOMEM); /* Ran out of memory. */
+						else if (GLOB_ABORTED == status)
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) EACCES); /* Access error. */
+						else
+							assert(GLOB_NOMATCH == status);			  /* No matches found. */
+#ifdef _AIX
+					}
+#endif
 				}
 			}
 		}
@@ -204,9 +246,12 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
 {
 	START_CH(TRUE);
+	/* START_CH() defines prev_intrpt_state */
 	if (NULL != TREF(fnzsearch_globbuf_ptr))
 	{
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		globfree(TREF(fnzsearch_globbuf_ptr));
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		TREF(fnzsearch_globbuf_ptr) = NULL;
 	}
 	TREF(lv_null_subs) = TREF(fnzsearch_nullsubs_sav);

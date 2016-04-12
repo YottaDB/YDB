@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +54,10 @@ int gtmrecv_end_helpers(boolean_t is_rcvr_srvr)
 		upd_helper_ctl->reap_helpers = HELPER_REAP_WAIT;
 		while (HELPER_REAP_NONE != upd_helper_ctl->reap_helpers && SRV_ALIVE == is_recv_srv_alive())
 			SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_SHUTDOWN);
-		upd_helper_ctl->reap_helpers = HELPER_REAP_NONE;
+		if (HELPER_REAP_WAIT == upd_helper_ctl->reap_helpers)	/* No receiver to clean things up for us */
+			gtmrecv_reap_helpers(TRUE);	/* waitpid will fail, but is_proc_alive() check will work */
+		else
+			upd_helper_ctl->reap_helpers = HELPER_REAP_NONE;
 	}
 	return NORMAL_SHUTDOWN;
 }

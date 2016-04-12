@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,10 +13,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#ifdef VMS
-#include <descrip.h>
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -57,6 +53,9 @@
 #include "gtmimagename.h"
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
+#include "format_targ_key.h"
+#include "mupip_reorg_encrypt.h"
+#include "process_reorg_encrypt_restart.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -66,7 +65,7 @@
 #endif
 
 GBLDEF	trans_num		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
-GBLDEF	int4			tp_fail_n, tp_fail_level;
+GBLDEF	int4			blkmod_fail_type, blkmod_fail_level;
 GBLDEF	int4			n_pvtmods, n_blkmods;
 GBLDEF	gv_namehead		*tp_fail_hist[CDB_MAX_TRIES];
 GBLDEF	block_id		t_fail_hist_blk[CDB_MAX_TRIES];
@@ -99,14 +98,10 @@ GBLREF	symval			*curr_symval;
 GBLREF	trans_num		tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	mstr			extnam_str;
-#ifdef VMS
-GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t		tp_restart_fail_sig_used;
-#else
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		is_updproc;
-#endif
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 #ifdef GTM_TRIGGER
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
@@ -114,10 +109,8 @@ GBLREF	mval			dollar_ztslate;
 LITREF	mval			literal_null;
 #endif
 
-#ifdef UNIX
 error_def(ERR_GVFAILCORE);
 error_def(ERR_REPLONLNRLBK);
-#endif
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
 error_def(ERR_TPRESTART);
@@ -125,28 +118,9 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
 
-#define	GVNAME_UNKNOWN		"*BITMAP"
-
-static readonly char		gvname_unknown[] = GVNAME_UNKNOWN;
-static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
-
 CONDITION_HANDLER(tp_restart_ch)
 {
 	START_CH(TRUE);
-	/* On Unix, there is only one set of the signal info and this error will handily replace it. For VMS,
-	 * far more subterfuge is required. We will save the signal information and paramters and overlay the
-	 * TPRETRY signal information with it so that the signal will be handled properly. Note also that since
-	 * VMS does not support triggers, no special avoidance of the below needs to occur when we are dealing with
-	 * a trigger unwind initiated rethrow.
-	 */
-#	ifdef VMS
-	assert(TPRESTART_ARG_CNT >= sig->chf$is_sig_args);
-	if (NULL == tp_restart_fail_sig)
-		tp_restart_fail_sig = (struct chf$signal_array *)malloc((TPRESTART_ARG_CNT + 1) * SIZEOF(int));
-	memcpy(tp_restart_fail_sig, sig, (sig->chf$is_sig_args + 1) * SIZEOF(int));
-	assert(FALSE == tp_restart_fail_sig_used);
-	tp_restart_fail_sig_used = TRUE;
-#	endif
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart_ch: ERROR!! unwinding C frame to return. Error is %d, tprestart_state is %d\n",
 			       arg, tprestart_state)));
 	/* It is possible that dollar_tlevel at the time of the ESTABLISH_RET was higher than the current dollar_tlevel.
@@ -156,17 +130,18 @@ CONDITION_HANDLER(tp_restart_ch)
 	 * active_ch->dollar_tlevel so it is in sync with the current dollar_tlevel. This prevents an assert failure in UNWIND.
 	 * START_CH would have done a active_ch-- so we need a active_ch[1] to get at the desired active_ch.
 	 */
-	UNIX_ONLY(assert(active_ch[1].dollar_tlevel >= dollar_tlevel);)
-	UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
+	assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
+	DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
 	UNWIND(NULL, NULL);
 }
 
 /* Note that adding a new rts_error in "tp_restart" might need a change to the INVOKE_RESTART macro in tp.h and
- * TPRESTART_ARG_CNT in errorsp.h (sl_vvms). See comment in tp.h for INVOKE_RESTART macro for the details.
+ * TPRESTART_ARG_CNT in errorsp.h. See comment in tp.h for INVOKE_RESTART macro for the details.
  */
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	unsigned char		*cp;
+	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
 	unsigned int		hist_index;
 	tp_frame		*tf;
 	mv_stent		*mvc;
@@ -179,6 +154,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	mstr			gvname_mstr, reg_mstr;
 	gd_region		*restart_reg, *reg;
 	int			tprestart_rc, len;
+	gv_namehead		*gvt;
 	enum cdb_sc		status;
 	DCL_THREADGBL_ACCESS;
 
@@ -202,9 +178,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * inadvertently using a TRUE value for "handle_errors_internally". One reason for being paranoid
 		 * about the TRUE usage is for example in gv_trigger.c, if tp_restart is incorrectly invoked with
 		 * TRUE as the second paramter, it will result in indefinite number of cores on a broken database.
-		 * In VMS, SIGNAL can be used only if we are inside a condition handler so do the assert only in Unix.
 		 */
-		UNIX_ONLY(assert(ERR_TPRETRY == SIGNAL));
+		assert(ERR_TPRETRY == SIGNAL);
 		ESTABLISH_RET(tp_restart_ch, tprestart_rc);
 	}
 	assert(1 == newlevel);
@@ -257,15 +232,25 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 */
 		assert(!mupip_jnl_recover || WB_COMMIT_ERR_ENABLED ||
 				(WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
-		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_limit))
-			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_limit)) % TREF(tprestart_syslog_delta)))))
+		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_first))
+			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
 		{
-			if (NULL != tp_fail_hist[t_tries])
-				gvname_mstr = tp_fail_hist[t_tries]->gvname.var_name;
-			else
+			gvt = tp_fail_hist[t_tries];
+			if (NULL == gvt)
 			{
 				gvname_mstr.addr = (char *)gvname_unknown;
 				gvname_mstr.len = gvname_unknown_len;
+			} else if ((NULL != gvt->gd_csa) && (gvt->gd_csa->dir_tree == gvt))
+			{
+				gvname_mstr.addr = (char *)gvname_dirtree;
+				gvname_mstr.len = gvname_dirtree_len;
+			} else
+			{
+				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buff[MAX_ZWR_KEY_SZ - 1];
+				assert(buff[0] == '^');
+				gvname_mstr.addr = (char*)(buff + 1);
+				gvname_mstr.len = end - buff - 1;
 			}
 			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 			assert(0 == cdb_sc_normal);
@@ -301,7 +286,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
 					t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					n_pvtmods, n_blkmods, tp_fail_level, tp_fail_n,
+					n_pvtmods, n_blkmods, blkmod_fail_level, blkmod_fail_type,
 					sgm_info_ptr->num_of_blks,
 					sgm_info_ptr->cw_set_depth, &local_tn,
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
@@ -327,6 +312,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		switch (status)
 		{
 			case cdb_sc_helpedout:
+				assert(IS_FINAL_RETRY_CODE(status));
 				csa = sgm_info_ptr->tp_csa;
 				if (dba_bg == csa->hdr->acc_meth)
 				{
@@ -345,7 +331,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						 * cache-recovery to fix the shared memory structures. Since we hold crit,
 						 * so no need to grab/rel crit. Call wcs_recover right away.
 						 */
-						assert(!csa->hold_onto_crit UNIX_ONLY(|| jgbl.onlnrlbk));
+						assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
 						DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE);
 						wcs_recover(sgm_info_ptr->gv_cur_region);
 						DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE);
@@ -373,6 +359,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				 * virtue of it having now been referenced) has been added to tp_reg_list so all we need
 				 * now is a retry.
 				 */
+				assert(IS_FINAL_RETRY_CODE(status));
 				assert(CDB_STAGNATE == t_tries);
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
@@ -400,6 +387,52 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				)
 				/* If retry due to M-locks, sleep so needed locks have a chance to get released */
 				break;
+			case cdb_sc_reorg_encrypt:
+				assert(IS_FINAL_RETRY_CODE(status));
+				/* Even though the failure code is "cdb_sc_reorg_encrypt", it is possible
+				 * "process_reorg_encrypt_restart" was already called from "t_qread" which then
+				 * returned "cdb_sc_reorg_encrypt" that ended up in tp_restart. "reorg_encrypt_restart_csa" would
+				 * have been reset to NULL after opening the new keys in that case so no need to call it again.
+				 */
+				if (NULL != reorg_encrypt_restart_csa)
+				{
+#					ifdef DEBUG
+					/* Assert "reorg_encrypt_restart_csa" is present in the tp_reg_list AND all regions
+					 * are either locked down or not (i.e. reorg_encrypt_restart_csa->now_crit is a good
+					 * indicator of whether we need to release crit on all regions or not before doing
+					 * the "process_reorg_encrypt_restart" invocation.
+					 */
+					for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+					{
+						reg = tr->reg;
+						csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+						assert(csa->now_crit == reorg_encrypt_restart_csa->now_crit);
+						if (csa == reorg_encrypt_restart_csa)
+							break;
+					}
+					assert(NULL != tr);
+#					endif
+					if (!reorg_encrypt_restart_csa->now_crit)
+					{
+						process_reorg_encrypt_restart();
+						assert(NULL == reorg_encrypt_restart_csa);
+					} else
+					{	/* We are holding crit and need to do "process_reorg_encrypt_restart" (possible
+						 * if we noticed the "cdb_sc_reorg_encrypt" restart in the 2nd retry in "tp_tend".
+						 * In this case, we need to release crit to avoid heavyweight encryption handle
+						 * open operations inside crit. And need to reobtain crit afterwards. The
+						 * existing function "tp_crit_all_regions" does exactly that (by invoking
+						 * "grab_crit_encr_cycle_sync").
+						 */
+						for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+							rel_crit(tr->reg);
+						process_reorg_encrypt_restart();
+						assert(NULL == reorg_encrypt_restart_csa);
+						tp_tend_status = tp_crit_all_regions();
+						assert(FALSE != tp_tend_status);
+					}
+				}
+				/* WARNING - fallthrough !!! */
 			/* Journaling might get turned off in the final retry INSIDE crit while trying to flush journal buffer or
 			 * during extending the journal file (due to possible disk issues) in which case we will come here with
 			 * t_tries = CDB_STAGNATE and failure status set to cdb_sc_jnlclose
@@ -412,7 +445,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			 * beginning of final retry) since jnl state changes are considered infrequent that too in the final retry
 			 */
 			case cdb_sc_jnlstatemod:
-#			ifdef UNIX
 			/* cdb_sc_onln_rlbk[1,2] are possible in the final retry. See comment below that explains why. So, decrement
 			 * t_tries to account for later increment
 			 */
@@ -420,8 +452,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			case cdb_sc_onln_rlbk2:
 			case cdb_sc_instancefreeze:
 			case cdb_sc_gvtrootmod2:
-#			endif
 			case cdb_sc_optrestart:
+				assert(IS_FINAL_RETRY_CODE(status));
 				if (CDB_STAGNATE <= t_tries)
 				{
 					t_tries--;
@@ -430,20 +462,18 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						(TREF(tp_restart_dont_counts))++;
 #					endif
 				}
-#				ifdef UNIX
 				if (cdb_sc_instancefreeze == status)
 					WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;
-#				endif
 				/* fall through */
 			default:
 				if (CDB_STAGNATE < ++t_tries)
 				{
+					assert(!IS_FINAL_RETRY_CODE(status));
 					hist_index = t_tries;
 					t_tries = 0;
 					assert(0 != have_crit(CRIT_HAVE_ANY_REG)); /* we should still be holding crit */
 					assert(gtm_white_box_test_case_enabled
 					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
-#					ifdef UNIX
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist,
 							ERR_GVFAILCORE);
 					/* Generate core only if not triggering this codepath using white-box tests */
@@ -452,8 +482,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
 					)
 							gtm_fork_n_core();
-#					endif
-					VMS_ONLY(send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 					return 0; /* for the compiler only -- never executed */
 				} else
@@ -468,11 +496,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					 * The next to last try is not followed by a rel_quant as it may leave the buffers
 					 * 	locked, to reduce live lock and deadlock issues.
 					 * With only 4 tries that leaves only the "middle" for rel_quant.
+					 * This seems like a legitimate rel_quant
 					 */
 					if ((CDB_STAGNATE - 1) == t_tries)
 						rel_quant();
 				}
 		}
+		assert(NULL == reorg_encrypt_restart_csa);
 		if ((CDB_STAGNATE <= t_tries))
 		{	/* If there are any regions that haven't yet been opened, open them before attempting for crit on
 			 * all. Since we don't hold any crit locks now, we can rest assured this cannot cause a deadlock.
@@ -498,7 +528,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 			}
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE);
-			UNIX_ONLY(if (!jgbl.onlnrlbk))
+			if (!jgbl.onlnrlbk)
 				tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
 			/* else online rollback in which case we already hold crit on all regions */
 			/* It is possible we came into tp_restart to handle a different restart code but as part of the final
@@ -508,12 +538,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			 * enough to check any region as Online Rollback will increment the cycle field ON all the regions
 			 * unconditionally
 			 */
-#			ifdef UNIX
 			if (cs_addrs_list && MISMATCH_ONLN_RLBK_CYCLES(cs_addrs_list, cs_addrs_list->nl))
 			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
 				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat
 				 * this as just an online rollback restart and handle it by syncing cycles, but by doing so, we will
-				 * loose the information that an online rollback happened when we go back to gvcst_{put,kill}. This
+				 * lose the information that an online rollback happened when we go back to gvcst_{put,kill}. This
 				 * is usually fine except when we are in implicit TP (due to triggers). In case of implicit TP,
 				 * gvcst_{put,kill} has specific code to handle online rollback differently than other restart codes
 				 * Because of this reason, we don't want to sync cycles but instead continue with the final retry.
@@ -525,7 +554,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				RESET_ALL_GVT_CLUES;
 				reset_clues_done = TRUE;
 			}
-#			endif
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE);
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
@@ -537,14 +565,12 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					TP_CHANGE_REG_IF_NEEDED(reg);
 					MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
 				}
-#				ifdef UNIX
 				csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 				if (MISMATCH_ROOT_CYCLES(csa, csa->nl) && !reset_clues_done)
 				{
 					RESET_ALL_GVT_CLUES;
 					reset_clues_done = TRUE;
 				}
-#				endif
 			}
 		}
 #	ifdef GTM_TRIGGER
@@ -552,7 +578,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		status = LAST_RESTART_CODE;
 	DBGTRIGR((stderr, "tp_restart: past initial normal state processing\n"));
 #	endif
-	/* The below code to determine the roll-back point depends on tp_frame sized blocks being pushed on the TP
+	/* The below code to determine the rollback point depends on tp_frame sized blocks being pushed on the TP
 	 * stack. If ever other sized blocks are pushed on, a different method will need to be found.
 	 */
 	assert(0 == ((tpstackbase - (unsigned char *)tp_pointer) % SIZEOF(tp_frame))); /* Simple check for above condition */
@@ -574,7 +600,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * further restarts, we don't need to because tp_set_sgm (done for each region that is updated in a TP transaction)
 		 * does the syncing anyways.
 		 */
-#		ifdef UNIX
 		assert(cdb_sc_normal != status);
 		switch (status)
 		{
@@ -590,7 +615,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			default:
 				break;
 		}
-#		endif
 #	ifdef GTM_TRIGGER
 	}
 	if (TPRESTART_STATE_TPUNW >= tprestart_state)
@@ -623,26 +647,26 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		}
 		extnam_str.len = len;
 #		ifdef GTM_TRIGGER
-		/* Maintenance of SFF_IMPLTSTART_CALLD stack frame flag:
+		/* Maintenance of SSF_NORET_VIA_MUMTSTART stack frame flag:
 		 * - Set by gtm_trigger when trigger base frame is created. Purpose to prevent MUM_TSTART from restarting
 		 *   a frame making a call-in to a trigger (flag is checked in MUM_TSTART macro) because the mpc in the
 		 *   stack frame is not the return point to the frame, which is only available in the C stack.
 		 * - Both TP restart and error handling unwinds can use MUM_TSTART to restart frame.
 		 * - TP restart changes the mpc to the proper address (where TSTART was done) before invoking MUM_TSTART. We allow
-		 *   this by shutting the SFF_IMPLTSTART_CALLD flag off when mpc is changed.
+		 *   this by shutting the SSF_NORET_VIA_MUMTSTART flag off when mpc is changed.
 		 * - For TSTARTs done implcitly by triggers, MUM_TSTART would break things so we do not turn off the flag
 		 *   for that type.
 		 */
 		if (!tf->implicit_tstart)
-		{	/* SFF_IMPLTSTART_CALLD validation:
+		{	/* SSF_NORET_VIA_MUMTSTART validation:
 			 * - This is not a trigger-initiated implicit TSTART.
 			 * - If the flag is is not on, no further checks. Turning off flag is unconditional for best performance.
 			 * - If flag is on, verify the address in the stack frame is in fact being modified so it points to
 			 *   a TSTART instead of the (currently) trigger call point.
 			 */
-			assert(!(tf->fp->flags & SFF_IMPLTSTART_CALLD) || (tf->fp->mpc != tf->restart_pc));
-			tf->fp->flags &= SFF_IMPLTSTART_CALLD_OFF;
-			DBGTRIGR((stderr, "tp_restart: Removing SFF_IMPLTSTART_CALLD in frame 0x"lvaddr"\n", tf->fp));
+			assert(!(tf->fp->flags & SSF_NORET_VIA_MUMTSTART) || (tf->fp->mpc != tf->restart_pc));
+			tf->fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
+			DBGTRIGR((stderr, "tp_restart: Removing SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", tf->fp));
 		}
 #		endif
 		tf->fp->mpc = tf->restart_pc;
@@ -766,14 +790,12 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 #	endif
 	if (!dollar_trestart)		/* in case of a wrap */
 		dollar_trestart--;
-	UNIX_ONLY(
-		/* Now that we are done with all the cleanup related to this restart, issue rts_error if we are update process.
-		 * updproc_ch knows to handle this SIGNAL.
-		 */
-		assert(cdb_sc_normal != status);
-		if (is_updproc && ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
-	)
+	/* Now that we are done with all the cleanup related to this restart, issue rts_error if we are update process.
+	 * updproc_ch knows to handle this SIGNAL.
+	 */
+	assert(cdb_sc_normal != status);
+	if (is_updproc && ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
 	if (handle_errors_internally)
 		REVERT;
 	TREF(expand_prev_key) = FALSE;	/* in case we did a "t_retry" in the middle of "gvcst_zprevious2" */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +115,7 @@ error_def(ERR_TEXT);
 int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t *sem_created_ptr, boolean_t immediate)
 {
 	int			status, save_errno, sem_id, semval, semnum, instfilelen;
-	time_t			sem_ctime;
+	time_t			semctime;
 	boolean_t		sem_created, force_increment;
 	char			*instfilename;
 	union semun		semarg;
@@ -125,6 +126,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 
 	SETUP_THREADGBL_ACCESS;
 	*sem_created_ptr = sem_created = FALSE; /* assume semaphore not created by default */
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	force_increment = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && INST_FREEZE_ON_ERROR_POLICY));
 	/* First ensure that the caller has grabbed the ftok semaphore on the replication instance file */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
@@ -138,15 +140,15 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 	if (JNLPOOL_SEGMENT == pool_type)
 	{
 		sem_id = repl_inst_filehdr->jnlpool_semid;
-		sem_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
+		semctime = repl_inst_filehdr->jnlpool_semid_ctime;
 	}
 	else
 	{
 		sem_id = repl_inst_filehdr->recvpool_semid;
-		sem_ctime = repl_inst_filehdr->recvpool_semid_ctime;
+		semctime = repl_inst_filehdr->recvpool_semid_ctime;
 	}
 	semarg.buf = &semstat;
-	if ((INVALID_SEMID == sem_id) || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)) || (sem_ctime != semarg.buf->sem_ctime))
+	if ((INVALID_SEMID == sem_id) || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)) || (semctime != semarg.buf->sem_ctime))
 	{	/* Semaphore doesn't exist. Create new ones */
 		if (JNLPOOL_SEGMENT == pool_type)
 		{
@@ -177,7 +179,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			save_errno = errno;
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semctl()");
 		}
-		sem_ctime = semarg.buf->sem_ctime;
+		semctime = semarg.buf->sem_ctime;
 	} else if (JNLPOOL_SEGMENT == pool_type)
 		set_sem_set_src(sem_id);
 	else
@@ -220,7 +222,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 		}
 		holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = TRUE;
 		repl_inst_filehdr->jnlpool_semid = sem_id;
-		repl_inst_filehdr->jnlpool_semid_ctime = sem_ctime;
+		repl_inst_filehdr->jnlpool_semid_ctime = semctime;
 	}
 	else
 	{
@@ -286,7 +288,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			holds_sem[RECV][semnum] = TRUE;
 		}
 		repl_inst_filehdr->recvpool_semid = sem_id;
-		repl_inst_filehdr->recvpool_semid_ctime = sem_ctime;
+		repl_inst_filehdr->recvpool_semid_ctime = semctime;
 	}
 	return SS_NORMAL;
 }

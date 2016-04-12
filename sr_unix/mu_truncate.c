@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,6 +142,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	char			*err_msg;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -351,7 +353,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 		rel_crit(gv_cur_region);
 		return TRUE;
 	}
-	DEFER_INTERRUPTS(INTRPT_IN_TRUNC);
+	DEFER_INTERRUPTS(INTRPT_IN_TRUNC, prev_intrpt_state);
 	if (JNL_ENABLED(csa))
 	{ /* Write JRT_TRUNC and INCTN records */
 		if (!jgbl.dont_reset_gbl_jrec_time)
@@ -442,7 +444,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog, save_errno);
 	KILL_TRUNC_TEST(WBTEST_CRASH_TRUNCATE_5); /* 58 : Issue a kill -9 after after 2nd fsync */
 	CHECK_DBSYNC(gv_cur_region, save_errno);
-	ENABLE_INTERRUPTS(INTRPT_IN_TRUNC);
+	ENABLE_INTERRUPTS(INTRPT_IN_TRUNC, prev_intrpt_state);
 	curr_tn = csa->ti->curr_tn;
 	rel_crit(gv_cur_region);
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTRUNCSUCCESS, 5, DB_LEN_STR(gv_cur_region), old_total, new_total, &curr_tn);

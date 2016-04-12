@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,9 +85,8 @@ typedef struct
 			cumul_update_array_size += tmpua->update_array_size;							\
 			if (NULL == curr_ua) /* in PRO, don't take chances, reset first_ua/curr_ua to newly created upd array */\
 			{													\
-				if (dollar_tlevel && (NULL != first_ua)) /* if already in TP, we will lose all updates until now\
-									    if we reset first_ua. do not proceed in this case */\
-					GTMASSERT;										\
+				/* if already in TP, we will lose all updates until now if we reset first_ua. do not proceed */ \
+				assertpro(!dollar_tlevel || (NULL == first_ua));						\
 				first_ua = curr_ua = tmpua;									\
 			} else													\
 				curr_ua = curr_ua->next_ua = tmpua;								\
@@ -218,19 +218,17 @@ typedef struct
 #endif
 
 /* ********************************************************************************
- *	REORG_BLK_SEG(BNUM, ADDR, LEN) is the same as the BLK_SEG macro
- *	except that it takes a private copy of the input memory and adds that
- *	to the update array. This is necessary in case of MUPIP REORG for two
- *	operations (Coalesce and Swap). In either cases, the contents of one block
- *	will rely on the contents of itself and another block. This is not currently
- *	supported by t_end where the assumption is that all contents needed to build
- *	a buffer are available in that buffer itself (this greatly simplifies the
- *	process of pinning of buffers in shared memory). To avoid cross-links to other
- *	buffers, we need to take a copy of the other buffer's contents from shared
- *	memory into private memory before adding it to the update array. This macro
- *	should be called only by MUPIP REORG. An assert has been added to that effect.
+ *
+ *	REORG_BLK_SEG(BNUM, ADDR, LEN, BLK_SRCH_STAT) is the same as the BLK_SEG macro except that it takes a private copy of the
+ *	input memory and adds that to the update array. This is necessary in case of MUPIP REORG for two operations (Coalesce and
+ *	Swap). In either cases, the contents of one block will rely on the contents of itself and another block. This is not
+ *	currently supported by t_end where the assumption is that all contents needed to build a buffer are available in that buffer
+ *	itself (this greatly simplifies the process of pinning of buffers in shared memory). To avoid cross-links to other buffers,
+ *	we need to take a copy of the other buffer's contents from shared memory into private memory before adding it to the update
+ *	array. This macro should be called only by MUPIP REORG. An assert has been added to that effect.
+ *
  */
-#define REORG_BLK_SEG(BNUM, ADDR, LEN)						\
+#define REORG_BLK_SEG(BNUM, ADDR, LEN, BLK_SRCH_STAT)				\
 {										\
 	char			*lcl_ptr;					\
 	sm_ulong_t		lcl_len;					\
@@ -242,6 +240,7 @@ typedef struct
 	if ((0 > (sm_long_t)lcl_len) || ((blk_seg_cnt + lcl_len) > blk_size))	\
 	{									\
 		assert(CDB_STAGNATE > t_tries);					\
+		NONTP_TRACE_HIST_MOD(BLK_SRCH_STAT, t_blkmod_mu_clsce);		\
 		return cdb_sc_blkmod;						\
 	}									\
 	BLK_ADDR(lcl_ptr, lcl_len, char);					\

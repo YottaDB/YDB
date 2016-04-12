@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +57,6 @@ GBLREF	int4			tstart_trigger_depth;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	tp_frame		*tp_pointer;
 
-error_def(ERR_TRIGNAMBAD);
 error_def(ERR_TPRETRY);
 
 STATICFNDCL CONDITION_HANDLER(trigger_fill_xecute_buffer_ch);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,13 +13,13 @@
 #include "mdef.h"
 
 #include <stddef.h>
-#include <signal.h>		/* for VSIG_ATOMIC_T type */
 
 #include "gtm_time.h"
 #include "gtm_inet.h"
+#include "gtm_signal.h"	/* for VSIG_ATOMIC_T type */
 
 #ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
+#include <descrip.h> 	/* Required for gtmsource.h */
 #endif
 
 #include "cdb_sc.h"
@@ -108,7 +108,7 @@ GBLREF	uint4			t_err, process_id;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_one;
 GBLREF	boolean_t		mu_reorg_process;
@@ -126,7 +126,8 @@ GBLREF	boolean_t		is_dollar_incr;	/* valid only if gvcst_put is in the call-stac
 						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
-GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
+GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by
+								 * REORG UPGRADE/DOWNGRADE */
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		block_is_free;
@@ -143,6 +144,8 @@ GBLREF	int4			strm_index;
 #ifdef DEBUG
 GBLREF	boolean_t		mupip_jnl_recover;
 #endif
+GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG ENCRYPT is in progress */
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVKILLFAIL);
@@ -150,6 +153,7 @@ error_def(ERR_GVPUTFAIL);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLFLUSH);
 error_def(ERR_JRTNULLFAIL);
+error_def(ERR_JNLPOOLRECOVERY);
 error_def(ERR_NOTREPLICATED);
 error_def(ERR_TEXT);
 
@@ -181,7 +185,7 @@ error_def(ERR_TEXT);
 
 trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 {
-	srch_hist		*hist;
+	srch_hist		*hist, tmp_hist;
 	bt_rec_ptr_t		bt;
 	boolean_t		blk_used;
 	cache_rec		cr_save;
@@ -202,7 +206,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	jnldata_hdr_ptr_t	jnl_header;
 	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth, prev_cw_set_depth;
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
-	jnlpool_ctl_ptr_t	jpl, tjpl;
+	jnlpool_ctl_ptr_t	jpl;
+	jnlpool_write_ctx_t	jplctx;
 	boolean_t		replication = FALSE;
 #	ifdef UNIX
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
@@ -224,18 +229,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	enum gds_t_mode		mode;
 	uint4			prev_cr_array_index;
 	uint4			com_csum;
+	seq_num			temp_jnl_seqno;
 #	ifdef DEBUG
 	boolean_t		ready2signal_gvundef_lcl;
 	enum cdb_sc		prev_status;
-	GTMCRYPT_ONLY(
-		blk_hdr_ptr_t	save_old_block;
-	)
+	blk_hdr_ptr_t		save_old_block;
 #	endif
 	int			n_blks_validated;
 	boolean_t		before_image_needed, lcl_ss_in_prog = FALSE, reorg_ss_in_prog = FALSE;
 	boolean_t		ss_need_to_restart, new_bkup_started;
 	boolean_t		same_db_state;
 	gv_namehead		*gvnh;
+	qw_off_t		jnlpool_overflow_size;
 #	ifdef GTM_TRIGGER
 	uint4			cycle;
 #	endif
@@ -292,9 +297,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert(!gv_cur_region->read_only || !update_trans);
 	cr_array_index = 0;	/* be safe and reset it in PRO even if it is not zero */
 	/* If inctn_opcode has a valid value, then we better be doing an update. The only exception to this rule is if we are
-	 * in MUPIP REORG UPGRADE/DOWNGRADE (mu_reorg_upgrd_dwngrd.c) where update_trans is explicitly set to 0 in some cases.
+	 * in MUPIP REORG UPGRADE/DOWNGRADE/ENCRYPT (mu_reorg_upgrd_dwngrd.c or mupip_reorg_encrypt.c), where update_trans is
+	 * explicitly set to 0 in some cases.
 	 */
-	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || update_trans);
+	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans UNIX_ONLY(|| TREF(in_gvcst_redo_root_search)));
 	if (cnl->wc_blocked || (is_mm && (csa->total_blks != csa->ti->total_blks)))
 	{	/* If blocked, or we have MM and file has been extended, force repair */
@@ -310,6 +316,35 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		SHM_READ_MEMORY_BARRIER;
 		same_db_state = (start_tn == csa->ti->early_tn);
 		n_blks_validated = 0;
+		if (cw_map_depth)
+		{	/* Bit maps from "mupip_reorg_encrypt" or "mu_reorg_upgrd_dwngrd" that need history validation.
+			 * There would be just ONE cse entry and "hist2" is guaranteed to be NULL. Assert that.
+			 * Morph the one cse into a history that hist2 points to so we can use the below EACH_HIST for loop.
+			 */
+			assert(mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog);
+			assert(1 == cw_map_depth);
+			assert(0 == cw_set_depth);
+			assert(NULL == hist2);
+			hist2 = &tmp_hist;
+			tmp_hist.h[1].blk_num = 0;			/* needed to indicate only one block in history array */
+			tmp_hist.h[0].cr = cw_set[0].cr;		/* used by TP_IS_CDB_SC_BLKMOD and cycle check below */
+			tmp_hist.h[0].buffaddr = cw_set[0].old_block;	/* used by TP_IS_CDB_SC_BLKMOD below */
+			assert(IS_BITMAP_BLK(cw_set[0].blk));
+			/* The for loop terminator for history validation below expects a non-zero block number
+			 * (it is coded to handle non-bitmap blocks) whereas we might pass the bitmap block 0 here
+			 * so add 1 to the block number so it descends down through the history validation but remember
+			 * to undo the +1 before using the NONTP_TRACE_HIST_MOD macro which expects the correct block number.
+			 */
+			tmp_hist.h[0].blk_num = cw_set[0].blk + 1;	/* used by for terminator and NONTP_TRACE_HIST_MOD below */
+			tmp_hist.h[0].tn = cw_set[0].tn;		/* used by TP_IS_CDB_SC_BLKMOD below */
+			tmp_hist.h[0].cycle = cw_set[0].cycle;		/* used by cycle check below */
+			assert(LCL_MAP_LEVL == cw_set[0].level);
+			tmp_hist.h[0].level = cw_set[0].level;		/* used by NONTP_TRACE_HIST_MOD below */
+			tmp_hist.h[0].blk_target = NULL;		/* used after "failed_skip_revert" in case of restart */
+			/* "prev_rec", "curr_rec", "cse" and "first_tp_srch_status" are unused by below validation
+			 * or "failed_skip_revert" code so no need to initialize them.
+			 */
+		}
 		for EACH_HIST(hist, hist1, hist2)
 		{
 			for (t1 = hist->h;  t1->blk_num;  t1++)
@@ -317,6 +352,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				if (!same_db_state && TP_IS_CDB_SC_BLKMOD(t1->cr, t1))
 				{	/* block has been modified */
 					status = cdb_sc_blkmod;
+					if (cw_map_depth && (hist == hist2))
+						t1->blk_num--;	/* Undo the + 1 done above (to ensure the for loop is executed) */
+					NONTP_TRACE_HIST_MOD(t1, t_blkmod_t_end1);
 					goto failed_skip_revert;
 				}
 				/* Validate buffer cycle */
@@ -670,6 +708,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 	}
 #	endif
+	if ((NULL != csa->encr_ptr) && (csa->encr_ptr->reorg_encrypt_cycle != cnl->reorg_encrypt_cycle))
+	{
+		assert(csa->now_crit);
+		SIGNAL_REORG_ENCRYPT_RESTART(mu_reorg_encrypt_in_prog, reorg_encrypt_restart_csa,
+				cnl, csa, csd, status, process_id);
+		goto failed;
+	}
 	if (JNL_ALLOWED(csa))
 	{
 		if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
@@ -777,6 +822,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_blkmod;
+					NONTP_TRACE_HIST_MOD(t1, t_blkmod_t_end2);
 					goto failed;
 				}
 				t1->cse = NULL;	/* reset for next transaction */
@@ -838,6 +884,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							|| t1->level || (1 != cw_set_depth) || (t1->blk_num != cw_set[0].blk))
 						{
 							status = cdb_sc_blkmod;
+							NONTP_TRACE_HIST_MOD(t1, t_blkmod_t_end3);
 							goto failed;
 						} else
 						{
@@ -845,6 +892,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							if (cdb_sc_normal != status)
 							{
 								status = cdb_sc_blkmod;
+								NONTP_TRACE_HIST_MOD(t1, t_blkmod_t_end4);
 								goto failed;
 							}
 						}
@@ -920,7 +968,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert(!TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 	/* check bit maps for usage */
 	if (0 != cw_map_depth)
-	{	/* Bit maps on end from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
+	{	/* Bit maps from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
 		prev_cw_set_depth = cw_set_depth;
 		prev_cr_array_index = cr_array_index;	/* note down current depth of pinned cache-records */
 		cw_set_depth = cw_map_depth;
@@ -1002,8 +1050,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		}
 	}
-	if ((0 != cw_map_depth) && mu_reorg_upgrd_dwngrd_in_prog)
-	{	/* Bit maps on end from mu_reorg_upgrd_dwngrd. Bitmap history has been validated.
+	if ((0 != cw_map_depth) && (mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog))
+	{	/* Bit maps from mu_reorg_upgrd_dwngrd. Bitmap history has been validated.
 		 * But we do not want bitmap cse to be considered for bg_update. Reset cw_set_depth accordingly.
 		 */
 		cw_set_depth = prev_cw_set_depth;
@@ -1106,12 +1154,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					assert(SIZEOF(bsiz) == SIZEOF(old_block->bsiz));
 					bsiz = old_block->bsiz;
 					assert(bsiz <= csd->blk_size);
-					cs->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
+					cs->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
 				}
 				DEBUG_ONLY(
 				else
-					assert(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block,
-											csa, old_block->bsiz));
+					assert(cs->blk_checksum == jnl_get_checksum(old_block, csa, old_block->bsiz));
 				)
 				assert(cs->cr->blk == cs->blk);
 			}
@@ -1150,30 +1197,29 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		if (is_replicator && (inctn_invalid_op == inctn_opcode))
 		{
 			jpl = jnlpool_ctl;
-			tjpl = temp_jnlpool_ctl;
 			replication = TRUE;
-			tjpl->write_addr = jpl->write_addr;
-			tjpl->write = jpl->write;
-			tjpl->jnl_seqno = jpl->jnl_seqno;
+			jplctx.write = jpl->write;
+			jplctx.write_total = 0;
+			temp_jnl_seqno = jpl->jnl_seqno;
 #			ifdef UNIX
 			if (INVALID_SUPPL_STRM != strm_index)
 			{	/* Need to also update supplementary stream seqno */
 				supplementary = TRUE;
 				assert(0 <= strm_index);
-				/* assert(strm_index < ARRAYSIZE(tjpl->strm_seqno)); */
 				strm_seqno = jpl->strm_seqno[strm_index];
 				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
 			} else
 				supplementary = FALSE;
 #			endif
-			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size));
+			INT8_ONLY(assert(jplctx.write == jpl->write_addr % jpl->jnlpool_size));
 			assert(jgbl.cumul_jnl_rec_len);
 			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
-			tjpl->write += SIZEOF(jnldata_hdr_struct);
-			if (tjpl->write >= tjpl->jnlpool_size)
+			jplctx.write += SIZEOF(jnldata_hdr_struct);
+			jplctx.write_total += SIZEOF(jnldata_hdr_struct);
+			if (jplctx.write >= jpl->jnlpool_size)
 			{
-				assert(tjpl->write == tjpl->jnlpool_size);
-				tjpl->write = 0;
+				assert(jplctx.write == jpl->jnlpool_size);
+				jplctx.write = 0;
 			}
 			assert(jpl->early_write_addr == jpl->write_addr);
 			jpl->early_write_addr = jpl->write_addr + tmp_cumul_jnl_rec_len;
@@ -1228,11 +1274,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * It is now though that the actual jnl record write occurs. Ensure that the current value of
 			 * cw_set_depth does not entail any change in journal record size than was calculated.
 			 * Same case with csa->jnl_before_images & jbp->before_images.
-			 * The only exception is that in case of mu_reorg_upgrd_dwngrd_in_prog cw_set_depth will be
-			 * LESSER than tmp_cw_set_depth (this is still fine as there is more size allocated than used).
+			 * The only exception is that in case of mu_reorg_{upgrd_dwngrd,encrypt}_in_prog cw_set_depth will be
+			 * LESS than tmp_cw_set_depth (this is still fine as there is more size allocated than used).
 			 */
-			assert(cw_set_depth == tmp_cw_set_depth
-				|| mu_reorg_upgrd_dwngrd_in_prog && cw_map_depth && cw_set_depth < tmp_cw_set_depth);
+			assert((cw_set_depth == tmp_cw_set_depth) || ((mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog)
+					&& cw_map_depth && (cw_set_depth < tmp_cw_set_depth)));
 			assert(jbp->before_images == csa->jnl_before_image);
 			assert((csa->jnl_state == csd->jnl_state) && (csa->jnl_before_image == csd->jnl_before_image));
 			if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
@@ -1297,11 +1343,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	blktn = (TN_NOT_SPECIFIED == ctn) ? dbtn : ctn;
 	csa->ti->early_tn = dbtn + 1;
 	if (JNL_ENABLED(csa))
-	{
-		/* At this point we know tn,pini_addr and jrec_time; so calculate the checksum for the transaction once
-		   reuse it for all the updates
-		*/
-		if(!com_csum)
+	{	/* At this point we know tn,pini_addr and jrec_time; so calculate the checksum for the transaction once reuse it for
+		 * all the updates.
+		 */
+		if (!com_csum)
 		{
 			ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, &dbtn, com_csum);
 			ADJUST_CHECKSUM(com_csum, csa->jnl->pini_addr, com_csum);
@@ -1310,7 +1355,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 		if (jbp->before_images)
 		{	/* do not write PBLKs if MUPIP REORG UPGRADE/DOWNGRADE with -NOSAFEJNL */
-			if (!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_nosafejnl)
+			if ((!mu_reorg_upgrd_dwngrd_in_prog && !mu_reorg_encrypt_in_prog) || !mu_reorg_nosafejnl)
 			{
 				epoch_tn = jbp->epoch_tn; /* store in a local as it is used in a loop below */
 				for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
@@ -1362,24 +1407,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						 */
 						if (IS_DSE_IMAGE)
 							bsiz = MIN(bsiz, csd->blk_size);
-						assert(!cs->blk_checksum ||
-							(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block,
-												csa,
-												bsiz)));
+						assert(!cs->blk_checksum
+							|| (cs->blk_checksum == jnl_get_checksum(old_block, csa, bsiz)));
 						if (!cs->blk_checksum)
-							cs->blk_checksum = jnl_get_checksum((uint4 *)old_block,
-												csa,
-												bsiz);
-#						ifdef GTM_CRYPT
-						if (csd->is_encrypted)
+							cs->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+						if (NEEDS_ANY_KEY(csd, old_block->tn))
 						{
 							DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
 							DEBUG_ONLY(save_old_block = old_block;)
-							old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block,
-													      csa);
-							/* Ensure that the unencrypted block and it's twin counterpart are
-							 * in sync.
-							 */
+							old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block, csa);
+							/* Ensure that unencrypted block and its twin counterpart are in sync. */
 							assert(save_old_block->tn == old_block->tn);
 							assert(save_old_block->bsiz == old_block->bsiz);
 							assert(save_old_block->levl == old_block->levl);
@@ -1387,7 +1424,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 											       csd,
 											       (sm_uc_ptr_t)old_block);
 						}
-#						endif
 						jnl_write_pblk(csa, cs, old_block, com_csum);
 						cs->jnl_freeaddr = jbp->freeaddr;
 					}
@@ -1407,14 +1443,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		} else if (write_inctn)
 		{
 			assert(!replication);
-			if ((inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode))
+			if ((inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode)
+					|| (inctn_blkreencrypt == inctn_opcode))
 			{
-				assert(1 == cw_set_depth); /* upgrade/downgrade one block at a time */
+				assert(1 == cw_set_depth); /* upgrade/downgrade/(re)encrypt one block at a time */
 				cs = cw_set;
 				assert(inctn_detail.blknum_struct.blknum == cs->blk);
-				assert(mu_reorg_upgrd_dwngrd_blktn < dbtn);
+				assert((inctn_blkreencrypt != inctn_opcode) || (mu_reorg_upgrd_dwngrd_blktn < dbtn));
 				if (mu_reorg_nosafejnl)
 				{
+					assert(inctn_blkreencrypt != inctn_opcode);
 					blktn = mu_reorg_upgrd_dwngrd_blktn;
 					/* if NOSAFEJNL and there is going to be a block format change
 					 * as a result of this update, note it down in the inctn opcode
@@ -1431,7 +1469,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			assert(!replication || !jgbl.forw_phase_recovery);
 			if (replication)
 			{
-				jnl_fence_ctl.token = tjpl->jnl_seqno;
+				jnl_fence_ctl.token = temp_jnl_seqno;
 				UNIX_ONLY(
 					if (supplementary)
 						jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
@@ -1439,9 +1477,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			} else if (!jgbl.forw_phase_recovery)
 				jnl_fence_ctl.token = seq_num_zero;
 			/* In case of forw-phase of recovery, token would have been set by mur_output_record */
-			jnl_write_logical(csa, non_tp_jfb_ptr, com_csum);
+			jnl_write_logical(csa, non_tp_jfb_ptr, com_csum, &jplctx);
 		} else
-			jnl_write_ztp_logical(csa, non_tp_jfb_ptr, com_csum);
+			jnl_write_ztp_logical(csa, non_tp_jfb_ptr, com_csum, temp_jnl_seqno, &jplctx);
 		/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
 		assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
 	} else if (replication)
@@ -1451,14 +1489,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		assert(!JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa));
 		if (0 == jnl_fence_ctl.level)
 		{
-			jnl_fence_ctl.token = tjpl->jnl_seqno;
+			jnl_fence_ctl.token = temp_jnl_seqno;
 			UNIX_ONLY(
 				if (supplementary)
 					jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
 			)
-			jnl_write_logical(csa, non_tp_jfb_ptr, com_csum);
+			jnl_write_logical(csa, non_tp_jfb_ptr, com_csum, &jplctx);
 		} else
-			jnl_write_ztp_logical(csa, non_tp_jfb_ptr, com_csum);
+			jnl_write_ztp_logical(csa, non_tp_jfb_ptr, com_csum, temp_jnl_seqno, &jplctx);
 	}
 	if (free_seen)
 	{	/* Write to snapshot and backup file for busy2free and recycled2free mode. These modes only appear in
@@ -1494,14 +1532,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	if (replication)
 	{
-		tjpl->jnl_seqno++;
-		assert(csa->hdr->reg_seqno < tjpl->jnl_seqno);
-		csa->hdr->reg_seqno = tjpl->jnl_seqno;
+		temp_jnl_seqno++;
+		assert(csa->hdr->reg_seqno < temp_jnl_seqno);
+		csa->hdr->reg_seqno = temp_jnl_seqno;
 		UNIX_ONLY(
 			if (supplementary)
 			{
 				next_strm_seqno = strm_seqno + 1;
-				/* tjpl->strm_seqno[strm_index] = next_strm_seqno; */
 				csa->hdr->strm_reg_seqno[strm_index] = next_strm_seqno;
 			}
 		)
@@ -1643,7 +1680,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	if (replication)
 	{
 		assert(jpl->early_write_addr > jpl->write_addr);
-		assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write + (tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
+		assert(tmp_cumul_jnl_rec_len == (jplctx.write - jpl->write + (jplctx.write > jpl->write ? 0 : jpl->jnlpool_size)));
 		/* the following statements should be atomic */
 		jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jpl->write);
 		jnl_header->jnldata_len = tmp_cumul_jnl_rec_len;
@@ -1666,11 +1703,33 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * sees all shared memory updates related to a transaction before the change in write_addr
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
-		jpl->write = tjpl->write;
+		jpl->write = jplctx.write;
 		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup relies on this */
-		jpl->write_addr += jnl_header->jnldata_len;
+		jpl->write_addr += jplctx.write_total;
+		if ((jplctx.write_total != jnl_header->jnldata_len)
+				DEBUG_ONLY(|| ((0 != TREF(gtm_test_jnlpool_sync))
+						&& (0 == (temp_jnl_seqno % TREF(gtm_test_jnlpool_sync))))))
+		{	/* Our accounting got out of sync somehow. Drop a core and force the journal pool to overflow. */
+			if (!jpl->outofsync_core_generated
+					DEBUG_ONLY(&& ((0 == TREF(gtm_test_jnlpool_sync))
+							|| (0 != (temp_jnl_seqno % TREF(gtm_test_jnlpool_sync))))))
+			{
+				jpl->outofsync_core_generated = TRUE;
+				gtm_fork_n_core();
+			}
+			/* The source server considers an increment to early_write_addr greater than the jnlpool_size as
+			 * an overflow, so add twice the jnlpool_size to early_write_addr and write_addr to keep them aligned
+			 * with each other and with write.
+			 */
+			jnlpool_overflow_size = jpl->jnlpool_size * 2ull;	/* Use ull to force 64-bit multiplication */
+			jpl->early_write_addr += jnlpool_overflow_size;
+			jpl->write_addr += jnlpool_overflow_size;
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLPOOLRECOVERY, 3, jplctx.write_total, jnl_header->jnldata_len,
+									jpl->jnlpool_id.instfilename);
+		}
 		assert(jpl->early_write_addr == jpl->write_addr);
-		jpl->jnl_seqno = tjpl->jnl_seqno;
+		assert(jplctx.write == (jpl->write_addr % jpl->jnlpool_size));
+		jpl->jnl_seqno = temp_jnl_seqno;
 	}
 	if (jnlpool_crit_acquired)
 	{
@@ -1738,12 +1797,7 @@ skip_cr_array:
 	assert(cdb_sc_normal == status);
 	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
-	if (block_saved)
-		backup_buffer_flush(gv_cur_region);
-	if (unhandled_stale_timer_pop)
-		process_deferred_stale();
 	assert(update_trans);
-	wcs_timer_start(gv_cur_region, TRUE);
 	if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)
 	{
 		temp_tn = dbtn + 1;
@@ -1758,6 +1812,10 @@ skip_cr_array:
 	 */
 	DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;) 	/* symmetrical with TP and makes op_tstart checks happy */
 	cw_set_depth = 0;
+	/* Resetting this before CWS_RESET and process_deferred_stale is necessary to avoid coming to wcs_wtstart with non-zero
+	 * update_trans and thus causing to skip the operation as a precaution against timer-based writes occurring in the midst of
+	 * transaction logic.
+	 */
 	update_trans = 0;
 	CWS_RESET;
 	/* although we have the same assert at the beginning of "skip_cr_array" label, the below assert ensures that we did not grab
@@ -1767,6 +1825,11 @@ skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);
 	t_tries = 0;	/* commit was successful so reset t_tries */
 	assert(0 == cr_array_index);
+	if (block_saved)
+		backup_buffer_flush(gv_cur_region);
+	if (unhandled_stale_timer_pop)
+		process_deferred_stale();
+	wcs_timer_start(gv_cur_region, TRUE);
 	return dbtn;
 failed:
 	assert(cdb_sc_normal != status);

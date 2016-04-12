@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,18 +137,21 @@ int get_cmpc(sm_uc_ptr_t first_key, sm_uc_ptr_t second_key)
  *		KEY :=		local copy of key copied out of record
  */
 enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, sm_uc_ptr_t key,
-		int level, sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_base)
+		int level, srch_blk_status *blk_stat, sm_uc_ptr_t rec_base)
 {
 	sm_uc_ptr_t	rPtr1, rPtr2, blk_end, rPtr1_end, rPtr2_end;
 	unsigned short	temp_ushort;
 	int		key_cmpc, rec_size, key_len;
 	boolean_t	invalid;
+	sm_uc_ptr_t blk_base;
 
+	blk_base = blk_stat->buffaddr;
 	blk_end = blk_base + cs_data->blk_size;
 	DBG_VERIFY_ACCESS(blk_end - 1);
 	if (blk_end <= (rec_base + SIZEOF(rec_hdr)))
 	{
 		assert(CDB_STAGNATE > t_tries);
+		NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_reorg_funcs);
 		return cdb_sc_blkmod;
 	}
 	GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
@@ -175,6 +179,7 @@ enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, 
 	if (invalid || ((KEY_DELIMITER != *(rPtr1 - 1)) || (KEY_DELIMITER != *(rPtr1 - 2))))
 	{
 		assert(CDB_STAGNATE > t_tries);
+		NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_reorg_funcs);
 		return cdb_sc_blkmod;
 	}
 	*key_cmpc_ptr = key_cmpc;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Copyright (c) 2004-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <sys/sem.h>
 #include <sys/types.h>
+#include <locale.h>
 #include "gtm_stat.h"
 #include "gtm_string.h"
 #include "gtm_strings.h"
@@ -52,6 +53,7 @@
 #include "gtmlink.h"
 #include "send_msg.h"
 #include "eintr_wrappers.h"
+#include "utfcgr.h"
 #ifdef __linux__
 #include "hugetlbfs_overrides.h"
 #endif
@@ -69,6 +71,10 @@
 # define GTM_TEST_FAKE_ENOSPC			"$gtm_test_fake_enospc"
 /* GTM_TEST_AUTORELINK_ALWAYS is used only in debug code so it does not have to go in gtm_logicals.h */
 # define GTM_TEST_AUTORELINK_ALWAYS		"$gtm_test_autorelink_always"
+/* GTM_DB_COUNTER_SEM_INCR is used only in debug code so it does not have to go in gtm_logicals.h */
+# define GTM_DB_COUNTER_SEM_INCR		"$gtm_db_counter_sem_incr"
+/* GTM_TEST_JNLPOOL_SYNC is used only in debug code so it does not have to go in gtm_logicals.h */
+# define GTM_TEST_JNLPOOL_SYNC			"$gtm_test_jnlpool_sync"
 #endif
 #define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
 
@@ -127,6 +133,7 @@ static readonly unsigned char editing_index[27] =
 };
 static readonly unsigned char init_break[1] = {'B'};
 
+error_def(ERR_INVLOCALE);
 error_def(ERR_INVLINKTMPDIR);
 error_def(ERR_INVTMPDIR);
 error_def(ERR_ARCTLMAXHIGH);
@@ -474,6 +481,18 @@ void	gtm_env_init_sp(void)
 	TREF(gtm_test_autorelink_always) = logical_truth_value(&val, FALSE, &is_defined);
 	if (!is_defined)
 		TREF(gtm_test_autorelink_always) = FALSE;
+	/* DEBUG-only option to enable counter semaphore to be incremented by more than the default value of 1 */
+	val.addr = GTM_DB_COUNTER_SEM_INCR;
+	val.len = SIZEOF(GTM_DB_COUNTER_SEM_INCR) - 1;
+	gtm_db_counter_sem_incr = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		gtm_db_counter_sem_incr = DEFAULT_DB_COUNTER_SEM_INCR;
+	/* DEBUG-only option to force the journal pool accounting out of sync every n transactions. */
+	val.addr = GTM_TEST_JNLPOOL_SYNC;
+	val.len = SIZEOF(GTM_TEST_JNLPOOL_SYNC) - 1;
+	TREF(gtm_test_jnlpool_sync) = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		TREF(gtm_test_jnlpool_sync) = 0;
 #	endif
 #	ifdef GTMDBGFLAGS_ENABLED
 	val.addr = GTMDBGFLAGS;
@@ -491,4 +510,38 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_DMTERM;
 	val.len = SIZEOF(GTM_DMTERM) - 1;
 	dmterm_default = logical_truth_value(&val, FALSE, NULL);
+	/* Set values for gtm_utfcgr_strings and gtm_utfcgr_string_groups */
+	val.addr = GTM_UTFCGR_STRINGS;
+	val.len = SIZEOF(GTM_UTFCGR_STRINGS) - 1;
+	TREF(gtm_utfcgr_strings) = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+	{
+		assert(GTM_UTFCGR_STRINGS_DEFAULT <= GTM_UTFCGR_STRINGS_MAX);
+		TREF(gtm_utfcgr_strings) = GTM_UTFCGR_STRINGS_DEFAULT;
+	} else if (GTM_UTFCGR_STRINGS_MAX < TREF(gtm_utfcgr_strings))
+		TREF(gtm_utfcgr_strings) = GTM_UTFCGR_STRINGS_MAX;
+	val.addr = GTM_UTFCGR_STRING_GROUPS;
+	val.len = SIZEOF(GTM_UTFCGR_STRING_GROUPS) - 1;
+	TREF(gtm_utfcgr_string_groups) = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		TREF(gtm_utfcgr_string_groups) = GTM_UTFCGR_STRING_GROUPS_DEFAULT;
+	/* If gtm_locale is defined, reset the locale for this process - but only for UTF8 mode */
+	if (is_gtm_chset_utf8)
+	{
+		val.addr = GTM_LOCALE;
+		val.len = SIZEOF(GTM_LOCALE) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			if ((0 < trans.len) && (SIZEOF(buf) > trans.len))
+			{	/* Something was specified - need to clear LC_ALL and set LC_CTYPE but need room in buf[]
+				 * for string-ending null.
+				 */
+				putenv("LC_ALL");			/* Clear LC_ALL before LC_CTYPE can take effect */
+				buf[trans.len] = '\0';
+				status = setenv("LC_CTYPE", buf, TRUE);
+				if (0 != status)
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVLOCALE, 2, val.len, val.addr, status);
+			}
+		}
+	}
 }

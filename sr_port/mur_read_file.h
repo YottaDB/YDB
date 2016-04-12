@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +9,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #ifndef MUR_READ_FILE_H_INCLUDED
 #define MUR_READ_FILE_H_INCLUDED
 
@@ -19,16 +21,19 @@
 
 #if defined (MUR_USE_AIO) || defined(VMS)
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_START) is thread-safe */
 #define MUR_FREAD_START(JCTL, BUFF_DESC, RET_STATUS)				\
 {										\
 	RET_STATUS = mur_fread_start(JCTL, BUFF_DESC);				\
 }
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_WAIT) is thread-safe */
 #define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)				\
 {										\
 	RET_STATUS = mur_fread_wait(JCTL, BUFF_DESC);				\
 }
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_CANCEL) is thread-safe */
 #define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)				\
 {										\
 	RET_STATUS = mur_fread_cancel(JCTL);					\
@@ -36,6 +41,7 @@
 
 #else /* !MUR_USE_AIO && !VMS */
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_START) is thread-safe */
 #define MUR_FREAD_START(JCTL, BUFF_DESC, RET_STATUS)					\
 {											\
 	assert(JCTL->eof_addr > (BUFF_DESC)->dskaddr);					\
@@ -46,6 +52,7 @@
 	RET_STATUS = JCTL->status;							\
 }
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_WAIT) is thread-safe */
 #define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)				\
 {										\
 	assert((BUFF_DESC)->read_in_progress);					\
@@ -53,6 +60,7 @@
 	RET_STATUS = SS_NORMAL;							\
 }
 
+/* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_CANCEL) is thread-safe */
 #define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)				\
 {										\
 	MUR_DESC->seq_buff[0].read_in_progress = FALSE;				\

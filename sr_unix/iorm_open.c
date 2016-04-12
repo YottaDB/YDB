@@ -119,6 +119,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->output_encrypted = FALSE;
 		d_rm->read_occurred = FALSE;
 		d_rm->write_occurred = FALSE;
+		d_rm->fsblock_buffer_size = 0;
+		d_rm->fsblock_buffer = NULL;
 	} else
 	{
 		d_rm = (d_rm_struct *)iod->dev_sp;
@@ -228,15 +230,14 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			d_rm->filstr = NULL;
 		else
 		{
-			FDOPEN(d_rm->filstr, fd, "r");
+			FDOPEN(d_rm->filstr, fd, "r+");		/* Try open R/W */
 			if (NULL == d_rm->filstr)
-			{
-				FDOPEN(d_rm->filstr, fd, "w");
-				if (NULL == d_rm->filstr)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-						      dev_name->dollar_io, ERR_TEXT, 2,
-						      LEN_AND_LIT("Error in stream open"), errno);
-			}
+				FDOPEN(d_rm->filstr, fd, "r");	/* Try open RO */
+			if (NULL == d_rm->filstr)
+				FDOPEN(d_rm->filstr, fd, "w");	/* Try open WO */
+			if (NULL == d_rm->filstr)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+					      dev_name->dollar_io, ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
 			/* now fseeko required for nodestroy if non-fixed M streaming */
 			if (d_rm->no_destroy && !d_rm->fixed && !IS_UTF_CHSET(iod->ichset))
 			{

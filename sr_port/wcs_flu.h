@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,9 @@ boolean_t wcs_flu(uint4 options);
 		 * commits. Since we dont release crit throughout this final-retry restart loop, we	\
 		 * are guaranteed not to do infinite retries.						\
 		 */											\
-		assert(gtm_white_box_test_case_enabled && WB_PHASE2_COMMIT_ERR);			\
+		assert(gtm_white_box_test_case_enabled							\
+			&& (WB_PHASE2_COMMIT_ERR							\
+				|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));	\
 		status = (enum cdb_sc)cdb_sc_helpedout;							\
 	} else												\
 		status = (enum cdb_sc)cdb_sc_cacheprob;							\

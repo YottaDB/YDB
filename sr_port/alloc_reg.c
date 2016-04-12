@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +81,7 @@ void alloc_reg(void)
 				opx = x->exorder.fl->opcode;
 				if ((OC_LINESTART == opx) || (OC_LINEFETCH == opx))
 				{
-					opc = x->opcode = OC_NOOP;
+					x->opcode = OC_NOOP;
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 1) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
 				}
@@ -92,7 +93,7 @@ void alloc_reg(void)
 				if (!(cmd_qlf.qlf & CQ_LINE_ENTRY) && (OC_ILIT == opx) && (NULL != x->exorder.fl->exorder.fl)
 				    && (OC_LINEFETCH == x->exorder.fl->exorder.fl->opcode))
 				{
-					opc = x->opcode = OC_NOOP;
+					x->opcode = OC_NOOP;
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
 				}

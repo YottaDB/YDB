@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,8 +61,7 @@ int dse_order(block_id srch,
 		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
-	patch_comp_count = 0;
-	patch_comp_key[0] = patch_comp_key[1] = 0;
+	CLEAR_DSE_COMPRESS_KEY;
 	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top, last = *pp)
 	{
 		GET_SHORT(rsize, &((rec_hdr_ptr_t)rp)->rsiz);

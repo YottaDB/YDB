@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +24,11 @@
 #include "filestruct.h"
 #include "iosp.h"
 #include "jnl.h"
+#include "wcs_clean_dbsync.h" /* for setting wcs_clean_dbsync pointer */
 
 GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	void			(*wcs_stale_fptr)();
+GBLREF	void			(*wcs_clean_dbsync_fptr)();
 
 void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 {
@@ -49,4 +53,6 @@ void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 		prc_vec = (jnl_process_vector *)malloc(SIZEOF(jnl_process_vector));
 		jnl_prc_vector(prc_vec);
 	}
+	wcs_stale_fptr = &wcs_stale;
+	wcs_clean_dbsync_fptr = &wcs_clean_dbsync;
 }

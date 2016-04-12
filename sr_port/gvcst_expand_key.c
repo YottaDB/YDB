@@ -23,18 +23,21 @@
 #include "min_max.h"
 #include "gvcst_expand_key.h"
 
+GBLREF	gd_region	*gv_cur_region;
 GBLREF unsigned int	t_tries;
+GBLREF	uint4		dollar_tlevel;
 
 /* Note: A lot of the code below is similar to that in gvcst_blk_search.h.
  * Any changes there need to be incorporated here and vice-versa.
  */
-enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
+enum cdb_sc	gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key)
 {
 	int		expKeyCmpLen;	/* length of compressed portion of expKey stored in key->base */
 	int		expKeyUnCmpLen;/* Length of uncompressed portion of expKey */
 	int		nTmp;
 	int		r_offset;
 	rec_hdr_ptr_t	rp, rtop;
+	blk_hdr_ptr_t	bp;
 	sm_uc_ptr_t	expKeyUnCmp;	/* pointer to beginning of uncompressed portion of expKey */
 	sm_uc_ptr_t	pTop;
 	unsigned char	*expKeyStart;	/* pointer to &key->base[0] */
@@ -43,6 +46,7 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 	unsigned short	temp_ushort;
 
 	assert(SIZEOF(rec_hdr) <= SIZEOF(blk_hdr));
+	bp = (blk_hdr_ptr_t)pStat->buffaddr;
 	rp = (rec_hdr_ptr_t)bp;
 	rtop = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + rec_top);
 	expKeyCmpLen = 0;
@@ -67,7 +71,14 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 		if (nTmp > expKeyCmpLen)
 		{
 			if (((expKeyStart + nTmp) >= expKeyTop) || (NULL == expKeyUnCmp))
+			{
+				if (dollar_tlevel)
+					TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data,
+							  pStat->tn, ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+				else
+					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
 				return cdb_sc_blkmod;
+			}
 			assert(NULL != expKeyUnCmp);
 			memcpy(expKeyStart + expKeyCmpLen, expKeyUnCmp, nTmp - expKeyCmpLen);
 		}
@@ -87,7 +98,14 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 	do
 	{
 		if (tmpPtr >= pTop)
+		{
+			if (dollar_tlevel)
+				TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
+						  ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+			else
+				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
 			return cdb_sc_blkmod;
+		}
 		/* It is now safe to do *tmpPtr and *++tmpPtr without worry about exceeding block bounds */
 		if ((KEY_DELIMITER == *tmpPtr++) && (KEY_DELIMITER == *tmpPtr))
 			break;
@@ -96,7 +114,14 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 	expKeyUnCmpLen = tmpPtr - expKeyUnCmp;
 	tmpPtr = expKeyStart + expKeyCmpLen;
 	if (tmpPtr + expKeyUnCmpLen > expKeyTop)
+	{
+		if (dollar_tlevel)
+			TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
+					  ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+		else
+			NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
 		return cdb_sc_blkmod;
+	}
 	memcpy(tmpPtr, expKeyUnCmp, expKeyUnCmpLen);
 	if (KEY_DELIMITER == *expKeyStart)
 	{	/* A valid key wouldn't start with a '\0' character. So the block must have been concurrently modified. */
@@ -134,4 +159,3 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 #define GVCST_EXPAND_PREV_KEY
 #include "gvcst_expand_key.h"	/* Defines the function "gvcst_expand_prev_key" */ /* BYPASSOK : intentional duplicate include. */
 #undef GVCST_EXPAND_PREV_KEY
-

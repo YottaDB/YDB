@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information 	*
+ * Copyright (c) 2011-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "trigger.h"
 #include "trigger_fill_xecute_buffer.h"
 #include "trigger_gbl_fill_xecute_buffer.h"
-#include "trigger_source_read_andor_verify.h"
+#include "trigger_read_andor_locate.h"
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
 #include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME) */
@@ -76,47 +76,16 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 
 LITREF	mval			literal_batch;
 
-#define TRIG_FAILURE_RC	-1
 
-#define	ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(TRIGNAME)								\
-{														\
-	DCL_THREADGBL_ACCESS;											\
-														\
-	SETUP_THREADGBL_ACCESS;											\
-	if (!TREF(op_fntext_tlevel))										\
-	{													\
-		CLEAR_IMPLICIT_TP_BEFORE_ERROR;									\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, TRIGNAME->len, TRIGNAME->addr);	\
-	}													\
-}
-
-STATICFNDCL gd_region *find_region(mstr *regname);
 STATICFNDCL CONDITION_HANDLER(trigger_source_raov_ch);
-STATICFNDCL int trigger_source_raov(mstr *trigname, trigger_action trigger_op, gd_region *reg, rhdtyp **rtn_vec);
-STATICFNDCL int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action trigger_op, gd_region *reg, rhdtyp **rtn_vec);
+STATICFNDCL int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn_vec);
+STATICFNDCL int trigger_source_raov_tpwrap_helper(mstr *trigname, gd_region *reg, rhdtyp **rtn_vec);
 STATICFNDCL boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc, gd_region *reg);
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
-error_def(ERR_TRIGNAMBAD);
 error_def(ERR_TRIGNAMENF);
-
-/* If we have an implicit transaction and are about to fire an error, commit the transaction first so we can
- * get rid of the transaction connotation before error handling gets involved. Note we use op_tcommit() here
- * instead of op_trollback so we can verify the conditions that generated the error. If some restartable
- * condition caused the error, this will restart and retry the transaction. Note that since skip_INVOKE_RESTART
- * is not set before this op_tcommit, it with throw a restart rather than returning a restartable code.
- */
-#define CLEAR_IMPLICIT_TP_BEFORE_ERROR							\
-	if (dollar_tlevel && tp_pointer->implicit_trigger && (0 == gtm_trigger_depth))	\
-	{	/* We have an implicit TP fence */					\
-		enum cdb_sc		status;						\
-		/* Eliminate transaction by commiting it (nothing was done) */		\
-		status = op_tcommit();							\
-		assert(cdb_sc_normal == status);					\
-	}
-
 
 /* Similar condition handler to gvtr_tpwrap_ch except we don't insist on first_sgm_info being set */
 CONDITION_HANDLER(trigger_source_raov_ch)
@@ -138,7 +107,7 @@ CONDITION_HANDLER(trigger_source_raov_ch)
 	NEXTCH;
 }
 
-STATICFNDEF gd_region *find_region(mstr *regname)
+gd_region *find_region(mstr *regname)
 {
 	gd_region	*reg, *reg_top;
 	mstr		tmpstr;
@@ -156,9 +125,11 @@ STATICFNDEF gd_region *find_region(mstr *regname)
 	return NULL;
 }
 
-/* Routine to check on the named trigger. This routine is called from (at least) two places: the above get_src_line()
- * routine where it is called to retrieve trigger source (left in source definition buffer of the trigger) and the other
- * time it is called from op_setzbrk() to load and/or compile the trigger. In both cases, the trigger may be loaded or
+/* Routine to check on the named trigger. This routine is called from (at least) two places: the trigger_locate_andor_load()
+ * where is it called when the attempted locating of a trigger failed so it must be loaded. The other time it is called from
+ * op_setzbrk() to load and/or compile the trigger. In both cases, the trigger may be loaded or
+
+
  * its source loaded already so we perform a validation on it that it is the current trigger. If the trigger contents are
  * stale, Our actions depend on what mode we are in. If already in TP, we cause the trigger to be unloaded and signal a
  * restart. If not in TP, we just unload the trigger and work our full mojo on it to reload the current version.
@@ -176,12 +147,15 @@ STATICFNDEF gd_region *find_region(mstr *regname)
  * If a TP FENCE is in place and we are in the final retry, we verify that the triggers are current and reload them if
  *      not. This avoids the possibility of using stale triggers.
  *
+ * Note the trigger_locate_andor_load() routine acts much like a stripped down verison of this routine and its subroutines
+ * so changes here should be reflected there.
+ *
  * Note, this routine is for loading trigger source when we are not driving triggers. The trigger_fill_xecute_buffer()
  * should be used when fetching source for trigger execution because it is lighter weight with built-in trigger refetch
  * logic since we are using the globals the triggers live in. In this case, the trigger access is adhoc for the $TEXT()
  * ZPRINT and ZBREAK uses.
  */
-int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, rhdtyp **rtn_vec)
+int trigger_source_read_andor_verify(mstr *trigname, rhdtyp **rtn_vec)
 {
 	char			*ptr, *ptr_beg, *ptr_top;
 	enum cdb_sc		failure;
@@ -196,8 +170,8 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, 
 	assert((NULL != trigname->addr) && (0 != trigname->len));
 	if (NULL == gd_header)
 		gvinit();
-	DBGTRIGR((stderr, "trigger_source_read_andor_verify: Entered with trigger action %d $tlevel=%d, $trigdepth=%d\n",
-				trigger_op, dollar_tlevel, gtm_trigger_depth));
+	DBGTRIGR((stderr, "trigger_source_read_andor_verify: Entered with $tlevel=%d, $trigdepth=%d\n",
+		  dollar_tlevel, gtm_trigger_depth));
 	/*
 	 * Input parameter "trigname" is of the form
 	 *	a) <21-BYTE-MAX-TRUNCATED-GBLNAME>#<AUTO-GENERATED-CNT>#[RUNTIME-DISAMBIGUATOR][/REGION-NAME] OR
@@ -259,7 +233,7 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, 
 		for (;;)
 		{	/* Now that we are TP wrapped, fetch the trigger source lines from the ^#t global */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
-			src_fetch_status = trigger_source_raov_tpwrap_helper(trigname, trigger_op, reg, rtn_vec);
+			src_fetch_status = trigger_source_raov_tpwrap_helper(trigname, reg, rtn_vec);
 			if ((0 == src_fetch_status) || (TRIG_FAILURE_RC == src_fetch_status))
 			{
 				assert(0 == dollar_tlevel); /* op_tcommit should have made sure of this */
@@ -287,15 +261,16 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, 
 		}
 	} else
 		/* no return if TP restart */
-		src_fetch_status = trigger_source_raov(trigname, trigger_op, reg, rtn_vec);
+		src_fetch_status = trigger_source_raov(trigname, reg, rtn_vec);
 	assert((0 == src_fetch_status) || (TRIG_FAILURE_RC == src_fetch_status));
 	DBGTRIGR((stderr, "trigger_source_read_andor_verify: leaving with source from 0x%lx\n",
-				(*rtn_vec)?(*((rhdtyp **)rtn_vec))->trigr_handle:NULL));
+		  (*rtn_vec) ? (*((rhdtyp **)rtn_vec))->trigr_handle : NULL));
+	assert((0 != src_fetch_status) || (NULL != *rtn_vec));	/* Either got an error or rtnvector returned */
 	return src_fetch_status;
 }
 
 /* Now TP wrap and fetch the trigger source lines from the ^#t global */
-STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action trigger_op, gd_region *reg, rhdtyp **rtn_vec)
+STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, gd_region *reg, rhdtyp **rtn_vec)
 {
 	enum cdb_sc	cdb_status;
 	int		rc;
@@ -303,7 +278,7 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action
 	DBGTRIGR((stderr, "trigger_source_tpwrap_helper: Entered\n"));
 	ESTABLISH_RET(trigger_source_raov_ch, SIGNAL);
 	assert(donot_INVOKE_MUMTSTART);
-	rc = trigger_source_raov(trigname, trigger_op, reg, rtn_vec);
+	rc = trigger_source_raov(trigname, reg, rtn_vec);
 	assert((0 == rc) || (TRIG_FAILURE_RC == rc));
 	/* Finish it now verifying it completed successfully */
 	GVTR_OP_TCOMMIT(cdb_status);
@@ -320,7 +295,7 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action
  * loading the trigger, loading the source, verifying proper source/trigger is loaded and compiling if
  * desired. If we complete successfully, returns 0. Error returns caught by condition handlers can return other values.
  */
-STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, gd_region *reg, rhdtyp **rtn_vec)
+STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn_vec)
 {
 	boolean_t		runtime_disambiguator_specified;
 	gd_region		*save_gv_cur_region;
@@ -344,7 +319,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 
 	SETUP_THREADGBL_ACCESS;
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
-	DBGTRIGR((stderr, "trigger_source_raov: Entered with trigger action %d\n", trigger_op));
+	DBGTRIGR((stderr, "trigger_source_raov: Entered\n"));
 	/* Before we try to save anything, see if there is something to save and initialize stuff if not */
 	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	if (NULL != *rtn_vec)
@@ -394,7 +369,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 			COMPUTE_HASH_MNAME(&gvt->gvname);
 			GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
-					|| ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
+			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 				continue;
 			/* Target region and trigger routine's region match, break (this check is a formality) */
 			if (gvt->gd_csa == regcsa)
@@ -448,7 +423,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 			COMPUTE_HASH_MNAME(&gvt->gvname);
 			GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
-					|| ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
+			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 			{
 				RESTORE_TRIGGER_REGION_INFO(save_currkey);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
@@ -456,19 +431,21 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 			}
 		}
 		DBGTRIGR((stderr, "trigger_source_raov: existing trigger routine has %d bytes of source\n",
-					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len));
+			  ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len));
 		assert(csd == cs_data);
 		tp_set_sgm();
-		/* If we are in the final retry, ensure we dont rely on stale triggers as we cannot afford any restarts now */
-		if (CDB_STAGNATE <= t_tries)
+		/* Ensure that we don't use stale triggers if we are in the third retry OR an explicit transaction */
+		if ((CDB_STAGNATE <= t_tries) || (!tp_pointer->implicit_tstart))
 		{
 			ztrig_cycle_mismatch = (csa->db_dztrigger_cycle && (gvt->db_dztrigger_cycle != csa->db_dztrigger_cycle));
 			db_trigger_cycle_mismatch = (csa->db_trigger_cycle != gvt->db_trigger_cycle);
 			needs_reload = (db_trigger_cycle_mismatch || ztrig_cycle_mismatch);
 			DBGTRIGR((stderr, "trigger_source_raov: ztrig_cycle_mismatch=%d\tdb_trigger_cycle_mismatch=%d\treload?%d\n",
-				ztrig_cycle_mismatch, db_trigger_cycle_mismatch, needs_reload));
-			if (needs_reload && (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg)))
+				  ztrig_cycle_mismatch, db_trigger_cycle_mismatch, needs_reload));
+			if (needs_reload && (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg)) &&
+					(0 == trigdsc->xecute_str.str.len && NULL == rtn_vector->source_code))
 			{
+				/* A reload failed (deleted or ^#t busted) and there is nothing cached, issue an error */
 				RESTORE_TRIGGER_REGION_INFO(save_currkey);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
@@ -478,9 +455,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 		 * TP that detects and reloads newer triggers (e.g. trigger invocation) restarts the entire TP transaction.
 		 */
 		gvt->trig_local_tn = local_tn;
-
 		/* If this trigger is already compiled, we are done */
-		if ((TRIGGER_COMPILE == trigger_op) && (NULL != trigdsc->rtn_desc.rt_adr))
+		if (NULL != trigdsc->rtn_desc.rt_adr)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: trigger already compiled, all done\n"));
 			RESTORE_TRIGGER_REGION_INFO(save_currkey);
@@ -488,7 +464,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 			return 0;
 		}
 		/* Else load the trigger source as needed */
-		if (0 == trigdsc->xecute_str.str.len)
+		if ((0 == trigdsc->xecute_str.str.len) && (NULL == rtn_vector->source_code))
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: get the source\n"));
 			SET_GVTARGET_TO_HASHT_GBL(csa);
@@ -503,19 +479,19 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 	/* If the trigger is not already compiled, it needs to be since the routine header is the method for obtaining the
 	 * trigger descriptor. If routine is already compiled, we don't need to compile it again.
 	 */
-	if ((TRIGGER_COMPILE == trigger_op) || (NULL == trigdsc->rtn_desc.rt_adr))
+	if (NULL == trigdsc->rtn_desc.rt_adr)
 	{
 		DBGTRIGR((stderr, "trigger_source_raov: compile it\n"));
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Flush out any compiler messages for compile record */
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
-					trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
+				      trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
 		}
 		assert(trigdsc->rtn_desc.rt_adr);
 		assert(trigdsc->rtn_desc.rt_adr == CURRENT_RHEAD_ADR(trigdsc->rtn_desc.rt_adr));
-		/* If compile only, the source code is no longer needed so release it */
-		if ((TRIGGER_COMPILE == trigger_op) && (0 < trigdsc->xecute_str.str.len))
+		/* After the compile is no longer needed so release it */
+		if (0 < trigdsc->xecute_str.str.len)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: free the source\n"));
 			free(trigdsc->xecute_str.str.addr);
@@ -525,14 +501,12 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 		rtn_vector = trigdsc->rtn_desc.rt_adr;
 	} else
 	{
-		assert(TRIGGER_SRC_LOAD == trigger_op);
-		assert(NULL != trigdsc->xecute_str.str.addr);
-		assert(0 < trigdsc->xecute_str.str.len);
+		assert(((NULL != trigdsc->xecute_str.str.addr) && (0 < trigdsc->xecute_str.str.len))
+		       || (rtn_vector && NULL !=rtn_vector->source_code));
 	}
 	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	assert(rtn_vector);
 	assert(trigdsc == rtn_vector->trigr_handle);
-	assert(((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len);
 	*rtn_vec = rtn_vector;
 	return 0;
 }
@@ -556,7 +530,6 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	gvnh_reg_t		*gvnh_reg;
 	boolean_t		name_not_found;
 	int			trig_protected_mval_push_count;
-
 
 	trig_protected_mval_push_count = 0;
 	INCR_AND_PUSH_MV_STENT(val); /* Protect val from garbage collection */
@@ -582,7 +555,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	ptr++;
 	A2I(ptr, val->str.addr + val->str.len, index);
 	if (1 > index)
-	{ /* trigger indexes cannot be less than 1 */
+	{	/* Trigger indexes cannot be less than 1 */
 		if (CDB_STAGNATE > t_tries)
 			t_retry(cdb_sc_triggermod);
 		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */
@@ -626,7 +599,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	assert(0 == trigdsc->xecute_str.str.len);	/* Make sure not replacing/losing a buffer */
 	i2mval(&trig_index, index);
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gvname.var_name.addr, gvname.var_name.len,
-								&trig_index, NULL, (int4 *)&xecute_buff.len);
+							  &trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	*ret_trigdsc = trigdsc;
 	RETURN_AND_POP_MVALS(TRIG_SUCCESS);

@@ -147,7 +147,6 @@
     -BK[UPDBJNL]={DISABLE|OFF}]
     -B[YTESTREAM] [-NET[TIMEOUT]]
     -DA[TABASE]
-    -DBG
     -[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]]
     -O[NLINE]
     -REC[ORD]
@@ -693,6 +692,15 @@
    criteria for your database, refer to the release notes document of your
    current GT.M version.
 
+   **Note**
+
+   You must perform a GT.M database integrity check using the -noonline
+   parameter prior to downgrading a database. The integrity check verifies
+   and clears database header fields required for an orderly downgrade. If an
+   integrity check is not possible due to time constraints, please rely on a
+   rolling upgrade scheme using replication and / or take a backup prior to
+   upgrading the database.
+
 3 Examples
    Examples
 
@@ -894,8 +902,14 @@
        | 1-2        | Hexadecimal representation of the length of the label |
        |            | (by default 64 - decimal 100).                        |
        |------------+-------------------------------------------------------|
-       | 3-28       | Fixed-length ASCII text: "GDS BINARY EXTRACT LEVEL    |
-       |            | 6".                                                   |
+       |            | Fixed-length ASCII text containing:                   |
+       |            |                                                       |
+       |            |   o "GDS BINARY EXTRACT LEVEL 6": when no region is   |
+       | 3-28       |     encrypted.                                        |
+       |            |   o "GDS BINARY EXTRACT LEVEL 8": when one more       |
+       |            |     regions are encrypted using null IVs.             |
+       |            |   o "GDS BINARY EXTRACT LEVEL 9": when one or regions |
+       |            |     are encrypted using non-null IVs.                 |
        |------------+-------------------------------------------------------|
        | 29-41      | Fixed-length ASCII text: Date and time of extract in  |
        |            | the $ZDATE() format: "YEARMMDD2460SS".                |
@@ -972,6 +986,15 @@
    -[NO]LO[G]
 
    By default, EXTRACT operates -LOG.
+
+3 Null_iv
+   Null_iv
+
+   Creates an encrypted binary extract with null IVs from a database with
+   non-null IVs, which can be restored to a version that does not support
+   non-null IVs. The format of the -NULL_IV qualifier is:
+
+   -[N]ULL_IV
 
 3 Region
    Region
@@ -1734,7 +1757,12 @@
    related data occupies 20 data blocks in the current database. The sample
    output shows that out of 1137 data blocks, 1030 data blocks are adjacent
    to each other. One may be able to improve the performance of a database if
-   the all blocks are as adjacent as possible.
+   the all blocks are as adjacent as possible. "% Used" is the amount of
+   space occupied across the in-use blocks divided by the space available in
+   the in-use blocks, and thus represents the packing density for the in-use
+   blocks (excluding local bit maps). Higher "% Used" may actually be
+   undesirable from a performance perspective as they indicate a higher
+   likelihood of block splits with upcoming updates.
 
    Example:
 
@@ -1878,6 +1906,7 @@
      o LOAD supports user collation routines.
      o LOAD takes its input from the file defined by the file-name, which may
        be a UNIX file on any device that supports such files.
+     o LOAD accepts files with DOS style termination.
      o MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
        the environment variable gtm_chset is set to UTF-8. Ensure that MUPIP
        EXTRACT commands and corresponding MUPIP LOAD commands execute with
@@ -1931,6 +1960,15 @@
        ZWR format file. -FORMAT=BINARY works with data in a proprietary
        format. -FORMAT=BINARY has one header record, therefore LOAD
        -FORMAT=BINARY starts active work with record number two (2).
+     o -FORMAT={ZWR|GO} applies to text files produced by tools such as MUPIP
+       EXTRACT or %GO.
+     o For FORMAT={ZWR|GO} UTF-8 files not produced by MUPIP EXTRACT or %GO,
+       the first line of the label must contain the case insensitive text
+       "UTF-8".
+     o For all -FORMAT={ZWR|GO} files not produced by MUPIP EXTRACT or %GO,
+       the second line should contain the case insensitive test "ZWR" for zwr
+       format or "GLO" for GO format and the two label lines must contain a
+       total of more than 10 characters.
      o -FORMAT=GO expects the data in record pairs. Each global node requires
        one record for the key and one for the data.
      o -FORMAT=ZWR expects the data for each global node in a single record.
@@ -2008,7 +2046,7 @@
 
      o STOP causes MUPIP LOAD to exit immediately.
      o PROCEED proceeds to the next record.
-     o PROMPTS prompts to continue or stop.
+     o INTERACTIVE prompts to continue or stop.
 
    By default MUPIP LOAD exits on encountering an error.
 
@@ -2134,11 +2172,15 @@
    Competing activity generally increases the time required to perform a
    REORG, as well as that of the competing operations.
 
+   MUPIP REORG can also encrypt a database and/or change the encryption keys
+   for database files "on the fly" while the database is in use.
+
    The format of the MUPIP REORG command is:
 
    REO[RG]
    [
     -D[OWNGRADE]
+    -ENCR[YPT]=key
     -E[XCLUDE]=global-name-list
     -FI[LL_FACTOR]=integer
     -I[NDEX_FILL_FACTOR]=integer
@@ -2160,22 +2202,23 @@
    on operational procedures) to eliminate file fragmentation when database
    files have been extended more than a dozen times.
 
-     o Using REORG concurrently with normal database access affects the
-       performance of normal operation. To reduce this impact, lower the
-       priority of the process performing the REORG.
+     o As REORG is IO intensive, running a REORG concurrently with normal
+       database access may impact the operation of normal processes. As the
+       GT.M database engine has a daemonless architecture, attempts to reduce
+       the impact by reducing the priority of REORG can (perhaps
+       counter-intuitively) exacerbate rather than alleviate the impact. To
+       reduce the impact REORG has on other processes, use the gtm_poollimit
+       environment variable to limit the number of global buffers used by the
+       REORG.
      o MUPIP REORG does not change the logical contents of the database, and
        can run on either the originating instance or replicating instance of
        an LMS application. In such cases, resuming REORGs in process should
        be part of the batch restart. See "GT.M Database Replication" chapter
        for more information about running REORG on a dual site application.
-     o If you run MUPIP STOP for an ongoing MUPIP REORG process, it may leave
-       the database blocks in an inconsistent state. In this situation, GT.M
-       converts the ongoing KILLs flag to abandoned KILLs flag. If a
-       subsequent MUPIP REORG encounters these abandoned KILLs flags, it
-       gives a message and then starts its REORG actions.
-     o <CTRL-C> terminates REORG. A REORG terminated abnormally by operator
-       action or error is incomplete but does not adversely affect the
-       database structure, unless terminated with a kill -9.
+     o Use MUPIP STOP (or <Ctrl-C> for an interactive REORG) to terminate a
+       REORG process. Unless terminated with a kill -9, a REORG terminated by
+       operator action or error is incomplete but does not adversely affect
+       the database.
 
    **Caution**
 
@@ -2243,6 +2286,38 @@
    (depending on the FILL_FACTOR) more compact.
 
    The optional qualifiers for MUPIP REORG are:
+
+3 Encrypt
+   Encrypt
+
+   Encrypts an unencrypted database or changes the encryption key of a
+   database while the database continues to be used by applications. Whether
+   or not the prior encryption uses non-zero initialization vectors (IVs),
+   database blocks encrypted with the new key use non-zero IVs The format of
+   the ENCRYPT qualifier is:
+
+   -ENCR[YPT]=<key>
+
+   MUPIP provides <key> to the encryption plugin. The reference
+   implementation of the plugin expects a key with the specified name in the
+   encryption configuration file identified by $gtmcrypt_config. The
+   configuration file must contain an entry in the database section for each
+   database file mapping to a region specified in <region-list> that names
+   the specified key as its key. The -ENCRYPT flag is incompatible with all
+   other command line flags of MUPIP REORG except -REGION, and performs no
+   operation other than changing the encryption key. If the specified key is
+   already the encryption key of a database region, MUPIP REORG -ENCRYPT
+   moves on to the next region after displaying a message (on stderr, where
+   MUPIP operations send their output).
+
+   As MUPIP REORG -ENCRYPT reads, re-encrypts, and writes every in-use block
+   in each database file, its operations take a material amount of time on
+   the databases of typical applications, and furthermore add an additional
+   IO load to the system on which it runs. You can use the environment
+   variable gtm_poollimit to ameliorate, but not eliminate, the impact, at
+   the cost of extending execution times. To minimize impact on production
+   instances, FIS recommends running this operation on replicating secondary
+   instances, rather than on originating primary instances.
 
 3 Exclude
    Exclude
@@ -2437,6 +2512,54 @@
 
 3 Examples
    Examples
+
+   Example:
+
+   $ mupip reorg
+   Fill Factor:: Index blocks 100%: Data blocks 100%
+
+   Global: CUST (region DEFAULT)
+   Blocks processed    : 667340
+   Blocks coalesced    : 601487
+   Blocks split        : 0
+   Blocks swapped      : 319211
+   Blocks freed        : 646964
+   Blocks reused       : 298814
+   Blocks extended     : 0
+
+   Global: HIST (region HIST)
+   %GTM-I-FILERENAME, File /var/myApp/prod/journals/hist.mjl is renamed to /var/myApp/prod/journals/hist.mjl_2015289165050
+   Blocks processed    : 337069
+   Blocks coalesced    : 12888
+   Blocks split        : 0
+   Blocks swapped      : 329410
+   Blocks freed        : 315998
+   Blocks reused       : 308337
+   Levels Eliminated   : 1
+   Blocks extended     : 0
+   $
+
+   In this output:
+
+     o Blocks processed - the number of blocks originally used by the global
+       variable
+     o Blocks coalesced - the number of blocks that were sufficiently
+       compacted enough to free a block
+     o Blocks split - the number of blocks expanded enough to require the
+       allocation of a new block
+     o Blocks swapped - the number of blocks moved to improve adjacency; this
+       can exceed the number of blocks processed as a consequence of the
+       movement of blocks
+     o Blocks freed - the number of blocks formerly used that were released
+       by a combination of swaps and coalesces
+     o Blocks reused - blocks freed, and then reused
+     o Levels eliminated - reduction in the depth of the global variable tree
+     o Blocks extended - the number of blocks the database grew during the
+       reorg
+
+   Note also that owing the database update activity of REORG, the hist.mjl
+   journal file reached its limit, requiring MUPIP to switch the journal
+   file.
 
    Example:
 
@@ -2655,6 +2778,8 @@
     -REG[ION] region-list
     -REP[LICATION]={ON|OFF}
     -RES[ERVED_BYTES]=integer]
+    -SLEE[P_SPIN_COUNT]=integer
+    -SPIN[_SLEEP_LIMIT]=nanoseconds
     -S[TANDALONENOT]
     -V[ERSION]={V4|V6}
     -W[AIT_DISK]=integer
@@ -2749,12 +2874,8 @@
    switch an existing database file so it immediately preallocates all
    blocks, first use MUPIP SET -NODEFER_ALLOCATE to set the switch in the
    database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >= 0.
-   Failures to preallocate space produce a PREALLOCATEFAIL error. On
-   platforms where GT.M does not support preallocation (HP-UX and Solaris),
-   although GDE accepts -NODEFER_ALLOCATE, MUPIP CREATE ignores it and sets
-   the database file to DEFER_ALLOCATE. On those platforms, any attempt to
-   change this flag with MUPIP SET produces a NODFRALLOCSUPP error. The
-   format of the DEFER_ALLOCATE qualifier is:
+   Failures to preallocate space produce a PREALLOCATEFAIL error. The format
+   of the DEFER_ALLOCATE qualifier is:
 
    -[NO]DEFER_Allocate
 
@@ -2764,7 +2885,7 @@
    Tries to minimize epoch duration by reducing the number of buffers to
    flush by GT.M and the file system (via an fsync()) as the epoch
    (time-based or due to journal file auto-switch) approaches. The format of
-   the QDBRUNDOWN qualifier is:
+   the -EPOCHTAPER qualifier is:
 
    -[NO]EPOCHTAPER
 
@@ -2885,10 +3006,10 @@
 3 Qdbrundown
    Qdbrundown
 
-   Quickens normal process shutdown where a large number of processes
-   accessing a database file are required to shutdown almost simultaneously,
-   for example, in benchmarking scenarios. The format of the QDBRUNDOWN
-   qualifier is:
+   Shortens normal process shutdown when a large number of processes
+   accessing a database file need to shutdown almost simultaneously, for
+   example, in benchmarking scenarios or emergencies. The format of the
+   QDBRUNDOWN qualifier is:
 
    -[NO]Q[DBRUNDOWN]
 
@@ -2900,12 +3021,23 @@
    possible impediment to process startup. By default, QDBRUNDOWN is
    disabled.
 
-   Note that with QDBRUNDOWN there is a possibility of race condition that
-   might leave the database file header and IPC resources in need of cleanup.
-   Although QDBRUNDOWN minimizes the probability of such a race condition, it
-   cannot eliminate it. When using QDBRUNDOWN, FIS recommends an explicit
-   MUPIP RUNDOWN of the database file after the last process exits, to ensure
-   the cleanup of database file header and IPC resources.
+   Note that with QDBRUNDOWN there is a possibility that the last process to
+   exit might leave the database shared memory and IPC resources in need of
+   cleanup. Except after the number of concurrent processes exceeds 32Ki,
+   QDBRUNDOWN minimizes the possibility of abandoned resources, but it cannot
+   eliminate it. When using QDBRUNDOWN, use an explicit MUPIP command such as
+   RUNDOWN or JOURNAL -RECOVER or -ROLLBACK of the database file after the
+   last process exits, to ensure the cleanup of database shared memory and
+   IPC resources; not doing so risk database damage.
+
+   When a database has QDBRUNDOWN enabled, if the number of attached
+   processes ever exceeds 32Ki, GT.M stops tracking the number of attached
+   processes, which means that it cannot recognize when the number reaches
+   zero (0) and the shared resources can be released. The process that
+   detects this event issues a NOMORESEMCNT in the system log. This means an
+   orderly, safe shutdown requires a MUPIP JOURNAL -ROLLBACK -BACKWARD for
+   replicated databases, a MUPIP JOURNAL -RECOVER -BACKWARD for unreplicated
+   journaled databases and a MUPIP RUNDOWN for journal-free databases.
 
 3 PArtial_recov_bypass
    PArtial_recov_bypass
@@ -2940,6 +3072,48 @@
        the block size minus the size of the block header which is 7 or 8
        depending on your platform. Realistic determinations of this amount
        should leave room for at least one record of maximum size.
+
+3 SLEEp_spin_count
+   SLEEp_spin_count
+
+   Specifies the number of times a processes suspends its activity while
+   waiting to obtain critical sections for shared resources, principally
+   those involving databases. The format of the -SLEEP_SPIN_COUNT qualifier
+   is:
+
+   -SLEEP_SPIN_COUNT=integer
+
+     o integer is the number times the process yields to the OS scheduler or
+       sleeps (depending in the SPIN_SLEEP_LIMIT) after exhausting its hard
+       spin count and before enquing itself to be awakened by another process
+       releasing the shared resource mutex.
+     o The default is 128.
+     o Except on the advice of your GT.M support channel, FIS recommends
+       leaving the default values unchanged in production environments, until
+       and unless, you have data from testing and benchmarking that
+       demonstrates a benefit from a change.
+
+3 SPIN_spin_limit
+   SPIN_spin_limit
+
+   Specifies the maximum number nanoseconds for processes to sleep while
+   waiting to obtain critical sections for shared resources, principally
+   those involving databases. The format of the -SPIN_SLEEP_LIMIT qualifier
+   is:
+
+   -SPIN_SLEEP_LIMIT=nanoseconds
+
+     o nanoseconds is the maximum number of nanoseconds (in decimal form)
+       rounded up to the nearest power of two. Internally, GT.M converts it
+       to a hexadecimal mask.
+     o The default is zero (0) which causes the process to return control to
+       the UNIX kernel to be rescheduled with no explicit delay. When the
+       value is non-zero, the process waits for a random value between zero
+       (0) and the maximum value permitted by the mask.
+     o Except on the advice of your GT.M support channel, FIS recommends
+       leaving the default values unchanged in production environments, until
+       and unless, you have data from testing and benchmarking that
+       demonstrates a benefit from a change.
 
 3 Version
    Version
@@ -3302,13 +3476,16 @@
    $ZTRIGGER() and save the result. Note that TRIGGER -UPGRADE assumes that
    the existing trigger definitions are properly defined; if the prior
    release has produced defective triggers delete them with a wild-card
-   ("*"), do the MUPIP TRIGGER -UPGRADE and redefine the triggers in the new
-   release. In the event of a downgrade, delete "*" all triggers before the
-   downgrade and insert the saved version from before the upgrade. Attempting
-   to perform a MUPIP TRIGGER -UPGRADE on a database without write
-   authorization to the database produces a TRIGMODREGNOTRW error. The
-   -UPGRADE qualifier is not compatible with any other MUPIP TRIGGER
-   qualifier.
+   ("*"), and redefine the triggers in the new release. In the event of a
+   downgrade, delete "*" all triggers before the downgrade and insert the
+   saved version from before the upgrade. Attempting to perform a MUPIP
+   TRIGGER -UPGRADE on a database without write authorization to the database
+   produces a TRIGMODREGNOTRW error. The -UPGRADE qualifier is not compatible
+   with any other MUPIP TRIGGER qualifier. Trigger upgrades from older
+   versions may produce journal records based on the prior format that a
+   MUPIP JOURNAL -RECOVER cannot process correctly, therefore, FIS recommends
+   you do them with journaling off, and start with a backup and fresh journal
+   files after the trigger upgrade.
 
 3 Examples
    Examples
@@ -3807,7 +3984,7 @@
    cost of increased I/O load on the run-time system (due to more frequent
    checkpoints). A larger EPOCH_INTERVAL has the opposite effect. Therefore,
    set EPOCH=interval for a more efficient run-time with larger values of
-   interval and more efficient ROLLBACK processing with smaller values of
+   interval and more efficient -ROLLBACK processing with smaller values of
    interval.
 
    The default EPOCH_INTERVAL value is 300 seconds (5 minutes). The minimum
@@ -3918,7 +4095,7 @@
    generation journal file name. This indicates that this is a fresh start of
    journaling for the particular database. When journaling is already ON, and
    GT.M is implicitly (due to AUTOSWITCHLIMIT being reached) or explicitly
-   (due to MUPIP SET JOURNAL) required to create new journal files, GT.M
+   (due to MUPIP SET -JOURNAL) required to create new journal files, GT.M
    maintains the previous generation journal filename (after any appropriate
    rename), in the new journal file's header.
 
@@ -3933,11 +4110,11 @@
    **Note**
 
    In the event of a crash, FIS strongly recommends performing a MUPIP
-   JOURNAL ROLLBACK on a database with replication, MUPIP JOURNAL RECOVER on
-   a journaled database, and MUPIP RUNDOWN only if using neither journaling
-   nor replication. GT.M error messages provide context-specific instructions
-   to promote this decision-making model which helps protect and recover data
-   after a crash.
+   JOURNAL -ROLLBACK on a database with replication, MUPIP JOURNAL -RECOVER
+   on a journaled database, and MUPIP RUNDOWN only if using neither
+   journaling nor replication. GT.M error messages provide context-specific
+   instructions to promote this decision-making model which helps protect and
+   recover data after a crash.
 
    The previous generation journal filename is a back link from the current
    generation journal.
@@ -4134,71 +4311,76 @@
    appropriate combination of qualifiers by moving horizontally from the
    Action column extending to the Selection column:
 
-   +---------------------------------------------------------------------------------------+
-   |               |         |                    | Sequence |   Control    |  Selection   |
-   |    Action     |Direction|  Time (optional)   |  Number  |  (optional)  |  (optional)  |
-   |               |         |                    |(optional)|              |              |
-   |---------------+---------+--------------------+----------+--------------+--------------|
-   |One or more    |Only one |One or more         |Only one  |One or more   |One or more   |
-   |---------------+---------+--------------------+----------+--------------+--------------|
-   |               |         |                    |          |-[NO]AP       |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-BR=extract   |              |
-   |               |         |                    |          |file name     |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-[NO]CHA      |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-[NO]CHE      |              |
-   |-EX[=file      |         |                    |          |              |              |
-   |specification] |         |                    |          |-[NO]ER[=     |              |
-   |               |         |-A=time             |          |integer]      |-G=global list|
-   |-REC           |         |                    |-FET=port |              |              |
-   |               |         |-BE=time            |number    |-FE=fence     |-ID=pid list  |
-   |-RO            |-BA -FO  |                    |          |option        |              |
-   |               |         |-[NO]LOO= lookback  |-RES=jnl  |              |-T=transaction|
-   |-SH=show option|         |option list]        |sequence  |-FU           |type          |
-   |list]          |         |                    |number    |              |              |
-   |               |         |-SI=time            |          |-[NO]IN       |-U=user list  |
-   |-[NO]V         |         |                    |          |              |              |
-   |               |         |                    |          |-LOST=extract |              |
-   |               |         |                    |          |file name     |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-RED=file pair|              |
-   |               |         |                    |          |list          |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-VERB         |              |
-   |               |         |                    |          |              |              |
-   |               |         |                    |          |-DE           |              |
-   +---------------------------------------------------------------------------------------+
+   +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   |         Action         |Direction|          Time (optional)           |Sequence Number (optional) |      Control (optional)      |    Selection (optional)     |
+   |------------------------+---------+------------------------------------+---------------------------+------------------------------+-----------------------------|
+   |One or more             |Only one |One or more                         |Only one                   |One or more                   |One or more                  |
+   |------------------------+---------+------------------------------------+---------------------------+------------------------------+-----------------------------|
+   |                        |         |                                    |                           |-[NO]APPLY_AFTER_IMAGE        |                             |
+   |                        |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-BROKENTRANS=extract file name|                             |
+   |                        |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-[NO]CHAIN                    |                             |
+   |                        |         |                                    |                           |                              |                             |
+   |-EXTRACT[=file          |         |                                    |                           |-[NO]CHECKTN                  |                             |
+   |specification]          |         |-AFTER=time                         |                           |                              |                             |
+   |                        |         |                                    |                           |-[NO]ERRORLIMIT[=integer]     |-GLOBAL=global-list          |
+   |-RECOVER                |         |-BEFORE=time                        |                           |                              |                             |
+   |                        |-BACKWARD|                                    |-FETCH_RESYNC=port-number  |-FENCES=fence option          |-ID=pid-list                 |
+   |-ROLLBACK               |         |-[NO]LOOKBACK_TIME[=lookback option |                           |                              |                             |
+   |                        |-FORWARD |list]                               |-RESYNC=jnl sequence-number|-FULL                         |-TRANSACTION=transaction-type|
+   |-SHOW[=show-option-list]|         |                                    |                           |                              |                             |
+   |                        |         |-SINCE=time                         |                           |-[NO]INTERACTIVE              |-USER=user-list              |
+   |-[NO]VERIFY             |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-LOSTTRANS=extract-file-name  |                             |
+   |                        |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-REDIRECT=file pair list      |                             |
+   |                        |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-VERBOSE                      |                             |
+   |                        |         |                                    |                           |                              |                             |
+   |                        |         |                                    |                           |-DETAIL                       |                             |
+   +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
    Also ensure that you adhere to the following rules:
 
-    1. -BEFORE is compatible with all other JOURNAL qualifiers except
-       -ROLLBACK.
-    2. -AFTER is incompatible with -BACKWARD and all action qualifiers,
-       except -EXTRACT, -SHOW, and -VERIFY.
-    3. -APPLY_AFTER_IMAGE is compatible only with -RECOVER, or -ROLLBACK.
-    4. -BACKWARD is incompatible with -FORWARD, -AFTER, -CHECKTN, -NOCHAIN,
+    1. -AFTER is incompatible with -RECOVER or -ROLLBACK; that is -AFTER
+       requires -FORWARD, and only applies to action qualifiers: -EXTRACT,
+       -SHOW, and -VERIFY.
+    2. -APPLY_AFTER_IMAGE is compatible only with -RECOVER, or -ROLLBACK.
+    3. -BACKWARD is incompatible with -FORWARD, -AFTER, -CHECKTN, -NOCHAIN,
        and -REDIRECT.
-    5. -BROKENTRANS is compatible only with -RECOVER, -ROLLBACK, or -EXTRACT.
-    6. -CHAIN is only compatible with -FORWARD.
+    4. -BROKENTRANS is compatible only with -RECOVER, -ROLLBACK, or -EXTRACT.
+    5. -CHAIN is only compatible with -FORWARD.
+    6. -CHECKTN is incompatible with -BACKWARD.
     7. -DETAIL is compatible only with -EXTRACT.
-    8. -FETCHRESYNC or -RESYNC are compatible only with -ROLLBACK.
-    9. -FORWARD is incompatible with -BACKWARD, -ROLLBACK, -SINCE, and
-       -LOOKBACK_LIMIT.
+    8. -FETCHRESYNC is only compatible with the -ROLLBACK action in the
+       -FORWARD direction and is incompatible with RESYNC.
+    9. -FORWARD is incompatible with -BACKWARD, -FETCHRESYNC,
+       -LOOKBACK_LIMIT, -ONLINE and -SINCE.
    10. -FULL is compatible only with -EXTRACT, -SHOW, or -VERIFY.
    11. -LOSTTRANS is compatible only with -RECOVER, -ROLLBACK, or -EXTRACT.
-   12. -REDIRECT is compatible only with -RECOVER.
-   13. -ROLLBACK is incompatible with -RECOVER, FORWARD, -CHAIN, -CHECKTN,
-       -REDIRECT, time qualifiers of -SHOW.
-   14. -SINCE is incompatible with -FORWARD.
-   15. -TRANSACTION is compatible only with -EXTRACT and -SHOW.
-   16. -USER is compatible only with -EXTRACT and -SHOW.
-   17. file list must not be asterisk (*) for -REDIRECT.
-   18. file list must be asterisk (*) for -ROLLBACK.
-   19. Journal selection qualifiers are incompatible with -RECOVER,
+   12. -REDIRECT is compatible only with -BACKWARD and -RECOVER.
+   13. -RESYNC is only compatible with the -ROLLBACK action and incompatible
+       with FETCHRESYNC.
+   14. -ROLLBACK is incompatible with -RECOVER, -CHAIN, -CHECKTN, -REDIRECT,
+       time qualifiers of -SHOW except -BEFORE.
+   15. -SINCE is incompatible with -FORWARD.
+   16. -TRANSACTION is compatible only with -EXTRACT and -SHOW.
+   17. -USER is compatible only with -EXTRACT and -SHOW.
+   18. file list must not be asterisk (*) for -REDIRECT.
+   19. file list must be asterisk (*) for -BACKWARD -ROLLBACK; -ROLLBACK
+       -FORWARD accepts a list of journal file names.
+   20. Journal selection qualifiers are incompatible with -RECOVER,
        -ROLLBACK, and -VERIFY.
-   20. Journal time qualifiers are incompatible with -ROLLBACK.
+   21. If -BEFORE (time-based) and -FETCHRESYNC/-RESYNC
+       (sequence-number-based) are specified in the same MUPIP JOURNAL
+       -ROLLBACK command, the qualifier that corresponds to an earlier
+       database state or point in time prevails. For example, -BEFORE
+       prevails when the update corresponding to the sequence number obtained
+       through the -FETCHRESYNC command happened at a later time relative to
+       the -BEFORE qualifier and vice versa.
+   22. -FETCHRESYNC, -ONLINE, and -RSYNC_STRM qualifiers are not compatible
+       with -ROLLBACK -FORWARD.
 
    For example, MUPIP JOURNAL -EXTRACT=gtm.mjf -FORWARD -DETAIL is a valid
    command which performs forward processing to extract detailed the journal
@@ -4277,6 +4459,28 @@
    extract all journal records into one file, use the control qualifier
    -FENCES=NONE. FIS strongly recommended against using -FENCES=NONE if
    -RECOVER/-ROLLBACK is also specified.
+
+4 Parallel
+   Parallel
+
+   PARA[LLEL][=n] specifies the number of parallel threads (for backward
+   processing) and parallel processes (for forward processing). Parallel
+   threads typically increase the speed of MUPIP JOURNAL RECOVER/ROLLBACK
+   operations.
+
+   Omitting the qualifier or specifying a value of one (1) defaults to a
+   single process with no threads. Omitting the value or specifying a value
+   of zero (0) specifies one thread or process per region.
+
+   A value greater than one (1) specifies the maximum number of concurrent
+   threads or processes MUPIP should use, although it never uses more than
+   one per region. If the number of regions exceeds the specified value,
+   MUPIP allocates one thread or processes in an order determined by
+   timestamps in the journal records.
+
+   The environment variable gtm_mupjnl_parallel provides a value when the
+   MUPIP JOURNAL command has no explicit -PARALLEL qualifier; when defined
+   with no value gtm_mupjnl_parallel acts like -PARALLEL with no value.
 
 4 RECover
    RECover
@@ -4392,77 +4596,45 @@
 4 ROLLBACK
    ROLLBACK
 
+   -ROLLBACK -FORWARD "*" command does what a -RECOVER -FORWARD "*" would do
+   except that the ROLLBACK also updates sequence number related fields in
+   the database file header and ensures update serialization across regions.
+   -RECOVER can leave one database region ahead of another region. -RECOVER
+   cannot ensure database Consistency across regions whereas -ROLLBACK can.
+
+   When used without time qualifiers, -ROLLBACK -FORWARD "*" applies update
+   records in journal files to backed up copies of database files to bring
+   them to the same state that -ROLLBACK -BACKWARD "*" would bring crashed
+   database files. Note that, in the context of -RECOVER and -ROLLBACK, the
+   "*" indicates the use of all the appropriate journal files in all the
+   replicated regions and the quotes prevent inappropriate expansion by the
+   OS shell.
+
+   Databases recovered with -ROLLBACK can be used in replicated instances.
+
+  Important
+
+     o -ROLLBACK -FORWARD leaves the journaling state turned off in database
+       files (as does MUPIP JOURNAL -RECOVER -FORWARD), which in turn means
+       that replication is also turned off; re-enable journaling, and turn
+       replication on, before using database files in environments where they
+       can be updated, but journaling and replication may be left off if
+       subsequent access is read-only.
+     o After a -ROLLBACK -FORWARD, recreate the replication instance file as
+       part of turning replication on for the recovered database.
+     o -ROLLBACK -FORWARD can use both before-image and nobefore-image
+       journal files.
+
    -ROLLBACK initiates the central JOURNAL operation for a replicated
    database. MUPIP JOURNAL commands may specify -ROLLBACK with other action
-   qualifiers but not with -RECOVER. If you do not use -FETCHRESYNC, the
-   database rolls back to the last consistent state. Only asterisk (*)
-   qualifier is allowed for the journal file selection, that is, -ROLLBACK
-   selects journal files by itself.
+   qualifiers but not with -RECOVER. With -BACKWARD, if you do not specify
+   -BEFORE or -FETCHRESYNC, the database rolls back to the last consistent
+   state. With -BACKWARD, the command allows only an asterisk (*) argument
+   for the journal file selection, that is, -ROLLBACK selects journal files
+   by itself.
 
-   -NOO[NLINE]
-
-   Specifies that ROLLBACK requires exclusive access to the database and the
-   replication instance file. This means that the database and the
-   replication instance files are inaccessible during a -ROLLBACK -NOONLINE.
-
-   By default, MUPIP JOURNAL -ROLLBACK is -NOONLINE.
-
-   -ON[LINE]
-
-   Specifies that ROLLBACK should run without requiring exclusive access to
-   the database and the replication instance file.
-
-   GT.M increments ISV $ZONLNRLBK every time a process detects a concurrent
-   MUPIP JOURNAL -ONLINE -ROLLBACK.
-
-   If the logical state of the database after the completion of MUPIP JOURNAL
-   -ONLINE -ROLLBACK matches the logical state of the database at the start
-   of MUPIP JOURNAL -ONLINE -ROLLBACK, that is, only removes or commits an
-   uncommitted TP transaction or non-TP mini-transaction, any transaction (TP
-   or Non-TP) incurs a restart.
-
-   If MUPIP JOURNAL -ONLINE -ROLLBACK changes the logical state of the
-   database, the behavior is as follows:
-
-     o -ONLINE -ROLLBACK increments ISV $ZONLNRLBK
-     o In a TP transaction including trigger code within a transaction,
-       -ONLINE -ROLLBACK restarts the transaction.
-     o In a non-TP mini-transaction, including within an implicit transaction
-       caused by a trigger, -ONLINE -ROLLBACK produces a DBROLLEDBACK error,
-       which, in turn, invokes the error trap if $ETRAP or $ZTRAP are in
-       effect.
-
-   Any utility/command attempted while MUPIP JOURNAL -ONLINE -ROLLBACK
-   operates waits for ROLLBACK to complete; the $gtm_db_startup_max_wait
-   environment variable configures the wait period.
-
-   **Note**
-
-   Because MUPIP ROLLBACK -ONLINE can take a database backwards in state
-   space, please make sure that you understand what it is that you intend it
-   to do when you invoke it. FIS developed it as a step towards a much larger
-   project and anticipates that it will not be broadly useful as is.
-
-   -ROLLBACK -BACKWARD exits with an error message for following conditions:
-
-    1. Any database region corresponding to a journal file processed has
-       replication state turned OFF. Note that, a configuration where there
-       are replicated regions and at least one non-replicated-but-journaled
-       region is not permitted by the replication source server. The source
-       server errors out at startup on such a configuration without having
-       set up the journal pool. Since all GT.M updates to replicated regions
-       need the source server to have set up a journal pool, no updates are
-       possible until the configuration is changed to have only replicated
-       regions or non-replicated-and-non-journaled regions.
-    2. Any database region corresponding to a journal file identified by the
-       command argument has journaling state DISABLE'd or ENABLE'd and OFF.
-    3. Any database region corresponding to a journal file has journal state
-       ENABLE'd and ON, but the journal file name specified in the database
-       file header is different than one identified by the command argument.
-
-   If a transaction is found with incomplete fence, it is considered broken.
-   For the duration of the rollback, replication is turned OFF on all regions
-   and turned back ON at the end of the rollback.
+   If a transaction is found with incomplete fence, it is considered
+   incomplete or broken.
 
    During the forward phase of rollback, if a complete transaction (fenced or
    unfenced) is found after a broken transaction, it is considered as a lost
@@ -4492,6 +4664,9 @@
    state and attempt to automatically recover a database if there is a
    crash).
 
+   -ROLLBACK -BACKWARD exits with an error message if a database does not
+   have both journaling and replication either enabled or disabled.
+
    **Note**
 
    If ROLLBACK (either -NOONLINE or -ONLINE) terminates abnormally (say
@@ -4508,6 +4683,55 @@
 
    However, the MUPIP and DSE actions do not ensure that the database has
    consistent state; check for database integrity with MUPIP INTEG.
+
+   -NOO[NLINE]
+
+   Specifies that ROLLBACK requires exclusive access to the database and the
+   replication instance file, which means the database and the replication
+   instance files are inaccessible during a -ROLLBACK -NOONLINE.
+
+   -ROLLBACK -FORWARD does not support the -[NO]O[NLINE] qualifier.
+
+   -ON[LINE]
+
+   Specifies that ROLLBACK can run without requiring exclusive access to the
+   database and the replication instance file.
+
+   Any utility/command attempted while MUPIP JOURNAL -ONLINE -ROLLBACK
+   operates waits for ROLLBACK to complete; the $gtm_db_startup_max_wait
+   environment variable configures the wait period.
+
+   **Note**
+
+   Because MUPIP ROLLBACK -ONLINE can take a database backwards in state
+   space, please make sure that you understand what it is that you intend it
+   to do when you invoke it. FIS developed it as a step towards a much larger
+   project and anticipates that it will not be broadly useful in its current
+   form.
+
+   By default, MUPIP JOURNAL -ROLLBACK -BACKWARD is -NOONLINE.
+
+   GT.M increments ISV $ZONLNRLBK every time a process detects a concurrent
+   MUPIP JOURNAL -ONLINE -ROLLBACK.
+
+   The logical state of the database after the completion of MUPIP JOURNAL
+   -ONLINE -ROLLBACK matches the logical state of the database at the start
+   of MUPIP JOURNAL -ONLINE -ROLLBACK, that is, the ROLLBACK only removes any
+   incompletely committed TP transactions or non-TP mini-transactions; any
+   concurrent transaction (TP or Non-TP) incurs a restart.
+
+   If MUPIP JOURNAL -ONLINE -ROLLBACK changes the logical state of the
+   database, the behavior is as follows:
+
+     o For the duration of the rollback, replication is turned OFF on all
+       regions and turned back ON at the end of the rollback.
+     o -ONLINE -ROLLBACK increments ISV $ZONLNRLBK
+     o In a TP transaction including trigger code within a transaction,
+       -ONLINE -ROLLBACK restarts the transaction.
+     o In a non-TP mini-transaction, including within an implicit transaction
+       caused by a trigger, -ONLINE -ROLLBACK produces a DBROLLEDBACK error,
+       which, in turn, invokes the error trap if $ETRAP or $ZTRAP are in
+       effect.
 
 4 SHow
    SHow
@@ -4659,9 +4883,14 @@
 4 Verify
    Verify
 
-   Verifies a journal file for integrity. This qualifier cannot have a value.
-   -VERIFY scans the files and checks if it is in legal form, if not, it
+   Verifies journal files for integrity. This qualifier cannot have a value.
+   -VERIFY scans journal files and checks if they have legal form, if not, it
    terminates without affecting the database files.
+
+   -NOVERIFY is the default for -RECOVER -FORWARD and -ROLLBACK -FORWARD.
+   -VERIFY is the default for RECOVER -FORWARD -NOCHECKTN. -VERIFY is also
+   the default for all other MUPIP JOURNAL commands (including -RECOVER
+   -BACKWARD and -ROLLBACK -BACKWARD).
 
    -VERIFY when specified along with -FORWARD verifies the entire journal
    file For -NOVERIFY -FORWARD, only the tail of a journal file is verified
@@ -4680,10 +4909,13 @@
    This speeds up processing. But the disadvantage of this approach is that
    in the event of verification terminating in the middle of backward
    processing, there is no protection of cross-region integrity. FIS
-   recommends the use of -VERIFY with -RECOVER or -ROLLBACK.
+   recommends the use of -VERIFY (the default) when -BACKWARD is used with
+   -RECOVER or -ROLLBACK. For -FORWARD, unless there is reason to suspect
+   that the journal files have sustained structural damage, FIS suggests the
+   use of -NOVERIFY (the default).
 
    When used independent of -RECOVER (or -ROLLBACK), -[NO]VERIFY option does
-   not need database access. The default is -VERIFY.
+   not need database access. In this case the default is -VERIFY.
 
 3 Direction_Qualifiers
    Direction Qualifiers
@@ -4730,7 +4962,7 @@
    back-slash (\) delimiter before both, the beginning and ending quotation
    marks to escape it from being processed by the UNIX shell.
 
-   Absolute format is day-mon-yyyy hh:mm:ss , where day denotes the date of
+   Absolute format is day-mon-yyyy hh:mm:ss, where day denotes the date of
    the month, mon indicates the abbreviated 3-letter month name (for example,
    Jan, Feb,..) and the year yyyy and hour hh are separated by a space.
    Absolute time may indicate today's date with "-- " before the hours.
@@ -4745,7 +4977,7 @@
 
    **Note**
 
-   All time qualifiers are incompatible with -ROLLBACK.
+   All time qualifiers except -BEFORE are incompatible with -ROLLBACK.
 
    The following section describes the time qualifiers in more detail:
 
@@ -4757,7 +4989,7 @@
 
    If -AFTER= provides a time following the last time recorded in the journal
    file or following any -BEFORE= time, JOURNAL processing produces no result
-   and a warning message is displayed. If -AFTER provides a time preceding
+   and MUPIP displays a warning message. If -AFTER provides a time preceding
    the first time recorded in the journal file specified in the command line,
    and, previous generation journal file(s) exists for that journal file,
    then previous generation journal file(s) are not included for the
@@ -4773,17 +5005,28 @@
    specified references time stamps in the journal files. If -BEFORE=
    specifies a time preceding the first time recorded in the journal file, or
    preceding any -AFTER= or -SINCE= time, JOURNAL processing produces no
-   result, and a warning message is displayed.
+   result, and MUPIP displays a warning message.
 
    If -BEFORE= time exceeds the last time recorded in journal files, JOURNAL
    processing effectively ignores the qualifier and terminates at the end of
    the journal file. By default, JOURNAL processing terminates at the end of
    the journal file.
 
+   When used with -ROLLBACK or -RECOVER, -BEFORE specifies the the time at
+   which MUPIP stops applying updates to the database in its forward
+   processing phase (i.e., no journal records with update times after the
+   -BEFORE time are applied to the database).
+
+   When both -FETCHRESYNC/-RESYNC and -BEFORE are used with -ROLLBACK
+   -BACKWARD, the qualifier corresponding to an earlier database state or
+   point in time prevails. For example, -BEFORE prevails when the update
+   corresponding to the sequence number obtained through the -FETCHRESYNC
+   command happened at a later time relative -BEFORE and vice versa.
+
    -[NO]LOO[KBACK_LIMIT][=lookback-option-list]
 
-   Specifies how far JOURNAL -BACKWARD processes past the turnaround point
-   (the explicit or implicit point in journal file up to which -RECOVER
+   Specifies how far JOURNAL -RECOVER -BACKWARD processes past the turnaround
+   point (the explicit or implicit point in journal file up to which -RECOVER
    proceeds backward before it reverses and processes database in forward
    direction), while attempting to resolve open transaction fences. This
    option is applicable only for transactions fenced with ZTSTART and
@@ -4830,10 +5073,12 @@
 
    -SI[NCE]=time
 
-   Specifies a starting (or checkpoint) time for an action qualifier with
-   -BACKWARD, that is, -SINCE specifies how far back in time JOURNAL
-   -BACKWARD should process (from the end of the journal file), before
-   starting the forward processing.
+   The -SINCE time qualifier applies to MUPIP JOURNAL -BACKWARD. The -SINCE
+   qualifier specifies how far back in time MUPIP JOURNAL should at least
+   process (from the end of the journal file), before starting the forward
+   processing. The actual turn-around point for -RECOVER and -ROLLBACK in
+   each database region is an epoch in the journal files before or at the
+   -SINCE time, but not after it.
 
    The time specified references time stamps in the journal files. If there
    are open fenced transactions when JOURNAL -BACKWARD locates the -SINCE=
@@ -4869,8 +5114,8 @@
 
    **Important**
 
-   FIS recommends you to unconditionally script the mupip journal -rollback
-   -fetchresync command prior to starting any Source Server on the
+   FIS recommends you to unconditionally script the MUPIP JOURNAL -ROLLBACK
+   -FETCHRESYNC command prior to starting any Source Server on the
    replicating instance to avoid a possible out-of-sync situation.
 
    The reference point sent by the originating instance is the RESYNC_SEQNO
@@ -4927,10 +5172,10 @@
    -[NO]AP[PLY_AFTER_IMAGE]
 
    Specifies that after image records (AIMG) be applied to the database as
-   part of forward processing of backward recovery or rollback. AIMG are
-   "snapshots" of the database updates captured by GTM immediately after the
-   change caused by a DSE update. By default, during forward phase of
-   backward recovery or rollback, AIMG records are applied to the database.
+   part of forward processing of -RECOVERY or -ROLLBACK. AIMG are "snapshots"
+   of the database updates captured by GT.M immediately after the change
+   caused by a DSE update. By default, during forward phase of backward
+   recovery or rollback, AIMG records are applied to the database.
 
    By default, -RECOVER -FORWARD does not apply AIMG record into the
    database. -APPLY_AFTER_IMAGE is compatible with -RECOVER, or -ROLLBACK
@@ -4964,17 +5209,21 @@
    -[NO]CHE[CKTN]
 
    -CHECKTN specifies that JOURNAL -FORWARD must verify for each region that
-   the begin transaction number of the earliest journal file to be processed
-   for that region is same as the current transaction in the database file
-   and that the end transaction number of every journal file is equal to the
-   begin transaction number of the next generation journal file for a given
-   region. By default, -FORWARD uses -CHECKTN.
+   the begining transaction number of the earliest journal file to be
+   processed for that region is same as the current transaction in the
+   database file and that the ending transaction number of every journal file
+   is equal to the begining transaction number of the next generation journal
+   file for a given region. By default, -FORWARD uses -CHECKTN.
 
    -NOCHECKTN forces forward recovery by overriding inbuilt mechanisms for
-   checking transaction integrity. Use -NOCHECKTN with caution because it may
-   lead to integrity issues in the recovered database and journal files.
+   checking transaction integrity. MUPIP performs -VERIFY when -NOCHECKTN is
+   specified. Use -NOCHECKTN with caution because it may lead to integrity
+   issues in the recovered database and journal files.
 
-   -CHECKTN is incompatible with -BACKWARD and -ROLLBACK.
+   ROLLBACK -FORWARD accepts only -CHECKTN, which is the default, but does
+   not accept -NOCHECKTN.
+
+   -CHECKTN is incompatible with -BACKWARD.
 
    -[NO]ER[ROR_LIMIT][=integer]
 
@@ -4993,13 +5242,13 @@
    JOURNAL does not consider these as errors. In addition, fenced
    transactions that are broken are not considered as errors.
 
-   During the forward phase of recovery, if a broken transaction is found,
-   all the logical records processed afterwards are considered suspect. If a
-   complete transaction is found after any broken transactions, MUPIP JOURNAL
-   -RECOVER increments the error count and, if it is less than the error
-   limit, it is applied to the database. Otherwise, it is treated as a lost
-   transaction and extracted. If a complete transaction is found after any
-   broken transactions, MUPIP JOURNAL -ROLLBACK treats it as a lost
+   During the forward phase of recovery, if journal processing finds a broken
+   transaction, all the logical records processed afterwards are considered
+   suspect. If a complete transaction is found after any broken transactions,
+   MUPIP JOURNAL -RECOVER increments the error count and, if it is less than
+   the error limit, it is applied to the database. Otherwise, it is treated
+   as a lost transaction and extracted. If a complete transaction is found
+   after any broken transactions, MUPIP JOURNAL -ROLLBACK treats it as a lost
    transaction and extracts it irrespective of the error limit.
 
    If MUPIP JOURNAL needs to increment error count during its processing, a
@@ -5017,41 +5266,39 @@
 
    Specifies how JOURNAL processes fenced transactions. Fenced transactions
    are logical transactions made up of database updates preceded by a TSTART
-   or ZTSTART command and followed, respectively, by a TCOMMIT or ZTCOMMIT
-   command. All updates between a TSTART or ZTSTART and a TCOMMIT or ZTCOMMIT
-   are designed to occur together so that after journal recovery the database
-   contains either all the updates corresponding to a fenced transaction, or
-   none of them.
+   command followed by a TCOMMIT command. All updates between a TSTART and a
+   TCOMMIT are designed to occur together so that after journal recovery the
+   database contains either all the updates corresponding to a fenced
+   transaction, or none of them.
 
-   The argument values for -FENCES option for MUPIP -RECOVER are not
-   case-sensitive.
+   The argument values for -FENCES option for MUPIP -RECOVER/-ROLLBACK are
+   not case-sensitive.
 
    The fence options are:
 
      o NONE
 
-       This causes MUPIP JOURNAL to apply all individual updates as if
-       transaction fences did not exist. Note that, this means a SET/KILL
-       within a TP or ZTP transaction would be played as if it was an
-       unfenced SET/KILL. This may cause the database and new journals
-       created (if -BACKWARD is specified), to be different from the state
-       before the recovery took place.
+       This causes MUPIP JOURNAL -RECOVER to apply all individual updates as
+       if transaction fences did not exist. Note that, this means journal
+       processing treats a SET/KILL within a TP transaction as if it was an
+       unfenced SET/KILL. -FENCES=NONE is not permitted for MUPIP JOURNAL
+       -ROLLBACK.
 
      o ALWAYS
 
-       This causes MUPIP JOURNAL to treat any unfenced or improperly fenced
-       updates as broken transactions.
+       This causes MUPIP JOURNAL -RECOVER to treat any unfenced or improperly
+       fenced updates as broken transactions. FENCES=ALWAYS is not permitted
+       for MUPIP JOURNAL -ROLLBACK.
 
      o PROCESS
 
        This causes MUPIP JOURNAL to accept unfenced database updates, and
        also to observe fences when they appear, generating broken transaction
-       files in the case of a TSTART with no corresponding TCOMMIT, or a
-       ZTSTART with no corresponding ZTCOMMIT. It also generates broken
-       transactions if a multi-region transaction with TSTART and TCOMMIT
-       expects N regions to participate, but the number of TSTART/TCOMMIT
-       pairs found is less than N. The same happens for multi-region ZTSTART
-       and ZTCOMMIT.
+       files in the case of a TSTART with no corresponding TCOMMIT. It also
+       generates broken transactions if a multi-region transaction with
+       TSTART and TCOMMIT expects N regions to participate, but the number of
+       TSTART/TCOMMIT pairs found is less than N. -ROLLBACK accepts
+       -FENCES=PROCESS, which is the default.
 
    By default, MUPIP JOURNAL uses -FENCES=PROCESS.
 
@@ -5068,10 +5315,10 @@
    file (this field shows up as "End of Data" in a MUPIP JOURNAL -SHOW=HEADER
    output). Once a journal file's contents are rolled back, all future MUPIP
    JOURNAL commands (including -EXTRACT) operate on the rolled back journal
-   file only. But if -FULL is specified along with -EXTRACT, the entire
-   journal file contents (including those records that were rolled back) are
-   extracted. This qualifier is to be used only as a diagnostic tool and not
-   in normal operation.
+   file only. But if -FULL is specified along with -EXTRACT, MUPIP extracts
+   the entire journal file contents (including those records that were rolled
+   back). This qualifier is to be used only as a diagnostic tool and not in
+   normal operation.
 
    -FULL qualifier is compatible with -EXTRACT only.
 
@@ -5085,7 +5332,7 @@
    -NOINTERACTIVE terminates the journal processing as soon as the MUPIP
    JOURNAL command generates the number of errors specified in -ERROR_LIMIT.
 
-   This qualifier is applicable only to interactive mode or terminal mode.
+   This qualifier applies when the MUPIP command is entered from a terminal.
    The default is -INTERACTIVE.
 
    -LOST[TRANS]=<extract file>
@@ -5095,19 +5342,19 @@
    necessary, MUPIP JOURNAL creates one using the name of the current journal
    file being processed with a .lost extension.
 
-   Any complete transactions after a broken transaction is considered a lost
-   transaction. They are written into the lost transaction file. For -RECOVER
-   it might be considered as good transaction and applied to the database, if
-   -ERROR_LIMIT qualifier allows it to do so.
+   Journal processing treats any complete transactions after a broken
+   transaction as a lost transaction, and writes such transactions into the
+   lost transaction file. -RECOVER might consider it as good transaction and
+   apply it to the database, if -ERROR_LIMIT qualifier allows it to do so.
 
-   Note that, if selection qualifiers are specified, the broken transaction
-   determination (and therefore lost transaction determination as well) is
-   done based on the journal file that is filtered by the selection
-   qualifiers. This means that a transaction's journal records may be
-   considered complete or broken or lost, depending on the nature of the
+   Note that, if selection qualifiers are specified, journal processing does
+   the broken transaction determination (and therefore lost transaction
+   determination as well) based on the journal file that is filtered by the
+   selection qualifiers. This means that a transaction's journal records may
+   be considered complete or broken or lost, depending on the nature of the
    selection qualifiers. Using -FENCES=NONE along with the selection
-   qualifiers will result in every journal record to be considered complete
-   and hence prevent broken or lost transaction processing.
+   qualifiers results in every journal record being considered complete and
+   hence preventing broken or lost transaction processing.
 
    In the case of a replicated database, lost transaction can have an
    additional cause. If failover occurs (that is, the originating Source
@@ -5364,9 +5611,8 @@
        record that has a different schema.
      o If the source side has triggers enabled and its receiver side either
        runs a pre-trigger version of GT.M or runs on a platform where
-       triggers are not supported (for example, AXP VMS or HPUX HPPA),
-       trigger definition journal records from the source side are
-       transformed to NULL records on the receiver side.
+       triggers are not supported, trigger definition journal records from
+       the source side are transformed to NULL records on the receiver side.
 
    **Important**
 
@@ -5896,7 +6142,8 @@
    value of 64 MB. Remember that you cannot exceed the system-provided
    maximum shared memory. For systems with high update rates, specify a
    larger buffer size to avoid the overflows and file I/O that occur when the
-   Source Server reads journal records from journal files.
+   Source Server reads journal records from journal files. The maximum value
+   is 4GiB - 1.
 
    -filter=<filter command>
 
@@ -5932,8 +6179,7 @@
      set log=$ztrnlnm("filterlog")        ; use the environment variable filterlog" (if defined)
      ;to specify which logfile to use
      if logersion="" set log="logcharout"  char
-     if $zv["VMS" sechar EOL=$C(13)_$C(10)
-     else  set EOL=$C(10)
+     set EOL=$C(10)
      open log:newve:sion
      use $principal:nowrap
      for  do
@@ -6192,16 +6438,6 @@
    If a package for zlib is available with your operating system, FIS
    suggests that you use it rather than building your own.
 
-   Solaris/cc compiler from Sun Studio:
-
-   ./configure --shared
-   make CFLAGS="-KPIC -m64"
-
-   HP-UX(IA64)/HP C compiler:
-
-   ./configure --shared
-   make CFLAGS="+DD64"
-
    AIX/XL compiler:
 
    ./configure --shared
@@ -6247,16 +6483,16 @@
    /usr/local/lib in LIBPATH, the environment variable that provides a search
    path for processes to use when they link DLLs.
 
-   By default, GT.M searches for the libz.so shared library (libz.sl on HPUX
-   PA-RISC) in the standard system library directories (for example,
-   /usr/lib, /usr/local/lib, /usr/local/lib64). If the shared library is
-   installed in a non-standard location, before starting replication, you
-   must ensure that the environment variable $LIBPATH (AIX and z/OS) or
-   $LD_LIBRARY_PATH (other UNIX platforms) includes the directory containung
-   the library. The Source and Receiver Server link the shared library at
-   runtime. If this fails for any reason (such as file not found, or
-   insufficient authorization), the replication logic logs a DLLNOOPEN error
-   and continues with no compression.
+   By default, GT.M searches for the libz.so shared library in the standard
+   system library directories (for example, /usr/lib, /usr/local/lib,
+   /usr/local/lib64). If the shared library is installed in a non-standard
+   location, before starting replication, you must ensure that the
+   environment variable $LIBPATH (AIX and z/OS) or $LD_LIBRARY_PATH (other
+   UNIX platforms) includes the directory containung the library. The Source
+   and Receiver Server link the shared library at runtime. If this fails for
+   any reason (such as file not found, or insufficient authorization), the
+   replication logic logs a DLLNOOPEN error and continues with no
+   compression.
 
    -tlsid=<label>
 
@@ -6992,15 +7228,15 @@
 
    Command syntax:
 
-   mupip replicate -receiver -shutdown [-updateonly|-helpers] [-timeout=<timeout in seconds>]
+   mupip replicate -receiver -shutdown [-helpers | -updateonly] [-timeout=<timeout in seconds>]
 
    Qualifiers:
 
-   -updateonly
+   -shutdown
 
-   Use this qualifier to stop only the Update Process. If neither -updateonly
-   nor -helper are specified, the Update Process, all helper processes (if
-   any), and Receiver Server shut down.
+   Initiates the shutdown procedures of the Receiver Server, Update Process,
+   and/or helper processes. If the Receiver Server previously shut down
+   abnormally, -shutdown can shut down helper processes left running.
 
    -helper
 
@@ -7015,6 +7251,12 @@
    processes to shut down.If you do not specify -timeout, the default timeout
    period is 30 seconds. If you specify -timeout=0, shutdown occurs
    immediately.
+
+   -updateonly
+
+   Use this qualifier to stop only the Update Process. If neither -updateonly
+   nor -helper are specified, the Update Process, all helper processes (if
+   any), and Receiver Server shut down.
 
    Example:
 
@@ -7504,7 +7746,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2015
+   Copyright 2016
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -7526,7 +7768,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-002 of the
+   This help file is a concise representation of revision V6.3-000 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

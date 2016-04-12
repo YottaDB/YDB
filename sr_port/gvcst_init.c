@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,7 +140,7 @@ void	assert_jrec_member_offsets(void)
 	assert(JNL_HDR_LEN == JNL_FILE_FIRST_RECORD);
 	assert(DISK_BLOCK_SIZE >= PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN);
 	assert((JNL_ALLOC_MIN * DISK_BLOCK_SIZE) > JNL_HDR_LEN);
-	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in tp.h */
+	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in jnl.h */
 	assert(PINI_RECLEN >= EPOCH_RECLEN && PINI_RECLEN >= PFIN_RECLEN && PINI_RECLEN >= EOF_RECLEN);
 	/* jnl_string structure has a 8-bit nodeflags field and a 24-bit length field. In some cases, this is
 	 * used as a 32-bit length field (e.g. in the value part of the SET record or ZTWORMHOLE or LGTRIG record).
@@ -191,12 +191,6 @@ void	assert_jrec_member_offsets(void)
 	assert(NULL_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_null), JNL_REC_START_BNDRY)));
 	assert(EPOCH_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_epoch), JNL_REC_START_BNDRY)));
 	assert(EOF_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_eof), JNL_REC_START_BNDRY)));
-	/* Assert following comment which is relied upon in JNL_FILE_TAIL_PRESERVE macro.
-	 * 	"We know PINI_RECLEN is maximum of EPOCH_RECLEN, PFIN_RECLEN, EOF_RECLEN"
-	 */
-	assert(PINI_RECLEN > EPOCH_RECLEN);
-	assert(PINI_RECLEN > PFIN_RECLEN);
-	assert(PINI_RECLEN > EOF_RECLEN);
 	/* Assumption about the structures in code */
 	assert(0 == MIN_ALIGN_RECLEN % JNL_REC_START_BNDRY);
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
@@ -242,11 +236,10 @@ void gvcst_init(gd_region *greg)
 	enum db_acc_method	greg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	intrpt_state_t		save_intrpt_ok_state;
-#	ifdef UNIX
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	int4			db_init_retry;
-#	endif
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -438,7 +431,8 @@ void gvcst_init(gd_region *greg)
 	 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
 	 * thus would be left over in the system.
 	 */
-	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT);
+	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS in dbinit_ch */
 	VMS_ONLY(db_init(greg, temp_cs_data));
 #	ifdef UNIX
 	db_init_retry = 0;
@@ -520,8 +514,8 @@ void gvcst_init(gd_region *greg)
 	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
 	UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE);
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
-	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT), can do mallocs which in turn can issue a
-	 * GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
+	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state), can do mallocs which in turn
+	 * can issue a GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
 	 * UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE) call. Since these are only private memory initializations, it is safe to
 	 * do these after reg->open is set. Any rts_errors from now on still do the needful cleanup of shared memory in
 	 * gds_rundown since reg->open is already TRUE.
@@ -572,29 +566,24 @@ void gvcst_init(gd_region *greg)
 			non_tp_jfb_ptr->hi_water_bsize = bsize;
 			non_tp_jfb_ptr->buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(bsize));
 			non_tp_jfb_ptr->record_size = 0;	/* initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
-			GTMCRYPT_ONLY(non_tp_jfb_ptr->alt_buff = NULL);
+			non_tp_jfb_ptr->alt_buff = NULL;
 		} else if (bsize > non_tp_jfb_ptr->hi_water_bsize)
 		{	/* Need a larger buffer to accommodate larger non-TP journal records */
 			non_tp_jfb_ptr->hi_water_bsize = bsize;
 			free(non_tp_jfb_ptr->buff);
 			non_tp_jfb_ptr->buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(bsize));
-#			ifdef GTM_CRYPT
 			if (NULL != non_tp_jfb_ptr->alt_buff)
 			{
 				free(non_tp_jfb_ptr->alt_buff);
 				realloc_alt_buff = TRUE;
 			}
-#			endif
 		}
-		/* If the journal records need to be encrypted in the journal file and if replication is in use,
-		 * we will need access to both the encrypted (for the journal file) and unencrypted (for the
-		 * journal pool) journal record contents. Allocate an alternative buffer if any open journaled region
-		 * is encrypted.
+		/* If the journal records need to be encrypted in the journal file and if replication is in use, we will need access
+		 * to both the encrypted (for the journal file) and unencrypted (for the journal pool) journal record contents.
+		 * Allocate an alternative buffer if any open journaled region is encrypted.
 		 */
-#		ifdef GTM_CRYPT
-		if (realloc_alt_buff || (csd->is_encrypted && (NULL == non_tp_jfb_ptr->alt_buff)))
+		if (realloc_alt_buff || (USES_ENCRYPTION(csd->is_encrypted) && (NULL == non_tp_jfb_ptr->alt_buff)))
 			non_tp_jfb_ptr->alt_buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(non_tp_jfb_ptr->hi_water_bsize));
-#		endif
 		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP transaction.
 		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
 		 * one set of fixed size jnl records written.
@@ -619,7 +608,7 @@ void gvcst_init(gd_region *greg)
 		global_tlvl_info_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 		initialize_list(global_tlvl_info_list, SIZEOF(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
 	}
-	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
+	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 	if (dba_bg == greg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
 		 * (c) if it is big enough to deal with this region. If the region does not have any non-upgraded

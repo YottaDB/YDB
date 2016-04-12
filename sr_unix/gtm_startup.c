@@ -15,11 +15,9 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_inet.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "error.h"
-#include "fnpc.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
@@ -94,6 +92,9 @@
 #include "continue_handler.h"
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
+#ifdef UNICODE_SUPPORTED
+#include "utfcgr.h"
+#endif
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -154,7 +155,6 @@ void gtm_startup(struct startup_vector *svec)
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
 	int4		lct;
-	int		i;
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
@@ -288,19 +288,12 @@ void gtm_startup(struct startup_vector *svec)
 		{
 			exi_condition = -ERR_COLLATIONUNDEF;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
-			exit(exi_condition);
+			EXIT(exi_condition);
 		}
 	} else
 		TREF(local_collseq) = 0;
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
-	for (i = 0; FNPC_MAX > i; i++)
-	{	/* Initialize cache structure for $Piece function */
-		(TREF(fnpca)).fnpcs[i].pcoffmax = &(TREF(fnpca)).fnpcs[i].pstart[FNPC_ELEM_MAX];
-		(TREF(fnpca)).fnpcs[i].indx = i;
-	}
-	(TREF(fnpca)).fnpcsteal = (TREF(fnpca)).fnpcs;		/* Starting place to look for cache reuse */
-	(TREF(fnpca)).fnpcmax = &(TREF(fnpca)).fnpcs[FNPC_MAX - 1];	/* The last element */
 	/* Initialize zwrite subsystem. Better to do it now when we have storage to allocate than
 	 * if we fail and storage allocation may not be possible. To that end, pretend we have
 	 * seen alias acitivity so those structures are initialized as well.
@@ -322,23 +315,49 @@ void gtm_startup(struct startup_vector *svec)
 
 void gtm_utf8_init(void)
 {
+	int	utfcgr_size, alloc_size, i;
+#	ifdef UNICODE_SUPPORTED
+	utfcgr	*utfcgrp, *p;
+#	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	if (!gtm_utf8_mode)
 	{	/* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
-	  	FIX_XFER_ENTRY(xf_fnascii, op_fnzascii)
-		FIX_XFER_ENTRY(xf_fnchar, op_fnzchar)
-		FIX_XFER_ENTRY(xf_fnextract, op_fnzextract)
-		FIX_XFER_ENTRY(xf_setextract, op_setzextract)
-		FIX_XFER_ENTRY(xf_fnfind, op_fnzfind)
-		FIX_XFER_ENTRY(xf_fnj2, op_fnzj2)
-		FIX_XFER_ENTRY(xf_fnlength, op_fnzlength)
-		FIX_XFER_ENTRY(xf_fnpopulation, op_fnzpopulation)
-		FIX_XFER_ENTRY(xf_fnpiece, op_fnzpiece)
-		FIX_XFER_ENTRY(xf_fnp1, op_fnzp1)
-		FIX_XFER_ENTRY(xf_setpiece, op_setzpiece)
-		FIX_XFER_ENTRY(xf_setp1, op_setzp1)
-		FIX_XFER_ENTRY(xf_fntranslate, op_fnztranslate)
-		FIX_XFER_ENTRY(xf_fnreverse, op_fnzreverse)
+	  	FIX_XFER_ENTRY(xf_fnascii, op_fnzascii);
+		FIX_XFER_ENTRY(xf_fnchar, op_fnzchar);
+		FIX_XFER_ENTRY(xf_fnextract, op_fnzextract);
+		FIX_XFER_ENTRY(xf_setextract, op_setzextract);
+		FIX_XFER_ENTRY(xf_fnfind, op_fnzfind);
+		FIX_XFER_ENTRY(xf_fnj2, op_fnzj2);
+		FIX_XFER_ENTRY(xf_fnlength, op_fnzlength);
+		FIX_XFER_ENTRY(xf_fnpopulation, op_fnzpopulation);
+		FIX_XFER_ENTRY(xf_fnpiece, op_fnzpiece);
+		FIX_XFER_ENTRY(xf_fnp1, op_fnzp1);
+		FIX_XFER_ENTRY(xf_setpiece, op_setzpiece);
+		FIX_XFER_ENTRY(xf_setp1, op_setzp1);
+		FIX_XFER_ENTRY(xf_fntranslate, op_fnztranslate);
+		FIX_XFER_ENTRY(xf_fnreverse, op_fnzreverse);
 		return;
+	} else
+	{	/* We are in UTF8 mode - allocate desired UTF8 parse cache and initialize it. This is effectively a 2 dimensional
+		 * structure where both dimensions are variable.
+		 */
+#       	ifdef UNICODE_SUPPORTED
+		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(gtm_utfcgr_string_groups));
+		alloc_size = utfcgr_size * TREF(gtm_utfcgr_strings);
+		(TREF(utfcgra)).utfcgrs = utfcgrp = (utfcgr *)malloc(alloc_size);
+		memset((char *)utfcgrp, 0, alloc_size);			/* Init to zeros */
+		for (i = 0, p = utfcgrp; TREF(gtm_utfcgr_strings) > i; i++, p = (utfcgr *)((INTPTR_T)p + utfcgr_size))
+			/* Initialize cache structure for UTF8 string scan lookaside cache */
+			p->idx = i;					/* Initialize index value */
+		(TREF(utfcgra)).utfcgrsize = utfcgr_size;
+		(TREF(utfcgra)).utfcgrsteal = utfcgrp;			/* Starting place to look for cache reuse */
+		/* Pointer to the last usable utfcgr struct */
+		(TREF(utfcgra)).utfcgrmax = (utfcgr *)((UINTPTR_T)utfcgrp + ((TREF(gtm_utfcgr_strings) - 1) * utfcgr_size));
+		/* Spins to find non-(recently)-referenced cache slot before we overwrite an entry */
+		TREF(utfcgr_string_lookmax) = TREF(gtm_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
+#		endif /* UNICODE_SUPPORTED */
 	}
 	dollar_zchset.len = STR_LIT_LEN(UTF8_NAME);
 	dollar_zchset.addr = UTF8_NAME;
@@ -348,4 +367,3 @@ void gtm_utf8_init(void)
 		dollar_zpatnumeric.addr = UTF8_NAME;
 	}
 }
-

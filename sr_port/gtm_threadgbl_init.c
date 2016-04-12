@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,8 @@
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
 #include "gtm_un.h"
+#include "gtm_signal.h"
 
-#include <signal.h>
 #include <sys/time.h>
 #ifdef VMS
 # include <descrip.h>		/* Required for gtmsource.h */
@@ -44,6 +44,7 @@
 # include <glob.h>
 #endif
 #include "cache.h"
+#include "gtm_multi_thread.h"
 #include "hashtab_addr.h"
 #include "hashtab_int4.h"
 #include "hashtab_int8.h"
@@ -141,13 +142,12 @@
 #ifdef UNICODE_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
+# include "utfcgr.h"
 #endif
 
-#ifdef GTM_CRYPT
-# include "gtmcrypt.h"
-# include "gdsblk.h"
-# include "muextr.h"
-#endif
+#include "gtmcrypt.h"
+#include "gdsblk.h"
+#include "muextr.h"
 
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
@@ -201,18 +201,18 @@ void gtm_threadgbl_init(void)
 		 * the best we can.
 		 */
 		FPRINTF(stderr, "GTM-F-GTMASSERT gtm_threadgbl_true_t and gtm_threadgbl_t are different sizes\n");
-		exit(ERR_GTMASSERT);
+		EXIT(ERR_GTMASSERT);
 	}
 	if (NULL != gtm_threadgbl)
 	{	/* has already been initialized - don't re-init */
 		FPRINTF(stderr, "GTM-F-GTMASSERT gtm_threadgbl is already initialized\n");
-		exit(ERR_GTMASSERT);
+		EXIT(ERR_GTMASSERT);
 	}
 	gtm_threadgbl = lcl_gtm_threadgbl = malloc(size_gtm_threadgbl_struct);
 	if (NULL == gtm_threadgbl)
 	{	/* Storage was not allocated for some reason - no error handling yet still */
 		perror("GTM-F-MEMORY Unable to allocate startup thread structure");
-		exit(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
+		EXIT(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
 	}
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;
@@ -228,6 +228,7 @@ void gtm_threadgbl_init(void)
 	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	(TREF(window_ident)).addr = TADR(window_string);
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	TREF(util_outbuff_ptr) = TADR(util_outbuff);	/* Point util_outbuff_ptr to the beginning of util_outbuff at first. */
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	TREF(max_advancewindow_line) = MAX_SRCLINE;

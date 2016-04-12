@@ -16,14 +16,15 @@
 #ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 #define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000003
+#define GTM_TLS_API_VERSION		0x00000004
 #define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
+#define GTM_TLS_API_VERSION_RENEGOPT	0x00000004	/* WRITE /TLS renegotiate with options */
 
 #define MAX_X509_LEN			256
 #define MAX_ALGORITHM_LEN		64
 #define MAX_TIME_STRLEN			32
 #define MAX_TLSID_LEN			32
-#define MAX_SESSION_ID_LEN		64
+#define MAX_SESSION_ID_LEN		64		/* twice SSL_MAX_SSL_SESSION_ID_LENGTH since in hex */
 
 #define INVALID_TLS_CONTEXT		NULL
 #define INVALID_TLS_SOCKET		NULL
@@ -70,10 +71,20 @@
 #define GTMTLS_OP_ABSENT_VERIFYMODE	0x00000100
 /* Server requested renegotiation without waiting for handshake */
 #define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
-/* No gtmcrypt_config needed for client only use */
+/* No gtmcrypt_config  or tls in config needed for client only use */
 #define GTMTLS_OP_ABSENT_CONFIG		0x00000400
 /* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
 #define GTMTLS_OP_NOPWDENVVAR		0x00000800
+/* Bit mask for VERIFY_LEVEL options - one now and one planned but allow two more */
+#define GTMTLS_OP_VERIFY_LEVEL_MASK	0x0000F000
+/* Check SSL_get_verify_result after SSL_connect and other useful places */
+#define GTMTLS_OP_VERIFY_LEVEL_CHECK	0x00001000
+/* Default VERIFY_LEVEL options */
+#define GTMTLS_OP_VERIFY_LEVEL_DEFAULT	GTMTLS_OP_VERIFY_LEVEL_CHECK
+/* For socket level only - explicit SSL_set_client_CA_list has been done */
+#define GTMTLS_OP_CLIENT_CA	 	0x00010000
+/* CAfile or CApath processed */
+#define GTMTLS_OP_CA_LOADED	 	0x00020000
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -98,6 +109,9 @@ typedef struct gtm_tls_conn_info_struct
 	/* items after this added for GTM_TLS_API_VERSION_SOCK */
 	long		options;			/* bitmask of SSL options */
 	int		renegotiation_pending;		/* no handshake yet */
+	/* items after this added for GTM_TLS_API_VERSION_RENEGOPT */
+	int		total_renegotiations;		/* SSL_total_renegotiations */
+	int		verify_mode;			/* SSL_get_verify_mode */
 } gtm_tls_conn_info;
 
 typedef struct gtm_tls_ctx_struct
@@ -256,6 +270,16 @@ int		gtm_tls_accept(gtm_tls_socket_t *socket);
  * Return value: none.
  */
 int		gtm_tls_renegotiate(gtm_tls_socket_t *socket);
+
+/* Process configuration file options for WRITE /TLS("renegotiate") and then calls gtm_tls_renegotiate
+ *
+ * Arguments:
+ *    `socket'   : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Return value: none.
+ */
+int		gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char *idstr, char *configstr,
+			int tlsid_present);
 
 /* Obtains additional SSL/TLS related information on the peer. This function is typically invoked to log information for diagnostic
  * purposes.

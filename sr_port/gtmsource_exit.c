@@ -13,12 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"		/* for FILE * in repl_comm.h */
-#include "gtm_stdlib.h"		/* for exit() */
-
-#ifdef VMS
-#include <ssdef.h>
-#include <descrip.h>
-#endif
+#include "gtm_stdlib.h"		/* for EXIT() */
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -45,9 +40,5 @@ void gtmsource_exit(int exit_status)
 	if ((0 != exit_status) && is_src_server)
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLSRCEXITERR, 2, gtmsource_options.secondary_instname,
 				gtmsource_options.log_file);
-#	ifdef VMS
-	sys$exit((0 == exit_status) ? SS$_NORMAL : ERR_REPLEXITERR);
-#	else
-	exit(exit_status);
-#	endif
+	EXIT(exit_status);
 }

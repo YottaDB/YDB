@@ -13,7 +13,7 @@
 #ifndef GVCST_EXPAND_KEY_INCLUDED
 #define GVCST_EXPAND_KEY_INCLUDED
 
-enum cdb_sc gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key);
+enum cdb_sc gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key);
 enum cdb_sc gvcst_expand_curr_key(srch_blk_status *pStat, gv_key *srch_key, gv_key *exp_key);
 enum cdb_sc gvcst_expand_prev_key(srch_blk_status *pStat, gv_key *srch_key, gv_key *exp_key);
 
@@ -76,7 +76,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 		/* We cannot determine the uncompressed prev_key based only on prev_rec.match and srch_key.
 		 * Need to go the full-blown route.
 		 */
-		return gvcst_expand_key((blk_hdr_ptr_t)buffaddr, offset, exp_key);
+		return gvcst_expand_key(pStat, offset, exp_key);
 #		endif
 #		ifdef GVCST_EXPAND_CURR_KEY
 		/* This means the block changed since we did the search. Return abnormal status so retry occurs. */

@@ -16,9 +16,9 @@
 #-----------------------------------------------
 .ifdef cygwin
 # will need another 8 to save sigmasks
-chnd_size	=	224
+chnd_size	=	228
 .else
-chnd_size	=	172
+chnd_size	=	176
 .endif
 chnd_save_active =	0
 chnd_ch_active	=	4

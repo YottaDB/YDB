@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "gtm_string.h"
 #include "gtm_time.h"
 #include "gtm_unistd.h"
+#include "gtm_signal.h"
 
 #include <sys/shm.h>
 
@@ -49,14 +50,16 @@
 #include "repl_sem.h"
 #include "ftok_sems.h"
 #include "gtmsource_srv_latch.h"
-#include <signal.h>
 #include "anticipatory_freeze.h"
 #include "ipcrmid.h"
 #include "util.h"
+#include "wcs_flu.h"
+#include "gtm_sem.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
 #endif
 #include "interlock.h"
+#include "do_semop.h"
 
 #define WARN_STATUS(jctl)											\
 if (SS_NORMAL != jctl->status)											\
@@ -71,22 +74,23 @@ if (SS_NORMAL != jctl->status)											\
 	wrn_count++;												\
 }														\
 
-GBLREF	void			(*call_on_signal)();
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	mur_opt_struct		mur_options;
-GBLREF	reg_ctl_list		*mur_ctl;
-GBLREF	mur_gbls_t		murgbl;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	char			*jnl_state_lit[];
-GBLREF	char			*repl_state_lit[];
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		mupip_exit_status_displayed;
 GBLREF	boolean_t		mur_close_files_done;
+GBLREF	char			*jnl_state_lit[];
+GBLREF	char			*repl_state_lit[];
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	int4			forced_exit_err;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	uint4			process_id;
-GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF	reg_ctl_list		*mur_ctl;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data		*cs_data;
+GBLREF	uint4			process_id;
+GBLREF	void			(*call_on_signal)();
 #ifdef DEBUG
 GBLREF	boolean_t		exiting_on_dev_out_error;
 #endif
@@ -113,7 +117,7 @@ error_def(ERR_RLBKSTRMSEQ);
 
 boolean_t mur_close_files(void)
 {
-	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN];
+	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN + 1];
 	int			head_jnl_fn_len, wrn_count = 0, rename_fn_len;
 	reg_ctl_list		*rctl, *rctl_top;
 	jnl_ctl_list		jctl_temp, *jctl, *prev_jctl, *end_jctl;
@@ -128,13 +132,14 @@ boolean_t mur_close_files(void)
 	const char		*termntd_str;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 	struct shmid_ds		shm_buf;
+	union semun		semarg;
 	unix_db_info		*udi = NULL;
 	gtmsrc_lcl		gtmsrc_lcl_array[NUM_GTMSRC_LCL];
 	repl_inst_hdr		repl_instance;
 	repl_inst_hdr_ptr_t	inst_hdr = NULL;
 	seq_num			max_strm_seqno[MAX_SUPPL_STRMS], this_strm_seqno;
 	boolean_t		incr_jnlpool_rlbk_cycle = TRUE, got_ftok, anticipatory_freeze_available, was_crit;
-	boolean_t		inst_frozen = FALSE;
+	boolean_t		inst_frozen = FALSE, strm_seqno_nonzero;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	global_latch_t		*latch;
 	seq_num			max_zqgblmod_seqno = 0, last_histinfo_seqno;
@@ -162,7 +167,10 @@ boolean_t mur_close_files(void)
 	 */
 	jgbl.dont_reset_gbl_jrec_time = FALSE;
 	if (mur_options.rollback)
+	{
 		memset(&max_strm_seqno[0], 0, SIZEOF(max_strm_seqno));
+		strm_seqno_nonzero = FALSE;
+	}
 	anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
 	inst_hdr = jnlpool.repl_inst_filehdr;
 	/* Note that murgbl.consist_jnl_seqno is maintained even if the only thing done by rollback was lost transaction processing.
@@ -263,23 +271,29 @@ boolean_t mur_close_files(void)
 			}
 			if (rctl->standalone && (murgbl.clean_exit || !rctl->db_updated) && !reg->read_only)
 			{
-				status = FALSE;
 				if (mur_options.forward)
+				{
 					status = file_head_read((char *)reg->dyn.addr->fname, csd, SIZEOF(csd_temp));
-				if (!mur_options.forward || status)
+					/* A TRUE "status" implies successful return from "file_head_read".
+					 * A FALSE "status" implies "file_head_read" would have done the needed "gtm_putmsg" */
+					if (!status)
+						wrn_count++;	/* signal mupip journal action is incomplete */
+				} else
+					status = TRUE;
+				if (status)
 				{
 					assert(mur_options.update);
-					/* For MUPIP JOURNAL RECOVER -FORWARD, we are done "gds_rundown" at this point and so have
-					 * a clean database state at this point. For RECOVER/ROLLBACK -BACKWARD, even though we
-					 * haven't done the gds_rundown yet, we still hold the standalone access and so no new
-					 * process can attach to the database. For the -ONLINE version of RECOVER/ROLLBACK
-					 * -BACKWARD, we haven't released the access control lock as well as the critical section
-					 * lock, so no new processes can attach to the database and no existing process can
-					 * continue from their hung state(waiting for crit). So, in all cases, it should be okay
-					 * to safely set csd->file_corrupt to FALSE. The only issue is if we get crashed AFTER
-					 * setting csd->file_corrupt to FALSE, but before doing the gds_rundown in which case,
-					 * all the processes starting up will see it just like any other system crash warranting
-					 * a ROLLBACK/RECOVER.
+					/* For MUPIP JOURNAL -RECOVER -FORWARD or MUPIP JOURNAL -ROLLBACK -FORWARD, we are
+					 * done "gds_rundown" at this point and so have a clean database state at this point.
+					 * For RECOVER/ROLLBACK -BACKWARD, even though we haven't done the gds_rundown yet,
+					 * we still hold the standalone access and so no new process can attach to the database.
+					 * For the -ONLINE version of RECOVER/ROLLBACK -BACKWARD, we haven't released the access
+					 * control lock as well as the critical section lock, so no new processes can attach to
+					 * the database and no existing process can continue from their hung state(waiting for
+					 * crit). So, in all cases, it should be okay to safely set csd->file_corrupt to FALSE.
+					 * The only issue is if we get crashed AFTER setting csd->file_corrupt to FALSE, but
+					 * before doing the gds_rundown in which case, all the processes starting up will see
+					 * it just like any other system crash warranting a ROLLBACK/RECOVER.
 					 */
 					csd->file_corrupt = FALSE;
 					if (murgbl.clean_exit)
@@ -325,7 +339,10 @@ boolean_t mur_close_files(void)
 								for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 								{
 									if (csd->strm_reg_seqno[idx] > max_strm_seqno[idx])
+									{
 										max_strm_seqno[idx] = csd->strm_reg_seqno[idx];
+										strm_seqno_nonzero = TRUE;
+									}
 								}
 							}
 						}
@@ -426,7 +443,7 @@ boolean_t mur_close_files(void)
 					if ((jctl->jnl_fn_len == head_jnl_fn_len)
 							&& !memcmp(jctl->jnl_fn, head_jnl_fn, jctl->jnl_fn_len))
 						break;
-					if (!mur_fopen(jctl))
+					if (SS_NORMAL != mur_fopen(jctl, rctl))
 					{	/* if opening the journal file failed, we cannot do anything here */
 						wrn_count++;
 						/* mur_fopen() would have done the appropriate gtm_putmsg() */
@@ -537,142 +554,176 @@ boolean_t mur_close_files(void)
 		}
 		rctl->jctl_head = NULL;	/* So that we do not come to above loop again */
 	}
-	/* If rollback, we better have the standalone lock. The only exception is if we could not get standalone access
+	/* If -ROLLBACK -BACKWARD, we better have the standalone lock. The only exception is if we could not get standalone access
 	 * (due to some other process still accessing the instance file and/or db/jnl). In that case "clean_exit" should be FALSE.
 	 */
-	assert(!mur_options.rollback || murgbl.repl_standalone || !murgbl.clean_exit);
-	if (mur_options.rollback && murgbl.repl_standalone)
+	assert(!mur_options.rollback || mur_options.forward || murgbl.repl_standalone || !murgbl.clean_exit);
+	if (mur_options.rollback)
 	{
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-		csa = &udi->s_addrs;
-		ASSERT_HOLD_REPLPOOL_SEMS;
-		if (murgbl.clean_exit && !mur_options.rollback_losttnonly && murgbl.consist_jnl_seqno)
-		{	/* The database has been successfully rolled back by the MUPIP JOURNAL ROLLBACK command */
-			if (inst_hdr->is_supplementary)
-			{	/* for supplementary instance, set strm_seqno[] appropriately in the instance file header. History
-				 * record truncating function (invoked below) relies on this.
-				 */
-				for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-				{
-					this_strm_seqno = max_strm_seqno[idx];
-					/* Since this is a supplementary instance, the 0th stream should have seqno of at least 1.
-					 * In case of a rollback, it is possible that this seqno is being reset to 0 (as we get
-					 * this value from the EPOCH record in backward processing which could be 0 even though
-					 * the next expected seqno is 1) so reset it to 1 instead in that case.
-					 * See repl_inst_create.c & gtmsource_seqno_init.c for more such 0 -> 1 seqno adjustments.
-					 */
-					if ((0 == idx) && !this_strm_seqno)
-						this_strm_seqno = 1;
-					inst_hdr->strm_seqno[idx] = this_strm_seqno;
-					if (this_strm_seqno)
-					{
-						assert(0 == GET_STRM_INDEX(this_strm_seqno));
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLBKSTRMSEQ, 3, idx,
-									&this_strm_seqno, &this_strm_seqno);
-					}
-				}
-			}
-			if (!jgbl.onlnrlbk || murgbl.incr_db_rlbkd_cycle)
-			{	/* Virtually truncate the history in the replication instance file if necessary. For online
-				 * rollback, we should truncate the history records ONLY if the instance was actually rolled back
-				 * (indicated by incr_db_rlbkd_cycle)
-				 * Also, the repl_inst_histinfo_truncate function expects the caller to hold journal pool crit
-				 * if jnlpool exists. We can come here with journal pool if:
-				 * (a) ONLINE ROLLBACK
-				 * (b) Regular ROLLBACK with Anticipatory Freeze scheme
-				 */
-				if ((NULL != jnlpool_ctl) && !(was_crit = csa->now_crit))	/* note: assignment */
-				{
-					assert(!jgbl.onlnrlbk);
-					assert(anticipatory_freeze_available);
-					assert(!csa->hold_onto_crit);
-					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-				}
-				last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
-				if ((NULL != jnlpool_ctl) && !was_crit)
-					rel_lock(jnlpool.jnlpool_dummy_reg);
-				/* The above also updates "repl_inst_filehdr->jnl_seqno". If regular rollback, it also updates
-				 * "repl_inst_filehdr->crash" to FALSE. For online rollback, we have to update the crash field
-				 * ONLY if there is NO journal pool and that is done below.
-				 */
-				if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
-				{	/* journal pool still exists and some backward and forward processing happened. More
-					 * importantly, the database was taken to a prior logical state. Refresh the journal
-					 * pool fields to reflect the new state.
-					 */
-					assert(csa->now_crit && csa->hold_onto_crit);
-					jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
-					jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
-					jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
-					jnlpool_ctl->early_write_addr = jnlpool_ctl->write_addr = jnlpool_ctl->write = 0;
-					jnlpool_ctl->lastwrite_len = 0;
-					jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
-					/* Keep strm_seqno in the journal pool in sync with the one in the instance file header */
-					assert(SIZEOF(jnlpool_ctl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
-					memcpy(jnlpool_ctl->strm_seqno, inst_hdr->strm_seqno, MAX_SUPPL_STRMS * SIZEOF(seq_num));
-					if (!jnlpool_ctl->upd_disabled)
-					{	/* Simulate a fresh instance startup by writing a new history record with
-						 * the rollback'ed sequence number. This is required as otherwise the source
-						 * server startup will NOT realize that receiver server needs to rollback or
-						 * will incorrectly conclude a wrong resync sequence number to be passed on
-						 * to the receiver server.
-						 */
-						gtmsource_rootprimary_init(murgbl.consist_jnl_seqno);
-					}
-				}
-			}
-#			ifdef DEBUG
-			else if (murgbl.incr_onln_rlbk_cycle)
-			{	/* database was updated, but the logical state is unchanged. We need to make sure
-				 * the jnlpool structures have sane and expected values
-				 */
-				if (NULL != jnlpool_ctl)
-				{	/* journal pool exists */
-					assert(jnlpool_ctl->jnl_seqno == murgbl.consist_jnl_seqno);
-					assert(jnlpool_ctl->start_jnl_seqno <= murgbl.consist_jnl_seqno);
-					assert(jnlpool_ctl->max_zqgblmod_seqno == max_zqgblmod_seqno);
-					if (inst_hdr->is_supplementary)
-					{
-						for (idx = 0; MAX_SUPPL_STRMS > idx; idx++)
-							assert((NULL != jnlpool_ctl)
-								|| (jnlpool_ctl->strm_seqno[idx] == inst_hdr->strm_seqno[idx]));
-					}
-				}
-			}
-#			endif
-			inst_hdr->file_corrupt = FALSE;
-			/* Reset seqnos in "gtmsrc_lcl" in case it is greater than seqno that the db is being rolled back to */
-			repl_inst_read(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
-			for (idx = 0; idx < NUM_GTMSRC_LCL; idx++)
-			{	/* Check if the slot is being used and only then check the resync_seqno */
-				if ('\0' != gtmsrc_lcl_array[idx].secondary_instname[0])
-				{
-					if (gtmsrc_lcl_array[idx].resync_seqno > murgbl.consist_jnl_seqno)
-						gtmsrc_lcl_array[idx].resync_seqno = murgbl.consist_jnl_seqno;
-					if (gtmsrc_lcl_array[idx].connect_jnl_seqno > murgbl.consist_jnl_seqno)
-						gtmsrc_lcl_array[idx].connect_jnl_seqno = murgbl.consist_jnl_seqno;
-				}
-			}
-			repl_inst_write(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
-		}
-		if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
-		{	/* Remove any locks that we acquired in mur_open_files. Needs to be done even if this is NOT a clean exit */
-			assert(0 != jnlpool_ctl->onln_rlbk_pid || !murgbl.clean_exit);
-			assert((csa->now_crit && csa->hold_onto_crit) || !murgbl.clean_exit);
-			jnlpool_ctl->onln_rlbk_pid = 0;
-			if (csa->now_crit)
-				rel_lock(jnlpool.jnlpool_dummy_reg);
-			gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
-			for (idx = 0; NUM_GTMSRC_LCL > idx; idx++, gtmsourcelocal_ptr++)
+		if (mur_options.forward && murgbl.clean_exit && murgbl.consist_jnl_seqno && strm_seqno_nonzero)
+		{	/* For cleanly exiting forward rollback, issue RLBKSTRMSEQ message now.
+			 * The "strm_seqno_nonzero" check above accomplishes the equivalent of "if (inst_hdr->is_supplementary)"
+			 * (used in backward rollback to determine if RLBKSTRMSEQ message needs to be printed or not)
+			 * for forward rollback. For backward rollback we do it a little later.
+			 */
+			assert(!mur_options.rollback_losttnonly);
+			assert(!murgbl.repl_standalone);
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 			{
-				latch = &gtmsourcelocal_ptr->gtmsource_srv_latch;
-				assert((latch->u.parts.latch_pid == process_id) || !murgbl.clean_exit);
-				if (latch->u.parts.latch_pid == process_id)
-				{	/* need to release the latch */
-					rel_gtmsource_srv_latch(latch);
+				this_strm_seqno = max_strm_seqno[idx];
+				if ((0 == idx) && !this_strm_seqno)
+					this_strm_seqno = 1;
+				if (this_strm_seqno)
+				{
+					assert(0 == GET_STRM_INDEX(this_strm_seqno));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLBKSTRMSEQ, 3, idx,
+								&this_strm_seqno, &this_strm_seqno);
 				}
 			}
-			csa->hold_onto_crit = FALSE;
+			/* Note: The above RLBKSTRMSEQ printing code is copied from similar code for backward rollback below */
+		} else if (murgbl.repl_standalone)
+		{	/* In case of -ROLLBACK -BACKWARD, do some replication instance file related cleanup.
+			 * For -ROLLBACK -FORWARD, we do not touch the instance file.
+			 */
+			assert(!mur_options.forward);	/* or else murgbl.repl_standalone wont be TRUE
+							 * (needed to get in this "if" block)
+							 */
+			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			csa = &udi->s_addrs;
+			ASSERT_HOLD_REPLPOOL_SEMS;
+			if (murgbl.clean_exit && !mur_options.rollback_losttnonly && murgbl.consist_jnl_seqno)
+			{	/* The database has been successfully rolled back by the MUPIP JOURNAL ROLLBACK command */
+				if (inst_hdr->is_supplementary)
+				{	/* For supplementary instance, set strm_seqno[] appropriately in the instance file header.
+					 * History record truncating function (invoked below) relies on this.
+					 */
+					for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+					{
+						this_strm_seqno = max_strm_seqno[idx];
+						/* Since this is a supplementary instance, the 0th stream should have seqno of
+						 * at least 1. In case of a rollback, it is possible that this seqno is being
+						 * reset to 0 (as we get this value from the EPOCH record in backward processing
+						 * which could be 0 even though the next expected seqno is 1) so reset it to 1
+						 * instead in that case. See repl_inst_create.c & gtmsource_seqno_init.c for
+						 * more such 0 -> 1 seqno adjustments.
+						 */
+						if ((0 == idx) && !this_strm_seqno)
+							this_strm_seqno = 1;
+						inst_hdr->strm_seqno[idx] = this_strm_seqno;
+						if (this_strm_seqno)
+						{
+							assert(0 == GET_STRM_INDEX(this_strm_seqno));
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLBKSTRMSEQ, 3, idx,
+										&this_strm_seqno, &this_strm_seqno);
+						}
+					}
+				}
+				if (!jgbl.onlnrlbk || murgbl.incr_db_rlbkd_cycle)
+				{	/* Virtually truncate the history in the replication instance file if necessary. For online
+					 * rollback, we should truncate the history records ONLY if the instance was actually rolled
+					 * back (indicated by incr_db_rlbkd_cycle). Also, the repl_inst_histinfo_truncate function
+					 * expects the caller to hold journal pool crit if jnlpool exists. We can come here with
+					 * journal pool if:
+					 * (a) ONLINE ROLLBACK
+					 * (b) Regular ROLLBACK with Anticipatory Freeze scheme
+					 */
+					if ((NULL != jnlpool_ctl) && !(was_crit = csa->now_crit))	/* note: assignment */
+					{
+						assert(!jgbl.onlnrlbk);
+						assert(anticipatory_freeze_available);
+						assert(!csa->hold_onto_crit);
+						grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+					}
+					last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
+					if ((NULL != jnlpool_ctl) && !was_crit)
+						rel_lock(jnlpool.jnlpool_dummy_reg);
+					/* The above also updates "repl_inst_filehdr->jnl_seqno". If regular rollback, it also
+					 * updates "repl_inst_filehdr->crash" to FALSE. For online rollback, we have to update
+					 * the crash field ONLY if there is NO journal pool and that is done below.
+					 */
+					if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
+					{	/* journal pool still exists and some backward and forward processing happened. More
+						 * importantly, the database was taken to a prior logical state. Refresh the journal
+						 * pool fields to reflect the new state.
+						 */
+						assert(csa->now_crit && csa->hold_onto_crit);
+						jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
+						jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool_ctl->early_write_addr = jnlpool_ctl->write_addr = jnlpool_ctl->write = 0;
+						jnlpool_ctl->lastwrite_len = 0;
+						jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+						/* Keep strm_seqno in journal pool in sync with the one in instance file header */
+						assert(SIZEOF(jnlpool_ctl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
+						memcpy(jnlpool_ctl->strm_seqno, inst_hdr->strm_seqno,
+										MAX_SUPPL_STRMS * SIZEOF(seq_num));
+						if (!jnlpool_ctl->upd_disabled)
+						{	/* Simulate a fresh instance startup by writing a new history record with
+							 * the rollback'ed sequence number. This is required as otherwise the source
+							 * server startup will NOT realize that receiver server needs to rollback or
+							 * will incorrectly conclude a wrong resync sequence number to be passed on
+							 * to the receiver server.
+							 */
+							gtmsource_rootprimary_init(murgbl.consist_jnl_seqno);
+						}
+					}
+				}
+#				ifdef DEBUG
+				else if (murgbl.incr_onln_rlbk_cycle)
+				{	/* database was updated, but the logical state is unchanged. We need to make sure
+					 * the jnlpool structures have sane and expected values
+					 */
+					if (NULL != jnlpool_ctl)
+					{	/* journal pool exists */
+						assert(jnlpool_ctl->jnl_seqno == murgbl.consist_jnl_seqno);
+						assert(jnlpool_ctl->start_jnl_seqno <= murgbl.consist_jnl_seqno);
+						assert(jnlpool_ctl->max_zqgblmod_seqno == max_zqgblmod_seqno);
+						if (inst_hdr->is_supplementary)
+						{
+							for (idx = 0; MAX_SUPPL_STRMS > idx; idx++)
+								assert((NULL != jnlpool_ctl)
+									|| (jnlpool_ctl->strm_seqno[idx]
+										== inst_hdr->strm_seqno[idx]));
+						}
+					}
+				}
+#				endif
+				inst_hdr->file_corrupt = FALSE;
+				/* Reset seqnos in "gtmsrc_lcl" in case it is greater than seqno the db is being rolled back to */
+				repl_inst_read(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
+				for (idx = 0; idx < NUM_GTMSRC_LCL; idx++)
+				{	/* Check if the slot is being used and only then check the resync_seqno */
+					if ('\0' != gtmsrc_lcl_array[idx].secondary_instname[0])
+					{
+						if (gtmsrc_lcl_array[idx].resync_seqno > murgbl.consist_jnl_seqno)
+							gtmsrc_lcl_array[idx].resync_seqno = murgbl.consist_jnl_seqno;
+						if (gtmsrc_lcl_array[idx].connect_jnl_seqno > murgbl.consist_jnl_seqno)
+							gtmsrc_lcl_array[idx].connect_jnl_seqno = murgbl.consist_jnl_seqno;
+					}
+				}
+				repl_inst_write(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
+			}
+			if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
+			{	/* Remove any locks that we acquired in mur_open_files.
+				 * Needs to be done even if this is NOT a clean exit.
+				 */
+				assert(0 != jnlpool_ctl->onln_rlbk_pid || !murgbl.clean_exit);
+				assert((csa->now_crit && csa->hold_onto_crit) || !murgbl.clean_exit);
+				jnlpool_ctl->onln_rlbk_pid = 0;
+				if (csa->now_crit)
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+				gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+				for (idx = 0; NUM_GTMSRC_LCL > idx; idx++, gtmsourcelocal_ptr++)
+				{
+					latch = &gtmsourcelocal_ptr->gtmsource_srv_latch;
+					assert((latch->u.parts.latch_pid == process_id) || !murgbl.clean_exit);
+					if (latch->u.parts.latch_pid == process_id)
+					{	/* need to release the latch */
+						rel_gtmsource_srv_latch(latch);
+					}
+				}
+				csa->hold_onto_crit = FALSE;
+			}
 		}
 	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
@@ -688,6 +739,20 @@ boolean_t mur_close_files(void)
 			TP_CHANGE_REG(reg);
 			assert(!jgbl.onlnrlbk || (cs_addrs->now_crit && cs_addrs->hold_onto_crit) || !murgbl.clean_exit);
 			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
+			if (jgbl.onlnrlbk)
+			{	/* This is an online rollback. If "gtm_mupjnl_parallel" is not 1, multiple child processes were
+				 * started to operate on different regions in the forward phase. Any updates they made would not
+				 * have been flushed since the children did not go through gds_rundown. If multiple child processes
+				 * were not started, it is possible some GT.M processes (which were active before the online
+				 * rollback started) have taken over the flush timers so the rollback process could not get any
+				 * timer slots. In either case, it is better to flush the jnl records to disk right away as the
+				 * source server could be waiting for these and the sooner it gets them, the better. In the
+				 * multiple-child processes case, not doing the flush here can actually cause the source server to
+				 * timeout with a SEQNUMSEARCHTIMEOUT error (if no GT.M processes have any flush timers active and
+				 * if online rollback does not do the flush either) so it is actually necessary.
+				 */
+				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+			}
 			rundown_status = gds_rundown(); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
 				wrn_count++;
@@ -712,6 +777,7 @@ boolean_t mur_close_files(void)
 	}
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
+		assert(!mur_options.forward);	/* or else murgbl.repl_standalone wont be TRUE (needed to get in this "if" block) */
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 		ASSERT_HOLD_REPLPOOL_SEMS;
 		/* repl_inst_read and mu_replpool_release_sem expects that the caller holds the ftok semaphore as it is about to
@@ -732,8 +798,42 @@ boolean_t mur_close_files(void)
 		repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		repl_instance.file_corrupt = inst_hdr->file_corrupt;
 		if (NULL == jnlpool_ctl)
+		{
 			repl_instance.crash = inst_hdr->crash = FALSE;
-		else
+			/* We have standalone access on the instance file so can safely clear halted fields if set */
+			if (repl_instance.ftok_counter_halted)
+			{	/* Clear the halted field and reset ftok counter semaphore value to set counter back to reliable */
+				semarg.val = 0;
+				if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
+				{
+					save_errno = errno;
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+						ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
+						CALLFROM, save_errno);
+					/* In case not able to set counter to 1, proceed with rundown without deleting the
+					 * ftok semaphore (so set counter_ftok_incremented to FALSE)
+					 */
+					udi->counter_ftok_incremented = FALSE;
+				} else
+				{
+					save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
+					if (save_errno)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
+							CALLFROM, save_errno);
+						/* In case not able to set counter to 1, proceed with rundown without deleting the
+						 * ftok semaphore (so set counter_ftok_incremented to FALSE)
+						 */
+						udi->counter_ftok_incremented = FALSE;
+					} else
+					{
+						udi->counter_ftok_incremented = TRUE;
+						repl_instance.ftok_counter_halted = FALSE;
+					}
+				}
+			}
+		} else
 		{	/* Online Rollback OR Anticipatory Freeze is in effect. Detach from the journal pool as all the database
 			 * writes are now over. Since the attach count is 1 (we are the only one attached) go ahead and remove the
 			 * journal pool. We've already flushed all the contents to the instance file at the beginning of rollback
@@ -785,7 +885,12 @@ boolean_t mur_close_files(void)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
 						LEN_AND_STR(udi->fn));
 				/* Now that the journal pool shared memory is removed, go ahead and invalidate it in the file
-				 * header
+				 * header. Note that we cannot reset the halted fields (ftok_counter_halted) because the
+				 * processes that are attached to the journal pool OR the receive pool bump the ftok counter.
+				 * All we know is that there is no one attached to the journal pool now. We dont know anything
+				 * about the receive pool. Resetting ftok_counter_halted implies the ftok counter is back to
+				 * being reliable and that is not correct. We leave it unchanged instead of attaching to the
+				 * receive pool shmid and determining the # of pids attached to it.
 				 */
 				repl_instance.jnlpool_shmid = INVALID_SHMID;
 				repl_instance.jnlpool_shmid_ctime = 0;
@@ -800,7 +905,7 @@ boolean_t mur_close_files(void)
 		 * disk reads/writes.
 		 */
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-		got_ftok = ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
+		got_ftok = ftok_sem_lock(jnlpool.jnlpool_dummy_reg, TRUE); /* immediate=TRUE */
 		/* Note: The decision to remove the Journal Pool Access Control Semaphores should be based on two things:
 		 * 1. If we have the ftok on the instance file
 		 * 			AND
@@ -823,8 +928,10 @@ boolean_t mur_close_files(void)
 		 * Since we should be holding the ftok lock to release it, grab the ftok lock first. We don't expect ftok_sem_lock
 		 * to error out because the semaphore should still exist in the system
 		 */
-		if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, FALSE)
-			|| !ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
+		assert(!repl_instance.ftok_counter_halted || jgbl.onlnrlbk || anticipatory_freeze_available);
+		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || anticipatory_freeze_available);
+		if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE)
+				|| !ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 			wrn_count++;
 	}
 	if (jgbl.onlnrlbk)
@@ -840,28 +947,17 @@ boolean_t mur_close_files(void)
 					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		}
 	}
-	mur_close_file_extfmt();
+	mur_close_file_extfmt(IN_MUR_CLOSE_FILES_TRUE);
 	mur_free();	/* free up whatever was allocated by "mur_init" */
 	if (wrn_count)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
 	else if (!mupip_exit_status_displayed)
-	{	/* This exit path is not coming through "mupip_exit". Print an error message indicating incomplete recovery.
-		 * The || in the assert below is to take care of a white-box test that primarily tests the
-		 * WBTEST_TP_HIST_CDB_SC_BLKMOD scenario but also induces a secondary WBTEST_MUR_ABNORMAL_EXIT_EXPECTED scenario.
-		 * WBTEST_JNL_FILE_OPEN_FAIL and WBTEST_JNL_CREATE_FAIL are also accepted since the impossibility to create a
-		 * journal file will induce a recovery failure. Another possibility is that we failed to write something (for
-		 * instance, due to a broken pipe) and ended up coming here.
+	{	/* This exit path is not coming through "mupip_exit". Print an error message indicating incomplete recovery. */
+		/* Since this exit is not through "mupip_exit" we expect murgbl.clean_exit to be set to FALSE. There is one
+		 * exception and that is if after setting murgbl.clean_exit to TRUE in mupip_recover, we got interrupted by an
+		 * external signal that in turn took us to exit handling. In that case forced_exit_err would be set so assert that.
 		 */
-		assert(gtm_white_box_test_case_enabled
-			&& ((WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)
-				|| (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)
-				|| (WBTEST_JNL_FILE_OPEN_FAIL == gtm_white_box_test_case_number)
-				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)
-				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)
-				|| (WBTEST_FAIL_ON_SHMGET == gtm_white_box_test_case_number)
-				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number))
-				|| exiting_on_dev_out_error);
-		assert(!murgbl.clean_exit);
+		assert(!murgbl.clean_exit || forced_exit_err);
 		if (murgbl.wrn_count)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
 		else

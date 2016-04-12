@@ -11,10 +11,6 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -30,6 +26,10 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "init_secshr_addrs.h"
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#include "gt_timer.h"
+#endif
 
 GBLREF gd_addr_fn_ptr	get_next_gdr_addrs;
 GBLREF cw_set_element	*cw_set_addrs;
@@ -79,5 +79,21 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs,
 	cs_addrs_addrs = cs_addrs_address;
 	kip_csa_addrs = kip_csa_address;
 	need_kip_incr_addrs = need_kip_incr_address;
-	start_tn_addrs = start_tn_address;
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_SLAM_SECSHR_ADDRS))
+	{	/* For this white box test, we're going to send ourselves a SIGTERM termination signal at a specific point
+		 * in the processing to make sure it succeeds without exploding during database initialization. To test the 
+		 * condition GTM-8455 fixes
+		 */
+		kill(epid, SIGTERM);
+		hiber_start(20 * 1000);			/* Wait up to 20 secs - don't use wait_any as the heartbeat timer
+							 * will kill this wait in 0-7 seconds or so.
+							 */
+		/* We sent, we waited, wait expired - weird - funky condition is for identification purposes (to identify the	
+		 * actual assert). We should be dead or dying, not trying to resume.
+		 */
+		assert(WBTEST_SLAM_SECSHR_ADDRS == 0);
+	}
+#	endif
+	start_tn_addrs = start_tn_address;	/* WARNING secshr_db_clnup relies on this being the last assignment in this setup */
 }

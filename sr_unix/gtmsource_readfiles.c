@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "gtm_repl.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "jnl.h"
@@ -56,13 +58,9 @@
 #include "repl_tr_good.h"
 #include "repl_instance.h"
 #include "wbox_test_init.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "gtmdbgflags.h"
-
-#define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
-#define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
+#include "anticipatory_freeze.h"
 
 #define LSEEK_ERR_STR		"Error in lseek"
 #define READ_ERR_STR		"Error in read"
@@ -91,6 +89,7 @@
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	repl_ctl_element	*repl_ctl_list;
+GBLREF	repl_rctl_elem_t	*repl_rctl_list;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	int			gtmsource_msgbufsiz;
@@ -111,7 +110,6 @@ error_def(ERR_NOPREVLINK);
 error_def(ERR_REPLBRKNTRANS);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLFILIOERR);
-error_def(ERR_SEQNUMSEARCHTIMEOUT);
 error_def(ERR_TEXT);
 
 static	int4			num_tcom = -1;
@@ -228,12 +226,12 @@ static	int repl_next(repl_buff_t *rb)
 	int			status, sav_buffremaining;
 	char			err_string[BUFSIZ];
 	repl_ctl_element	*backctl;
-#	ifdef GTM_CRYPT
 	int			gtmcrypt_errno;
 	enum jnl_record_type	rectype;
 	jnl_record		*rec;
 	jnl_string		*keystr;
-#	endif
+	jnl_file_header		*jfh;
+	boolean_t		use_new_key;
 
 	b = &rb->buff[rb->buffindex];
 	b->recbuff += b->reclen; /* The next record */
@@ -276,12 +274,12 @@ static	int repl_next(repl_buff_t *rb)
 	}
 	maxreclen = (uint4)(((b->base + REPL_BLKSIZE(rb)) - b->recbuff) - b->buffremaining);
 	assert(maxreclen > 0);
+	jfh = rb->fc->jfh;
 	if (maxreclen > JREC_PREFIX_UPTO_LEN_SIZE &&
 		(reclen = ((jrec_prefix *)b->recbuff)->forwptr) <= maxreclen &&
-		IS_VALID_JNLREC((jnl_record *)b->recbuff, rb->fc->jfh))
+		IS_VALID_JNLREC((jnl_record *)b->recbuff, jfh))
 	{
-#		ifdef GTM_CRYPT
-		if (rb->fc->jfh->is_encrypted)
+		if (USES_ANY_KEY(jfh))
 		{
 			rec = ((jnl_record *)(b->recbuff));
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
@@ -292,12 +290,18 @@ static	int repl_next(repl_buff_t *rb)
 				/* Assert that ZTWORMHOLE and LGTRIG type record too has same layout as KILL/SET */
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_ztworm.ztworm_str);
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_lgtrig.lgtrig_str);
-				MUR_DECRYPT_LOGICAL_RECS(keystr, rec->prefix.forwptr, backctl->encr_key_handle, gtmcrypt_errno);
+				use_new_key = USES_NEW_KEY(jfh);
+				assert(NEEDS_NEW_KEY(jfh, ((jrec_prefix *)b->recbuff)->tn) == use_new_key);
+				MUR_DECRYPT_LOGICAL_RECS(
+						keystr,
+						(use_new_key ? TRUE : jfh->non_null_iv),
+						rec->prefix.forwptr,
+						(use_new_key ? backctl->encr_key_handle2 : backctl->encr_key_handle),
+						gtmcrypt_errno);
 				if (0 != gtmcrypt_errno)
 					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, backctl->jnl_fn_len, backctl->jnl_fn);
 			}
 		}
-#		endif
 		b->reclen = reclen;
 		return SS_NORMAL;
 	}
@@ -313,6 +317,10 @@ static	int repl_next(repl_buff_t *rb)
 
 static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, seq_num read_seqno)
 {
+	gtmsource_state_t	gtmsource_state_sav;
+	repl_ctl_element	*prev_ctl;
+	repl_rctl_elem_t	*repl_rctl;
+
 	if (0 == ctl->repl_buff->fc->jfh->prev_jnl_file_name_length ||
 		 QWLE(ctl->repl_buff->fc->jfh->start_seqno, read_seqno))
 	{
@@ -324,20 +332,30 @@ static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, se
 	repl_ctl_create(old_ctl, ctl->reg, ctl->repl_buff->fc->jfh->prev_jnl_file_name_length,
 			(char *)ctl->repl_buff->fc->jfh->prev_jnl_file_name, FALSE);
 	REPL_DPRINT2("Prev gener file %s opened\n", ctl->repl_buff->fc->jfh->prev_jnl_file_name);
-	(*old_ctl)->prev = ctl->prev;
-	(*old_ctl)->next = ctl;
-	(*old_ctl)->prev->next = *old_ctl;
-	(*old_ctl)->next->prev = *old_ctl;
-	first_read(*old_ctl);
-	assertpro((JNL_FILE_OPEN == (*old_ctl)->file_state) || (JNL_FILE_UNREAD == (*old_ctl)->file_state));
-	if (JNL_FILE_OPEN == (*old_ctl)->file_state)
+	prev_ctl = *old_ctl;
+	assert(prev_ctl->reg == ctl->reg);
+	prev_ctl->prev = ctl->prev;
+	prev_ctl->next = ctl;
+	prev_ctl->prev->next = prev_ctl;
+	ctl->prev = prev_ctl;
+	repl_rctl = ctl->repl_rctl;
+	prev_ctl->repl_rctl = repl_rctl;
+	repl_rctl->ctl_start = prev_ctl;
+	GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
+	first_read(prev_ctl);
+	if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
 	{
-		(*old_ctl)->file_state = JNL_FILE_CLOSED;
-		REPL_DPRINT2("open_prev_gener : %s jnl file marked closed\n", (*old_ctl)->jnl_fn);
-	} else if (JNL_FILE_UNREAD == (*old_ctl)->file_state)
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Abandoning open_prev_gener\n");
+		return (0);
+	}
+	if (JNL_FILE_OPEN == prev_ctl->file_state)
 	{
-		(*old_ctl)->file_state = JNL_FILE_EMPTY;
-		REPL_DPRINT2("open_prev_gener :  %s jnl file marked empty\n", (*old_ctl)->jnl_fn);
+		prev_ctl->file_state = JNL_FILE_CLOSED;
+		REPL_DPRINT2("open_prev_gener : %s jnl file marked closed\n", prev_ctl->jnl_fn);
+	} else
+	{
+		MARK_CTL_AS_EMPTY(prev_ctl);
+		REPL_DPRINT2("open_prev_gener :  %s jnl file marked empty\n", prev_ctl->jnl_fn);
 	}
 	return (1);
 }
@@ -346,22 +364,26 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 {
 	sgmnt_addrs		*csa;
 	repl_ctl_element	*new_ctl, *ctl;
-	ino_t			save_jnl_inode;
 	int			jnl_fn_len;
 	char			jnl_fn[JNL_NAME_SIZE];
 	int			nopen, n;
-	int			status;
-	gd_region		*r_save;
-	uint4			jnl_status;
 	boolean_t		do_jnl_ensure_open;
 	gd_id_ptr_t		reg_ctl_end_id;
+	gtmsource_state_t	gtmsource_state_sav;
+	repl_rctl_elem_t	*repl_rctl;
+	jnl_private_control	*jpc;
 
 	/* Attempt to open newer generation journal files. Return the number of new files opened. Create new
 	 * ctl element(s) for each newer generation and attach at reg_ctl_end. Work backwards from the current journal file.
 	 */
-	jnl_status = 0;
 	nopen = 0;
 	csa = &FILE_INFO(reg)->s_addrs;
+	/* If no journal file switch happened since the last time we did a "jnl_ensure_open" on this region, do a "cycle"
+	 * check (lightweight) and avoid the heavyweight "jnl_ensure_open" call.
+	 */
+	jpc = csa->jnl;
+	if (!JNL_FILE_SWITCHED(jpc))
+		return nopen;
 	reg_ctl_end_id = &reg_ctl_end->repl_buff->fc->id;
 	/* Note that at this point, journaling might have been turned OFF (e.g. REPL_WAS_ON state) in which case
 	 * JNL_GDID_PTR(csa) would have been nullified by jnl_file_lost. Therefore comparing with that is not a good idea
@@ -375,19 +397,21 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	for (do_jnl_ensure_open = TRUE; ; do_jnl_ensure_open = FALSE)
 	{
 		repl_ctl_create(&new_ctl, reg, jnl_fn_len, jnl_fn, do_jnl_ensure_open);
-		if (do_jnl_ensure_open && is_gdid_file_identical(reg_ctl_end_id, new_ctl->jnl_fn, new_ctl->jnl_fn_len))
+		if (do_jnl_ensure_open && is_gdid_gdid_identical(reg_ctl_end_id, &new_ctl->repl_buff->fc->id))
 		{	/* Current journal file in db file header has been opened ALREADY by source server. Return right away */
 			assert(0 == nopen);
 			repl_ctl_close(new_ctl);
-			return (nopen);
+			return nopen;
 		}
 		nopen++;
 		REPL_DPRINT2("Newer generation file %s opened\n", new_ctl->jnl_fn);
 		new_ctl->prev = reg_ctl_end;
 		new_ctl->next = reg_ctl_end->next;
-		if (new_ctl->next)
+		if (NULL != new_ctl->next)
 			new_ctl->next->prev = new_ctl;
-		new_ctl->prev->next = new_ctl;
+		reg_ctl_end->next = new_ctl;
+		repl_rctl = reg_ctl_end->repl_rctl;
+		new_ctl->repl_rctl = repl_rctl;
 		jnl_fn_len = new_ctl->repl_buff->fc->jfh->prev_jnl_file_name_length;
 		memcpy(jnl_fn, new_ctl->repl_buff->fc->jfh->prev_jnl_file_name, jnl_fn_len);
 		jnl_fn[jnl_fn_len] = '\0';
@@ -412,33 +436,45 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	}
 	/* Except the latest generation, mark the newly opened future generations CLOSED, or EMPTY.
 	 * We assume that when a new file is opened, the previous generation has been flushed to disk fully.
-	 * C9M06-999999.
 	 */
 	for (ctl = reg_ctl_end, n = nopen; n; n--, ctl = ctl->next)
 	{
-		assertpro((JNL_FILE_UNREAD == ctl->file_state) || (JNL_FILE_OPEN == ctl->file_state));
-		if (ctl->file_state == JNL_FILE_UNREAD)
-			first_read(ctl);
-		else if (ctl->file_state == JNL_FILE_OPEN)
+		if (JNL_FILE_UNREAD == ctl->file_state)
 		{
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
+			first_read(ctl);
+			if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Abandoning open_newer_gener_jnlfiles (first_read)\n");
+				return 0;
+			}
+		} else
+		{
+			assert(JNL_FILE_OPEN == ctl->file_state);
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			if (update_max_seqno_info(ctl) != SS_NORMAL)
 			{
 				assert(repl_errno == EREPL_JNLEARLYEOF);
 				assertpro(FALSE); /* Program bug */
 			}
+			if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Abandoning open_newer_gener_jnlfiles (update_max)\n");
+				return 0;
+			}
 		}
-		if (ctl->file_state == JNL_FILE_UNREAD)
+		if (JNL_FILE_UNREAD == ctl->file_state)
 		{
-			ctl->file_state = JNL_FILE_EMPTY;
+			MARK_CTL_AS_EMPTY(ctl);
 			REPL_DPRINT2("Open_newer_gener_files : %s marked empty\n", ctl->jnl_fn);
 		} else
 		{
-			assert(ctl->file_state == JNL_FILE_OPEN);
+			assert(JNL_FILE_OPEN == ctl->file_state);
 			ctl->file_state = JNL_FILE_CLOSED;
 			REPL_DPRINT2("Open_newer_gener_files : %s marked closed\n", ctl->jnl_fn);
 		}
 	}
-	return (nopen);
+	return nopen;
 }
 
 static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
@@ -545,6 +581,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	gd_region		*reg;
 	sgmnt_addrs		*csa;
 	int			wait_for_jnl = 0;
+	gtmsource_state_t	gtmsource_state_sav;
 
 	assert(ctl->file_state == JNL_FILE_OPEN);
 
@@ -648,15 +685,32 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					}
 					break;
 				}
+				assert(GTMSOURCE_WAITING_FOR_XON != gtmsource_state);
+				if (gtmsource_recv_ctl_nowait())
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "State change detected in update_max_seqno_info\n");
+					rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
+					gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+					return (SS_NORMAL);
+				}
+				GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 				gtmsource_poll_actions(TRUE);
+				if(GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+							"State change detected in update_max_seqno_info (poll)\n");
+					rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
+					gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+					return (SS_NORMAL);
+				}
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
 				if (0 == (wait_for_jnl += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
 				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal "
-						"record(s) to be written to journal file %s while attempting to read seqno %llu "
-						"[0x%llx]. [dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with journaling\n",
-						wait_for_jnl, ctl->jnl_fn, ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
-						csa->jnl->jnl_buff->freeaddr);
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for "
+						" journal record(s) to be written to journal file %s while attempting to read "
+						"seqno %llu [0x%llx]. [dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with "
+						"journaling\n", wait_for_jnl / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
+						csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
 				}
 			} else
 			{
@@ -728,7 +782,9 @@ static	int first_read(repl_ctl_element *ctl)
 	repl_file_control_t	*fc;
 	boolean_t		min_seqno_found;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
+	gtmsource_state_t	gtmsource_state_sav;
 
+	assert(JNL_FILE_UNREAD == ctl->file_state);
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
@@ -785,10 +841,18 @@ static	int first_read(repl_ctl_element *ctl)
 	}
 	REPL_DPRINT5("FIRST READ of %s - Min seqno "INT8_FMT" min_seqno_dskaddr %u EOF addr %u\n",
 			ctl->jnl_fn, INT8_PRINT(ctl->min_seqno), ctl->min_seqno_dskaddr, ctl->repl_buff->fc->eof_addr);
+	GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 	if (update_max_seqno_info(ctl) != SS_NORMAL)
 	{
 		assert(repl_errno == EREPL_JNLEARLYEOF);
 		assertpro(FALSE); /* Program bug */
+	}
+	if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+	{
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Abandoning first_read\n");
+		/* file_state was set to JNL_FILE_OPEN above; reset it here. */
+		ctl->file_state = JNL_FILE_UNREAD;
+		return (SS_NORMAL);
 	}
 	REPL_DPRINT5("FIRST READ of %s - Max seqno "INT8_FMT" max_seqno_dskaddr %u EOF addr %d\n",
 			ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), ctl->max_seqno_dskaddr, ctl->repl_buff->fc->eof_addr);
@@ -838,12 +902,15 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	seq_num			read_seqno;
 	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 	sgmnt_addrs		*csa;
+	gtmsource_state_t	gtmsource_state_sav;
+	repl_rctl_elem_t	*repl_rctl;
 
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
 	fc = rb->fc;
-	ctl->read_complete = FALSE;
+	repl_rctl = ctl->repl_rctl;
+	assert(FALSE == repl_rctl->read_complete);
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
 	readlen = 0;
 	assert(0 != b->reclen);
@@ -864,7 +931,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 	if (!IS_FENCED(rectype) || JRT_NULL == rectype)
 	{	/* Entire transaction done */
-		ctl->read_complete = TRUE;
+		repl_rctl->read_complete = TRUE;
 		trans_read = TRUE;
 	} else
 	{
@@ -874,7 +941,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	 * be written to the journal file, read those available, mark this file BLOCKED, read other journal
 	 * files, and come back to this journal file later.
 	 */
-	while (!ctl->read_complete) /* Read the rest of the transaction */
+	while (!repl_rctl->read_complete) /* Read the rest of the transaction */
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
@@ -897,7 +964,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 					tcombuffp += b->reclen;
 					tot_tcom_len += b->reclen;
 					/* End of transaction in this file */
-					ctl->read_complete = TRUE;
+					repl_rctl->read_complete = TRUE;
 					if (num_tcom == -1)
 						num_tcom = ((jnl_record *)b->recbuff)->jrec_tcom.num_participants;
 					num_tcom--;
@@ -929,15 +996,28 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
 					b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
 			}
+			if (gtmsource_recv_ctl_nowait())
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "State change detected in read_transaction\n");
+				gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+				return 0;
+			}
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			gtmsource_poll_actions(TRUE);
+			if(GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "State change detected in read_transaction (poll)\n");
+				gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+				return 0;
+			}
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
 			if (0 == (total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal "
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for journal "
 					"record(s) to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
 					"[dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with journaling\n",
-					total_wait_for_jnl_recs, ctl->jnl_fn, ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
-					csa->jnl->jnl_buff->freeaddr);
+					total_wait_for_jnl_recs / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
+					csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
 			}
 		} else
 		{
@@ -1340,6 +1420,8 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	repl_ctl_element	*ctl;
 	int			wait_for_jnlopen_log_num = -1;
 	sgmnt_addrs		*csa;
+	gtmsource_state_t	gtmsource_state_sav;
+	repl_rctl_elem_t	*repl_rctl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1354,50 +1436,64 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	/* ensure that buff is always within gtmsource_msgp bounds (especially in case the buffer got expanded in the last call) */
 	assert((buff >= (uchar_ptr_t)gtmsource_msgp + REPL_MSG_HDRLEN)
 			&& (buff <= (uchar_ptr_t)gtmsource_msgp + gtmsource_msgbufsiz));
-	for (ctl = repl_ctl_list->next; ctl != NULL; ctl = ctl->next)
-		ctl->read_complete = FALSE;
+	for (repl_rctl = repl_rctl_list; NULL != repl_rctl; repl_rctl = repl_rctl->next)
+		repl_rctl->read_complete = FALSE;
 	for (pass = 1; !trans_read; pass++)
 	{
 		if (1 < pass)
 		{
-			gtmsource_poll_actions(TRUE);
-			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN);
-			if (0 == ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD))
+			if (gtmsource_recv_ctl_nowait())
 			{
-			    if (LOG_WAIT_FOR_JNLOPEN_TIMES > ++wait_for_jnlopen_log_num)
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) "
-					 "to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check for "
-					 "problems with journaling\n", total_wait_for_jnlopen, read_jnl_seqno, read_jnl_seqno);
-			    else
-			    {
-				for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
-				{
-					repl_log(gtmsource_log_fp, FALSE, FALSE, "DGB_INFO: Journal File: %s for Database File: %s;"
-						 " State: %s.", ctl->jnl_fn, ctl->reg->dyn.addr->fname,
-								  jnl_file_state_lit[ctl->file_state]);
-					if (JNL_FILE_OPEN == ctl->file_state)
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "State change detected in read_and_merge\n");
+				gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+				return 0;
+			}
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
+			gtmsource_poll_actions(TRUE);
+			if(GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "State change detected in read_and_merge (poll)\n");
+				gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */
+				return 0;
+			}
+			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN); /* sleep for 10 msec between each iteration */
+			if (0 == ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD))
+			{	/* We have waited for 5000 intervals of 10 msec each, for a total of 50 seconds sleep.
+				 * Issue alert every 50 seconds. Print detail of all open journal files only in first alert.
+				 */
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for journal"
+					" file(s) to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check"
+					" for problems with journaling\n", total_wait_for_jnlopen / 1000,
+					read_jnl_seqno, read_jnl_seqno);
+				if (LOG_WAIT_FOR_JNLOPEN_PERIOD == total_wait_for_jnlopen)
+				{	/* Print debug info only for first alert */
+					for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
 					{
 						csa = &FILE_INFO(ctl->reg)->s_addrs;
-						repl_log(gtmsource_log_fp, FALSE, FALSE, " "
-							"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
-							"ctl->read_complete = %d\n",
-							ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
-							csa->jnl->jnl_buff->freeaddr, ctl->read_complete);
-					} else
-						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "DBG_INFO: Journal File: %s for"
+							" Database File: %s; State: %s. Timer PIDs(%d): (%u %u %u)\n",
+							ctl->jnl_fn, ctl->reg->dyn.addr->fname,
+							jnl_file_state_lit[ctl->file_state], csa->nl->wcs_timers + 1,
+							csa->nl->wt_pid_array[0], csa->nl->wt_pid_array[1],
+							csa->nl->wt_pid_array[2]);
+						if (JNL_FILE_OPEN == ctl->file_state)
+						{
+							repl_log(gtmsource_log_fp, TRUE, TRUE, " "
+								"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
+								"ctl->repl_rctl->read_complete = %d\n",
+								ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+								csa->jnl->jnl_buff->freeaddr, ctl->repl_rctl->read_complete);
+						}
+					}
+					if (TREF(gtm_environment_init) && !IS_REPL_INST_FROZEN)
+						gtm_fork_n_core();
 				}
-				if (!jnlpool.gtmsource_local->jnlfileonly)
-				{
-					if (TREF(gtm_environment_init)
-						DEBUG_ONLY(&& (WBTEST_CLOSE_JNLFILE != gtm_white_box_test_case_number)))
-							gtm_fork_n_core();
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2,
-						&read_jnl_seqno, &read_jnl_seqno);
-				}
-			    }
 			}
 		}
+		GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
+		if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			return 0;
 		if (brkn_trans)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
 		total_read += read_len;
@@ -1418,7 +1514,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 static	int read_regions(unsigned char **buff, int *buff_avail,
 		         boolean_t attempt_open_oldnew, boolean_t *brkn_trans, seq_num read_jnl_seqno)
 {
-	repl_ctl_element	*ctl, *prev_ctl, *old_ctl;
+	repl_ctl_element	*ctl, *prev_ctl, *next_ctl, *old_ctl;
 	gd_region		*region;
 	tr_search_state_t	found;
 	int			read_len, cumul_read;
@@ -1428,35 +1524,82 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	sgmnt_addrs		*csa;
 	jnlpool_ctl_ptr_t	jctl;
 	uint4			freeaddr;
-	DEBUG_ONLY(boolean_t	file_close;)
+	gtmsource_state_t	gtmsource_state_sav;
+	repl_rctl_elem_t	*repl_rctl;
+	boolean_t		ctl_close;
+	seq_num			next_ctl_min_seqno;
 
 	cumul_read = 0;
 	*brkn_trans = TRUE;
-	DEBUG_ONLY(file_close = FALSE;)
 	assert(repl_ctl_list->next != NULL);
 	jctl = jnlpool.jnlpool_ctl;
-	DEBUG_ONLY(GTM_WHITE_BOX_TEST(WBTEST_CLOSE_JNLFILE, file_close, TRUE);)
 	/* For each region */
-	for (ctl = repl_ctl_list->next, prev_ctl = repl_ctl_list; ctl != NULL && !trans_read; prev_ctl = ctl, ctl = ctl->next)
+	assert(repl_ctl_list->next == repl_rctl_list->ctl_start);
+	for (repl_rctl = repl_rctl_list; (NULL != repl_rctl) && !trans_read; repl_rctl = repl_rctl->next)
 	{
-#ifdef DEBUG
-		if (file_close)
-			ctl->file_state = JNL_FILE_CLOSED;
-#endif
+		ctl = repl_rctl->ctl_start;
+		prev_ctl = ctl->prev;
+		assert(NULL != prev_ctl);
 		found = TR_NOT_FOUND;
 		region = ctl->reg;
 		DEBUG_ONLY(loopcnt = 0;)
-		while (found == TR_NOT_FOUND)
+		do
 		{	/* Find the generation of the journal file which has read_jnl_seqno */
-			for ( ; ctl != NULL && ctl->reg == region &&
-				((JNL_FILE_CLOSED == ctl->file_state) && (read_jnl_seqno > ctl->max_seqno)
-					|| (JNL_FILE_EMPTY == ctl->file_state)
-						&& (read_jnl_seqno >= ctl->repl_buff->fc->jfh->start_seqno));
-					prev_ctl = ctl, ctl = ctl->next)
-				;
-			if (ctl == NULL || ctl->reg != region)
+			for ( ; ; )
+			{
+				if ((NULL == ctl) || (ctl->reg != region))
+					break;
+				if ((JNL_FILE_OPEN == ctl->file_state) || (JNL_FILE_UNREAD == ctl->file_state))
+					break;
+				assert((JNL_FILE_CLOSED == ctl->file_state) || (JNL_FILE_EMPTY == ctl->file_state));
+				assert(ctl->first_read_done);
+				if (read_jnl_seqno <= ctl->max_seqno)
+					break;
+				next_ctl = ctl->next;
+				/* "ctl" is no longer needed for any future seqnos (until a reconnection occurs)
+				 * so close it and free up associated "fd" and "memory" with one exception.
+				 * If the max-seqno of "ctl" is lesser than the min-seqno of "next_ctl".
+				 * In this case, keep "ctl" open until "read_jnl_seqno becomes >= next_ctl->min_seqno".
+				 */
+				assert(next_ctl->reg == ctl->reg);
+				assert(next_ctl->repl_rctl == repl_rctl);
+				if (!next_ctl->first_read_done)
+				{
+					GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
+					first_read(next_ctl);
+					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+					{
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
+								"Abandoning read_regions (first_read CLOSED/EMPTY)\n");
+						return 0;
+					}
+					assert(next_ctl->first_read_done);
+				}
+				assert(ctl->max_seqno || ((JNL_FILE_EMPTY == ctl->file_state)
+								&& (1 == ctl->repl_buff->fc->jfh->start_seqno)));
+				next_ctl_min_seqno = next_ctl->min_seqno;
+				if (!next_ctl->min_seqno)
+				{
+					assert((JNL_FILE_UNREAD == next_ctl->file_state)
+						|| (JNL_FILE_EMPTY == next_ctl->file_state));
+					next_ctl_min_seqno = next_ctl->repl_buff->fc->jfh->start_seqno;
+				}
+				assert(next_ctl_min_seqno > ctl->max_seqno);
+				ctl_close = (read_jnl_seqno >= next_ctl_min_seqno);
+				if (ctl_close)
+				{
+					prev_ctl->next = next_ctl;
+					next_ctl->prev = prev_ctl;
+					repl_rctl = ctl->repl_rctl;
+					if (repl_rctl->ctl_start == ctl)
+						repl_rctl->ctl_start = next_ctl;
+					repl_ctl_close(ctl);
+				}
+				ctl = next_ctl;
+			}
+			if ((NULL == ctl) || (ctl->reg != region))
 			{	/* Hit the end of generation list for journal file */
-				if (!attempt_open_oldnew DEBUG_ONLY( || file_close))
+				if (!attempt_open_oldnew)
 				{	/* Reposition to skip prev_ctl */
 					REPL_DPRINT2("First pass...not opening newer gener file...skipping %s\n", prev_ctl->jnl_fn);
 					ctl = prev_ctl;
@@ -1469,7 +1612,10 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 				 * find read_jnl_seqno. Open newer generation journal files (if any) to see if they contain
 				 * read_jnl_seqno
 				 */
+				GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 				nopen = open_newer_gener_jnlfiles(region, prev_ctl);
+				if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+					return 0;
 				if (nopen > 0) /* Newer gener files opened */
 				{
 					if (prev_ctl->file_state == JNL_FILE_CLOSED)
@@ -1509,7 +1655,16 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 			} else if (ctl->file_state == JNL_FILE_UNREAD)
 			{
 				if (!ctl->first_read_done || attempt_open_oldnew)
+				{
+					GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 					first_read(ctl);
+					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+					{
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
+								"Abandoning read_regions (first_read UNREAD)\n");
+						return 0;
+					}
+				}
 				if (ctl->file_state == JNL_FILE_UNREAD)
 				{
 					REPL_DPRINT2("First read of %s. Nothing yet written to this file\n", ctl->jnl_fn);
@@ -1529,8 +1684,15 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						ctl = ctl->next;
 					} else if (attempt_open_oldnew)
 					{
+						GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 						if (open_prev_gener(&old_ctl, ctl, read_jnl_seqno) == 0)
 						{
+							if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+							{
+								repl_log(gtmsource_log_fp, TRUE, TRUE,
+									"Abandoning read_regions (open_prev_gener UNREAD)\n");
+								return 0;
+							}
 							if (QWGT(ctl->repl_buff->fc->jfh->start_seqno, read_jnl_seqno))
 							{
 								found = TR_WILL_NOT_BE_FOUND;
@@ -1596,8 +1758,15 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					continue;
 				}
 				/* Need to open prev gener */
+				GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 				if (open_prev_gener(&old_ctl, ctl, read_jnl_seqno) == 0)
 				{
+					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+					{
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
+								"Abandoning read_regions (open_prev_gener EMPTY)\n");
+						return 0;
+					}
 					if (ctl->file_state != JNL_FILE_EMPTY)
 						found = TR_WILL_NOT_BE_FOUND;
 					else
@@ -1636,10 +1805,13 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 				}
 				if (QWEQ(read_jnl_seqno, ctl->seqno))
 				{	/* Found it */
-					if (!ctl->read_complete)
+					if (!ctl->repl_rctl->read_complete)
 					{
+						GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 						if ((read_len = read_transaction(ctl, buff, buff_avail, read_jnl_seqno)) < 0)
 							assert(repl_errno == EREPL_JNLEARLYEOF);
+						if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+							return 0;
 						cumul_read += read_len;
 						assert(cumul_read % JNL_WRT_END_MODULUS == 0);
 					}
@@ -1657,10 +1829,17 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						 * The journal files have grown since the transition from READ_FILE to READ_POOL
 						 * was made. Update ctl info.
 						 */
+						GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 						if (update_max_seqno_info(ctl) != SS_NORMAL)
 						{
 							assert(repl_errno == EREPL_JNLEARLYEOF);
 							assertpro(FALSE); /* Program bug */
+						}
+						if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+						{
+							repl_log(gtmsource_log_fp, TRUE, TRUE,
+									"Abandoning read_regions (update_max file/pool/file)\n");
+							return 0;
 						}
 						if (read_jnl_seqno <= ctl->max_seqno)
 						{	/* May be found in this journal file,
@@ -1682,13 +1861,13 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					}
 				}
 			}
-		}
+		} while (TR_NOT_FOUND == found);
 		/* Move to the next region, now that the tr has been found or will not be found */
-		*brkn_trans = (*brkn_trans && found == TR_WILL_NOT_BE_FOUND);
-		for ( ; ctl->next != NULL && ctl->next->reg == region; prev_ctl = ctl, ctl = ctl->next)
-			;
+		*brkn_trans = (*brkn_trans && (TR_WILL_NOT_BE_FOUND == found));
 	}
-	assert(!*brkn_trans || (gtm_white_box_test_case_enabled && (WBTEST_REPLBRKNTRANS == gtm_white_box_test_case_number)));
+	assert(!*brkn_trans || (gtm_white_box_test_case_enabled &&
+				((WBTEST_REPLBRKNTRANS == gtm_white_box_test_case_number)
+					|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))));
 	return (cumul_read);
 }
 
@@ -1703,6 +1882,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	uint4			jnlpool_size;
 	boolean_t		file2pool;
 	unsigned int		start_heartbeat;
+	gtmsource_state_t	gtmsource_state_sav;
 
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
@@ -1735,7 +1915,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 		}
 		start_heartbeat = heartbeat_counter;
 		read_addr = gtmsource_local->read_addr;
+		GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 		first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+		if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+			return 0;
 		tot_tr_len = 0;
 		do
 		{
@@ -1784,7 +1967,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 				if ((tot_tr_len < MAX_TR_BUFFSIZE) && (read_jnl_seqno < max_read_seqno))
 				{
 					assert(0 < maxbufflen);
+					GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 					read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+						return 0;	/* Control message triggered state change */
 					/* Don't use buff to assign type and len as buffer may have expanded.
 					 * Use gtmsource_msgp instead */
 					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
@@ -1843,69 +2029,6 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	return (tot_tr_len);
 }
 
-#if 0 /* currently  not used  - Defed out to fix compiler warnings */
-
-static	int scavenge_closed_jnl_files(seq_num ack_seqno)
-{	/* Run thru the repl_ctl_list and scavenge for those journal files which are no longer required for
-	 * replication (the receiver side has acknowledged that it has successfully processed journal recs upto
-	 * and including those with JNL_SEQNO ack_seqno). Close these journal files and report to the operator
-	 * that these files are no longer needed for replication so that the operator can take these files off-line.
-	 */
-	boolean_t		scavenge;
-	repl_ctl_element	*ctl, *prev_ctl;
-
-	for (prev_ctl = repl_ctl_list, ctl = repl_ctl_list->next; ctl != NULL; prev_ctl = ctl, ctl = ctl->next)
-	{
-		if (!ctl->next || ctl->next->reg != ctl->reg)
-			open_newer_gener_jnlfiles(ctl->reg, ctl);
-		/* following two switche blocks cannot be merged as file_state could change in the first switch block */
-		switch(ctl->file_state)
-		{
-			case JNL_FILE_CLOSED :
-			case JNL_FILE_EMPTY :
-				break;
-			case JNL_FILE_OPEN :
-				if (update_max_seqno_info(ctl) != SS_NORMAL)
-				{
-					assert(repl_errno == EREPL_JNLEARLYEOF);
-					assertpro(FALSE); /* Program bug */
-				}
-				break;
-			case JNL_FILE_UNREAD :
-				first_read(ctl);
-				break;
-		}
-		switch(ctl->file_state)
-		{
-			case JNL_FILE_CLOSED :
-				scavenge = (QWGE(ack_seqno, ctl->max_seqno) && ctl->next && ctl->next->reg == ctl->reg);
-					/* There should exist a next generation */
-				break;
-			case JNL_FILE_EMPTY :
-				/* Previous generation should have been scavenged and the
-				 * ack_seqno should be in one of the next generations.
-				 */
-				scavenge = (ctl->prev->reg != ctl->reg && ctl->next && ctl->next->reg == ctl->reg
-						&& (ctl->next->file_state == JNL_FILE_OPEN
-							|| ctl->next->file_state == JNL_FILE_CLOSED)
-						&& QWGE(ctl->next->min_seqno, ack_seqno));
-				break;
-			default :
-				scavenge = FALSE;
-				break;
-		}
-		if (scavenge)
-		{
-			ctl->prev->next = ctl->next;
-			ctl->next->prev = ctl->prev;
-			REPL_DPRINT2("Journal file %s no longer needed for replication\n", ctl->jnl_fn);
-			repl_ctl_close(ctl);
-		}
-	}
-	return 0;
-}
-#endif /* 0 */
-
 /* This function resets "zqgblmod_seqno" and "zqgblmod_tn" in all replicated database file headers to correspond to the
  * "resync_seqno" passed in as input. This shares some of its code with the function "repl_inst_reset_zqgblmod_seqno_and_tn".
  * Any changes there might need to be reflected here.
@@ -1919,6 +2042,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 	boolean_t		was_crit;
 	seq_num			start_seqno, max_zqgblmod_seqno;
 	trans_num		bov_tn;
+	gtmsource_state_t	gtmsource_state_sav;
 
 	gtmsource_ctl_close();
 	gtmsource_ctl_init();
@@ -1934,7 +2058,13 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 		next_ctl = ctl->next;
 		assert((NULL == next_ctl) || (ctl->reg != next_ctl->reg));
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Updating ZQGBLMOD SEQNO and TN for Region [%s]\n", ctl->reg->rname);
+		GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 		first_read(ctl);
+		if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Abandoning gtmsource_update_zqgblmod_seqno_and_tn (first_read)\n");
+			return (SS_NORMAL);
+		}
 		do
 		{
 			assert(ctl->first_read_done);
@@ -1943,8 +2073,15 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 				ctl->reg->rname, ctl->jnl_fn, start_seqno);
 			if (start_seqno <= resync_seqno)
 				break;
+			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			if (0 == open_prev_gener(&old_ctl, ctl, resync_seqno))	/* this automatically does a "first_read" */
 			{	/* Previous journal file link was NULL. Issue error. */
+				if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+							"Abandoning gtmsource_update_zqgblmod_seqno_and_tn (open_prev_gener)\n");
+					return (SS_NORMAL);
+				}
 				rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs)
 					VARLSTCNT(4) ERR_NOPREVLINK, 2, ctl->jnl_fn_len, ctl->jnl_fn);
 			}

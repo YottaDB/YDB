@@ -20,8 +20,15 @@
 #		FALSE - if either of them is not available
 ###########################################################################################
 
+# depending on the list of locales configured, locale -a might be considered a binary output.
+# grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
+if ("Linux" == "$HOSTOS") then
+	set binaryopt = "-a"
+else
+	set binaryopt = ""
+endif
 set found_icu = 0
-set utflocale = `locale -a | grep -iE '\.utf.?8$' | head -n1`
+set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 
 # This _could_ not work on new platforms or newly installed supported platforms.
 # It should be manually tested using this command :

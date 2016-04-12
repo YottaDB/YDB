@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_time.h"
 
 #include "error.h"
 #include "gdsroot.h"
@@ -27,12 +30,17 @@
 #include "muprec.h"
 #include "iosp.h"
 #include "jnl_typedef.h"
-#include "gtmmsg.h"			/* for gtm_putmsg() prototype */
-#include "mur_validate_checksum.h"	/* for "mur_validate_checksum" */
+#include "gtmmsg.h"			/* for "gtm_putmsg" prototype */
+#include "mur_validate_checksum.h"	/* for "mur_validate_checksum" prototype */
+#include "interlock.h"
+#include "gtm_multi_proc.h"
 
 GBLREF reg_ctl_list		*mur_ctl;
 GBLREF mur_gbls_t		murgbl;
 GBLREF mur_opt_struct 		mur_options;
+
+error_def(ERR_NOPREVLINK);
+error_def(ERR_TEXT);
 
 boolean_t mur_ztp_lookback(void)
 {
@@ -40,17 +48,10 @@ boolean_t mur_ztp_lookback(void)
 	reg_ctl_list		*rctl, *rctl_top;
 	jnl_ctl_list		*jctl;
 	uint4			status;
-	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
 	jnl_record		*jrec;
 	pini_list_struct	*plst;
 	enum jnl_record_type 	rectype;
 	token_num		token;
-
-	error_def(ERR_NOPREVLINK);
-	error_def(ERR_MUINFOUINT4);
-	error_def(ERR_MUINFOUINT8);
-	error_def(ERR_MUINFOSTR);
-	error_def(ERR_TEXT);
 
 	assert(FENCE_NONE != mur_options.fences);
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
@@ -71,7 +72,8 @@ boolean_t mur_ztp_lookback(void)
 			rectype = (enum jnl_record_type)jrec->prefix.jrec_type;
 			if (mur_options.verify && !mur_validate_checksum(jctl))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Checksum validation failed"));
+				gtm_putmsg_csa(CSA_ARG(rctl->csa)
+					VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Checksum validation failed"));
 				return FALSE;
 			}
 			if (mur_options.lookback_time_specified && jrec->prefix.time <= mur_options.lookback_time)
@@ -87,14 +89,8 @@ boolean_t mur_ztp_lookback(void)
 			}
 			if (IS_FUPD(rectype))
 			{
-				VMS_ONLY(
-					MUR_GET_IMAGE_COUNT(jctl, jrec, rec_image_count, status);
-					if (SS_NORMAL != status)
-						break;
-				)
 				token = ((struct_jrec_upd *)jrec)->token_seq.token;
-			    	if ((NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_image_count, 0, ZTPFENCE)))
-								&& (0 < multi->partner))
+			    	if ((NULL != (multi = MUR_TOKEN_LOOKUP(token, 0, ZTPFENCE))) && (0 < multi->partner))
 				{	/* this transaction has already been identified as broken */
 					/* see turn-around-point code in mur_back_process/mur_apply_pblk for the fields to clear */
 					rctl->jctl_turn_around->turn_around_offset = 0;
@@ -117,10 +113,11 @@ boolean_t mur_ztp_lookback(void)
 		{
 			if (mur_options.lookback_time_specified)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+				gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_NOPREVLINK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
 				return FALSE;
 			}
-			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_INFO(ERR_NOPREVLINK), 2, jctl->jnl_fn_len, jctl->jnl_fn);
+			gtm_putmsg_csa(CSA_ARG(rctl->csa)
+					VARLSTCNT(4) MAKE_MSG_INFO(ERR_NOPREVLINK), 2, jctl->jnl_fn_len, jctl->jnl_fn);
 		} else if (SS_NORMAL != status)
 			return FALSE;
 	}

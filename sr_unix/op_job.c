@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +69,7 @@ static	int4	tid;	/* Job Timer ID */
 error_def(ERR_TEXT);
 error_def(ERR_JOBFAIL);
 error_def(ERR_NULLENTRYREF);
+error_def(ERR_JOBLVN2LONG);
 
 #define JOBTIMESTR "JOB time too long"
 
@@ -89,29 +91,30 @@ void	job_timer_handler(void)
  */
 int	op_job(int4 argcnt, ...)
 {
-	va_list		var;
-	int4		i;
-	mval		*label;
-	int4		offset;
-	mval		*routine, *param_buf;
-	int4		timeout;	/* timeout in seconds */
-	int4		msec_timeout;	/* timeout in milliseconds */
-	boolean_t	timed, single_attempt, non_exit_return;
-	unsigned char	buff[128], *c;
-	int4		status, exit_stat, term_sig, stop_sig;
-	pid_t		zjob_pid = 0; 	/* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
-	int		pipe_fds[2], pipe_status;
+	va_list			var;
+	int4			i;
+	mval			*label;
+	int4			offset;
+	mval			*routine, *param_buf;
+	int4			timeout;	/* timeout in seconds */
+	int4			msec_timeout;	/* timeout in milliseconds */
+	boolean_t		timed, single_attempt, non_exit_return;
+	unsigned char		buff[128], *c;
+	int4			status, exit_stat, term_sig, stop_sig;
+	pid_t			zjob_pid = 0; 	/* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
+	int			pipe_fds[2], pipe_status;
 #	ifdef _BSD
-	union wait	wait_stat;
+	union wait		wait_stat;
 #	else
-	int4		wait_stat;
+	int4			wait_stat;
 #	endif
-	job_params_type job_params;
-	char		combuf[128];
-	mstr		command;
-	job_parm	*jp;
-	mstr_len_t	handle_len;
-	int4		index;
+	job_params_type		job_params;
+	char			combuf[128];
+	mstr			command;
+	job_parm		*jp;
+	mstr_len_t		handle_len;
+	int4			index;
+	job_buffer_size_msg	buffer_size;
 	DCL_THREADGBL_ACCESS;
 
 	LITREF mval		skiparg;
@@ -222,6 +225,14 @@ int	op_job(int4 argcnt, ...)
 			if (0 < pipe_status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
 										joberrs[exit_stat].msg, 2, errno);
+			if (ERR_JOBLVN2LONG == job_errno)
+			{	/* This message takes buffer_size as argument so take it before closing the pipe */
+				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);
+				if (0 < pipe_status)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+						      LEN_AND_LIT("Error reading buffer_size from pipe after a JOBLVN2LONG error"),
+						      errno);
+			}
 		}
 
 	}
@@ -272,6 +283,10 @@ int	op_job(int4 argcnt, ...)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 							  joberrs[exit_stat].len,
 							  joberrs[exit_stat].msg);
+					} else if (ERR_JOBLVN2LONG == job_errno)
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN,
+							      buffer_size);
 					} else
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +66,7 @@ error_def(ERR_TEXT);
 
 int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 {
-	boolean_t		all_dead, first_time, sem_incremented, regrab_lock;
+	boolean_t		all_dead, first_time, ftok_counter_halted, regrab_lock, sem_incremented;
 	uint4			savepid[NUM_GTMSRC_LCL];
 	int			status, shutdown_status, save_errno, max_loopcnt;
 	int4			index, maxindex, lcnt, num_src_servers_running;
@@ -301,13 +302,14 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 * other error occurs in that function causing it to return ABNORMAL_SHUTDOWN, then we should return ABNORMAL_SHUTDOWN
 	 * from this function as well.
 	 */
+	ftok_counter_halted = jnlpool.repl_inst_filehdr->ftok_counter_halted;	/* Note down before repl_inst_filehdr is NULLed */
 	if (FALSE == gtmsource_ipc_cleanup(auto_shutdown, &exit_status, &num_src_servers_running))
 		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 	else
 	{	/* Journal Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
-		repl_inst_jnlpool_reset();
+		repl_inst_jnlpool_reset(CLEAR_FTOK_HALTED_FALSE);
 	}
-	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
+	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
 	return (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);

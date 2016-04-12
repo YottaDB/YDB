@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,10 +83,7 @@
 #include "shmpool.h"
 #include "gtm_permissions.h"
 #include "wbox_test_init.h"
-#include "wcs_clean_dbsync.h" /* for setting wcs_clean_dbsync pointer */
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "have_crit.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
@@ -123,6 +120,18 @@
 	SS_DEFAULT_INIT_POOL(ss_shm_ptr);										\
 }
 
+/* If a current value doesn't match the saved value used in the original calculation revert to the original */
+#define DSE_VERIFY_AND_RESTORE(CSA, TSD, VAR)						\
+{											\
+	assert(IS_DSE_IMAGE);								\
+	if (CSA->nl->saved_##VAR != TSD->VAR)						\
+	{										\
+		gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(6) ERR_NLRESTORE, 4,		\
+				LEN_AND_LIT(#VAR), TSD->VAR, CSA->nl->saved_##VAR);	\
+		TSD->VAR = CSA->nl->saved_##VAR;					\
+	}										\
+}
+
 #define GTM_ATTACH_CHECK_ERROR												\
 {															\
 	if (-1 == status_l)												\
@@ -137,6 +146,16 @@
 	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));			\
 	GTM_ATTACH_CHECK_ERROR;												\
 	csa->nl = (node_local_ptr_t)csa->db_addrs[0];									\
+}
+
+/* These values may potentially be used by DSE to calculate various offsets into the shared memory layout.
+ * Note that blk_size does not affect the offset calculation for MM. */
+#define GTM_CACHE_INTO_SHM(CSA, TSD)					\
+{									\
+	CSA->nl->saved_acc_meth		= TSD->acc_meth;		\
+	CSA->nl->saved_lock_space_size	= TSD->lock_space_size;		\
+	CSA->nl->saved_blk_size		= TSD->blk_size;		\
+	CSA->nl->saved_jnl_buffer_size	= TSD->jnl_buffer_size;		\
 }
 
 #define GTM_ATTACH_SHM_AND_CHECK_VERS(VERMISMATCH, SHM_SETUP_OK)								\
@@ -183,38 +202,35 @@
 	}														\
 }
 
-#ifdef GTM_CRYPT
-#define INIT_DB_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS, REG, CSA, TSD)							\
-{																\
-	int			fn_len = 0;											\
-	char			*fn;												\
-																\
-	if (DO_CRYPT_INIT)													\
-	{															\
-		if (0 == INIT_STATUS)												\
-			INIT_DB_ENCRYPTION(CSA, TSD, INIT_STATUS);								\
-		if (0 != INIT_STATUS)												\
-		{														\
-			fn = (char *)(REG->dyn.addr->fname);									\
-			fn_len = REG->dyn.addr->fname_len;									\
-			if (IS_GTM_IMAGE)											\
-			{													\
-				GTMCRYPT_REPORT_ERROR(INIT_STATUS, rts_error, fn_len, fn);					\
-			} else													\
-				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(INIT_STATUS), gtm_putmsg, fn_len, fn);			\
-			CSA->encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;							\
-		}														\
-	}															\
+#define INIT_DB_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS, REG, CSA, TSD, CRYPT_WARNING)				\
+{															\
+	int	fn_len;													\
+	char	*fn;													\
+															\
+	if (DO_CRYPT_INIT)												\
+	{														\
+		fn = (char *)(REG->dyn.addr->fname);									\
+		fn_len = REG->dyn.addr->fname_len;									\
+		if (0 == INIT_STATUS)											\
+			INIT_DB_OR_JNL_ENCRYPTION(CSA, TSD, fn_len, fn, INIT_STATUS);					\
+		if (0 != INIT_STATUS)											\
+		{													\
+			if (IS_GTM_IMAGE || mu_reorg_encrypt_in_prog)							\
+			{												\
+				GTMCRYPT_REPORT_ERROR(INIT_STATUS, rts_error, fn_len, fn);				\
+			} else												\
+			{												\
+				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(INIT_STATUS), gtm_putmsg, fn_len, fn);		\
+				CRYPT_WARNING = TRUE;									\
+			}												\
+		}													\
+	}														\
 }
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)								\
-{																\
-	if (DO_CRYPT_INIT)													\
-		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);										\
+#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)							\
+{															\
+	if (DO_CRYPT_INIT)												\
+		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);									\
 }
-#else
-#define INIT_DB_ENCRYPTION_IF_NEEDED(IS_ENCRYPTED, INIT_STATUS, REG, CSA, TSD)
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, IS_ENCRYPTED, INIT_STATUS)
-#endif
 
 #define READ_DB_FILE_HEADER(REG, TSD)			\
 {							\
@@ -270,11 +286,9 @@ GBLREF	node_local_ptr_t	locknl;
 GBLREF	uint4			heartbeat_counter;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF  uint4                   process_id;
-GBLREF	void			(*wcs_clean_dbsync_fptr)();
 GBLREF	jnl_gbls_t		jgbl;
-GTMCRYPT_ONLY(
-GBLREF	gtmcrypt_key_t		mu_int_encrypt_key_handle;
-)
+GBLREF	uint4			mu_reorg_encrypt_in_prog;
+GBLREF	boolean_t		pool_init;
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
 #endif
@@ -297,6 +311,7 @@ error_def(ERR_DBNOTGDS);
 error_def(ERR_DBSHMNAMEDIFF);
 error_def(ERR_JNLBUFFREGUPD);
 error_def(ERR_NLMISMATCHCALC);
+error_def(ERR_NLRESTORE);
 error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_PERMGENFAIL);
 error_def(ERR_REQROLLBACK);
@@ -371,20 +386,23 @@ gd_region *dbfilopn (gd_region *reg)
 	fnptr = (char *)seg->fname + pblk.b_node;
 	udi->raw = raw;
 	udi->fn = (char *)fnptr;
-	OPENFILE(fnptr, O_RDWR, udi->fd);
-	if (!udi->grabbed_access_sem)
-	{	/* If the process already has standalone access, these fields are initialized in mu_rndwn_file */
-		udi->ftok_semid = INVALID_SEMID;
-		udi->semid = INVALID_SEMID;
-		udi->shmid = INVALID_SHMID;
-		udi->gt_sem_ctime = 0;
-		udi->gt_shm_ctime = 0;
-	}
-	reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
-	csa->read_write = TRUE;	/* maintain reg->read_only simultaneously */
-	if (FD_INVALID == udi->fd)
+	if (!(jgbl.mur_extract && !jgbl.mur_update))
 	{
-		OPENFILE(fnptr, O_RDONLY, udi->fd);
+		OPENFILE_CLOEXEC(fnptr, O_RDWR, udi->fd);
+		if (!udi->grabbed_access_sem)
+		{	/* If the process already has standalone access, these fields are initialized in mu_rndwn_file */
+			udi->ftok_semid = INVALID_SEMID;
+			udi->semid = INVALID_SEMID;
+			udi->shmid = INVALID_SHMID;
+			udi->gt_sem_ctime = 0;
+			udi->gt_shm_ctime = 0;
+		}
+		reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
+		csa->read_write = TRUE;	/* maintain reg->read_only simultaneously */
+	}
+	if ((jgbl.mur_extract && !jgbl.mur_update) || (FD_INVALID == udi->fd))
+	{
+		OPENFILE_CLOEXEC(fnptr, O_RDONLY, udi->fd);
 		if (FD_INVALID == udi->fd)
 		{
 			save_errno = errno;
@@ -453,10 +471,11 @@ int db_init(gd_region *reg)
 {
 	boolean_t       	is_bg, read_only, sem_created = FALSE, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
-	boolean_t		new_shm_ipc, do_crypt_init = FALSE, replinst_mismatch, need_shmctl, need_semctl;
+	boolean_t		new_shm_ipc, replinst_mismatch, need_shmctl, need_semctl;
+	boolean_t		gld_do_crypt_init, db_do_crypt_init;
 	char            	machine_name[MAX_MCNAMELEN];
 	int			gethostname_res, stat_res, user_id, group_id, perm, save_udi_semid;
-	int4            	status, semval, dblksize, fbwsize, save_errno, wait_time, loopcnt, sem_pid;
+	int4            	status, dblksize, fbwsize, save_errno, wait_time, loopcnt, sem_pid;
 	sm_long_t       	status_l;
 	sgmnt_addrs     	*csa;
 	sgmnt_data		tsdbuff;
@@ -473,18 +492,19 @@ int db_init(gd_region *reg)
 	int			init_status;
 	gtm_uint64_t 		sec_size, mmap_sz;
 	semwait_status_t	retstat;
-	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE;
+	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE,
+				ftok_counter_halted, access_counter_halted, incr_cnt, flush_hdr = FALSE;
 	int			jnl_buffer_size;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
 	char			*syscall;
 	void			*mmapaddr;
 	int			secshrstat;
+	boolean_t		crypt_warning;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_NOUNWIND(dbinit_ch);
 	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
-	wcs_clean_dbsync_fptr = &wcs_clean_dbsync;
 	tsd = &tsdbuff;
 	read_only = reg->read_only;
 	udi = FILE_INFO(reg);
@@ -514,13 +534,20 @@ int db_init(gd_region *reg)
 	 * standalone access or not when it entered this function.
 	 */
 	have_standalone_access = udi->grabbed_access_sem;
+	init_status = 0;
+	crypt_warning = FALSE;
 	if (!have_standalone_access)
 	{
-		do_crypt_init = (reg->dyn.addr->is_encrypted && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status); /* heavy-weight so needs to be done before ftok */
+		gld_do_crypt_init = (IS_ENCRYPTED(reg->dyn.addr->is_encrypted) && !IS_LKE_IMAGE);
+		assert(!TO_BE_ENCRYPTED(reg->dyn.addr->is_encrypted));
+		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, gld_do_crypt_init, init_status); /* heavyweight so do it before ftok */
 		start_hrtbt_cntr = heartbeat_counter;
-		if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok))
+		/* If the header is uninitalized we assume that mumps_can_bypass is TRUE. After we read the header to confirm our
+		 * assumption. If we turn out to be wrong, we error out
+		 */
+		if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok, &ftok_counter_halted))
 			ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
+		assert(udi->grabbed_ftok_sem || bypassed_ftok);
 		if (bypassed_ftok)
 			SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("FTOK bypassed at database initialization"));
 		/* At this point we have ftok_semid semaphore based on ftok key. Any ftok conflicted region will block at this
@@ -531,20 +558,23 @@ int db_init(gd_region *reg)
 		READ_DB_FILE_HEADER(reg, tsd); /* file already opened by dbfilopn() done from gvcst_init() */
 		DO_BADDBVER_CHK(reg, tsd); /* need to do BADDBVER check before de-referencing shmid and semid from file header
 					    * as they could be at different offsets if the database is V4-format */
-		if (reg->dyn.addr->is_encrypted != tsd->is_encrypted)
+		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
+		if (gld_do_crypt_init != db_do_crypt_init)
 		{	/* Encryption setting different between global directory and database file header */
-			reg->dyn.addr->is_encrypted = tsd->is_encrypted; /* override with the value in file header */
-			do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
-			if (do_crypt_init)
+			if (db_do_crypt_init)
 			{	/* Encryption is turned on in the file header. Need to do encryption initialization. Release ftok
-				 * as initialization is heavy-weight.
+				 * as initialization is heavy-weight. Decrement counter so later increment is correct.
 				 */
-				if (!ftok_sem_release(reg, TRUE, FALSE)) /* decrement counter so later increment is correct */
+				assert(udi->counter_ftok_incremented == !ftok_counter_halted);
+				ftok_counter_halted = ftok_counter_halted || tsd->ftok_counter_halted;
+				if (!bypassed_ftok && !ftok_sem_release(reg, !ftok_counter_halted, FALSE))
 					RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status); /* redo initialization */
+				INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status); /* redo initialization */
+				bypassed_ftok = FALSE;
 				start_hrtbt_cntr = heartbeat_counter; /* update to reflect time lost in encryption initialization */
-				if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok))
+				if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok, &ftok_counter_halted))
 					ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
+				assert(udi->grabbed_ftok_sem || bypassed_ftok);
 				if (bypassed_ftok)
 					SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2,
 						 LEN_AND_LIT("bypassed at database encryption initialization"));
@@ -554,13 +584,14 @@ int db_init(gd_region *reg)
 							    * file header as they could be at different offsets if the database is
 							    * V4-format
 							    */
-				reg->dyn.addr->is_encrypted = tsd->is_encrypted; /* override with the value in file header */
-				do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
+				db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
 			} /* else encryption is turned off in the file header. Continue as-is. Any encryption initialization done
 			   * before is discarded
 			   */
 		}
-		INIT_DB_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status, reg, csa, tsd);
+		ftok_counter_halted = ftok_counter_halted || tsd->ftok_counter_halted;
+		access_counter_halted = tsd->access_counter_halted;
+		INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
 		if (WBTEST_ENABLED(WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT))
 		{
 			DBGFPF((stderr, "Holding the ftok semaphore.. Sleeping for 30 seconds\n"));
@@ -632,7 +663,7 @@ int db_init(gd_region *reg)
 				{
 					if (WBTEST_ENABLED(WBTEST_HOLD_FTOK_UNTIL_BYPASS))
 					{
-						if (4 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+						if ((4 * DB_COUNTER_SEM_INCR) == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
 						{	/* We are bypasser */
 							DBGFPF((stderr, "Waiting for all processes to quit.\n"));
 							while (1 < semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
@@ -693,18 +724,19 @@ int db_init(gd_region *reg)
 					udi->new_shm = TRUE; /* Need to create shared memory */
 				}
 			}
+			incr_cnt = (!read_only) && (!tsd->access_counter_halted);
 			/* We already have ftok semaphore of this region, so all we need is the access control semaphore */
-			SET_GTM_SOP_ARRAY(sop, sopcnt, !read_only, (SEM_UNDO | IPC_NOWAIT));
+			SET_GTM_SOP_ARRAY(sop, sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 			SEMOP(udi->semid, sop, sopcnt, status, NO_WAIT);
 			if (-1 != status)
 				break;
 			else
 			{
-				assert(!sem_created); /* if we created the semaphore, we should be able to do the semop */
 				save_errno = errno;
-				if (EAGAIN == save_errno)
+				assert(!sem_created); /* If we created the semaphore, we should be able to do the semop */
+				if ((EAGAIN == save_errno) || (ERANGE == save_errno))
 				{
-					if (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_hrtbt_delta))
+					if ((EAGAIN == save_errno) && (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_hrtbt_delta)))
 					{
 						sem_pid = semctl(udi->semid, DB_CONTROL_SEM, GETPID);
 						if (-1 != sem_pid)
@@ -723,7 +755,7 @@ int db_init(gd_region *reg)
 							} /* else semaphore was removed. Fall-through */
 						}
 					} else if (!do_blocking_semop(udi->semid, gtm_access_sem, start_hrtbt_cntr,
-								      &retstat, reg, &bypassed_access))
+								      &retstat, reg, &bypassed_access, &access_counter_halted, tsd))
 					{
 						if (!SEM_REMOVED(retstat.save_errno))
 							ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "access control");
@@ -734,6 +766,7 @@ int db_init(gd_region *reg)
 							SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2,
 								 LEN_AND_LIT("Access control bypassed at init"));
 						save_errno = status = SS_NORMAL;
+						incr_cnt = (incr_cnt && !access_counter_halted);
 						break;
 					}
 				} else if (!SEM_REMOVED(save_errno))
@@ -760,8 +793,7 @@ int db_init(gd_region *reg)
 		assert(-1 != status || bypassed_access);
 		if (!bypassed_access)
 			udi->grabbed_access_sem = TRUE;
-		if(!read_only)
-			udi->counter_acc_incremented = TRUE;
+		udi->counter_acc_incremented = incr_cnt;
 		/* Now that we have the access control semaphore, re-read the file header so we have the uptodate information
 		 * in case some of the fields (like access method) were modified concurrently by MUPIP SET -FILE
 		 */
@@ -773,10 +805,13 @@ int db_init(gd_region *reg)
 		 * would have gotten "ftok" semaphore before acquiring the access control semaphore, no need to get the "ftok"
 		 * semaphore as well.
 		 */
+		incr_cnt = !read_only;
+		ftok_counter_halted = FALSE;
+		access_counter_halted = FALSE;
 		READ_DB_FILE_HEADER(reg, tsd); /* file already opened by dbfilopn() done from gvcst_init() */
-		do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status);
-		INIT_DB_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status, reg, csa, tsd);
+		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
+		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status);
+		INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
 		CSD2UDI(tsd, udi);
 		/* Make sure "mu_rndwn_file" has created semaphore for standalone access */
 		assertpro((INVALID_SEMID != udi->semid) && (0 != udi->gt_sem_ctime));
@@ -796,7 +831,7 @@ int db_init(gd_region *reg)
 	}
 	if (WBTEST_ENABLED(WBTEST_HOLD_FTOK_UNTIL_BYPASS))
 	{
-		if (3 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+		if ((3 * DB_COUNTER_SEM_INCR) == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
 		{	/* We are ftok semaphore holder */
 			DBGFPF((stderr, "Holding the ftok semaphore until a new process comes along.\n"));
 			while (3 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
@@ -886,6 +921,14 @@ int db_init(gd_region *reg)
 		{
 			PRINT_CRASH_MESSAGE(0, tsd, ERR_TEXT, 2, LEN_AND_LIT("shared memory is invalid"));
 		}
+		/* Compare file header fields against cached values. Restore as necessary to fix shared memory layout calculation */
+		if (IS_DSE_IMAGE)
+		{
+			DSE_VERIFY_AND_RESTORE(csa, tsd, acc_meth);
+			DSE_VERIFY_AND_RESTORE(csa, tsd, lock_space_size);
+			DSE_VERIFY_AND_RESTORE(csa, tsd, jnl_buffer_size);
+			DSE_VERIFY_AND_RESTORE(csa, tsd, blk_size);
+		}
 	}
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((INTPTR_T)csa->critical & 0xf) == 0); /* critical should be 16-byte aligned */
@@ -914,6 +957,7 @@ int db_init(gd_region *reg)
 			 */
 			csa->jnl->jnl_buff->cycle = 1;
 		}
+		GTM_CACHE_INTO_SHM(csa, tsd);
 	}
 	is_bg = (dba_bg == tsd->acc_meth);
 	if (is_bg)
@@ -1140,10 +1184,17 @@ int db_init(gd_region *reg)
 		if (is_bg)
 			db_csh_ini(csa);
 	}
-	if (REPL_ALLOWED(csd) && is_src_server)
-	{	/* Bind this database to the journal pool shmid & instance file name that the source server started with.
-		 * Assert that jnlpool_init has already been done by the source server before it does db_init.
-		 */
+	/* If this is a source server, bind this database to the journal pool shmid & instance file name that the
+	 * source server started with. Assert that jnlpool_init has already been done by the source server before
+	 * it does db_init.
+	 * In addition, if this is not a source server, but has done a "jnlpool_init" (in caller function "gvcst_init"),
+	 * and the source server had shut down just before we got the access control lock in db_init(), we would have
+	 * had to create db shm afresh. In that case, the source server would have left the jnlpool intact but db shm
+	 * would have lost the jnlpool initialization that the source server did. So do it on behalf of the source
+	 * server even though this is not a source server.
+	 */
+	if ((REPL_ALLOWED(csd) && is_src_server) || (pool_init && csa->dbinit_shm_created))
+	{
 		assert(NULL != jnlpool.repl_inst_filehdr);
 		/* Note: csa->nl->replinstfilename is changed under control of the init/rundown semaphore only. */
 		assert('\0' != jnlpool.jnlpool_ctl->jnlpool_id.instfilename[0]);
@@ -1151,7 +1202,10 @@ int db_init(gd_region *reg)
 		if ('\0' == csa->nl->replinstfilename[0])
 			STRCPY(csa->nl->replinstfilename, jnlpool.jnlpool_ctl->jnlpool_id.instfilename);
 		else if (STRCMP(csa->nl->replinstfilename, jnlpool.jnlpool_ctl->jnlpool_id.instfilename))
+		{
+			assert(!(pool_init && csa->dbinit_shm_created));
 			replinst_mismatch = TRUE;
+		}
 		/* Note: csa->nl->jnlpool_shmid is changed under control of the init/rundown semaphore only. */
 		assert(INVALID_SHMID != jnlpool.repl_inst_filehdr->jnlpool_shmid);
 		if (INVALID_SHMID == csa->nl->jnlpool_shmid)
@@ -1161,6 +1215,7 @@ int db_init(gd_region *reg)
 			 * Possible if the jnlpool has since been deleted. If so, note the new one down.
 			 * If not, then issue an error.
 			 */
+			assert(!(pool_init && csa->dbinit_shm_created));
 			if (-1 == shmctl(csa->nl->jnlpool_shmid, IPC_STAT, &shmstat))
 			{
 				save_errno = errno;
@@ -1176,6 +1231,7 @@ int db_init(gd_region *reg)
 		/* Replication instance file or jnlpool id mismatch. Issue error. */
 		if (replinst_mismatch)
 		{
+			assert(!(pool_init && csa->dbinit_shm_created));
 			if (INVALID_SHMID == csa->nl->jnlpool_shmid)
 				RTS_ERROR(VARLSTCNT(4) ERR_REPLINSTNOSHM, 2, DB_LEN_STR(reg));
 			else
@@ -1188,33 +1244,40 @@ int db_init(gd_region *reg)
 	csa->root_search_cycle = csa->nl->root_search_cycle;
 	csa->onln_rlbk_cycle = csa->nl->onln_rlbk_cycle;	/* take local copy of the current Online Rollback cycle */
 	csa->db_onln_rlbkd_cycle = csa->nl->db_onln_rlbkd_cycle; /* take local copy of the current Online Rollback mod cycle */
-	/* Record  ftok information as soon as shared memory set up is done */
+	INITIALIZE_CSA_ENCR_PTR(csa, csd, udi, db_do_crypt_init, crypt_warning);	/* sets csa->encr_ptr */
+	/* Record ftok information as soon as shared memory set up is done */
 	if (!have_standalone_access && !bypassed_ftok)
 		FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_lock, process_id);
-	if (-1 == (semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL))) /* semval = number of process attached */
+	assert(!incr_cnt || !read_only);
+	if (incr_cnt)
 	{
-		save_errno = errno;
-		RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,	\
-				RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
-	}
-	if (!read_only && (1 == semval) && !bypassed_ftok && !bypassed_access)
-	{	/* For read-write process flush file header to write machine_name,
-		 * semaphore, shared memory id and semaphore creation time to disk.
-		 */
-		csa->nl->remove_shm = FALSE;
-		STRNCPY_STR(csd->machine_name, machine_name, MAX_MCNAMELEN);
-		if (!is_bg)
+		if (!csa->nl->first_writer_seen)
 		{
-			csd->shmid = tsd->shmid;
-			csd->semid = tsd->semid;
-			csd->gt_sem_ctime = tsd->gt_sem_ctime;
-			csd->gt_shm_ctime = tsd->gt_shm_ctime;
+			csa->nl->first_writer_seen = TRUE;
+			csa->nl->remove_shm = FALSE;
 		}
-		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SIZEOF(sgmnt_data), save_errno);
-		if (0 != save_errno)
-		{
-			RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, LEN_AND_LIT("Error with database header flush"), save_errno);
+		if (!csa->nl->first_nonbypas_writer_seen && !bypassed_ftok && !bypassed_access)
+		{	/* For read-write process flush file header to write machine_name,
+			 * semaphore, shared memory id and semaphore creation time to disk.
+			 * Note: If first process to open db was read-only, then sem/shm info would have already been flushed
+			 * using gtmsecshr but machine_name is flushed only now. It is possible the first writer bypassed
+			 * the ftok/access in which case we will not write the machine_name then (because we do not hold a
+			 * lock on the database to safely flush the file header) but it is considered acceptable to wait
+			 * until the first non-bypassing-writer process attaches since those bypassing processes would be
+			 * DSE/LKE only.
+			 */
+			csa->nl->first_nonbypas_writer_seen = TRUE;
+			STRNCPY_STR(csd->machine_name, machine_name, MAX_MCNAMELEN);
+			assert(csd->shmid == tsd->shmid); /* csd already has uptodate sem/shm info from the UDI2CSD call above */
+			assert(csd->semid == tsd->semid);
+			assert(!memcmp(&csd->gt_sem_ctime, &tsd->gt_sem_ctime, SIZEOF(tsd->gt_sem_ctime)));
+			assert(!memcmp(&csd->gt_shm_ctime, &tsd->gt_shm_ctime, SIZEOF(tsd->gt_shm_ctime)));
+			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SIZEOF(sgmnt_data), save_errno);
+			if (0 != save_errno)
+			{
+				RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					  ERR_TEXT, 2, LEN_AND_LIT("Error with database header flush"), save_errno);
+			}
 		}
 	} else if (read_only && new_shm_ipc)
 	{	/* For read-only process if shared memory and semaphore created for first time,
@@ -1233,6 +1296,32 @@ int db_init(gd_region *reg)
 		if ((0 != secshrstat) && !csa->read_only_fs)
 			RTS_ERROR(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
+	}
+	if (ftok_counter_halted || access_counter_halted)
+	{
+		if (!csd->mumps_can_bypass)
+		{	/* We skipped ftok/access counter increment operation, but after reading the file header, we found out we
+			 * are not allowed to do that. Abort. */
+			SET_SEMWAIT_FAILURE_RETSTAT(&retstat, ERANGE, op_semctl_or_semop, 0, ERR_CRITSEMFAIL, 0);
+			ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, (ftok_counter_halted ? "ftok" : "access control"));
+		}
+		if (ftok_counter_halted && !csd->ftok_counter_halted)
+		{
+			assert(!tsd->ftok_counter_halted);
+			SEM_COUNTER_OFFLINE(ftok, csd, csa, reg);
+			flush_hdr = TRUE;
+		}
+		if (access_counter_halted && !csd->access_counter_halted)
+		{	/* We already issued the NOMORESEMCNT message for the access control semaphore in the
+			 * "do_blocking_semop" call a little earlier so no need to issue this again. We had
+			 * updated "tsd" (read from disk) then but later gotten attached to "csd" (shared memory)
+			 * so update "csd" accordingly. No more action needed other than flushing the file header to disk.
+			 */
+			csd->access_counter_halted = TRUE;
+			flush_hdr = TRUE;
+		}
+		if (!read_only && flush_hdr)
+			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SIZEOF(sgmnt_data), save_errno)
 	}
 	if (gtm_fullblockwrites)
 	{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
@@ -1293,9 +1382,10 @@ int db_init(gd_region *reg)
 		csa->nl->wbox_test_seq_num = 2;
 		/* Wait till the other process has got some stack traces */
 		while (csa->nl->wbox_test_seq_num != 3)
-			LONG_SLEEP(10);
+			LONG_SLEEP(1);
 	}
-	if (!have_standalone_access && !bypassed_ftok)
+	/* In case of REORG -ENCRYPT the ftok will be released after it has incremented cnl->reorg_encrypt_cycle. */
+	if (!have_standalone_access && !bypassed_ftok && !mu_reorg_encrypt_in_prog)
 	{	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
 		if (!ftok_sem_release(reg, FALSE, FALSE))
 			RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));

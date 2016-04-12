@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2014 Fidelity Information Services, Inc   *
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -115,6 +116,8 @@ typedef unsigned short	in_port_t;
 #ifdef UNICODE_SUPPORTED_OBEYED
 #undef UNICODE_SUPPORTED
 #endif
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
 #define KEY_T_LONG			/* 8 bytes */
 #define SYS_ERRLIST_INCLUDE	<errno.h>
 #endif
@@ -184,14 +187,18 @@ typedef char  mach_inst;	/* machine instruction */
 typedef struct
 {
 	unsigned short	mvtype;
-#ifdef	BIGENDIAN
-	unsigned	sgn	: 1;
-	unsigned	e	: 7;
-#else
-	unsigned	e	: 7;
-	unsigned	sgn	: 1;
-#endif
+#	ifdef	BIGENDIAN
+	unsigned char	sgn	: 1;
+	unsigned char	e	: 7;
+#	else
+	unsigned char	e	: 7;
+	unsigned char	sgn	: 1;
+#	endif
 	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
+#	ifdef UNICODE_SUPPORTED
+	unsigned int	utfcgr_indx;	/* Index to utfcgr_work area this mval is using */
+	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
+#	endif
 	int4	m[2];
 	mstr	str;
 } mval;
@@ -201,6 +208,10 @@ typedef struct
 	unsigned short	mvtype;
 	unsigned char	sgne;
 	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
+#	ifdef UNICODE_SUPPORTED
+	unsigned int	utfcgr_indx;	/* Index to utfcgr_work area this mval is using */
+	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
+#	endif
 	int4	m[2];
 	mstr	str;
 } mval_b;

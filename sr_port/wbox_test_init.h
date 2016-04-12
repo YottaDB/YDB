@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,9 +44,9 @@ typedef enum {
 	WBTEST_REPL_TR_UNCMP_ERROR,		/* 19 : Unix only */
 	WBTEST_TP_HIST_CDB_SC_BLKMOD,		/* 20 */
 	WBTEST_ABANDONEDKILL,			/* 21 : MUPIP STOP a kill in progress in 2nd stage*/
-	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption initialized assert from happening */
+	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption-initialized assert from happening */
 	WBTEST_UPD_PROCESS_ERROR,		/* 23 : Update process should issue GVSUBOFLOW error, REC2BIG error */
-	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert form mupip extend if # blocks is > 224M */
+	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert form mupip extend if # blocks is > 992M */
 	WBTEST_BUFOWNERSTUCK_STACK,		/* 25 : Get stack trace of the blocking pid for stuck messages*/
 	WBTEST_OINTEG_WAIT_ON_START,		/* 26 : Have online integ wait 60 after initiating the snapshot */
 	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED,	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
@@ -92,15 +92,14 @@ typedef enum {
 	WBTEST_UTIL_OUT_BUFFER_PROTECTION,	/* 61 : Start a timer that would mess with util_out buffers by frequently
 						 *	printing long messages via util_out_print */
 	WBTEST_SET_WC_BLOCKED,			/* 62 : Set the wc_blocked when searching the tree to start wcs_recover process*/
-	WBTEST_CLOSE_JNLFILE,			/* 63 : Set the journal file state to close when reading journal files to
-						 *	trigger repl_warn message */
+	WBTEST_REORG_DEBUG,			/* 63 : mupip reorg will print GTMPOOLLIMIT value */
 	WBTEST_WCS_FLU_IOERR,			/* 64 : Force an I/O error (other than ENOSPC) when wcs_wtstart is invoked from
 						 *      wcs_flu */
 	WBTEST_WCS_WTSTART_IOERR,		/* 65 : Force an I/O error (other than ENOSPC) within wcs_wtstart */
 	WBTEST_HOLD_CRIT_TILL_LCKALERT,		/* 66 : Grab and hold crit until 15 seconds past what triggers a lock alert message
 						 *      which should invoke a mutex salvage */
 	WBTEST_OPER_LOG_MSG,			/* 67 : send message to operator log */
-	WBTEST_FAKE_BIG_EXTRACT,		/* 68 : fake large increase in EXTRACT record count to show it doesn't overflow  */
+	WBTEST_FAKE_BIG_CNTS	,		/* 68 : fake large increase in database counts to show they don't overflow  */
 	/* Begin ANTIFREEZE related white box test cases */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
@@ -137,14 +136,14 @@ typedef enum {
 	WBTEST_SLEEP_IN_WCS_WTSTART,		/* 97 : Sleep in one of the predetermined places inside wcs_wtstart.c */
 	WBTEST_SETITIMER_ERROR,			/* 98 : Simulate an error return from setitimer in gt_timers.c */
 	WBTEST_HOLD_GTMSOURCE_SRV_LATCH,	/* 99 : Hold the source server latch until rollback process issues a SIGCONT */
-	WBTEST_KILL_ROLLBACK,			/* 100: Kill in the middle of rollback */
+	WBTEST_KILL_ROLLBACK,			/* 100 : Kill in the middle of rollback */
 	WBTEST_INFO_HUB_SEND_ZMESS,		/* 101 : Print messages triggered via ZMESSAGE to the syslog */
 	WBTEST_SKIP_CORE_FOR_MEMORY_ERROR,	/* 102 : Do not generate core file in case of GTM-E-MEMORY fatal error */
 	WBTEST_EXTFILTER_INDUCE_ERROR,		/* 103 : Do not assert in case of external filter error (test induces that) */
 	WBTEST_BADEXEC_UPDATE_PROCESS,		/* 104 : Prevent the update process from EXECing */
 	WBTEST_BADEXEC_HELPER_PROCESS,		/* 105 : Prevent the helper processes from EXECing */
-	WBTEST_BADEDITOR_GETEDITOR,		/* 106 : Have geteditor return that it was unable to find an editor*/
-	WBTEST_BADEXEC_OP_ZEDIT,		/* 107 : Give a invalid executable path to an editor so EXEC will fail*/
+	WBTEST_BADEDITOR_GETEDITOR,		/* 106 : Have geteditor return that it was unable to find an editor */
+	WBTEST_BADEXEC_OP_ZEDIT,		/* 107 : Give a invalid executable path to an editor so EXEC will fail */
 	WBTEST_BADEXEC_SECSHR_PROCESS,		/* 108 : Prevent the SECSHR process from being EXEC'ed */
 	WBTEST_BADDUP_PIPE_STDIN,		/* 109 : Prevent dup2() of stdin in forked piped process */
 	WBTEST_BADDUP_PIPE_STDOUT,		/* 110 : Prevent dup2() of stdout in forked piped process */
@@ -155,8 +154,13 @@ typedef enum {
 	WBTEST_MAXGTMDIST_HELPER_PROCESS,	/* 115 : Make gtm_dist too big for helper process */
 	WBTEST_MAX_TRIGNAME_SEQ_NUM,		/* 116 : Induce "too many triggers" error sooner (MAX_TRIGNAME_SEQ_NUM) */
 	WBTEST_RELINKCTL_MAX_ENTRIES,		/* 117 : Bring down the maximum number of relink control entries in one file */
-	WBTEST_FAKE_BIG_KEY_COUNT,		/* 118 : fake large increase in mupip load key count to show it doesn't overflow */
-	WBTEST_TEND_GBLJRECTIME_SLEEP		/* 119 : sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
+	WBTEST_FAKE_BIG_KEY_COUNT,		/* 118 : Fake large increase in mupip load key count to show it does not overflow */
+	WBTEST_TEND_GBLJRECTIME_SLEEP,		/* 119 : Sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
+	WBTEST_SIGTSTP_IN_T_QREAD,		/* 120 : Stop ourselves in t_qread to force secshr_db_clnup to clear read state */
+	WBTEST_SLAM_SECSHR_ADDRS,		/* 121 : SIGTERM in init_secshr_addrs - verify secshr_db_clnup does not assert */
+	WBTEST_UNUSED_122,			/* 122 : **************** UNUSED PLEASE REUSE **************** */
+	WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT,	/* 123 : Sleep in mupip_reorg_encrypt() upon releasing crit */
+	WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR   /* 124 : gtm_strToTitle() returning U_FILE_ACCESS_ERROR error */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
@@ -215,4 +219,3 @@ typedef enum {
 #endif
 
 #endif
-

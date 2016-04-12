@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +12,9 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#ifdef VMS
-#include <ssdef.h>
-#endif
 
 #include "gtmimagename.h"
 #include "send_msg.h"
@@ -37,9 +35,6 @@ void op_zhalt(mval *returncode)
 	retcode = 0;
 	assert(returncode);
 	retcode = mval2i(returncode);		/* can only use integer portion */
-#	ifdef VMS
-	exit((0 == retcode) ? EXIT_SUCCESS : EXIT_FAILURE);
-#	else
 #	ifdef GTM_TRIGGER
 	/* If ZHALT is done from a non-runtime trigger, send a warning message to oplog to record the fact
 	 * of this uncommon process termination method.
@@ -57,6 +52,5 @@ void op_zhalt(mval *returncode)
 		retcode = 255;;	/* If the truncated return code that can be passed back to a parent process is zero
 				 * set the retcode to 255 so a non-zero return code is returned instead (UNIX only).
 				 */
-	exit(retcode);
-#	endif
+	EXIT(retcode);
 }

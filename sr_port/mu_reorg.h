@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,10 +79,10 @@ typedef char *dbg_osf_short_char_ptr_t;
 	KEY_CMPC = get_cmpc(FIRST_KEY, SECOND_KEY);	\
 }
 
-#define READ_RECORD(STATUS, REC_SIZE_PTR, KEY_CMPC_PTR, KEY_LEN_PTR, KEY, LEVEL, BLK_BASE, REC_BASE)	\
+#define READ_RECORD(STATUS, REC_SIZE_PTR, KEY_CMPC_PTR, KEY_LEN_PTR, KEY, LEVEL, BLK_STAT, REC_BASE)	\
 {													\
 	DBG_CHECK_KEY_ALLOCATION_SIZE(KEY);								\
-	STATUS = read_record(REC_SIZE_PTR, KEY_CMPC_PTR, KEY_LEN_PTR, KEY, LEVEL, BLK_BASE, REC_BASE);	\
+	STATUS = read_record(REC_SIZE_PTR, KEY_CMPC_PTR, KEY_LEN_PTR, KEY, LEVEL, BLK_STAT, REC_BASE);	\
 }
 
 enum reorg_options {	DEFAULT = 0,
@@ -95,4 +96,4 @@ int		get_gblname_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base);
 int		get_key_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base);
 int		get_cmpc(sm_uc_ptr_t first_key, sm_uc_ptr_t second_key);
 enum cdb_sc 	read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, sm_uc_ptr_t key,
-				int level, sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_base);
+				int level, srch_blk_status *blk_stat, sm_uc_ptr_t rec_base);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -152,12 +153,15 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 				tp_list_csa_element = &FILE_INFO(tr->reg)->s_addrs;
 				/* Make sure csa is at the end of this list  */
 				if (tp_list_csa_element == csa)
+				{
+					assert(!csa->now_crit);
 					passed_cur_region = TRUE;
+				}
 				if (tp_list_csa_element->now_crit)
 				{
-					tp_list_csa_element->crit_check_cycle = crit_deadlock_check_cycle;
 					if (passed_cur_region)
 						break;
+					tp_list_csa_element->crit_check_cycle = crit_deadlock_check_cycle;
 				}
 			}
 			/* All regions including current must be in the tp_reg_list. */

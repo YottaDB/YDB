@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,11 +14,10 @@
 
 #include "mdef.h"
 
-#if defined(VMS)
-#include <descrip.h>
-#endif
 #include "gtm_time.h"
 #include "gtm_string.h"
+
+#include "gtm_multi_thread.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -47,14 +47,12 @@
 #include "mupip_recover.h"
 #include "wbox_test_init.h"
 #include "anticipatory_freeze.h"
-#ifdef GTM_TRIGGER
-#include "error_trap.h"
-#endif
-#ifdef UNIX
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "have_crit.h"
+#ifdef GTM_TRIGGER
+#include "error_trap.h"
 #endif
 
 GBLREF	int4			gv_keysize;
@@ -62,20 +60,14 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-#ifdef VMS
-GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t		tp_restart_fail_sig_used;
-#endif
 GBLREF	mur_opt_struct		mur_options;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF  jnl_process_vector	*prc_vec;
-#ifdef UNIX
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
-#endif
 #ifdef GTM_TRIGGER
 DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
@@ -84,7 +76,6 @@ GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related i
 error_def(ERR_ASSERT);
 error_def(ERR_BLKCNTEDITFAIL);
 error_def(ERR_DBCOLLREQ);
-error_def(ERR_SETEXTRENV);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -97,16 +88,15 @@ error_def(ERR_MUJNLSTAT);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUPJNLINTERRUPT);
 error_def(ERR_REPEATERROR);
+error_def(ERR_REPLINSTDBMATCH);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_RLBKJNSEQ);
 error_def(ERR_RLBKLOSTTNONLY);
 error_def(ERR_RSYNCSTRMSUPPLONLY);
+error_def(ERR_SETEXTRENV);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_SYSCALL);
 error_def(ERR_TPRETRY);
-error_def(ERR_VMSMEMORY);
-#ifdef UNIX
-error_def(ERR_REPLINSTDBMATCH);
-#endif
 
 void		gtm_ret_code();
 
@@ -118,24 +108,9 @@ CONDITION_HANDLER(mupip_recover_ch)
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
-		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);	/* This SHOULD generate an error (TPFAIL or other) */
 		GTMTRIG_ONLY(assert(ERR_TPRETRY != rc));
-#		ifdef UNIX
 		assertpro(ERR_TPRETRY != SIGNAL);		/* (signal value undisturbed) */
-#		elif defined VMS
-		assertpro(tp_restart_fail_sig_used);	/* If tp_restart ran clean */
-#		else
-#		error unsupported platform
-#		endif
-#		ifdef VMS
-		/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
-		   information with that saved from tp_restart. */
-		/* Assert we have room for these arguments - the array malloc is in tp_restart */
-		assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-		memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
-		tp_restart_fail_sig_used = FALSE;
-#		endif
 		/* At this point SIGNAL would correspond to TPFAIL (not a TPRETRY) error */
 	}
 #	ifdef GTM_TRIGGER
@@ -154,7 +129,6 @@ CONDITION_HANDLER(mupip_recover_ch)
 	}
 }
 
-#ifdef UNIX
 /* This function computes the maximum strm_reg_seqno[] across all databases open by rollback for a given "strm_num".
  * Note: If a fetchresync rollback crashes before it completes, it would have updated csd->strm_reg_seqno as it
  * processes updates in the forward phase. In this case, a reissue of rollback should not look at the point where
@@ -183,7 +157,6 @@ seq_num	mur_get_max_strm_reg_seqno(int strm_num)
 	}
 	return strm_jnl_seqno;
 }
-#endif
 
 void	mupip_recover(void)
 {
@@ -196,32 +169,30 @@ void	mupip_recover(void)
 	jnl_tm_t		min_broken_time;
 	reg_ctl_list		*rctl;
 	seq_num 		losttn_seqno, min_broken_seqno;
-#ifdef UNIX
 	repl_histinfo		local_histinfo;
 	seq_num			max_reg_seqno, replinst_seqno;
 	unix_db_info		*udi;
 	boolean_t		db_absent = FALSE;
 	reg_ctl_list		*db_absent_rctl;
-#endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!multi_thread_in_use);
 	ESTABLISH(mupip_recover_ch);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mupip_recover_ch);
 	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
 	JNL_PUT_MSG_PROGRESS("Initial processing started");
 	mur_init();
 	mur_get_options();
-	/*DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); */
+	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
+	jgbl.mur_update = mur_options.update;
 	mur_open_files_status = mur_open_files();
 	if (WBTEST_ENABLED(WBTEST_KILL_ROLLBACK))
 		kill(getpid(), SIGKILL);
-	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
-	/*ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);*/
 	if (!mur_open_files_status) /* mur_open_files already issued error */
 		mupip_exit(ERR_MUNOACTION);
-	VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
-	UNIX_ONLY(assert(!mur_options.rollback_losttnonly || mur_options.rollback);)
+	assert(!mur_options.rollback_losttnonly || mur_options.rollback);
+	assert(!mur_options.rollback || jgbl.mur_rollback);	/* this equivalence is assumed all over so assert it */
 	murgbl.prc_vec = prc_vec;
 	reg_total = murgbl.reg_total;
 	if (mur_options.show_head_only)
@@ -237,13 +208,11 @@ void	mupip_recover(void)
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
 		assert(NULL == jctl->next_gen);
-#		ifdef UNIX
 		if (!rctl->db_present)
 		{
 			db_absent = TRUE;
 			db_absent_rctl = rctl;
 		}
-#		endif
 		if (!jctl->properly_closed)
 			all_gen_properly_closed = FALSE;
 		if (jctl->jfh->recover_interrupted)
@@ -257,10 +226,9 @@ void	mupip_recover(void)
 		} else if (rctl->recov_interrupted) /* it is not necessary to do interrupted recover processing */
 		{
 			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
-			rctl->csa->hdr->turn_around_point = FALSE; /*Reset turn around point field*/
+			rctl->csa->hdr->turn_around_point = FALSE; /* Reset turn around point field */
 		}
 	}
-#	ifdef UNIX
 	if (!mur_options.update && jgbl.mur_extract && (db_absent || IS_REPL_INST_FROZEN))
 	{
 		if (TREF(jnl_extract_nocol))
@@ -279,22 +247,28 @@ void	mupip_recover(void)
 		}
 	} else
 		TREF(jnl_extract_nocol) = 0;
-	max_reg_seqno = 0;
-	for (regno = 0; regno < reg_total; regno++)
-	{
-		rctl = &mur_ctl[regno];
-		jctl = rctl->jctl;
-		assert(NULL == jctl->next_gen);
-		assert(!mur_options.update || (NULL != rctl->csd));
-		assert(!mur_options.rollback || mur_options.update);
-		if (mur_options.rollback && (rctl->csd->reg_seqno > max_reg_seqno))
-			max_reg_seqno = rctl->csd->reg_seqno;
+	if (mur_options.rollback && !mur_options.forward)
+	{	/* For backward rollback, determine "max_reg_seqno".
+		 * Note: For all other cases "max_reg_seqno" is uninitialized so should be later used only if backward rollback.
+		 */
+		max_reg_seqno = 0;
+		for (regno = 0; regno < reg_total; regno++)
+		{
+			rctl = &mur_ctl[regno];
+			jctl = rctl->jctl;
+			assert(NULL == jctl->next_gen);
+			assert(!mur_options.update || (NULL != rctl->csd));
+			assert(!mur_options.rollback || mur_options.update);
+			if (mur_options.rollback && (rctl->csd->reg_seqno > max_reg_seqno))
+				max_reg_seqno = rctl->csd->reg_seqno;
+		}
 	}
 	assert(!mur_options.fetchresync_port || mur_options.rollback);
-	/* If rollback, check if jnl seqno in db and instance file match. Do that only if this is not interrupted
+	/* If backward rollback, check if jnl seqno in db and instance file match. Do that only if this is not interrupted
 	 * rollback AND if the replication instance file AND all the journal files were cleanly shutdown.
+	 * In case of forward rollback, the instance file and db file wont match since the db reflects a past state in time.
 	 */
-	if (mur_options.rollback && !intrrupted_recov_processing && all_gen_properly_closed)
+	if (mur_options.rollback && !mur_options.forward && !intrrupted_recov_processing && all_gen_properly_closed)
 	{
 		assert(NULL != jnlpool.repl_inst_filehdr);
 		replinst_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
@@ -306,31 +280,31 @@ void	mupip_recover(void)
 			mupip_exit(ERR_MUNOACTION);
 		}
 	}
-#	endif
 	if (all_gen_properly_closed && !murgbl.intrpt_recovery && !mur_options.forward
-	    && ((!mur_options.rollback && !mur_options.since_time_specified &&
-		 !mur_options.lookback_time_specified && !mur_options.lookback_opers_specified)
-		|| (mur_options.rollback && !mur_options.resync_specified && 0 == mur_options.fetchresync_port)))
-	{ 	/* We do not need to do unnecessary processing */
+		&& ((!mur_options.rollback && !mur_options.since_time_specified
+				&& !mur_options.lookback_time_specified && !mur_options.lookback_opers_specified)
+			|| (mur_options.rollback && !mur_options.resync_specified && (0 == mur_options.fetchresync_port))))
+	{	/* We do not need to do unnecessary processing */
 		assert(!mur_options.rollback_losttnonly);
 		if (mur_options.show)
 			mur_output_show();
-		murgbl.clean_exit = TRUE;		 /* "mur_close_files" (invoked from "mupip_exit_handler") relies on this */
-#		ifdef UNIX
+		murgbl.clean_exit = TRUE;	/* "mur_close_files" (invoked from "mupip_exit_handler") relies on this */
 		if (mur_options.rollback)
 		{
 			assert(max_reg_seqno);
 			murgbl.consist_jnl_seqno = max_reg_seqno;/* "mur_close_files" relies on this */
 			DEBUG_ONLY(murgbl.losttn_seqno = MAXUINT8;) /* or else an assert in mur_close_files will fail */
 			DEBUG_ONLY(murgbl.save_losttn_seqno = murgbl.losttn_seqno;) /* keep save_losttn_seqno in sync for assert */
-			/* Determine if any of the databases are taken back in time. If so we have to increment cycles
-			 * in mur_close_files
+			/* Determine if any of the databases are taken back in time.
+			 * If so we have to increment cycles in mur_close_files.
 			 */
 			assert(NULL != jnlpool.repl_inst_filehdr);
-			murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk ? jnlpool.repl_inst_filehdr->jnl_seqno -
-									murgbl.consist_jnl_seqno : FALSE;
+			murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk
+							? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
+							: FALSE;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLBKJNSEQ, 2,
+					&murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
 		}
-#		endif
 		mupip_exit(SS_NORMAL);
 	}
 	if (murgbl.intrpt_recovery && mur_options.update && mur_options.forward)
@@ -338,78 +312,67 @@ void	mupip_recover(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
 		mupip_exit(ERR_MUNOACTION);
 	}
+	/* Initialize array of pthread_t structures to be used later in various stages of recovery (for creating libpthreads) */
+	murgbl.thr_array = (pthread_t *)malloc(SIZEOF(pthread_t) * murgbl.reg_total);
+	murgbl.ret_array = (void **)malloc(SIZEOF(void *) * murgbl.reg_total);
+	assert(!multi_thread_in_use);
+	status = pthread_key_create(&thread_gtm_putmsg_rname_key, NULL);
+	if (0 != status)
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_key_create()"), CALLFROM,
+															status);
+		mupip_exit(ERR_MUNOACTION);
+	}
 	if (mur_options.update && intrrupted_recov_processing)
 	{
+		murgbl.mur_state = MUR_STATE_INTRPT_RECOVERY;
 		JNL_PUT_MSG_PROGRESS("Interrupted recovery processing started");
 		/* Additional steps because recover was interrupted earlier */
 		assert(!mur_options.rollback_losttnonly);
 		murgbl.ok_to_update_db = TRUE;	/* Allow db to be updated by the PBLKs */
-		if (SS_NORMAL != mur_apply_pblk(TRUE))
+		assert(!multi_thread_in_use);
+		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, gtm_mupjnl_parallel,
+					murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 			mupip_exit(ERR_MUNOACTION);
+		assert(!multi_thread_in_use);
 		murgbl.ok_to_update_db = FALSE;	/* Reset flag until it is safe to allow updates to the db */
-		if (!mur_jctl_from_next_gen())
+		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_jctl_from_next_gen, murgbl.reg_total, gtm_mupjnl_parallel,
+					murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 			mupip_exit(ERR_MUNOACTION);
 	}
 	assert(FALSE == murgbl.ok_to_update_db);
 	if (mur_options.rollback_losttnonly)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RLBKLOSTTNONLY);
 	/* The current resync_seqno of this replication instance needs to be calculated before the call to "gtmrecv_fetchresync" */
-	VMS_ONLY(jgbl.max_resync_seqno = 0;)
 	for (regno = 0; regno < reg_total; regno++)
 	{
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
 		assert(NULL == jctl->next_gen);
-		VMS_ONLY(
-			if (mur_options.fetchresync_port && rctl->csd->resync_seqno > jgbl.max_resync_seqno)
-				jgbl.max_resync_seqno = rctl->csd->resync_seqno;
-		)
 	}
-	UNIX_ONLY(
-		if (mur_options.fetchresync_port || mur_options.resync_specified)
-		{
-			this_side = NULL;
-			remote_side = &murgbl.remote_side; /* fields in this structure will be initialized in gtmrecv_fetchresync */
-		}
-	)
+	if (mur_options.fetchresync_port || mur_options.resync_specified)
+	{
+		this_side = NULL;
+		remote_side = &murgbl.remote_side; /* fields in this structure will be initialized in gtmrecv_fetchresync */
+	}
 	if (mur_options.fetchresync_port)
 	{
 		JNL_PUT_MSG_PROGRESS("FETCHRESYNC processing started");
-		VMS_ONLY(
-			if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno))
-				mupip_exit(ERR_MUNOACTION);
-		)
-		UNIX_ONLY(
-			if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno, max_reg_seqno))
-				mupip_exit(ERR_MUNOACTION);
-			if (INVALID_SUPPL_STRM != strm_index)	/* set by "gtmrecv_fetchresync" */
-				murgbl.resync_strm_index = strm_index; /* Keep murgbl.resync_seqno in sync with resync_strm_index */
-		)
+		if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno, max_reg_seqno))
+			mupip_exit(ERR_MUNOACTION);
+		if (INVALID_SUPPL_STRM != strm_index)	/* set by "gtmrecv_fetchresync" */
+			murgbl.resync_strm_index = strm_index; /* Keep murgbl.resync_seqno in sync with resync_strm_index */
 		if (mur_options.verbose)
 		{
-			UNIX_ONLY(
-				if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
-						LEN_AND_LIT("Gtmrecv_fetchresync returned strm_index"),
-							murgbl.resync_strm_index, murgbl.resync_strm_index);
-			)
+			if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+					LEN_AND_LIT("Gtmrecv_fetchresync returned strm_index"),
+						murgbl.resync_strm_index, murgbl.resync_strm_index);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
 					LEN_AND_LIT("Gtmrecv_fetchresync returned resync_seqno"),
 					&murgbl.resync_seqno, &murgbl.resync_seqno);
 		}
-		VMS_ONLY(
-			if (jgbl.max_resync_seqno < murgbl.resync_seqno)
-			{
-				murgbl.resync_seqno = jgbl.max_resync_seqno;
-				if (mur_options.verbose)
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
-						LEN_AND_LIT("Resync_seqno is reset to max_resync_seqno"),
-						&murgbl.resync_seqno, &murgbl.resync_seqno);
-			}
-		)
-	}
-#	ifdef UNIX
-	else if (mur_options.resync_specified && (INVALID_SUPPL_STRM != murgbl.resync_strm_index))
+	} else if (mur_options.resync_specified && (INVALID_SUPPL_STRM != murgbl.resync_strm_index))
 	{	/* -RESYNC=<strm_seqno> AND -RSYNC_STRM=<strm_num> were specified. Verify input stream is a valid #
 		 * and input seqno is a valid strm_seqno in the current replication instance file. If not, issue errors.
 		 */
@@ -442,32 +405,30 @@ void	mupip_recover(void)
 			}
 		}
 	}
-#	endif
-	UNIX_ONLY(
-		/* Do some adjustments if -resync or -fetchresync was specified and resync_strm_index is non-zero */
-		if (murgbl.resync_seqno)
+	/* Do some adjustments if -resync or -fetchresync was specified and resync_strm_index is non-zero */
+	if (murgbl.resync_seqno)
+	{
+		/* In case the current instance is supplementary and the remote source is also supplementary, and a
+		 * resync seqno has been agreed upon, this is the unified seqno and not the stream-specific seqno
+		 * even though "murgbl.resync_strm_index" is actually 0 in this case. In this case, do not set
+		 * murgbl.resync_strm_seqno.
+		 */
+		assert(!remote_side->is_supplementary
+			|| (jnlpool.repl_inst_filehdr->is_supplementary && (0 == murgbl.resync_strm_index)));
+		if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
 		{
-			/* In case the current instance is supplementary and the remote source is also supplementary, and a
-			 * resync seqno has been agreed upon, this is the unified seqno and not the stream-specific seqno
-			 * even though "murgbl.resync_strm_index" is actually 0 in this case. In this case, do not set
-			 * murgbl.resync_strm_seqno.
-			 */
-			assert(!remote_side->is_supplementary
-				|| (jnlpool.repl_inst_filehdr->is_supplementary && (0 == murgbl.resync_strm_index)));
-			if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
-			{
-				assert((0 <= murgbl.resync_strm_index) && (MAX_SUPPL_STRMS > murgbl.resync_strm_index));
-				assert(murgbl.resync_seqno);
-				murgbl.resync_strm_seqno[murgbl.resync_strm_index] = murgbl.resync_seqno;
-				murgbl.resync_strm_seqno_nonzero = TRUE;
-				murgbl.resync_seqno = 0; /* reset resync_seqno now that stream specific seqno has been copied */
-				/* From now on, use murgbl.resync_strm_index only (not the global variable "strm_index") */
-			}
+			assert((0 <= murgbl.resync_strm_index) && (MAX_SUPPL_STRMS > murgbl.resync_strm_index));
+			assert(murgbl.resync_seqno);
+			murgbl.resync_strm_seqno[murgbl.resync_strm_index] = murgbl.resync_seqno;
+			murgbl.resync_strm_seqno_nonzero = TRUE;
+			murgbl.resync_seqno = 0; /* reset resync_seqno now that stream specific seqno has been copied */
+			/* From now on, use murgbl.resync_strm_index only (not the global variable "strm_index") */
 		}
-	)
+	}
 	/* PHASE 2: Create list of broken transactions for both forward and backward recovery
 	 *          In addition apply PBLK for backward recover with noverify */
 	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.rollback_losttnonly && !mur_options.verify);
+	murgbl.mur_state = MUR_STATE_BACKWARD;
 	murgbl.ok_to_update_db = apply_pblk;	/* Allow db to be updated by the PBLKs if we chose to apply them */
 	if (!mur_back_process(apply_pblk, &losttn_seqno))
 		mupip_exit(ERR_MUNOACTION);
@@ -483,11 +444,17 @@ void	mupip_recover(void)
 					min_broken_time, min_broken_time);
 		min_broken_seqno = losttn_seqno = MAXUINT8;
 	} else
-		assert(0 != losttn_seqno);
+	{	/* In case of -ROLLBACK -BACKWARD, mur_back_process returns with "losttn_seqno" set to a pre-resolve-seqno.
+		 * This is the earliest seqno that is possibly lost in the journal files in case of a system crash.
+		 * In case of -ROLLBACK -FORWARD, it is possible this did not get set, in case of -VERIFY.
+		 * In that case though, it will get initialized in "mur_process_seqno_table". So assert accordingly.
+		 */
+		assert((0 != losttn_seqno) || mur_options.forward);
+	}
        	/* Multi_region TP/ZTP resolution */
 	if (!mur_options.forward)
 	{
-		if (!mur_options.rollback && FENCE_NONE != mur_options.fences && ztp_broken)
+		if (!mur_options.rollback && ((FENCE_NONE != mur_options.fences) && ztp_broken))
 		{
 			/* PHASE 3 : ZTP lookback processing phase (not for non-ZTP) */
 			JNL_PUT_MSG_PROGRESS("Lookback processing started");
@@ -536,9 +503,11 @@ void	mupip_recover(void)
 				assert(!mur_options.verify || !murgbl.ok_to_update_db);
 				murgbl.ok_to_update_db = TRUE;
 			}
-			if (SS_NORMAL != mur_apply_pblk(FALSE))
+			murgbl.mur_state = MUR_STATE_BEFORE_IMAGE;
+			assert(!multi_thread_in_use);
+			if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, gtm_mupjnl_parallel,
+						murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 				mupip_exit(ERR_MUNOACTION);
-
 			/* PHASE 5 : Update journal file header with current state of recover, so that if this process
 			 *	is interrupted, we can recover from it. We already synched updates. Dont do this
 			 *	in case of a LOSTTNONLY rollback as we want to avoid touching the database/jnl in this case.
@@ -549,8 +518,12 @@ void	mupip_recover(void)
 	}
 	/* PHASE 6 : Forward processing phase */
 	JNL_PUT_MSG_PROGRESS("Forward processing started");
+	murgbl.mur_state = MUR_STATE_FORWARD;
 	if (mur_options.rollback)
-	{
+	{	/* Pass in "losttn_seqno" determined in "mur_back_process" to "mur_process_seqno_table". That will try
+		 * and update "losttn_seqno" based on the seqno-hashtable maintained during backward phase of rollback.
+		 * It returns with "min_broken_seqno" and "losttn_seqno" set appropriately.
+		 */
 		mur_process_seqno_table(&min_broken_seqno, &losttn_seqno);
 		if (mur_options.verbose)
 		{
@@ -567,17 +540,13 @@ void	mupip_recover(void)
 	if (SS_NORMAL != mur_forward(min_broken_time, min_broken_seqno, losttn_seqno))
 		mupip_exit(ERR_MUNOACTION);
 	assert(prc_vec == murgbl.prc_vec);	/* should have been modified temporarily but finally reset by mur_forward */
-	if (mur_options.show)
-		mur_output_show();
-#	ifdef UNIX
 	if (jgbl.onlnrlbk)
 	{
 		/* Determine if any of the databases are taken back in time. If so we have to increment cycles in mur_close_files */
 		assert(NULL != jnlpool.repl_inst_filehdr);
-		murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk ? jnlpool.repl_inst_filehdr->jnl_seqno -
-										murgbl.consist_jnl_seqno : FALSE;
+		murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk ? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
+							   : FALSE;
 	}
-#	endif
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;
 	if (mur_options.rollback && !mur_options.rollback_losttnonly)

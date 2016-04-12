@@ -70,6 +70,7 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 #ifdef DEBUG
 GBLREF	uint4			process_id;
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	boolean_t		multi_thread_in_use;
 #endif
 
 /* Typically prototypes are included in the header file. But, in this case the static function - get_mnemonic_offset - has the
@@ -237,7 +238,7 @@ boolean_t		init_anticipatory_freeze_errors()
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		/* should hold journal pool access control semaphore */
 	/* Now, read the custom errors file and populate the journal pool */
 	custom_err_file = TREF(gtm_custom_errors);
-	handle = Fopen(custom_err_file.addr, "r");
+	Fopen(handle, custom_err_file.addr, "r");
 	if (NULL == handle)
 	{
 		save_errno = errno;
@@ -369,6 +370,7 @@ void clear_fake_enospc_if_master_dead(void)
 	gd_region			*r_top, *r_local;
 	sgmnt_addrs			*csa;
 
+	assert(!multi_thread_in_use);	/* fake-enospc would not have been set if in threaded-code */
 	if((jnlpool_ctl->jnlpool_creator_pid != process_id) && !is_proc_alive(jnlpool_ctl->jnlpool_creator_pid, 0))
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))

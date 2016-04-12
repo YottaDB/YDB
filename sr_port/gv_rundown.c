@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -215,24 +216,30 @@ void gv_rundown(void)
 	 * ftok_sem_reg to NULL (as part of ftok_sem_release). But, jnlpool_dummy_reg is still non-null and the lingering ftok
 	 * should be released. So, even though a subset of the below conditions should be enough, we check for all there cases just
 	 * to be safe.
+	 * Note that we use FALSE for the decr_cnt parameter (2nd parameter) to "ftok_sem_release". This is to avoid incorrect
+	 * removal of the ftok semaphore in case the counter is down to 1 but there are processes which did not bump the counter
+	 * (due to the counter overflowing) that are still accessing the semaphore. Even though we dont decrement the counter,
+	 * the SEM_UNDO will take care of doing the actual decrement when this process terminates. The only consequence is
+	 * we will not be removing the ftok semaphore when the last process to use it dies (requiring a mupip rundown to clean
+	 * it up). But that is considered okay since these are abnormal exit conditions anyways and hopefully unlikely in practice.
 	 */
 	if (ftok_sem_reg)
 	{
 		udi = FILE_INFO(ftok_sem_reg);
 		assert(udi->grabbed_ftok_sem);
-		ftok_sem_release(ftok_sem_reg, TRUE, TRUE);
+		ftok_sem_release(ftok_sem_reg, FALSE, TRUE);
 	}
 	if (NULL != jnlpool.jnlpool_dummy_reg)
 	{
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE);
 	}
 	if (NULL != recvpool.recvpool_dummy_reg)
 	{
 		udi = FILE_INFO(recvpool.recvpool_dummy_reg);
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, TRUE);
 	}
 #	endif
 

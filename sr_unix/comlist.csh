@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -75,6 +75,10 @@ echo "Value after reset : gtmroutines=""$gtmroutines"""
 echo "--------------------------------------------"
 echo ""
 
+if ( "$version" =~ *ibm-aix* ) then
+	unsetenv gtm_icu_version
+endif
+
 @ comlist_status = 0
 
 set dollar_sign = \$
@@ -145,7 +149,8 @@ endif
 switch ( $gtm_verno )
 
 case "V990":
-	#	V990 is designated "most recent on the main line of descent in CMS"
+case "V999*":
+	#	V990/V999 is designated "most recent on the main line"
 	#	and should be protected from inadvertent change.
 	set comlist_chmod_protect = 1
 	breaksw
@@ -157,8 +162,8 @@ case "V9*":
 	breaksw
 
 default:
-	#	Anything else should be a configured release (i.e., should correspond to
-	#	a CMS release class) and should be protected against inadvertent change.
+	#	Anything else should be a release version
+	#	and should be protected against inadvertent change.
 	set comlist_chmod_protect = 1
 	breaksw
 
@@ -432,13 +437,15 @@ if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
 endif
 
 # For all systems, the file gtm_threadgbl_deftypes.h needs to be generated (no -f as needs startup file)
-$shell $gtm_tools/gen_gtm_threadgbl_deftypes.csh
+$shell -f $gtm_tools/gen_gtm_threadgbl_deftypes.csh
 if (0 != $status) then
     echo "Failed to generate gtm_threadgbl_deftypes.h -- aborting build"
     exit 1
 endif
-# Setup link from $gtm_obj to the proper assembler include file
-if (! -e ${gtm_obj}/gtm_threadgbl_deftypes_asm.si) then
+
+# Setup link from $gtm_obj to the proper assembler include file if this is for a version that doesn't already
+# have a gtm_threadgbl_deftypes_asm.si in its $gtm_inc directory in order to include the proper variant.
+if ((! -e ${gtm_inc}/gtm_threadgbl_deftypes_asm.si) && (! -e ${gtm_obj}/gtm_threadgbl_deftypes_asm.si)) then
     \ln -s ${gtm_inc}/gtm_threadgbl_deftypes_asm_${asmtgbltype}.si ${gtm_obj}/gtm_threadgbl_deftypes_asm.si
 endif
 
@@ -461,13 +468,13 @@ gtmcrypt_util.c
 maskpass.c
 gtm_tls_impl.c
 EOF
-find $gs[1] -name '*.c' | grep -v -f ${TMP_DIR}/exclude.lst | sort | xargs -n25 $shell $gtm_tools/gt_cc.csh
+find $gs[1] -name '*.c' | grep -v -f ${TMP_DIR}/exclude.lst | sort | xargs -n25 $gtm_tools/gt_cc.csh
 \rm -rf ${TMP_DIR}
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"
 setenv comlist_gt_cc "$comlist_gt_cc -DFILE_TCP"
-$shell $gtm_tools/gt_cc.csh $gtm_src/omi_sx_play.c
+$gtm_tools/gt_cc.csh $gtm_src/omi_sx_play.c
 setenv comlist_gt_cc "$comlist_gt_cc_bak"
 
 echo ""
@@ -490,14 +497,14 @@ echo "Start of Assembly"	# Do not change this string. $gtm_tools/buildwarn.awk r
 #endif
 
 if ( "$HOSTOS" == "OS/390" ) then
-    $shell $gtm_tools/gt_os390_maclib.csh
+    $shell -f $gtm_tools/gt_os390_maclib.csh
 endif
 
 # AS - 2010/07/12 this applies to sr_dux only
 if ( $gt_as_src_convert == "true" ) then
 	# Convert assembly language sources to native dialect in this directory:
 	foreach cvt (${gs[1]}/*${gt_as_src_from_suffix})
-		$shell $gtm_tools/gt_as_src_cvt.csh $cvt
+		$shell -f $gtm_tools/gt_as_src_cvt.csh $cvt
 	end
 endif
 
@@ -515,7 +522,7 @@ if ( $?gt_as_use_prebuilt == 0 ) then
 			set asmsublist=(${asmlist})
 			set asmlist=()
 		endif
-		$shell $gtm_tools/gt_as.csh ${asmsublist}
+		$shell -f $gtm_tools/gt_as.csh ${asmsublist}
 	end
 else
 	cp -p $gtm_vrt/$gt_as_use_prebuilt/*.o .
@@ -571,7 +578,7 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^gtcm_gnp_server\.o|^dbcertify_cmd\.o"
 		set exclude = "$exclude|^dummy_gtmci\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
-			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
+			xargs -n50 $shell -f $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status ) then
 			@ comlist_status++
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
@@ -612,19 +619,19 @@ end
 switch ( $3 )
 case "gtm_bta":
 	set bldtype = "Bta"
-	$shell $gtm_tools/buildbta.csh $p4
+	$shell -f $gtm_tools/buildbta.csh $p4
 	if ($status) @ comlist_status++	# done before each breaksw instead of after endsw
 	breaksw				# as $status seems to be get reset in between
 
 case "gtm_dbg":
 	set bldtype = "Dbg"
-	$shell $gtm_tools/builddbg.csh $p4
+	$shell -f $gtm_tools/builddbg.csh $p4
 	if ($status) @ comlist_status++
 	breaksw
 
 case "gtm_pro":
 	set bldtype = "Pro"
-	$shell $gtm_tools/buildpro.csh $p4
+	$shell -f $gtm_tools/buildpro.csh $p4
 	if ($status) @ comlist_status++
 	breaksw
 endsw
@@ -723,17 +730,6 @@ if (-e GTMDefinedTypesInit.m) then
 		unsetenv gtm_chset      # switch back to "M" mode
 		if ( "OS/390" == $HOSTOS ) unsetenv gtm_chset_locale
 	endif
-endif
-
-# Create a default global directory.
-setenv gtmgbldir ./mumps.gld
-gde <<GDE_in1
-exit
-GDE_in1
-
-if ($status) then
-	@ comlist_status++
-	echo "comlist-E-gde, creating $gtmgbldir failed"	>> $errorlog
 endif
 
 # Create the GT.M/GDE/MUPIP/DSE/LKE help databases

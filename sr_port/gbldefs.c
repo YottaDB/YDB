@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,19 +29,11 @@
 #include "gtm_limits.h"
 #include "gtm_un.h"
 #include "gtm_pwd.h"
+#include "gtm_signal.h"
 
-#include <signal.h>
 #include <sys/time.h>
-#ifdef VMS
-# include <descrip.h>		/* Required for gtmsource.h */
-# include <ssdef.h>
-# include <fab.h>
-# include "desblk.h"
-#endif
-#ifdef GTM_PTHREAD
-# include <pthread.h>
-#endif
 #include "cache.h"
+#include "gtm_multi_thread.h"
 #include "hashtab_addr.h"
 #include "hashtab_int4.h"
 #include "hashtab_int8.h"
@@ -82,9 +74,7 @@
 #include "zwrite.h"
 #include "zbreak.h"
 #include "mmseg.h"
-#ifndef VMS
-# include "gtmsiginfo.h"
-#endif
+#include "gtmsiginfo.h"
 #include "gtmimagename.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS */
@@ -107,7 +97,6 @@
 /* FOR MERGE RELATED GLOBALS */
 #include "gvname_info.h"
 #include "op_merge.h"
-#ifdef UNIX
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
@@ -116,25 +105,22 @@
 #include "gtm_zlib.h"
 #include "anticipatory_freeze.h"
 #include "mu_rndwn_all.h"
-#endif
 #include "jnl_typedef.h"
 #include "repl_ctl.h"
-#ifdef VMS
-#include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
-#endif
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
+#include "gtm_multi_proc.h"
+#include "fnpc.h"
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
+#include "utfcgr.h"
 #endif
-# ifdef GTM_CRYPT
-# include "gtmcrypt.h"
-# include "gdsblk.h"
-# include "muextr.h"
-# include "gtmxc_types.h"
-# endif
+#include "gtmcrypt.h"
+#include "gdsblk.h"
+#include "muextr.h"
+#include "gtmxc_types.h"
 #ifdef GTM_TLS
 #include "gtm_tls_interface.h"
 #endif
@@ -179,7 +165,6 @@ GBLDEF	bool		error_mupip,
 			mupip_error_occurred,
 	                dec_nofac;
 GBLDEF	boolean_t	is_updproc,
-			is_updhelper,
 			mupip_jnl_recover,
 			suspend_lvgcol,
 			run_time,
@@ -191,6 +176,9 @@ GBLDEF	boolean_t	is_updproc,
 			gtm_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
 			tp_timeout_deferred;	/* TRUE => A TP timeout has occurred but is deferred */
+GBLDEF	uint4		is_updhelper;		/* = UPD_HELPER_READER if reader helper, = UPD_HELPER_WRITER if writer helper,
+						 * = 0 otherwise.
+						 */
 GBLDEF	volatile boolean_t tp_timeout_set_xfer;	/* TRUE => A timeout succeeded in setting xfer table intercepts. This flag stays
 						 * a true global unless each thread gets its own xfer table.
 						 */
@@ -288,13 +276,10 @@ GBLDEF	boolean_t	created_core;		/* core file was created */
 GBLDEF	unsigned int	core_in_progress;	/* creating core NOW if > 0 */
 GBLDEF	boolean_t	dont_want_core;		/* Higher level flag overrides need_core set by lower level rtns */
 GBLDEF	boolean_t	exit_handler_active;	/* recursion prevention */
+GBLDEF	boolean_t	skip_exit_handler;	/* set for processes that are usually forked off and so should not do gds_rundown */
 GBLDEF	boolean_t	block_saved;
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-GBLDEF	iconv_t		dse_over_cvtcd = (iconv_t)0;
-#endif
 GBLDEF	gtm_chset_t	dse_over_chset = CHSET_M;
 LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
-GBLDEF	char		*lexical_ptr;
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
 GBLDEF	src_line_struct	src_head;
@@ -316,24 +301,12 @@ GBLDEF	char		**cmd_arg;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-#ifdef UNIX
 GBLDEF	volatile uint4	heartbeat_counter;
 GBLDEF	boolean_t	heartbeat_started;
-#endif
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
-#if defined(UNIX)
 GBLDEF	volatile int4		num_deferred;
-#elif defined(VMS)
-GBLDEF	volatile short		num_deferred;
-GBLDEF	int4 			lkid, lid;
-GBLDEF	desblk			exi_blk;
-GBLDEF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLDEF	boolean_t		tp_restart_fail_sig_used;
-#else
-# error "Unsupported Platform"
-#endif
 GBLDEF	volatile	int4	fast_lock_count;	/* Used in wcs_stale */
 /* REPLICATION RELATED GLOBALS */
 GBLDEF	gtmsource_options_t	gtmsource_options;
@@ -355,11 +328,9 @@ GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the 
 GBLDEF	boolean_t		mu_rndwn_process;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
-#ifdef UNIX
 GBLDEF	struct sockaddr_un	gtmsecshr_sock_name;
 GBLDEF	struct sockaddr_un	gtmsecshr_cli_sock_name;
 GBLDEF	key_t			gtmsecshr_key;
-#endif
 GBLDEF	int			gtmsecshr_sockpath_len;
 GBLDEF	int			gtmsecshr_cli_sockpath_len;
 GBLDEF	mstr			gtmsecshr_pathname;
@@ -396,8 +367,6 @@ GBLDEF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLDEF	boolean_t		dse_running;
 GBLDEF	jnlpool_addrs		jnlpool;
 GBLDEF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLDEF	jnlpool_ctl_struct	temp_jnlpool_ctl_struct;
-GBLDEF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl = &temp_jnlpool_ctl_struct;
 GBLDEF	sm_uc_ptr_t		jnldata_base;
 GBLDEF	int4			jnlpool_shmid = INVALID_SHMID;
 GBLDEF	recvpool_addrs		recvpool;
@@ -407,7 +376,6 @@ GBLDEF	int			gtmrecv_srv_count;
 /* The following _in_prog counters are needed to prevent deadlocks while doing jnl-qio (timer & non-timer). */
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
-#ifdef UNIX
 GBLDEF	gtmsiginfo_t		signal_info;
 #ifndef MUTEX_MSEM_WAKE
 GBLDEF	int			mutex_sock_fd = FD_INVALID;
@@ -417,24 +385,19 @@ GBLDEF	int			mutex_wake_this_proc_len;
 GBLDEF	int			mutex_wake_this_proc_prefix_len;
 GBLDEF	fd_set			mutex_wait_on_descs;
 #endif
-#endif
 GBLDEF	void			(*call_on_signal)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
 
-#ifdef UNIX
 GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr;
 GBLDEF	boolean_t		gtm_pipe_child;
-#endif
 GBLDEF	io_desc			*gtm_err_dev;
 /* this array is indexed by file descriptor */
 GBLDEF	boolean_t		*lseekIoInProgress_flags;
-#if defined(UNIX)
 /* Latch variable for Unix implementations. Used in SUN and HP */
 GBLDEF	global_latch_t		defer_latch;
-#endif
 GBLDEF	int			num_additional_processors;
 GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error */
 GBLDEF	int4			error_condition;
@@ -445,9 +408,7 @@ GBLDEF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLDEF	d_socket_struct		*socket_pool;
 GBLDEF	boolean_t		mu_star_specified;
 GBLDEF	backup_reg_list		*mu_repl_inst_reg_list;
-#ifndef VMS
 GBLDEF	volatile int		suspend_status = NO_SUSPEND;
-#endif
 GBLDEF	gv_namehead		*reset_gv_target = INVALID_GV_TARGET;
 GBLDEF	VSIG_ATOMIC_T		util_interrupt;
 GBLDEF	sgmnt_addrs		*kip_csa;
@@ -457,8 +418,8 @@ GBLDEF	merge_glvn_ptr		mglvnp;
 GBLDEF	int			ztrap_form;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
-/* items for $piece stats */
 #ifdef DEBUG
+/* Items for $piece stats */
 GBLDEF	int	c_miss;				/* cache misses (debug) */
 GBLDEF	int	c_hit;				/* cache hits (debug) */
 GBLDEF	int	c_small;			/* scanned small string brute force */
@@ -475,20 +436,22 @@ GBLDEF	int	cs_pscan;			/* number of pieces "scanned" */
 GBLDEF	int	cs_parscan;			/* number of partial scans (partial cache hits) */
 GBLDEF	int	c_clear;			/* cleared due to (possible) value change */
 GBLDEF	boolean_t	setp_work;
-#endif
+#ifdef UNICODE_SUPPORTED
+/* Items for UTF8 cache */
+GBLDEF	int	u_miss;				/* UTF cache misses (debug) */
+GBLDEF	int	u_hit;				/* UTF cache hits (debug) */
+GBLDEF	int	u_small;			/* UTF scanned small string brute force (debug) */
+GBLDEF	int	u_pskip;			/* Number of UTF groups "skipped" (debug) */
+GBLDEF	int	u_puscan;			/* Number of groups "scanned" for located char (debug) */
+GBLDEF	int	u_pabscan;			/* Number of non-UTF groups we scan for located char (debug) */
+GBLDEF	int	u_parscan;			/* Number of partial scans (partial cache hits) (debug) */
+GBLDEF	int	u_parhscan;			/* Number of partial scans after filled slots (debug) */
+#endif /* UNICODE_SUPPORTED */
+#endif /* DEBUG */
 GBLDEF z_records	zbrk_recs;
-#ifdef UNIX
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grabbed */
 GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
-#endif
-#ifdef VMS
-/* Following global variables store the state of an erroring sys$qio just before a GTMASSERT			BYPASSOK(GTMASSERT)
- * in the CHECK_CHANNEL_STATUS macro.
- */
-GBLDEF	uint4	check_channel_status;		/* stores the qio return status */
-GBLDEF	uint4	check_channel_id;		/* stores the qio channel id */
-#endif
 GBLDEF	boolean_t		write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int			iott_write_error;
 GBLDEF	int4			write_filter;
@@ -697,9 +660,9 @@ GBLDEF	uint4		update_trans;	/* Bitmask indicating among other things whether thi
 
 GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply database cache related problem */
 {	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
-#define	CDB_SC_NUM_ENTRY(code, value)
-#define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
-#define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)
+#define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	is_wcs_code,
+#define	CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
 #include "cdb_sc_table.h"	/* BYPASSOK */
 #undef CDB_SC_NUM_ENTRY
 #undef CDB_SC_UCHAR_ENTRY
@@ -707,9 +670,39 @@ GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply da
 };
 GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply database cache related problem */
 {	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
-#define	CDB_SC_NUM_ENTRY(code, value)
-#define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)
-#define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
+#define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
+#define	CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	is_wcs_code,
+#include "cdb_sc_table.h"	/* BYPASSOK */
+#undef CDB_SC_NUM_ENTRY
+#undef CDB_SC_UCHAR_ENTRY
+#undef CDB_SC_LCHAR_ENTRY
+};
+GBLDEF	boolean_t	is_final_retry_code_num[] = 	/* failure codes that are possible in final retry : numeric */
+{
+#define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)			final_retry_ok,
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
+#define CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
+#include "cdb_sc_table.h"	/* BYPASSOK */
+#undef CDB_SC_NUM_ENTRY
+#undef CDB_SC_UCHAR_ENTRY
+#undef CDB_SC_LCHAR_ENTRY
+};
+GBLDEF	boolean_t	is_final_retry_code_uchar[] = 	/* failure codes that are possible in final retry : upper case */
+{
+#define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	final_retry_ok,
+#define CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
+#include "cdb_sc_table.h"	/* BYPASSOK */
+#undef CDB_SC_NUM_ENTRY
+#undef CDB_SC_UCHAR_ENTRY
+#undef CDB_SC_LCHAR_ENTRY
+};
+GBLDEF	boolean_t	is_final_retry_code_lchar[] = 	/* failure codes that are possible in final retry : lower case */
+{
+#define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)
+#define	CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	final_retry_ok,
 #include "cdb_sc_table.h"	/* BYPASSOK */
 #undef CDB_SC_NUM_ENTRY
 #undef CDB_SC_UCHAR_ENTRY
@@ -721,10 +714,6 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
 GBLDEF boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
-#ifdef VMS
-GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_NOACCESS_ADDR logicals which are defined */
-GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
-#endif
 GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -756,16 +745,9 @@ GBLDEF	MIDENT_DEF(int_module_name, 0, &int_module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
 GBLDEF	short		object_name_len;
-UNIX_ONLY(
-	GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];
-	GBLDEF unsigned char	object_file_name[MAX_FBUFF + 1];
-	GBLDEF int		object_file_des;
-)
-VMS_ONLY(
-	GBLDEF char		source_file_name[PATH_MAX];
-	GBLDEF char		object_file_name[256];
-	GBLDEF struct FAB	obj_fab;	/* file access block for the object file */
-)
+GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];
+GBLDEF unsigned char	object_file_name[MAX_FBUFF + 1];
+GBLDEF int		object_file_des;
 GBLDEF	int4		curr_addr, code_size;
 GBLDEF	mident_fixed	zlink_mname;
 GBLDEF	sm_uc_ptr_t	reformat_buffer;
@@ -783,7 +765,6 @@ GBLDEF	boolean_t	gtm_dbfilext_syslog_disable;	/* by default, log every file exte
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
 GBLDEF	uint4		log_interval;
-#ifdef UNIX
 GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
@@ -794,7 +775,6 @@ GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
 GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
-#endif
 #ifdef UNICODE_SUPPORTED
 /* Unicode line terminators.  In addition to the following
  * codepoints, the sequence CR LF is considered a single
@@ -873,13 +853,10 @@ GBLDEF	int 			mcavail;
 GBLDEF	mcalloc_hdr 		*mcavailptr, *mcavailbase;
 GBLDEF	uint4			max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLDEF	uint4			max_cache_entries;	/* Maximum number of cached indirect compilations */
-GBLDEF  void            (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
-UNIX_ONLY(GBLDEF ch_ret_type (*ht_rhash_ch)());         /* Function pointer to hashtab_rehash_ch */
-UNIX_ONLY(GBLDEF ch_ret_type (*jbxm_dump_ch)());        /* Function pointer to jobexam_dump_ch */
-UNIX_ONLY(GBLDEF ch_ret_type (*stpgc_ch)());		/* Function pointer to stp_gcol_ch */
-#ifdef VMS
-GBLDEF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
-#endif
+GBLDEF	void		(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
+GBLDEF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
+GBLDEF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
+GBLDEF	ch_ret_type	(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLDEF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
 GBLDEF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
 GBLDEF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
@@ -909,7 +886,6 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
 #endif
 GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
-#ifdef UNIX
 GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
 GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
 							 * This is a source-server specific variable and is non-zero only
@@ -917,31 +893,31 @@ GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in
 							 */
 GBLDEF	zlib_cmp_func_t		zlib_compress_fnptr;
 GBLDEF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
-#endif
 GBLDEF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
-#ifdef UNIX
 /* Initialized blockalrm, block_ttinout and block_sigsent can be used by all threads */
 GBLDEF	boolean_t	blocksig_initialized;		/* set to TRUE when blockalrm and block_sigsent are initialized */
 GBLDEF	sigset_t	blockalrm;
-UNIX_ONLY(GBLDEF	sigset_t	block_ttinout;)
+GBLDEF	sigset_t	block_ttinout;
 GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
 					  (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
 GBLDEF  char            *gtm_core_file;
 GBLDEF  char            *gtm_core_putenv;
-#endif
 #ifdef __MVS__
 GBLDEF	char		*gtm_utf8_locale_object;
 GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
 #endif
-#ifdef GTM_CRYPT
+
+/* Encryption-related fields. */
 LITDEF	char		gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
 GBLDEF	char		*gtmcrypt_badhash_size_msg;
-GBLDEF	boolean_t	gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
+GBLDEF	boolean_t	gtmcrypt_initialized;		/* Set to TRUE if gtmcrypt_init() completes successfully */
 GBLDEF	char		dl_err[MAX_ERRSTR_LEN];
-GBLDEF	mstr		pvt_crypt_buf;		/* Temporary buffer needed where in-place encryption/decryption is not an option */
+GBLDEF	mstr		pvt_crypt_buf;			/* Temporary buffer if in-place encryption / decryption is not an option */
 LITDEF	gtm_string_t	null_iv = {0, ""};
-GBLDEF	boolean_t	err_same_as_out;
-#endif /* GTM_CRYPT */
+GBLDEF	uint4		mu_reorg_encrypt_in_prog;	/* Reflects whether MUPIP REORG -ENCRYPT is in progress */
+GBLDEF	sgmnt_addrs	*reorg_encrypt_restart_csa;	/* Pointer to the region which caused a transaction restart due to a
+							 * concurrent MUPIP REORG -ENCRYPT */
+
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
 GBLDEF	boolean_t	gtm_white_box_test_case_enabled;
@@ -1038,7 +1014,6 @@ GBLDEF	boolean_t	skip_block_chain_tail_check;
 GBLDEF	boolean_t	in_mu_rndwn_file;		/* TRUE if we are in mu_rndwn_file (holding standalone access) */
 #endif
 GBLDEF	char		gvcst_search_clue;
-#ifdef UNIX
 /* The following are replication related global variables. Ideally if we had a repl_gbls_t structure (like jnl_gbls_t)
  * this would be a member in that. But since we dont have one and since we need to initialize this specificially to a
  * non-zero value (whereas usually everything else accepts a 0 default value), this is better kept as a separate global
@@ -1064,7 +1039,6 @@ GBLDEF  repl_conn_info_t        *this_side, *remote_side;
 /* Replication related global variables END */
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
-#endif
 GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-existent nodes will continue to
 							 * write jnl records and increment the db curr_tn even though they dont
 							 * touch any GDS blocks in the db (i.e. treat it as a duplicate kill).
@@ -1074,7 +1048,6 @@ GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-e
 GBLDEF	boolean_t	donot_fflush_NULL;		/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
 							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
 							 */
-#ifdef UNIX
 GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time (eg., for
 							 * anticipatory freeze supported configurations). The variable is set
 							 * explicitly by interested commands (eg., MUPIP REORG).
@@ -1089,7 +1062,6 @@ GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
 GBLDEF	boolean_t	gtm_dist_ok_to_use = FALSE;		/* Whether or not we can use $gtm_dist */
 GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
 GBLDEF	boolean_t		dmterm_default;		/* Retain default line terminators in the direct mode */
-#endif
 GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window inside jnl_file_extend when we are about
 							 * to autoswitch; used by jnl_write. */
 #ifdef GTM_PTHREAD
@@ -1098,21 +1070,13 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
 GBLDEF	size_t		gtm_max_storalloc;		/* Maximum that GTM allows to be allocated - used for testing */
-#ifdef VMS
-GBLDEF	sgmnt_addrs	*vms_mutex_check_csa;		/* On VMS, mutex_deadlock_check() is directly called from mutex.mar. In
-							 * order to avoid passing csa parameter from the VMS assembly, we set this
-							 * global from mutex_lock* callers.
-							 */
-#endif
 GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
 							 * environment variable, so is process wide.
 							 */
-#ifdef UNIX
 GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
 							 * stx_error() into gtmsecshr, and thus just about everything else as well.
 							 */
 GBLDEF void (*show_source_line_fptr)(boolean_t warn);	/* Func pointer for show_source_line() - same purpose as stx_error_fptr */
-#endif
 #ifdef GTM_TLS
 GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. Any SSL/TLS connections that
 							 * the process needs to create will be created from this context.
@@ -1121,5 +1085,57 @@ GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. 
 							 * Socket devices.
 							 */
 #endif
-GBLDEF lv_val		*active_lv;
-GBLDEF boolean_t	in_prin_gtmio = FALSE;		/* Flag to indicate whether we are processing a GT.M I/O function. */
+GBLDEF	lv_val		*active_lv;
+GBLDEF	boolean_t	in_prin_gtmio = FALSE;		/* Flag to indicate whether we are processing a GT.M I/O function. */
+GBLDEF	boolean_t	err_same_as_out;
+
+GBLDEF	boolean_t	multi_proc_in_use;		/* TRUE => parallel processes active ("gtm_multi_proc"). False otherwise */
+GBLDEF	multi_proc_shm_hdr_t	*multi_proc_shm_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory
+							 *	created by "gtm_multi_proc".
+							 */
+GBLDEF	unsigned char	*multi_proc_key;		/* NULL for parent process; Non-NULL for child processes forked off
+							 *	in "gtm_multi_proc" (usually a null-terminated pointer to the
+							 *	region name)
+							 */
+#ifdef DEBUG
+GBLDEF	boolean_t	multi_proc_key_exception;	/* If TRUE, multi_proc_key can be NULL even if multi_proc_use is TRUE.
+							 * If FALSE, multi_proc_key shold be non-NULL if multi_proc_use is TRUE.
+							 *	else an assert in util_format will fail.
+							 */
+#endif
+GBLDEF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
+GBLDEF	boolean_t	thread_mutex_initialized;	/* TRUE => "thread_mutex" variable is initialized */
+GBLDEF	pthread_mutex_t	thread_mutex;			/* mutex structure used to ensure serialization in case we need
+							 * to execute some code that is not thread-safe. Note that it is
+							 * more typical to use different mutexes for different things that
+							 * need concurrency protection, e.g., memory allocation, encryption,
+							 * token hash table, message buffers, etc. If the single mutex becomes
+							 * a bottleneck this needs to be revisited.
+							 */
+GBLDEF	pthread_t	thread_mutex_holder;		/* pid/tid of the thread that has "thread_mutex" currently locked */
+GBLDEF	pthread_key_t	thread_gtm_putmsg_rname_key;	/* points to region name corresponding to each running thread */
+GBLDEF	boolean_t	thread_block_sigsent;		/* TRUE => block external signals SIGINT/SIGQUIT/SIGTERM/SIGTSTP/SIGCONT */
+GBLDEF	boolean_t	in_nondeferrable_signal_handler;	/* TRUE if we are inside "generic_signal_handler". Although this
+								 * is a dbg-only variable, the GBLDEF needs to stay outside of
+								 * a #ifdef DEBUG because this is used inside gtm_malloc_dbg
+								 * which is even used by a non-debug mumps link.
+								 */
+GBLDEF	boolean_t	forced_thread_exit;		/* TRUE => signal threads to exit (likely because some thread already
+							 * exited with an error or the main process got a SIGTERM etc.)
+							 */
+GBLDEF	int		next_task_index;		/* "next" task index waiting for a thread to be assigned */
+GBLDEF	int		gtm_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread"
+							 *		or in forward phase of mupip recover.
+							 *	0 => Use one thread/proc per region.
+							 *	1 => Serial execution (no threads)
+							 *	2 => 2 threads concurrently run
+							 *	etc.
+							 * Currently only mupip journal commands use this.
+							 */
+GBLDEF	boolean_t	ctrlc_on;			/* TRUE in cenable mode; FALSE in nocenable mode */
+#ifdef DEBUG
+GBLDEF	int		gtm_db_counter_sem_incr;	/* Value used to bump the counter semaphore by every process.
+							 * Default is 1. Higher values exercise the ERANGE code better
+							 * when the ftok/access/jnlpool counter semaphore overflows.
+							 */
+#endif

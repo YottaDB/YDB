@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -257,22 +257,6 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : GTM_BOOL;
 			if (old_bool != TREF(gtm_fullbool))
 				cache_table_rebuild();
-			break;
-		case VTK_GDSCERT0:
-			outval.mvtype = MV_STR;
-			op_wteol(1);
-			WRITE_LITERAL(msg1);
-			certify_all_blocks = FALSE;
-			WRITE_LITERAL(msg2);
-			op_wteol(1);
-			break;
-		case VTK_GDSCERT1:
-			outval.mvtype = MV_STR;
-			op_wteol(1);
-			WRITE_LITERAL(msg1);
-			certify_all_blocks = TRUE;
-			WRITE_LITERAL(msg3);
-			op_wteol(1);
 			break;
 		case VTK_GDSCERT:
 			outval.mvtype = MV_STR;
@@ -722,8 +706,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			{
 				if (!TREF(tprestart_syslog_delta))
 					TREF(tprestart_syslog_delta) = 1;
-			}
-			else
+			} else
 			{
 				TREF(tprestart_syslog_delta) = MV_FORCE_INT(parmblk.value);
 				if (0 > TREF(tprestart_syslog_delta))
@@ -733,6 +716,22 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 		case VTK_NOLOGTPRESTART:
 			TREF(tprestart_syslog_delta) = 0;
+			break;
+		case VTK_LOGNONTP:
+			if (!numarg)
+			{
+				if (!TREF(nontprestart_log_delta))
+					TREF(nontprestart_log_delta) = 1;
+			} else
+			{
+				TREF(nontprestart_log_delta) = MV_FORCE_INT(parmblk.value);
+				if (0 > TREF(nontprestart_log_delta))
+					TREF(nontprestart_log_delta) = 0;
+			}
+			TREF(nontprestart_count) = 0;
+			break;
+		case VTK_NOLOGNONTP:
+			TREF(nontprestart_log_delta) = 0;
 			break;
 #		ifdef UNIX
 		case VTK_LINK:

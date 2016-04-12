@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,7 @@
 #include "gdsbml.h"
 #include "gtmmsg.h"
 #include "get_spec.h"
+#include "mupip_integ.h"
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
@@ -65,10 +67,8 @@ GBLREF int			muint_start_keyend;
 GBLREF int			mu_int_plen;
 GBLREF int			trans_errors;
 GBLREF int4			mu_int_adj[];
-GBLREF uint4			mu_int_blks[];
+GBLREF gtm_uint64_t		mu_int_cum[CUM_TYPE_MAX][MAX_BT_DEPTH + 1];
 GBLREF uint4			mu_int_offset[];
-GBLREF uint4			mu_int_recs[];
-GBLREF qw_num			mu_int_size[];
 GBLREF uint4			mu_int_errknt;
 GBLREF block_id			mu_int_path[];
 GBLREF int4			mu_int_blks_to_upgrd;
@@ -200,7 +200,7 @@ boolean_t mu_int_blk(
 	unsigned short	numsubs;
 
 	mu_int_offset[mu_int_plen] = 0;
-	mu_int_path[mu_int_plen++] = blk;
+	mu_int_path[mu_int_plen++] = blk;  /* Increment mu_int_plen on entry; decrement explicitly or via mu_int_err() on exit. */
 	mu_int_path[mu_int_plen] = 0;
 	if (!bml_busy(blk, mu_int_locals)) /* block already marked busy */
 	{
@@ -209,7 +209,7 @@ boolean_t mu_int_blk(
 	}
 	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 	if (!blk_base)
-		return FALSE;
+		return FALSE;	/* Only occurs on malloc failure, so don't worry about mu_int_plen. */
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
 	if (!muint_fast)
 	{
@@ -283,18 +283,22 @@ boolean_t mu_int_blk(
 		}
 		/* Stop searching the sub-tree when TN in block is larger than integ_start_tn for fast_integ. The reason being,
 		 * fast_integ skips writing free blocks and level-0 block in GV tree to snapshot file. However, some blocks can be
-		 * mistakenly marked free or its level is messed-up as 0. After updating these blocks, thse blocks will have TN
+		 * mistakenly marked free or its level is messed-up as 0. After updating these blocks, these blocks will have TN
 		 * larger than integ_start_tn. In this case, the child tree pointed to by one such updated block may result in
 		 * arbitrary error report. Since we already capture the core reason for the integ error, we should not proceed
 		 * searching its child tree; otherwise, we will have meaningless report content
 		 */
 		if (muint_fast)
+		{
+			mu_int_plen--;
+			free(blk_base);
 			return FALSE;
+		}
 		if (blk_tn > largest_tn)
 			largest_tn = blk_tn;
 	}
-	mu_int_blks[level]++;
-	QWINCRBYDW(mu_int_size[level], blk_size);
+	mu_int_cum[BLKS][level]++;
+	mu_int_cum[SIZE][level] += blk_size;
 	first_key = TRUE;
 	buff_length = 0;
 	comp_length = bot_len;
@@ -305,8 +309,8 @@ boolean_t mu_int_blk(
 		rec_base = rec_top, comp_length = buff_length)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
-			return FALSE;
-		mu_int_recs[level]++;
+			return FALSE;	/* Only happens on termination, so don't worry about mu_int_plen. */
+		mu_int_cum[RECS][level]++;
 		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 		rec_size = temp_ushort;
 		mu_int_offset[mu_int_plen - 1] = (uint4)(rec_base - blk_base);
@@ -507,7 +511,7 @@ boolean_t mu_int_blk(
 								muint_range_done = TRUE;
 							else
 							{
-								mu_int_recs[level]--;
+								mu_int_cum[RECS][level]--;
 								mu_int_plen--;
 								free(blk_base);
 								return TRUE;
@@ -515,7 +519,7 @@ boolean_t mu_int_blk(
 						}
 						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
 						{
-							mu_int_recs[level]--;
+							mu_int_cum[RECS][level]--;
 							continue;
 						}
 					} else
@@ -526,7 +530,7 @@ boolean_t mu_int_blk(
 								muint_range_done = TRUE;
 							else
 							{
-								mu_int_recs[level]--;
+								mu_int_cum[RECS][level]--;
 								mu_int_plen--;
 								free(blk_base);
 								return TRUE;
@@ -534,7 +538,7 @@ boolean_t mu_int_blk(
 						}
 						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
 						{
-							mu_int_recs[level]--;
+							mu_int_cum[RECS][level]--;
 							continue;
 						}
 					}
@@ -818,14 +822,14 @@ boolean_t mu_int_blk(
 				if (!bml_busy(child, mu_int_locals))
 				{
 					mu_int_offset[mu_int_plen]=0;
-					mu_int_path[mu_int_plen++]=child;
+					mu_int_path[mu_int_plen++]=child;	/* Increment mu_int_plen */
 					mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, old_buff, comp_length, buff, buff_length,
 							(unsigned int)((blk_hdr_ptr_t)ptr)->levl);
-					mu_int_plen--;
+					mu_int_plen--;				/* Revert above increment */
 					free(blk_base);
 					return FALSE;
 				}
-				mu_int_blks[0]++;
+				mu_int_cum[BLKS][0]++;
 				if (muint_fast && (1 == level))
 					CHECK_ADJACENCY(child, 0, mu_int_adj[0]);
 			}

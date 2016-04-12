@@ -1,6 +1,7 @@
  /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 
 #include "gtm_string.h"
 
+#include "gtm_multi_thread.h"
 #include "min_max.h"
 #include "op.h"
 #include "util.h"
@@ -33,6 +35,7 @@ void op_fnzsyslog(mval* src, mval* dst)
 	len = MIN(src->str.len, OUT_BUFF_SIZE - 1);
 	if (0 < len)
 	{
+		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 		{
 			SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);

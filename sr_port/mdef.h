@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,18 +161,12 @@ error_def(ERR_ASSERT);
 #endif
 
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
- * or generic parameters.  For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be
- * equivalenced to [u]intptr_t.  But since this type is used for alignment and other checking, and since Tru64/VMS
- * (implemented as a 32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will
- * explicitly make [U]INTPTR_T a 4 byte creature.
+ * or generic parameters.
  */
-#if !defined(__alpha)
+
 typedef intptr_t INTPTR_T;
 typedef uintptr_t UINTPTR_T;
-#else
-typedef int INTPTR_T;
-typedef unsigned int UINTPTR_T;
-#endif
+
 /* The intszofptr_t type is defined to be basically the same size as an address on the platforms it runs on. So it
    is the same size as INTPTR_T without the connotation of being a pointer. This is used in places where size_t
    or ssize_t would normally be used except they can't be used because they are the wrong size on Alpha systems.
@@ -231,8 +225,10 @@ typedef UINTPTR_T uintszofptr_t;
 #if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
 #	define GTM_PTHREAD
 #	define GTM_PTHREAD_ONLY(X) X
+#	define NON_GTM_PTHREAD_ONLY(X)
 #else
 #	define GTM_PTHREAD_ONLY(X)
+#	define NON_GTM_PTHREAD_ONLY(X)	X
 #endif
 
 #if defined(__ia64)
@@ -430,7 +426,7 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
  * 		Byte pattern			max. expanded 	   input byte	ratio
  * 						output length	 length
  * 	------------------------------------------------------------------------------
- * 		$C(129)_$ZCH(128)_		18			2	 9
+ * 		$C(127)_$ZCH(128)_		18			2	 9
  * 		$C(1536)_$ZCH(128)_		19			3	 7
  * 		$C(65279)_$ZCH(128)_		20			4	 5
  * 		$C(917585)_$ZCH(128)_		21			5	 6
@@ -500,8 +496,8 @@ mval *underr_strict(mval *start, ...);
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
-#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = 0xff)
-#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
+#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UNICODE_ONLY((X)->utfcgr_indx =) 0xff)
+#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UNICODE_ONLY((X)->utfcgr_indx =) 0xff,	\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
 /* The MVTYPE_IS_* macros are similar to the MV_IS_* macros except that the input is an mvtype instead of an "mval *".
@@ -523,28 +519,33 @@ mval *underr_strict(mval *start, ...);
 #define DEFINE_MVAL_STRING(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)		\
 	DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, 0, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)
 
-#ifdef VMS
-#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH}
-#else
 #ifdef BIGENDIAN
-#ifdef UNICODE_SUPPORTED
-#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
-#else
-#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+# ifdef UNICODE_SUPPORTED
+#  ifdef GTM64
+#   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, SIGN, EXPONENT, 0xff, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#  else
+#   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#  endif /* GTM64 */
+# else
+#  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
-#endif
-#else	/* BIGENDIAN */
-#ifdef UNICODE_SUPPORTED
-#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
-#else
-#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+# endif	/* UNICODE */
+#else	/* end BIGENDIAN -- start LITTLEENDIAN */
+# ifdef UNICODE_SUPPORTED
+#  ifdef GTM64
+#    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, EXPONENT, SIGN, 0xff, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#  else
+#    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#  endif /* GTM64 */
+# else
+#  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
-#endif	/* UNICODE */
-#endif	/* BIGENDIAN */
-#endif	/* VMS */
+# endif	/* UNICODE */
+#endif	/* BIGENDIAN/LITTLEENDIAN */
 
 #define	ASCII_MAX		(unsigned char)0x7F
 #define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
@@ -825,8 +826,7 @@ typedef struct
 } global_latch_t;
 #define latch_image_count latch_word
 
-#define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid \
-					VMS_ONLY(&& image_count == (latch)->u.parts.latch_image_count))
+#define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid)
 
 typedef struct compswap_time_field_struct
 {	/* This structure is used where we want to do a compare-n-swap (CAS) on a time value. The CAS interfaces
@@ -1344,8 +1344,8 @@ char is_ident(mstr *v);
 int val_iscan(mval *v);
 void mcfree(void);
 int4 getprime(int4 n);
-void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
-UNIX_ONLY(void suspend(int sig);)
+void push_parm(unsigned int totalcnt, int truth_value, ...);
+void suspend(int sig);
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);
 
@@ -1715,24 +1715,22 @@ typedef enum
 
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
 
-/* Encryption and TLS related macros */
+/* Encryption- and TLS-related macros */
 #if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)
-# define GTM_CRYPT
-# define GTMCRYPT_ONLY(X)		X
 # define GTM_TLS
 # define GTMTLS_ONLY(X)			X
 # define GTMTLS_ONLY_COMMA(X)		, X
 # define NON_GTMTLS_ONLY(X)
 #else
-# define GTMCRYPT_ONLY(X)
 # define GTMTLS_ONLY(X)
 # define GTMTLS_ONLY_COMMA(X)
 # define NON_GTMTLS_ONLY(X)		X
 #endif
 
 #define GTMCRYPT_HASH_LEN		64
+#define GTMCRYPT_RESERVED_HASH_LEN	80
 #define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2
-#define GTMCRYPT_RESERVED_HASH_LEN	256
+#define GTMCRYPT_RESERVED_ENCR_SPACE	256
 
 #define GTMCRYPT_PLUGIN_DIR_NAME	"plugin"
 #define GTMCRYPT_UTIL_LIBNAME		"libgtmcryptutil.so"
@@ -1755,15 +1753,9 @@ typedef enum
 #	define	GTM_SNAPSHOT_ONLY(X)
 #endif
 
-/* Currently MUPIP REORG -TRUNCATE is only supported on UNIX */
-#ifdef UNIX
-#	define	GTM_TRUNCATE
-#	define	NON_GTM_TRUNCATE_ONLY(X)
-#	define	GTM_TRUNCATE_ONLY(X)		X
-#else
-#	define	NON_GTM_TRUNCATE_ONLY(X)	X
-#	define	GTM_TRUNCATE_ONLY(X)
-#endif
+#define	GTM_TRUNCATE
+#define	NON_GTM_TRUNCATE_ONLY(X)
+#define	GTM_TRUNCATE_ONLY(X)		X
 
 /* Currently triggers are supported only on UNIX */
 #if defined(UNIX) && !defined(__hppa)	/* triggers not supported on HPUX-HPPA */
@@ -1828,7 +1820,7 @@ enum
 #ifdef GTM_PTHREAD
 /* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
  * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
- * signal, dispatches a new thread to invoke signal handlers other than its own. The ptrhead_kill() enables us to target the signal
+ * signal, dispatches a new thread to invoke signal handlers other than its own. The pthread_kill() enables us to target the signal
  * to a specific thread rather than rethrow it to the whole process.
  */
 #define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)								\
@@ -1861,9 +1853,9 @@ enum
 #define MV_FORCE_DEFINED_UNLESS_SKIPARG(V)	((!M_ARG_SKIPPED(V)) ? (MV_FORCE_DEFINED(V)) : (V))
 
 #ifdef _AIX
-#define LIBPATH_ENV	"LIBPATH"
+#define LIBPATH_ENV		"LIBPATH"
 #else
-#define LIBPATH_ENV	"LD_LIBRARY_PATH"
+#define LIBPATH_ENV		"LD_LIBRARY_PATH"
 #endif
 
 #endif /* MDEF_included */

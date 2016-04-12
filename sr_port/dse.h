@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +76,7 @@ enum dse_fmt
 		if (NOCRIT_PRESENT)										\
 			CS_ADDRS->now_crit = TRUE;								\
 		else												\
-			grab_crit(GV_CUR_REGION);								\
+			grab_crit_encr_cycle_sync(GV_CUR_REGION);						\
 		WAS_HOLD_ONTO_CRIT = CS_ADDRS->hold_onto_crit;							\
 		CS_ADDRS->hold_onto_crit = TRUE;								\
 	}													\
@@ -138,36 +139,38 @@ enum dse_fmt
 }
 
 /* This macro is currently used only inside the BUILD_AIMG_IF_JNL_ENABLED_AND_T_END_WITH_EFFECTIVE_TN macro */
-#ifdef GTM_CRYPT
 #define	BUILD_ENCRYPT_TWINBUFF_IF_NEEDED(CSA, CSD, TN)										\
 {																\
 	blk_hdr_ptr_t		bp, save_bp;											\
 	gd_segment		*seg;												\
 	int			gtmcrypt_errno, req_enc_blk_size;								\
+	boolean_t		use_new_key;											\
 																\
 	GBLREF	gd_region	*gv_cur_region;											\
 																\
-	if (CSD->is_encrypted && (TN < CSA->ti->curr_tn))									\
-	{	/* BG and db encryption is enabled and the DSE update caused the block-header to potentially have a tn		\
-		 * that is LESS than what it had before. At this point, the global buffer (corresponding to blkhist.blk_num)	\
-		 * reflects the contents of the block AFTER the dse update (bg_update would have touched this) whereas		\
-		 * the corresponding encryption global buffer reflects the contents of the block BEFORE the update.		\
-		 * Normally wcs_wtstart takes care of propagating the tn update from the regular global buffer to the		\
-		 * corresponding encryption buffer. But if before it gets a chance, let us say a process goes to t_end		\
-		 * as part of a subsequent transaction and updates this same block. Since the  blk-hdr-tn potentially		\
-		 * decreased, it is possible that the PBLK writing check (comparing blk-hdr-tn with the epoch_tn) decides	\
-		 * to write a PBLK for this block (even though a PBLK was already written for this block as part of a		\
-		 * previous DSE CHANGE -BL -TN in the same epoch). In this case, since the db is encrypted, the logic		\
-		 * will assume there were no updates to this block since the last time wcs_wtstart updated the encryption	\
-		 * buffer and therefore use that to write the pblk, which is incorrect since it does not yet contain the	\
-		 * tn update. The consequence of this is would be writing an older before-image PBLK) record to the		\
-		 * journal file. To prevent this situation, we update the encryption buffer here (before releasing crit)	\
-		 * using logic like that in wcs_wtstart to ensure it is in sync with the regular global buffer. To ensure	\
-		 * that t_end doesn't release crit, we set CSA->hold_onto_crit to TRUE						\
-		 * Note:													\
-		 * Although we use cw_set[0] to access the global buffer corresponding to the block number being updated,	\
-		 * cw_set_depth at this point is 0 because t_end resets it. This is considered safe since cw_set is a		\
-		 * static array (as opposed to malloc'ed memory) and hence is always available and valid until it gets		\
+	if (USES_ENCRYPTION(CSD->is_encrypted) && (TN < CSA->ti->curr_tn))							\
+	{	/* BG and db encryption are enabled and the DSE update caused the block-header to potentially have a tn LESS	\
+		 * than before. At this point, the global buffer (corresponding to blkhist.blk_num) reflects the contents of	\
+		 * the block AFTER the dse update (bg_update would have touched this), whereas the corresponding encryption	\
+		 * global buffer reflects the contents of the block BEFORE the update.						\
+		 *														\
+		 * Normally, wcs_wtstart would take care of propagating the tn update from the regular global buffer to the	\
+		 * corresponding encryption buffer. But if before it gets a chance, a process goes to t_end as a part of a	\
+		 * subsequent transaction and updates this same block, then, since the blk-hdr-tn potentially decreased, it is	\
+		 * possible that the PBLK writing check (that compares blk-hdr-tn with the epoch_tn) will decide to write a	\
+		 * PBLK for this block, even though a PBLK was already written for this block as part of a previous		\
+		 * DSE CHANGE -BL -TN in the same epoch. In this case, since the db is encrypted, the logic will assume	that	\
+		 * there were no updates to this block because the last time wcs_wtstart updated the encryption buffer and,	\
+		 * therefore, use that to write the PBLK, which is incorrect, for it does not yet contain the tn update.	\
+		 * 														\
+		 * The consequence of this is that we would be writing an older before-image PBLK record to the journal file.	\
+		 * To prevent this situation, we update the encryption buffer here (before releasing crit) using logic similar	\
+		 * to that in wcs_wtstart, to ensure it is in sync with the regular global buffer. To prevent t_end from	\
+		 * releasing crit, we set CSA->hold_onto_crit to TRUE.								\
+		 * 														\
+		 * Note that although we use cw_set[0] to access the global buffer corresponding to the block number being	\
+		 * updated, cw_set_depth at this point is 0 because t_end resets it. This is considered safe since cw_set is a	\
+		 * static array (as opposed to malloced memory) and hence is always available and valid until it gets		\
 		 * overwritten by subsequent updates.										\
 		 */														\
 		bp = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(CSA, cw_set[0].cr->buffaddr);						\
@@ -180,8 +183,11 @@ enum dse_fmt
 		{														\
 			ASSERT_ENCRYPTION_INITIALIZED;										\
 			memcpy(save_bp, bp, SIZEOF(blk_hdr));									\
-			GTMCRYPT_ENCRYPT(CSA, CSA->encr_key_handle, (char *)(bp + 1), req_enc_blk_size,				\
-						(char *)(save_bp + 1), gtmcrypt_errno);						\
+			use_new_key = USES_NEW_KEY(CSD);									\
+			GTMCRYPT_ENCRYPT(CSA, (use_new_key ? TRUE : CSD->non_null_iv),						\
+					(use_new_key ? CSA->encr_key_handle2 : CSA->encr_key_handle),				\
+					(char *)(bp + 1), req_enc_blk_size, (char *)(save_bp + 1),				\
+					bp, SIZEOF(blk_hdr), gtmcrypt_errno);							\
 			if (0 != gtmcrypt_errno)										\
 			{													\
 				seg = gv_cur_region->dyn.addr;									\
@@ -191,9 +197,6 @@ enum dse_fmt
 			memcpy(save_bp, bp, bp->bsiz);										\
 	}															\
 }
-#else
-#define	BUILD_ENCRYPT_TWINBUFF_IF_NEEDED(CSA, CSD, TN)
-#endif
 
 /* This macro is used whenever t_end needs to be invoked with a 3rd parameter != TN_NOT_SPECIFIED.
  * Currently the only two usages of this are from DSE and hence this macro is placed in dse.h.
@@ -220,6 +223,14 @@ enum dse_fmt
 	if (unhandled_stale_timer_pop)											\
 		process_deferred_stale();										\
 }
+
+#define	CLEAR_DSE_COMPRESS_KEY						\
+MBSTART {								\
+	GBLREF char	patch_comp_key[MAX_KEY_SZ + 1];			\
+	GBLREF unsigned short   patch_comp_count;			\
+									\
+	patch_comp_count = patch_comp_key[0] = patch_comp_key[1] = 0;	\
+} MBEND
 
 void		dse_adrec(void);
 void		dse_adstar(void);

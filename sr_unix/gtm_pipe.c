@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,13 +63,12 @@ int gtm_pipe(char *command, pipe_type pt)
 		CLOSEFILE_RESET(pfd[parent], rc);	/* resets "pfd[parent]" to FD_INVALID */
 		DUP2(pfd[child], child, dup2_res);
 		CLOSEFILE_RESET(pfd[child], rc);	/* resets "pfd[child]" to FD_INVALID */
-		/* We should have used exec instead of SYSTEM. Earlier it was followed by exit(EXIT_SUCCESS), which calls
+		/* We should have used exec instead of SYSTEM. Earlier it was followed by EXIT(EXIT_SUCCESS), which calls
 		 * exit_handler.  So both child and parent will do exit handling. This can make ref_cnt < 0, or, it can release
-		 * semaphores, which we should not release until parent exists. So we just call _exit(EXIT_SUCCESS).  Add the do
-		 * nothing if to keep compiler happy since exiting anyway.
+		 * semaphores, which we should not release until parent exists. So we just call UNDERSCORE_EXIT(EXIT_SUCCESS).
 		 */
 		rc = SYSTEM(command);
-		_exit(EXIT_SUCCESS); /* just exit from here */
+		UNDERSCORE_EXIT(EXIT_SUCCESS); /* just exit from here */
 	} else
 	{	/* parent process */
 		pipe_child = child_pid;

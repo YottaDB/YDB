@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,6 @@
 #include "fullbool.h"
 
 GBLREF spdesc		stringpool;
-GBLREF char		*lexical_ptr;
 GBLREF unsigned char	*source_buffer;
 GBLREF int		source_column;
 
@@ -78,7 +78,7 @@ int compile_pattern(oprtype *opr, boolean_t is_indirect)
 		memcpy(stringpool.free, &retstr.buff[0], retmval.str.len);
 		stringpool.free += retmval.str.len;
 		*opr = put_lit(&retmval);
-		lexical_ptr = instr.addr;
+		TREF(lexical_ptr) = instr.addr;
 		advancewindow();
 		advancewindow();
 		return TRUE;

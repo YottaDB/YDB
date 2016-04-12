@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_unistd.h"		/* for getopt() and read() */
 #include "gtm_fcntl.h"
 #include "gtm_ipc.h"
@@ -190,11 +191,11 @@ int main(int argc, char_ptr_t argv[])
 		if (1 != read(0, &resp, 1))  /*unable to read response*/
 		{
 			FPRINTF(stderr,"Error while reading response from user. Exiting\n");
-			exit(0);
+			EXIT(0);
 		}
 		if ((resp != 'y') && (resp != 'Y'))
 		{
-			exit(0);
+			EXIT(0);
 		}
 	}
 	if (server == 1 && daemon == 0)

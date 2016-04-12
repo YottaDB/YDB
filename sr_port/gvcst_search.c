@@ -228,9 +228,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							if (TP_IS_CDB_SC_BLKMOD3(cr, tp_srch_status, blkhdrtn))
 							{
 								assert(CDB_STAGNATE > t_tries);
+								assert(0 == leaf_blk_hist->level);
+								assert(0 == tp_srch_status->level);
 								TP_TRACE_HIST_MOD(leaf_blk_hist->blk_num, gv_target,
 									tp_blkmod_gvcst_srch, cs_data, tp_srch_status->tn,
-									blkhdrtn, ((blk_hdr_ptr_t)buffaddr)->levl);
+									blkhdrtn, leaf_blk_hist->level);
 								return cdb_sc_blkmod;
 							}
 							if (!is_mm && ((tp_srch_status->cycle != cr->cycle)

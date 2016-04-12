@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,8 +14,8 @@
 
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
+#include "gtm_signal.h"
 
-#include <signal.h>
 #include <sys/shm.h>
 
 #include "gdsroot.h"
@@ -55,6 +55,7 @@ GBLREF	boolean_t		created_core;			/* core file was created */
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 
 static	enum rundown_state	attempting;
@@ -101,6 +102,10 @@ GBLREF	int			process_exiting;
 {													\
 	SET_PROCESS_EXITING_TRUE;									\
 	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */	\
+	/* Note we call secshr_db_clnup() with the flag NORMAL_TERMINATION even in an error condition	\
+	 * here because we know at this point that we aren't in the middle of a transaction but crit	\
+	 * may be held in one or more regions and/or other odds/ends to cleanup.			\
+	 */												\
 	secshr_db_clnup(NORMAL_TERMINATION);								\
 	if (dollar_tlevel)										\
 		OP_TROLLBACK(0);									\
@@ -161,7 +166,7 @@ void gtm_exit_handler(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (exit_handler_active)	/* Don't recurse if exit handler exited */
+	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;
 	attempting = rundown_state_mprof;

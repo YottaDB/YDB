@@ -13,7 +13,13 @@
 #-----------------------------------------------
 # Mumps error condition handler macros
 #-----------------------------------------------
-chnd_size	=	224
+.ifdef cygwin
+# This is provisionally bumped up by 8. It needs be be verified on a 64-bit cygwin computer
+chnd_size	=	288
+.else
+chnd_size	=	232
+.endif
+
 chnd_save_active =	0
 chnd_ch_active	=	8
 chnd_ch		=	16

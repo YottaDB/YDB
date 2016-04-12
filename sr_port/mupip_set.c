@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,7 @@
 
 GBLDEF	bool		region;
 GBLREF	bool		error_mupip;
-#ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
-#endif
 
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
@@ -49,7 +47,7 @@ void mupip_set(void)
 	int 		cli_stat;
 	boolean_t	set_journal, set_replication;
 
-	UNIX_ONLY(jnlpool_init_needed = TRUE);
+	jnlpool_init_needed = TRUE;
 	file = cli_present("FILE") == CLI_PRESENT;
 	region = cli_present("REGION") == CLI_PRESENT;
 	jnlfile = cli_present("JNLFILE") == CLI_PRESENT;
@@ -80,31 +78,32 @@ void mupip_set(void)
 		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
 	}
-	if (cli_present("ACCESS_METHOD")   	== CLI_PRESENT  ||
-#	    ifdef UNIX
-	    cli_present("INST_FREEZE_ON_ERROR")	== CLI_PRESENT  ||
-	    cli_present("INST_FREEZE_ON_ERROR") == CLI_NEGATED  ||
-#	    endif
-	    cli_present("EXTENSION_COUNT") 	== CLI_PRESENT  ||
-	    cli_present("GLOBAL_BUFFERS")  	== CLI_PRESENT  ||
-	    cli_present("RESERVED_BYTES")  	== CLI_PRESENT  ||
-	    cli_present("FLUSH_TIME")      	== CLI_PRESENT  ||
-	    cli_present("LOCK_SPACE")      	== CLI_PRESENT  ||
-	    cli_present("MUTEX_SLOTS")      	== CLI_PRESENT  ||
-	    cli_present("DEFER_TIME")      	== CLI_PRESENT  ||
-	    cli_present("DEFER_ALLOCATE")	== CLI_PRESENT  ||
-	    cli_present("DEFER_ALLOCATE")	== CLI_NEGATED  ||
-	    cli_present("WAIT_DISK")		== CLI_PRESENT  ||
-	    cli_present("PARTIAL_RECOV_BYPASS")	== CLI_PRESENT  ||
-#	    ifdef UNIX
-	    cli_present("KEY_SIZE")		== CLI_PRESENT  ||
-	    cli_present("QDBRUNDOWN")		== CLI_PRESENT  ||
-	    cli_present("QDBRUNDOWN")		== CLI_NEGATED  ||
-	    cli_present("EPOCHTAPER")		== CLI_PRESENT  ||
-	    cli_present("EPOCHTAPER")		== CLI_NEGATED  ||
-	    cli_present("RECORD_SIZE")		== CLI_PRESENT  ||
-#	    endif
-	    cli_present("VERSION")		== CLI_PRESENT)
+	if (cli_present("ACCESS_METHOD")		== CLI_PRESENT  ||
+	    cli_present("DEFER_ALLOCATE")		== CLI_NEGATED  ||
+	    cli_present("DEFER_ALLOCATE")		== CLI_PRESENT  ||
+	    cli_present("DEFER_TIME")			== CLI_PRESENT  ||
+	    cli_present("ENCRYPTABLE")			== CLI_PRESENT  ||
+	    cli_present("ENCRYPTABLE")			== CLI_NEGATED  ||
+	    cli_present("ENCRYPTIONCOMPLETE")		== CLI_PRESENT  ||
+	    cli_present("EPOCHTAPER")			== CLI_NEGATED  ||
+	    cli_present("EPOCHTAPER")			== CLI_PRESENT  ||
+	    cli_present("EXTENSION_COUNT")		== CLI_PRESENT  ||
+	    cli_present("FLUSH_TIME")			== CLI_PRESENT  ||
+	    cli_present("GLOBAL_BUFFERS")		== CLI_PRESENT  ||
+	    cli_present("INST_FREEZE_ON_ERROR")		== CLI_NEGATED  ||
+	    cli_present("INST_FREEZE_ON_ERROR")		== CLI_PRESENT  ||
+	    cli_present("KEY_SIZE")			== CLI_PRESENT  ||
+	    cli_present("LOCK_SPACE")			== CLI_PRESENT  ||
+	    cli_present("MUTEX_SLOTS")			== CLI_PRESENT  ||
+	    cli_present("PARTIAL_RECOV_BYPASS")		== CLI_PRESENT  ||
+	    cli_present("QDBRUNDOWN")			== CLI_NEGATED  ||
+	    cli_present("QDBRUNDOWN")			== CLI_PRESENT  ||
+	    cli_present("RECORD_SIZE")			== CLI_PRESENT  ||
+	    cli_present("RESERVED_BYTES")		== CLI_PRESENT  ||
+	    cli_present("SLEEP_SPIN_COUNT")		== CLI_PRESENT  ||
+	    cli_present("SPIN_SLEEP_LIMIT")		== CLI_PRESENT  ||
+	    cli_present("VERSION")			== CLI_PRESENT  ||
+	    cli_present("WAIT_DISK")			== CLI_PRESENT)
 	{
 		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
 			mupip_exit(status);

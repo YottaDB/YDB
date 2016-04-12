@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +25,7 @@
 #include "iosp.h"
 #include "mupint.h"
 #include "gds_blk_upgrade.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "min_max.h"
 #ifdef GTM_SNAPSHOT
 #include "shmpool.h"		/* Needed for DBG_ENSURE_PTR_WITHIN_SS_BOUNDS */
@@ -34,16 +33,15 @@
 #endif
 #include "mupip_exit.h"
 
-GBLREF sgmnt_data	mu_int_data;
-GBLREF int4		mu_int_ovrhd;
-GBLREF gd_region	*gv_cur_region;
-GTMCRYPT_ONLY(
-GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
-)
-GBLREF	boolean_t	ointeg_this_reg;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	uint4		mu_int_errknt;
-GBLREF	bool		region;
+GBLREF sgmnt_data		mu_int_data;
+GBLREF int4			mu_int_ovrhd;
+GBLREF gd_region		*gv_cur_region;
+GBLREF enc_handles		mu_int_encr_handles;
+GBLREF boolean_t		ointeg_this_reg;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF uint4			mu_int_errknt;
+GBLREF bool			region;
 
 error_def(ERR_DBRDERR);
 error_def(ERR_DBROLLEDBACK);
@@ -56,18 +54,19 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 	int4			status;
 	file_control		*fc;
 	unsigned char		*tmp_ptr;
-#	ifdef GTM_CRYPT
 	int			in_len, gtmcrypt_errno;
 	char			*in;
 	gd_segment		*seg;
-#	endif
-	boolean_t 		have_blk = FALSE;
+	boolean_t		db_is_encrypted, use_new_key;
+	sgmnt_data_ptr_t	csd;
+	boolean_t 		have_blk;
 	sgmnt_addrs		*csa;
 	GTM_SNAPSHOT_ONLY(
 		boolean_t	read_failed;
 		shm_snapshot_t	*ss_shm_ptr;
 	)
 
+	have_blk = FALSE;
 	csa = cs_addrs;
 #	ifdef UNIX
 	if (region && csa->nl->onln_rlbk_pid)
@@ -124,25 +123,30 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 		}
 #		endif
 	}
-#	ifdef GTM_CRYPT
-	in_len = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
-	if (BLK_NEEDS_ENCRYPTION3(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), in_len))
+	csd = &mu_int_data;
+	if (USES_ENCRYPTION(csd->is_encrypted))
 	{
-		/* The below assert cannot be moved before BLK_NEEDS_ENCRYPTION3 check done above as tmp_ptr could
-		 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
-		 * a V5 block header.
-		 */
-		assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz <= mu_int_data.blk_size);
-		assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz >= SIZEOF(blk_hdr));
-		in = (char *)(tmp_ptr + SIZEOF(blk_hdr));
-		GTMCRYPT_DECRYPT(csa, mu_int_encrypt_key_handle, in, in_len, NULL, gtmcrypt_errno);
-		if (0 != gtmcrypt_errno)
-		{
-			seg = gv_cur_region->dyn.addr;
-			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		in_len = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
+		db_is_encrypted = IS_ENCRYPTED(csd->is_encrypted);
+		use_new_key = NEEDS_NEW_KEY(csd, ((blk_hdr_ptr_t)tmp_ptr)->tn);
+		if ((use_new_key || db_is_encrypted) && IS_BLK_ENCRYPTED((((blk_hdr_ptr_t)tmp_ptr)->levl), in_len))
+		{	/* The below assert cannot be moved before (use_new_key || db_is_encrypted) check done above as tmp_ptr
+			 * could potentially point to a V4 block in which case the assert might fail when a V4 block is cast to
+			 * a V5 block header.
+			 */
+			assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz <= csd->blk_size);
+			assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz >= SIZEOF(blk_hdr));
+			in = (char *)(tmp_ptr + SIZEOF(blk_hdr));
+			GTMCRYPT_DECRYPT(csa, (use_new_key ? TRUE : csd->non_null_iv),
+					(use_new_key ? mu_int_encr_handles.encr_key_handle2 : mu_int_encr_handles.encr_key_handle),
+					in, in_len, NULL, tmp_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				seg = gv_cur_region->dyn.addr;
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+			}
 		}
 	}
-#	endif
 	GDS_BLK_UPGRADE_IF_NEEDED(blk, tmp_ptr, tmp_ptr, &mu_int_data, ondsk_blkver, status, mu_int_data.fully_upgraded);
 	if (SS_NORMAL != status)
 		if (ERR_DYNUPGRDFAIL == status)

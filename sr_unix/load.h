@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,7 @@
 #define ONERROR_STOP		0
 #define ONERROR_PROCEED		1
 #define ONERROR_INTERACTIVE	2
+#define BADZCHSET		-1
 #define ONERROR_PROCESS														\
 {																\
 	GBLREF int onerror;													\
@@ -33,8 +35,14 @@
 	continue; /* continue, when (onerror = ONERROR_PROCEED) or when user selects Yes in ONERROR_INTERACTIVE */		\
 }
 
-void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len);
-void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2_ptr, int line2_len);
-void goq_load(void);
+void		bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len);
+void		go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
+int		go_get(char **in_ptr, int max_len, uint4 max_rec_size);
+void		go_load(uint4 begin, uint4 end, unsigned char *recbuf, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
+			int utf8_extract, int dos);
+void		goq_load(void);
+int		get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size,
+			int *utf8_extract, int *dos);
+boolean_t	gtm_regex_perf(const char *rexpr, char *str_buff);
 
 #endif /* LOAD_INCLUDED */

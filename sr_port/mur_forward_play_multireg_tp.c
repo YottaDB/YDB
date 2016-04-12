@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +41,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	boolean_t		multi_proc_in_use;	/* TRUE => parallel processes active ("gtm_multi_proc"). False otherwise */
 
 error_def(ERR_JNLREADEOF);
 
@@ -63,23 +65,33 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 	jnl_record		*rec;
 	jnl_ctl_list		*jctl;
 	reg_ctl_list		*save_rctl, *next_rctl;
-	uint4			num_tcoms, num_participants;
+	uint4			num_tcoms, num_participants, num_tcoms_this_proc;
 	boolean_t		tcom_played, first_tcom, deleted;
 	ht_ent_int8		*tabent;
 	forw_multi_struct	*cur_forw_multi, *prev_forw_multi;
+	shm_forw_multi_t	*sfm;
 
 	save_rctl = rctl;	/* save input "rctl" (needed at end) */
 	assert(!save_rctl->forw_eof_seen);
 	assert(1 < forw_multi->num_reg_total);	/* should not have come here for single-region TP transactions */
 	rec_token_seq = forw_multi->token;
 	recstat = forw_multi->recstat;
-	if (mur_options.rollback && (rec_token_seq >= murgbl.losttn_seqno) && (GOOD_TN == recstat))
+	/* If "multi_proc_in_use" is TRUE and the "shm_forw_multi" structure (shared memory) indicates this is a lost
+	 * transaction (based on the perspective of all processes participating in this multi-region TP transaction),
+	 * convert this process' perspective to be the same in case this still thinks it is a good transaction.
+	 */
+	sfm = forw_multi->shm_forw_multi;
+	assert((NULL == sfm) || multi_proc_in_use);
+	assert((NULL == sfm) || !((BROKEN_TN == sfm->recstat) ^ (BROKEN_TN == forw_multi->recstat)));
+	if ((mur_options.rollback && (rec_token_seq >= murgbl.losttn_seqno) && (GOOD_TN == recstat))
+			|| ((NULL != sfm) && (LOST_TN == sfm->recstat)))
 		recstat = forw_multi->recstat = LOST_TN;
 	next_rctl = forw_multi->first_tp_rctl;
 	assert(NULL != next_rctl);
 	num_tcoms = 0;
 	first_tcom = TRUE;
 	assert(!dollar_tlevel);
+	num_tcoms_this_proc = forw_multi->num_reg_seen_forward;
 	DEBUG_ONLY(num_participants = (uint4)-1;)	/* a very high value to indicate uninitialized state */
 	do
 	{
@@ -117,7 +129,7 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 				assert(rec_token_seq == GET_JNL_SEQNO(rec));
 			}
 #			endif
-			status = mur_forward_play_cur_jrec(rctl);
+			status = mur_forward_play_cur_jrec(rctl);	/* Note: also sets "multi_proc_key" if applicable */
 			if (SS_NORMAL != status)
 				return status;
 			assert(!murgbl.ok_to_update_db || dollar_tlevel || (GOOD_TN != recstat));
@@ -131,7 +143,7 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 				}
 				assert(rec->jrec_tcom.num_participants == num_participants);
 				num_tcoms++;
-				if ((num_tcoms == num_participants) && murgbl.ok_to_update_db && (GOOD_TN == recstat))
+				if ((num_tcoms == num_tcoms_this_proc) && murgbl.ok_to_update_db && (GOOD_TN == recstat))
 				{	/* TCOM record of LAST region. Do actual transaction commit */
 					MUR_SET_JNL_FENCE_CTL_TOKEN(rec_token_seq, ((reg_ctl_list *)NULL));
 					jgbl.mur_jrec_participants = rec->jrec_tcom.num_participants;
@@ -158,7 +170,9 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 			MUR_FORW_TOKEN_REMOVE(rctl);
 		}
 	} while (next_rctl != rctl);
-	assert((num_tcoms == num_participants) || (BROKEN_TN == recstat));
+	assert((!multi_proc_in_use && (num_tcoms == num_participants))
+		|| (multi_proc_in_use && (num_tcoms <= num_participants) && (num_tcoms == num_tcoms_this_proc))
+		|| (BROKEN_TN == recstat));
 	assert(!dollar_tlevel);
 	/* Now that the multi-region "forw_multi" structure is processed, it can be freed. Along with it, the corresponding
 	 * hashtable entry can be freed as well as long as there are no other same-token "forw_multi" structures.

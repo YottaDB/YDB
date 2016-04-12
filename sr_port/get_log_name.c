@@ -24,8 +24,7 @@ GBLREF io_log_name *io_root_log_name;
 io_log_name *get_log_name(mstr *v, bool insert)
 {
         io_log_name	*l, *prev, *new;
-        int4		stat;
-        short		index, v_len;
+        int4		index, stat, v_len;
         unsigned char	buf[LOGNAME_LEN];
         error_def	(ERR_INVSTRLEN);
 

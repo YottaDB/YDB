@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +43,7 @@
 GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	dse_running;
 GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;
+GBLREF	uint4		mu_reorg_encrypt_in_prog;
 
 error_def(ERR_DBBLEVMX);
 error_def(ERR_DBBLEVMN);
@@ -433,9 +435,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
-				if ((child > csa->ti->total_blks) && !mu_reorg_upgrd_dwngrd_in_prog)
-				{	/* REORG -UPGRADE/DOWNGRADE can update recycled blocks, which may contain children beyond
-					 * the total_blks if a truncate happened sometime after the block was killed.
+				if ((child > csa->ti->total_blks) && !mu_reorg_upgrd_dwngrd_in_prog && !mu_reorg_encrypt_in_prog)
+				{	/* REORG -UPGRADE/DOWNGRADE/ENCRYPT can update recycled blocks, which may contain children
+					 * beyond total_blks if a truncate happened sometime after the block was killed.
 					 */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff);
 					return FALSE;

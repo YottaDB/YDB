@@ -15,7 +15,7 @@
 #ifdef GTM_TRIGGER
 
 #include <errno.h>
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_limits.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"

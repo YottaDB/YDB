@@ -65,7 +65,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	max_retries = max_timeout_in_secs * 4 * 1000; /* outer-loop : X minutes, 1 loop in 4 is sleep of 1 ms */
 	for (retries = max_retries - 1; 0 < retries; retries--)
-	{
+	{	/* seems like it should be a mutex */
 		for (spins = maxspins; 0 < spins; spins--)
 		{
 			assert(latch->u.parts.latch_pid != process_id); /* We better not hold it if trying to get it */

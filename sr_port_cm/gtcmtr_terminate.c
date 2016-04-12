@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>		/* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"	/* needed for VSIG_ATOMIC_T */
 
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
@@ -41,11 +42,12 @@ bool gtcmtr_terminate(bool cm_err)
 #endif
 	uint4		status;
 	struct CLB	*clb;
+	intrpt_state_t	prev_intrpt_state;
 
 	if (curr_entry)
 	{
 		/* We are about to rundown databases, clean up structures. Defer MUPIP STOP/signal handling until function end. */
-		DEFER_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE);
+		DEFER_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE, prev_intrpt_state);
 		cancel_timer((TID)curr_entry);
 		gtcml_lkrundown();
 		gtcmd_rundown(curr_entry, cm_err);
@@ -82,8 +84,8 @@ bool gtcmtr_terminate(bool cm_err)
 		 */
 		VMS_ONLY(free(curr_entry));
 		curr_entry = NULL;
-		ENABLE_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE);	/* check if any MUPIP STOP/signals were deferred
-									 * while in this function */
+		ENABLE_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE, prev_intrpt_state);	/* check if any MUPIP STOP/signals were
+											 * deferred while in this function */
 	}
 	gtcm_users--;
 	VMS_ONLY(gtcm_ast_avail++);

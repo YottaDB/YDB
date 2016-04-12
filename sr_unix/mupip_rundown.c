@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +56,7 @@
 #include "repl_sem.h"
 #include "ftok_sems.h"
 #include "ipcrmid.h"
+#include "do_semop.h"
 
 GBLREF	bool			in_backup;
 GBLREF	bool			error_mupip;
@@ -89,7 +91,9 @@ void mupip_rundown(void)
 	tp_region		*rptr, single;
 	replpool_identifier	replpool_id;
 	repl_inst_hdr		repl_instance;
+	unix_db_info		*udi;
 	struct shmid_ds		shm_buf;
+	union semun		semarg;
 	unsigned int		full_len;
 	char			*instfilename;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
@@ -137,12 +141,32 @@ void mupip_rundown(void)
 			{
 				instfilename = &replpool_id.instfilename[0];
 				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,
-						&jnlpool_sem_created))
-				{
-					assert(NULL == jnlpool_ctl);
+												&jnlpool_sem_created))
+				{	/* It is possible, we attached to the journal pool (and did not run it down because there
+					 * were other processes still attached to it) but got an error while trying to grab the
+					 * access control semaphore for the receive pool (because a receiver server was still
+					 * running) and because anticipatory_freeze_available is TRUE, we did not detach from
+					 * the journal pool inside "mu_rndwn_repl_instance". We need to do the detach here.
+					 * No need to do any instance file cleanup since there is nothing to rundown there
+					 * from either the journal pool or receive pool.
+					 */
+					assert((NULL == jnlpool_ctl) || anticipatory_freeze_available);
+					if (NULL != jnlpool_ctl)
+					{
+						shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
+						JNLPOOL_SHMDT(status, save_errno);
+						jnlpool.gtmsrc_lcl_array = NULL;
+						jnlpool.repl_inst_filehdr = NULL;
+						jnlpool.gtmsource_local_array = NULL;
+						jnlpool.jnldata_base = NULL;
+						if (0 > status)
+						{
+							ISSUE_REPLPOOLINST(save_errno, shmid, instfilename, "shmdt()");
+							mupip_exit(ERR_MUNOTALLSEC);
+						}
+					}
 					exit_status = ERR_MUNOTALLSEC;
-				}
-				else
+				} else
 					do_jnlpool_detach = (NULL != jnlpool_ctl);
 				ENABLE_FREEZE_ON_ERROR;
 			}
@@ -175,6 +199,7 @@ void mupip_rundown(void)
 		}
 		if (do_jnlpool_detach)
 		{
+			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 			assert(anticipatory_freeze_available && repl_inst_available);
 			assert(NULL != jnlpool_ctl);
 			/* Read the instance file to invalidate the journal pool semaphore ID and shared memory ID */
@@ -197,7 +222,7 @@ void mupip_rundown(void)
 				mupip_exit(ERR_MUNOTALLSEC);
 			}
 			/* Grab the ftok again */
-			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
+			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE))
 			{	/* CRITSEMFAIL is issued in case of an error */
 				assert(FALSE);
 				mupip_exit(ERR_MUNOTALLSEC);
@@ -266,6 +291,44 @@ void mupip_rundown(void)
 								       ERR_SEMREMOVED, 1, semid);
 						}
 						repl_instance.crash = FALSE; /* No more semaphore IDs. Reset crash bit */
+						if (repl_instance.ftok_counter_halted)
+						{	/* recvpool has already been rundown in "mu_rndwn_repl_instance" above */
+							assert(INVALID_SEMID == repl_instance.recvpool_semid);
+							assert(INVALID_SHMID == repl_instance.recvpool_shmid);
+							/* ftok counter is not guaranteed to be at 1. So fix it that way the
+							 * "ftok_sem_release" done later WILL remove the ftok semaphore.
+							 */
+							semarg.val = 0;
+							if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
+							{
+								save_errno = errno;
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+									ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
+									CALLFROM, save_errno);
+								/* In case not able to set counter to 1, proceed with rundown
+								 * without deleting the ftok semaphore (so keep
+								 * counter_ftok_incremented unchanged)
+								 */
+							} else
+							{
+								save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM,
+												DB_COUNTER_SEM_INCR, SEM_UNDO);
+								if (save_errno)
+								{
+									gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+										ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
+										CALLFROM, save_errno);
+									/* In case not able to set counter to 1, proceed with
+									 * rundown without deleting the ftok semaphore (so keep
+									 * counter_ftok_incremented at FALSE)
+									 */
+								} else
+								{
+									udi->counter_ftok_incremented = TRUE;
+									repl_instance.ftok_counter_halted = FALSE;
+								}
+							}
+						}
 					}
 				} else
 				{	/* REPLACCESSSEM is issued from within mu_replpool_release_sem */
@@ -286,7 +349,7 @@ void mupip_rundown(void)
 					mupip_exit(ERR_MUNOTALLSEC);
 				}
 			}
-			if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
+			if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 			{	/* CRITSEMFAIL is issued in case of an error */
 				assert(FALSE);
 				mupip_exit(ERR_MUNOTALLSEC);

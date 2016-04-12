@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +47,7 @@
 #include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR macro */
 #include <rtnhdr.h>
 #include "stack_frame.h"
+#include "jobsp.h"
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
@@ -178,6 +180,7 @@ void lvzwr_out(lv_val *lvp)
 				{	/* Put out "dummy" statement that will clear all the $ZWRTAC vars for a clean slate */
 					zwr_output->flush = TRUE;
 					zshow_output(zwr_output, &dzwrtac_clean);
+					UNIX_ONLY(MIDCHILD_SEND_VAR);
 				}
 				MEMCPY_LIT(zwrt_varname.c, DOLLAR_ZWRTAC);
 				lastc = i2asc((uchar_ptr_t)zwrt_varname.c + STR_LIT_LEN(DOLLAR_ZWRTAC), zwrtacindx);
@@ -200,6 +203,7 @@ void lvzwr_out(lv_val *lvp)
 			zshow_output(zwr_output, &one);
 			zwr_output->flush = TRUE;
 			zshow_output(zwr_output, (const mstr *)&newzav->zwr_var);
+			UNIX_ONLY(MIDCHILD_SEND_VAR);
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
 				 * currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var
@@ -270,7 +274,7 @@ void lvzwr_out(lv_val *lvp)
 		zshow_output(zwr_output, &one);
 		mval_write(zwr_output, val, !htent_added);
 		if (htent_added)
-		{	/* output the ";#" tag to indicate this is an alias output */
+		{	/* output the "; *" tag to indicate this is an alias output */
 			zwr_output->flush = TRUE;
 			zshow_output(zwr_output, &semi_star);
 		}

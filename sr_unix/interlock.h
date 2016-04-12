@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +18,11 @@
 #include "memcoherency.h"
 
 /* Define memory barrier macro to use in LOCK_BUFF_FOR_READ/RELEASE_BUFF_READ_LOCK macros below. On AIX
- * and Tru64, the locking macros have no memory barrier connotation because they use load/store_locked instructions.
+ * the locking macros have no memory barrier connotation because they use load/store_locked instructions.
  * The macros defined below give us that connotation on the platforms that need it and avoid adding additional
  * memory barriers on platforms that already have them.
  */
-#if defined(_AIX) || defined(__osf__)
+#if defined(_AIX)
 #  define READ_LOCK_READ_MEMBARRIER SHM_READ_MEMORY_BARRIER
 #  define READ_LOCK_WRITE_MEMBARRIER SHM_WRITE_MEMORY_BARRIER
 #else

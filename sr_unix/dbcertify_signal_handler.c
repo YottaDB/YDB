@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,18 +15,17 @@
  * If we are nesting our handlers in an improper way, this routine will
  * not return but will immediately invoke core/termination processing.
  *
- * Returns if some condition makes it inadvisable to exit now else invokes the system exit() system call.
+ * Returns if some condition makes it inadvisable to exit now else invokes the system EXIT() system call.
  */
 
 #include "mdef.h"
 
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "error.h"
 #include "gtmsiginfo.h"
@@ -113,9 +113,10 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 				if (core_in_progress)
 				{
 					if (exit_handler_active)
-						_exit(sig);
-					else
-						exit(sig);
+					{
+						UNDERSCORE_EXIT(sig);
+					} else
+						EXIT(sig);
 				}
 				++core_in_progress;
 				DUMP_CORE;
@@ -302,5 +303,5 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 		DRIVECH(exi_condition);
 
 	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }

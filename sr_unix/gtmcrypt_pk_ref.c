@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,6 +85,7 @@ int gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, unsigned char *plai
 	memset(plain_text, 0, SYMMETRIC_KEY_MAX);
 	gpgme_data_seek(plain_data, 0, SEEK_SET);
 	ret = (int)gpgme_data_read(plain_data, plain_text, SYMMETRIC_KEY_MAX);
+	assert(ret || (NULL != getenv("gtm_white_box_test_case_enable"))); /* || needed for "encryption/key_file_enc" subtest */
 	return ret;
 }
 
@@ -176,7 +178,7 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 int gc_pk_gpghome_has_permissions()
 {
 	char		pathname[GTM_PATH_MAX], *ptr;
-	int		gnupghome_set, perms;
+	int		gnupghome_set, perms, pathlen;
 
 	/* See if GNUPGHOME is set in the environment */
 	if (!(ptr = getenv(GNUPGHOME)))
@@ -190,13 +192,20 @@ int gc_pk_gpghome_has_permissions()
 		SNPRINTF(pathname, GTM_PATH_MAX, "%s/%s", ptr, DOT_GNUPG);
 	} else
 	{
-		if (0 == strlen(ptr))
+		pathlen = strlen(ptr);
+		if (0 == pathlen)
 		{
 			UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, GNUPGHOME);
 			return -1;
 		}
+		if (GTM_PATH_MAX <= pathlen)
+		{
+			UPDATE_ERROR_STRING("$GNUPGHOME is too long -" STR_ARG, ELLIPSIZE(pathname));
+			return -1;
+		}
 		gnupghome_set = TRUE;
-		strcpy(pathname, ptr);
+		strncpy(pathname, ptr, pathlen);
+		pathname[pathlen] = '\0';
 	}
 	if (-1 != (perms = access(pathname, R_OK | X_OK)))
 		return 0;

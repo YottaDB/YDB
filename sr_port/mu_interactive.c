@@ -30,20 +30,15 @@ boolean_t mu_interactive(caddr_t message)
 	unsigned short	len;
 	int		index;
 	char		res[8];
-	UNIX_ONLY(char *fgets_res;)
-	UNIX_ONLY(util_out_print(PROCEED_PROMPT, TRUE);)
-	VMS_ONLY($DESCRIPTOR (dres, res);)
-	VMS_ONLY($DESCRIPTOR (dprm, PROCEED_PROMPT);)
+	char 		*fgets_res;
+	util_out_print(PROCEED_PROMPT, TRUE);
 
 	while (FALSE == done)
 	{
-		VMS_ONLY(lib$get_input(&dres, &dprm, &len);)
-#		if defined(UNIX)
 		fgets_res = util_input(res, SIZEOF(res), stdin, FALSE);
 		if (NULL != fgets_res)
 		{
 			len = strlen(res);
-#		endif
 			if (0 < len)
 			{
 				for (index = 0; index < len; index++)
@@ -61,13 +56,11 @@ boolean_t mu_interactive(caddr_t message)
 				}
 			}
 			util_out_print(CORRECT_PROMPT, TRUE);
-#		if defined(UNIX)
 		} else
 		{
 			mur_error_allowed = FALSE;
 			break;
 		}
-#		endif
 	}
 	if (FALSE == mur_error_allowed)
 		util_out_print(message, TRUE);

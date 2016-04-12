@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +55,7 @@
 #include "gtmmsg.h"
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
-#include "ftok_sems.h"
+#include "ftok_sem_incrcnt.h"
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "fork_init.h"
@@ -96,6 +97,7 @@ error_def(ERR_REPLINSTOPEN);
 error_def(ERR_RESUMESTRMNUM);
 error_def(ERR_REUSEINSTNAME);
 error_def(ERR_REUSESLOTZERO);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_UPDSYNC2MTINS);
 error_def(ERR_UPDSYNCINSTFILE);
@@ -114,7 +116,7 @@ int gtmrecv(void)
 	int			exit_status, waitpid_res, save_errno;
 	int			log_init_status;
 	int			updresync_instfile_fd;	/* fd of the instance file name specified in -UPDATERESYNC= */
-	boolean_t		cross_endian;
+	boolean_t		cross_endian, dummy_ftok_counter_halted;
 	int			null_fd, rc;
 
 	call_on_signal = gtmrecv_sigstop;
@@ -157,11 +159,11 @@ int gtmrecv(void)
 		 */
 		if (0 < gtmrecv_options.shutdown_time)
 		{
-			repl_log(stdout, FALSE, TRUE, "Waiting for %d seconds before signalling shutdown\n",
+			repl_log(stdout, TRUE, TRUE, "Waiting for %d second(s) before forcing shutdown\n",
 				gtmrecv_options.shutdown_time);
 			LONG_SLEEP(gtmrecv_options.shutdown_time);
 		} else
-			repl_log(stdout, FALSE, TRUE, "Signalling immediate shutdown\n");
+			repl_log(stdout, TRUE, TRUE, "Forcing immediate shutdown\n");
 	}
 	recvpool_init(GTMRECV, gtmrecv_options.start && 0 != gtmrecv_options.listen_port);
 	/*
@@ -212,7 +214,7 @@ int gtmrecv(void)
 		{	/* -UPDATERESYNC=<INSTANCE_FILENAME> was specified.
 			 * Note: -UPDATERESYNC without a value is treated as -UPDATERESYNC="" hence the above check.
 			 */
-			OPENFILE(gtmrecv_options.updresync_instfilename, O_RDONLY, updresync_instfile_fd);
+			OPENFILE_CLOEXEC(gtmrecv_options.updresync_instfilename, O_RDONLY, updresync_instfile_fd);
 			if (FD_INVALID == updresync_instfile_fd)
 			{
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
@@ -490,6 +492,11 @@ int gtmrecv(void)
 		 * This will trigger update process to reset recvpool_ctl->jnl_seqno too.
 		 */
 		gtmrecv_local->restart = GTMRECV_RCVR_RESTARTED;
+		/* Signal the update process to check for the update. */
+		PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
 				jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
 	}
@@ -538,6 +545,11 @@ int gtmrecv(void)
 		recvpool_ctl->wrapped = FALSE;
 		upd_proc_local->changelog = TRUE;
 		gtmrecv_local->restart = GTMRECV_NO_RESTART; /* release the update process wait */
+		/* Signal the update process to check for the update. */
+		PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	}
 	if (gtmrecv_options.helpers)
 		gtmrecv_helpers_init(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
@@ -547,7 +559,7 @@ int gtmrecv(void)
 	 * for the replication instance file. But the receiver server process (the child) that comes here would not have done
 	 * that. Do that while the parent is still waiting for our okay.
 	 */
-	if (!ftok_sem_incrcnt(recvpool.recvpool_dummy_reg))
+	if (!ftok_sem_incrcnt(recvpool.recvpool_dummy_reg, FILE_TYPE_REPLINST, &dummy_ftok_counter_halted))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	/* Lock the receiver server count semaphore. Its value should be atmost 1. */
 	if (0 > grab_sem_immediate(RECV, RECV_SERV_COUNT_SEM))

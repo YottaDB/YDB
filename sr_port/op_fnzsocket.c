@@ -35,6 +35,7 @@
 #ifdef GTM_TLS
 #include "gtm_caseconv.h"
 #include "min_max.h"
+#include "gtm_time.h"
 #include "gtm_tls.h"
 #endif
 
@@ -61,11 +62,17 @@ LITREF	mval		skiparg;
 #define	TLSCLIENTSTR	"CLIENT"
 #define	TLSSERVERSTR	"SERVER"
 #define TLSOPTIONLIT	"TLS option: "		/* for error message */
-LITDEF char *zsocket_tls_options[] = {"CIPHER", "OPTIONS", NULL};
-#define	OPTIONEND		','
-#define	OPTIONENDSTR		","
+LITDEF char *zsocket_tls_options[] = {"CIPHER", "OPTIONS", "SESSION", "INTERNAL", "ALL", NULL};
+/* TLS_OPTIONS_ are bits in a bitmask */
 #define	TLS_OPTIONS_CIPHER	1
 #define	TLS_OPTIONS_OPTIONS	2
+#define	TLS_OPTIONS_SESSION	4
+#define	TLS_OPTIONS_INTERNAL	8
+#define TLS_OPTIONS_ALL_INDEX	4
+#define	TLS_OPTIONS_ALL_MASK	(TLS_OPTIONS_CIPHER | TLS_OPTIONS_OPTIONS | TLS_OPTIONS_SESSION)
+#define	OPTIONEND		','
+#define	OPTIONENDSTR		","
+#define OPTIONPREFIXLEN		3		/* vertbar CPOS colon */
 #endif
 
 #define ZSOCKETITEM(A,B,C,D) {(SIZEOF(A) - 1), A}
@@ -128,8 +135,10 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 #ifdef	GTM_TLS
 	int			tls_options_mask, optionoffset, optionlen;
 	gtm_tls_socket_t	*tls_sock;
+	gtm_tls_ctx_t		*tls_ctx;
 	gtm_tls_conn_info	conn_info;
 	char			*charptr, *optionend;
+	struct tm		*localtm;
 #endif
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
@@ -462,7 +471,10 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 						for (index2 = 0; NULL != zsocket_tls_options[index2]; index2++)
 							if (0 == STRCMP(charptr, zsocket_tls_options[index2]))
 							{
-								tls_options_mask |= 1 << index2;
+								if (TLS_OPTIONS_ALL_INDEX == index2)
+									tls_options_mask |= TLS_OPTIONS_ALL_MASK;
+								else
+									tls_options_mask |= 1 << index2;
 								break;
 							}
 						if (NULL == zsocket_tls_options[index2])
@@ -479,15 +491,32 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 							return;		/* make compiler happy */
 						}
 					}
+					memset(&conn_info, 0, SIZEOF(conn_info));
 					if (0 == gtm_tls_get_conn_info(tls_sock, &conn_info))
 					{
 						if (TLS_OPTIONS_CIPHER & tls_options_mask)
 						{
-							len += STRLEN(conn_info.protocol) + 3;		/* |P: */
-							len += STRLEN(conn_info.session_algo) + 3;	/* |C: */
+							len += STRLEN(conn_info.protocol) + OPTIONPREFIXLEN;	/* |P: */
+							len += STRLEN(conn_info.session_algo) + OPTIONPREFIXLEN;	/* |C: */
 						}
 						if (TLS_OPTIONS_OPTIONS & tls_options_mask)
-							len += (3 + 16);	/* |O: hex digits in long */
+						{
+							len += (OPTIONPREFIXLEN + MAX_HEX_DIGITS_IN_INT8);	/* |O: long */
+							len += 3;		/* ,xx for verify_mode */
+						}
+						if (TLS_OPTIONS_SESSION & tls_options_mask)
+						{
+							len += OPTIONPREFIXLEN;	/* |S: */
+							len += 7 + 1 + 1;	/* RENSEC: 0 or 1 - is secure comma */
+							len += 7 + MAX_DIGITS_IN_INT + 1;	/* RENTOT: value comma */
+							len += 7 + MAX_SESSION_ID_LEN + 1;	/* SESSID: hex session_id comma */
+							len += 7 + CTIME_BEFORE_NL + 2;		/* SESEXP: room for NL + null */
+						}
+					} else
+						len2 = 0;	/* no conn info available - ignore errors here */
+					if (TLS_OPTIONS_INTERNAL & tls_options_mask)
+					{	/* |I: ctxflags,sockflags */
+						len += (OPTIONPREFIXLEN + (2 * MAX_HEX_DIGITS_IN_INT) + 1);
 					}
 				} else
 					len2 = 0;	/* flag no extras */
@@ -511,12 +540,12 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					if (TLS_OPTIONS_CIPHER & tls_options_mask)
 					{
 						STRCPY(charptr, "|P:");
-						charptr += 3;
+						charptr += OPTIONPREFIXLEN;
 						len2 = STRLEN(conn_info.protocol);
 						STRNCPY_STR(charptr, conn_info.protocol, len2);
 						charptr += len2;
 						STRCPY(charptr, "|C:");
-						charptr += 3;
+						charptr += OPTIONPREFIXLEN;
 						len2 = STRLEN(conn_info.session_algo);
 						STRNCPY_STR(charptr, conn_info.session_algo, len2);
 						charptr += len2;
@@ -524,12 +553,55 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					if (TLS_OPTIONS_OPTIONS & tls_options_mask)
 					{
 						STRCPY(charptr, "|O:");
-						charptr += 3;
-						len2 = STRLEN(conn_info.protocol);
-						i2hexl((qw_num)conn_info.options, (uchar_ptr_t)charptr, 16);
-						len2 = 16;
-						charptr += len2;
+						charptr += OPTIONPREFIXLEN;
+						i2hexl((qw_num)conn_info.options, (uchar_ptr_t)charptr, MAX_HEX_DIGITS_IN_INT8);
+						charptr += MAX_HEX_DIGITS_IN_INT8;
+						*charptr++ = ',';
+						i2hex(conn_info.verify_mode, (uchar_ptr_t)charptr, 2);
+						charptr += 2;
 					}
+					if (TLS_OPTIONS_SESSION & tls_options_mask)
+					{
+						STRCPY(charptr, "|S:");
+						charptr += OPTIONPREFIXLEN;
+						STRCPY(charptr, "RENSEC:");
+						charptr[7] = conn_info.secure_renegotiation ? '1' : '0';
+						charptr[8] = ',';
+						charptr += 9;
+						STRCPY(charptr, "RENTOT:");
+						charptr += 7;
+						charptr = (char *)i2asc((uchar_ptr_t)charptr, conn_info.total_renegotiations);
+						len2 = STRLEN(conn_info.session_id);
+						if (0 < len2)
+						{
+							*charptr++ = ',';
+							STRCPY(charptr, "SESSID:");
+							charptr += 7;
+							STRNCPY_STR(charptr, conn_info.session_id, len2);
+							charptr += len2;
+						}
+						if (-1 != conn_info.session_expiry_timeout)
+						{
+							*charptr++ = ',';
+							STRCPY(charptr, "SESEXP:");
+							charptr += 7;
+							GTM_LOCALTIME(localtm, (time_t *)&conn_info.session_expiry_timeout);
+							STRFTIME(charptr, CTIME_BEFORE_NL + 2, CTIME_STRFMT, localtm, len2);
+							assert(CTIME_BEFORE_NL == (len2 - 1));
+							charptr += (len2 - 1);		/* ignore NL */
+						}
+					}
+				}
+				if (TLS_OPTIONS_INTERNAL & tls_options_mask)
+				{
+					tls_ctx = tls_sock->gtm_ctx;
+					STRCPY(charptr, "|I:");
+					charptr += OPTIONPREFIXLEN;
+					i2hex(tls_ctx->flags, (uchar_ptr_t)charptr, MAX_HEX_DIGITS_IN_INT);
+					charptr += MAX_HEX_DIGITS_IN_INT;
+					*charptr++ = ',';
+					i2hex(tls_sock->flags, (uchar_ptr_t)charptr, MAX_HEX_DIGITS_IN_INT);
+					charptr += MAX_HEX_DIGITS_IN_INT;
 				}
 				len = charptr - (char *)stringpool.free;
 				dst->str.addr = (char *)stringpool.free;

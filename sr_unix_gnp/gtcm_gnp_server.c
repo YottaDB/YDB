@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,7 +157,7 @@ static void gtcm_gnp_server_actions(void)
 	unsigned short		value;
 	char			reply;
 	connection_struct	*prev_curr_entry;
-	CMI_MUTEX_DECL;
+	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -182,20 +183,20 @@ static void gtcm_gnp_server_actions(void)
 		}
 		if (blkdlist)
 			gtcml_chkreg();
-		CMI_MUTEX_BLOCK;
+		CMI_MUTEX_BLOCK(cmi_mutex_rc);
 		gtcm_remove_from_action_queue();
-		CMI_MUTEX_RESTORE;
+		CMI_MUTEX_RESTORE(cmi_mutex_rc);
 		if ((connection_struct *)INTERLOCK_FAIL == curr_entry)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
 		if ((connection_struct *)EMPTY_QUEUE != curr_entry)
 		{
 			if (1 == (curr_entry->int_cancel.laflag & 1))
 			{ /* valid interrupt cancel msg, handle in gtcm_urgread_ast */
-				CMI_MUTEX_BLOCK;
+				CMI_MUTEX_BLOCK(cmi_mutex_rc);
 				prev_curr_entry = curr_entry;
 				curr_entry = EMPTY_QUEUE;
 				gtcm_int_unpack(prev_curr_entry);
-				CMI_MUTEX_RESTORE;
+				CMI_MUTEX_RESTORE(cmi_mutex_rc);
 				continue;
 			}
 			switch (*curr_entry->clb_ptr->mbf)
@@ -310,9 +311,9 @@ static void gtcm_gnp_server_actions(void)
 					curr_entry = EMPTY_QUEUE;
 					if (1 == (prev_curr_entry->int_cancel.laflag & 1))
 					{  /* valid interrupt cancel msg, handle in gtcm_urgread_ast */
-						CMI_MUTEX_BLOCK;
+						CMI_MUTEX_BLOCK(cmi_mutex_rc);
 						gtcm_int_unpack(prev_curr_entry);
-						CMI_MUTEX_RESTORE;
+						CMI_MUTEX_RESTORE(cmi_mutex_rc);
 					} else if (CM_READ == reply)
 					{
 						prev_curr_entry->clb_ptr->ast = gtcm_read_ast;
@@ -366,8 +367,7 @@ int main(int argc, char **argv, char **envp)
 	cmi_descriptor		service_descr, log_path_descr;
 	unsigned short		service_len, log_path_len;
 	char			*ptr, service[512];
-	now_t			now;	/* for GET_CUR_TIME macro */
-	char			time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
+	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	pid_t			pid;
 	struct sigaction	act;
 	DCL_THREADGBL_ACCESS;
@@ -445,16 +445,16 @@ int main(int argc, char **argv, char **envp)
                 {
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
 					LEN_AND_LIT("Error forking gnp server into the background"), errno);
-                        exit(-1);
+                        EXIT(-1);
                 }
                 else if (0 < pid)
-                        exit(0);
+                        EXIT(0);
 		getjobnum();
                 (void) setpgrp();
         }
 	/* Write argv and the process id for ease of admin */
-	GET_CUR_TIME;
-	util_out_print("!AD : ", FALSE, CTIME_BEFORE_NL, time_ptr);
+	GET_CUR_TIME(time_str);
+	util_out_print("!AD : ", FALSE, CTIME_BEFORE_NL, time_str);
 	for (arg_index = 0; arg_index < argc; arg_index++)
 		util_out_print("!AZ ", FALSE, argv[arg_index]);
 	util_out_print("[pid : !UL]", TRUE, process_id);
@@ -468,7 +468,7 @@ int main(int argc, char **argv, char **envp)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_NETFAIL, 0,
 				ERR_TEXT, 2, LEN_AND_LIT("Network interface initialization failed"), status);
-		exit(status);
+		EXIT(status);
 	}
 	atexit(gtcm_exi_handler);
 	INVOKE_INIT_SECSHR_ADDRS;
@@ -490,5 +490,5 @@ int main(int argc, char **argv, char **envp)
 	{
 		gtcm_gnp_server_actions();
 	}
-	exit(SS_NORMAL);
+	return SS_NORMAL;
 }

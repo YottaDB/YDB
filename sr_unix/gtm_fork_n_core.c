@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +20,9 @@
  */
 #undef malloc
 
+#include "gtm_signal.h"
+
 #include <errno.h>
-#include <signal.h>
 #include <sys/wait.h>
 
 #include "gtm_stdio.h"
@@ -33,6 +35,7 @@
 #ifdef DEBUG
 #include <sys/resource.h>
 #include <sys/time.h>
+#include "gtmio.h"
 #endif
 #include "gtmmsg.h"
 #include "gdsroot.h"
@@ -48,6 +51,9 @@ GBLREF boolean_t	created_core;		/* core file was created */
 GBLREF unsigned int	core_in_progress;
 GBLREF int4		exi_condition;
 GBLREF sigset_t		blockalrm;
+#ifdef DEBUG
+GBLREF sgmnt_addrs	*cs_addrs;
+#endif
 
 error_def(ERR_COREINPROGRESS);
 error_def(ERR_NOFORKCORE);
@@ -66,7 +72,7 @@ void gtm_fork_n_core(void)
 {
 	struct sigaction	act, intr;
 	pid_t			childid, waitrc;
-	int			status, save_errno;
+	int			rc, status, save_errno;
 #ifdef AIX_SYSTRACE_ENABLE
         struct stat             fs1;
         char                    oldname[1024], newname[1024], *trcpath, *trcsuffix;
@@ -163,7 +169,7 @@ void gtm_fork_n_core(void)
 	sigaction(SIGINT, &act, &intr);
 
 	/* block SIGALRM signal */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 
 	FORK(childid);
 	if (childid)
@@ -171,15 +177,21 @@ void gtm_fork_n_core(void)
 		if (-1 == childid)
 		{	/* restore interrupt handler */
 			sigaction(SIGINT, &intr, 0);
-			sigprocmask(SIG_SETMASK, &savemask, NULL);
+			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NOFORKCORE, 0, errno);
 			return;		/* Fork failed, no core done */
 		}
+
+		if (NULL != cs_addrs && NULL != cs_addrs->nl)
+		{
+			DBG_PRINT_BLOCK_INFOS(cs_addrs->nl);
+		}
+
 		WAITPID(childid, &status, 0, waitrc);
 		save_errno = errno;
 		/* restore interrupt handler */
 		sigaction(SIGINT, &intr, 0);
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
+		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		--core_in_progress;
 		if (-1 == waitrc)
 		{	/* If got error from waitpid, core may or may not have been taken. Assume worst & don't set flag */
@@ -190,7 +202,7 @@ void gtm_fork_n_core(void)
 	} else
 	{
 		DUMP_CORE;	/* This will (should) not return */
-		_exit(-1);	/* Protection to kill fork'd process with no rundown by exit handler(s) */
+		UNDERSCORE_EXIT(-1);	/* Protection to kill fork'd process with no rundown by exit handler(s) */
 	}
 }
 

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2015 Fidelity National Information 	#
+# Copyright (c) 2013-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -74,9 +74,9 @@ default_thirdparty_CFLAGS = -DUSE_GCRYPT
 default_thirdparty_LDFLAGS = -lgcrypt -lgpg-error
 
 # Platform specific compiler and linker flags
-# Linux
 LIBFLAGS =
 IFLAGS =
+# Linux
 ifneq (,$(findstring Linux,$(UNAMESTR)))
 	# -fPIC for Position Independent Code.
 	CFLAGS += -fPIC
@@ -85,6 +85,12 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	RPATHFLAGS = -Wl,-rpath,'$$ORIGIN'
 	# So that we can build shared library.
 	LDSHR = -shared
+	IFLAGS += -I /usr/local/ssl/include
+	ifeq ($(BIT64),0)
+		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
+	else
+		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
+	endif
 endif
 
 # Solaris
@@ -138,12 +144,12 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 endif
 
 # Common header and library paths
-IFLAGS += -I /usr/local/ssl/include -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
+IFLAGS += -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
 ifeq ($(BIT64),0)
-	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu -L /usr/local/lib64
+	LIBFLAGS += -L /usr/local/lib64
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
 else
-	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu -L /usr/local/lib32
+	LIBFLAGS += -L /usr/local/lib32
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib32 -L /usr/lib -L /lib32 -L /lib -L `pwd`
 endif
 
@@ -200,14 +206,18 @@ libgtmtls.so: $(tls_srcfiles) $(tls_hdrfiles) libgtmcryptutil.so
 install: all
 	@echo ; echo "Installing shared libraries to $(PLUGINDIR) and maskpass to $(PLUGINDIR)/gtmcrypt..."
 	cp -f *.so $(PLUGINDIR)
+	echo "$(PLUGINDIR)/libgtmcryptutil.so"                                                      > $(PLUGINDIR)/gpgagent.tab
+	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
-	cp -f maskpass $(PLUGINDIR)/gtmcrypt
+	cp -pf *.sh $(GTMCRYPTDIR)/
+	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 
 uninstall:
 	@echo ; echo "Uninstalling shared libraries from $(PLUGINDIR) and maskpass from $(PLUGINDIR)/gtmcrypt..."
-	rm -f $(PLUGINDIR)/*.so
+	rm -f $(PLUGINDIR)/gpgagent.tab
+	rm -f $(PLUGINDIR)/libgtmcrypt*.so $(PLUGINDIR)/libgtmtls*.so
 	rm -f $(PLUGINDIR)/gtmcrypt/maskpass
 
 clean:

@@ -43,7 +43,6 @@
 
 #define F_SUBSC_LEN		 3
 #define N_SUBSC_LEN		 5
-#define MIN_DATASIZE		40
 
 #define WRITE_ONE_LINE_FROM_BUFFER			\
 {							\
@@ -69,24 +68,20 @@ GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF mval literal_null;
 
-error_def(ERR_ZSHOWGLOSMALL);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_MAXNRSUBSCRIPTS);
 
 void zshow_output(zshow_out *out, const mstr *str)
 {
-	mval		*mv, lmv, *mv_child;
-	lv_val		*lv, *lv_child;
-	char		buff, *strptr, *strnext, *strtop, *strbase, *leadptr;
-	char		*tempstr, *piecestr, *strtokptr;
-	int		key_ovrhd, str_processed, sbs_depth, dbg_sbs_depth;
-	ssize_t        	len, outlen, chcnt, char_len, disp_len;
-	int		buff_len;
-	int		device_width, inchar_width, cumul_width;
 	boolean_t	is_base_var, lvundef, utf8_active, zshow_depth;
+	char		buff, *leadptr, *piecestr, *strbase, *strnext, *strptr, *strtokptr, *strtop, *tempstr;
 	gd_addr		*gbl_gd_addr;
 	gvnh_reg_t	*gvnh_reg;
+	int		dbg_sbs_depth, sbs_depth, str_processed;
+	lv_val		*lv, *lv_child;
+	mval		lmv, *mv_child, *mv;
+	ssize_t		buff_len, cumul_width, device_width, inchar_width, len, outlen, chcnt, char_len, disp_len;
 #ifdef UNICODE_SUPPORTED
 	wint_t		codepoint;
 #endif
@@ -278,7 +273,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				len = str->len;
 				strptr = str->addr;
 				str_processed = 0;
-				if (str->len + (out->ptr - out->buff) > MAX_SRCLINE)
+				if (len + (out->ptr - out->buff) > MAX_SRCLINE)
 				{
 					strtop = str->addr + str->len;
 					lv_child = out->out_var.lv.child;
@@ -386,12 +381,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			break;
 		}
 		if (!out->len)
-		{
-			key_ovrhd = gv_currkey->end + 1 + F_SUBSC_LEN + N_SUBSC_LEN;
-			out->len = (int)(gv_cur_region->max_rec_size - key_ovrhd - SIZEOF(rec_hdr));
-			if (out->len < MIN_DATASIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSHOWGLOSMALL);
-		}
+			out->len = (int)(gv_cur_region->max_rec_size);
 		gbl_gd_addr = TREF(gd_targ_addr);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
 		gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
 		if (out->code && out->code != out->curr_code)
@@ -410,6 +400,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
 			if (gv_currkey->end >= gv_cur_region->max_key_size)
 				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			assert(gv_currkey->end - 3 == out->out_var.gv.end);	/* true for current 1 character string codes */
 			op_gvkill();
 		}
 		if (str)
@@ -417,30 +408,82 @@ void zshow_output(zshow_out *out, const mstr *str)
 			len = str->len;
 			strptr = str->addr;
 			str_processed = 0;
-		}
-		if (str && ((int)str->len + (out->ptr - out->buff) > out->len))
-		{
-			strtop = str->addr + str->len;
-			for (; strptr != strtop; )
-			{
-				len = (ssize_t)(strtop - strptr);
-				if (len <= out->len - (out->ptr - out->buff))
-					break;
-				len = out->len - (ssize_t)(out->ptr - out->buff);
-				strbase = str->addr + str_processed;
-#				ifdef UNICODE_SUPPORTED
-				if (gtm_utf8_mode)
-				{ /* terminate at the proper character boundary within out->len bytes */
-					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
-					len = (ssize_t)(leadptr - strbase);
+			if ((int)len + (out->ptr - out->buff) > out->len)
+			{	/* won't fit in a single database record */
+				for (strtop = str->addr + str->len; strptr != strtop; out->line_cont++)
+				{	/* line_cont initialized to 0  by setup in op_zshow.c */
+					len = (ssize_t)(strtop - strptr);
+					if (len <= out->len - (out->ptr - out->buff))
+					{
+						assert(0 < out->line_cont);	/*  should not come into loop unless needed */
+						break;
+					}
+					len = out->len - (ssize_t)(out->ptr - out->buff);
+					assert(0 <= len);
+					strbase = str->addr + str_processed;
+#					ifdef UNICODE_SUPPORTED
+					if (gtm_utf8_mode)
+					{ /* terminate at the proper character boundary within out->len bytes */
+						UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
+						len = (ssize_t)(leadptr - strbase);
+					}
+#					endif
+					memcpy(out->ptr, strbase, len);
+					strptr += len;
+					out->ptr += len;
+					str_processed += (int)len;
+					if (out->line_cont)
+					{	/* continuations are all at the same level (established below) */
+						MV_FORCE_MVAL(mv, out->line_cont);
+						op_gvnaked(VARLSTCNT(1) mv);
+					} else
+					{
+						MV_FORCE_MVAL(mv, out->line_num);
+						if (NOT_FIRST_LINE_OF_ZSHOW_OUTPUT(out))
+							op_gvnaked(VARLSTCNT(1) mv);
+						else
+						{
+							mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
+							/* If gvnh_reg corresponds to a spanning global, then determine
+							 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+							 */
+							GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
+							if (gv_currkey->end >= gv_cur_region->max_key_size)
+								ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+						}
+					}
+					ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
+					mv->str.addr = (char *)stringpool.free;
+					mv->str.len = INTCAST(out->ptr - out->buff);
+					mv->mvtype = MV_STR;
+					memcpy(mv->str.addr, &out->buff[0], mv->str.len);
+					stringpool.free += mv->str.len;
+					op_gvput(mv);
+					stringpool.free = (unsigned char *)mv->str.addr;	/* prevent bloat in the loop */
+					out->ptr = out->buff;
+					if (!out->line_cont)
+					{	/* the initial chunk went at the line_num right under the code */
+						MV_FORCE_MVAL(mv, out->line_cont);	/* but the rest go down a level */
+						mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
+						GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
+						if (gv_currkey->end >= gv_cur_region->max_key_size)
+							ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+					}
 				}
-#				endif
-				memcpy(out->ptr, strbase, len);
-				strptr += len;
-				out->ptr += len;
-				str_processed += (int)len;
+			}
+			memcpy(out->ptr, str->addr + str_processed, len);
+			out->ptr += len;
+		}
+		if (out->flush && out->ptr != out->buff)
+		{
+			if (out->line_cont)
+			{	/* completing a continuation */
+				MV_FORCE_MVAL(mv, out->line_cont);
+				op_gvnaked(VARLSTCNT(1) mv);
+			} else
+			{	/* not finishing a continuation  */
 				MV_FORCE_MVAL(mv, out->line_num);
-				if (FIRST_LINE_OF_ZSHOW_OUTPUT(out))
+				if (NOT_FIRST_LINE_OF_ZSHOW_OUTPUT(out))
 					op_gvnaked(VARLSTCNT(1) mv);
 				else
 				{
@@ -452,36 +495,6 @@ void zshow_output(zshow_out *out, const mstr *str)
 					if (gv_currkey->end >= gv_cur_region->max_key_size)
 						ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 				}
-				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
-				mv->str.addr = (char *)stringpool.free;
-				mv->str.len = INTCAST(out->ptr - out->buff);
-				mv->mvtype = MV_STR;
-				memcpy(mv->str.addr, &out->buff[0], mv->str.len);
-				stringpool.free += mv->str.len;
-				op_gvput(mv);
-				out->ptr = out->buff;
-				out->line_num++;
-			}
-		}
-		if (str)
-		{
-			memcpy(out->ptr, str->addr + str_processed, len);
-			out->ptr += len;
-		}
-		if (out->flush && out->ptr != out->buff)
-		{
-			MV_FORCE_MVAL(mv, out->line_num);
-			if (FIRST_LINE_OF_ZSHOW_OUTPUT(out))
-				op_gvnaked(VARLSTCNT(1) mv);
-			else
-			{
-				mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
-				/* If gvnh_reg corresponds to a spanning global, then determine
-				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
-				 */
-				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-				if (gv_currkey->end >= gv_cur_region->max_key_size)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 			}
 			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 			mv->str.addr = (char *)stringpool.free;
@@ -491,6 +504,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 			stringpool.free += mv->str.len;
 			op_gvput(mv);
 			out->ptr = out->buff;
+			if (out->line_cont)
+			{	/* after a continuation reset the key up a level where the line_number goes */
+				gv_currkey->end = gv_currkey->prev;
+				gv_currkey->base[gv_currkey->end] = 0;
+				gv_currkey->prev = out->out_var.gv.end + 3;	/* use condition asserted for 1 character codes */
+				out->line_cont = 0;
+			}
 			out->line_num++;
 		}
 		break;
@@ -513,5 +533,5 @@ void zshow_output(zshow_out *out, const mstr *str)
 	if (!process_exiting)
 		POP_MV_STENT();
 	out->curr_code = out->code;
-	out->flush = 0;
+	out->flush = FALSE;
 }

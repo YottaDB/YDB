@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,6 +125,10 @@ static	mstr	global_collation_mstr;
 	rootsrch_ctxt_ptr->start_tn = start_tn;							\
 	rootsrch_ctxt_ptr->update_trans = update_trans;						\
 	rootsrch_ctxt_ptr->inctn_opcode = inctn_opcode;						\
+	/* Resetting and restoring of update_trans is necessary to avoid blowing an assert in	\
+	 * t_begin that it is 0.								\
+	 */											\
+	update_trans = 0;									\
 	inctn_opcode = 0;									\
 	rootsrch_ctxt_ptr->t_err = t_err;							\
 	rootsrch_ctxt_ptr->hold_onto_crit = cs_addrs->hold_onto_crit;				\

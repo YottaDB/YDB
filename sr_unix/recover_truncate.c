@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +36,8 @@
 #include "clear_cache_array.h"
 #include "is_proc_alive.h"
 #include "do_semop.h"
-#include "anticipatory_freeze.h"	/* needed for WRITE_EOF_BLOCK */
+#include "anticipatory_freeze.h"	/* needed for WRITE_EOF_BLOCK -->  DB_LSEEKWRITE */
+#include "gtm_semutils.h"
 
 error_def(ERR_DBFILERR);
 error_def(ERR_MUTRUNCERROR);
@@ -59,7 +61,8 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 	/* If called from db_init, assure we've grabbed the access semaphor and are the only process attached to the database.
 	 * Otherwise, we should have crit when called from wcs_recover. */
 	udi = FILE_INFO(reg);
-	assert((udi->grabbed_access_sem && (1 == (semval = semctl(udi->semid, 1, GETVAL)))) || csa->now_crit);
+	assert((udi->grabbed_access_sem && (DB_COUNTER_SEM_INCR == (semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL))))
+		|| csa->now_crit);
 	/* Interrupted truncate scenario */
 	if (NULL != csa->nl)
 		csa->nl->root_search_cycle++;
@@ -83,25 +86,22 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 		if (status != 0)
 		{
 			err_msg = (char *)STRERROR(errno);
-			rts_error(VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(reg), LEN_AND_STR(err_msg));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(reg), LEN_AND_STR(err_msg));
 			return;
 		}
 		FTRUNCATE(FILE_INFO(reg)->fd, new_size, ftrunc_status);
 		if (ftrunc_status != 0)
 		{
 			err_msg = (char *)STRERROR(errno);
-			rts_error(VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(reg), LEN_AND_STR(err_msg));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(reg), LEN_AND_STR(err_msg));
 			return;
 		}
 	} else
-	{
-		/* Crash before even changing csa->ti->total_blks OR after successful FTRUNCATE */
+	{	/* Crash before even changing csa->ti->total_blks OR after successful FTRUNCATE */
 		/* In either case, the db file is in a consistent state, so no need to do anything further */
 		assert((old_total == cur_total && old_size == cur_size) || (new_total == cur_total && new_size == cur_size));
 		if (!((old_total == cur_total && old_size == cur_size) || (new_total == cur_total && new_size == cur_size)))
-		{
-			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-		}
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	}
 	csd->before_trunc_total_blks = 0; /* indicate CONSISTENT */
 }

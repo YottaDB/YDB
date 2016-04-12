@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,9 +42,7 @@
 #include "util.h"
 #include "gtmdbglvl.h"
 #include "anticipatory_freeze.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "shmpool.h"	/* Needed for the shmpool structures */
 #include "jnl.h"
 
@@ -106,10 +104,8 @@ unsigned char mu_cre_file(void)
 	unix_db_info	udi_struct, *udi;
 	char		*fgets_res;
 	gd_segment	*seg;
-#	ifdef GTM_CRYPT
 	char		hash[GTMCRYPT_HASH_LEN];
 	int		gtmcrypt_errno;
-#	endif
 	ZOS_ONLY(int	realfiletag;)
 
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
@@ -122,7 +118,7 @@ unsigned char mu_cre_file(void)
 	file.addr = (char*)gv_cur_region->dyn.addr->fname;
 	file.len = gv_cur_region->dyn.addr->fname_len;
 	strncpy(path, file.addr, file.len);
-	*(path+file.len) = '\0';
+	*(path + file.len) = '\0';
 	if (is_raw_dev(path))
 	{	/* do not use a default extension for raw device files */
 		pblk.def1_buf = DEF_NODBEXT;
@@ -147,10 +143,10 @@ unsigned char mu_cre_file(void)
 	udi = &udi_struct;
 	memset(udi, 0, SIZEOF(unix_db_info));
 	udi->raw = is_raw_dev(pblk.l_dir);
-#	ifdef GTM_CRYPT
 	/* Check if this file is an encrypted database. If yes, do init */
-	if (gv_cur_region->dyn.addr->is_encrypted)
+	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
+		assert(!TO_BE_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted));
 		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
@@ -158,7 +154,6 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	}
-#	endif
 	if (udi->raw)
 	{
 		fd = OPEN(pblk.l_dir,O_EXCL | O_RDWR);
@@ -315,11 +310,10 @@ unsigned char mu_cre_file(void)
 		cs_data->trans_hist.total_blks += DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1);
 		cs_data->extension_size = gv_cur_region->dyn.addr->ext_blk_count;
 	}
-#	ifdef GTM_CRYPT
 	/* Check if this file is an encrypted database. If yes, do init */
-	if (gv_cur_region->dyn.addr->is_encrypted)
+	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
-		GTMCRYPT_HASH_GEN(cs_addrs, path, STRLEN(path), hash, gtmcrypt_errno);
+		GTMCRYPT_HASH_GEN(cs_addrs, STRLEN(path), path, 0, NULL, hash, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -327,8 +321,8 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 		memcpy(cs_data->encryption_hash, hash, GTMCRYPT_HASH_LEN);
-		cs_data->is_encrypted = TRUE; /* Mark this file as encrypted */
-		INIT_DB_ENCRYPTION(cs_addrs, cs_data, gtmcrypt_errno);
+		SET_AS_ENCRYPTED(cs_data->is_encrypted); /* Mark this file as encrypted */
+		INIT_DB_OR_JNL_ENCRYPTION(cs_addrs, cs_data, STRLEN(path), path, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -336,8 +330,10 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	} else
-		cs_data->is_encrypted = FALSE;
-#	endif
+		SET_AS_UNENCRYPTED(cs_data->is_encrypted);
+	cs_data->non_null_iv = TRUE;
+	cs_data->encryption_hash_cutoff = UNSTARTED;
+	cs_data->encryption_hash2_start_tn = 0;
 	cs_data->span_node_absent = TRUE;
 	cs_data->maxkeysz_assured = TRUE;
 	mucregini(cs_data->trans_hist.total_blks);

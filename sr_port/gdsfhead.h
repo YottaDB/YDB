@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,9 +30,7 @@
 #ifdef VMS
 #include "iosb_disk.h"
 #endif
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h" /* for gtmcrypt_key_t */
-#endif
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -88,13 +86,8 @@ typedef struct cache_rec_struct
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
 	trans_num	tn;
 	sm_off_t	bt_index;	/* offset to bt_rec */
-	sm_off_t	buffaddr;	/* offset to buffer holding actual data*/
-	sm_off_t	twin;		/* (VMS) offset to cache_rec of another copy of the same block from bg_update & wcs_wt_all
-					 * (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
-#ifdef VMS
-	sm_off_t	shmpool_blk_off; /* Offset to shmpool block containing the reformat buffer for this CR */
-	int4		backup_cr_off;   /* Offset to backup_cr (set/used by bg_update_phase1/2 routines) */
-#endif
+	sm_off_t	buffaddr;	/* offset to buffer holding actual data */
+	sm_off_t	twin;		/* (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
 	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
 	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
 					   latch is used on those platforms where read_in_progress is not directly updated
@@ -109,9 +102,6 @@ typedef struct cache_rec_struct
 	int4		r_epid;		/* set by db_csh_getn, cleared by t_qread, bg_update, wcs_recover or secshr_db_clnup
 					 * used to check for process leaving without releasing the buffer
 					 * must be word aligned on the VAX */
-#ifdef VMS
-	io_status_block_disk	iosb;	/* used on VMS write */
-#endif
 	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
 	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
 	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
@@ -123,7 +113,7 @@ typedef struct cache_rec_struct
 } cache_rec;
 
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
-   many (ptentially tens+ of) thousands of times in a running system, we have decided against providing cacheline
+   many (potentially tens+ of) thousands of times in a running system, we have decided against providing cacheline
    padding so as to force each cache record into a separate cacheline (due to it containing a latch and/or atomic
    counter field) to prevent processes from causing interference with each other. We decided that the probability
    of two processes working on adjacent cache records simultaneously was low enough that the interference was
@@ -650,9 +640,7 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 #define GDS_ABS2REL(x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)cs_addrs->lock_addrs[0]))
 #define GDS_ANY_REL2ABS(w,x) (((sm_uc_ptr_t)(w->lock_addrs[0]) + (sm_off_t)(x)))
 #define GDS_ANY_ABS2REL(w,x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)w->lock_addrs[0]))
-#ifdef GTM_CRYPT
 #define GDS_ANY_ENCRYPTGLOBUF(w,x) ((sm_uc_ptr_t)(w) + (sm_off_t)(x->nl->encrypt_glo_buff_off))
-#endif
 #define	ASSERT_IS_WITHIN_SHM_BOUNDS(ptr, csa)											\
 	assert((NULL == (ptr)) || (((ptr) >= csa->db_addrs[0]) && ((0 == csa->db_addrs[1]) || ((ptr) < csa->db_addrs[1]))))
 
@@ -1518,11 +1506,12 @@ n_db_csh_acct_rec_types
 	cnl->gvstats_rec.counter += increment;	/* database stats */		\
 }
 
-/* clear everything from the end of the encryption_hash up to the ntrpt_recov_resync_strm_seqno array, which includes:
- * all bg_trc_rec_tn, all bg_trc_rec_cntr, all db_csh_acct_rec, all gvstats as well as any intervening filler;
- * also clear tp_cdb_sc_blkmod
- * This means we MUST NOT insert anything in the file header between the encryption_hash and intrpt_recov_resync_strm_seqno
- * nor move either of those end points without appropriately adjusting this macro
+/* Clear everything from the end of the encryption section up to the ntrpt_recov_resync_strm_seqno array, which includes all
+ * bg_trc_rec_tn, all bg_trc_rec_cntr, all db_csh_acct_rec, all gvstats as well as any intervening filler; also clear
+ * tp_cdb_sc_blkmod.
+ *
+ * This means we MUST NOT insert anything in the file header between the encryption section and intrpt_recov_resync_strm_seqno
+ * nor move either of those end points without appropriately adjusting this macro.
  */
 #define	CLRGVSTATS(CSA)									\
 {											\
@@ -1531,7 +1520,13 @@ n_db_csh_acct_rec_types
 	sgmnt_data_ptr_t	CSD;							\
 											\
 	CSD = CSA->hdr;									\
-	CHPTR = (char *)&CSD->encryption_hash + GTMCRYPT_RESERVED_HASH_LEN;		\
+	assert((256 == GTMCRYPT_RESERVED_ENCR_SPACE)					\
+		&& (GTMCRYPT_RESERVED_ENCR_SPACE == 2 * GTMCRYPT_RESERVED_HASH_LEN	\
+			+ SIZEOF(CSD->non_null_iv)					\
+			+ SIZEOF(CSD->encryption_hash_cutoff)				\
+			+ SIZEOF(CSD->encryption_hash2_start_tn)			\
+			+ SIZEOF(CSD->filler_encrypt)));				\
+	CHPTR = (char *)&CSD->encryption_hash + GTMCRYPT_RESERVED_ENCR_SPACE;		\
 	CLRLEN = (char *)&CSD->intrpt_recov_resync_strm_seqno - CHPTR;			\
 	memset(CHPTR, 0, CLRLEN);							\
 	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */			\
@@ -1547,14 +1542,31 @@ n_db_csh_acct_rec_types
 #	define	INCR_DB_CSH_COUNTER(csa, counter, increment)
 #endif
 
-enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
+enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 {
+	/* TP transactions */
 	tp_blkmod_nomod = 0,
 	tp_blkmod_gvcst_srch,
 	tp_blkmod_t_qread,
 	tp_blkmod_tp_tend,
 	tp_blkmod_tp_hist,
-	n_tp_blkmod_types
+	n_tp_blkmod_types,
+	/* NON-TP transactions */
+	t_blkmod_nomod,
+	t_blkmod_gvcst_srch,
+	t_blkmod_gvcst_expand_key,
+	t_blkmod_t_qread,
+	t_blkmod_t_end1,
+	t_blkmod_t_end2,
+	t_blkmod_t_end3,
+	t_blkmod_t_end4,
+	/* MUPIP specific */
+	t_blkmod_mu_clsce,
+	t_blkmod_mu_reduce_level,
+	t_blkmod_mu_split,
+	t_blkmod_mu_swap_blk,
+	t_blkmod_reorg_funcs,
+	n_nontp_blkmod_types
 };
 
 /* Below is a list of macro bitmasks used to set the global variable "donot_commit". This variable should normally be 0.
@@ -1576,6 +1588,7 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 #define DONOTCOMMIT_T_WRITE_CSE_DONE			(1 << 9) /* Restartable situation encountered in t_write */
 #define DONOTCOMMIT_T_WRITE_CSE_MODE			(1 << 10) /* Restartable situation encountered in t_write */
 #define DONOTCOMMIT_TRIGGER_SELECT_XECUTE		(1 << 11) /* Restartable situation encountered in trigger_select */
+#define DONOTCOMMIT_JNL_FORMAT				(1 << 12) /* Restartable situation encountered in jnl_format */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1848,10 +1861,20 @@ typedef struct sgmnt_data_struct
 								 * Note: In mu_reorg we don't save keys longer than OLD_MAX_KEY_SZ
 								 */
 	char		machine_name[MAX_MCNAMELEN];
-	char            encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
-	/* char filler_2k[256] was here before adding the encryption_hash. Since the GTMCRYPT_RESERVED_HASH_LEN
-	 * consumes 256 bytes, filler_2k has been removed.
+	/************* ENCRYPTION-RELATED FIELDS **************/
+	/* Prior to the introduction of encryption_hash and, subsequently, other encryption fields, this space was occupied by a
+	 * char filler_2k[256]. Now that the encryption fields consume a part of that space, the filler has been reduced in size.
 	 */
+	char            encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
+	char		encryption_hash2[GTMCRYPT_RESERVED_HASH_LEN];
+	boolean_t	non_null_iv;
+	block_id	encryption_hash_cutoff;		/* Points to the first block to be encrypted by MUPIP REORG -ENCRYPT with
+							 * encryption_hash2. The value of -1 indicates that no (re)encryption is
+							 * happening. */
+	trans_num	encryption_hash2_start_tn;	/* Indicates the lowest transaction number at which a block is encrypted
+							 * with encryption_hash2. */
+	char		filler_encrypt[80];
+	/***************************************************/
 	/* The CLRGVSTATS macro wipes out everything from here through the GVSTATS fields up to intrpt_recov_resync_strm_seqno
 	 * starting from the end of the space reserved for the encryption_hash above - DO NOT insert anthing in this range or move
 	 * those two end points without appropriately adjusting that macro
@@ -1894,7 +1917,8 @@ typedef struct sgmnt_data_struct
 	int4		secshr_ops_array_filler[255];	/* taking up 1k */
 	/********************************************************/
 	compswap_time_field next_upgrd_warn;	/* Time when we can send the next upgrade warning to the operator log */
-	boolean_t	is_encrypted;
+	uint4		is_encrypted;		/* Encryption state of the database as a superimposition of IS_ENCRYPTED and
+						 * TO_BE_ENCRYPTED flags. */
 	uint4		db_trigger_cycle;	/* incremented every MUPIP TRIGGER command that changes ^#t global contents */
 	/************* SUPPLEMENTARY REPLICATION INSTANCE RELATED FIELDS ****************/
 	seq_num		strm_reg_seqno[MAX_SUPPL_STRMS];	/* the jnl seqno of the last update to this region for a given
@@ -1910,7 +1934,9 @@ typedef struct sgmnt_data_struct
 	boolean_t	maxkeysz_assured;	/* All the keys in the database are less than MAX_KEY_SIZE */
 	boolean_t	hasht_upgrade_needed;	/* ^#t global needs to be upgraded from V62000 to post-V62000 format */
 	boolean_t	defer_allocate;		/* If FALSE: Use fallocate() preallocate space from the disk */
-	char		filler_7k[716];
+	boolean_t	ftok_counter_halted;	/* Stop increasing/decreasing the ftok counter semaphore */
+	boolean_t	access_counter_halted;	/* Stop increasing/decreasing the access counter semaphore */
+	char		filler_7k[708];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -2018,6 +2044,107 @@ typedef struct
 #define REG2CSA(REG)	(((REG) && (REG)->dyn.addr && (REG)->dyn.addr->file_cntl) ? (&FILE_INFO(REG)->s_addrs) : NULL)
 #define JCTL2CSA(JCTL)	(((JCTL) && (JCTL->reg_ctl)) ? (JCTL->reg_ctl->csa) : NULL)
 
+/* A structure to store the encryption settings when a reorg_encrypt_cycle change is detected in shared memory in the middle of a
+ * transaction. We updated the private copy of encryption settings and (re)initialize handles, if needed, based on this information
+ * before restarting the transaction. Note that this structure should be populated at a safe time, such as while holding crit or
+ * having otherwise ensured that MUPIP REORG -ENCRYPT cannot cross the boundary of another reorg_encrypt_cycle (such as in
+ * dsk_read.c and wcs_wtstart.c); however, read access does not require crit (such as in jnl_format.c).
+ */
+typedef struct
+{
+	uint4		reorg_encrypt_cycle;
+	uint4		is_encrypted;
+	boolean_t	non_null_iv;
+	block_id	encryption_hash_cutoff;
+	trans_num	encryption_hash2_start_tn;
+	char            encryption_hash[GTMCRYPT_HASH_LEN];
+	char		encryption_hash2[GTMCRYPT_HASH_LEN];
+	boolean_t	issued_db_init_crypt_warning;	/* Indicates whether we issued a warning-severity encryption-setup-related
+							 * message in db_init for a non-mumps process */
+	uint4		filler;
+} enc_info_t;
+
+/* Macro to copy the encryption information into an enc_info_t structure. */
+#define COPY_ENC_INFO_INT(SRC, DST, REORG_ENCRYPT_CYCLE)						\
+{													\
+	(DST)->reorg_encrypt_cycle = REORG_ENCRYPT_CYCLE;						\
+	(DST)->is_encrypted = (SRC)->is_encrypted;							\
+	(DST)->non_null_iv = (SRC)->non_null_iv;							\
+	(DST)->encryption_hash_cutoff = (SRC)->encryption_hash_cutoff;					\
+	(DST)->encryption_hash2_start_tn = (SRC)->encryption_hash2_start_tn;				\
+	memcpy((DST)->encryption_hash, (SRC)->encryption_hash, GTMCRYPT_HASH_LEN);			\
+	memcpy((DST)->encryption_hash2, (SRC)->encryption_hash2, GTMCRYPT_HASH_LEN);			\
+	DEBUG_ONLY((DST)->filler = 0;)									\
+}													\
+
+/* Macro to copy the encryption information into an enc_info_t structure. */
+#define COPY_ENC_INFO(SRC, DST, REORG_ENCRYPT_CYCLE)							\
+{													\
+	DEBUG_ONLY(enc_info_t	before);								\
+													\
+	DEBUG_ONLY(COPY_ENC_INFO_INT(SRC, &before, REORG_ENCRYPT_CYCLE));				\
+	/* This is to have the following memcmp succeed; normally, the issued_db_init_crypt_warning 	\
+	 * field is never updated once set.								\
+	 */												\
+	DEBUG_ONLY(before.issued_db_init_crypt_warning = (DST)->issued_db_init_crypt_warning);		\
+	COPY_ENC_INFO_INT(SRC, DST, REORG_ENCRYPT_CYCLE);						\
+	/* This macro is not necessarily invoked while holding crit, yet none of its usages should be	\
+	 * subject to concurrent database file header changes of encrypted settings, so assert that.	\
+	 * The only exception is "encryption_hash_cutoff" which could be concurrently changed (by a	\
+	 * MUPIP REORG ENCRYPT) but is not critical encryption information so skip that part.		\
+	 */												\
+	DEBUG_ONLY(before.encryption_hash_cutoff = DST->encryption_hash_cutoff;)			\
+	DEBUG_ONLY(assert(!memcmp(&before, DST, SIZEOF(enc_info_t))));					\
+}													\
+
+#define	INITIALIZE_CSA_ENCR_PTR(CSA, CSD, UDI, DO_CRYPT_INIT, CRYPT_WARNING)						\
+{															\
+	if (DO_CRYPT_INIT)												\
+	{														\
+		CSA->encr_ptr = (enc_info_t *)malloc(SIZEOF(enc_info_t));						\
+		/* It should be safe to copy encryption key information from CSD to CSA because only a concurrent	\
+		 * REORG -ENCRYPT may be changing these fields, and it takes the ftok access control semaphore on	\
+		 * a live (non-standalone) database before changing things. But the caller of this macro is expected to	\
+		 * hold either the ftok access control semaphore (udi->grabbed_fotk_sem) OR the database access control	\
+		 * semaphore (udi->grabbed_access_sem) in case of standalone access. This ensures a safe copy. The only	\
+		 * exception is if caller is "db_init" and we are DSE or LKE as they can bypass getting the ftok	\
+		 * semaphore, but in those cases we do not rely much on the encryption settings and in the places where	\
+		 * we do rely, we expect the users know what they are doing with these admin tools. Assert accordingly.	\
+		 */													\
+		assert(UDI->grabbed_ftok_sem || UDI->grabbed_access_sem || IS_DSE_IMAGE || IS_LKE_IMAGE);		\
+		COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);					\
+		CSA->encr_ptr->issued_db_init_crypt_warning = CRYPT_WARNING;						\
+	} else														\
+		CSA->encr_ptr = NULL;											\
+}
+
+/* Encryption key reinitialization cannot be safely done if we are in the middle of a TP transaction that has already
+ * done some updates to a journaled database (old keys would have been used for prior calls to "jnl_format" in this
+ * transaction) as otherwise we would be a mix of journal records encrypted using old and new keys in the same TP
+ * transaction. Just to be safe, we do the same for read-only TP transaction ("dollar_tlevel" global variable covers
+ * both these cases) as well as a non-TP transaction that is read_write ("update_trans" global variable covers this case).
+ * In all these cases, we know the caller is capable of restarting the transaction which will sync up the cycles at a safe
+ * point (start of the retry).
+ *
+ * If both these global variables are zero, it is possible this is a non-TP transaction that is read-only OR a non-transaction.
+ * In the latter case, it is not just safe but essential to sync new keys since callers might be relying on this.
+ * In the former case, it is thankfully safe to sync so we do the sync if both these variables are zero.
+ *
+ * If it is unsafe to sync keys, the caller of this macro has to cause a restart of the ongoing transaction (caller "t_qread")
+ * OR skip doing encrypt/decrypt operations (caller "wcs_wtstart")
+ */
+#define IS_NOT_SAFE_TO_SYNC_NEW_KEYS(DOLLAR_TLEVEL, UPDATE_TRANS)	(DOLLAR_TLEVEL || UPDATE_TRANS)
+
+#define SIGNAL_REORG_ENCRYPT_RESTART(REORG_ENCRYPT_IN_PROG, REORG_ENCRYPT_CSA, CNL, CSA, CSD, STATUS, PID)	\
+{														\
+	assert(!REORG_ENCRYPT_IN_PROG);										\
+	DBG_RECORD_BLOCK_RETRY(CSD, CSA, CNL, PID);								\
+	COPY_ENC_INFO(CSD, (CSA)->encr_ptr, (CNL)->reorg_encrypt_cycle);					\
+	assert(NULL == REORG_ENCRYPT_CSA);									\
+	REORG_ENCRYPT_CSA = CSA;										\
+	STATUS = cdb_sc_reorg_encrypt;										\
+}
+
 typedef struct	file_control_struct
 {
 	sm_uc_ptr_t	op_buff;
@@ -2089,7 +2216,7 @@ typedef struct	gd_segment_struct
 	enum db_acc_method	acc_meth;
 	file_control		*file_cntl;
 	struct gd_region_struct	*repl_list;
-	UNIX_ONLY(boolean_t	is_encrypted;)
+	uint4			is_encrypted;
 	char			filler[16];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_segment;
 
@@ -2188,13 +2315,15 @@ typedef struct	sgmnt_addrs_struct
 	gd_region				*region;		/* the region corresponding to this csa */
 	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
 								 	 * Maintains all gv_targets mapped to this db file */
-	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery
-								 * or pointer to gvt_hashtab for this region if DSE_IMAGE.
-								 * NULL in all other cases. */
-	struct sgmnt_addrs_struct	*next_csa; /* points to csa of NEXT database that has been opened by this process */
-#	ifdef GTM_CRYPT
+	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery)
+								 * pointer to gvt_hashtab for this region (if DSE_IMAGE)
+								 * pointer to repl_rctl for this region (if source server)
+								 * NULL in all other cases.
+								 */
+	struct sgmnt_addrs_struct		*next_csa; /* points to csa of NEXT database that has been opened by this process */
 	gtmcrypt_key_t				encr_key_handle;
-#	endif
+	gtmcrypt_key_t				encr_key_handle2;
+	enc_info_t				*encr_ptr;	/* Copy of encryption info from the database file header */
 #	ifdef GTM_SNAPSHOT
 	struct snapshot_context_struct 	*ss_ctx;
 #	endif
@@ -2474,7 +2603,9 @@ typedef struct srch_blk_status_struct
 								 * at which point we are guaranteed local_tn is much higher than
 								 * gvt->read_local_tn which is an indication to complete this
 								 * deferred cleanup.
-								 * In non-TP, this field is maintained but not used.
+								 * In non-TP, this field is maintained in most but not all places
+								 * (e.g. if gvcst_search uses the clue and does not go to t_qread,
+								 * this field is not maintained) so do not rely on this in non-TP.
 								 */
 	struct gv_namehead_struct	*blk_target;
 } srch_blk_status;
@@ -3032,13 +3163,16 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 
 #define	ISSUE_GVSUBOFLOW_ERROR(GVKEY, IS_KEY_COMPLETE)							\
 {													\
-	unsigned char *endBuff, fmtBuff[MAX_ZWR_KEY_SZ];						\
+	GBLREF	gv_key	*gv_currkey;									\
+	unsigned char	*endBuff, fmtBuff[MAX_ZWR_KEY_SZ];						\
 													\
 	/* Assert that input key to format_targ_key is double null terminated */			\
 	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);						\
 	endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), GVKEY, TRUE);				\
 	if (!IS_KEY_COMPLETE)										\
 		GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
+	if (GVKEY == gv_currkey)									\
+		gv_currkey->end = 0;	/* to show the key is not valid */				\
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,			\
 			endBuff - fmtBuff, fmtBuff);							\
 }
@@ -3310,6 +3444,7 @@ typedef enum
 					 */
 	inctn_blkdwngrd,		/* 12 : similar to inctn_blkupgrd except that this is for DOWNGRADE */
 	inctn_blkdwngrd_fmtchng,	/* 13 : similar to inctn_blkupgrd_fmtchng except that this is for DOWNGRADE */
+	inctn_blkreencrypt,		/* 14 : written whenever a GDS block is (re)encrypted using MUPIP REORG -ENCRYPT */
 	/* the following opcodes do NOT populate the global variable "inctn_detail" */
 	inctn_opcode_total		/* 15 : MAX. All additions of inctn opcodes should be done BEFORE this line */
 } inctn_opcode_t;
@@ -3386,11 +3521,11 @@ typedef enum
  * of database blocks at all times, we can avoid allocating process private memory to store encrypted before-images
  * (to write to a journal file). Instead processes can use the encrypted global buffer directly for this purpose.
  * In user environments where process-private memory is very costly compared to database shared memory (e.g. where
- * 1000s of GT.M processes run against the same database) the above approach is expected to use lesser total memory.
+ * 1000s of GT.M processes run against the same database) the above approach is expected to use less total memory.
  */
 #define CACHE_CONTROL_SIZE(X)												\
 	(ROUND_UP((ROUND_UP((X->bt_buckets + X->n_bts) * SIZEOF(cache_rec) + SIZEOF(cache_que_heads), OS_PAGE_SIZE)	\
-		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (X->is_encrypted ? 2 : 1))), OS_PAGE_SIZE))
+		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (USES_ENCRYPTION(X->is_encrypted) ? 2 : 1))), OS_PAGE_SIZE))
 
 OS_PAGE_SIZE_DECLARE
 
@@ -3461,7 +3596,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 {										\
 	int		idx;							\
 	uint4		pid;							\
-	pid_t		*kip_pid_arr_ptr;					\
+	uint4		*kip_pid_arr_ptr;					\
 	GBLREF uint4	process_id;						\
 										\
 	kip_pid_arr_ptr = local_csa->nl->kip_pid_array;				\
@@ -3480,7 +3615,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define REMOVE_KIP_PID(local_csa)						\
 {										\
 	int		idx;							\
-	pid_t		*kip_pid_arr_ptr;					\
+	uint4		*kip_pid_arr_ptr;					\
 	GBLREF uint4	process_id;						\
 										\
 	kip_pid_arr_ptr = local_csa->nl->kip_pid_array;				\
@@ -3493,6 +3628,44 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 		}								\
 	}									\
 }
+/* Insert the process_id into the list of process ids with active wcs_timers
+ * Note: Unreliable - For Diagnostic Purposes Only
+ */
+#define INSERT_WT_PID(local_csa)												\
+MBSTART {															\
+	int		idx;													\
+	uint4		*wt_pid_arr_ptr;											\
+	GBLREF uint4	process_id;												\
+																\
+	wt_pid_arr_ptr = local_csa->nl->wt_pid_array;										\
+	for (idx = 0; idx < MAX_WT_PID_SLOTS; idx++)										\
+	{															\
+		/* Unreliable, as there is a race for the empty slot. */							\
+		if (0 == wt_pid_arr_ptr[idx])											\
+			wt_pid_arr_ptr[idx] = process_id;									\
+		if (process_id == wt_pid_arr_ptr[idx])										\
+			break;													\
+	}															\
+} MBEND
+/* Remove the process_id from the list of process ids with active wcs_timers
+ * Note: Unreliable - For Diagnostic Purposes Only
+ */
+#define REMOVE_WT_PID(local_csa)						\
+MBSTART {									\
+	int		idx;							\
+	uint4		*wt_pid_arr_ptr;					\
+	GBLREF uint4	process_id;						\
+										\
+	wt_pid_arr_ptr = local_csa->nl->wt_pid_array;				\
+	for (idx = 0; idx < MAX_WT_PID_SLOTS; idx++)				\
+	{									\
+		if (process_id == wt_pid_arr_ptr[idx])				\
+		{								\
+			wt_pid_arr_ptr[idx] = 0;				\
+			break;							\
+		}								\
+	}									\
+} MBEND
 #else
 #define INSERT_KIP_PID(local_csa)
 #define REMOVE_KIP_PID(local_csa)
@@ -3634,6 +3807,11 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	}						\
 }
 
+/* Since this macro is called from "t_retry", we need to ensure encryption cycles are synced as part of
+ * the grab_crit, hence the "grab_crit_encr_cycle_sync" usage. Other callers of this macro like "mupip_extend"
+ * dont need that functionality but it does not hurt them so we leave it at that instead of forking this
+ * macro into two versions (one using "grab_crit" and another using "grab_crit_encr_cycle_sync").
+ */
 #define	GRAB_UNFROZEN_CRIT(reg, csa, csd)				\
 {									\
 	int	lcnt;							\
@@ -3646,7 +3824,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 			break;						\
 		rel_crit(reg);						\
 		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);			\
-		grab_crit(reg);						\
+		grab_crit_encr_cycle_sync(reg);				\
 	}								\
 	assert(!csd->freeze && csa->now_crit);				\
 }
@@ -3686,16 +3864,16 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define NEW_DBINIT_SEM_IPC_MASK		(1 << 1)	/* 1 if db_init created a new access control semaphore */
 #endif
 
-#define RESET_SHMID_CTIME(X)		\
-{					\
-	(X)->shmid = INVALID_SHMID;	\
-	(X)->gt_shm_ctime.ctime = 0;	\
+#define RESET_SHMID_CTIME(X)			\
+{						\
+	(X)->shmid = INVALID_SHMID;		\
+	(X)->gt_shm_ctime.ctime = 0;		\
 }
 
-#define RESET_SEMID_CTIME(X)		\
-{					\
-	(X)->semid = INVALID_SEMID;	\
-	(X)->gt_sem_ctime.ctime = 0;	\
+#define RESET_SEMID_CTIME(X)			\
+{						\
+	(X)->semid = INVALID_SEMID;		\
+	(X)->gt_sem_ctime.ctime = 0;		\
 }
 
 #define RESET_IPC_FIELDS(X)		\
@@ -3705,20 +3883,29 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 }
 
 #if defined(UNIX)
-#define DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno)	\
-{								\
-	int	rc;						\
-								\
-	BG_TRACE_PRO_ANY(csa, n_db_fsyncs);			\
-	if (csa->now_crit)					\
-		BG_TRACE_PRO_ANY(csa, n_db_fsyncs_in_crit);	\
-	db_fsync_in_prog++;					\
-	save_errno = 0;						\
-	GTM_DB_FSYNC(csa, udi->fd, rc);				\
-	if (-1 == rc)						\
-		save_errno = errno;				\
-	db_fsync_in_prog--;					\
-	assert(0 <= db_fsync_in_prog);				\
+GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
+
+/* #GTM_THREAD_SAFE : The below macro (DB_FSYNC) is thread-safe */
+#define DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno)						\
+{													\
+	int	rc;											\
+													\
+	BG_TRACE_PRO_ANY(csa, n_db_fsyncs);								\
+	if (csa->now_crit)										\
+		BG_TRACE_PRO_ANY(csa, n_db_fsyncs_in_crit);						\
+	/* If inside thread, do not touch global variable "db_fsync_in_prog" due to concurrency issues.	\
+	 * Besides, no need to maintain this variable inside thread since SIGALRMs are blocked and	\
+	 * this is primarily used by "wcs_clean_dbsync" (the idle epoch timer code) anyways.		\
+	 */												\
+	if (!multi_thread_in_use)									\
+		db_fsync_in_prog++;									\
+	save_errno = 0;											\
+	GTM_DB_FSYNC(csa, udi->fd, rc);									\
+	if (-1 == rc)											\
+		save_errno = errno;									\
+	if (!multi_thread_in_use)									\
+		db_fsync_in_prog--;									\
+	assert(0 <= db_fsync_in_prog);									\
 }
 
 #define STANDALONE(x) mu_rndwn_file(x, TRUE)
@@ -4028,6 +4215,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #ifdef GTM_TRUNCATE
 /* Reduction in free blocks after truncating from a to b total blocks: a = old_total (larger), b = new_total */
 # define DELTA_FREE_BLOCKS(a, b)	((a - b) - (DIVIDE_ROUND_UP(a, BLKS_PER_LMAP) - DIVIDE_ROUND_UP(b, BLKS_PER_LMAP)))
+/* #GTM_THREAD_SAFE : The below macro (WRITE_EOF_BLOCK) is thread-safe */
 # define WRITE_EOF_BLOCK(reg, csd, new_total, status)								\
 {														\
 	off_t		new_eof;										\
@@ -4194,7 +4382,6 @@ typedef struct redo_root_search_context_struct
 	SETUP_THREADGBL_ACCESS;											\
 	assert(dollar_tlevel);											\
 	ASSERT_BEGIN_OF_FRESH_TP_TRANS;										\
-	frame_pointer->flags |= SFF_IMPLTSTART_CALLD;								\
 	if (est_first_pass && (cdb_sc_onln_rlbk2 == LAST_RESTART_CODE))						\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);					\
 	tp_set_sgm();												\
@@ -4484,7 +4671,7 @@ typedef struct redo_root_search_context_struct
 																\
 	SETUP_THREADGBL_ACCESS;													\
 	assert(0 < t_tries);													\
-	assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));							\
+	assert((CDB_STAGNATE == t_tries) || (LCL_T_TRIES == t_tries - 1));							\
 	DEBUG_ONLY(failure = LAST_RESTART_CODE);										\
 	assert(NULL != gv_target);												\
 	TN_ABORTED = FALSE;													\
@@ -4798,6 +4985,7 @@ void		bt_malloc(sgmnt_addrs *csa);
 void		bt_refresh(sgmnt_addrs *csa, boolean_t init);
 void		db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
 void		grab_crit(gd_region *reg);
+boolean_t	grab_crit_encr_cycle_sync(gd_region *reg);
 boolean_t	grab_crit_immediate(gd_region *reg);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
 void		gv_init_reg(gd_region *reg);
@@ -4811,6 +4999,7 @@ void		rel_crit(gd_region *reg);
 void		rel_lock(gd_region *reg);
 boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
 bool		wcs_wtfini(gd_region *reg);
+void		wcs_stale(TID tid, int4 hd_len, gd_region **region);
 
 #ifdef VMS
 int4 wcs_wtstart(gd_region *region);
@@ -4852,7 +5041,6 @@ gtm_uint64_t gds_file_size(file_control *fc);
 
 uint4	jnl_flush(gd_region *reg);
 void	jnl_fsync(gd_region *reg, uint4 fsync_addr);
-void	jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg);
 void	jnl_oper_user_ast(gd_region *reg);
 void	jnl_wait(gd_region *reg);
 void	view_jnlfile(mval *dst, gd_region *reg);
@@ -4872,6 +5060,9 @@ void	gvstats_rec_cnl2csd(sgmnt_addrs *csa);
 void	gvstats_rec_upgrade(sgmnt_addrs *csa);
 
 void act_in_gvt(gv_namehead *gvt);
+
+#define FILE_TYPE_REPLINST	"replication instance"
+#define FILE_TYPE_DB		"database"
 
 #include "gdsfheadsp.h"
 

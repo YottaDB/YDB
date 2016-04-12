@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +59,7 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer,
 	assert(buffer->bsiz <= csa->hdr->blk_size || dse_running);
 	pblk_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
 	assert((pblk_record.bsiz == buffer->bsiz) ||
-	       (cse->blk_checksum == jnl_get_checksum((uint4 *)buffer, NULL, pblk_record.bsiz)));
+	       (cse->blk_checksum == jnl_get_checksum(buffer, NULL, pblk_record.bsiz)));
 	assert(pblk_record.bsiz >= SIZEOF(blk_hdr) || dse_running);
 	pblk_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = (int)FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
@@ -72,5 +73,5 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer,
 	COMPUTE_PBLK_CHECKSUM(cse->blk_checksum, &pblk_record, com_csum, pblk_record.prefix.checksum);
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
-	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer);
+	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer, NULL);
 }

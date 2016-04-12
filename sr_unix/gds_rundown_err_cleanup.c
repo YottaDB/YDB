@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +43,10 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 	sgmnt_addrs	*csa;
 	boolean_t	cancelled_timer, cancelled_dbsync_timer;
 
+	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in
+	 * gds_rundown().Because we don't have access to file header, we can not know if counters are disabled so we go by our best
+	 * guess, not disabled, during cleanup.
+	 */
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
@@ -56,6 +61,13 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 	}
 	if (!have_standalone_access)
 	{
+		if (udi->counter_acc_incremented)
+		{
+			if (0 != (semop_res = do_semop(udi->semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT)))
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),
+					     ERR_TEXT, 2, RTS_ERROR_TEXT("Error decreasing access semaphore counter"), semop_res);
+			udi->counter_acc_incremented = FALSE;
+		}
 		if (udi->grabbed_access_sem)
 		{	/* release the access control semaphore, if you hold it */
 			sem_pid = semctl(udi->semid, 0, GETPID);
@@ -65,21 +77,15 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 					     ERR_TEXT, 2, RTS_ERROR_TEXT("Error releasing access semaphore"), semop_res);
 			udi->grabbed_access_sem = FALSE;
 		}
-		if (udi->counter_acc_incremented)
-		{
-			if (0 != (semop_res = do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT)))
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),
-					     ERR_TEXT, 2, RTS_ERROR_TEXT("Error decreasing access semaphore counter"), semop_res);
-			udi->counter_acc_incremented = FALSE;
-		}
 	}
 	if (udi->grabbed_ftok_sem)
 	{	/* Decrease counter and release ftok */
 		assert(!have_standalone_access);
-		ftok_sem_release(gv_cur_region, !have_standalone_access, TRUE);
+		/* See gv_rundown.c comment for why ftok_sem_release 2nd parameter is FALSE below */
+		ftok_sem_release(gv_cur_region, FALSE, TRUE);
 	} else if (udi->counter_ftok_incremented) /* Just decrease ftok counter */
 	{
-		if (0 != (semop_res = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT)))
+		if (0 != (semop_res = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT)))
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),
 				     ERR_TEXT, 2, RTS_ERROR_TEXT("Error decreasing ftok semaphore counter"), semop_res);
 		udi->counter_ftok_incremented = FALSE;

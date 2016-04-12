@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,9 @@
 #include "compile_pattern.h"
 #include "fullbool.h"
 #include "show_source_line.h"
+#include "stringpool.h"
+#include "gtm_string.h"
+#include "gtm_utf8.h"
 
 GBLREF	boolean_t	run_time;
 
@@ -29,17 +32,33 @@ error_def(ERR_SIDEEFFECTEVAL);
 LITREF octabstruct oc_tab[];
 LITREF toktabtype tokentable[];
 
+GBLREF  spdesc          stringpool;
+GBLREF boolean_t        gtm_utf8_mode;
+
+/**
+ * Given a start token that represents a non-unary operation, consumes tokens and constructs an appropriate triple tree.
+ * Adds the triple tree to the chain of execution.
+ * @input[out] a A pointer that will be set to the last token seen
+ * @returns An integer flag of; EXPR_INDR or EXPR_GOOD or EXPR_FAIL
+ * @par Side effects
+ *  - Calls advance window multiple times, and consumes tokens accordingly
+ *  - Calls expratom multiple times, which (most notably) adds literals to a hash table
+ *  - Calls ins_triple, which adds triples to the execution chain
+ */
 int eval_expr(oprtype *a)
 {
-	boolean_t	ind_pat, saw_local, saw_se, se_warn;
+	boolean_t	ind_pat, saw_local, saw_se, se_warn, replaced;
 	int		op_count, se_handling;
 	opctype		bin_opcode;
 	oprtype		optyp_1, optyp_2, *optyp_ptr;
 	tbp		*catbp, *tripbp;
-	triple 		*argtrip, *parm, *ref, *ref1, *t1, *t2;
+	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
+	mliteral	*m1, *m2;
+	mval		tmp_mval;
+	int i = 0;
 	unsigned short	type;
-	DCL_THREADGBL_ACCESS;
 
+	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 	if (!expratom(&optyp_1))
 	{	/* If didn't already add an error of our own, do so now with catch all expression error */
@@ -80,12 +99,36 @@ int eval_expr(oprtype *a)
 			catbp = &ref->backptr;		/* borrow backptr to track args */
 			saw_se = saw_local = FALSE;
 			for (op_count = 2; ; op_count++) /* op_count = first operand plus destination */
-			{
-				parm = newtriple(OC_PARAMETER);
-				ref1->operand[1] = put_tref(parm);
-				ref1 = parm;
-				ref1->operand[0] = optyp_1;
-				if (se_handling)
+			{	/* If we can, concat string literals at compile-time rather than runtime */
+				replaced = FALSE;
+				if ((OC_PARAMETER == ref1->opcode)
+					&& (TRIP_REF == ref1->operand[0].oprclass)
+					&& (OC_LIT == ref1->operand[0].oprval.tref->opcode)
+					&& (TRIP_REF == optyp_1.oprclass)
+					&& (OC_LIT == optyp_1.oprval.tref->opcode))
+				{	/* Copy the string over */
+					m1 = ref1->operand[0].oprval.tref->operand[0].oprval.mlit;
+					m2 = optyp_1.oprval.tref->operand[0].oprval.mlit;
+					tmp_mval.mvtype = MV_STR;
+					tmp_mval.str.char_len = m1->v.str.char_len + m2->v.str.char_len;
+					tmp_mval.str.len = m1->v.str.len + m2->v.str.len;
+					ENSURE_STP_FREE_SPACE(tmp_mval.str.len);
+					tmp_mval.str.addr = (char *)stringpool.free;
+					memcpy(tmp_mval.str.addr, m1->v.str.addr, m1->v.str.len);
+					memcpy(tmp_mval.str.addr + m1->v.str.len, m2->v.str.addr, m2->v.str.len);
+					stringpool.free = (unsigned char *)tmp_mval.str.addr + tmp_mval.str.len;
+					ref1->operand[0] = put_lit(&tmp_mval);
+					optyp_1 = ref1->operand[0];
+					replaced = TRUE;
+					op_count--;
+				} else
+				{
+					parm = newtriple(OC_PARAMETER);
+					ref1->operand[1] = put_tref(parm);
+					ref1 = parm;
+					ref1->operand[0] = optyp_1;
+				}
+				if (se_handling && !replaced)
 				{	/* the following code deals with protecting lvn values from change by a following
 					 * side effect and thereby produces a standard evaluation order. It is similar to code in
 					 * expritem for function arguments, but has slightly different and easier circumstances
@@ -114,6 +157,18 @@ int eval_expr(oprtype *a)
 				{
 					if (!saw_se)			/* suppressed standard or lucked out on ordering */
 						saw_local = FALSE;	/* just clear the backptrs - shut off other processing */
+					/* This code checks to see if the only parameter for this OC_CAT is a string literal,
+						and if it is, then it simply returns the literal*/
+					if ((2 == op_count) && (OC_PARAMETER == ref1->opcode)
+						&& (TRIP_REF == ref1->operand[0].oprclass)
+						&& (OC_LIT == ref1->operand[0].oprval.tref->opcode))
+					{	/* We need to copy some things from the original first */
+						ref1->operand[0].oprval.tref->src = ref->src;
+						t1 = ref1->operand[0].oprval.tref;
+						ref = t1;
+						optyp_1 = put_tref(t1);
+						break;
+					}
 					dqloop(catbp, que, tripbp)
 					{	/* work chained arguments which are in reverse order */
 						argtrip = tripbp->bpt;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +12,9 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
+#include "gtm_signal.h"
 
-#include <signal.h>
 #include <errno.h>
 
 #include "error.h"
@@ -40,7 +41,7 @@ void stop_image(void)
 	gtm_fork_n_core();
 	if (0 == exi_condition)
 		exi_condition = SIGQUIT;
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }
 
 /* This entry point will core if necessary */
@@ -58,7 +59,7 @@ void stop_image_conditional_core(void)
 	}
 	if (0 == exi_condition)
 		exi_condition = SIGQUIT;
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }
 
 /* This entry point will not core */
@@ -68,5 +69,5 @@ void stop_image_no_core(void)
 	if (0 == exi_condition)
 		exi_condition = SIGQUIT;
 	need_core = FALSE;
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }

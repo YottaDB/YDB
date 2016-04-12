@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,7 @@
 #include "performcaslatchcheck.h"
 #include "updproc_get_gblname.h"
 #include "gtmmsg.h"
+#include "mupip_reorg_encrypt.h"
 
 #ifdef REPL_DEBUG
 #include "format_targ_key.h"
@@ -110,6 +111,10 @@ GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF  uint4                   image_count;
 #endif
 GBLREF boolean_t		disk_blk_read;
+#ifdef DEBUG
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+#endif
+
 static	uint4			last_pre_read_offset;
 
 error_def(ERR_DBCCERR);
@@ -202,7 +207,7 @@ boolean_t updproc_preread(void)
 			return TRUE;
 		}
 		for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
-		{
+		{	/* seems like this might be a legitimate spin lock - might could use some work to tighten it up */
 			for (spins = maxspins; 0 < spins; spins--)
 			{
 				if (GET_SWAPLOCK(&upd_helper_ctl->pre_read_lock))
@@ -380,7 +385,8 @@ boolean_t updproc_preread(void)
 							 * This is done for performance reasons so that n_pre_read
 							 * doesn't have to be an atomic counter.
 							 */
-							csa = &FILE_INFO(gv_cur_region)->s_addrs;
+							reg = gv_cur_region;
+							csa = &FILE_INFO(reg)->s_addrs;
 							assert(!csa->now_crit);
 							status = gvcst_search(gv_currkey, NULL);
 							assert(!csa->now_crit);
@@ -401,7 +407,9 @@ boolean_t updproc_preread(void)
 								 * gvcst_search for this gv_target is called.
 								 */
 								gv_target->clue.end = 0;
+								assert(cdb_sc_reorg_encrypt != status);
 							}
+							assert(NULL == reorg_encrypt_restart_csa);
 							if (disk_blk_read)
 								csa->nl->n_pre_read--;
 #							ifdef REPL_DEBUG

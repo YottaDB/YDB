@@ -112,11 +112,9 @@ void op_unwind(void)
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
-#	ifdef GTM_TRIGGER
-	if (SFF_IMPLTSTART_CALLD & frame_pointer->type)
-		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_IMPLTSTART_CALLD turned on\n",
+	if (SSF_NORET_VIA_MUMTSTART & frame_pointer->type)
+		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SSF_NORET_VIA_MUMTSTART enabled\n",
 			  frame_pointer, frame_pointer->type));
-#	endif
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */

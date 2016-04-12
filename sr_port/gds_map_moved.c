@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +39,7 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 	srch_hist	*hist, *hist1, *hist2;
 	gv_namehead	*gvt;
 	sgmnt_addrs	*csa;
+	sm_uc_ptr_t	buffaddr;
 
 	csa = cs_addrs;
 	assert(csa->now_crit);
@@ -65,22 +67,14 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 				for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
 				{
 					assert(MAX_BT_DEPTH >= hist_index);
-					if ((old_base <= hist->h[hist_index].buffaddr)
-						&& (old_top > hist->h[hist_index].buffaddr))
-					{
+					buffaddr = hist->h[hist_index].buffaddr;
+					if ((old_base <= buffaddr) && (old_top > buffaddr))
 						hist->h[hist_index].buffaddr += adj;
-						assert(new_base <= hist->h[hist_index].buffaddr);
-					} else if ((hist == hist2) && (0 < gvt->clue.end))
+					else if ((hist == hist2) && (0 < gvt->clue.end))
 					{	/* alt_hist is not updated when clue is set so the buffaddr can
-						 * point to a prior instance of the file's mapping.  So, reset alt_hist.
+						 * point to a prior instance of the file's mapping. So, reset alt_hist.
 						 */
 						hist->h[hist_index].blk_num = HIST_TERMINATOR;
-					} else
-					{	/* It's already been adjusted or it has to be a private copy */
-						assert(((new_base <= hist->h[hist_index].buffaddr)
-							&& (hist->h[hist_index].buffaddr < new_base + (old_top - old_base)))
-							|| (0 != hist->h[hist_index].first_tp_srch_status)
-							|| (0 != ((off_chain *)&(hist->h[hist_index].blk_num))->flag));
 					}
 				}
 			}

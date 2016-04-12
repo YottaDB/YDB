@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,9 +46,8 @@
 #include "send_msg.h"
 #include "dse.h"
 #include "gtmmsg.h"
-#ifdef GTM_CRYPT
+#include "mutex.h"
 #include "gtmcrypt.h"
-#endif
 
 GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	sgmnt_addrs	*cs_addrs;
@@ -81,10 +80,8 @@ void dse_chng_fhead(void)
 	int		gethostname_res;
 	sm_uc_ptr_t	chng_ptr;
 	const char 	*freeze_msg[] = { "UNFROZEN", "FROZEN" } ;
-#	ifdef GTM_CRYPT
 	char		hash_buff[GTMCRYPT_HASH_LEN];
 	int		gtmcrypt_errno;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -482,35 +479,22 @@ void dse_chng_fhead(void)
 	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SLEEP_SPIN_COUNT")) && cli_get_int("MUTEX_SLEEP_SPIN_COUNT", &x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
-		if (0 < x)
-			cs_data->mutex_spin_parms.mutex_sleep_spin_count = x;
+		if (0 <= x)
+			SLEEP_SPIN_CNT(cs_data) = x;
 		else
 			util_out_print("Error: SLEEP SPIN COUNT should be a non zero positive number", TRUE);
 	}
-#	ifdef MUTEX_REAL_SLEEP
-	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_TIME")) && cli_get_int("SPIN_SLEEP_TIME", &x))
-	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && cli_get_int("MUTEX_SPIN_SLEEP_TIME", &x)))
+	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_MASK")) && cli_get_hex("SPIN_SLEEP_MASK", (uint4 *)&x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_MASK"))
+	      && cli_get_hex("MUTEX_SPIN_SLEEP_MASK", (uint4 *)&x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
 		if (x < 0)
-			util_out_print("Error: SPIN SLEEP TIME should be non negative", TRUE);
+			util_out_print("Error: SPIN SLEEP MASK should be less than 0x3FFFFFFF, permitting sleep just over a second",
+				TRUE);
 		else
-		{
-			save_x = x;
-			for (index_x = 0;  0 != x;  x >>= 1, index_x++);
-			if (index_x <= 1)
-				x = index_x;
-			else  if ((1 << (index_x - 1)) == save_x)
-				x = save_x - 1;
-			else
-				x = (1 << index_x) - 1;
-			if (x > 999999)
-				util_out_print("Error: SPIN SLEEP TIME should be less than one million micro seconds", TRUE);
-			else
-				cs_data->mutex_spin_parms.mutex_spin_sleep_mask = x;
-		}
+			SPIN_SLEEP_MASK(cs_data) = x;
 	}
-#	endif
 	UNIX_ONLY(
 		if ((CLI_PRESENT == cli_present("COMMITWAIT_SPIN_COUNT")) && cli_get_int("COMMITWAIT_SPIN_COUNT", &x))
 		{
@@ -670,29 +654,26 @@ void dse_chng_fhead(void)
 			util_out_print("Error: cannot get value for !AD.", TRUE, LEN_AND_LIT("MACHINE_NAME"));
 
 	}
-#	ifdef GTM_CRYPT
 	if (CLI_PRESENT == cli_present("ENCRYPTION_HASH"))
 	{
 		if (1 < cs_addrs->nl->ref_cnt)
 		{
 			util_out_print("Cannot reset encryption hash in file header while !XL other processes are "
 					"accessing the database.",
-					TRUE,
-					cs_addrs->nl->ref_cnt - 1);
+					TRUE, cs_addrs->nl->ref_cnt - 1);
 			return;
 		}
 		fname_ptr = (char *)gv_cur_region->dyn.addr->fname;
 		fname_len = gv_cur_region->dyn.addr->fname_len;
 		ASSERT_ENCRYPTION_INITIALIZED;
 		/* Now generate the new hash to be placed in the database file header. */
-		GTMCRYPT_HASH_GEN(cs_addrs, fname_ptr, fname_len, hash_buff, gtmcrypt_errno);
+		GTMCRYPT_HASH_GEN(cs_addrs, fname_len, fname_ptr, 0, NULL, hash_buff, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, fname_len, fname_ptr);
 		memcpy(cs_data->encryption_hash, hash_buff, GTMCRYPT_HASH_LEN);
-		DEBUG_ONLY(GTMCRYPT_HASH_CHK(cs_addrs, cs_data->encryption_hash, gtmcrypt_errno));
+		DEBUG_ONLY(GTMCRYPT_HASH_CHK(cs_addrs, cs_data->encryption_hash, fname_len, fname_ptr, gtmcrypt_errno));
 		assert(0 == gtmcrypt_errno);
 	}
-#	endif
 
 #	ifdef UNIX
 	if (CLI_PRESENT == cli_present("JNL_YIELD_LIMIT") && cli_get_int("JNL_YIELD_LIMIT", &x))

@@ -47,8 +47,8 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 {															\
 	do														\
 	{														\
-		RC = sigprocmask(FUNC, NEWSET, OLDSET);									\
-	} while (-1 == RC && EINTR == errno);										\
+		RC = sigprocmask(FUNC, NEWSET, OLDSET);	/* BYPASSOK(sigprocmask) */					\
+	} while ((-1 == RC) && (EINTR == errno));									\
 }
 
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)									\

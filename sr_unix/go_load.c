@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,90 +41,72 @@
 #include "gv_trigger.h"
 #include "mu_interactive.h"
 #include "wbox_test_init.h"
+#include "op.h"
+#include "io.h"
+#include "iormdef.h"
+#include "iosp.h"
+#include "gtmio.h"
+#include "io_params.h"
+#include "iotimer.h"
 
 GBLREF bool		mupip_error_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF bool		mu_ctrlc_occurred;
-GBLREF spdesc		stringpool;
 GBLREF gv_key		*gv_currkey;
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF int		onerror;
+GBLREF io_pair		io_curr_device;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF spdesc		stringpool;
 
 error_def(ERR_LOADCTRLY);
 error_def(ERR_LOADEOF);
 error_def(ERR_LOADFILERR);
-error_def(ERR_LOADINVCHSET);
 error_def(ERR_MUNOFINISH);
-error_def(ERR_TRIGDATAIGNORE);
+error_def(ERR_PREMATEOF);
 error_def(ERR_RECLOAD);
+error_def(ERR_TRIGDATAIGNORE);
 
 #define GO_PUT_SUB		0
 #define GO_PUT_DATA		1
 #define GO_SET_EXTRACT		2
-#define DEFAULT_MAX_REC_SIZE	3096
-#define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL)								\
-{																\
-	/* The ordering of the && below is important as the caller uses HASHT_GBL to be set to TRUE if the global pointed to 	\
-	 * by PTR is ^#t. 													\
-	 */															\
-	if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !hasht_ignored)					\
-	{															\
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGDATAIGNORE, 2, KEYLENGTH, PTR);				\
-		hasht_ignored = TRUE;												\
-	}															\
-}
 
-void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
+#define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL, IGNORE)						\
+/* The ordering of the && below is important as the caller uses HASHT_GBL to be set to TRUE if the global pointed to 	\
+ * by PTR is ^#t. 													\
+ */															\
+if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !IGNORE)						\
+{															\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGDATAIGNORE, 2, KEYLENGTH, PTR);				\
+	IGNORE = TRUE;													\
+}															\
 
-void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2_ptr, int line2_len)
+void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
+	int utf8_extract, int dos)
 {
-	char		*ptr;
-	int		len, fmt, keylength, keystate;
-	uint4	        max_data_len, max_subsc_len, max_rec_size;
-	gtm_uint64_t	iter, tmp_rec_count, key_count;
-	mstr            src, des;
-	unsigned char   *rec_buff, ch;
-	boolean_t	utf8_extract, format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
-	char		*val_off;
-	int 		val_len, val_off1, val_len1;
+	boolean_t	format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
 	boolean_t	is_setextract;
+	char		*add_off, *ptr, *val_off;
+	gtm_uint64_t	iter, tmp_rec_count, key_count;
+	int		add_len, len, keylength, keystate, val_len, val_len1, val_off1;
+	mstr            src, des;
+	uint4	        max_data_len, max_subsc_len;
 
 	gvinit();
-
-	fmt = MU_FMT_ZWR;	/* by default, the extract format is ZWR (not GO) */
-	len = line1_len;
-	ptr = line1_ptr;
-	if (0 <= len)
+	if ((MU_FMT_GO != fmt) && (MU_FMT_ZWR != fmt))
 	{
-		util_out_print("!AD", TRUE, len, ptr);
-		utf8_extract = ((len >= STR_LIT_LEN(UTF8_NAME)) &&
-				(0 == MEMCMP_LIT(ptr + len - STR_LIT_LEN("UTF-8"), "UTF-8"))) ? TRUE : FALSE;
-		if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
-		{ /* extract CHSET doesn't match $ZCHSET */
-			if (utf8_extract)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
-			else
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
-			mupip_error_occurred = TRUE;
-			return;
-		}
-	} else
+		assert((MU_FMT_GO == fmt) || (MU_FMT_ZWR == fmt));
 		mupip_exit(ERR_LOADFILERR);
-	len = line2_len;
-	ptr = line2_ptr;
-	if (len >= 0)
-	{
-		util_out_print("!AD", TRUE, len, ptr);
-		fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ? MU_FMT_ZWR : MU_FMT_GO;
-	} else
-		mupip_exit(ERR_LOADFILERR);
+	}
 	if (begin < 3)
 		begin = 3;
+	ptr = line3_ptr;
+	len = line3_len;
 	for (iter = 3; iter < begin; iter++)
 	{
-		len = file_input_get(&ptr, 0);
+		len = go_get(&ptr, 0, max_rec_size);
 		if (len < 0)	/* The IO device has signalled an end of file */
 		{
+			++iter;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			mupip_error_occurred = TRUE;
 			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
@@ -132,12 +115,9 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 	}
 	assert(iter == begin);
 	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
-	max_data_len = 0;
-	max_subsc_len = 0;
-	key_count = 0;
+	des.len = key_count = max_data_len = max_subsc_len = 0;
+	des.addr = (char *)rec_buff;
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
-	max_rec_size = DEFAULT_MAX_REC_SIZE;
-	rec_buff = (unsigned char *)malloc(max_rec_size);
 	for (iter = begin - 1; ; )
 	{
 		if (++iter > end)
@@ -156,7 +136,7 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
-		if (0 > (len = file_input_get(&ptr, 0)))
+		if ((iter > begin) && (0 > (len = go_get(&ptr, MAX_STRLEN, max_rec_size) - dos)))	/* WARNING assignment */
 			break;
 		if (mupip_error_occurred)
 		{
@@ -165,7 +145,7 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 		}
 		if ('\n' == *ptr)
 		{
-			if ('\n' == *(ptr+1))
+			if ('\n' == *(ptr + 1))
 				break;
 			ptr++;
 		}
@@ -185,12 +165,13 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 				keylength = zwrkeyvallen(ptr, len, &val_off, &val_len, NULL, NULL);
 				is_setextract = FALSE;
 			}
-			ISSUE_TRIGDATAIGNORE_IF_NEEDED(keylength, ptr, hasht_gbl);
-			if (hasht_gbl)
+			if (0 < val_len)
 			{
-				hasht_gbl = FALSE;
-				continue;
-			}
+				ISSUE_TRIGDATAIGNORE_IF_NEEDED(keylength, ptr, hasht_gbl, hasht_ignored);
+				if (hasht_gbl)
+					continue;
+			} else
+				mupip_error_occurred = TRUE;
 			go_call_db(GO_PUT_SUB, ptr, keylength, 0, 0);
 			if (mupip_error_occurred)
 			{
@@ -200,17 +181,16 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 				gv_currkey->base[0] = '\0';
 				ONERROR_PROCESS;
 			}
-			assert(keylength < len - 1);
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
 			src.len = val_len;
 			src.addr = val_off;
-			des.len = 0;
 			if (src.len > max_rec_size)
 			{
-			        max_rec_size = src.len;
-				free(rec_buff);
-				rec_buff = (unsigned char *)malloc(max_rec_size);
+				util_out_print("Record too long - record number: !@UQ!/With content:!/!AD",
+					TRUE, &iter, src.len, src.addr);
+				format_error = TRUE;
+				continue;
 			}
 			des.addr = (char *)rec_buff;
 			if (FALSE == zwr2format(&src, &des))
@@ -230,16 +210,15 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				ONERROR_PROCESS;
 			}
-			key_count++;
+			des.len = 0;
 		} else
 		{
-			ISSUE_TRIGDATAIGNORE_IF_NEEDED(len, ptr, hasht_gbl);
+			ISSUE_TRIGDATAIGNORE_IF_NEEDED(len, ptr, hasht_gbl, hasht_ignored);
 			if (hasht_gbl)
 			{
-				if (0 > (len = file_input_get(&ptr, 0)))
+				if (0 > (len = go_get(&ptr, 0, max_rec_size) - dos))	/* WARNING assignment */
 					break;
 				iter++;
-				hasht_gbl = FALSE;
 				continue;
 			}
 			go_call_db(GO_PUT_SUB, ptr, len, 0, 0);
@@ -258,7 +237,7 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 				iter--;	/* Decrement as didn't load key */
 				break;
 			}
-			if (0 > (len = file_input_get(&ptr, 0)))
+			if (0 > (len = go_get(&ptr, 0, max_rec_size) - dos))		/* WARNING assignment */
 			        break;
 			if (mupip_error_occurred)
 			{
@@ -276,10 +255,9 @@ void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				ONERROR_PROCESS;
 			}
-			key_count++;
 		}
+		key_count++;
 	}
-	free(rec_buff);
 	file_input_close();
 	if (mu_ctrly_occurred)
 	{
@@ -314,4 +292,37 @@ void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1)
 			break;
 	}
 	REVERT;
+}
+
+/* The following is similar to file_get_input in file_input.c but avoids reallocation because the regex memory management issue */
+int go_get(char **in_ptr, int max_len, uint4 max_rec_size)
+{
+	int			rd_len, ret_len;
+	mval			val;
+
+	ESTABLISH_RET(mupip_load_ch, 0);
+	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
+	for (ret_len = 0; ; )
+	{
+		op_read(&val, dollar_tlevel ? 0 : NO_M_TIMEOUT);
+		rd_len = val.str.len;
+		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
+		{
+			REVERT;
+			if (io_curr_device.in->dollar.x)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
+			return FILE_INPUT_GET_ERROR;
+		}
+		if ((max_len && (rd_len > max_len)) || ((ret_len + rd_len) > max_rec_size))
+		{
+			REVERT;
+			return FILE_INPUT_GET_LINE2LONG;
+		}
+		memcpy((unsigned char *)(*in_ptr + ret_len), val.str.addr, rd_len);
+		ret_len += rd_len;
+		if (!io_curr_device.in->dollar.x)
+			break;
+	}
+	REVERT;
+	return ret_len;
 }

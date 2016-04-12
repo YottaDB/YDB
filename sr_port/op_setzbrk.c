@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,10 @@
 #include "min_max.h"
 #include "dm_setup.h"
 #ifdef GTM_TRIGGER
-# include "trigger_source_read_andor_verify.h"
+# include "gdsroot.h"			/* for gdsfhead.h */
+# include "gdsbt.h"			/* for gdsfhead.h */
+# include "gdsfhead.h"
+# include "trigger_read_andor_locate.h"
 # include "gtm_trigger_trc.h"
 #else
 # define DBGIFTRIGR(x)
@@ -107,8 +110,8 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			tmprtnname = rtn->str;
 			if (is_trigger)
 			{
-				DEBUG_ONLY(routine = NULL;)
-				sstatus = trigger_source_read_andor_verify(&tmprtnname, TRIGGER_COMPILE, &routine);
+				routine = NULL;				/* Init so garbage value isn't used */
+				sstatus = trigger_source_read_andor_verify(&tmprtnname, &routine);
 				if (0 != sstatus)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
 				assert(NULL != routine);

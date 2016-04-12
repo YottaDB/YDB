@@ -61,7 +61,7 @@ if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
 		export gtmroutines="$tmpdir($dir)"
 	fi
 
-	gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -run $PINENTRY
+	gtm_local_collate= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -run $PINENTRY
 	punt=$?
 	if [ -d "$tmpdir" ] ; then rm -rf "$tmpdir" ; fi
 fi

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 
 #include "gtm_string.h"
 
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "error.h"
 #include "gdsroot.h"
@@ -383,15 +384,13 @@ void dse_f_blk(void)
 				{
 					if (!(sp = t_qread(look, &dummy_int, &dummy_cr)))	/* NOTE assignment */
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-					if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
-						s_top = sp + cs_addrs->hdr->blk_size;
-					else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
+					if (!(((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size) &&
+							(SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz))
 					{
 						util_out_print("Error: sibling search hit problem blk 0x!XL", TRUE, look);
 						look = 0;
 						break;
-					} else
-						s_top = sp + ((blk_hdr_ptr_t)sp)->bsiz;
+					}
 					if (0 >= (signed char)(((blk_hdr_ptr_t)sp)->levl))
 					{
 						util_out_print("Error: sibling search reached level 0", TRUE);

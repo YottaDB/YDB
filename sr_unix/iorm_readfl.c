@@ -122,7 +122,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	int4		msec_timeout;	/* timeout in milliseconds */
 	int4		bytes2read, bytes_read, char_bytes_read, add_bytes, reclen;
 	int4		buff_len, mblen, char_count, bytes_count, tot_bytes_read, utf_tot_bytes_read;
-	int4		status, max_width, ltind, exp_width, from_bom;
+	int4		status, max_width, ltind, exp_width, from_bom, fol_bytes_read, feof_status;
 	wint_t		utf_code;
 	char		*errptr;
 	io_desc		*io_ptr;
@@ -712,7 +712,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			do
 			{
 				/* in follow mode a read will return an EOF if no more bytes are available*/
-				if (EOF != (status = getc(filstr)))
+				GETC(filstr, status);
+				if (EOF != status)
 				{
 					inchar = (unsigned char)status;
 					tot_bytes_read++;
@@ -731,10 +732,11 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				} else
 				{
 					inchar = 0;
-					if (feof(filstr))
+					FEOF(filstr, feof_status);
+					if (feof_status)
 					{
 						status = 0;
-						clearerr(filstr);
+						CLEARERR(filstr);
 
 						if (rm_ptr->follow)
 						{
@@ -812,7 +814,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			{
 				unsigned char tchar;
 				int tfcntl_res;
-				if (EOF != (status = getc(filstr)))
+				GETC(filstr, status);
+				if (EOF != status)
 				{
 					tchar = (unsigned char)status;
 					if (rm_ptr->input_encrypted)
@@ -821,11 +824,14 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					/* force it to process below in case character read is a 0 */
 					if (!status)
 						status = 1;
-				}
-				else if (feof(filstr))
+				} else
 				{
-					status = 0;
-					clearerr(filstr);
+					FEOF(filstr, feof_status);
+					if (feof_status)
+					{
+						status = 0;
+						CLEARERR(filstr);
+					}
 				}
 
 				if (0 > status)
@@ -920,17 +926,24 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			if ((0 == buff_len) || zint_restart)
 			{	/* need to refill the buffer */
 				if (rm_ptr->follow)
+				{
 					buff_len = iorm_get_fol(io_ptr, &tot_bytes_read, &msec_timeout, timed, zint_restart,
 								&follow_timeout, end_time);
-				else
+					/* this will include the total bytes read including any stripped pad chars */
+					fol_bytes_read = rm_ptr->fol_bytes_read;
+				} else
+				{
 					buff_len = iorm_get(io_ptr, &blocked_in, rm_ptr->pipe, flags, &tot_bytes_read,
 						    timer_id, &msec_timeout, pipe_zero_timeout, zint_restart);
+					/* not using fol_bytes_read for non-follow mode */
+					fol_bytes_read = buff_len;
+				}
 				if (0 > buff_len)
 				{
 					bytes_count = 0;
 					if (errno == EINTR  &&  out_of_time)
 						buff_len = -2;
-				} else if (outofband && (buff_len < rm_ptr->recordsize))
+				} else if (outofband && (fol_bytes_read < rm_ptr->recordsize))
 				{
 					PIPE_DEBUG(PRINTF(" %d utf fixed outofband, buff_len: %d done_1st_read: %d\n", pid,
 							  buff_len, rm_ptr->done_1st_read); DEBUGPIPEFLUSH);
@@ -1621,7 +1634,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	PIPE_DEBUG(PRINTF(" %d notoutofband, %d %d\n", pid, status, line_term_seen); DEBUGPIPEFLUSH);
 	real_errno = errno;
 	if (TRUE == do_clearerr)
-		clearerr(filstr);
+		CLEARERR(filstr);
 	memcpy(io_ptr->dollar.device, "0", SIZEOF("0"));
 	io_ptr->dollar.za = 0;
 	/* On error, getc() returns EOF while read() returns -1. Both code paths converge here. Thankfully EOF is -1 on all

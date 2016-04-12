@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,11 +17,6 @@
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "min_max.h"
-#ifdef VMS
-#include <rms.h>
-#include <devdef.h>
-#include <ssdef.h>
-#endif
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -49,9 +45,7 @@
 #include "gvnh_spanreg.h"
 #include "gtmimagename.h"
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
@@ -64,6 +58,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF 	jnl_gbls_t		jgbl;
 
 error_def(ERR_DUPTN);
+error_def(ERR_FORCEDHALT);
 error_def(ERR_JNLTPNEST);
 
 static	void	(* const extraction_routine[])() =
@@ -82,7 +77,6 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	enum rec_fence_type	rec_fence;
 	enum broken_type	recstat;
 	jnl_tm_t		rec_time;
-	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
 	uint4			status;
 	mval			mv;
 	seq_num 		rec_token_seq, rec_strm_seqno, resync_strm_seqno;
@@ -93,9 +87,9 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	ht_ent_mname		*tabent;
 	mname_entry	 	gvent;
 	gvnh_reg_t		*gvnh_reg;
-#	ifdef GTM_CRYPT
+	pini_list_struct	*plst;
 	int4			gtmcrypt_errno;
-#	endif
+	boolean_t		use_new_key;
 	forw_multi_struct	*forw_multi;
 #	if (defined(DEBUG) && defined(UNIX))
 	int4			strm_idx;
@@ -104,34 +98,46 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!rctl->forw_eof_seen);
+	if (multi_proc_in_use)
+	{	/* Set key to print this rctl's region-name as prefix in case this forked off process prints any output.
+		 * e.g. If this function ends up calling t_end/op_tcommit which in turn needs to do a jnl autoswitch
+		 * inside jnl_file_extend and prints a GTM-I-FILERENAME message.
+		 */
+		MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);
+	}
 	jctl = rctl->jctl;
 	/* Ensure we never DOUBLE process the same journal record in the forward phase */
 	assert((jctl != rctl->last_processed_jctl) || (jctl->rec_offset != rctl->last_processed_rec_offset));
-	DEBUG_ONLY(
-		rctl->last_processed_jctl = jctl;
-		rctl->last_processed_rec_offset = jctl->rec_offset;
-	)
+#	ifdef DEBUG
+	rctl->last_processed_jctl = jctl;
+	rctl->last_processed_rec_offset = jctl->rec_offset;
+#	endif
 	rec = rctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	rec_time = rec->prefix.time;
 	assert(rec_time <= mur_options.before_time);
 	assert(rec_time >= mur_options.after_time);
-	assert((0 == mur_options.after_time) || mur_options.forward && !rctl->db_updated);
+	assert((0 == mur_options.after_time) || (mur_options.forward && !rctl->db_updated));
 	is_set_kill_zkill_ztworm_lgtrig_ztrig = (boolean_t)(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	if (is_set_kill_zkill_ztworm_lgtrig_ztrig)
 	{
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
-#		ifdef GTM_CRYPT
-		if (jctl->jfh->is_encrypted)
+		if (USES_ANY_KEY(jctl->jfh))
 		{
-			MUR_DECRYPT_LOGICAL_RECS(keystr, rec->prefix.forwptr, jctl->encr_key_handle, gtmcrypt_errno);
+			use_new_key = USES_NEW_KEY(jctl->jfh);
+			assert(NEEDS_NEW_KEY(jctl->jfh, rec->prefix.tn) == use_new_key);
+			MUR_DECRYPT_LOGICAL_RECS(
+					keystr,
+					(use_new_key ? TRUE : jctl->jfh->non_null_iv),
+					rec->prefix.forwptr,
+					(use_new_key ? jctl->encr_key_handle2 : jctl->encr_key_handle),
+					gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
 				return gtmcrypt_errno;
 			}
 		}
-#		endif
 	}
 	if (mur_options.selection && !mur_select_rec(jctl))
 		return SS_NORMAL;
@@ -139,7 +145,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	process_losttn = rctl->process_losttn;
 	if (!process_losttn && mur_options.rollback)
 	{
-		if (rec_token_seq >= murgbl.losttn_seqno)
+		if (IS_REPLICATED(rectype) && (rec_token_seq >= murgbl.losttn_seqno))
 			process_losttn = rctl->process_losttn = TRUE;
 #		if (defined(UNIX) && defined(DEBUG))
 		if ((rec_token_seq < murgbl.losttn_seqno) && murgbl.resync_strm_seqno_nonzero && IS_REPLICATED(rectype))
@@ -169,25 +175,19 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		if (IS_FENCED(rectype))
 		{
 			assert(rec_token_seq);
-			DEBUG_ONLY(
-				/* assert that all TP records before min_broken_time are not broken */
-				if (IS_TP(rectype) &&
-					((!mur_options.rollback && rec_time < murgbl.min_broken_time) ||
-					  (mur_options.rollback && rec_token_seq < murgbl.min_broken_seqno)))
+#			ifdef DEBUG
+			/* assert that all TP records before min_broken_time are not broken */
+			if (IS_TP(rectype) && ((!mur_options.rollback && rec_time < murgbl.min_broken_time)
+						|| (mur_options.rollback && rec_token_seq < murgbl.min_broken_seqno)))
+			{
+				rec_fence = GET_REC_FENCE_TYPE(rectype);
+				if (NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_time, rec_fence)))
 				{
-					VMS_ONLY(
-						MUR_GET_IMAGE_COUNT(jctl, rec, rec_image_count, status);
-						assert(SS_NORMAL == status);
-					)
-					rec_fence = GET_REC_FENCE_TYPE(rectype);
-					if (NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq,
-						rec_image_count, rec_time, rec_fence)))
-					{
-						assert(0 == multi->partner);
-						assert(FALSE == multi->this_is_broken);
-					}
+					assert(0 == multi->partner);
+					assert(FALSE == multi->this_is_broken);
 				}
-			)
+			}
+#			endif
 			/* In most cases, the fact whether a TP tn is broken or not would have been determined already in
 			 * mur_forward. In this case, rctl->forw_multi would be set appropriately. So use that to get to
 			 * "multi" and avoid a hashtable lookup. If forw_multi is NULL (e.g. for ZTP or single-region TP),
@@ -206,14 +206,9 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			} else if (IS_REC_POSSIBLY_BROKEN(rec_time, rec_token_seq))
 			{
 				assert(!mur_options.rollback || process_losttn);
-				VMS_ONLY(
-					MUR_GET_IMAGE_COUNT(jctl, rec, rec_image_count, status);
-					if (SS_NORMAL != status)
-						return status;
-				)
 				rec_fence = GET_REC_FENCE_TYPE(rectype);
 				assert(rec_token_seq == ((struct_jrec_upd *)rec)->token_seq.token);
-				multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_image_count, rec_time, rec_fence);
+				multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_time, rec_fence);
 				if ((NULL != multi) && (0 < multi->partner))
 				{
 					process_losttn = rctl->process_losttn = TRUE;
@@ -320,7 +315,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	}
 	if (GOOD_TN == recstat)
 	{
-		if ((is_set_kill_zkill_ztworm_lgtrig_ztrig && !IS_TP(rectype)) || JRT_TCOM == rectype)
+		if ((is_set_kill_zkill_ztworm_lgtrig_ztrig && !IS_TP(rectype)) || (JRT_TCOM == rectype))
 		{
 			/* Do forward journaling, detecting operations with duplicate transaction numbers.
 			 * While doing journaling on a database, a process may be killed immediately after
@@ -331,9 +326,11 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			 * database writes a journal record with the same transaction number as the
 			 * previous record.  While processing the journal file, we must recognize this and
 			 * issue a DUPTN warning so the user knows this was encountered during the recovery.
+			 * Note: DUPTN is possible with -NOTNCHECK (if two identical jnl files with just one tn
+			 * is presented to forward recovery like the v54003/C9K08003315 subtest does) so ignore that.
 			 */
 			curr_tn = rec->prefix.tn;
-			if (rctl->last_tn == curr_tn)
+			if ((rctl->last_tn == curr_tn) && !mur_options.notncheck)
 			{
 				assert(FALSE); /* We want to debug this */
 				murgbl.wrn_count++;
@@ -349,23 +346,31 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		}
 		if (murgbl.ok_to_update_db)
 		{
-			assert(!mur_options.rollback || (rec_token_seq < murgbl.losttn_seqno));
+			assert(!mur_options.rollback || !IS_REPLICATED(rectype) || (rec_token_seq < murgbl.losttn_seqno));
 			if (SS_NORMAL != (status = mur_output_record(rctl))) /* updates murgbl.consist_jnl_seqno */
 				return status;
 			assert(!mur_options.rollback || (murgbl.consist_jnl_seqno <= murgbl.losttn_seqno));
 		}
 	}
-	if (GOOD_TN != recstat || jgbl.mur_extract)
+	if ((GOOD_TN != recstat) || jgbl.mur_extract)
 	{
-		if (murgbl.extr_file_create[recstat])
-		{
+		if (!rctl->extr_file_created[recstat])
+		{	/* Before creating a persistent file, check if parent is still alive. If not return right away
+			 * with abnormal status (parent is not there to clean up this file anyways).
+			 */
+			if (multi_proc_in_use && multi_proc_shm_hdr->parent_pid != getppid())
+			{
+				SET_FORCED_MULTI_PROC_EXIT;	/* Also signal sibling children to stop processing */
+				return ERR_FORCEDHALT;
+			}
 			if (SS_NORMAL != (status = mur_cre_file_extfmt(jctl, recstat)))
 				return status;
-			murgbl.extr_file_create[recstat] = FALSE;
 		}
 		/* extract "rec" using routine "extraction_routine[rectype]" into broken transaction file */
-		EXTRACT_JNLREC(jctl, rec, extraction_routine[rectype], murgbl.file_info[recstat], status);
-		if (SS_NORMAL != status)
+		status = mur_get_pini(jctl, rec->prefix.pini_addr, &plst);
+		if (SS_NORMAL == status)
+			(*extraction_routine[rectype])(jctl, recstat, rec, plst);
+		else
 			return status;
 	}
 	return SS_NORMAL;

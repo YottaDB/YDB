@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +11,15 @@
  ****************************************************************/
 
 #ifdef __CYGWIN__
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A CYGWIN x86"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 CYGWIN x86"
 #elif defined(__ia64)
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A Linux IA64"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 Linux IA64"
 #elif defined(__x86_64__)
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A Linux x86_64"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 Linux x86_64"
 #elif defined(__s390__)
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A Linux S390X"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 Linux S390X"
 #else
-#define GTM_RELEASE_NAME 	"GT.M V6.2-002A Linux x86"
+#define GTM_RELEASE_NAME 	"GT.M V6.3-000 Linux x86"
 #endif
 #define GTM_PRODUCT 		"GT.M"
-#define GTM_VERSION		"V6.2"
+#define GTM_VERSION		"V6.3"

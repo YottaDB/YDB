@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,7 +110,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				bn_ptr, bmp_buff, tblk_ptr, rec_base, key_base;
 	boolean_t		gbl_target_was_set, blk_was_free, deleted;
 	gv_namehead		*save_targ;
-	srch_blk_status		bmlhist, destblkhist, *hist_ptr;
+	srch_blk_status		bmlhist, destblkhist, *hist_ptr, *work_blk_stat;
 	unsigned char    	save_cw_set_depth;
 	cw_set_element		*tmpcse;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
@@ -126,12 +127,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	blk_size = cs_data->blk_size;
 	work_parent_ptr = gv_target->hist.h[level+1].buffaddr;
 	work_parent_size = ((blk_hdr_ptr_t)work_parent_ptr)->bsiz;
-	work_blk_ptr = gv_target->hist.h[level].buffaddr;
+	work_blk_stat = &gv_target->hist.h[level];
+	work_blk_ptr = work_blk_stat->buffaddr;
 	work_blk_size = ((blk_hdr_ptr_t)work_blk_ptr)->bsiz;
-	work_blk_id = gv_target->hist.h[level].blk_num;
+	work_blk_id = work_blk_stat->blk_num;
 	if (blk_size < work_blk_size)
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 		return cdb_sc_blkmod;
 	}
 	cws_reorg_remove_index = 0;
@@ -253,7 +256,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (CDB_STAGNATE <= t_tries)
 				continue;
 			else
+			{
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
+			}
 		}
 		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len_dir);
 		(TREF(gv_reorgkey))->base[key_len_dir] = 0;
@@ -307,6 +313,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		{
 			assert(t_tries < CDB_STAGNATE);
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		/* Assign Global Variable Tree path to find dest_blk_id in dest_hist_ptr */
@@ -319,7 +326,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if ((cdb_sc_normal != status) || (dest_hist_ptr->h[nslevel].curr_rec.match != ((TREF(gv_reorgkey))->end + 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);
-			return (cdb_sc_normal != status ? status : cdb_sc_blkmod);
+			if (cdb_sc_normal != status)
+				return status;
+			else
+			{
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
+				return cdb_sc_blkmod;
+			}
 		}
 		for (wlevel = nslevel; wlevel <= dest_blk_level; wlevel++)
 			dest_hist_ptr->h[wlevel].tn = ctn;
@@ -340,6 +353,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (!BLK_FINI (bs_ptr,bs1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		assert(gv_target->hist.h[level].blk_num == work_blk_id);
@@ -355,6 +369,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (dest_blk_level + 1 != level || dest_parent_size != work_blk_size)
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		BLK_INIT(bs_ptr, bs1);
@@ -365,6 +380,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (work_blk_size < first_offset + rec_size1)
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		piece_len1 =  first_offset + rec_size1;
@@ -376,6 +392,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		assert(dest_blk_id == dest_hist_ptr->h[dest_blk_level].blk_num);
@@ -390,6 +407,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		if (blk_was_free)
@@ -458,6 +476,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				gv_target->hist.h[level+1].curr_rec.offset == dest_hist_ptr->h[level+1].curr_rec.offset)
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			if (gv_target->hist.h[level+1].curr_rec.offset < dest_hist_ptr->h[level+1].curr_rec.offset)
@@ -476,6 +495,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				BSTAR_REC_SIZE >= rec_size1 || BSTAR_REC_SIZE > rec_size2)
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			piece_len1 =  first_offset + rec_size1 - SIZEOF(block_id);
@@ -496,6 +516,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (!BLK_FINI(bs_ptr,bs1))
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			assert(level == dest_blk_level);
@@ -511,6 +532,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				BSTAR_REC_SIZE > rec_size1)
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			BLK_SEG (bs_ptr, dest_parent_ptr + SIZEOF(blk_hdr),
@@ -523,6 +545,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (!BLK_FINI(bs_ptr,bs1))
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			assert(dest_parent_ptr == dest_hist_ptr->h[dest_blk_level+1].buffaddr);
@@ -537,6 +560,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (work_parent_size < rec_size1 +  gv_target->hist.h[level+1].curr_rec.offset || BSTAR_REC_SIZE > rec_size1)
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		BLK_INIT(bs_ptr, bs1);
@@ -550,6 +574,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
 		assert(gv_target->hist.h[level+1].buffaddr == work_parent_ptr);

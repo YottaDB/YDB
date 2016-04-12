@@ -285,8 +285,11 @@
 
    The format of the ALL command is:
 
-   AL[L]  -B[UFFER_FLUSH]
+   AL[L]
+   [
+   -B[UFFER_FLUSH]
    -C[RITINIT]
+   -D[UMP] -A[LL]
    -[NO]F[REEZE]
    -O[VERRIDE]]
    -REF[ERENCE]
@@ -294,6 +297,7 @@
    -REN[EW]
    -S[EIZE]
    -W[CINIT]
+   ]
 
      o This is a very powerful command; use it with caution.
      o Be especially careful if you have an overlapping database structure
@@ -305,6 +309,13 @@
 
 3 Qualifiers
    Qualifiers
+
+   -ALL
+
+   Displays additional information on the database most of which is useful
+   for FIS in diagnosing issues.
+
+   Meaningful only with: -D[UMP]
 
    -BUFFER_FLUSH
 
@@ -323,6 +334,12 @@
 
    Never use CRITINIT while concurrent updates are in progress as doing so
    may damage the database.
+
+   -[D]UMP
+
+   Displays fileheader information.
+
+   Compatible with: -A[LL]
 
    -[NO]F[REEZE]
 
@@ -480,7 +497,7 @@
 
    Example:
 
-   DSE> WCINIT
+   DSE> ALL -WCINIT
 
    This command reinitializes the buffers for all regions of the current
    global directory.
@@ -558,7 +575,8 @@
    -REF[ERENCE_COUNT]=reference-count
    -REG[_SEQNO]=sequence-number
    -RESERVED_BYTES=reserved-bytes
-   -SLEEP_SPIN_COUNT=mutex-sleep-spin-count
+   -SLEE[P_SPIN_COUNT]=mutex-sleep-spin-count
+   -SPIN[_SLEEP_MASK]=mutex-spin-sleep-mask
    -STRM_NUM=stream-number STRM_REG_SEQNO=hexa
    -TIM[ERS_PENDING]=integer
    -TO[TAL_BLKS]=total-blocks
@@ -964,6 +982,23 @@
 
    In an LMS environment, this sets the "Resync transaction" field.
 
+   -SPIN_SLEEP_MASK]=hexadecimal-mask
+
+   Changes the Spin sleep time mask that controls the maximum time in
+   nanoseconds the process sleeps on a sleep spin; zero (0), the default
+   causes the process to just yield to the OS scheduler.
+
+   Use only with: -FILEHEADER; hexa
+
+   -SLEE[P_SPIN_COUNT]=integer
+
+   Changes the Mutex Sleep Spin Count that controls the number of times a
+   process waiting on a shared resource (usually a database) suspends its
+   activity after exhausting its Mutex Hard Spin Count and before enquing
+   itself to be awakened by a process releasing the resource
+
+   Use only with: -FILEHEADER; hexa
+
    -STRM_NUM=stream-number -STRM_R[EG_SEQNO]=str_num's_region_sequence_number
 
    Changes the Stream and its Reg Seqno. Use -STRM_NUM and -STRM_REG_SEQNO
@@ -1164,10 +1199,13 @@
    Operates on the cache of a database having BG access method. The format of
    the CACHE command is:
 
-   CA[CHE] -ALL
+   CA[CHE]
+   [
+   -ALL
    -RE[COVER]
    -SH[OW]
    -VE[RIFY]
+   ]
 
 3 Qualifiers
    Qualifiers
@@ -1265,13 +1303,16 @@
    Displays and/or modifies the status and contents of the critical section
    for the current region. The format of the CRITICAL command is:
 
-   CR[ITICAL] -A[LL]
+   CR[ITICAL]
+   [
+   -A[LL]
    -I[NIT]
    -O[WNER]
    -REL[EASE]
    -REM[OVE]
    -RES[ET]
    -S[EIZE]
+   ]
 
      o The critical section field identifies, by its process identification
        number (PID), the process presently managing updates to database.
@@ -1376,7 +1417,9 @@
 
    The format of the DUMP command is:
 
-   D[UMP]  -A[LL]
+   D[UMP]
+   [
+   -A[LL]
    -B[LOCK]=block_number
    -C[OUNT]=count
    -F[ILEHEADER]
@@ -1388,6 +1431,7 @@
    -R[ECORD]=record-number
    -U[PDPROC]
    -Z[WR]
+   ]
 
    Use the error messages reported by MUPIP INTEG to determine what to DUMP
    and examine in the database. DUMP also can transfer records to a
@@ -1403,9 +1447,9 @@
    When used with -FILEHEADER, the -A[LL] qualifier displays additional
    information on the database most of which is useful for FIS in diagnosing
    issues. A complete description of all the elements that show up with the
-   DSE DUMP -FILEHEADER -ALL command are beyond the scope of this book. Use
-   only with -FILEHEADER or -UPDPROC (which is actually redundant as -ALL
-   displays the UPDPROC information).
+   DSE DUMP -FILEHEADER -ALL command are beyond the scope of this book.
+
+   Meaningful only with: -FILEHEADER
 
    -B[LOCK]=block-number
 
@@ -1560,9 +1604,12 @@
 
    The format of the EVALUATE command is:
 
-   EV[ALUATE]  -D[ECIMAL]
+   EV[ALUATE]
+   [
+   -D[ECIMAL]
    -H[EXADECIMAL]
    -N[UMBER]=number
+   ]
 
    The -DECIMAL and -HEXADECIMAL qualifiers specify the input base for the
    number. The -NUMBER qualifier is mandatory. By default, EVALUATE treats
@@ -1629,13 +1676,16 @@
 
    Locates a given block or region. The format of the FIND command is:
 
-   F[IND]  -B[LOCK]=block-number
+   F[IND]
+   [
+   -B[LOCK]=block-number
    -E[XHAUSTIVE]
-   -F[REEBLOCK] /H[INT]
+   -F[REEBLOCK] -H[INT]
    -K[EY]=key
    -[NO]C[RIT]
    -R[EGION][=region]
    -S[IBLINGS]
+   ]
 
      o At the beginning of a DSE session, use the FIND -REGION command to
        select the target region.
@@ -1855,11 +1905,14 @@
 
    Examines or updates bitmaps. The format of the MAPS command is:
 
-   M[APS] -BL[OCK]=block-number
+   M[APS]
+   [
+   -BL[OCK]=block-number
    -BU[SY]
    -F[REE]
    -M[ASTER]
    -R[ESTORE_ALL]
+   ]
 
    MAPS can flag blocks as being either -BUSY or -FREE. The -MASTER qualifier
    reflects the current status of a local bitmap back into the master map.
@@ -2025,8 +2078,11 @@
 
    The format of the OVERWRITE command is:
 
-   OV[ERWRITE] -D[ATA]=string
+   OV[ERWRITE]
+   [
+   -D[ATA]=string
    -O[FFSET]=offset
+   ]
 
 3 Qualifiers_for_OVERWRITE
    Qualifiers for OVERWRITE
@@ -2081,7 +2137,9 @@
 
    The format of the RANGE command is:
 
-   RA[NGE] -F[ROM]=block-number
+   RA[NGE]
+   [
+   -F[ROM]=block-number
    -T[O]=block-number
    -I[NDEX]
    -LOS[T]
@@ -2090,6 +2148,7 @@
    -S[TAR]
    -LOW[ER]=key
    -U[PPER]=key
+   ]
 
 3 Qualifiers
    Qualifiers
@@ -2190,11 +2249,14 @@
 
    The format of the REMOVE command is:
 
-   REM[OVE]    -B[LOCK]=block-number
+   REM[OVE]
+   [
+   -B[LOCK]=block-number
    -C[OUNT]=count
    -O[FFSET]=offset
    -R[ECORD]=record-number
    -V[ERSION]=version-number
+   ]
 
    The version number is specified in decimal.
 
@@ -2255,10 +2317,13 @@
 
    The RESTORE command restores saved versions of blocks.
 
-   RES[TORE]   -B[LOCK]=block-number
+   RES[TORE]
+   [
+   -B[LOCK]=block-number
    -F[ROM]=from
    -R[EGION]=region
    -V[ERSION]=version-number
+   ]
 
    The version number is specified in decimal.
 
@@ -2314,10 +2379,13 @@
 
    The format of the SAVE command is:
 
-   SA[VE] -B[LOCK]=block-number
+   SA[VE]
+   [
+   -B[LOCK]=block-number
    -C[OMMENT]=string
    -L[IST]
    -[NO]C[RIT]
+   ]
 
 3 Qualifiers
    Qualifiers
@@ -2363,10 +2431,13 @@
    Use the SHIFT command to shift data in a block, filling the block with
    zeros, or shortening the block. The format of the SHIFT command is:
 
-   SH[IFT]  -B[ACKWARD]=b_shift
+   SH[IFT]
+   [
+   -B[ACKWARD]=b_shift
    -BL[OCK]=block_number
    -F[ORWARD]=f_shift
    -O[FFSET]=offset
+   ]
 
    b_shift must always be less than or equal to offset. This means that DSE
    SHIFT in the backward direction is restricted to the maximum of OFFSET
@@ -2465,381 +2536,404 @@
    Summary
 
    +------------------------------------------------------------------------+
-   |   COMMAND   |            QUALIFIERS             |       COMMENTS       |
-   |-------------+-----------------------------------+----------------------|
-   | AD[D]       | -B[LOCK]=block number             | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -D[ATA]=string                    | Incompatible with    |
-   |             |                                   | -POINTER, -STAR      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -K[EY]=key                        | Incompatible with    |
-   |             |                                   | -STAR                |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[FFSET]=offset                  | Incompatible with    |
-   |             |                                   | -RECORD, -STAR       |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -P[OINTER]=pointer                | Incompatible with    |
-   |             |                                   | -DATA                |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[ECORD]=record-number           | Incompatible with    |
-   |             |                                   | -OFFSET, -STAR       |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -S[TAR]                           | -DATA,-KEY, -OFFSET, |
-   |             |                                   | -RECORD              |
-   |-------------+-----------------------------------+----------------------|
-   | AL[L]       | -B[UFFER_FLUSH]                   | Incompatible with    |
-   |             |                                   | -RENEW               |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -C[RITINIT]                       | -RENEW, -RELEASE,    |
-   |             |                                   | -SEIZE               |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -[NO]F[REEZE]                     | Incompatible with    |
-   |             |                                   | -RENEW               |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[VERRIDE]                       | Meaningful only with |
-   |             |                                   | -[NO]FREEZE          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REF[ERENCE]                      | Incompatible with    |
-   |             |                                   | -RENEW               |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -REL[EASE]                        | -CRITINIT,           |
-   |             |                                   | -RENEW,-SEIZE        |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REN[EW]                          | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -S[EIZE]                          | -RENEW, -RELEASE,    |
-   |             |                                   | -CRITINIT            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -W[CINIT]                         | Incompatible with    |
-   |             |                                   | -RENEW               |
-   |-------------+-----------------------------------+----------------------|
-   | B[UFFER     | -                                 | -                    |
-   | _FLUSH]     |                                   |                      |
-   |-------------+-----------------------------------+----------------------|
-   | CA[CHE]     | -ALL                              | Used with -RECOVER,  |
-   |             |                                   | -SHOW, and -VERIFY   |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RE[COVER]                        | Use only with -ALL.  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -SH[OW]                           | Use only with -ALL.  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -VE[RIFY]                         | Use only with -ALL.  |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | CH[ANGE]    | -BL[OCK]=block number             | -FILEHEADER and      |
-   |             |                                   | qualifiers used with |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -BS[IZ]=block-size                | Use only with        |
-   |             |                                   | -BLOCK, -LEVEL, -TN  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -L[EVEL]=level                    | Use only with        |
-   |             |                                   | -BLOCK, -BSIZ, -TN   |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Use only with        |
-   | -           | -TN [=transaction number]         | -BLOCK, -BSIZ,       |
-   |             |                                   | -LEVEL               |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -OF[FSET]=offset                  | Use only with        |
-   |             |                                   | -BLOCK, -CMPC, -RSIZ |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RE[CORD]=record number           | Use only with        |
-   |             |                                   | -BLOCK, -CMPC, -RSIZ |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Use only with        |
-   | -           | -CM[PC]= compression count        | -BLOCK, -RECORD,     |
-   |             |                                   | -OFFSET, -RSIZ       |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Use only with -CMPC  |
-   | -           | -RS[IZ]=record size               | -OFFSET, -RECORD,    |
-   |             |                                   | -BLOCK               |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -F[ILEHEADER]                     | -BSIZ, -CMPC, -TN,   |
-   |             |                                   | -LEVEL, -OFFSET,     |
-   |             |                                   | -RECORD, -RSIZ       |
-   |-------------+-----------------------------------+----------------------|
-   | -           | AVG_BLKS_READ=Average blocks read | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | B_B[YTESTREAM]=transaction number | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -B_C[OMPREHENSIVE]=transaction    | Use only with        |
-   |             | number                            | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | B_D[ATABASE] = transaction number | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -B_I[NCREMENTAL] = transaction    | Use only with        |
-   |             | number                            | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -BLK[_SIZE]=block size            | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -BLO[CKS_FREE]=free blocks        | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -B_R[ECORD]=transaction number    | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -CO[RRUPT_FILE]=value             | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -CU[RRENT_TN]=transaction number  | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | DECL[OCATION]=value               | Use only with        |
-   |             |                                   | -FILHEADER; decimal  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | DEF[_COLLATION]=value             | Use only with        |
-   |             |                                   | -FILEHEADER;         |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -ENCRYPTION_HASH                  | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -FL[USH_TIME][=delta time]        | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -FR[EEZE]=value                   | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -FU[LLY_UPGRADED]=boolean         | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -GV[STATSRESET]                   | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -HARD_SPIN_CPUNT=Mutex hard spin  | Use only with        |
-   |             | count                             | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   |             | -HEXL[OCATION]=value              | Use only with        |
-   |             |                                   | -FILEHEADER;hexa     |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -INT[ERRUPTED_RECOV]=boolean      |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -JNL_YIELD_LIMIT=journal yeild    |                      |
-   |             | limit                             |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -K[EY_MAX_SIZE]=key_max_size      | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -M[ACHINE_NAM]=value              |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -N[ULL_SUBSCRIPTS]=value          | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -NO[CRIT]                         |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -OV[ERRIDE]                       |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RC_SRV_COUNT                     |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RE_READ_TRIGGER=read trigger     |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -Q[UANTUM_INTERVAL] [=delta time] | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REC[ORD_MAX_SIZE]=maximum record | Use only with        |
-   |             | size                              | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REF[ERENCE_COUNT]=reference      | Use only with        |
-   |             | count                             | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REG[_SEQNO]=sequence number      | Use only with        |
-   |             |                                   | -FILEHEADER; hexa    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RESERVED_BYTES=reserved bytes    | Use only with        |
-   |             |                                   | -FILEHEADER;decimal  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -[NO] RES[PONSE_INTERVAL] [=delta | Use only with        |
-   |             | time]                             | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -SLEEP_SPIN_COUNT=mutex sleep     | Use only with        |
-   |             | spin count                        | -FILEHEADER;         |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -SPIN_SLEEP_TIME=mutex sleep time |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -[NO]S[TALENESS_TIMER] [=delta    | Use only with        |
-   |             | time]                             | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -TIC[K_INTERVAL] [=delta time]    | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -TIM[ERS_PENDING]=timers pending  | Use only with        |
-   |             |                                   | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -TO[TAL_BLKS]=total_blocks        | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -TR[IGGER_FLUSH]=trigger flush    | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -W[RITES_PER_FLUSH]=writes per    | Use only with        |
-   |             | flush                             | -FILEHEADER; decimal |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -WAIT_DISK=wait disk              | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -Zqgblmod_S[EQNO] = sequence      | Use only with        |
-   |             | number                            | -FILEHEADER;hexa     |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -Zqgblmod_T[rans]=sequence_number | Use only with        |
-   |             |                                   | -FILEHEADER;hexa     |
-   |-------------+-----------------------------------+----------------------|
-   | CL[OSE]     | -                                 | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | CR[ITICAL]  | -I[NIT]                           | Use only with -RESET |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[WNER]                          | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REL[EASE]                        | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -REM[OVE]                         | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -RES[ET]                          | Use only with -INIT  |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -S[EIZE]                          | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | D[UMP]      | -B[LOCK]=block_number             | Incompatible with    |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -C[OUNT]=count                    | Incompatible with    |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -F[ILEHEADER]                     | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -G[LO]                            | Incompatible with    |
-   |             |                                   | -FILEHEADER, -HEADER |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -G[VSTATS]                        | Use only with        |
-   |             |                                   | -FILEHEADER          |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -[NO]H[EADER]                     | Incompatible with    |
-   |             |                                   | -FILEHEADER, -GLO    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[FFSET]=offset                  | Incompatible with    |
-   |             |                                   | -FILEHEADER, -RECORD |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[ECORD]=record_number           | Incompatible with    |
-   |             |                                   | -FILEHEADER, -OFFSET |
-   |-------------+-----------------------------------+----------------------|
-   | EV[ALUATE]  | -D[ECIMAL]                        | Incompatible with    |
-   |             |                                   | -HEXADECIMAL         |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -H[EXADECIMAL]                    | Incompatible with    |
-   |             |                                   | -DECIMAL             |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -N[UMBER]=number                  | Required             |
-   |-------------+-----------------------------------+----------------------|
-   | EX[IT]      |                                   | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | F[IND]      | -B[LOCK]=block_number             | Incompatible with    |
-   |             |                                   | -KEY, -REGION        |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -E[XHAUSTIVE]                     | -KEY, -REGION,       |
-   |             |                                   | -FREEBLOCK           |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Required with -HINT; |
-   | -           | -F[REEBLOCK]                      | compatible with      |
-   |             |                                   | -BLOCK               |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -H[INT]=block_number              | Required with        |
-   |             |                                   | -FREEBLOCK           |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -K[EY]=key                        | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[EGION][=region]                | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   |             |                                   | Incompatible with    |
-   | -           | -S[BLINGS]                        | -FREEBLOCK, -HINT,   |
-   |             |                                   | -KEY, -REGION        |
-   |-------------+-----------------------------------+----------------------|
-   | H[ELP]      | [help topic]                      | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | I[NTEGRIT]  | -B[LOCK]=block_number             | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | M[APS]      | -BL[OCK]=block_number             | Incompatible with    |
-   |             |                                   | -RESTORE_ALL         |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -BU[SY]                           | Compatible only with |
-   |             |                                   | -BLOCK               |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -F[REE]                           | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -M[ASTER]                         | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[ESTORE_ALL]                    | Use alone            |
-   |-------------+-----------------------------------+----------------------|
-   | OP[EN]      | -F[ILE]=file                      | -                    |
-   |-------------+-----------------------------------+----------------------|
-   |             | -B[LOCK]=block_number             |                      |
-   | OV[ERWRITE] |                                   | -                    |
-   |             | -D[ATA]=string                    |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[FFSET]=offset                  | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | P[AGE]      | -                                 | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | RA[NGE]     | -F[ROM]=block_number              | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -T[O]=block_number                | -                    |
-   |-------------+-----------------------------------+----------------------|
-   |             | -I[NDEX]=block_number             |                      |
-   |             |                                   |                      |
-   |             | -L[OST]=block_number              |                      |
-   |             |                                   |                      |
-   | -           | -[NOT]BUSY=busy/free              | -                    |
-   |             |                                   |                      |
-   |             | -S[TAR]=block_number              |                      |
-   |             |                                   |                      |
-   |             | -L[OWER]=key                      |                      |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -U[PPER]=key                      | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | REM[OVE]    | -B[LOCK]=block-number             | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -C[OUNT]=count                    | Incompatible with    |
-   |             |                                   | -VERSION             |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[FFSET]=offset                  | Incompatible with    |
-   |             |                                   | -VERSION, -RECORD    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[ECORD]=record-number           | Incompatible with    |
-   |             |                                   | -VERSION, -OFFSET    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -V[ERSION]=version-number         | Use only with        |
-   |             |                                   | -BLOCK; decimal      |
-   |-------------+-----------------------------------+----------------------|
-   | RES[TORE]   | -B[LOCK]=block-number             | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -F[ROM]=block-number              | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -R[EGION]=region                  | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -V[ERSION]=version-number         | Required; decimal    |
-   |-------------+-----------------------------------+----------------------|
-   | SA[VE]      | -B[LOCK]=block-number             | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -C[OMMENT]=string                 | Incompatible with    |
-   |             |                                   | -LIST                |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -L[IST]                           | Incompatible with    |
-   |             |                                   | -COMMENT             |
-   |-------------+-----------------------------------+----------------------|
-   | SH[IFT]     | -B[ACKWARD]=shift                 | Incompatible with    |
-   |             |                                   | -FORWARD             |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -F[ORWARD]=shift                  | Incompatible with    |
-   |             |                                   | -BACKWARD            |
-   |-------------+-----------------------------------+----------------------|
-   | -           | -O[FFSET]=offset                  | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | SP[AWN]     | [CLI command]                     | -                    |
-   |-------------+-----------------------------------+----------------------|
-   | W[CINIT]    | -                                 | -                    |
+   |   COMMAND   |             QUALIFIERS             |      COMMENTS       |
+   |-------------+------------------------------------+---------------------|
+   | AD[D]       | -B[LOCK]=block number              | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -D[ATA]=string                     | Incompatible with   |
+   |             |                                    | -POINTER, -STAR     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -K[EY]=key                         | Incompatible with   |
+   |             |                                    | -STAR               |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[FFSET]=offset                   | Incompatible with   |
+   |             |                                    | -RECORD, -STAR      |
+   |-------------+------------------------------------+---------------------|
+   | -           | -P[OINTER]=pointer                 | Incompatible with   |
+   |             |                                    | -DATA               |
+   |-------------+------------------------------------+---------------------|
+   | -           | -R[ECORD]=record-number            | Incompatible with   |
+   |             |                                    | -OFFSET, -STAR      |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -S[TAR]                            | -DATA,-KEY,         |
+   |             |                                    | -OFFSET, -RECORD    |
+   |-------------+------------------------------------+---------------------|
+   | AL[L]       | -A[LL]                             | Meaningful only     |
+   |             |                                    | with -DUMP          |
+   |-------------+------------------------------------+---------------------|
+   | -           | -B[UFFER_FLUSH]                    | Incompatible with   |
+   |             |                                    | -RENEW              |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -C[RITINIT]                        | -RENEW, -RELEASE,   |
+   |             |                                    | -SEIZE              |
+   |-------------+------------------------------------+---------------------|
+   | -           | -D[UMP]                            | Use with: -ALL      |
+   |-------------+------------------------------------+---------------------|
+   | -           | -[NO]F[REEZE]                      | Incompatible with   |
+   |             |                                    | -RENEW              |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[VERRIDE]                        | Meaningful only     |
+   |             |                                    | with -[NO]FREEZE    |
+   |-------------+------------------------------------+---------------------|
+   | -           | -REF[ERENCE]                       | Incompatible with   |
+   |             |                                    | -RENEW              |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -REL[EASE]                         | -CRITINIT,          |
+   |             |                                    | -RENEW,-SEIZE       |
+   |-------------+------------------------------------+---------------------|
+   | -           | -REN[EW]                           | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -S[EIZE]                           | -RENEW, -RELEASE,   |
+   |             |                                    | -CRITINIT           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -W[CINIT]                          | Incompatible with   |
+   |             |                                    | -RENEW              |
+   |-------------+------------------------------------+---------------------|
+   | CA[CHE]     | -ALL                               | Used with -RECOVER, |
+   |             |                                    | -SHOW, and -VERIFY  |
+   |-------------+------------------------------------+---------------------|
+   | -           | -RE[COVER]                         | Use only with -ALL. |
+   |-------------+------------------------------------+---------------------|
+   | -           | -SH[OW]                            | Use only with -ALL. |
+   |-------------+------------------------------------+---------------------|
+   | -           | -VE[RIFY]                          | Use only with -ALL. |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | CH[ANGE]    | -BL[OCK]=block number              | -FILEHEADER and     |
+   |             |                                    | qualifiers used     |
+   |             |                                    | with -FILEHEADER    |
+   |-------------+------------------------------------+---------------------|
+   | -           | -BS[IZ]=block-size                 | Use only with       |
+   |             |                                    | -BLOCK, -LEVEL, -TN |
+   |-------------+------------------------------------+---------------------|
+   | -           | -L[EVEL]=level                     | Use only with       |
+   |             |                                    | -BLOCK, -BSIZ, -TN  |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -TN [=transaction number]          | -BLOCK, -BSIZ,      |
+   |             |                                    | -LEVEL              |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -OF[FSET]=offset                   | -BLOCK, -CMPC,      |
+   |             |                                    | -RSIZ               |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -RE[CORD]=record number            | -BLOCK, -CMPC,      |
+   |             |                                    | -RSIZ               |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -CM[PC]= compression count         | -BLOCK, -RECORD,    |
+   |             |                                    | -OFFSET, -RSIZ      |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with -CMPC |
+   | -           | -RS[IZ]=record size                | -OFFSET, -RECORD,   |
+   |             |                                    | -BLOCK              |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -F[ILEHEADER]                      | -BSIZ, -CMPC, -TN,  |
+   |             |                                    | -LEVEL, -OFFSET,    |
+   |             |                                    | -RECORD, -RSIZ      |
+   |-------------+------------------------------------+---------------------|
+   | -           | AVG_BLKS_READ=Average blocks read  | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | B_B[YTESTREAM]=transaction number  | -                   |
+   |-------------+------------------------------------+---------------------|
+   |             | -B_C[OMPREHENSIVE]=transaction     | Use only with       |
+   | -           | number                             | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | B_D[ATABASE] = transaction number  | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             | -B_I[NCREMENTAL] = transaction     | Use only with       |
+   | -           | number                             | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -BLK[_SIZE]=block size             | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -BLO[CKS_FREE]=free blocks         | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -B_R[ECORD]=transaction number     | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -CO[RRUPT_FILE]=value              | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -CU[RRENT_TN]=transaction number   | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | DECL[OCATION]=value                | Use only with       |
+   |             |                                    | -FILHEADER; decimal |
+   |-------------+------------------------------------+---------------------|
+   | -           | DEF[_COLLATION]=value              | Use only with       |
+   |             |                                    | -FILEHEADER;        |
+   |-------------+------------------------------------+---------------------|
+   | -           | -ENCRYPTION_HASH                   | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -FL[USH_TIME][=delta time]         | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -FR[EEZE]=value                    | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -FU[LLY_UPGRADED]=boolean          | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -GV[STATSRESET]                    | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -HARD_SPIN_CPUNT=Mutex hard spin   | Use only with       |
+   |             | count                              | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   |             | -HEXL[OCATION]=value               | Use only with       |
+   |             |                                    | -FILEHEADER;hexa    |
+   |-------------+------------------------------------+---------------------|
+   | -           | -INT[ERRUPTED_RECOV]=boolean       |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -JNL_YIELD_LIMIT=journal yeild     |                     |
+   |             | limit                              |                     |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -K[EY_MAX_SIZE]=key_max_size       | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -M[ACHINE_NAM]=value               |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -N[ULL_SUBSCRIPTS]=value           | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -NO[CRIT]                          |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -OV[ERRIDE]                        |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -RC_SRV_COUNT                      |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -RE_READ_TRIGGER=read trigger      |                     |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -Q[UANTUM_INTERVAL] [=delta time]  | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             | -REC[ORD_MAX_SIZE]=maximum record  | Use only with       |
+   | -           | size                               | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -REF[ERENCE_COUNT]=reference count | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -REG[_SEQNO]=sequence number       | Use only with       |
+   |             |                                    | -FILEHEADER; hexa   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -RESERVED_BYTES=reserved bytes     | Use only with       |
+   |             |                                    | -FILEHEADER;decimal |
+   |-------------+------------------------------------+---------------------|
+   |             | -[NO] RES[PONSE_INTERVAL] [=delta  | Use only with       |
+   | -           | time]                              | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -SLEEP_SPIN_COUNT=mutex sleep spin | Use only with       |
+   |             | count                              | -FILEHEADER;        |
+   |-------------+------------------------------------+---------------------|
+   | -           | -SPIN_SLEEP_TIME=mutex sleep time  |                     |
+   |-------------+------------------------------------+---------------------|
+   |             | -[NO]S[TALENESS_TIMER] [=delta     | Use only with       |
+   | -           | time]                              | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -TIC[K_INTERVAL] [=delta time]     | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Use only with       |
+   | -           | -TIM[ERS_PENDING]=timers pending   | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -TO[TAL_BLKS]=total_blocks         | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -TR[IGGER_FLUSH]=trigger flush     | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   |             | -W[RITES_PER_FLUSH]=writes per     | Use only with       |
+   | -           | flush                              | -FILEHEADER;        |
+   |             |                                    | decimal             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -WAIT_DISK=wait disk               | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -Zqgblmod_S[EQNO] = sequence       | Use only with       |
+   |             | number                             | -FILEHEADER;hexa    |
+   |-------------+------------------------------------+---------------------|
+   | -           | -Zqgblmod_T[rans]=sequence_number  | Use only with       |
+   |             |                                    | -FILEHEADER;hexa    |
+   |-------------+------------------------------------+---------------------|
+   | CL[OSE]     | -                                  | -                   |
+   |-------------+------------------------------------+---------------------|
+   | CR[ITICAL]  | -I[NIT]                            | Use only with       |
+   |             |                                    | -RESET              |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[WNER]                           | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -REL[EASE]                         | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -REM[OVE]                          | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -RES[ET]                           | Use only with -INIT |
+   |-------------+------------------------------------+---------------------|
+   | -           | -S[EIZE]                           | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | D[UMP]      | -B[LOCK]=block_number              | Incompatible with   |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -C[OUNT]=count                     | Incompatible with   |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -F[ILEHEADER]                      | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -G[LO]                             | -FILEHEADER,        |
+   |             |                                    | -HEADER             |
+   |-------------+------------------------------------+---------------------|
+   | -           | -G[VSTATS]                         | Use only with       |
+   |             |                                    | -FILEHEADER         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -[NO]H[EADER]                      | Incompatible with   |
+   |             |                                    | -FILEHEADER, -GLO   |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -O[FFSET]=offset                   | -FILEHEADER,        |
+   |             |                                    | -RECORD             |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -R[ECORD]=record_number            | -FILEHEADER,        |
+   |             |                                    | -OFFSET             |
+   |-------------+------------------------------------+---------------------|
+   | EV[ALUATE]  | -D[ECIMAL]                         | Incompatible with   |
+   |             |                                    | -HEXADECIMAL        |
+   |-------------+------------------------------------+---------------------|
+   | -           | -H[EXADECIMAL]                     | Incompatible with   |
+   |             |                                    | -DECIMAL            |
+   |-------------+------------------------------------+---------------------|
+   | -           | -N[UMBER]=number                   | Required            |
+   |-------------+------------------------------------+---------------------|
+   | EX[IT]      |                                    | -                   |
+   |-------------+------------------------------------+---------------------|
+   | F[IND]      | -B[LOCK]=block_number              | Incompatible with   |
+   |             |                                    | -KEY, -REGION       |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -E[XHAUSTIVE]                      | -KEY, -REGION,      |
+   |             |                                    | -FREEBLOCK          |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Required with       |
+   | -           | -F[REEBLOCK]                       | -HINT; compatible   |
+   |             |                                    | with -BLOCK         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -H[INT]=block_number               | Required with       |
+   |             |                                    | -FREEBLOCK          |
+   |-------------+------------------------------------+---------------------|
+   | -           | -K[EY]=key                         | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -R[EGION][=region]                 | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   |             |                                    | Incompatible with   |
+   | -           | -S[BLINGS]                         | -FREEBLOCK, -HINT,  |
+   |             |                                    | -KEY, -REGION       |
+   |-------------+------------------------------------+---------------------|
+   | H[ELP]      | [help topic]                       | -                   |
+   |-------------+------------------------------------+---------------------|
+   | I[NTEGRIT]  | -B[LOCK]=block_number              | -                   |
+   |-------------+------------------------------------+---------------------|
+   | M[APS]      | -BL[OCK]=block_number              | Incompatible with   |
+   |             |                                    | -RESTORE_ALL        |
+   |-------------+------------------------------------+---------------------|
+   | -           | -BU[SY]                            | Compatible only     |
+   |             |                                    | with -BLOCK         |
+   |-------------+------------------------------------+---------------------|
+   | -           | -F[REE]                            | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -M[ASTER]                          | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -R[ESTORE_ALL]                     | Use alone           |
+   |-------------+------------------------------------+---------------------|
+   | OP[EN]      | -F[ILE]=file                       | -                   |
+   |-------------+------------------------------------+---------------------|
+   |             | -B[LOCK]=block_number              |                     |
+   | OV[ERWRITE] |                                    | -                   |
+   |             | -D[ATA]=string                     |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[FFSET]=offset                   | -                   |
+   |-------------+------------------------------------+---------------------|
+   | P[AGE]      | -                                  | -                   |
+   |-------------+------------------------------------+---------------------|
+   | RA[NGE]     | -F[ROM]=block_number               | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -T[O]=block_number                 | -                   |
+   |-------------+------------------------------------+---------------------|
+   |             | -I[NDEX]=block_number              |                     |
+   |             |                                    |                     |
+   |             | -L[OST]=block_number               |                     |
+   |             |                                    |                     |
+   | -           | -[NOT]BUSY=busy/free               | -                   |
+   |             |                                    |                     |
+   |             | -S[TAR]=block_number               |                     |
+   |             |                                    |                     |
+   |             | -L[OWER]=key                       |                     |
+   |-------------+------------------------------------+---------------------|
+   | -           | -U[PPER]=key                       | -                   |
+   |-------------+------------------------------------+---------------------|
+   | REM[OVE]    | -B[LOCK]=block-number              | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -C[OUNT]=count                     | Incompatible with   |
+   |             |                                    | -VERSION            |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[FFSET]=offset                   | Incompatible with   |
+   |             |                                    | -VERSION, -RECORD   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -R[ECORD]=record-number            | Incompatible with   |
+   |             |                                    | -VERSION, -OFFSET   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -V[ERSION]=version-number          | Use only with       |
+   |             |                                    | -BLOCK; decimal     |
+   |-------------+------------------------------------+---------------------|
+   | RES[TORE]   | -B[LOCK]=block-number              | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -F[ROM]=block-number               | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -R[EGION]=region                   | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -V[ERSION]=version-number          | Required; decimal   |
+   |-------------+------------------------------------+---------------------|
+   | SA[VE]      | -B[LOCK]=block-number              | -                   |
+   |-------------+------------------------------------+---------------------|
+   | -           | -C[OMMENT]=string                  | Incompatible with   |
+   |             |                                    | -LIST               |
+   |-------------+------------------------------------+---------------------|
+   | -           | -L[IST]                            | Incompatible with   |
+   |             |                                    | -COMMENT            |
+   |-------------+------------------------------------+---------------------|
+   | SH[IFT]     | -B[ACKWARD]=shift                  | Incompatible with   |
+   |             |                                    | -FORWARD            |
+   |-------------+------------------------------------+---------------------|
+   | -           | -F[ORWARD]=shift                   | Incompatible with   |
+   |             |                                    | -BACKWARD           |
+   |-------------+------------------------------------+---------------------|
+   | -           | -O[FFSET]=offset                   | -                   |
+   |-------------+------------------------------------+---------------------|
+   | SP[AWN]     | [CLI command]                      | -                   |
+   |-------------+------------------------------------+---------------------|
+   | W[CINIT]    | -                                  | -                   |
    +------------------------------------------------------------------------+
 
    * Use these qualifiers only with instructions from FIS.
@@ -2847,7 +2941,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2015
+   Copyright 2016
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2869,7 +2963,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-002 of the
+   This help file is a concise representation of revision V6.3-000 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

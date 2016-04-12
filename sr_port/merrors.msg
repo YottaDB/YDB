@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2015 Fidelity National Information 	!
+! Copyright (c) 2001-2016 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -158,7 +158,6 @@
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_MUDESTROYSUC	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
-!	ERR_RBWRNNOTCHG		not seen by user since return status of mupip_set_file (that triggers this) is not displayed.
 !	ERR_REPEATERROR		internal error (not displayed to the users)
 !	ERR_SYSTEMVALUE		code is not executed (set $system won't reach op_svput at all to signal the error)
 !	ERR_TPRETRY		internal error (not displayed to the users)
@@ -166,6 +165,7 @@
 !	ERR_YDIRTSZ		used by a percent utility, which is not documented intentionally
 !	ERR_ZDEFACTIVE		functionality not documented (GT.CM related weirdness)
 !	ERR_ZDEFOFLOW		functionality not documented (GT.CM related weirdness)
+!
 !
 !
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
@@ -216,7 +216,7 @@ DEVPARVALREQ	<A value is required for this device parameter>/error/fao=0!/ansi=0
 DEVPARMNEG	<Deviceparameter must be a positive value>/error/fao=0!/ansi=0
 DSEBLKRDFAIL	<Failed attempt to read block>/error/fao=0!/ansi=0
 DSEFAIL		<DSE failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-NOTALLREPLON	<Replication state is not on for all regions>/warning/fao=0!/ansi=0
+NOTALLREPLON	<Replication off for !AD regions>/warning/fao=2!/ansi=0
 BADLKIPARAM	<!AD is not a legal parameter for $ZGETLKI()>/error/fao=2!/ansi=0
 JNLREADBOF	<Beginning of journal file encountered for !AD>/error/fao=2!/ansi=0
 DVIKEYBAD	<$ZGETDVI("!AD","!AD") contains an illegal keyword>/error/fao=4!/ansi=0
@@ -566,8 +566,8 @@ CCENOCCP	<The cluster control program is not running on this node>/info/fao=0!/a
 CCECCPPID	<The cluster control program has PID 0x!XL>/info/fao=1!/ansi=0
 CCECLSTPRCS	<!UL processes are accessing clustered database files>/info/fao=1!/ansi=0
 ZSHOWBADFUNC	<An illegal function was specified for ZSHOW>/error/fao=0!/ansi=0
-NOTALLJNLEN	<Journaling not enabled and on for all regions>/warning/fao=0!/ansi=0
-ZSHOWGLOSMALL	<Global output variable is too small for ZSHOW output>/error/fao=0!/ansi=0
+NOTALLJNLEN	<Journaling disabled/off for !AD regions>/warning/fao=2!/ansi=0
+UNUSEDMSG570	<ZSHOWGLOSMALL last used in V6.2-002A>/error/fao=0!/ansi=0
 NOLBRSRC	<Object libraries cannot have SRC paths associated>/error/fao=0!/ansi=0
 INVZSTEP	<Invalid ZSTEP qualifier>/error/fao=0!/ansi=0
 ZSTEPARG	<ZSTEP argument expected>/error/fao=0!/ansi=0
@@ -667,7 +667,7 @@ CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/an
 CETOOLONG	<Compiler escape substitution exceeds maximum line size>/error/fao=0!/ansi=0
 CENOINDIR	<Indirection type information not available for compiler escape feature>/error/fao=0!/ansi=0
 COLLATIONUNDEF	<Collation type !UL is not defined>/error/fao=1!/ansi=0
-RBWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=0
+UNUSEDMSG670	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
@@ -675,8 +675,8 @@ CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support
 NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
-UNUSEDMSG678	<SOCKPARMREQ last used in V6.0-002>/error/fao=0!/ansi=78
-UNUSEDMSG679	<IPADDRREQ last used in V6.0-002>/error/fao=0!/ansi=0
+MUREENCRYPTEND	<Database !AD : MUPIP REORG ENCRYPT finished by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0
+CRYPTJNLMISMATCH	<Encryption settings mismatch between journal file !AD and corresponding database file !AD>/error/fao=4!/ansi=0
 SOCKWAIT	<Error waiting for socket connection>/error/fao=0!/ansi=80
 SOCKACPT	<Error accepting socket connection>/error/fao=0!/ansi=81
 SOCKINIT	<Error initializing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
@@ -897,7 +897,7 @@ SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
 RELINKCTLFULL	<Relinkctl file for directory !AD is full (maximum entries !UL)>/error/fao=3!/ansi=0
-UNUSEDMSG900	<GTMSECSHRDEFLOG last used in V5.5-000>/info/fao=0!/ansi=0
+MUPIPSET2BIG	<!UL too large, maximum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBBADNSUB	<!AD Bad numeric subscript>/error/fao=2!/ansi=0
 DBBADKYNM	<!AD Bad key name>/error/fao=2!/ansi=0
 DBBADPNTR	<!AD Bad pointer value in directory>/error/fao=2!/ansi=0
@@ -948,7 +948,7 @@ DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk loc
 DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0
 DBMAXKEYEXC	<!AD Maximum key size for database exceeds design maximum>/error/fao=2!/ansi=0
 DBMXRSEXCMIN	<!AD Maximum record size for database is less than the design minimum>/error/fao=2!/ansi=0
-UNUSEDMSG951	<DBMAXRSEXBL : Last used in V5.5-000>/error/fao=0!/ansi=0
+MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBREADBM	<!AD Read error on bitmap>/error/fao=2!/ansi=0
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0
 DBVERPERFWARN2	<Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
@@ -1183,9 +1183,9 @@ SETREG2RESYNC	<Setting resync sequence number 0x!16@XQ to region sequence number
 JNLALIGNTOOSM	<Alignsize !UL (bytes) is too small for a block size of !UL (bytes) for !AD !AD.  Using alignsize of !UL (bytes) instead.>/warning/fao=7!/ansi=0
 JNLFILEOPNERR	<Error opening journal file !AD>/error/fao=2!/ansi=0
 JNLFILECLOSERR	<Error closing journal file !AD>/error/fao=2!/ansi=0
-REPLSTATEOFF	<ROLLBACK cannot proceed as database !AD does not have replication ON>/error/fao=2!/ansi=0
+REPLSTATEOFF	<MUPIP JOURNAL -ROLLBACK -BACKWARD cannot proceed as database !AD does not have replication ON>/error/fao=2!/ansi=0
 MUJNLPREVGEN	<Previous generation journal file !AD included for database file !AD>/info/fao=4!/ansi=0
-MUPJNLINTERRUPT	<Database file !AD indicates interrupted MUPIP JOURNAL command.  Restore from backup for forward recovery.>/error/fao=2!/ansi=0
+MUPJNLINTERRUPT	<Database file !AD indicates interrupted MUPIP JOURNAL command.  Restore from backup for forward recover/rollback.>/error/fao=2!/ansi=0
 ROLLBKINTERRUPT	<Database file !AD indicates interrupted ROLLBACK.  Reissue the MUPIP JOURNAL ROLLBACK command.>/error/fao=2!/ansi=0
 RLBKJNSEQ	<Journal seqno of the instance after rollback is !@ZQ [0x!16@XQ]>/info/fao=2!/ansi=0
 REPLRECFMT	<Replication journal record format error encountered>/fatal/fao=0!/ansi=0
@@ -1313,11 +1313,11 @@ CRYPTOPFAILED		<Encrypt/Decrypt operation failed for file !AD. !AD>/error/fao=4!
 CRYPTDLNOOPEN		<Could not load encryption library while opening encrypted file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.>/error/fao=2!/ansi=0
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
-CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and corresponding database file !AD>/error/fao=4!/ansi=0
+UNUSEDMSG1316	<Last used in V6.2-002A>/error/fao=0!/ansi=0
 CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
-UNUSEDMSG1320	<CRYPTNOPSWDINTP : Last used in V6.0-003>/error/fao=0!/ansi=0
+CRYPTNOKEY	<No encryption key specified>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
@@ -1588,8 +1588,8 @@ ZPEEKNOJNLINFO	<$ZPEEK() unable to access requested journal structure - region !
 TLSPARAM	<TLS parameter !AD !AD>/error/fao=4!/ansi=0
 RLNKRECLATCH	<Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD>/error/fao=3!/ansi=0
 RLNKSHMLATCH	<Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
-JOBLVN2LONG	<The zwrite representation of a local variable transferred to a JOB'd process is too long. Please check the output of the JOB'd process for more details>/error/fao=0!/ansi=0
-JOBLVNDETAIL	<The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL>/error/fao=2!/ansi=0
+JOBLVN2LONG	<The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL>/error/fao=2!/ansi=0
+NLRESTORE	<DB file header field !AD: !UL does not match the value used in original mapping - restoring to: !UL>/warning/fao=4!/ansi=0
 PREALLOCATEFAIL	<Disk space reservation for !AD segment has failed>/error/fao=2!/ansi=0
 NODFRALLOCSUPP	<The NODEFER_ALLOCATE qualifier is not allowed on this operating system. Not changing the defer allocation flag>/warning/fao=0!/ansi=0
 LASTWRITERBYPAS	<The last writer for database file !AD bypassed the rundown>/warning/fao=2!/ansi=0
@@ -1600,6 +1600,23 @@ INVZBREAK	<Cannot set ZBREAK in direct mode routine (GTM$DMOD)>/error/fao=0!/ans
 INVTMPDIR	<Value or default for $gtm_tmp is either not found or not a directory (!AD) - Reverting to default value>/error/fao=2!/ansi=0
 ARCTLMAXHIGH	<The environment variable !AD = !UL is too high. Assuming the maximum acceptable value of !UL>/warning/fao=4!/ansi=0
 ARCTLMAXLOW	<The environment variable !AD = !UL is too low. Assuming the minimum acceptable value of !UL>/warning/fao=4!/ansi=0
+NONTPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; blklvl: !UL, type: !UL, zpos: !AD>/info/fao=11!/ansi=0
+PBNPARMREQ	<A first parameter value !AD requires a second parameter specified containing !AD>/error/fao=4!/ansi=0
+PBNNOPARM	<First parameter !AD does not support a second parameter>/error/fao=2!/ansi=0
+PBNUNSUPSTRUCT	<$ZPEEK() does not support structure !AD>/error/fao=2!/ansi=0
+PBNINVALID	<!AD does not have a field named !AD>/error/fao=4!/ansi=0
+PBNNOFIELD	<%ZPEEKBYNAME() requires a field.item as its first parameter>/error/fao=0!/ansi=0
+JNLDBSEQNOMATCH	<Journal file !AD has beginning region sequence number [0x!16@XQ], but database !AD has region sequence number [0x!16@XQ]>/error/fao=6!/ansi=0
+MULTIPROCLATCH	<Failed to get multi-process latch at !AD>/error/fao=2!/ansi=0
+INVLOCALE	<Attempt to reset locale to supplied value of $gtm_locale (!AD) failed>/error/fao=2!/ansi=0
+NOMORESEMCNT	<!AD counter semaphore has reached its maximum and stopped counting for !AZ !AD. Run MUPIP JOURNAL -ROLLBACK -BACKWARD, MUPIP JOURNAL -RECOVER -BACKWARD or MUPIP RUNDOWN to restore the database files and shared resources to a clean state>/info/fao=5!/ansi=0
+SETQUALPROB	<Error getting !AD qualifier value>/error/fao=2!/ansi=0
+EXTRINTEGRITY	<Database !AD potentially contains spanning nodes or data encrypted with two different keys>/error/fao=2!/ansi=0
+CRYPTKEYRELEASEFAILED	<Could not safely release encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
+MUREENCRYPTSTART	<Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0
+MUREENCRYPTV4NOALLOW	<Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks>/error/fao=2!/ansi=0
+ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
+JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=3!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

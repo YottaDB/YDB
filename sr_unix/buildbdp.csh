@@ -1,6 +1,8 @@
+#!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,10 +38,7 @@ if ( $buildbdp_status != 0 ) then
 	exit $buildbdp_status
 endif
 
-$shell $gtm_tools/buildshr.csh $1 $2 $3
-if ($status != 0) @ buildbdp_status = $status
-
-$shell $gtm_tools/buildaux.csh $1 $2 $3
+$gtm_tools/buildaux.csh $1 $2 $3 "shr"
 if ($status != 0) @ buildbdp_status = $status
 
 exit $buildbdp_status

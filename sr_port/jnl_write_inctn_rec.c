@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +74,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 	inctn_detail.blknum_struct.filler_uint4 = 0;
 	inctn_detail.blknum_struct.filler_short = 0;
 	inctn_record.detail = inctn_detail;
-	inctn_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&inctn_record, SIZEOF(struct_jrec_inctn));
-	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
+	inctn_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+								(unsigned char *)&inctn_record, SIZEOF(struct_jrec_inctn));
+	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL, NULL);
 }

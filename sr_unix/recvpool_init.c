@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +48,7 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "util.h"		/* For OUT_BUFF_SIZE */
+#include "repl_inst_ftok_counter_halted.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
@@ -63,6 +65,7 @@ LITREF	int4			gtm_release_name_len;
 error_def(ERR_NORECVPOOL);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
+error_def(ERR_SYSCALL);
 
 #define MAX_RES_TRIES		620 		/* Also defined in gvcst_init_sysops.c */
 
@@ -76,7 +79,7 @@ error_def(ERR_TEXT);
 
 void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 {
-	boolean_t	shm_created, new_ipc = FALSE;
+	boolean_t	shm_created, new_ipc = FALSE, ftok_counter_halted = FALSE, counter_halted_by_me;
 	char		instfilename[MAX_FN_LEN + 1];
         char           	machine_name[MAX_MCNAMELEN];
 	char		scndry_msg[OUT_BUFF_SIZE];
@@ -90,11 +93,13 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	unix_db_info	*udi;
 	unsigned int	full_len;
 	sgmnt_addrs	*repl_csa;
+	pthread_mutexattr_t	write_updated_ctl_attr;
+	pthread_condattr_t	write_updated_attr;
 	DEBUG_ONLY(int4	semval;)
 
         memset(machine_name, 0, SIZEOF(machine_name));
         if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
-                rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	if (NULL == jnlpool.jnlpool_dummy_reg)
 	{
 		r_save = gv_cur_region;
@@ -107,14 +112,15 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		 * both correspond to one and the same file (replication instance file). We need to do this to ensure that an
 		 * "ftok_sem_get" done with either "jnlpool.jnlpool_dummy_reg" region or "recvpool.recvpool_dummy_reg" region
 		 * locks the same entity.
-		 * Should have already attached to journal pool only for receiver server startup or shutdown. Assert that.
+		 * Should have already attached to journal pool only for receiver server startup or shutdown or $ZPEEK
+		 * or update process. Assert that.
 		 */
-		assert(gtmrecv_options.start || gtmrecv_options.shut_down || (GTMZPEEK == pool_user));
+		assert(gtmrecv_options.start || gtmrecv_options.shut_down || (GTMZPEEK == pool_user) || (UPDPROC == pool_user));
 		reg = recvpool.recvpool_dummy_reg = jnlpool.jnlpool_dummy_reg;
 	}
 	udi = FILE_INFO(reg);
-	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
-		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+	/* rts_error should be issued by repl_inst_get_name */
+	assertpro(repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error));
 	assert((recvpool.recvpool_dummy_reg != jnlpool.jnlpool_dummy_reg)
 		|| (reg->dyn.addr->fname_len == full_len) && !STRCMP(reg->dyn.addr->fname, instfilename));
 	if (recvpool.recvpool_dummy_reg != jnlpool.jnlpool_dummy_reg)
@@ -126,24 +132,26 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	/* First grab ftok semaphore for replication instance file.  Once we have it locked, no one else can start up
 	 * or, shut down replication for this instance. We will release ftok semaphore when initialization is done.
 	 */
-	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
-		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
+	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &ftok_counter_halted))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
+	save_errno = errno;
 	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+	CHECK_IF_REPL_INST_FTOK_COUNTER_HALTED(repl_instance, udi, ftok_counter_halted, counter_halted_by_me,
+							ERR_RECVPOOLSETUP, recvpool.recvpool_dummy_reg, save_errno);
 	if (INVALID_SEMID == repl_instance.recvpool_semid)
 	{
-		if (INVALID_SHMID != repl_instance.recvpool_shmid)
-			GTMASSERT;
+		assertpro(INVALID_SHMID == repl_instance.recvpool_shmid);
 		if (GTMRECV != pool_user || !gtmrecv_startup)
 		{
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
 		}
 		new_ipc = TRUE;
 		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
 		if (INVALID_SEMID == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, RWDALL | IPC_CREAT)))
 		{
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
 				  ERR_TEXT, 2,
 			          RTS_ERROR_LITERAL("Error creating recv pool"), errno);
 		}
@@ -155,8 +163,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		{
 			save_errno = errno;
 			remove_sem_set(RECV);		/* Remove what we created */
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
 		}
 		/* Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it. We must NOT do any more
@@ -167,8 +175,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		{
 			save_errno = errno;
 			remove_sem_set(RECV);		/* Remove what we created */
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
 		}
 		udi->gt_sem_ctime = semarg.buf->sem_ctime;
@@ -178,18 +186,19 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		if (-1 == semctl(repl_instance.recvpool_semid, DB_CONTROL_SEM, IPC_STAT, semarg))
 		{
 			save_errno = errno;
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Receive Pool SEMID (%d)",
 					repl_instance.recvpool_semid);
-			rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 					ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 		}
 		else if (semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime)
 		{
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Receive Pool SEMID (%d) is %d; Expected %d",
 					repl_instance.recvpool_semid, semarg.buf->sem_ctime, repl_instance.recvpool_semid_ctime);
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+					ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		udi->semid = repl_instance.recvpool_semid;
 		udi->gt_sem_ctime = repl_instance.recvpool_semid_ctime;
@@ -200,8 +209,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
 	if (SS_NORMAL != status)
 	{
-		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receive pool semaphores"), errno);
 	}
 	udi->grabbed_access_sem = TRUE;
@@ -236,9 +245,10 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	{	/* shared memory ID was removed form the system by an IPCRM command or we have a permission issue (or such) */
 		save_errno = errno;
 		REMOVE_OR_RELEASE_SEM(new_ipc);
-		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with shmctl on Receive Pool SHMID (%d)", repl_instance.recvpool_shmid);
-		rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+				ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 	} else if (shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime)
 	{	/* shared memory was possibly reused (causing shm_ctime and jnlpool_shmid_ctime to be different. We can't rely
 		 * on the shmid as it could be connected to a valid instance file in a different environment. Create new IPCs
@@ -252,8 +262,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (new_ipc && (GTMRECV != pool_user || !gtmrecv_startup))
 	{
 		REMOVE_OR_RELEASE_SEM(new_ipc);
-		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
+		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
 	}
 	shm_created = FALSE;
 	if (new_ipc)
@@ -263,19 +273,19 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			udi->shmid = recvpool_shmid = INVALID_SHMID;
 			save_errno = errno;
 			remove_sem_set(RECV);		/* Remove what we created */
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receive pool creation"), save_errno);
 		}
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 		{
 			save_errno = errno;
 			if (0 != shm_rmid(udi->shmid))
-				gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 					 RTS_ERROR_LITERAL("Error removing recvpool "), errno);
 			remove_sem_set(RECV);		/* Remove what we created */
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with recvpool shmctl"), save_errno);
 		}
 		udi->gt_shm_ctime = shmstat.shm_ctime;
@@ -292,8 +302,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
-		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with receive pool shmat"), save_errno);
 	}
 	if (shm_created)
@@ -317,8 +327,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 				rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool has not been initialized"));
 		}
 		/* Initialize the shared memory fields */
@@ -335,6 +345,31 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 					/* ensure that the pool identifier is at the top of the pool */
 		recvpool.recvpool_ctl->recvpool_id.pool_type = RECVPOOL_SEGMENT;
 		GTMRECV_CLEAR_CACHED_HISTINFO(recvpool.recvpool_ctl, jnlpool, jnlpool.jnlpool_ctl, INSERT_STRM_HISTINFO_TRUE);
+		/* Initialize mutex/cond for notifying update process of new writes */
+		status = pthread_mutexattr_init(&write_updated_ctl_attr);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
+		status = pthread_mutexattr_setpshared(&write_updated_ctl_attr, PTHREAD_PROCESS_SHARED);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+		status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
+		status = pthread_condattr_init(&write_updated_attr);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
+		status = pthread_condattr_setpshared(&write_updated_attr, PTHREAD_PROCESS_SHARED);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
+		status = pthread_cond_init(&recvpool.recvpool_ctl->write_updated, &write_updated_attr);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
 		this_side = &recvpool.recvpool_ctl->this_side;
 		this_side->proto_ver = REPL_PROTO_VER_THIS;
 		this_side->jnl_ver = JNL_VER_THIS;
@@ -398,6 +433,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		repl_inst_flush_filehdr();
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
+	if (counter_halted_by_me)
+		repl_inst_ftok_counter_halted(udi, FILE_TYPE_REPLINST, &repl_instance);
 	/* Release control lockout and ftok semaphore now that the receive pool has been attached.
 	 * The only exception is receiver server shutdown command. In this case, all these locks will be released
 	 * once the receiver server shutdown is actually complete. Note that if -UPDATEONLY or -HELPERS is specified
@@ -409,7 +446,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		if (!ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, FALSE))
-			rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	}
  	/* If receiver server startup, grab the options semaphore to lock out checkhealth, statslog or changelog.
 	 * Ideally one should grab this before releasing the ftok and access semaphore but the issue with this is that
@@ -427,8 +464,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
-		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
  	  		  RTS_ERROR_LITERAL("Error with receive pool options semaphore"), save_errno);
 	}
 	return;

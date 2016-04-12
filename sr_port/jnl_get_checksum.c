@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gdsblk.h"
 #include "jnl_get_checksum.h"
 
 /* The following four looktable are generated using following paramenters.
@@ -299,8 +301,7 @@ GBLDEF uint4 csum_table[SLICE_BY][TABLE_SIZE] = {
 #endif
 };
 
-/*
- * Input :
+/* Input :
  *	buff   	 	: Pointer to the input buffer whose checksum needs to be computed.
  *	sgmnt_addrs	: Segment address
  *	bufflen  	: Buffer size in bytes
@@ -309,29 +310,24 @@ GBLDEF uint4 csum_table[SLICE_BY][TABLE_SIZE] = {
  *	Computed checksum.
  */
 
-uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen)
+/* #GTM_THREAD_SAFE : The below function (jnl_get_checksum) is thread-safe */
+uint4 jnl_get_checksum(blk_hdr_ptr_t buff, sgmnt_addrs *csa, int bufflen)
 {
 	uint4			*top, *blk_base, *blk_top, blen;
-#	ifdef GTM_CRYPT
-	DEBUG_ONLY(
-		sm_uc_ptr_t	orig_buff = NULL;
-	)
+	DEBUG_ONLY(sm_uc_ptr_t	orig_buff = NULL;)
 
-	if (NULL != csa && (csa->hdr->is_encrypted))
+	/* We are not necessarily holding crit here, so we have to rely on the csa->encr_ptr copy of encryption settings. */
+	if ((NULL != csa) && (NULL != csa->encr_ptr) && NEEDS_ANY_KEY(csa->encr_ptr, buff->tn))
 	{
 		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csa->hdr, (sm_uc_ptr_t)buff);
 		DEBUG_ONLY(orig_buff = (unsigned char *)buff;)
-		buff = (uint4 *)GDS_ANY_ENCRYPTGLOBUF(buff, csa);
+		buff = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(buff, csa);
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csa->hdr, (sm_uc_ptr_t)buff);
 	}
-#	endif
-
-	return (compute_checksum(INIT_CHECKSUM_SEED, buff, bufflen));
+	return (compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)buff, bufflen));
 }
 
-
-/*
- * Input :
+/* Input :
  *	buff   	 	: Pointer to the input buffer whose checksum needs to be computed.
  *	bufflen  	: Buffer size in bytes
  *
@@ -342,16 +338,17 @@ uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen)
  *	The checksum is calculated using slice-by-4 checksum calculation algorithm
  */
 
-uint4 compute_checksum(uint4 init_checksum, uint4 *buff, int bufflen)
+/* #GTM_THREAD_SAFE : The below function (compute_checksum) is thread-safe */
+uint4 compute_checksum(uint4 init_checksum, unsigned char *buff, int bufflen)
 {
-	uint4	checksum = init_checksum;
-	char *byte;
-	int word_cnt, i, rem_bytes;
+	uint4		checksum = init_checksum;
+	unsigned char	*byte;
+	int		word_cnt, i, rem_bytes;
 	/* calculate checksum one byte at a time so that subsequent data read will be at addresses aligned to multiple of 4*/
 #ifdef GTM64
-	for (byte = (char *)buff; ((gtm_uint8)byte & SIZEOF(gtm_uint8)) != 0; byte++, bufflen--)
+	for (byte = buff; ((gtm_uint8)byte & SIZEOF(gtm_uint8)) != 0; byte++, bufflen--)
 #else
-	for (byte = (char *)buff; ((uint4)byte & SIZEOF(uint4)) != 0; byte++, bufflen--)
+	for (byte = buff; ((uint4)byte & SIZEOF(uint4)) != 0; byte++, bufflen--)
 #endif
 	{
 #ifdef	BIGENDIAN

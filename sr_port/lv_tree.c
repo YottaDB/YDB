@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -875,18 +876,8 @@ void	assert_tree_member_offsets(void)
 		/*    lvTree.ident     == symval.ident           == lv_val.v.mvtype */
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, ident, symval, ident));
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, ident, lv_val, v.mvtype));
-		/* In order to get OFFSETOF & SIZEOF to work on v.mvtype, the mval field "mvtype" was changed from
-		 * being a 16-bit "unsigned int" type bitfield to a "unsigned short". While this should not affect the
-		 * size of the "mvtype" fields, we fear it might affect the size of the immediately following fields
-		 * "sgn" (1-bit), "e" (7-bit) and "fnpc_index" (8-bit). While all of them together occupy 16-bits, they
-		 * have an "unsigned int" as the type specifier. In order to ensure the compiler does not allocate 4-bytes
-		 * (because of the int specification) to those 3 bitfields (and actually use only 2-bytes of those) and
-		 * create a 2-byte filler space, we assert that the offset of the immediately following non-bitfield (which
-		 * is "m[2]" in Unix & "str" in VMS) in the mval is 4-bytes. If the compiler had allocated 4-bytes, then this
-		 * offset would have been 8-bytes instead and the assert will fail alerting us of the unnecessary mval size bloat.
-		 */
-		UNIX_ONLY(assert(4 == OFFSETOF(mval, m[0]));)
-		VMS_ONLY(assert(4 == OFFSETOF(mval, str));)
+		/* Verify two mval layouts are equivalent */
+		assert(SIZEOF(mval) == SIZEOF(mval_b));
 		/*    lvTree.sbs_depth == symval.sbs_depth */
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, sbs_depth, symval, sbs_depth));
 		/*	                  lvTreeNode.v           == lv_val.v */

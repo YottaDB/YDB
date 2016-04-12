@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,13 +30,13 @@
 #include "gtm_stat.h"
 #include "gtm_socket.h"
 #include <sys/param.h>
-#include <signal.h>
 #if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__) && !defined(__MVS__)
 # include <siginfo.h>
 #endif
 #include "gtm_syslog.h"
 #include "gtm_limits.h"
 #include "gtm_stdlib.h"
+#include "gtm_signal.h"
 #include "gtm_sem.h"
 #include "gtm_string.h"
 #include "gtm_un.h"
@@ -321,6 +322,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	char		*fgets_rc, *newtz;
 	boolean_t	tzfnd;
 #	endif
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -407,7 +409,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			2, RTS_ERROR_LITERAL("Error during chdir to /etc - TZ cannot be determined"), save_errno);
 	} else
 	{
-		envfile = fopen("environment", "r");
+		Fopen(envfile, "environment", "r");
 		if (NULL == envfile)
 		{
 			save_errno = errno;
@@ -461,7 +463,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 						RTS_ERROR_LITERAL("TZ reset with putenv() failed"), save_errno);
 				}
 			}
-			fclose(envfile);
+			FCLOSE(envfile, status);
 		}
 	}
 #	endif /* _AIX */
@@ -479,9 +481,9 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	 * the logging capability disappears on some systems too - On others, it takes the executable name instead.
 	 * Either one causes our tests to fail.
 	 */
-	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	CLOSELOG();
-	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	first_syslog = TRUE;
 	FORK(pid);
 	if (0 > pid)
@@ -489,10 +491,10 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		save_errno = errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRSTART, 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRFORKF, 0, save_errno);
-		exit(GNDCHLDFORKFLD);
+		EXIT(GNDCHLDFORKFLD);
 	} else if (0 < pid)
 		/* This is the original process - it dies quietly (no exit handler of any sort) to isolate us */
-		_exit(EXIT_SUCCESS);
+		UNDERSCORE_EXIT(EXIT_SUCCESS);
 	/****** We are now in the (isolated) child process ******/
 	getjobnum();
 	pid = getsid(process_id);
@@ -526,7 +528,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		save_errno = errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
-		exit(UNABLETOCHDIR);
+		EXIT(UNABLETOCHDIR);
 	}
 	umask(0);
 	if (0 != gtmsecshr_pathname_init(SERVER, *rundir, *rundir_len))
@@ -623,7 +625,7 @@ void gtmsecshr_exit(int exit_code, boolean_t dump)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_GTMSECSHRREMSEMFAIL, 1, errno);
 	}
 	/* Note shutdown message taken care of by generic_signal_handler */
-	exit(exit_code);
+	EXIT(exit_code);
 }
 
 void gtmsecshr_timer_handler(void)
@@ -1059,7 +1061,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	ppptr = (char*)i2asc((uchar_ptr_t)ppptr, buf->mesg.id);
 	ppptr_save = ppptr;			/* Save where adding cmdline so can replace if need to move to check #2 */
 	memcpy(ppptr, PROCPATH_CMDLSUFFIX, SIZEOF(PROCPATH_CMDLSUFFIX));	/* Copy includes terminating null of literal */
-	procstrm = Fopen(procpath, "r");
+	Fopen(procstrm, procpath, "r");
 	if (NULL == procstrm)
 	{
 		save_errno = errno;
@@ -1102,7 +1104,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	}
 	/* Check #1 failed - attempt check #2 - read /proc/<pid>/maps to see if libgtmshr is there */
 	memcpy(ppptr_save, PROCPATH_MAPSSUFFIX, SIZEOF(PROCPATH_MAPSSUFFIX));	/* Copy includes terminating null of literal */
-	procstrm = Fopen(procpath, "r");
+	Fopen(procstrm, procpath, "r");
 	if (NULL == procstrm)
 	{
 		save_errno = errno;

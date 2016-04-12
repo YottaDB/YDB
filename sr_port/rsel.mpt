@@ -122,11 +122,11 @@ work
 	s end=$p(r,":",2),beg=$p(r,":"),rdf=0
         i end=beg!'$l(end) q:'$l(beg)  s stop=last                                          ; if all stripped out, done
 	s:'$l(beg) beg="*" s pct=$e(beg)                                                    ; CAUTION: ELSE on next line
-        e  s strt=$$mask(beg),stop=$$mask(end) i $l($p(stop,"$")) q:stop']strt              ; if end before begining, done
+        e  s strt=$$mask(beg),stop=$$mask(end) i $l($p(stop,"$")) q:stop']strt              ; if end before beginning, done
         i "*?"[pct s mtch="%*" d start(1) f  s r=$$search(1) q:r]stop!'$l(r)  d save        ; if alls, get _files first
 	s pct=pct="%",mtch=beg
         d start(pct)
-	f  s r=$$search(pct) q:r]stop!'$l(r)  d save                                        ; do begining
+	f  s r=$$search(pct) q:r]stop!'$l(r)  d save                                        ; do beginning
         i stop=last q                                                                       ; no range - we're done
         s stop=$p(stop,"$")
         i $l(stop),stop]$p(strt,"$") d                                                      ; if no overlap, do middle

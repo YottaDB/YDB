@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,18 +27,18 @@
 #include "gtm_string.h"
 #include "gtm_syslog.h"
 #include "main_pragma.h"
+#include "gtm_signal.h"
 #ifndef __MVS__
 #  include <malloc.h>
 #endif
-#include <signal.h>
 #include <errno.h>
+
 #define ROOTUID 0
 #define ROOTGID 0
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
 #define ASCIICTLMAX	32  /* space character */
 #define ASCIICTLMIN	0   /* NULL character */
-#define OVERWRITE 1
 #define GTM_TMP "gtm_tmp"
 #define GTM_DIST "gtm_dist"
 #define GTM_DBGLVL "gtmdbglvl"
@@ -125,60 +126,6 @@ SECSHRWRITABLE		<!AD writable. gtmsecshr will not be started>/error/fao=2!/ansi=
 	.end
 */
 
-int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite);
-int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite)
-{	/* The overwrite parameter is not used. In our case we always want to set the value */
-	char	*env_var_ptr;
-	int 	len;
-
-	len = STRLEN(env_var_name) + STRLEN("=") + STRLEN(env_var_val) + 1;
-	env_var_ptr = (char *)malloc(len);
-	if (NULL == env_var_ptr)
-		return -1;
-	strcpy(env_var_ptr, env_var_name);
-	strcat(env_var_ptr, "=");
-	strcat(env_var_ptr, env_var_val);
-	if (putenv(env_var_ptr))
-		return -1;
-	return 0;
-}
-
-int gtm_unsetenv(char * env_var_name);
-int gtm_unsetenv(char * env_var_name)
-{
-	return gtm_setenv(env_var_name, "", OVERWRITE);
-}
-
-int gtm_clearenv(void);
-int gtm_clearenv()
-{
-        char		env_var_name[MAX_ENV_NAME_LEN];
-	environptr_t	p;
-        char		*eq;
-        int		len;
-
-        if (NULL == environ)
-                return 0;
-        for (p = environ; *p; p++)
-        {
-                eq = strchr(*p, '=');
-                if (NULL != eq)
-                {
-			len = (int)(eq - *p);
-			if (MAX_ENV_NAME_LEN > len)
-			{
-                        	memcpy(env_var_name, *p, len);
-                        	env_var_name[len] = '\0';
-                        	if (gtm_unsetenv(env_var_name))
-					return -1;
-			} else
-				return -1;
-                } else
-                        return -1;
-        }
-        return 0;
-}
-
 void strsanitize(char *src, char *dst);
 void strsanitize(char *src, char *dst)
 {
@@ -196,6 +143,8 @@ void strsanitize(char *src, char *dst)
 	}
 }
 
+
+
 int main()
 {
 	int		ret, status;
@@ -211,14 +160,14 @@ int main()
 	char 		gtm_secshr_path_display[MAX_ENV_VAR_VAL_LEN];
 	char 		gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
 	int		gtm_tmp_exists = 0;
-	int		gtm_dbglvl_exists = 0;
+	int		rc;
 	sigset_t	mask;
 
 	/* Reset the signal mask (since the one inherited from the invoking process might have signals such as SIGALRM or SIGTERM
 	 * blocked) to let gtmsecshr manage its own signals using sig_init.
 	 */
 	sigemptyset(&mask);
-	sigprocmask(SIG_SETMASK, &mask, NULL);
+	sigprocmask(SIG_SETMASK, &mask, NULL);	/* BYPASSOK(sigprocmask) */
 	OPENLOG("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 	ret = 0; /* start positive */
 	/* get the ones we need */
@@ -266,21 +215,23 @@ int main()
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRGTMDBGLVL2LONG);
 			ret = -1;
 		} else
-		{
-			gtm_dbglvl_exists = 1;
 			strcpy(gtm_dbglvl_val, env_var_ptr);
-		}
 	}
 	if (!ret)
 	{	/* clear all */
-		status = gtm_clearenv();
+#		ifdef SUNOS
+		environ = NULL;
+          	status = 0;
+#		else
+		status = clearenv();
+#		endif
 		if (status)
 		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRCLEARENVFAILED);
 			ret = -1;
 		}
 		/* add the ones we need */
-		status = gtm_setenv(GTM_DIST, gtm_dist_val, OVERWRITE);
+		status = setenv(GTM_DIST, gtm_dist_val, TRUE);
 		if (status)
 		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETGTMDISTFAILED);
@@ -288,7 +239,7 @@ int main()
 		}
 		if (gtm_tmp_exists)
 		{
-			status = gtm_setenv(GTM_TMP, gtm_tmp_val, OVERWRITE);
+			status = setenv(GTM_TMP, gtm_tmp_val, TRUE);
 			if (status)
 			{
 				SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETGTMTMPFAILED);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,9 @@
 #include "gdsblk.h"
 #include "gdsbml.h"
 #include "gdsdbver.h"
+#include "gtm_multi_thread.h"
 
+/* #GTM_THREAD_SAFE : The below function (bml_newmap) is thread-safe */
 void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn)
 {
 	sm_uc_ptr_t bptr;

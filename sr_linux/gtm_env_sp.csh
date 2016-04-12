@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -167,15 +167,20 @@ if ( $?gtm_version_change == "1" ) then
             		setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         	endif
 		if ( "x86_64" == $mach_type ) then
-			# see if the compiler supports unused-result warnings
-			# Note: Compilers that dont support --help=warnings will not output unused-result.
-			# Currently, only compilers that support --help=warnings need to have unused-result
-			# turned off. Trying to turn it off on compilers that dont support it causes errors.
-			cc --help=warnings | & grep unused-result >/dev/null
-			if (! $status ) then
-				# if it does, turn them off
-				setenv gt_cc_options_common "$gt_cc_options_common -Wno-unused-result"
+			# Add uninitialized variable checking on 64bit platforms (GCC on our 32bits platforms don't support it
+			# correctly). Do not enable on SUSE or 4.4.7 on 64-bit because both platforms either cannot disable
+			# maybe-unitialized or require -O to be defined to disable maybe-unitialized.
+			cc --version |& grep -q -E '4.4.7|4.7.2|4.6.3|SUSE'
+			if (0 != $status) then
+				setenv  gt_cc_options_common    "$gt_cc_options_common -Wuninitialized "
 			endif
+			# Disable unused-result or maybe-uninitialized warnings if supported by the compiler as we don't care about
+			# them. Blindly adding disable flags causes errors. Note: Compilers that don't support --help=warnings will
+			# not output anything useful.
+
+			set  disableflags = `cc --help=warnings | & awk '{if ($1~/maybe-uninitialized/) \
+					print "-Wno-maybe-uninitialized "; if ($1~/unused-result/) print "-Wno-unused-result ";}'`
+			setenv  gt_cc_options_common    "$gt_cc_options_common $disableflags"
 		endif
 	endif
 

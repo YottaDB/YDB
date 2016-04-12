@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,13 +42,16 @@ GBLREF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
 
 /* The standard shared library suffix for HPUX on HPPA is .sl.
  * On HPUX/IA64, the standard suffix was changed to .so (to match other Unixes) but for
- * the sake of compatibility, they still accept (and look for) .sl if .so is not present.
+ * the sake of compatibility, they still accept, and look for, .sl if .so is not present.
  * Nevertheless, we use the standard suffix on all platforms.
  */
 #if (defined(__hpux) && defined(__hppa))
 #	define	ZLIB_LIBNAME	"libz.sl"
 #else
 #	define	ZLIB_LIBNAME	"libz.so"
+#ifdef _AIX
+#	define	ZLIB_AIXLIBNAME	"libz.a(libz.so.1)"
+#endif
 #endif
 
 #define	ZLIB_LIBFLAGS	(RTLD_NOW)	/* RTLD_NOW - resolve immediately so we know errors sooner than later */
@@ -77,25 +81,27 @@ void gtm_zlib_init(void);
 #define ZLIB_COMPRESS(CMPBUFF_PTR, CMPLEN, UNCMPBUFF_PTR, UNCMPLEN, ZLIB_CMP_LEVEL, RC)					\
 {															\
 	GBLREF zlib_cmp_func_t		zlib_compress_fnptr;								\
+	intrpt_state_t			prev_intrpt_state;								\
 															\
-	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 	assert(0 < (signed)(CMPLEN));											\
 	assert(NULL != zlib_compress_fnptr);										\
 	RC = (*zlib_compress_fnptr)(((Bytef *)(CMPBUFF_PTR)), (uLongf *)&(CMPLEN), (const Bytef *)(UNCMPBUFF_PTR), 	\
 					(uLong)(UNCMPLEN), ZLIB_CMP_LEVEL);						\
-	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 }
 
 #define ZLIB_UNCOMPRESS(UNCMPBUFF_PTR, UNCMPLEN, CMPBUFF_PTR, CMPLEN, RC)						\
 {															\
 	GBLREF zlib_uncmp_func_t	zlib_uncompress_fnptr;								\
+	intrpt_state_t			prev_intrpt_state;								\
 															\
-	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 	assert(0 < (signed)(UNCMPLEN));											\
 	assert(NULL != zlib_uncompress_fnptr);										\
 	RC = (*zlib_uncompress_fnptr)(((Bytef *)(UNCMPBUFF_PTR)), (uLongf *)&(UNCMPLEN), (const Bytef *)(CMPBUFF_PTR),	\
 					(uLong)(CMPLEN));								\
-	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 }
 
 #endif

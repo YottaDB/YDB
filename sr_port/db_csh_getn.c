@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>	/* needed for VSIG_ATOMIC_T */
+#include "gtm_signal.h"	/* needed for VSIG_ATOMIC_T */
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -39,7 +40,6 @@
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "wcs_get_space.h"
-#include "wcs_timer_start.h"
 #include "add_inter.h"
 #include "wbox_test_init.h"
 #include "have_crit.h"
@@ -86,6 +86,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
 	boolean_t		dont_flush_buff;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -94,6 +95,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	assert(dba_mm != csd->acc_meth);
 	assert(csa->now_crit);
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
+	/* If this is an encrypted database, make sure our private cycle matches the shared cycle. Or else
+	 * if we need to call "wcs_wtstart" below, it cannot flush dirty buffers and will create a wc_blocked
+	 * situation (which is best avoided).
+	 */
+	assert((NULL == csa->encr_ptr) || (csa->nl->reorg_encrypt_cycle == csa->encr_ptr->reorg_encrypt_cycle));
 	max_ent = csd->n_bts;
 	hdr = csa->acc_meth.bg.cache_state->cache_array + (block % csd->bt_buckets);
 	start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
@@ -117,7 +123,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	dont_flush_buff = gv_cur_region->read_only
 		 UNIX_ONLY(|| (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN));
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
-	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
+	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);
 	for (lcnt = 0;  ; lcnt++)
 	{
 		if (lcnt > pass3)
@@ -157,10 +163,6 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			}
 		}
 		assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
-		VMS_ONLY(
-			if ((lcnt == pass1) || (lcnt == pass2))
-				wcs_wtfini(gv_cur_region);
-		)
 		if (cr->refer && (lcnt < pass2))
 		{	/* in passes 1 & 2, set refer to FALSE and skip; in the third pass attempt reuse even if TRUE == refer */
 			cr->refer = FALSE;
@@ -232,11 +234,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			if (dont_flush_buff)
 				continue;
 			if (lcnt < pass1)
-			{
-				if (!csa->timer && (csa->nl->wcs_timers < 1))
-					wcs_timer_start(gv_cur_region, FALSE);
 				continue;
-			}
 			BG_TRACE_PRO(db_csh_getn_flush_dirty);
 			if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
 			{	/* failed to flush it out - force a rebuild */
@@ -247,43 +245,40 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			}
 			assert(0 == cr->dirty);
 		}
-		UNIX_ONLY(
-			/* the cache-record is not free for reuse until the write-latch value becomes LATCH_CLEAR.
-			 * In VMS, resetting the write-latch value occurs in "wcs_wtfini" which is in CRIT, we are fine.
-			 * In Unix, this resetting is done by "wcs_wtstart" which is out-of-crit. Therefore, we need to
-			 * 	wait for this value to be LATCH_CLEAR before reusing this cache-record.
-			 * Note that we are examining the write-latch-value without holding the interlock. It is ok to do
-			 * 	this because the only two routines that modify the latch value are "bg_update" and
-			 * 	"wcs_wtstart". The former cannot be concurrently executing because we are in crit.
-			 * 	The latter will not update the latch value unless this cache-record is dirty. But in this
-			 * 	case we would have most likely gone through the if (cr->dirty) check above. Most likely
-			 * 	because there is one rare possibility where a concurrent "wcs_wtstart" has set cr->dirty
-			 * 	to 0 but not yet cleared the latch. In that case we wait for the latch to be cleared.
-			 * 	In all other cases, nobody is modifying the latch since when we got crit and therefore
-			 * 	it is safe to observe the value of the latch without holding the interlock.
+		/* the cache-record is not free for reuse until the write-latch value becomes LATCH_CLEAR.
+		 * This resetting is done by "wcs_wtstart" which is out-of-crit. Therefore, we need to
+		 * 	wait for this value to be LATCH_CLEAR before reusing this cache-record.
+		 * Note that we are examining the write-latch-value without holding the interlock. It is ok to do
+		 * 	this because the only two routines that modify the latch value are "bg_update" and
+		 * 	"wcs_wtstart". The former cannot be concurrently executing because we are in crit.
+		 * 	The latter will not update the latch value unless this cache-record is dirty. But in this
+		 * 	case we would have most likely gone through the if (cr->dirty) check above. Most likely
+		 * 	because there is one rare possibility where a concurrent "wcs_wtstart" has set cr->dirty
+		 * 	to 0 but not yet cleared the latch. In that case we wait for the latch to be cleared.
+		 * 	In all other cases, nobody is modifying the latch since when we got crit and therefore
+		 * 	it is safe to observe the value of the latch without holding the interlock.
+		 */
+		if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
+		{	/* possible if a concurrent "wcs_wtstart" has set cr->dirty to 0 but not yet
+			 * cleared the latch. this should be very rare though.
 			 */
-			if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
-			{	/* possible if a concurrent "wcs_wtstart" has set cr->dirty to 0 but not yet
-				 * cleared the latch. this should be very rare though.
-				 */
-				if (lcnt < pass2)
-					continue; /* try to find some other cache-record to reuse until the 3rd pass */
-				for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
-					wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
-				if (MAXWRTLATCHWAIT <= ocnt)
-				{
-					BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);
-					assert(FALSE);
-					continue;
-				}
+			if (lcnt < pass2)
+				continue; /* try to find some other cache-record to reuse until the 3rd pass */
+			for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
+				wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
+			if (MAXWRTLATCHWAIT <= ocnt)
+			{
+				BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);
+				assert(FALSE);
+				continue;
 			}
-		)
+		}
 		/* Note that before setting up a buffer for the requested block, we should make sure the cache-record's
-		 * 	read_in_progress is set. This is so that noone else in t_qread gets access to this empty buffer.
+		 * 	read_in_progress is set. This is so that no one else in t_qread gets access to this empty buffer.
 		 * By setting up a buffer, it is meant assigning cr->blk in addition to inserting the cr in the blkques
 		 * 	through "shuffqth" below.
 		 * Note that "t_qread" has special code to handle read_in_progress */
-		LOCK_BUFF_FOR_READ(cr, rip);
+		LOCK_BUFF_FOR_READ(cr, rip);	/* lock is too long for a general form spin lock but too granular for a mutex */
 		if (0 != rip)
 		{
 			if (lcnt < pass2)
@@ -362,6 +357,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		/* got a block - set it up */
 		assert(0 == cr->epid);
 		assert(0 == cr->r_epid);
+		assert(NULL == TREF(block_now_locked));
+		TREF(block_now_locked) = cr;
 		cr->r_epid = process_id;	/* establish ownership */
 		cr->image_count = image_count;
 		cr->blk = block;
@@ -399,12 +396,12 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			csa->nl->cache_hits = 0;
 		}
 		INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
-		ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
+		ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);
 		return cr;
 	}
 	/* force a recover */
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
 	csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
-	ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
+	ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);
 	return (cache_rec_ptr_t)CR_NOTVALID;
 }

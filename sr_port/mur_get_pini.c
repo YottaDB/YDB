@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +62,7 @@ error_def(ERR_NOPINI);
 		*PPLST = PLST;												\
 		return SS_NORMAL;											\
 	}														\
-	/* at this point we have a bad PINI record in the beginning of the journal file, we probably should GTMASSERT */\
+	/* at this point we have a bad PINI record in the beginning of the journal file, we probably should assertpro*/	\
 	return ERR_JNLBADRECFMT;											\
 }
 
@@ -127,6 +128,8 @@ uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **p
 	plst->state = IGNORE_PROC;
 	memcpy(&plst->jpv,     &pinirec->process_vector[CURR_JPV], SIZEOF(jnl_process_vector));
 	memcpy(&plst->origjpv, &pinirec->process_vector[ORIG_JPV], SIZEOF(jnl_process_vector));
+	plst->pini_jpv_time = plst->jpv.jpv_time; /* save copy just in case jpv->jpv_time gets
+						    * changed in forward phase of journal recovery */
 	NON_GTM64_ONLY(assert(SIZEOF(void *) == SIZEOF(pini_addr));)
 	add_hashtab_int4(&jctl->pini_list, (uint4 *)&pini_addr, (void *)plst, &tabent);
 	*pplst = plst;

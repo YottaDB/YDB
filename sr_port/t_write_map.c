@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,9 +78,9 @@ void t_write_map (
 	cs->blk_checksum = 0;
 	cs->blk = blkhist->blk_num;
 	assert((cs->blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
-		cs->old_block = blkhist->buffaddr;
-	/* t_write_map operates on BUSY blocks and hence cs->blk_prior_state's free_status is set to FALSE unconditionally */
-	BIT_CLEAR_FREE(cs->blk_prior_state);
+	cs->old_block = blkhist->buffaddr;
+	BIT_CLEAR_FREE(cs->blk_prior_state);	/* t_write_map operates on BUSY blocks and hence
+						 * cs->blk_prior_state's free_status is set to FALSE unconditionally */
 	BIT_CLEAR_RECYCLED(cs->blk_prior_state);
 	old_block = (blk_hdr_ptr_t)cs->old_block;
 	assert(NULL != old_block);
@@ -89,7 +90,7 @@ void t_write_map (
 		 * access the buffer more than the db blk_size.
 		 */
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-		cs->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
+		cs->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
 	}
 	cs->cycle = blkhist->cycle;
 	cr = blkhist->cr;

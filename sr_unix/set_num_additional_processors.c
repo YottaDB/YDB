@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>	/* for VSIG_ATOMIC_T */
+#include "gtm_signal.h"	/* needed for VSIG_ATOMIC_T */
 #ifndef __MVS__
 #include <sys/param.h>
 
@@ -39,34 +40,35 @@
 #include "deferred_signal_handler.h"
 #endif
 
-GBLREF int		num_additional_processors;
+GBLREF int	num_additional_processors;
 
 error_def(ERR_NUMPROCESSORS);
 
 void set_num_additional_processors(void)
 {
-	long numcpus;
-
+	long			numcpus;
 #	ifdef __hpux
-	struct pst_dynamic psd;
-	DEFER_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS);
-#	  ifdef DEBUG
-	if (gtm_white_box_test_case_enabled
-		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))
-	{
-		DBGFPF((stderr, "will sleep indefinitely now\n"));
-		while (TRUE)
-			LONG_SLEEP(60);
-	}
-#	  endif
+	intrpt_state_t		prev_intrpt_state;
+	struct pst_dynamic	psd;
+	DEFER_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS, prev_intrpt_state);
+
+#		ifdef DEBUG
+		if (gtm_white_box_test_case_enabled
+			&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))
+		{
+			DBGFPF((stderr, "will sleep indefinitely now\n"));
+			while (TRUE)
+				LONG_SLEEP(60);
+		}
+#		endif
 	if (pstat_getdynamic(&psd, SIZEOF(psd), (size_t)1, 0) == -1)
 	{
-		send_msg(VARLSTCNT(1) ERR_NUMPROCESSORS);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMPROCESSORS);
                 numcpus = 1;
         }
 	else
 		numcpus = psd.psd_proc_cnt;
-	ENABLE_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS);
+	ENABLE_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS, prev_intrpt_state);
 #	else
 #	  ifdef __MVS__
 #	    ifdef DEBUG
@@ -86,11 +88,10 @@ void set_num_additional_processors(void)
 	SYSCONF(_SC_NPROCESSORS_ONLN, numcpus);
 	if (numcpus == -1)
 	{
-		send_msg(VARLSTCNT(1) ERR_NUMPROCESSORS);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMPROCESSORS);
 		numcpus = 1;
 	}
 #	  endif
 #	endif
 	num_additional_processors = (int)(numcpus - 1);
 }
-

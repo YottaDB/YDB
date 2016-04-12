@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +51,10 @@ void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 	int		match_res, int_del;
 	delimfmt	unichar;
 
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+
+	assert(!TREF(compile_time) || valid_utf_string(&src->str));
 	assert(gtm_utf8_mode);
 	if (--first < 0)
 		first = 0;

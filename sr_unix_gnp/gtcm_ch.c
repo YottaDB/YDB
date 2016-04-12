@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 
 #include "gtm_time.h"
 
+#include "gtm_multi_thread.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -59,8 +61,7 @@ CONDITION_HANDLER(gtcm_ch)
 	err_ctl		*fac;
 	int		i, msglen, len, rc, orig_severity;
 	bool		first;
-	now_t		now;	/* for GET_CUR_TIME macro */
-	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	short		short_len;
 
 	START_CH(FALSE);
@@ -70,6 +71,7 @@ CONDITION_HANDLER(gtcm_ch)
 	if (gtcm_firsterr)
 		gtcm_open_cmerrlog();
 	msgnum = 1;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	if (0 == msglen)
 	{	/* gtm_putmsg_list has already flushed message. Get length another way.
@@ -85,7 +87,7 @@ CONDITION_HANDLER(gtcm_ch)
 	assert(msglen);
 	if (gtcm_errfile)
 	{
-		GET_CUR_TIME;
+		GET_CUR_TIME(time_str);
 		time_str[CTIME_BEFORE_NL] = 0;
 		FPRINTF(gtcm_errfs, "%s: %s", time_str, TREF(util_outbuff_ptr));
 		FFLUSH(gtcm_errfs);

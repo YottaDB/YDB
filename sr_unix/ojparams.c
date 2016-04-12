@@ -34,6 +34,7 @@ MSTR_CONST(deferrext, ".mje");
 
 LITREF jp_datatype	job_param_datatypes[];
 
+GBLREF	mval			dollar_zgbldir;
 GBLREF	d_socket_struct		*socket_pool;
 
 error_def		(ERR_PARFILSPC);
@@ -172,7 +173,7 @@ void ojparams (char *p, job_params_type *job_params)
 /*
  * Input file
  */
-	if (job_params->input.len == 0)
+	if (0 == job_params->input.len)
 	{
 		job_params->input.len = STRLEN(definput);
 		job_params->input.addr = definput;
@@ -194,7 +195,7 @@ void ojparams (char *p, job_params_type *job_params)
 /*
  * Output file
  */
-	if (job_params->output.len == 0)
+	if (0 == job_params->output.len)
 	{
 		if (!defoutbuf)
 			defoutbuf = malloc(MAX_FILSPC_LEN);
@@ -225,7 +226,7 @@ void ojparams (char *p, job_params_type *job_params)
 /*
  * Error file
  */
-	if (job_params->error.len == 0)
+	if (0 == job_params->error.len)
 	{
 		if (!deferrbuf)
 			deferrbuf = malloc(MAX_FILSPC_LEN);
@@ -256,7 +257,13 @@ void ojparams (char *p, job_params_type *job_params)
 /*
  * Global Directory
  */
-	if (job_params->gbldir.len)
+	if (0 == job_params->gbldir.len)
+	{
+		assert(MAX_JOBPARM_LEN > dollar_zgbldir.str.len);
+		job_params->gbldir.len = dollar_zgbldir.str.len;
+		job_params->gbldir.addr = dollar_zgbldir.str.addr;
+	}
+	else
 		if (!(status = ojchkfs (job_params->gbldir.addr,
 		  job_params->gbldir.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6, "GBLDIR",

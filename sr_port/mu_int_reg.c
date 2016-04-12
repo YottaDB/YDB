@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +33,7 @@
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "interlock.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #include "gt_timer.h"
@@ -47,16 +46,13 @@
 GBLREF boolean_t		ointeg_this_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
-GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_skipreg_cnt;
 #ifdef DEBUG
 GBLREF pid_t			process_id;
 #endif
-#ifdef GTM_CRYPT
-GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
+GBLREF enc_handles		mu_int_encr_handles;
 GBLREF sgmnt_addrs		*cs_addrs;
-#endif
 #ifdef UNIX
 GBLREF boolean_t		jnlpool_init_needed, online_specified, preserve_snapshot;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
@@ -72,15 +68,15 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	freeze_status		status;
 	node_local_ptr_t	cnl;
 	sgmnt_addrs     	*csa;
+	sgmnt_data_ptr_t	csd;
 #	ifdef DEBUG
 	boolean_t		need_to_wait = FALSE;
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 #	endif
-#	ifdef GTM_CRYPT
+	sgmnt_data		*csd_copy_ptr;
 	gd_segment		*seg;
 	int			gtmcrypt_errno;
-#	endif
 	*return_value = FALSE;
 	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	ESTABLISH(mu_int_reg_ch);
@@ -106,31 +102,17 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	change_reg();
 	csa = &FILE_INFO(gv_cur_region)->s_addrs;
 	cnl = csa->nl;
+	csd = csa->hdr;
 	read_only = gv_cur_region->read_only;
-#	ifdef GTM_CRYPT
-	if (cs_data->is_encrypted)
-	{ 	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
-		assert(csa == cs_addrs);
-		ASSERT_ENCRYPTION_INITIALIZED;	/* should have happened in db_init() */
-		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(cs_addrs, cs_data->encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
-		if (0 != gtmcrypt_errno)
-		{
-			seg = gv_cur_region->dyn.addr;
-			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
-			mu_int_skipreg_cnt++;
-			return;
-		}
-	}
-#	endif
 	assert(NULL != mu_int_master);
 	/* Ensure that we don't see an increase in the file header and master map size compared to it's maximum values */
-	assert(SGMNT_HDR_LEN >= SIZEOF(sgmnt_data) && (MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(cs_data)));
+	assert(SGMNT_HDR_LEN >= SIZEOF(sgmnt_data) && (MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(csd)));
 	/* ONLINE INTEG if asked for explicitly by specifying -ONLINE is an error if the db has partial V4 blocks.
 	 * However, if -ONLINE is not explicitly specified but rather assumed implicitly (as default for -REG)
 	 * then turn off ONLINE INTEG for this region and continue as if -NOONLINE was specified
 	 */
 #	ifdef GTM_SNAPSHOT
-	if (!cs_data->fully_upgraded)
+	if (!csd->fully_upgraded)
 	{
 		ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 		if (online_specified)
@@ -189,10 +171,11 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		was_crit = csa->now_crit;
 		if (!was_crit)
 			grab_crit(gv_cur_region);
-		memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, SIZEOF(sgmnt_data));
+		memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)csd, SIZEOF(sgmnt_data));
 		if (!was_crit)
 			rel_crit(gv_cur_region);
-		memcpy(mu_int_master, MM_ADDR(cs_data), MASTER_MAP_SIZE(cs_data));
+		memcpy(mu_int_master, MM_ADDR(csd), MASTER_MAP_SIZE(csd));
+		csd_copy_ptr = &mu_int_data;
 	} else
 	{
 #		ifdef GTM_SNAPSHOT
@@ -203,13 +186,14 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-			assert(process_id != cs_data->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
+			assert(process_id != csd->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
 			assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 			return;
 		}
 		assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-		assert(process_id != cs_data->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
+		assert(process_id != csd->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
 		assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
+		csd_copy_ptr = &csa->ss_ctx->ss_shm_ptr->shadow_file_header;
 #		if defined(DEBUG)
 		curr_wbox_seq_num = 1;
 		cnl->wbox_test_seq_num = curr_wbox_seq_num; /* indicate we took the next step */
@@ -224,6 +208,17 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		}
 #		endif
 #		endif
+	}
+	if (USES_ANY_KEY(csd_copy_ptr))
+	{ 	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
+		seg = gv_cur_region->dyn.addr;
+		INIT_DB_OR_JNL_ENCRYPTION(&mu_int_encr_handles, csd_copy_ptr, seg->fname_len, (char *)seg->fname, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+			mu_int_skipreg_cnt++;
+			return;
+		}
 	}
 	*return_value = mu_int_fhead();
 	REVERT;

@@ -371,10 +371,10 @@ void	trigger_upgrade(gd_region *reg)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
 							HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
 							REG_LEN_STR(reg));
+				/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
+				gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
 			} else
 				count = 0;
-			/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
-			gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
 			/* Kill ^#t(<gvn>,"#TRHASH") unconditionally and regenerate */
 			gvtr_kill_hasht_gblsubs((mval *)&literal_hashtrhash, TRUE);
 			/* At this point, gv_currkey is ^#t(<gvn>) */

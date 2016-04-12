@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +26,6 @@
  *      The gtm_*() functions do some additional assert checks before and/or after invoking the actual queue operations.
  */
 
-#ifndef VMS
-
 int             insqhi2(que_ent_ptr_t new, que_head_ptr_t base);
 int             insqti2(que_ent_ptr_t new, que_head_ptr_t base);
 void_ptr_t	remqhi1(que_head_ptr_t base);
@@ -37,21 +36,6 @@ void_ptr_t	remqti1(que_head_ptr_t base);
 #define SYS_REMQHI(B)   remqhi1((que_head_ptr_t)(B))
 #define SYS_REMQTI(B)   remqti1((que_head_ptr_t)(B))
 
-#else
-# ifndef __vax
-/* Don't declare these routines for Vax since the routine names are macros on that platform */
-int		insqhi(que_ent_ptr_t, que_head_ptr_t);
-int		insqti(que_ent_ptr_t, que_head_ptr_t);
-# endif
-void_ptr_t	remqhi(que_head_ptr_t base);
-void_ptr_t	remqti(que_head_ptr_t base);
-
-#define SYS_INSQHI(N,B) insqhi((que_ent_ptr_t)(N), (que_head_ptr_t)(B))
-#define SYS_INSQTI(N,B) insqti((que_ent_ptr_t)(N), (que_head_ptr_t)(B))
-#define SYS_REMQHI(B)   remqhi((que_head_ptr_t)(B))
-#define SYS_REMQTI(B)   remqti((que_head_ptr_t)(B))
-
-#endif
 
 #ifdef DEBUG
 
@@ -73,4 +57,3 @@ void_ptr_t	gtm_remqti(que_head_ptr_t base);
 #define	REMQTI	SYS_REMQTI
 
 #endif
-

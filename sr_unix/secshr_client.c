@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +12,9 @@
 
 #include "mdef.h"
 
-#include <stddef.h>
-#include <errno.h>
-#include <signal.h>
-#include <sys/wait.h>
-#include <sys/time.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
-#include <sys/param.h>
-
+#include "gtm_signal.h"
 #include "gtm_ctype.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_string.h"
 #include "gtm_socket.h"
 #include "gtm_fcntl.h"
@@ -31,6 +24,14 @@
 #include "gtm_limits.h"
 #include "gtm_syslog.h"
 #include "gtm_ipc.h"
+
+#include <stddef.h>
+#include <errno.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
+#include <sys/param.h>
 
 #include "gt_timer.h"
 #include "gtmio.h"
@@ -130,7 +131,7 @@ const static char readonly *secshrstart_error_code[] = {
 		}										\
 		/* For transient failures we will continue after printing out message */	\
 	}											\
-	hiber_start(3000); /* 3000 ms (3 sec) to allow server to come up */			\
+	hiber_start(500); /* half-a-second to allow server to come up */			\
 }
 
 #define SETUP_FOR_RECV										\
@@ -452,7 +453,7 @@ int create_server(void)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[UNABLETOEXECGTMSECSHR]));
-			_exit(UNABLETOEXECGTMSECSHR);
+			UNDERSCORE_EXIT(UNABLETOEXECGTMSECSHR);
 		}
         } else
 	{

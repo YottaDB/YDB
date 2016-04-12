@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,9 @@
 #include "mdef.h"
 
 #include <errno.h>
+
 #include "gtm_termios.h"
+#include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
 
 #include "io.h"
 #include "iosp.h"
@@ -46,7 +49,7 @@ void setterm(io_desc *ioptr)
 	if (0 != status)
 	{
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
-			rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	}
 	return;
 }
@@ -85,7 +88,7 @@ void iott_mterm(io_desc *ioptr)
 	t.c_iflag &= ~(ICRNL);
 	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 	if (0 != status)
-		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;
 }
 
@@ -113,6 +116,6 @@ void iott_rterm(io_desc *ioptr)
 	t.c_iflag &= ~(ICRNL);
 	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 	if (0 != status)
-		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;
 }

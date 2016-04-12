@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -330,6 +331,8 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	}
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, file_corrupt), SIZEOF(repl_instance->file_corrupt));
 	PRINT_BOOLEAN(PREFIX_FILEHDR "Corrupt                                     !R10AZ", repl_instance->file_corrupt, -1);
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, qdbrundown), SIZEOF(repl_instance->qdbrundown));
+	PRINT_BOOLEAN(PREFIX_FILEHDR "Quick database rundown is active            !R10AZ", repl_instance->qdbrundown, -1);
 }
 
 void	repl_inst_dump_gtmsrclcl(gtmsrc_lcl_ptr_t gtmsrclcl_ptr)

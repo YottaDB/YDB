@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +14,11 @@
 #include "mdef.h"
 
 #include "gtm_ipc.h"
+#include "gtm_inet.h"
+#include "gtm_signal.h"
+
 #include <sys/shm.h>
 #include <sys/sem.h>
-#include "gtm_inet.h"
-#include <signal.h>
 #include <errno.h>
 
 #include "gtm_stdio.h"
@@ -70,12 +72,13 @@ GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		created_core;
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		skip_exit_handler;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	boolean_t		is_updproc;
-GBLREF	boolean_t		is_updhelper;
+GBLREF	uint4			is_updhelper;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	FILE			*updproc_log_fp;
@@ -98,17 +101,21 @@ void mupip_exit_handler(void)
 	FILE		*fp;
 	boolean_t	files_closed = TRUE;
 
-	if (exit_handler_active)	/* Don't recurse if exit handler exited */
+	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;
 	SET_PROCESS_EXITING_TRUE;
+	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	if (jgbl.mupip_journal)
 	{
 		files_closed = mur_close_files();
 		mupip_jnl_recover = FALSE;
 	}
-	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */
+	/* Note we call secshr_db_clnup() with the flag NORMAL_TERMINATION even in an error condition
+	 * here because we know at this point that we aren't in the middle of a transaction but we may
+	 * be holding crit in one or more regions and/or we could have other odds/ends to cleanup.
+	 */
 	secshr_db_clnup(NORMAL_TERMINATION);
 	if (dollar_tlevel)
 		OP_TROLLBACK(0);
@@ -123,7 +130,7 @@ void mupip_exit_handler(void)
 		SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
-	gv_rundown(); /* also takes care of detaching from the journal pool */
+	WITH_CH(exi_ch, gv_rundown(), 0); /* also takes care of detaching from the journal pool */
 	relinkctl_rundown(TRUE, TRUE);	/* decrement relinkctl-attach & rtnobj-reference counts */
 	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
 	 * might not be set up. In that case, use "stderr" for logging.
@@ -158,7 +165,7 @@ void mupip_exit_handler(void)
 		DUMP_CORE;	/* This will not return */
 	}
 	if (!files_closed)
-		_exit(EXIT_FAILURE);
+		UNDERSCORE_EXIT(EXIT_FAILURE);
 }
 
 void close_repl_logfiles()

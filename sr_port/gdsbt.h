@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,22 +17,15 @@
 #include <sys/types.h>
 #ifdef MUTEX_MSEM_WAKE
 #ifdef POSIX_MSEM
-#  include <semaphore.h>
+#  include "gtm_semaphore.h"
 #else
 #  include <sys/mman.h>
 #endif
 #endif
 
-#ifdef VMS
-#	include <ssdef.h>	/* for SS$_WASSET */
-#	include "ast.h"	/* for ENABLE/DISABLE */
-#elif defined(UNIX)
-#	include <gtm_limits.h>	/* for _POSIX_HOST_NAME_MAX */
-#	if defined(__osf__)
-#		include <sys/param.h>	/* for _POSIX_HOST_NAME_MAX */
-#	elif defined(SUNOS) && !defined(_POSIX_HOST_NAME_MAX)
-#		include <netdb.h>	/* for MAXHOSTNAMELEN (Solaris 9) */
-#	endif
+#include <gtm_limits.h>		/* for _POSIX_HOST_NAME_MAX */
+#if defined(SUNOS) && !defined(_POSIX_HOST_NAME_MAX)
+#	include <netdb.h>	/* for MAXHOSTNAMELEN (Solaris 9) */
 #endif
 
 #include "gvstats_rec.h"
@@ -50,18 +43,16 @@
 
 #define MAX_REL_NAME	36
 #define MAX_MCNAMELEN   256 /* We do not support hostname truncation */
-#if defined(UNIX)
-#	if defined(_POSIX_HOST_NAME_MAX)
-#		if MAX_MCNAMELEN <= _POSIX_HOST_NAME_MAX /* _POSIX_HOST_NAME_MAX excludes terminating NULL */
-#			error MAX_MCNAMELEN is not greater than _POSIX_HOST_NAME_MAX.
-#		endif
-#	elif defined(MAXHOSTNAMELEN)
-#		if MAX_MCNAMELEN < MAXHOSTNAMELEN /* MAXHOSTNAMELEN includes terminating NULL */
-#			error MAX_MCNAMELEN is less than MAXHOSTNAMELEN.
-#		endif
-#	else
-#		error _POSIX_HOST_NAME_MAX or MAXHOSTNAMELEN not defined.
+#if defined(_POSIX_HOST_NAME_MAX)
+#	if MAX_MCNAMELEN <= _POSIX_HOST_NAME_MAX /* _POSIX_HOST_NAME_MAX excludes terminating NULL */
+#		error MAX_MCNAMELEN is not greater than _POSIX_HOST_NAME_MAX.
 #	endif
+#elif defined(MAXHOSTNAMELEN)
+#	if MAX_MCNAMELEN < MAXHOSTNAMELEN /* MAXHOSTNAMELEN includes terminating NULL */
+#		error MAX_MCNAMELEN is less than MAXHOSTNAMELEN.
+#	endif
+#else
+#	error _POSIX_HOST_NAME_MAX or MAXHOSTNAMELEN not defined.
 #endif
 
 #define GDS_LABEL_SZ 	12
@@ -69,6 +60,7 @@
 #define MAX_DB_WTSTARTS		2			/* Max number of "flush-timer driven" simultaneous writers in wcs_wtstart */
 #define MAX_WTSTART_PID_SLOTS	4 * MAX_DB_WTSTARTS	/* Max number of PIDs for wcs_wtstart to save */
 #define MAX_KIP_PID_SLOTS 	8
+#define MAX_WT_PID_SLOTS 	4
 
 #define BT_FACTOR(X) (X)
 #define FLUSH_FACTOR(X) ((X)-(X)/16)
@@ -148,23 +140,19 @@ typedef struct
 	}		que;
 	int4		pid;
 	void		*super_crit;
-#if defined(UNIX)
 	/*
-	 * If the following fields are to be made part of VMS too, change
-	 * size of mutex_que_entry in mutex.mar (lines 118, 152).
 	 * Make sure that the size of mutex_que_entry is a multiple of 8 bytes
 	 * for quadword alignment requirements of remqhi and insqti.
 	 */
 	int4		mutex_wake_instance;
 	int4		filler1; /* for dword alignment 		 */
 #ifdef MUTEX_MSEM_WAKE
-#ifdef POSIX_MSEM
+# ifdef POSIX_MSEM
 	sem_t		mutex_wake_msem; /* Not two ints .. somewhat larger */
-#else
+# else
 	msemaphore	mutex_wake_msem; /* Two ints (incidentally two int4s) */
-#endif
+# endif
 
-#endif
 #endif
 } mutex_que_entry;
 
@@ -180,7 +168,6 @@ typedef struct
 
 typedef struct
 {
-#if defined(UNIX)
 	FILL8DCL(uint4, crit_cycle, 1);
 	global_latch_t	semaphore;
 	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2)		/* 8 for the FILL8DCL */
@@ -195,31 +182,12 @@ typedef struct
 	CACHELINE_PAD(SIZEOF(mutex_que_head), 8)
 	mutex_que_head	freehead;
 	CACHELINE_PAD(SIZEOF(mutex_que_head), 9)
-
-#elif defined(VMS)
-	short		semaphore;
-	unsigned short	wrtpnd;
-	short		crashcnt,
-			queslots;
-#ifdef __alpha
-/* use constant instead of defining CACHELINE_SIZE since we do not want to affect other structures
-      the 64 must match padding in mutex.mar and mutex_stoprel.mar */
-        char            filler1[64 - SIZEOF(short)*4];
-#endif
-        mutex_que_entry prochead;
-#ifdef __alpha
-        char            filler2[64 - SIZEOF(mutex_que_entry)];
-#endif
-        mutex_que_entry freehead;
-#else
-#error UNSUPPORTED PLATFORM
-#endif
 } mutex_struct;
 
 typedef struct { /* keep this structure and member offsets defined in sr_avms/mutex.mar in sync */
 	int4	mutex_hard_spin_count;
 	int4	mutex_sleep_spin_count;
-	int4	mutex_spin_sleep_mask;			/* currently unused */
+	int4	mutex_spin_sleep_mask;			/* mask for maximum spin sleep time */
 	int4	mutex_que_entry_space_size;		/* total number of entries */
 } mutex_spin_parms_struct;
 
@@ -287,6 +255,243 @@ typedef struct
 		csa->nl->secshr_ops_index++;								\
 	}												\
 }
+
+/*
+ * Enable the GTM_CRYPT_UPDATES_REPORT define below to activate logging of encryption-related operations in shared memory. Those
+ * operations currently include a write and read of an encrypted block (wcs_wtstart and dsk_read, respectively), update retry or
+ * abort due to a concurrent change of encryption cycle (t_end and tp_tend, wcs_wtstart, respectively), update of encryption
+ * settings (mupip_reorg_encrypt), and receipt of new encryption settings (t_retry and tp_restart). Add more macros and macro
+ * callers as necessary. The final report is printed via the DBG_PRINT_BLOCK_INFOS macro (gtm_fork_n_core).
+ */
+#ifdef DEBUG
+/* #define GTM_CRYPT_UPDATES_REPORT 1 */
+#endif
+
+#ifdef GTM_CRYPT_UPDATES_REPORT
+# define BLK_INFO_ARRAY_SIZE		 10000	/* Static array size for all encryption-related updates. */
+
+typedef struct
+{
+	uint4		blk_num;
+	uint4		operation;
+	trans_num	dbtn;
+	trans_num	blktn;
+	boolean_t	use_new_key;
+	uint4		subtype;
+	uint4		blk_size;
+	uint4		blk_encr_len;
+	char		pre_block[32];
+	char		post_block[32];
+} block_update_t;
+
+typedef struct
+{
+	uint4		is_encrypted;
+	uint4		reorg_encrypt_cycle;
+	char            hash[GTMCRYPT_HASH_LEN];
+	char            hash2[GTMCRYPT_HASH_LEN];
+	block_id	encryption_hash_cutoff;
+} trans_update_t;
+
+typedef union
+{
+	block_update_t	block_update;
+	trans_update_t	trans_update;
+} info_t;
+
+typedef struct blk_info_struct
+{
+	uint4		type;
+	uint4		pid;
+	uint4		is_encrypted;
+	int4		csa_reorg_encrypt_cycle;
+	uint4		cnl_reorg_encrypt_cycle;
+	block_id	encryption_hash_cutoff;
+	trans_num	encryption_hash2_start_tn;
+	char            hash[GTMCRYPT_HASH_LEN];
+	char            hash2[GTMCRYPT_HASH_LEN];
+	char		region[100];
+	char		where[100];
+	info_t		info;
+} blk_info;
+
+# define DBG_PRINT_BLOCK_INFOS(CNL)										\
+{														\
+	int		i, j, block_index, start, end;								\
+	blk_info	*blk_info_ptr;										\
+														\
+	if ((CNL)->blk_info_cnt <= BLK_INFO_ARRAY_SIZE)								\
+	{													\
+		start = 0;											\
+		end = start + (CNL)->blk_info_cnt;								\
+	} else													\
+	{													\
+		end = (CNL)->blk_info_cnt;									\
+		start = end - BLK_INFO_ARRAY_SIZE;								\
+	}													\
+	for (i = start; i < end; i++)										\
+	{													\
+		block_index = i % BLK_INFO_ARRAY_SIZE;								\
+		blk_info_ptr = &((CNL)->blk_infos[block_index]);						\
+		if (0 == blk_info_ptr->type)									\
+		{												\
+			if (0 == blk_info_ptr->info.block_update.operation)					\
+				FPRINTF(stderr, "%d: BLOCK READ", block_index);					\
+			else if (1 == blk_info_ptr->info.block_update.operation)				\
+				FPRINTF(stderr, "%d: BLOCK WRITE", block_index);				\
+		} else if (1 == blk_info_ptr->type)								\
+			FPRINTF(stderr, "%d: BLOCK RETRY", block_index);					\
+		else if (2 == blk_info_ptr->type)								\
+			FPRINTF(stderr, "%d: BLOCK ABORT", block_index);					\
+		else if (3 == blk_info_ptr->type)								\
+			FPRINTF(stderr, "%d: CRYPT UPDATE", block_index);					\
+		else if (4 == blk_info_ptr->type)								\
+			FPRINTF(stderr, "%d: CRYPT RECEIVE", block_index);					\
+		FPRINTF(stderr, " on %s in %s:", blk_info_ptr->region, blk_info_ptr->where);			\
+		FPRINTF(stderr,											\
+			"\n\tpid: %u\n"										\
+			"\tis_encrypted: %u\n"									\
+			"\tcsa_reorg_encrypt_cycle: %d\n"							\
+			"\tcnl_reorg_encrypt_cycle: %u\n"							\
+			"\tencryption_hash_cutoff: %d\n"							\
+			"\tencryption_hash2_start_tn: %ld",							\
+			blk_info_ptr->pid,									\
+			blk_info_ptr->is_encrypted,								\
+			blk_info_ptr->csa_reorg_encrypt_cycle,							\
+			blk_info_ptr->cnl_reorg_encrypt_cycle,							\
+			blk_info_ptr->encryption_hash_cutoff,							\
+			blk_info_ptr->encryption_hash2_start_tn);						\
+		FPRINTF(stderr, "\n\tencryption_hash: ");							\
+		for (j = 0; j < GTMCRYPT_HASH_LEN; j += 2)							\
+			FPRINTF(stderr, "%02X", (unsigned char)blk_info_ptr->hash[j / 2]);			\
+		FPRINTF(stderr, "\n\tencryption_hash2: ");							\
+		for (j = 0; j < GTMCRYPT_HASH_LEN; j += 2)							\
+			FPRINTF(stderr, "%02X", (unsigned char)blk_info_ptr->hash2[j / 2]);			\
+		if (0 == blk_info_ptr->type)									\
+		{												\
+			FPRINTF(stderr,										\
+				"\n\tblk_num   : %u\n"								\
+				"\toperation   : %d\n"								\
+				"\tdbtn        : 0x%llx\n"							\
+				"\tblktn       : 0x%llx\n"							\
+				"\tuse_new_key : %d\n"								\
+				"\tsubtype     : %d\n"								\
+				"\tblk_size    : %d\n"								\
+				"\tblk_encr_len: %d\n",								\
+				blk_info_ptr->info.block_update.blk_num,					\
+				blk_info_ptr->info.block_update.operation,					\
+				blk_info_ptr->info.block_update.dbtn,						\
+				blk_info_ptr->info.block_update.blktn,						\
+				blk_info_ptr->info.block_update.use_new_key,					\
+				blk_info_ptr->info.block_update.subtype,					\
+				blk_info_ptr->info.block_update.blk_size,					\
+				blk_info_ptr->info.block_update.blk_encr_len);					\
+		} else if (4 == blk_info_ptr->type)								\
+		{												\
+			FPRINTF(stderr,										\
+				"\n\tis_encrypted: %u\n"							\
+				"\treorg_encrypt_cycle: %u\n"							\
+				"\tencryption_hash_cutoff: %d",							\
+				blk_info_ptr->info.trans_update.is_encrypted,					\
+				blk_info_ptr->info.trans_update.reorg_encrypt_cycle,				\
+				blk_info_ptr->info.trans_update.encryption_hash_cutoff);			\
+			FPRINTF(stderr, "\n\thash: ");								\
+			for (j = 0; j < GTMCRYPT_HASH_LEN; j += 2)						\
+				FPRINTF(stderr, "%02X",								\
+						(unsigned char)blk_info_ptr->info.trans_update.hash[j / 2]);	\
+			FPRINTF(stderr, "\n\thash2: ");								\
+			for (j = 0; j < GTMCRYPT_HASH_LEN; j += 2)						\
+				FPRINTF(stderr, "%02X",								\
+						(unsigned char)blk_info_ptr->info.trans_update.hash2[j / 2]);	\
+			FPRINTF(stderr, "\n");									\
+		} else												\
+			FPRINTF(stderr, "\n");									\
+		FFLUSH(stderr);											\
+	}													\
+}
+
+# define DBG_RECORD_COMMON_STUFF(BLK_INFO_PTR, TYPE, CSD, CSA, CNL, PID)				\
+	blk_info *blk_info_ptr;										\
+													\
+	BLK_INFO_PTR = &((CNL)->blk_infos[(CNL)->blk_info_cnt++ % BLK_INFO_ARRAY_SIZE]);		\
+	BLK_INFO_PTR->type = TYPE;									\
+	BLK_INFO_PTR->pid = PID;									\
+	BLK_INFO_PTR->is_encrypted = (CSD)->is_encrypted;						\
+	BLK_INFO_PTR->csa_reorg_encrypt_cycle =								\
+		(NULL == (CSA)->encr_ptr) ? -1 : (CSA)->encr_ptr->reorg_encrypt_cycle;			\
+	BLK_INFO_PTR->cnl_reorg_encrypt_cycle = (CNL)->reorg_encrypt_cycle;				\
+	BLK_INFO_PTR->encryption_hash_cutoff = (CSD)->encryption_hash_cutoff;				\
+	BLK_INFO_PTR->encryption_hash2_start_tn = (CSD)->encryption_hash2_start_tn;			\
+	memcpy(BLK_INFO_PTR->hash, (CSD)->encryption_hash, GTMCRYPT_HASH_LEN);				\
+	memcpy(BLK_INFO_PTR->hash2, (CSD)->encryption_hash2, GTMCRYPT_HASH_LEN);			\
+	strcpy(BLK_INFO_PTR->where, __FILE__);								\
+	if ((NULL != (CSA)->region) && (NULL != (CSA)->region->dyn.addr))				\
+	{												\
+		memcpy(BLK_INFO_PTR->region, (char *)(CSA)->region->dyn.addr->fname,			\
+				(CSA)->region->dyn.addr->fname_len);					\
+		BLK_INFO_PTR->region[(CSA)->region->dyn.addr->fname_len] = '\0';			\
+	} else												\
+		strcpy(BLK_INFO_PTR->region, "UNKNOWN");						\
+
+# define DBG_RECORD_BLOCK_UPDATE(CSD, CSA, CNL, PID, BLK, OPER, BLKTN, SUBTYPE, NEW_KEY, PRE_BLK, POST_BLK, BLK_SIZE, BLK_ENC_LEN) \
+{														\
+	DBG_RECORD_COMMON_STUFF(blk_info_ptr, 0, CSD, CSA, CNL, PID);						\
+	blk_info_ptr->info.block_update.blk_num = BLK;								\
+	blk_info_ptr->info.block_update.operation = OPER;							\
+	blk_info_ptr->info.block_update.dbtn = CSD->trans_hist.curr_tn;						\
+	blk_info_ptr->info.block_update.blktn = BLKTN;								\
+	blk_info_ptr->info.block_update.use_new_key = NEW_KEY;							\
+	blk_info_ptr->info.block_update.subtype = SUBTYPE;							\
+	memcpy(blk_info_ptr->info.block_update.pre_block, PRE_BLK, 32);						\
+	memcpy(blk_info_ptr->info.block_update.post_block, POST_BLK, 32);					\
+	blk_info_ptr->info.block_update.blk_size = BLK_SIZE;							\
+	blk_info_ptr->info.block_update.blk_encr_len = BLK_ENC_LEN;						\
+}
+
+# define DBG_RECORD_BLOCK_READ(CSD, CSA, CNL, PID, BLK, BLKTN, SUBTYPE, NEW_KEY, PRE_BLK, POST_BLK, BLK_SIZE, BLK_ENCR_LEN)	\
+{																\
+	DBG_RECORD_BLOCK_UPDATE(CSD, CSA, CNL, PID, BLK, 0, BLKTN, SUBTYPE, NEW_KEY, PRE_BLK, POST_BLK, BLK_SIZE, BLK_ENCR_LEN);\
+}
+
+# define DBG_RECORD_BLOCK_WRITE(CSD, CSA, CNL, PID, BLK, BLKTN, SUBTYPE, NEW_KEY, PRE_BLK, POST_BLK, BLK_SIZE, BLK_ENCR_LEN)	\
+{																\
+	DBG_RECORD_BLOCK_UPDATE(CSD, CSA, CNL, PID, BLK, 1, BLKTN, SUBTYPE, NEW_KEY, PRE_BLK, POST_BLK, BLK_SIZE, BLK_ENCR_LEN);\
+}
+
+# define DBG_RECORD_BLOCK_RETRY(CSD, CSA, CNL, PID)							\
+{													\
+	DBG_RECORD_COMMON_STUFF(blk_info_ptr, 1, CSD, CSA, CNL, PID);					\
+}
+
+# define DBG_RECORD_BLOCK_ABORT(CSD, CSA, CNL, PID)							\
+{													\
+	DBG_RECORD_COMMON_STUFF(blk_info_ptr, 2, CSD, CSA, CNL, PID);					\
+}
+
+# define DBG_RECORD_CRYPT_UPDATE(CSD, CSA, CNL, PID)							\
+{													\
+	DBG_RECORD_COMMON_STUFF(blk_info_ptr, 3, CSD, CSA, CNL, PID);					\
+}
+
+# define DBG_RECORD_CRYPT_RECEIVE(CSD, CSA, CNL, PID, TRANS_INFO)					\
+{													\
+	DBG_RECORD_COMMON_STUFF(blk_info_ptr, 4, CSD, CSA, CNL, PID);					\
+	blk_info_ptr->info.trans_update.is_encrypted = TRANS_INFO->is_encrypted;			\
+	blk_info_ptr->info.trans_update.reorg_encrypt_cycle = TRANS_INFO->reorg_encrypt_cycle;		\
+	blk_info_ptr->info.trans_update.encryption_hash_cutoff = TRANS_INFO->encryption_hash_cutoff;	\
+	memcpy(blk_info_ptr->info.trans_update.hash, TRANS_INFO->encryption_hash, GTMCRYPT_HASH_LEN);	\
+	memcpy(blk_info_ptr->info.trans_update.hash2, TRANS_INFO->encryption_hash2, GTMCRYPT_HASH_LEN);	\
+}
+
+#else
+# define DBG_PRINT_BLOCK_INFOS(CNL)
+# define DBG_RECORD_BLOCK_READ(CSD, CSA, CNL, PID, BLK, BLKTN, SUBTYPE, USE_NEW_KEY, PRE_BLOCK, POST_BLOCK, BLK_SIZE, BLK_ENCR_LEN)
+# define DBG_RECORD_BLOCK_WRITE(CSD, CSA, CNL, PID, BLK, BLKTN, SUBTYPE, USE_NEW_KEY, PRE_BLOCK, POST_BLOCK, BLK_SIZE, BLK_ENCR_LEN)
+# define DBG_RECORD_BLOCK_RETRY(CSD, CSA, CNL, PID)
+# define DBG_RECORD_BLOCK_ABORT(CSD, CSA, CNL, PID)
+# define DBG_RECORD_CRYPT_UPDATE(CSD, CSA, CNL, PID)
+# define DBG_RECORD_CRYPT_RECEIVE(CSD, CSA, CNL, PID, TRANS_INFO)
+#endif
 
 /* Mapped space local to each node on the cluster */
 typedef struct node_local_struct
@@ -393,7 +598,7 @@ typedef struct node_local_struct
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
 	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
-	UNIX_ONLY(pid_t kip_pid_array[MAX_KIP_PID_SLOTS];) /* Processes actively doing kill (0 denotes empty slots) */
+	uint4		kip_pid_array[MAX_KIP_PID_SLOTS];	/* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
 					/* from info in the file header.						*/
@@ -409,7 +614,6 @@ typedef struct node_local_struct
 								 */
 	uint4		trunc_pid;			/* Operating truncate. */
 	block_id	highest_lbm_with_busy_blk;	/* Furthest lmap block known to have had a busy block during truncate. */
-#	if defined(UNIX)
 	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
 	volatile uint4	root_search_cycle;	/* incremented online rollback ends and mu_swap_root */
 	volatile uint4	onln_rlbk_cycle;	/* incremented everytime an online rollback ends */
@@ -429,8 +633,27 @@ typedef struct node_local_struct
 	boolean_t	doing_epoch;		/* set when performing an epoch */
 	uint4		epoch_taper_start_dbuffs; /* wcs_active_lvl at start of taper */
 	boolean_t	epoch_taper_need_fsync;
-	/* when needed (un)comment the line below to 8-byte align the structure on 32-bit platforms; 64s do it implicitly */
-	NON_GTM64_ONLY(int4 filler_8byte_align1;)
+	uint4		wt_pid_array[MAX_WT_PID_SLOTS];		/* Processes with active wcs_timers (0 denotes empty slots)
+								 * Note: Unreliable - For Diagnostic Purposes only
+								 */
+	uint4		reorg_encrypt_pid;	/* indicates whether a MUPIP REORG -ENCRYPT is in progress */
+	uint4		reorg_encrypt_cycle;	/* reflects the cycle of database encryption status in a series of
+						   MUPIP REORG -ENCRYPTs */
+	uint4		mupip_extract_count;	/* count of currently running MUPIP EXTRACTs; to be improved with GTM-8488 */
+	/* Below 4 values are cached from the original DB file header that created the shared memory segment. Used by DSE only */
+	enum db_acc_method      saved_acc_meth;
+	int4			saved_blk_size;
+	uint4			saved_lock_space_size;
+	int4			saved_jnl_buffer_size;
+	/* Miscellaneous flag */
+	boolean_t	lastwriterbypas_msg_issued;	/* whether a LASTWRITERBYPAS message has been once issued for this db */
+	boolean_t	first_writer_seen;	/* Has a process with read-write access to the database opened it yet */
+	boolean_t	first_nonbypas_writer_seen;	/* TRUE when first writer is seen that also does not bypass ftok/access */
+	uint4		filler_8byte_align1;
+#	ifdef GTM_CRYPT_UPDATES_REPORT
+	blk_info	blk_infos[BLK_INFO_ARRAY_SIZE];
+	uint4		blk_info_cnt;
+	int4		filler_8byte_align2;
 #	endif
 } node_local;
 
@@ -468,16 +691,7 @@ typedef struct node_local_struct
 	coidx = ++cnl->crit_ops_index;					\
 	if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
 		coidx = cnl->crit_ops_index = 0;			\
-	VMS_ONLY(							\
-		in_ast = lib$ast_in_prog();				\
-		if (!in_ast)						\
-			ast_status = sys$setast(DISABLE);		\
-		)							\
 	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
-	VMS_ONLY(							\
-		if ((!in_ast) && (SS$_WASSET == ast_status))		\
-			sys$setast(ENABLE);				\
-		)							\
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
 	cnl->crit_ops_array[coidx].curr_tn = (NULL != csa->hdr) ?	\
@@ -598,6 +812,14 @@ typedef struct node_local_struct
 #define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
 
+#define MIN_SLEEP_CNT				0		/* keep this in sync with any minseg("SLEEP_CNT) in gdeinit.m */
+#define MAX_SLEEP_CNT				E_6		/* keep this in sync with any maxseg("SLEEP_CNT") in gdeinit.m */
+#define DEFAULT_SLEEP_CNT			0		/* keep this in sync with any tmpseg("SLEEP_CNT") in gdeget.m */
+#define SLEEP_SPIN_CNT(CSD)			(CSD)->mutex_spin_parms.mutex_sleep_spin_count
+#define MIN_SPIN_SLEEP				0		/* keep this in sync with gdeinit.m minseg("SPIN_SLEEP_LIMIT") */
+#define MAX_SPIN_SLEEP				E_9		/* keep this in sync with gdeinit.m maxseg("SPIN_SLEEP_LIMIT") */
+#define DEFAULT_SPIN_SLEEP			0		/* keep this in sync with gdeget.m tmpseg("SPIN_SLEEP_LIMIT") */
+#define SPIN_SLEEP_MASK(CSD)			(CSD)->mutex_spin_parms.mutex_spin_sleep_mask
 #define MIN_CRIT_ENTRY				64		/* keep this in sync with gdeinit.m minseg("MUTEX_SLOTS") */
 #define MAX_CRIT_ENTRY				32768		/* keep this in sync with gdeinit.m maxseg("MUTEX_SLOTS") */
 #define DEFAULT_NUM_CRIT_ENTRY			1024		/* keep this in sync with gdeget.m tmpseg("MUTEX_SLOTS") */
@@ -629,7 +851,7 @@ typedef struct node_local_struct
 #define EPOCH_TAPER_JNL_PCT_DEFAULT 13
 
 #define EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET)					\
-{																\
+MBSTART	{															\
 	jnl_tm_t		now;												\
 	uint4			epoch_vector, jnl_autoswitchlimit, jnl_space_remaining, jnl_space_taper_interval;		\
 	uint4			next_epoch_time, relative_overall_taper, relative_space_taper, relative_time_taper;		\
@@ -646,7 +868,7 @@ typedef struct node_local_struct
 		time_remaining = next_epoch_time - now;										\
 		/* taper during last epoch_taper_time_pct of interval */							\
 		time_taper_interval = etjb->epoch_interval * CSD->epoch_taper_time_pct / 128;					\
-		if (time_remaining < time_taper_interval)									\
+		if ((0 <= time_remaining) && (time_remaining < time_taper_interval))						\
 			relative_time_taper = MAX(MIN(129 - ((time_remaining * 128) / time_taper_interval), 128), 0);		\
 	}															\
 	/* Determine if we are in the journal autoswitch (space-based) epoch taper) */						\
@@ -662,7 +884,7 @@ typedef struct node_local_struct
 		/* This starting point only needs to be approximate so no locking is needed */					\
 		if (0 == CNL->epoch_taper_start_dbuffs)										\
 			CNL->epoch_taper_start_dbuffs = CNL->wcs_active_lvl;							\
-		tmp_epoch_taper_start_dbuffs = CNL->epoch_taper_start_dbuffs; /* get same value for all calculations */		\
+		tmp_epoch_taper_start_dbuffs = MAX(1,CNL->epoch_taper_start_dbuffs); /* stable value for all calculations */	\
 		if ((relative_overall_taper > 64) && (relative_overall_taper < 96)) 						\
 			CNL->epoch_taper_need_fsync = TRUE;									\
 		if (DO_FSYNC && (relative_overall_taper > 75) && CNL->epoch_taper_need_fsync)					\
@@ -672,14 +894,14 @@ typedef struct node_local_struct
 		}														\
 		FLUSH_TARGET = MIN(tmp_epoch_taper_start_dbuffs, MAX(1,(tmp_epoch_taper_start_dbuffs *				\
 				(129 - relative_overall_taper)) / 128));							\
-		if (CNL->wcs_active_lvl > flush_target)										\
+		if (CNL->wcs_active_lvl > FLUSH_TARGET)										\
 		{														\
 			if (relative_overall_taper > 96)									\
 				epoch_vector =											\
-					(((CNL->wcs_active_lvl - flush_target) * 128 / flush_target) > 64) ? ETFAST : ETQUICK;	\
+					(((CNL->wcs_active_lvl - FLUSH_TARGET) * 128 / FLUSH_TARGET) > 64) ? ETFAST : ETQUICK;	\
 			else if (relative_overall_taper > 64)									\
 				epoch_vector =											\
-					(((CNL->wcs_active_lvl - flush_target) * 128 / flush_target) > 64) ? ETQUICK : ETSLOW;	\
+					(((CNL->wcs_active_lvl - FLUSH_TARGET) * 128 / FLUSH_TARGET) > 64) ? ETQUICK : ETSLOW;	\
 			else													\
 				epoch_vector = (relative_overall_taper > 32) ? ETSLOW : ETGENTLE;				\
 			BUFFS_PER_FLUSH = CSD->n_wrt_per_flu * epoch_vector;							\
@@ -690,7 +912,7 @@ typedef struct node_local_struct
 		CNL->epoch_taper_start_dbuffs = 0;										\
 		CNL->epoch_taper_need_fsync = FALSE;										\
 	}															\
-}
+} MBEND
 
 /* Define pointer types for above structures that may be in shared memory and need 64
    bit pointers. */

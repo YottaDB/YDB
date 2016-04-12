@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -492,6 +493,15 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
 	(LV)->sbs_child = (lvTree *)sym->lvtreenode_flist;				\
 	sym->lvtreenode_flist = LV;							\
 }
+
+#ifdef UNIX
+/* job command needs to send the local variables to the child */
+#define MIDCHILD_SEND_VAR			\
+{						\
+	if (TREF(midchild_send_locals))		\
+		ojmidchild_send_var();		\
+}
+#endif
 
 unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
 lv_val		*lv_getslot(symval *sym);

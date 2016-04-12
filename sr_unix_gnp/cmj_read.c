@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,15 +22,15 @@
 #define NUM_IOVECS_BOTH	2
 #define NUM_IOVECS_DATA	1
 
+error_def(CMI_DCNINPROG);
+error_def(CMI_LNKNOTIDLE);
+error_def(CMI_OVERRUN);
+
 cmi_status_t cmj_read_start(struct CLB *lnk)
 {
-	struct NTD *tsk = lnk->ntd;
 	cmi_status_t status = SS_NORMAL;
 	int save_errno;
         ssize_t rval;
-	error_def(CMI_DCNINPROG);
-	error_def(CMI_LNKNOTIDLE);
-	error_def(CMI_OVERRUN);
 
 	if (-1 == lnk->mun)
 		return ENOTCONN;
@@ -114,7 +115,6 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 {
 	ssize_t rval;
 	cmi_status_t status = SS_NORMAL;
-	error_def(CMI_OVERRUN);
 	char peekchar;
 	struct iovec vec[NUM_IOVECS];
 	struct msghdr msg;

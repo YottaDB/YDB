@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +74,7 @@ int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_typ
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
 	replreg = jnlpool.jnlpool_dummy_reg;
 	DEBUG_ONLY(udi = FILE_INFO(jnlpool.jnlpool_dummy_reg));

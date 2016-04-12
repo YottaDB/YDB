@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +66,8 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		pool_init;
 
+error_def(ERR_SYSCALL);
+
 int gtmrecv_endupd(void)
 {
 	pid_t 		savepid;
@@ -73,6 +76,11 @@ int gtmrecv_endupd(void)
 
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down of Update Process\n");
 	recvpool.upd_proc_local->upd_proc_shutdown = SHUTDOWN;
+	/* Signal the update process to check for the update. */
+	PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	/* Wait for update process to shut down */
 	while((SHUTDOWN == recvpool.upd_proc_local->upd_proc_shutdown)
 		&& (0 < (savepid = (pid_t)recvpool.upd_proc_local->upd_proc_pid)) && is_proc_alive(savepid, 0))

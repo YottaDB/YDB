@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,7 +117,6 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 		status = read_block(gv_target->root, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal != status)
 		{
-			assert(CDB_STAGNATE > t_tries);
 			t_retry(status);
 			continue;
 		}
@@ -227,10 +227,7 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				continue;	/* skip these guys, we've already counted over there */
 			status = read_block(nBlkId, &child_pBlkBase, &child_nLevl, lvl - 1);
 			if (status != cdb_sc_normal)
-			{
-				assert(CDB_STAGNATE > t_tries);
 				return status;
-			}
 			last_rec = ((pRec + nRecLen) == pTop);
 			first_iter = (curroff == saveoff[lvl]);
 			next_endtree = endtree && last_rec;

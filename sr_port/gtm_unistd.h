@@ -17,8 +17,20 @@
 #include <unistd.h>
 
 #define CHDIR		chdir
-
 #define CHOWN		chown
+
+/* Usual convention is to uppercase the system function in the GT.M macro wrapper. But in this case, we want to macro-wrap
+ * the _exit() function. _EXIT is ruled out because names starting with _ are reserved for system functions.
+ * Hence naming it UNDERSCORE_EXIT instead.
+ */
+#define	UNDERSCORE_EXIT(x)											\
+MBSTART {													\
+	char	*rname;												\
+														\
+	/* Currently we dont know of any caller of UNDERSCORE_EXIT inside threaded code. So add below assert */	\
+	assert(!INSIDE_THREADED_CODE(rname));	/* Below code is not thread safe as it does exit() */		\
+	_exit(x);												\
+} MBEND
 
 #define	INVALID_UID	(uid_t)-1
 #define	INVALID_GID	(gid_t)-1
@@ -48,11 +60,13 @@ GBLREF	gid_t	group_id, effective_group_id;
 
 #define GTM_MAX_DIR_LEN		(PATH_MAX + 1) /* DIRECTORY + terminating '\0' */
 
-#define GETCWD(buffer, size, getcwd_res)			\
-{								\
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC);		\
-	getcwd_res = getcwd(buffer, size);			\
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC);		\
+#define GETCWD(buffer, size, getcwd_res)					\
+{										\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
+	getcwd_res = getcwd(buffer, size);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 }
 
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +71,7 @@ void		util_out_syslog_dump(void);
  */
 #define SAVE_UTIL_OUT_BUFFER(UTIL_OUT_SAVE_PTR, VA_LIST_SAVE_PTR, COPY_SAVED)		\
 {											\
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;						\
 	if (TREF(util_outbuff_ptr) < (TADR(util_outbuff) + 				\
 	    OUT_BUFF_SIZE * (UTIL_OUTBUFF_STACK_SIZE - 1)))				\
 	{										\
@@ -88,6 +90,7 @@ void		util_out_syslog_dump(void);
  */
 #define RESTORE_UTIL_OUT_BUFFER(UTIL_OUT_SAVE_PTR, VA_LIST_SAVE_PTR, COPY_SAVED)	\
 {											\
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;						\
 	if (COPY_SAVED)									\
 	{										\
 		assert(TREF(util_outbuff_ptr) > TADR(util_outbuff));			\

@@ -277,7 +277,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				}
 				gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC);
 				/* Attempt to create the relinkctl file with desired permissions. */
-				fd = OPEN3(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm);
+				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
 				obtained_perms = TRUE;
 			}
 		} else
@@ -287,7 +287,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 		if ((!obtained_perms) || ((FD_INVALID == fd) && (errno == EEXIST)))
 		{
 			rctl_existed = TRUE;
-			fd = OPEN(linkctl->relinkctl_path, O_RDWR);
+			OPEN_CLOEXEC(linkctl->relinkctl_path, O_RDWR, fd);
 		} else
 			rctl_existed = FALSE;
 		if (FD_INVALID == fd)

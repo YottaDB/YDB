@@ -13,8 +13,8 @@
 #
 # mval_def.si
 #
-#	This is an include file for x86-64 assembler routines containing
-#	the macros for mval-related actions.
+# This is an include file for x86-64 assembler routines containing
+# the macros for mval-related actions.
 #
 
 mval_v_nm		=	0
@@ -43,7 +43,7 @@ mval_m_aliascont	=	0x200
 mval_byte_len		=	32	#	Length of mval in bytes
 
 #
-#	Offsets of type, exp, strlen, stradd, num in mval structure
+# Offsets of type, exp, strlen, stradd, num in mval structure
 #
 mval_w_mvtype		=	0
 mval_b_exp		=	2
@@ -51,11 +51,12 @@ mval_l_strlen		=	20
 mval_a_straddr		=	24
 
 #
-#	Address offset of number in mval
+# Address offset of number in mval
 #
-mvalnm_offs		=	4
-mval_l_m0		=	4
-mval_l_m1		=	8
+mvalnm_offs		=	8
+mval_l_m0		=	8
+mval_l_m1		=	12
+
 mval_esign_mask		=	0x080
 
 MV_BIAS			=	1000		# 10**3
@@ -64,7 +65,7 @@ MANT_HI			=	1000000000	# 10**9
 INT_HI			=	1000000		# 10**6
 
 #
-#	Stringpool structure offsets
+# Stringpool structure offsets
 #
 base			=	0
 free			=	8

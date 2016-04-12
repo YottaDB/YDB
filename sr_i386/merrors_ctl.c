@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ LITDEF	err_msg merrors[] = {
 	"DEVPARMNEG", "Deviceparameter must be a positive value", 0,
 	"DSEBLKRDFAIL", "Failed attempt to read block", 0,
 	"DSEFAIL", "DSE failed.  Failure code: !AD.", 2,
-	"NOTALLREPLON", "Replication state is not on for all regions", 0,
+	"NOTALLREPLON", "Replication off for !AD regions", 2,
 	"BADLKIPARAM", "!AD is not a legal parameter for $ZGETLKI()", 2,
 	"JNLREADBOF", "Beginning of journal file encountered for !AD", 2,
 	"DVIKEYBAD", "$ZGETDVI(\"!AD\",\"!AD\") contains an illegal keyword", 4,
@@ -403,8 +403,8 @@ LITDEF	err_msg merrors[] = {
 	"CCECCPPID", "The cluster control program has PID 0x!XL", 1,
 	"CCECLSTPRCS", "!UL processes are accessing clustered database files", 1,
 	"ZSHOWBADFUNC", "An illegal function was specified for ZSHOW", 0,
-	"NOTALLJNLEN", "Journaling not enabled and on for all regions", 0,
-	"ZSHOWGLOSMALL", "Global output variable is too small for ZSHOW output", 0,
+	"NOTALLJNLEN", "Journaling disabled/off for !AD regions", 2,
+	"UNUSEDMSG570", "ZSHOWGLOSMALL last used in V6.2-002A", 0,
 	"NOLBRSRC", "Object libraries cannot have SRC paths associated", 0,
 	"INVZSTEP", "Invalid ZSTEP qualifier", 0,
 	"ZSTEPARG", "ZSTEP argument expected", 0,
@@ -504,7 +504,7 @@ LITDEF	err_msg merrors[] = {
 	"CETOOLONG", "Compiler escape substitution exceeds maximum line size", 0,
 	"CENOINDIR", "Indirection type information not available for compiler escape feature", 0,
 	"COLLATIONUNDEF", "Collation type !UL is not defined", 1,
-	"RBWRNNOTCHG", "Not all specified database files were changed", 0,
+	"UNUSEDMSG670", "RBWRNNOTCHG last used in V6.2-002A", 0,
 	"GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed (retry = !UL)", 4,
 	"FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0,
 	"JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2,
@@ -512,8 +512,8 @@ LITDEF	err_msg merrors[] = {
 	"NOPRINCIO", "Unable to write to principal device", 0,
 	"INVPORTSPEC", "Invalid port specification", 0,
 	"INVADDRSPEC", "Invalid IP address specification", 0,
-	"UNUSEDMSG678", "SOCKPARMREQ last used in V6.0-002", 0,
-	"UNUSEDMSG679", "IPADDRREQ last used in V6.0-002", 0,
+	"MUREENCRYPTEND", "Database !AD : MUPIP REORG ENCRYPT finished by pid !UL at transaction number [0x!16@XQ]", 4,
+	"CRYPTJNLMISMATCH", "Encryption settings mismatch between journal file !AD and corresponding database file !AD", 4,
 	"SOCKWAIT", "Error waiting for socket connection", 0,
 	"SOCKACPT", "Error accepting socket connection", 0,
 	"SOCKINIT", "Error initializing socket: (errno == !UL) !AD", 3,
@@ -734,7 +734,7 @@ LITDEF	err_msg merrors[] = {
 	"MUINFOUINT4", "!AD : !UL [0x!XL]", 4,
 	"NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4,
 	"RELINKCTLFULL", "Relinkctl file for directory !AD is full (maximum entries !UL)", 3,
-	"UNUSEDMSG900", "GTMSECSHRDEFLOG last used in V5.5-000", 0,
+	"MUPIPSET2BIG", "!UL too large, maximum !AD allowed is !UL", 4,
 	"DBBADNSUB", "!AD Bad numeric subscript", 2,
 	"DBBADKYNM", "!AD Bad key name", 2,
 	"DBBADPNTR", "!AD Bad pointer value in directory", 2,
@@ -785,7 +785,7 @@ LITDEF	err_msg merrors[] = {
 	"DBMBPFRINT", "!AD Master bit map shows this map has space, agreeing with MUPIP INTEG", 2,
 	"DBMAXKEYEXC", "!AD Maximum key size for database exceeds design maximum", 2,
 	"DBMXRSEXCMIN", "!AD Maximum record size for database is less than the design minimum", 2,
-	"UNUSEDMSG951", "DBMAXRSEXBL : Last used in V5.5-000", 0,
+	"MUPIPSET2SML", "!UL too small, minimum !AD allowed is !UL", 4,
 	"DBREADBM", "!AD Read error on bitmap", 2,
 	"DBCOMPTOOLRG", "!AD Record has too large compression count", 2,
 	"DBVERPERFWARN2", "Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance", 2,
@@ -1020,9 +1020,9 @@ LITDEF	err_msg merrors[] = {
 	"JNLALIGNTOOSM", "Alignsize !UL (bytes) is too small for a block size of !UL (bytes) for !AD !AD.  Using alignsize of !UL (bytes) instead.", 7,
 	"JNLFILEOPNERR", "Error opening journal file !AD", 2,
 	"JNLFILECLOSERR", "Error closing journal file !AD", 2,
-	"REPLSTATEOFF", "ROLLBACK cannot proceed as database !AD does not have replication ON", 2,
+	"REPLSTATEOFF", "MUPIP JOURNAL -ROLLBACK -BACKWARD cannot proceed as database !AD does not have replication ON", 2,
 	"MUJNLPREVGEN", "Previous generation journal file !AD included for database file !AD", 4,
-	"MUPJNLINTERRUPT", "Database file !AD indicates interrupted MUPIP JOURNAL command.  Restore from backup for forward recovery.", 2,
+	"MUPJNLINTERRUPT", "Database file !AD indicates interrupted MUPIP JOURNAL command.  Restore from backup for forward recover/rollback.", 2,
 	"ROLLBKINTERRUPT", "Database file !AD indicates interrupted ROLLBACK.  Reissue the MUPIP JOURNAL ROLLBACK command.", 2,
 	"RLBKJNSEQ", "Journal seqno of the instance after rollback is !@ZQ [0x!16@XQ]", 2,
 	"REPLRECFMT", "Replication journal record format error encountered", 0,
@@ -1150,11 +1150,11 @@ LITDEF	err_msg merrors[] = {
 	"CRYPTDLNOOPEN", "Could not load encryption library while opening encrypted file !AD. !AD", 4,
 	"CRYPTNOV4", "!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.", 2,
 	"CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2,
-	"CRYPTJNLWRONGHASH", "Encryption key hash mismatch between journal file !AD and corresponding database file !AD", 4,
+	"UNUSEDMSG1316", "Last used in V6.2-002A", 0,
 	"CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4,
 	"CRYPTKEYFETCHFAILEDNF", "Could not retrieve encryption key during !AD operation key. !AD", 4,
 	"CRYPTHASHGENFAILED", "Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD", 4,
-	"UNUSEDMSG1320", "CRYPTNOPSWDINTP : Last used in V6.0-003", 0,
+	"CRYPTNOKEY", "No encryption key specified", 0,
 	"BADTAG", "Unable to use file !AD (CCSID !UL) with CCSID !UL", 4,
 	"ICUVERLT36", "!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used", 4,
 	"ICUSYMNOTFOUND", "Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified", 2,
@@ -1423,8 +1423,8 @@ LITDEF	err_msg merrors[] = {
 	"TLSPARAM", "TLS parameter !AD !AD", 4,
 	"RLNKRECLATCH", "Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD", 3,
 	"RLNKSHMLATCH", "Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD", 2,
-	"JOBLVN2LONG", "The zwrite representation of a local variable transferred to a JOB'd process is too long. Please check the output of the JOB'd process for more details", 0,
-	"JOBLVNDETAIL", "The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL", 2,
+	"JOBLVN2LONG", "The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL", 2,
+	"NLRESTORE", "DB file header field !AD: !UL does not match the value used in original mapping - restoring to: !UL", 4,
 	"PREALLOCATEFAIL", "Disk space reservation for !AD segment has failed", 2,
 	"NODFRALLOCSUPP", "The NODEFER_ALLOCATE qualifier is not allowed on this operating system. Not changing the defer allocation flag", 0,
 	"LASTWRITERBYPAS", "The last writer for database file !AD bypassed the rundown", 2,
@@ -1435,6 +1435,23 @@ LITDEF	err_msg merrors[] = {
 	"INVTMPDIR", "Value or default for $gtm_tmp is either not found or not a directory (!AD) - Reverting to default value", 2,
 	"ARCTLMAXHIGH", "The environment variable !AD = !UL is too high. Assuming the maximum acceptable value of !UL", 4,
 	"ARCTLMAXLOW", "The environment variable !AD = !UL is too low. Assuming the minimum acceptable value of !UL", 4,
+	"NONTPRESTART", "Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; blklvl: !UL, type: !UL, zpos: !AD", 11,
+	"PBNPARMREQ", "A first parameter value !AD requires a second parameter specified containing !AD", 4,
+	"PBNNOPARM", "First parameter !AD does not support a second parameter", 2,
+	"PBNUNSUPSTRUCT", "$ZPEEK() does not support structure !AD", 2,
+	"PBNINVALID", "!AD does not have a field named !AD", 4,
+	"PBNNOFIELD", "%ZPEEKBYNAME() requires a field.item as its first parameter", 0,
+	"JNLDBSEQNOMATCH", "Journal file !AD has beginning region sequence number [0x!16@XQ], but database !AD has region sequence number [0x!16@XQ]", 6,
+	"MULTIPROCLATCH", "Failed to get multi-process latch at !AD", 2,
+	"INVLOCALE", "Attempt to reset locale to supplied value of $gtm_locale (!AD) failed", 2,
+	"NOMORESEMCNT", "!AD counter semaphore has reached its maximum and stopped counting for !AZ !AD. Run MUPIP JOURNAL -ROLLBACK -BACKWARD, MUPIP JOURNAL -RECOVER -BACKWARD or MUPIP RUNDOWN to restore the database files and shared resources to a clean state", 5,
+	"SETQUALPROB", "Error getting !AD qualifier value", 2,
+	"EXTRINTEGRITY", "Database !AD potentially contains spanning nodes or data encrypted with two different keys", 2,
+	"CRYPTKEYRELEASEFAILED", "Could not safely release encryption key corresponding to file !AD. !AD", 4,
+	"MUREENCRYPTSTART", "Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]", 4,
+	"MUREENCRYPTV4NOALLOW", "Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks", 2,
+	"ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6,
+	"JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.", 3,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1828,7 +1845,7 @@ LITDEF	int ERR_CCECCPPID = 150375459;
 LITDEF	int ERR_CCECLSTPRCS = 150375467;
 LITDEF	int ERR_ZSHOWBADFUNC = 150375474;
 LITDEF	int ERR_NOTALLJNLEN = 150375480;
-LITDEF	int ERR_ZSHOWGLOSMALL = 150375490;
+LITDEF	int ERR_UNUSEDMSG570 = 150375490;
 LITDEF	int ERR_NOLBRSRC = 150375498;
 LITDEF	int ERR_INVZSTEP = 150375506;
 LITDEF	int ERR_ZSTEPARG = 150375514;
@@ -1928,7 +1945,7 @@ LITDEF	int ERR_CEBIGSKIP = 150376258;
 LITDEF	int ERR_CETOOLONG = 150376266;
 LITDEF	int ERR_CENOINDIR = 150376274;
 LITDEF	int ERR_COLLATIONUNDEF = 150376282;
-LITDEF	int ERR_RBWRNNOTCHG = 150376288;
+LITDEF	int ERR_UNUSEDMSG670 = 150376290;
 LITDEF	int ERR_GTMSECSHRSRVF = 150376298;
 LITDEF	int ERR_FREEZECTRL = 150376307;
 LITDEF	int ERR_JNLFLUSH = 150376315;
@@ -1936,8 +1953,8 @@ LITDEF	int ERR_CCPSIGDMP = 150376323;
 LITDEF	int ERR_NOPRINCIO = 150376332;
 LITDEF	int ERR_INVPORTSPEC = 150376338;
 LITDEF	int ERR_INVADDRSPEC = 150376346;
-LITDEF	int ERR_UNUSEDMSG678 = 150376354;
-LITDEF	int ERR_UNUSEDMSG679 = 150376362;
+LITDEF	int ERR_MUREENCRYPTEND = 150376355;
+LITDEF	int ERR_CRYPTJNLMISMATCH = 150376362;
 LITDEF	int ERR_SOCKWAIT = 150376370;
 LITDEF	int ERR_SOCKACPT = 150376378;
 LITDEF	int ERR_SOCKINIT = 150376386;
@@ -2158,7 +2175,7 @@ LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
 LITDEF	int ERR_RELINKCTLFULL = 150378122;
-LITDEF	int ERR_UNUSEDMSG900 = 150378131;
+LITDEF	int ERR_MUPIPSET2BIG = 150378128;
 LITDEF	int ERR_DBBADNSUB = 150378138;
 LITDEF	int ERR_DBBADKYNM = 150378146;
 LITDEF	int ERR_DBBADPNTR = 150378154;
@@ -2209,7 +2226,7 @@ LITDEF	int ERR_DBMBPFRDLBM = 150378504;
 LITDEF	int ERR_DBMBPFRINT = 150378512;
 LITDEF	int ERR_DBMAXKEYEXC = 150378522;
 LITDEF	int ERR_DBMXRSEXCMIN = 150378530;
-LITDEF	int ERR_UNUSEDMSG951 = 150378538;
+LITDEF	int ERR_MUPIPSET2SML = 150378536;
 LITDEF	int ERR_DBREADBM = 150378546;
 LITDEF	int ERR_DBCOMPTOOLRG = 150378554;
 LITDEF	int ERR_DBVERPERFWARN2 = 150378560;
@@ -2574,11 +2591,11 @@ LITDEF	int ERR_CRYPTOPFAILED = 150381426;
 LITDEF	int ERR_CRYPTDLNOOPEN = 150381434;
 LITDEF	int ERR_CRYPTNOV4 = 150381442;
 LITDEF	int ERR_CRYPTNOMM = 150381450;
-LITDEF	int ERR_CRYPTJNLWRONGHASH = 150381458;
+LITDEF	int ERR_UNUSEDMSG1316 = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 150381466;
 LITDEF	int ERR_CRYPTKEYFETCHFAILEDNF = 150381474;
 LITDEF	int ERR_CRYPTHASHGENFAILED = 150381482;
-LITDEF	int ERR_UNUSEDMSG1320 = 150381490;
+LITDEF	int ERR_CRYPTNOKEY = 150381490;
 LITDEF	int ERR_BADTAG = 150381498;
 LITDEF	int ERR_ICUVERLT36 = 150381506;
 LITDEF	int ERR_ICUSYMNOTFOUND = 150381514;
@@ -2848,7 +2865,7 @@ LITDEF	int ERR_TLSPARAM = 150383618;
 LITDEF	int ERR_RLNKRECLATCH = 150383626;
 LITDEF	int ERR_RLNKSHMLATCH = 150383634;
 LITDEF	int ERR_JOBLVN2LONG = 150383642;
-LITDEF	int ERR_JOBLVNDETAIL = 150383650;
+LITDEF	int ERR_NLRESTORE = 150383648;
 LITDEF	int ERR_PREALLOCATEFAIL = 150383658;
 LITDEF	int ERR_NODFRALLOCSUPP = 150383664;
 LITDEF	int ERR_LASTWRITERBYPAS = 150383672;
@@ -2859,9 +2876,26 @@ LITDEF	int ERR_INVZBREAK = 150383706;
 LITDEF	int ERR_INVTMPDIR = 150383714;
 LITDEF	int ERR_ARCTLMAXHIGH = 150383720;
 LITDEF	int ERR_ARCTLMAXLOW = 150383728;
+LITDEF	int ERR_NONTPRESTART = 150383739;
+LITDEF	int ERR_PBNPARMREQ = 150383746;
+LITDEF	int ERR_PBNNOPARM = 150383754;
+LITDEF	int ERR_PBNUNSUPSTRUCT = 150383762;
+LITDEF	int ERR_PBNINVALID = 150383770;
+LITDEF	int ERR_PBNNOFIELD = 150383778;
+LITDEF	int ERR_JNLDBSEQNOMATCH = 150383786;
+LITDEF	int ERR_MULTIPROCLATCH = 150383794;
+LITDEF	int ERR_INVLOCALE = 150383802;
+LITDEF	int ERR_NOMORESEMCNT = 150383811;
+LITDEF	int ERR_SETQUALPROB = 150383818;
+LITDEF	int ERR_EXTRINTEGRITY = 150383826;
+LITDEF	int ERR_CRYPTKEYRELEASEFAILED = 150383834;
+LITDEF	int ERR_MUREENCRYPTSTART = 150383843;
+LITDEF	int ERR_MUREENCRYPTV4NOALLOW = 150383850;
+LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
+LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1422};
+	1439};

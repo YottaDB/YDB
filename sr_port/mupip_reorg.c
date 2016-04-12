@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,7 @@
 #include "gtmmsg.h"
 #include "mu_getlst.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
+#include "mupip_reorg_encrypt.h"
 
 error_def(ERR_CONCURTRUNCINPROG);
 error_def(ERR_DBRDONLY);
@@ -99,6 +100,9 @@ GBLREF inctn_opcode_t	inctn_opcode;
 #ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
 #endif
+
+static readonly mval literal_poollimit =
+	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("POOLLIMIT") - 1), "POOLLIMIT", 0, 0);
 void mupip_reorg(void)
 {
 	boolean_t		resume, reorg_success = TRUE;
@@ -107,6 +111,7 @@ void mupip_reorg(void)
 	char			cli_buff[MAX_LINE], *ptr;
 	glist			gl_head, exclude_gl_head, *gl_ptr, hasht_gl;
 	uint4			cli_status;
+	mval			reg_nam_mval = DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF(MAX_RN_LEN), 0, 0, 0);
 	unsigned short		n_len;
 	boolean_t		truncate, cur_success, restrict_reg, arg_present;
 	int			root_swap_statistic;
@@ -133,11 +138,16 @@ void mupip_reorg(void)
 	)
 
 	if ((CLI_PRESENT == cli_present("UPGRADE")) || (CLI_PRESENT == cli_present("DOWNGRADE")))
-	{
-		/* note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG UPGRADE/DOWNGRADE.
-		 * this is intentional because we are not doing any REORG kind of processing.
+	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -UPGRADE/DOWNGRADE.
+		 * This is intentional because we are not doing any REORG kind of processing.
 		 */
 		mu_reorg_upgrd_dwngrd();
+		mupip_exit(SS_NORMAL);	/* does not return */
+	} else if (CLI_PRESENT == cli_present("ENCRYPT"))
+	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -ENCRYPT.
+		 * This is intentional because we are not doing any REORG kind of processing.
+		 */
+		mupip_reorg_encrypt();
 		mupip_exit(SS_NORMAL);	/* does not return */
 	}
 	grlist = NULL;
@@ -254,6 +264,21 @@ void mupip_reorg(void)
 	reorg_gv_target->alt_hist->depth = 0;
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
+		/* mu_reorg_process can't be set before gv_select above as the assert(!mu_reorg_process) fails in gvcst_search.
+		 * The option to set mu_reorg_process before calling gv_select and clearing it after being used in gvcst_init,
+		 *  can't be taken up as gvcst_init is called multiple times, once for each region.
+		 * This means gvcst_init() doesn't set csa->gbuff and we need to set csa->gbuff_limit explicitly now. */
+		if (0 == (TREF(gbuff_limit)).str.len)
+		{
+			(TREF(gbuff_limit)).str.len = SIZEOF(REORG_GBUFF_LIMIT);
+			(TREF(gbuff_limit)).str.addr = malloc(SIZEOF(REORG_GBUFF_LIMIT));
+			memcpy((TREF(gbuff_limit)).str.addr, REORG_GBUFF_LIMIT, SIZEOF(REORG_GBUFF_LIMIT));
+		}
+		reg_nam_mval.str.len = gv_cur_region->rname_len;
+		reg_nam_mval.str.addr = (char *)&gv_cur_region->rname;
+		op_view(VARLSTCNT(3) &literal_poollimit, &reg_nam_mval, &(TREF(gbuff_limit)));
+		if (WBTEST_ENABLED(WBTEST_REORG_DEBUG))
+			util_out_print("GTMPOOLLIMIT used for mupip reorg : !UL", TRUE, cs_addrs->gbuff_limit);
 		util_out_print("   ", FLUSH);
 		util_out_print("Global: !AD (region !AD)", FLUSH, GNAME(gl_ptr).len, GNAME(gl_ptr).addr, REG_LEN_STR(gl_ptr->reg));
 		if (in_exclude_list((unsigned char *)GNAME(gl_ptr).addr, GNAME(gl_ptr).len, &exclude_gl_head))
@@ -325,6 +350,7 @@ void mupip_reorg(void)
 	}
 	if (!reorg_success)
 	{
+		inctn_opcode = inctn_invalid_op;	/* needed by assert inside "preemptive_db_clnup" called by rts_error */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGINC);
 		mupip_exit(ERR_REORGINC);
 	}

@@ -83,9 +83,17 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory
     # Note that if UTF-8 mode cannot be properly set, GT.M remains configured for M mode
     # default $LC_CTYPE if not set
+    # depending on the list of locales configured, locale -a might be considered a binary output.
+    # grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
+    os=`uname -s`
+    if [ $os = "Linux" ]; then
+    	binaryopt="-a"
+    else
+    	binaryopt=""
+    fi
     if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 ] ; then
     	if [ -z "$LC_CTYPE" ] ; then
-    		LC_CTYPE=`locale -a | grep -iE '\.utf.?8$' | head -n1` ; export LC_CTYPE
+    		LC_CTYPE=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1` ; export LC_CTYPE
     	fi
     	echo $LC_CTYPE | grep -i .utf > /dev/null
     	if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then

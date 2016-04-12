@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +65,7 @@ GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	uint4			process_id;
 GBLREF	tp_region		*grlist;
+GBLREF	boolean_t		mu_reorg_process;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -192,7 +194,9 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = ERR_MUNOFINISH;
 			continue;
 		}
+		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
 		gvcst_init(reg);
+		mu_reorg_process = FALSE;
 		assert(update_array != NULL);
 		/* access method stored in global directory and database file header might be different in which case
 		 * the database setting prevails. therefore, the access method check can be done only after opening
@@ -205,11 +209,10 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = ERR_MUNOFINISH;
 			continue;
 		}
-		if (reg->was_open)	/* Already open under another name.  Region will not be marked open */
-		{
-			reg->open = FALSE;
-			continue;
-		}
+		/* The mu_getlst call above uses insert_region to create the grlist, which ensures that duplicate regions mapping to
+		 * the same db file correspond to only one grlist entry.
+		 */
+		assert(FALSE == reg->was_open);
 		TP_CHANGE_REG(reg);	/* sets gv_cur_region, cs_addrs, cs_data */
 		csa = cs_addrs;
 		csd = cs_data;
@@ -321,7 +324,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			assert(!csa->now_crit);
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
 			reorg_stats.blks_read_from_disk_bmp++;
-			grab_crit(reg);
+			grab_crit_encr_cycle_sync(reg); /* needed so t_qread does not return NULL below */
 			if (mu_reorg_upgrd_dwngrd_start_tn != csd->desired_db_format_tn)
 			{	/* csd->desired_db_format changed since reorg started. discontinue the reorg */
 				/* see later comment on "csd->reorg_upgrd_dwngrd_restart_block" for why the assignment
@@ -537,12 +540,12 @@ void	mu_reorg_upgrd_dwngrd(void)
 								t_write(blkhist, (unsigned char *)bs1, 0, 0,
 									((blk_hdr_ptr_t)blkBase)->levl, FALSE,
 									FALSE, GDS_WRITE_PLAIN);
-								/* The tree_status for now is only used to determin whether writing
-								 * the block to snapshot file.  * (see t_end_ops.c).
+								/* The directory tree status for now is only used to determine
+								 * whether writing the block to snapshot file (see t_end_sysops.c).
  								 * For reorg upgrade/downgrade process, the block is updated in a
-								 * sequential way without changing the gv_target. In this case,
-								 * we assume the block is in directory tree so as to have
-								 * it written to the snapshot file
+								 * sequential way without changing the gv_target. In this case, we
+								 * assume the block is in directory tree so as to have it written to
+								 * the snapshot file.
 			 					 */
 								BIT_SET_DIR_TREE(cw_set[cw_set_depth-1].blk_prior_state);
 								/* reset update_trans in case previous retry had set it to 0 */

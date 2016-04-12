@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,13 +30,7 @@
 
 #include "mdef.h"
 
-#ifdef	VMS
-#include <rms>
-#endif
-
-#ifdef UNIX
 #include "gtm_ipc.h"		/* needed for FTOK */
-#endif
 
 #include "gtm_string.h"
 #include "gdsroot.h"
@@ -69,18 +64,13 @@ tp_region	*insert_region(	gd_region	*reg,
 		   		tp_region	**reg_free_list,
 		   		int4		size)
 {
+	boolean_t	t_retry_needed;
+	enc_info_t	*encr_ptr;
 	int4		local_fid_index, match;
-	sgmnt_addrs	*csa;
+	sgmnt_addrs	*csa, *tr_csa;
 	tp_region	*tr, *tr_last, *tr_new;
 	unique_file_id	local_id;
-#	ifdef 	VMS
-	char		*local_id_fiptr;
-	file_control	*fc;
-	uint4		status;
-	gd_region	*temp_reg;
-#	elif UNIX
 	int		save_errno;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -88,36 +78,6 @@ tp_region	*insert_region(	gd_region	*reg,
 	assert(!IS_GTM_IMAGE || dollar_tlevel);
 	if (reg->open)
 		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
-#	if defined(VMS)
-	if (!reg->open)
-	{
-		temp_reg = gv_cur_region;
-		gv_cur_region = reg;
-		local_id_fiptr = local_id.file_id;
-		if (!mupfndfil(reg, NULL))
-		{
-			gv_cur_region = temp_reg;
-			return NULL;
-		}
-		FILE_CNTL_INIT_IF_NULL(reg->dyn.addr);
-		fc = reg->dyn.addr->file_cntl;
-		fc->file_type = reg->dyn.addr->acc_meth;
-		fc->op = FC_OPEN;
-		status = dbfilop(fc);
-		if (status & 1)
-		{
-			local_id_fiptr = &(FILE_INFO(reg)->file_id);
-			sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
-		} else
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-			gv_cur_region = temp_reg;
-			return NULL;
-		}
-		gv_cur_region = temp_reg;
-	} else
-		local_fid_index = csa->fid_index;
-#	elif defined(UNIX)
 	if (!reg->open)
 	{
 		if (!mupfndfil(reg, NULL))
@@ -129,7 +89,6 @@ tp_region	*insert_region(	gd_region	*reg,
 		}
 	} else
 		local_fid_index = csa->fid_index;
-#	endif
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
 	{
@@ -159,16 +118,12 @@ tp_region	*insert_region(	gd_region	*reg,
 			/* let's sort here */
 			if (!tr->reg->open)
 			{	/* all regions closed */
-				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, SIZEOF(gd_id)));
-				UNIX_ONLY(match = gdid_cmp(&(tr->file.file_id), &(local_id.uid)));
+				match = gdid_cmp(&(tr->file.file_id), &(local_id.uid));
 			} else
 			{	/* the other regions are open, i.e. file is pointing to fid_index, use file_id
 				 * from node_local */
-				VMS_ONLY(match = memcmp(
-					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.file_id),
-					local_id_fiptr, SIZEOF(gd_id)));
-				UNIX_ONLY(match = gdid_cmp(
-					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid)));
+				tr_csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
+				match = gdid_cmp(&(tr_csa->nl->unique_id.uid), &(local_id.uid));
 			}
 			if (0 == match)
 				return tr;
@@ -189,10 +144,8 @@ tp_region	*insert_region(	gd_region	*reg,
 	}
 	tr_new->reg = reg;				/* Add this region to end of list */
 	if (!reg->open)
-	{
-		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, SIZEOF(gd_id)));
-		UNIX_ONLY(tr_new->file.file_id = local_id.uid;)
-	} else
+		tr_new->file.file_id = local_id.uid;
+	else
 		tr_new->file.fid_index = local_fid_index;
 	if (NULL == tr_last)
 	{	/* First element on the list */
@@ -210,7 +163,23 @@ tp_region	*insert_region(	gd_region	*reg,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-		if (FALSE == grab_crit_immediate(reg))		/* Attempt lockdown now */
+		t_retry_needed = (FALSE == grab_crit_immediate(reg));		/* Attempt lockdown now */
+		if (!t_retry_needed)
+		{	/* The "grab_crit_immediate" returned successfully. Check if encryption cycles match.
+			 * If they dont, we need to do "grab_crit_encr_cycle_check" but that uses grab_crit and
+			 * is not easily possible to convert it to a "grab_crit_immediate". So assume as if
+			 * the "grab_crit_immediate" failed in this case too and do "t_retry" instead which will
+			 * do the right thing of releasing crit on all regions and fixing the encryption cycles
+			 * on all regions before getting crit on all of them.
+			 */
+			encr_ptr = csa->encr_ptr;
+			if ((NULL != encr_ptr) && (csa->nl->reorg_encrypt_cycle != encr_ptr->reorg_encrypt_cycle))
+			{
+				rel_crit(reg);
+				t_retry_needed = TRUE;
+			}
+		}
+		if (t_retry_needed)
 		{
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */

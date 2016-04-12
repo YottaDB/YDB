@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,14 +52,14 @@ void dse_crit(void)
 	if (cli_present("SEIZE") == CLI_PRESENT || cycle)
 	{
 		if (gv_cur_region->read_only && !cycle)
-			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		if (cs_addrs->now_crit)
 		{
 			util_out_print("!/Write critical section already seized.!/", TRUE);
 			return;
 		}
 		crash_count = cs_addrs->critical->crashcnt;
-		grab_crit(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region);
 		cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
 		cs_addrs->dse_crit_seize_done = TRUE;
 		util_out_print("!/Seized write critical section.!/", TRUE);
@@ -68,7 +69,7 @@ void dse_crit(void)
 	if (cli_present("RELEASE") == CLI_PRESENT || cycle)
 	{
 		if (gv_cur_region->read_only && !cycle)
-			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		if (!cs_addrs->now_crit)
 		{
 			util_out_print("!/Critical section already released.!/", TRUE);
@@ -92,7 +93,7 @@ void dse_crit(void)
 	if (cli_present("INIT") == CLI_PRESENT)
 	{
 		if (gv_cur_region->read_only)
-			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		cs_addrs->hdr->image_count = 0;
 		UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(cs_addrs->hdr), crash));
 		VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY(cs_addrs->hdr), crash));
@@ -104,7 +105,7 @@ void dse_crit(void)
 	if (cli_present("REMOVE") == CLI_PRESENT)
 	{
 		if (gv_cur_region->read_only)
-			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		if (cs_addrs->nl->in_crit == 0)
 		{
 			util_out_print("!/The write critical section is unowned!/", TRUE);

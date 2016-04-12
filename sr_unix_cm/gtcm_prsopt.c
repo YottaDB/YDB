@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@
 #include "gtm_string.h"
 
 
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_stdio.h"
 #ifdef __MVS__
 #include "eintr_wrappers.h"
@@ -30,6 +31,7 @@
 #include "gtm_zos_io.h"
 #endif
 #include "gtcm.h"
+#include "have_crit.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -116,10 +118,11 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 			    if (-1 == gtm_zos_create_tagged_file(*(argv + 1), TAG_EBCDIC))
 					perror("error tagging log file");
 #endif
-		    	    if (!(omi_debug = fopen(*(argv + 1), "w+")))
+		    	    Fopen(omi_debug, *(argv + 1), "w+");
+		    	    if (!omi_debug)
 		    	    {
 			    	    perror("error opening log file");
-			    	    exit(1);
+			    	    EXIT(1);
 		    	    }
 		    }
 		    break;

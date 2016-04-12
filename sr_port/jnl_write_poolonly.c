@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,10 +15,6 @@
 #include "gtm_inet.h"
 
 #include <stddef.h> /* for offsetof() macro */
-
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -35,8 +32,6 @@
 #include "sleep_cnt.h"
 #include "jnl_write.h"
 #include "copy.h"
-
-GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 
 GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;
@@ -57,7 +52,8 @@ error_def(ERR_JNLWRTNOWWRTR);
  * jnl_rec : This contains fixed part of a variable size record or the complete fixed size records.
  * jfb     : For SET/KILL/ZKILL records entire record is formatted in this.
  */
-void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb)
+void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb,
+				jnlpool_write_ctx_t *jplctx)
 {
 	int4			align_rec_len, rlen, rlen_with_align, srclen, dstlen;
 	jnl_buffer_ptr_t	jb;
@@ -88,25 +84,39 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	assert(0 == rlen % JNL_REC_START_BNDRY);
 	jb->bytcnt += rlen;
 	DEBUG_ONLY(jgbl.cu_jnl_index++;)
-	jnlpool_size = temp_jnlpool_ctl->jnlpool_size;
-	dstlen = jnlpool_size - temp_jnlpool_ctl->write;
+
+	/* If the database is encrypted, then at this point jfb->buff will contain encrypted
+	 * data which we don't want to to push into the jnlpool. Instead, we make use of the
+	 * alternate alt_buff which is guaranteed to contain the original unencrypted data.
+	 */
 	if (jrt_fixed_size[rectype])
 		jnlrecptr = (uchar_ptr_t)jnl_rec;
-#	ifdef GTM_CRYPT
-	else if (csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
+	else if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) && USES_ANY_KEY(csa->hdr))
 		jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
-#	endif
 	else
 		jnlrecptr = (uchar_ptr_t)jfb->buff;
-
-	if (rlen <= dstlen)	/* dstlen & srclen >= rlen  (most frequent case) */
-		memcpy(jnldata_base + temp_jnlpool_ctl->write, jnlrecptr, rlen);
-	else			/* dstlen < rlen <= srclen */
+	jnlpool_size = jnlpool_ctl->jnlpool_size;
+	dstlen = jnlpool_size - jplctx->write;
+	if (rlen <= dstlen)		/* dstlen & srclen >= rlen  (most frequent case) */
+		memcpy(jnldata_base + jplctx->write, jnlrecptr, rlen);
+	else if (rlen <= jnlpool_size)	/* dstlen < rlen <= jnlpool_size */
 	{
-		memcpy(jnldata_base + temp_jnlpool_ctl->write, jnlrecptr, dstlen);
+		memcpy(jnldata_base + jplctx->write, jnlrecptr, dstlen);
 		memcpy(jnldata_base, jnlrecptr + dstlen, rlen - dstlen);
+	} else				/* dstlen <= jnlpool_size < rlen */
+	{	/* Copy just the last "jnlpool_size" bytes of the journal record (which could be arbitrarily large)
+		 * onto the journal pool. Adjust pointers as appropriate. Note that this transaction can never be
+		 * read from the journal pool (because it does not completely fit in) but we still need to maintain
+		 * contiguity of jnl-seqnos in the journal pool. Note we could probably copy 0s in the journal pool
+		 * instead of the last "jnlpool_size" bytes and still things should work as well but we copy valid
+		 * data just in case it helps in debug situations.
+		 */
+		jnlrecptr = jnlrecptr + rlen - jnlpool_size;
+		memcpy(jnldata_base + jplctx->write, jnlrecptr, dstlen);
+		memcpy(jnldata_base, jnlrecptr + dstlen, jnlpool_size - dstlen);
 	}
-	temp_jnlpool_ctl->write += rlen;
-	if (temp_jnlpool_ctl->write >= jnlpool_size)
-		temp_jnlpool_ctl->write -= jnlpool_size;
+	jplctx->write += rlen;
+	jplctx->write_total += rlen;
+	if (jplctx->write >= jnlpool_size)
+		jplctx->write %= jnlpool_size;
 }

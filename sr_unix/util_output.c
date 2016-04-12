@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "gtm_syslog.h"
 #include <errno.h>
 
+#include "gtm_multi_thread.h"
 #include "io.h"
 #include "error.h"
 #include "fao_parm.h"
@@ -28,7 +29,6 @@
 #include "util_format.h"
 #include "util_out_print_vaparm.h"
 #include "gtmimagename.h"
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -44,6 +44,7 @@
 #include "gtmio.h"
 #include "gtm_logicals.h"
 #include "have_crit.h"
+#include "gtm_multi_proc.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -52,19 +53,23 @@
 
 GBLDEF	boolean_t		first_syslog = TRUE;	/* Global for a process - not thread specific */
 GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
+#ifdef DEBUG
+GBLDEF	boolean_t		util_out_print_vaparm_flush;
+#endif
 
 GBLREF	io_pair			io_std_device;
 GBLREF	boolean_t		blocksig_initialized;
-GBLREF  sigset_t		block_sigsent;
+GBLREF	sigset_t		block_sigsent;
 GBLREF	boolean_t		err_same_as_out;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	boolean_t		is_updproc;
-GBLREF	boolean_t		is_updhelper;
-GBLREF  recvpool_addrs          recvpool;
-GBLREF  uint4                   process_id;
+GBLREF	uint4			is_updhelper;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	uint4			process_id;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
 
 error_def(ERR_REPLINSTACC);
 error_def(ERR_TEXT);
@@ -72,20 +77,32 @@ error_def(ERR_TEXT);
 #define	ZTRIGBUFF_INIT_ALLOC		1024	/* start at 1K */
 #define	ZTRIGBUFF_INIT_MAX_GEOM_ALLOC	1048576	/* stop geometric growth at this value */
 
-#define GETFAOVALDEF(faocnt, var, type, result, defval) 				\
-	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
+/* #GTM_THREAD_SAFE : The below macro (GETFAOVALDEF) is thread-safe because caller ensures serialization with locks */
+#define GETFAOVALDEF(faocnt, var, type, result, defval)		\
+{								\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);			\
+	if (faocnt > 0)						\
+	{							\
+		result = (type)va_arg(var, type);		\
+		faocnt--;					\
+	} else							\
+		result = defval;				\
+}
 
+/* #GTM_THREAD_SAFE : The below macro (INSERT_MARKER) is thread-safe because caller ensures serialization with locks */
 #define INSERT_MARKER									\
 {											\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
 	STRNCPY_STR(offset, "-", STRLEN("-"));						\
 	offset += STRLEN("-");								\
 }
 
+/* #GTM_THREAD_SAFE : The below macro (BUILD_FACILITY) is thread-safe because caller ensures serialization with locks */
 #define BUILD_FACILITY(strptr)								\
 {											\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
 	STRNCPY_STR(offset, strptr, STRLEN(strptr));					\
 	offset += STRLEN(strptr);							\
-	INSERT_MARKER; 									\
 }
 
 /*
@@ -111,7 +128,7 @@ error_def(ERR_TEXT);
  *	Where `m' is an optional field width, `n' is a repeat count, and `c' is a single character.
  *	`m' or `n' may be specified as the '#' character, in which case the value is taken from the next parameter.
  *
- *	FAO stands for "formatted ASCII output".  The FAO directives may be considered equivalent to format
+ *	FAO stands for "formatted ASCII output". The FAO directives may be considered equivalent to format
  *	specifications and are documented with the VMS Lexical Fuction F$FAO in the OpenVMS DCL Dictionary.
  *
  *	The @XH and @XJ types need special mention. XH and XJ are ascii formatting of addresses and integers respectively. BOTH are
@@ -157,7 +174,7 @@ error_def(ERR_TEXT);
  *			    arguments already incorporated into buff
  *
  */
-
+/* #GTM_THREAD_SAFE : The below function (util_format) is thread-safe because caller ensures serialization with locks */
 caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, int faocnt)
 {
 	desc_struct	*d;
@@ -175,16 +192,45 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
-	unsigned char	*numptr;
-	boolean_t	right_justify, isprintable;
+	unsigned char	*numptr, *prefix;
+	boolean_t	right_justify, isprintable, line_begin;
+	int		prefix_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	VAR_COPY(TREF(last_va_list_ptr), fao);
+	if (multi_proc_in_use)
+	{
+		/* If we are about to flush the output to stdout/stderr, we better hold a latch (since we dont want
+		 * parallel processes mixing their outputs in the same device. The only exception is if caller
+		 * "util_out_print_vaparm" has been called without "FLUSH" argument which means the output goes to
+		 * a string or syslog or unflushed buffer. It is ok to not hold the latch in those cases. Assert that.
+		 */
+		assert((process_id == multi_proc_shm_hdr->multi_proc_latch.u.parts.latch_pid)
+			|| (FLUSH != util_out_print_vaparm_flush));
+		/* By similar reasoning as the above assert, assert on the key prefix */
+		assert((NULL != multi_proc_key) || multi_proc_key_exception || (FLUSH != util_out_print_vaparm_flush));
+		prefix = multi_proc_key;
+		prefix_len = (NULL == prefix) ? 0 : STRLEN((char *)prefix);
+		line_begin = (TREF(util_outptr) == TREF(util_outbuff_ptr));
+	} else
+		prefix = NULL;
 	outptr = buff;
 	outtop = outptr + size - 5;	/* 5 bytes to prevent writing across border */
 	while (outptr < outtop)
 	{
+		if ((NULL != prefix) && line_begin)
+		{
+			if ((outptr + prefix_len + 3) >= outtop)
+				break;
+			memcpy(outptr, prefix, prefix_len);
+			outptr += prefix_len;
+			*outptr++ = ' ';
+			*outptr++ = ':';
+			*outptr++ = ' ';
+			line_begin = FALSE;
+		}
 		/* Look for the '!' that starts an FAO directive */
 		while ((schar = *message++) != '!')
 		{
@@ -238,6 +284,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 			case '/':
 				assert(!indirect);
 				*outptr++ = '\n';
+				line_begin = TRUE;
 				continue;
 			case '_':
 				assert(!indirect);
@@ -570,21 +617,24 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	return outptr;
 }
 
+/* #GTM_THREAD_SAFE : The below function (util_format) is thread-safe because caller ensures serialization with locks */
 void	util_out_close(void)
 {
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 		util_out_print("", FLUSH);
 }
 
+/* #GTM_THREAD_SAFE : The below function (util_out_send_oper) is thread-safe because caller ensures serialization with locks */
 void	util_out_send_oper(char *addr, unsigned int len)
 /* 1st arg: address of system log message */
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
 	sigset_t		savemask;
-	char			*img_type, *offset, *proc_type, *helper_type;
+	char			*img_type, *offset;
 	char 			temp_inst_fn[MAX_FN_LEN + 1], fn[MAX_FN_LEN + 1];
 	mstr			log_nam, trans_name;
 	uint4			ustatus;
@@ -595,21 +645,37 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	int			fd;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	upd_helper_entry_ptr_t	helper, helper_top;
+	intrpt_state_t		prev_intrpt_state;
 
-	proc_type = helper_type = NULL;
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	if (first_syslog)
 	{
 		first_syslog = FALSE;
 
 		offset = facility;
 		BUILD_FACILITY("GTM");
+		INSERT_MARKER;
 		switch (image_type)
 		{
 			case GTM_IMAGE:
 				img_type = "MUMPS";
 				break;
 			case MUPIP_IMAGE:
-				img_type = "MUPIP";
+				if (is_src_server)
+					img_type = "SRCSRVR";
+				else if (is_rcvr_server)
+					img_type = "RCVSRVR";
+				else if (is_updproc)
+					img_type = "UPDPROC";
+				else if (is_updhelper)
+				{
+					assert((UPD_HELPER_READER == is_updhelper) || (UPD_HELPER_WRITER == is_updhelper));
+					if (UPD_HELPER_READER == is_updhelper)
+						img_type = "UPDREAD";
+					else
+						img_type = "UPDWRITE";
+				} else
+					img_type = "MUPIP";
 				break;
 			case DSE_IMAGE:
 				img_type = "DSE";
@@ -632,55 +698,13 @@ void	util_out_send_oper(char *addr, unsigned int len)
 			default:
 				assertpro(FALSE);
 		}
-		STRNCPY_STR(offset, img_type, STRLEN(img_type));
-		offset += STRLEN(img_type);
-		if (jnlpool_ctl)
+		BUILD_FACILITY(img_type);
+		if (NULL != jnlpool_ctl)
 		{	/* Read instace file name from jnlpool */
-			if (image_type == MUPIP_IMAGE)
-			{
-				if (is_src_server)
-					proc_type = "SRCSRVR";
-				else if (is_rcvr_server)
-					proc_type = "RCVSRVR";
-				else if (is_updproc)
-					proc_type = "UPDPROC";
-			}
-			if (proc_type)
-			{
-				offset -= STRLEN(img_type);
-				BUILD_FACILITY(proc_type);
-			}
-			else
-				INSERT_MARKER;
-			STRNCPY_STR(offset, (char *)jnlpool.repl_inst_filehdr->inst_info.this_instname,
-					STRLEN((char *)jnlpool.repl_inst_filehdr->inst_info.this_instname));
+			INSERT_MARKER;
+			BUILD_FACILITY((char *)jnlpool.repl_inst_filehdr->inst_info.this_instname);
 		} else
 		{	/* Read instance name from instance file */
-			if (is_updhelper)
-			{	/* Determine helper type from recvpool */
-				upd_helper_ctl = recvpool.upd_helper_ctl;
-				for (helper = upd_helper_ctl->helper_list, helper_top = helper + MAX_UPD_HELPERS;
-					helper < helper_top; helper++)
-				{
-					if (helper->helper_pid_prev == process_id) /* found my entry */
-					{
-						if ( UPD_HELPER_READER == helper->helper_type )
-							helper_type = "UPDREAD";
-						else if (UPD_HELPER_WRITER == helper->helper_type)
-							helper_type = "UPDWRITE";
-						break;
-					}
-				}
-				offset -= STRLEN(img_type);
-				if (helper_type) /*Otherwise entry for helper is not present in the receiver pool*/
-				{
-					BUILD_FACILITY(helper_type);
-				}
-				else {
-					proc_type = "UPDHELP";
-					BUILD_FACILITY(proc_type);
-				}
-			}
 			fn_len = &file_name_len;
 			bufsize = MAX_FN_LEN + 1;
 			log_nam.addr = GTM_REPL_INSTANCE;
@@ -688,7 +712,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 			trans_name.addr = temp_inst_fn;
 			ret = FALSE;
 			GET_INSTFILE_NAME(dont_sendmsg_on_log2long, return_on_error);
-			/* We want the instance name as part of operator log messages, but if we can’t get it,
+			/* We want the instance name as part of operator log messages, but if we cannot get it,
 			 * we will get by without it, so ignore any errors we might encounter trying to find the name
 			 */
 			if (ret)
@@ -699,33 +723,29 @@ void	util_out_send_oper(char *addr, unsigned int len)
 					LSEEKREAD(fd, 0, &replhdr, SIZEOF(repl_inst_hdr), status);
 					if (0 == status)
 					{
-						if (!is_updhelper)
-						{
-							INSERT_MARKER;
-						}
-						STRNCPY_STR(offset, (char *)replhdr.inst_info.this_instname,
-								STRLEN((char *)replhdr.inst_info.this_instname));
+						INSERT_MARKER;
+						BUILD_FACILITY((char *)replhdr.inst_info.this_instname);
 					}
-				CLOSEFILE_RESET(fd, status);
+					CLOSEFILE_RESET(fd, status);
 				}
 			}
 		}
-		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 		(void)OPENLOG(facility, LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
-		ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+		ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	}
-	/*
-	 * When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
-	 * call.  But in libc the first syslog has grabbed a lock (syslog_lock), and now the other syslog call will
+	/* When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
+	 * call. But in libc the first syslog has grabbed a lock (syslog_lock), and now the other syslog call will
 	 * block waiting for that lock which can't be released since the first syslog was interrupted by the signal.
 	 * We address this issue by deferring signals for the duration of the call; generic_signal_handler.c will also
 	 * skip send_msg invocations if the interrupt comes while INTRPT_IN_LOG_FUNCTION is set.
 	 */
-	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
-	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
+	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 }
 
+/* #GTM_THREAD_SAFE : The below function (util_out_print_vaparm) is thread-safe because caller ensures serialization with locks */
 void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 {
 	char		fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of the util out buffer */
@@ -740,13 +760,18 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	SETUP_THREADGBL_ACCESS;
 	if (IS_GTMSECSHR_IMAGE && (FLUSH == flush))
 		flush = OPER;			/* All gtmsecshr origin msgs go to operator log */
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	assert(NULL != TREF(util_outptr));
 	if (NULL != message)
 	{
 		util_avail_len = INTCAST(TREF(util_outbuff_ptr) + OUT_BUFF_SIZE - TREF(util_outptr) - 2);
 		assert(0 <= util_avail_len);
 		if (0 < util_avail_len)
+		{
+			DEBUG_ONLY(util_out_print_vaparm_flush = flush;)
 			TREF(util_outptr) = util_format(message, var, TREF(util_outptr), util_avail_len, faocnt);
+			DEBUG_ONLY(util_out_print_vaparm_flush = FLUSH;)
+		}
 	}
 	use_gtmio = ((NULL != io_std_device.out) && (!IS_GTMSECSHR_IMAGE) && err_same_as_out);
 	switch (flush)
@@ -771,7 +796,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			fmt_top1 = fmt_buff + SIZEOF(fmt_buff) - 1;
 			fmt_top2 = fmt_top1 - 1;
 			for (TREF(util_outptr) = TREF(util_outbuff_ptr), fmtc = fmt_buff;
-			    (0 != *(TREF(util_outptr))) && (fmtc < fmt_top1); )
+						(0 != *(TREF(util_outptr))) && (fmtc < fmt_top1); )
 			{
 				if ('%' == *(TREF(util_outptr)))
 				{
@@ -796,6 +821,16 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
+					/* Before flushing something to a file/terminal, check if parent is still alive.
+					 * If not, return without flushing. This child will eventually return when it
+					 * does a IS_FORCED_MULTI_PROC_EXIT check at a logical point.
+					 */
+					if (multi_proc_in_use && (process_id != multi_proc_shm_hdr->parent_pid)
+							&& (getppid() != multi_proc_shm_hdr->parent_pid))
+					{
+						SET_FORCED_MULTI_PROC_EXIT; /* Also signal sibling children to stop processing */
+						return;
+					}
 					if (err_same_as_out)
 					{	/* If err and out are conjoined, make sure that all messages that might have been
 						 * printed using PRINTF (unfortunately, we still have lots of such instances) are
@@ -834,18 +869,20 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		case RESET:
 		case OPER:
 		case SPRINT:
-			/* Reset buffer information.  */
+			/* Reset buffer information */
 			TREF(util_outptr) = TREF(util_outbuff_ptr);
 			break;
 	}
 }
 
+/* #GTM_THREAD_SAFE : The below function (util_out_print) is thread-safe because caller ensures serialization with locks */
 void	util_out_print(caddr_t message, int flush, ...)
 {
 	va_list	var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	va_start(var, flush);
 	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
 	va_end(TREF(last_va_list_ptr));
@@ -864,6 +901,7 @@ boolean_t util_out_save(char *dst, int *dstlen_ptr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	assert(NULL != TREF(util_outptr));
 	srclen = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	assert(0 <= srclen);
@@ -877,12 +915,14 @@ boolean_t util_out_save(char *dst, int *dstlen_ptr)
 	return TRUE;
 }
 
+/* #GTM_THREAD_SAFE : The below function (util_out_flush) is thread-safe because caller ensures serialization with locks */
 /* If there is something in the util_outptr buffer, flush it. Called and used only by PRN_ERROR macro. */
 void util_cond_flush(void)
 {
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	if (TREF(util_outptr) != TREF(util_outbuff_ptr))
 		util_out_print(NULL, FLUSH);
 }
@@ -895,7 +935,7 @@ void util_cond_flush(void)
 void util_out_syslog_dump(void)
 {
 	util_out_print("Just some white-box test message long enough to ensure that "
-		       "whatever under-construction util_out buffer is not damaged.\n", OPER);
+			"whatever under-construction util_out buffer is not damaged.\n", OPER);
 	/* Resubmit itself for the purposes of the white-box test which expects periodic writes to the syslog. */
 	start_timer((TID)&util_out_syslog_dump, UTIL_OUT_SYSLOG_INTERVAL, util_out_syslog_dump, 0, NULL);
 }

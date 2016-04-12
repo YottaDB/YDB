@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 #ifdef GTM_TRIGGER
 #include "gtm_string.h"
 
+#include "gtm_multi_thread.h"
 #include "util.h"		/* for FLUSH and util_out_print */
 #include "util_out_print_vaparm.h"
 #include "op.h"			/* for op_write prototype */
@@ -38,6 +40,7 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	/* we expect all trigger operations (SELECT, LOAD, etc.) to happen inside TP. exceptions should set TREF variable */
 	assert(dollar_tlevel || TREF(gtmio_skip_tlevel_assert));
 	va_start(var, flush);

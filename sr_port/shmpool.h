@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,31 +99,34 @@ typedef struct muinc_blk_hdr_struct
 /* Header of the shmpool buffer area. Describes contents */
 typedef struct  shmpool_buff_hdr_struct
 {
-	global_latch_t  shmpool_crit_latch;	/* Latch to update header fields */
-	off_t           dskaddr;		/* Highest disk address used (backup only) */
-	trans_num       backup_tn;		/* TN at start of full backup (backup only) */
-	trans_num       inc_backup_tn;		/* TN to start from for incremental backup (backup only) */
-	char            tempfilename[256];	/* Name of temporary file we are using (backup only) */
-	que_ent		que_free;		/* Queue header for all free elements */
-	que_ent		que_backup;		/* Queue header for all (allocated) backup elements */
-	VMS_ONLY(que_ent que_reformat;)		/* Queue header for all (allocated) reformat elements */
-	volatile int4	free_cnt;		/* Elements on free queue */
-	volatile int4   backup_cnt;		/* Elements used for backup */
-	volatile int4	reformat_cnt;		/* Elements used for reformat */
-	volatile int4	allocs_since_chk;	/* Allocations since last lost block check */
-	uint4		total_blks;		/* Total shmpool block buffers in 1MB buffer area */
-	uint4		blk_size;		/* Size of the created buffers (excluding header - convenient blk_size field) */
-	pid_t           failed;			/* Process id that failed to write to temp file causing failure (backup only) */
-	int4            backup_errno;		/* errno value when "failed" is set (backup only) */
-	uint4           backup_pid;		/* Process id performing online backup (backup only) */
-	uint4           backup_image_count;	/* Image count of process running online backup (VMS & backup only) */
-	boolean_t	shmpool_blocked;	/* secshr_db_clnup() detected a problem on shutdown .. force recovery */
-	uint4		filler;			/* 8 byte alignment */
+	global_latch_t  	shmpool_crit_latch;	/* Latch to update header fields */
+	off_t           	dskaddr;		/* Highest disk address used (backup only) */
+	trans_num       	backup_tn;		/* TN at start of full backup (backup only) */
+	trans_num       	inc_backup_tn;		/* TN to start from for incremental backup (backup only) */
+	char            	tempfilename[256];	/* Name of temporary file we are using (backup only) */
+	que_ent			que_free;		/* Queue header for all free elements */
+	que_ent			que_backup;		/* Queue header for all (allocated) backup elements */
+	VMS_ONLY(que_ent	que_reformat;)		/* Queue header for all (allocated) reformat elements */
+	volatile int4		free_cnt;		/* Elements on free queue */
+	volatile int4   	backup_cnt;		/* Elements used for backup */
+	volatile int4		reformat_cnt;		/* Elements used for reformat */
+	volatile int4		allocs_since_chk;	/* Allocations since last lost block check */
+	uint4			total_blks;		/* Total shmpool block buffers in 1MB buffer area */
+	uint4			blk_size;		/* Size of the created buffers (excluding header - convenient blk_size
+							 * field) */
+	pid_t           	failed;			/* Process id that failed to write to temp file,
+							 * causing failure (backup only) */
+	int4            	backup_errno;		/* errno value when "failed" is set (backup only) */
+	uint4           	backup_pid;		/* Process id performing online backup (backup only) */
+	uint4           	backup_image_count;	/* Image count of process running online backup (VMS & backup only) */
+	boolean_t		shmpool_blocked;	/* secshr_db_clnup() detected a problem on shutdown .. force recovery */
+	uint4			filler;			/* 8 byte alignment */
+	sgmnt_data		shadow_file_header;	/* Copy of the file header */
 } shmpool_buff_hdr;
 
 typedef	shmpool_buff_hdr	*shmpool_buff_hdr_ptr_t;
-typedef muinc_blk_hdr	muinc_blk_hdr_t;
-typedef muinc_blk_hdr	*muinc_blk_hdr_ptr_t;
+typedef muinc_blk_hdr		muinc_blk_hdr_t;
+typedef muinc_blk_hdr		*muinc_blk_hdr_ptr_t;
 typedef	shmpool_blk_hdr		*shmpool_blk_hdr_ptr_t;
 
 /* Macro to allow release of a shmpool reformat block if the current cache record is pointing to it

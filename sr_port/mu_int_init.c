@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,19 +32,15 @@
 #include "mu_gv_cur_reg_init.h"
 #include "gtmmsg.h"
 #include "wbox_test_init.h"
-
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
+
 #define MSGBUF_SIZE 256
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data		mu_int_data;
 GBLREF	unsigned char		*mu_int_master;
 GBLREF	int			mu_int_skipreg_cnt;
-#ifdef GTM_CRYPT
-GBLREF	gtmcrypt_key_t		mu_int_encrypt_key_handle;
-#endif
+GBLREF	enc_handles		mu_int_encr_handles;
 
 error_def(ERR_DBFSTHEAD);
 error_def(ERR_MUNODBNAME);
@@ -56,10 +53,8 @@ boolean_t mu_int_init(void)
 	file_control		*fc;
 	boolean_t		standalone;
 	char			msgbuff[MSGBUF_SIZE], *msgptr;
-#	ifdef GTM_CRYPT
 	int			gtmcrypt_errno;
 	gd_segment		*seg;
-#	endif
 	sgmnt_addrs		*csa;
 
 	mu_gv_cur_reg_init();
@@ -103,20 +98,18 @@ boolean_t mu_int_init(void)
 		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-#	ifdef GTM_CRYPT
-	if (mu_int_data.is_encrypted)
+	if (USES_ANY_KEY(&mu_int_data))
 	{ 	/* Initialize encryption and the key information for the current segment to be used in mu_int_read. */
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file called from STANDALONE macro */
-		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, mu_int_data.encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
+		seg = gv_cur_region->dyn.addr;
+		INIT_DB_OR_JNL_ENCRYPTION(&mu_int_encr_handles, &mu_int_data, seg->fname_len, (char *)seg->fname, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
-			seg = gv_cur_region->dyn.addr;
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
 			mu_int_skipreg_cnt++;
 			return FALSE;
 		}
 	}
-#	endif
 	mu_int_master = malloc(mu_int_data.master_map_len);
 	fc->op = FC_READ;
 	fc->op_buff = mu_int_master;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,8 @@
 #include "mu_gvis.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
-#ifdef GTM_CRYPT
 #include "io.h"
 #include "gtmcrypt.h"
-#endif
 #include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
@@ -64,9 +62,7 @@ GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF int		onerror;
-#ifdef GTM_CRYPT
 GBLREF io_pair		io_curr_device;
-#endif
 
 error_def(ERR_CORRUPTNODE);
 error_def(ERR_GVIS);
@@ -89,11 +85,6 @@ error_def(ERR_GVFAILCORE);
 #define BIN_KILL	3
 #define	BIN_PUT_GVSPAN	4
 
-#ifdef GTM_CRYPT
-# define EMPTY_GTMCRYPT_HASH16	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-# define EMPTY_GTMCRYPT_HASH32	EMPTY_GTMCRYPT_HASH16 EMPTY_GTMCRYPT_HASH16
-# define EMPTY_GTMCRYPT_HASH	EMPTY_GTMCRYPT_HASH32 EMPTY_GTMCRYPT_HASH32
-
 # define GC_BIN_LOAD_ERR(GTMCRYPT_ERRNO)											\
 {																\
 	io_log_name		*io_log;											\
@@ -111,7 +102,6 @@ error_def(ERR_GVFAILCORE);
 		return;														\
 	}															\
 }
-#endif
 
 #define	DEFAULT_SN_HOLD_BUFF_SIZE MAX_IO_BLOCK_SIZE
 
@@ -230,9 +220,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char		*end_buff;
 	unsigned short		rec_len, next_cmpc, numsubs;
-	int			len, current, last, length, max_blk_siz, max_key, status;
+	int			len, current, last, max_key;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
-	uint4			max_data_len, max_subsc_len, gblsize;
+	uint4			max_data_len, max_subsc_len, gblsize, data_len;
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
 	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
@@ -248,14 +238,12 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
 	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
-#	ifdef GTM_CRYPT
-	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len;
-	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr;
+	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
+	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
 	gtmcrypt_key_t		*encr_key_handles;
 	boolean_t		encrypted_version, mixed_encryption;
 	char			index_err_buf[1024];
-#	endif
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg;
 	DCL_THREADGBL_ACCESS;
@@ -265,7 +253,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gvinit();
 	v.mvtype = MV_STR;
 	file_offset_base = 0;
-	/* line1_ptr,line1_len were initialized as part of get_file_format using reads of the binary extract file which
+	/* line1_ptr & line1_len are initialized as part of get_load_format using a read of the binary extract file which
 	 * did not go through file_input_bin_get. So initialize the internal static structures that file_input_bin_get
 	 * maintains as if that read happened through it. This will let us finish reading the binary extract header line.
 	 */
@@ -278,7 +266,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	}
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
 	if (!(	((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (V5_BIN_HEADER_SZ == len)) ||
-		((('6' == hdr_lvl) || ('7' == hdr_lvl) || ('8' == hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
+		((('6' <= hdr_lvl) && ('9' >= hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
 		(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
@@ -287,7 +275,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	/* expecting the level in a single character */
 	assert(' ' == *(ptr + SIZEOF(BIN_HEADER_LABEL) - 3));
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
-			*(BIN_HEADER_VERSION_ENCR_INDEX) < hdr_lvl)
+			*(BIN_HEADER_VERSION_ENCR_IV) < hdr_lvl)
 	{	/* ignore the level check */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -335,9 +323,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		}
 	} else
 		extr_std_null_coll = 0;
-#	ifdef GTM_CRYPT
 	/* Encrypted versions to date. */
-	encrypted_version = ('8' == hdr_lvl) || ('7' == hdr_lvl) || ('5' == hdr_lvl);
+	encrypted_version = ('5' <= hdr_lvl) && ('6' != hdr_lvl); /* Includes 5, 7, 8, and 9. */
 	if (encrypted_version)
 	{
 		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base,
@@ -358,11 +345,18 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				mixed_encryption = TRUE;
 				continue;
 			}
-			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, curr_hash_ptr, encr_key_handles[index], gtmcrypt_errno);
+			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, curr_hash_ptr, 0, NULL, encr_key_handles[index], gtmcrypt_errno);
 			GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		}
+		if ('9' == hdr_lvl)
+		{
+			null_iv_array_len = file_input_bin_get((char **)&ptr, &file_offset_base,
+									(char **)&ptr_base, DO_RTS_ERROR_TRUE);
+			assert(n_index == null_iv_array_len);
+			null_iv_array_ptr = malloc(null_iv_array_len);
+			memcpy(null_iv_array_ptr, ptr, null_iv_array_len);
+		}
 	}
-#	endif
 	if ('2' < hdr_lvl)
 	{
 		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE);
@@ -440,67 +434,84 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			rec_count--;	/* Decrement as this record does not count as a record for loading purposes */
 			continue;
 		}
-		rp = (rec_hdr *)(ptr);
-#		ifdef GTM_CRYPT
 		if (encrypted_version)
 		{	/* Getting index value from the extracted file. It indicates which database file this record belongs to */
 			GET_LONG(index, ptr);
-			if ('7' != hdr_lvl)
+			tmp_ptr = ptr + SIZEOF(int4);
+			if (-1 != index)
 			{
-				if (-1 != index)
-				{	/* Record is encrypted; ensure legitimate encryption handle index. */
-					if ((n_index <= index) || (0 > index))
-					{
-						SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
+				switch (hdr_lvl)
+				{
+					case '9':
+						/* Record is encrypted; ensure legitimate encryption handle index. */
+						if ((n_index <= index) || (0 > index))
+						{
+							SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
 								"Encryption handle expected in the range [0; %d) but found %d",
 								n_index, index);
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
 								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf),
 								ERR_GVFAILCORE);
-						gtm_fork_n_core();
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_SEVERE(ERR_RECLOAD),
+							gtm_fork_n_core();
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_SEVERE(ERR_RECLOAD),
 								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf));
-						return;
-					}
-					in_len = len - SIZEOF(int4);
-					inbuf = (char *)(ptr + SIZEOF(int4));
-					GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len, NULL, gtmcrypt_errno);
-					GC_BIN_LOAD_ERR(gtmcrypt_errno);
-				}
-				rp = (rec_hdr *)(ptr + SIZEOF(int4));
-			} else
-			{	/* In version the extract logic did not properly distinguish non-encrypted records from encrypted
-				 * ones in case both kinds were present. Specifically, extracts did not precede unencrypted records
-				 * with a '-1' to signify that no decryption is required. Here we make the best attempt to recognize
-				 * that situation and process the record so long as the index appears legitimate.
-				 */
-				if (-1 != index)
-				{	/* Record is probably encrypted; however, there is a slight chance that the encryption
-					 * handle index is incorrect, although in a legitimate range. In that case we will
-					 * additionally check if the corresponding hash is non-zero---which would only be the case
-					 * if the region was encrypted---but only when dealing with a mix of encrypted and
-					 * unencrypted data.
-					 */
-					if ((n_index > index) && (0 <= index)
-						&& (!mixed_encryption
-							|| (0 != memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
-								EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))))
-					{
-						in_len = len - SIZEOF(int4);
-						inbuf = (char *)(ptr + SIZEOF(int4));
-						GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len,
-								NULL, gtmcrypt_errno);
+							return;
+						}
+#						ifdef DEBUG
+						/* Ensure that len is the length of one int, block header, and all records. */
+						GET_ULONG(data_len, &((blk_hdr *)tmp_ptr)->bsiz);
+						assert(data_len + SIZEOF(int4) == len);
+#						endif
+						in_len = len - SIZEOF(int4) - SIZEOF(blk_hdr);
+						inbuf = (char *)(tmp_ptr + SIZEOF(blk_hdr));
+						null_iv_char = null_iv_array_ptr[index];
+						assert(('1' == null_iv_char) || ('0' == null_iv_char));
+						GTMCRYPT_DECRYPT(NULL, ('0' == null_iv_char), encr_key_handles[index],
+								inbuf, in_len, NULL, tmp_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
 						GC_BIN_LOAD_ERR(gtmcrypt_errno);
-						rp = (rec_hdr *)(ptr + SIZEOF(int4));
-					}
-				} else
-					rp = (rec_hdr *)(ptr + SIZEOF(int4));
-			}
-		}
-#		endif
+						rp = (rec_hdr *)(tmp_ptr + SIZEOF(blk_hdr));
+						break;
+					case '7':
+						/* In version 7 the extract logic did not properly distinguish non-encrypted records
+						 * from encrypted ones in case both kinds were present. Specifically, extracts did
+						 * not precede unencrypted records with a '-1' to signify that no decryption is
+						 * required. Here we make the best attempt to recognize that situation and process
+						 * the record so long as the index appears legitimate.
+						 *
+						 * By now we know that the record is probably encrypted; however, there is a slight
+						 * chance that the encryption handle index is incorrect, although in a legitimate
+						 * range. In that case we will additionally check if the corresponding hash is
+						 * non-zero---which would only be the case if the region was encrypted---but only
+						 * when dealing with a mix of encrypted and unencrypted data.
+						 */
+						if ((n_index <= index) || (0 > index)
+						    || (mixed_encryption
+						        && (0 == memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
+									EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))))
+						{
+							rp = (rec_hdr *)ptr;
+							break;
+						}
+							/* CAUTION: Fall-through. */
+					case '5':	/* CAUTION: Fall-through. */
+					case '8':
+						/* Record is encrypted; ensure legitimate encryption handle index. */
+						assertpro((n_index > index) && (0 <= index));
+						in_len = len - SIZEOF(int4);
+						inbuf = (char *)tmp_ptr;
+						GTMCRYPT_DECRYPT_NO_IV(NULL, encr_key_handles[index],
+								inbuf, in_len, NULL, gtmcrypt_errno);
+						GC_BIN_LOAD_ERR(gtmcrypt_errno);
+						rp = (rec_hdr *)tmp_ptr;
+						break;
+				}
+			} else
+				rp = (rec_hdr *)tmp_ptr;
+		} else
+			rp = (rec_hdr *)(ptr);
 		btop = ptr + len;
-		cp1 = (unsigned char*)(rp + 1);
-		gvname.var_name.addr = (char *)cp1;
+		cp1 = (unsigned char *)(rp + 1);
+		gvname.var_name.addr = (char*)cp1;
 		while (*cp1++)
 			;
 		gvname.var_name.len = INTCAST((char *)cp1 - gvname.var_name.addr - 1);
@@ -642,7 +653,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				while (*gvkey_char_ptr)
 				{
 						/* get next subscript (in GT.M internal subsc format) */
-					subsc_len = 0;
 					tmp_ptr = src_buff;
 					while (*gvkey_char_ptr)
 						*tmp_ptr++ = *gvkey_char_ptr++;
@@ -867,13 +877,16 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			}
 		}
 	}
-#	ifdef GTM_CRYPT
-	if ('7' <= hdr_lvl)
+	if (encrypted_version)
 	{
 		assert(NULL != encrypted_hash_array_ptr);
 		free(encrypted_hash_array_ptr);
+		if ('9' == hdr_lvl)
+		{
+			assert(NULL != null_iv_array_ptr);
+			free(null_iv_array_ptr);
+		}
 	}
-#	endif
 	free(tmp_gvkey);
 	free(sn_gvkey);
 	if (NULL != sn_hold_buff)
@@ -902,7 +915,7 @@ gvnh_reg_t *bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, gvnh_reg);
-	switch(routine)
+	switch (routine)
 	{
 		case BIN_PUT_GVSPAN:
 			/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH

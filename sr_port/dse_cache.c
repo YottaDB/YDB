@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,12 +39,12 @@ GBLREF gd_addr		*original_header;
 
 error_def(ERR_SIZENOTVALID4);
 
-#define	DB_ABS2REL(X)			(uintszofptr_t)((uintszofptr_t)(X) - (uintszofptr_t)csa->nl)
-#define MAX_UTIL_LEN 			40
-#define	CLEAN_VERIFY			"verification is clean"
-#define	UNCLEAN_VERIFY			"verification is NOT clean (see operator log for details)"
-#define	RECOVER_DONE			"recovery complete (see operator log for details)"
-#define	RECOVER_NOT_APPLIC		"recovery not applicable with MM access method"
+#define	DB_ABS2REL(X)		(uintszofptr_t)((uintszofptr_t)(X) - (uintszofptr_t)csa->nl)
+#define MAX_UTIL_LEN		40
+#define	CLEAN_VERIFY		"verification is clean"
+#define	UNCLEAN_VERIFY		"verification is NOT clean (see operator log for details)"
+#define	RECOVER_DONE		"recovery complete (see operator log for details)"
+#define	RECOVER_NOT_APPLIC	"recovery not applicable with MM access method"
 
 error_def(ERR_SIZENOTVALID4);
 
@@ -216,18 +217,16 @@ void dse_cache(void)
 				section_offset = ROUND_UP2(DB_ABS2REL(cr_que_lo + csd->bt_buckets + csd->n_bts), OS_PAGE_SIZE);
 				util_out_print("Region !AD :  global_buffer      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), section_offset, csd->n_bts, csd->blk_size);
-#				ifdef GTM_CRYPT
-				if (csd->is_encrypted)
+				if (USES_ENCRYPTION(csd->is_encrypted))
 				{
 					section_offset += (gtm_uint64_t)csd->n_bts * csd->blk_size;
 					/* In case of an encrypted database, bp_top is actually the beginning of the encrypted
-					 * global buffer array (an array maintained parallely with the regular unencrypted
-					 * global buffer array).
+					 * global buffer array (an array maintained parallely with the regular unencrypted global
+					 * buffer array).
 					 */
 					util_out_print("Region !AD :  encrypted_globuff  = 0x!XJ : Numelems = 0x!XL : Elemsize = "
 						"0x!XL", TRUE, REG_LEN_STR(reg), section_offset, csd->n_bts, csd->blk_size);
 				}
-#				endif
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE,
 					REG_LEN_STR(reg), DB_ABS2REL(csd));
 				util_out_print("Region !AD :  bt_que_header      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",

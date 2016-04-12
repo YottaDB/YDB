@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,18 +107,19 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 					 *      cause the getframe macro to invoke error_return() for further error processing.
 					 */
 #define SFF_UNW_SYMVAL	(1 << 5)	/* 0x20 Unwound a symval in this stackframe (relevant to tp_restart) */
-#define SFF_IMPLTSTART_CALLD	(1 << 6)	/* 0x40 This frame initiated a trigger call or spanning node transaction
-						 * 	- checked by MUM_TSTART to prevent error returns to the frame
-						 * 	which would cause a restart of error handling.
-						 */
+#define SSF_NORET_VIA_MUMTSTART	(1 << 6)/* 0x40 This frame was not created by MUMPS code and cannot return via
+					 *	MUM_TSTART. This macro was originally written for trigger calls
+					 *	and then adapted for spanning node/region transactions.
+					 *	See comments in tp_restart.c for further details.
+					 */
 
-#define SFF_INDCE_OFF   		~(SFF_INDCE)		/* Mask to turn off SFF_INDCE */
-#define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)	/* Mask to turn off SFF_ZTRAP_ERR */
-#define SFF_DEV_ACT_ERR_OFF		~(SFF_DEV_ACT_ERR)	/* Mask to turn off SFF_DEV_ACT_ERR */
-#define SFF_CI_OFF			~(SFF_CI)		/* Mask to turn off SFF_CI */
-#define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)	/* Mask to turn off SFF_ETRAP_ERR */
-#define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)	/* Mask to turn off SFF_UNW_SYMVAL */
-#define SFF_IMPLTSTART_CALLD_OFF	~(SFF_IMPLTSTART_CALLD)	/* Mask to turn off SFF_IMPLTSTART_CALLD */
+#define SFF_INDCE_OFF   		~(SFF_INDCE)			/* Mask to turn off SFF_INDCE */
+#define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)		/* Mask to turn off SFF_ZTRAP_ERR */
+#define SFF_DEV_ACT_ERR_OFF		~(SFF_DEV_ACT_ERR)		/* Mask to turn off SFF_DEV_ACT_ERR */
+#define SFF_CI_OFF			~(SFF_CI)			/* Mask to turn off SFF_CI */
+#define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)		/* Mask to turn off SFF_ETRAP_ERR */
+#define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
+#define SSF_NORET_VIA_MUMTSTART_OFF	~(SSF_NORET_VIA_MUMTSTART)	/* Mask to turn off SSF_NORET_VIA_MUMTSTART */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 {								\

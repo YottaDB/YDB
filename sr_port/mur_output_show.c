@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,12 +32,10 @@
 #include "muprec.h"
 #include "cli.h"
 #include "util.h"
-#ifdef VMS
-#include <descrip.h>
-#include <jpidef.h>
-#endif
 #include "real_len.h"		/* for real_len() prototype */
 #include "have_crit.h"
+#include "gtm_multi_proc.h"
+#include "interlock.h"
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	reg_ctl_list	*mur_ctl;
@@ -50,6 +49,14 @@ static  const   char 	dashes_fao[] = "!#*-";
 
 #define DOUBLE_ARG(X)	X,X
 
+enum
+{
+	SHW_BROKEN = 0,	/* defining it as SHW_BROKEN since SHOW_BROKEN is already defined elsewhere */
+	SHW_ACTIVE = 1,
+	SHW_FINISHED = 2,
+	NUM_SHW_TYPES
+};
+
 #define	PRINT_SHOW_HEADER(jctl)												\
 {															\
 	util_out_print("!/-------------------------------------------------------------------------------", TRUE);	\
@@ -58,62 +65,6 @@ static  const   char 	dashes_fao[] = "!#*-";
 }
 
 #define	ZERO_TIME_LITERAL	"                   0"
-
-#if defined(VMS)
-/* Headings and FAO specs, etc. */
-static  const   char proc_header[] =
-        "PID      NODE     USER         TERM     JPV_TIME             PNAME           IMGCNT   MODE  LOGIN_TIME          ";
-static	const	char proc_fao[] =
-        "!XL !8AD !12AD !8AD !20AD !15AD !XL !5AD !20AD";
-
-#define	TIME_DISPLAY_FAO	"!20AD"
-
-/* Convert a time value to a string in the TIME_FORMAT_STRING's format.  this routine currently does not handle $h printing */
-int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
-{
-	jnl_proc_time	long_time;
-
-	if (SHORT_TIME_FORMAT == time_format)
-		JNL_WHOLE_FROM_SHORT_TIME(long_time, proc_time);
-	else
-		long_time = proc_time;
-	GET_LONG_TIME_STR(long_time, string, string_len);
-	assert(LENGTH_OF_TIME >= strlen(string));
-	return strlen(string);
-}
-
-static	void	mur_show_jpv(jnl_process_vector *pv, boolean_t print_header)
-{
-	int	jpv_time_len, node_len, user_len, term_len, proc_len, login_time_len;
-	char	*mode_str, login_time_str[LENGTH_OF_TIME + 1], jpv_time_str[LENGTH_OF_TIME + 1];
-
-	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, SIZEOF(jpv_time_str), LONG_TIME_FORMAT);
-	login_time_len = format_time(pv->jpv_login_time, login_time_str, SIZEOF(login_time_str), LONG_TIME_FORMAT);
-	node_len = real_len(JPV_LEN_NODE,	(uchar_ptr_t)pv->jpv_node);
-	user_len = real_len(JPV_LEN_USER,	(uchar_ptr_t)pv->jpv_user);
-	proc_len = real_len(JPV_LEN_PRCNAM,	(uchar_ptr_t)pv->jpv_prcnam);
-	term_len = real_len(JPV_LEN_TERMINAL,	(uchar_ptr_t)pv->jpv_terminal);
-	switch (pv->jpv_mode)
-	{
-		case JPI$K_DETACHED:	mode_str = "Detch";	break;
-		case JPI$K_NETWORK:	mode_str = "Netwk";	break;
-		case JPI$K_BATCH:	mode_str = "Batch";	break;
-		case JPI$K_LOCAL:	mode_str = "Local";	break;
-		case JPI$K_DIALUP:	mode_str = "Dialu";	break;
-		case JPI$K_REMOTE:	mode_str = "Remot";	break;
-		default:		mode_str = "UNKWN";
-	}
-	if (print_header)
-	{
-		util_out_print(proc_header, TRUE);
-		util_out_print(dashes_fao, TRUE, SIZEOF(proc_header) - 1);
-	}
-	util_out_print(proc_fao, TRUE, pv->jpv_pid, node_len, pv->jpv_node, user_len, pv->jpv_user,
-		term_len, pv->jpv_terminal, jpv_time_len, jpv_time_str,
-		proc_len, pv->jpv_prcnam, pv->jpv_image_count, 5, mode_str, login_time_len, login_time_str);
-}
-
-#elif defined(UNIX)
 
 static	const	char proc_header[] =
 	"PID        NODE         USER     TERM JPV_TIME           ";
@@ -159,8 +110,6 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 		term_len, pv->jpv_terminal, jpv_time_len, jpv_time_str);
 }
 
-#endif
-
 void	mur_show_header(jnl_ctl_list * jctl)
 {
 	jnl_file_header	*hdr;
@@ -183,11 +132,16 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Journal file checksum seed             !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->checksum));
 	util_out_print(" Crash                                       !AD", TRUE, 5, (hdr->crash ? " TRUE" : "FALSE"));
 	util_out_print(" Recover interrupted                         !AD", TRUE, 5, (hdr->recover_interrupted ? " TRUE" : "FALSE"));
-	/* Since we are defining GTM_CRYPT only for IA64, x86_64, i386, AIX and Solaris, the below dump might not happen
-	 * for VMS, Tru64, Solaris 32 and other encryption-unsupported platforms. So, do the display unconditionally. */
-	util_out_print(" Journal file encrypted                      !AD", TRUE, 5, (hdr->is_encrypted ? " TRUE" : "FALSE"));
+	util_out_print(" Journal file encrypted                      !AD", TRUE, 5,
+			(IS_ENCRYPTED(hdr->is_encrypted) ? " TRUE" : "FALSE"));
+	util_out_print(" Journal file (re)encryption in progress     !AD", TRUE, 5, (USES_NEW_KEY(hdr) ? " TRUE" : "FALSE"));
 	GET_HASH_IN_HEX(hdr->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
 	util_out_print(" Journal file hash                           !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+	GET_HASH_IN_HEX(hdr->encryption_hash2, outbuf, GTMCRYPT_HASH_HEX_LEN);
+	util_out_print(" Journal file hash2                          !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+	util_out_print(" Journal file uses null IV                   !AD", TRUE, 5, (hdr->non_null_iv ? "FALSE" : " TRUE"));
+	util_out_print(" Journal file encryption hash cutoff  !12SL", TRUE, hdr->encryption_hash_cutoff);
+	util_out_print(" Journal file hash2 start TN  !20@UQ [0x!16@XQ]", TRUE, DOUBLE_ARG(&hdr->encryption_hash2_start_tn));
 	util_out_print(" Blocks to Upgrade Adjustment           !10UL [0x!XL]", TRUE,
 		DOUBLE_ARG(hdr->prev_recov_blks_to_upgrd_adjust));
 	util_out_print(" End of Data                            !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));
@@ -204,9 +158,6 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	assert(!REPL_WAS_ENABLED(hdr));
 	util_out_print(" Replication State                        !8AD", TRUE, 8,
 		(hdr->repl_state == repl_closed ? "  CLOSED" : (hdr->repl_state == repl_open ? "    OPEN" : "WAS_OPEN")));
-#ifdef VMS
-	util_out_print(" Updates Disabled on Secondary               !AD", TRUE, 5, (hdr->update_disabled ? " TRUE" : "FALSE"));
-#endif
 	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
 	util_out_print(" Jnlfile Allocation               !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
 	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
@@ -235,7 +186,6 @@ void	mur_show_header(jnl_ctl_list * jctl)
 		assert(!hdr->strm_start_seqno[idx] || hdr->strm_end_seqno[idx]);
 		if (hdr->strm_start_seqno[idx] || hdr->strm_end_seqno[idx])
 		{
-			VMS_ONLY(assert(FALSE);)	/* we expect this field to be unused in VMS */
 			util_out_print(" Stream !2UL : Start RegSeqno   !20@UQ [0x!16@XQ]", TRUE,
 				idx, &hdr->strm_start_seqno[idx], &hdr->strm_start_seqno[idx]);
 			util_out_print(" Stream !2UL : End   RegSeqno   !20@UQ [0x!16@XQ]", TRUE,
@@ -256,11 +206,34 @@ void	mur_output_show()
 	int			rectype, size;
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
-	boolean_t		first_time;
+	boolean_t		first_time, ok_to_show[NUM_SHW_TYPES], release_latch;
+	int			index;
+	jnl_proc_time		tmp_jpv_time;
+	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+	const int		show_state[NUM_SHW_TYPES] = { BROKEN_PROC, ACTIVE_PROC, FINISHED_PROC };
 
 	assert(mur_options.show);
+	assert(3 == NUM_SHW_TYPES);
+	assert(0 == SHW_BROKEN);
+	assert(1 == SHW_ACTIVE);
+	assert(2 == SHW_FINISHED);
+	assert(NUM_SHW_TYPES == ARRAYSIZE(ok_to_show));
+	assert(NUM_SHW_TYPES == ARRAYSIZE(show_state));
+	if (multi_proc_in_use)
+	{
+		assert(NULL == multi_proc_key);
+		assert(!multi_proc_key_exception);
+		DEBUG_ONLY(multi_proc_key_exception = TRUE);	/* "multi_proc_in_use" is still TRUE so set this to avoid asserts */
+		GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch); /* Grab a latch for the entire show duration */
+		assert(release_latch);
+	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total;  rctl < rctl_top;  rctl++)
 	{
+		if (multi_proc_in_use)
+		{
+			if (!rctl->this_pid_is_owner)
+				continue;	/* in a parallel processing environment, process only regions we own */
+		}
 		jctl = (NULL == rctl->jctl_turn_around) ? rctl->jctl_head : rctl->jctl_turn_around;
 		while (jctl)
 		{
@@ -272,67 +245,64 @@ void	mur_output_show()
 				mur_show_header(jctl);
 			}
 			size = jctl->pini_list.size;
-			if (mur_options.show & SHOW_BROKEN
-				|| mur_options.show & SHOW_ACTIVE_PROCESSES
-				|| mur_options.show & SHOW_ALL_PROCESSES)
+			ok_to_show[SHW_FINISHED] = (mur_options.show & SHOW_ALL_PROCESSES) ? TRUE : FALSE;
+			ok_to_show[SHW_ACTIVE] = ok_to_show[SHW_FINISHED] || (mur_options.show & SHOW_ACTIVE_PROCESSES);
+			ok_to_show[SHW_BROKEN] = ok_to_show[SHW_ACTIVE] || (mur_options.show & SHOW_BROKEN);
+			for (index = 0; index < NUM_SHW_TYPES; index++)
 			{
-				first_time = TRUE;
-				for (tabent = jctl->pini_list.base, topent = jctl->pini_list.top; tabent < topent; tabent++)
+				if (ok_to_show[index])
 				{
-					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
+					assert((SHW_BROKEN == index) || (CLI_PRESENT == cli_present("SHOW")));
+					first_time = TRUE;
+					for (tabent = jctl->pini_list.base, topent = jctl->pini_list.top; tabent < topent; tabent++)
 					{
-						if (BROKEN_PROC == plst->state)
+						if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 						{
-							if (first_time)
-							{	/* print show-header in case SHOW=BROKEN was not explicitly
-								 * specified but implicitly assumed due to mur_options.update
+							if (show_state[index] == plst->state)
+							{
+								if (first_time)
+								{
+									switch(index)
+									{
+									case SHW_BROKEN:
+										/* print show-header in case SHOW=BROKEN was not
+										 * explicitly specified but implicitly assumed
+										 * due to mur_options.update
+										 */
+										if (CLI_PRESENT != cli_present("SHOW"))
+											PRINT_SHOW_HEADER(jctl);
+										util_out_print("!/Process(es) with BROKEN "
+											"transactions in this journal:!/", TRUE);
+										break;
+									case SHW_ACTIVE:
+										util_out_print("!/Process(es) that are still "
+											"ACTIVE in this journal:!/", TRUE);
+										break;
+									case SHW_FINISHED:
+										util_out_print("!/Process(es) that are COMPLETE "
+											"in this journal:!/", TRUE);
+										break;
+									}
+								}
+								/* Temporarily fix plst->jpv->jpv_time to be plst->pini_jpv_time so
+								 * gets displayed accurately. It is possible for the two to differ
+								 * in case backward recovery/rollback virtually truncated the
+								 * pre-recovery journal file and played its journal records in a new
+								 * journal file with a newer PINI record. We want the pre-recovery
+								 * time to be displayed hence this temporary adjustment.
 								 */
-								if (CLI_PRESENT != cli_present("SHOW"))
-									PRINT_SHOW_HEADER(jctl);
-								util_out_print("!/Process(es) with BROKEN transactions in this "
-										"journal:!/", TRUE);
+								assert((plst->jpv.jpv_time == plst->pini_jpv_time)
+									|| (!mur_options.forward && mur_options.update));
+								tmp_jpv_time = plst->jpv.jpv_time;
+								plst->jpv.jpv_time = plst->pini_jpv_time;
+								mur_show_jpv(&plst->jpv, first_time);
+								/* By the time "mur_output_show" is called, forward phase of
+								 * recovery is complete so no need to actually restore jpv_time
+								 * but just in case it is needed in the future, restore it.
+								 */
+								plst->jpv.jpv_time = tmp_jpv_time;
+								first_time = FALSE;
 							}
-							mur_show_jpv(&plst->jpv, first_time);
-							first_time = FALSE;
-						}
-					}
-				}
-			}
-			if (mur_options.show & SHOW_ACTIVE_PROCESSES
-				|| mur_options.show & SHOW_ALL_PROCESSES)
-			{
-				assert(CLI_PRESENT == cli_present("SHOW"));
-				first_time = TRUE;
-				for (tabent = jctl->pini_list.base, topent =  jctl->pini_list.top; tabent < topent; tabent++)
-				{
-					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
-					{
-						if (ACTIVE_PROC == plst->state)
-						{
-							if (first_time)
-								util_out_print("!/Process(es) that are still ACTIVE in this "
-										"journal:!/", TRUE);
-							mur_show_jpv(&plst->jpv, first_time);
-							first_time = FALSE;
-						}
-					}
-				}
-			}
-			if (mur_options.show & SHOW_ALL_PROCESSES)
-			{
-				assert(CLI_PRESENT == cli_present("SHOW"));
-				first_time = TRUE;
-				for (tabent = jctl->pini_list.base, topent =  jctl->pini_list.top; tabent < topent; tabent++)
-				{
-					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
-					{
-						if (FINISHED_PROC == plst->state)
-						{
-							if (first_time)
-								util_out_print("!/Process(es) that are COMPLETE in this journal:!/",
-										TRUE);
-							mur_show_jpv(&plst->jpv, first_time);
-							first_time = FALSE;
 						}
 					}
 				}
@@ -357,5 +327,10 @@ void	mur_output_show()
 			if ((CLI_PRESENT == cli_present("SHOW")) || !first_time)
 				util_out_print("", TRUE);
 		}
+	}
+	if (multi_proc_in_use)
+	{
+		REL_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
+		DEBUG_ONLY(multi_proc_key_exception = FALSE);
 	}
 }

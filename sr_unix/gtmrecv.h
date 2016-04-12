@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,6 @@
 
 /* Needs mdef.h, gdsfhead.h and its dependencies, and iosp.h */
 
-#define DEFAULT_RECVPOOL_SIZE		(64 * 1024 * 1024) /* bytes */
 #define DEFAULT_SHUTDOWN_TIMEOUT	30  /* seconds */
 #define	MAX_FILTER_CMD_LEN		512 /* characters */
 #define UPD_HELPERS_DELIM		','
@@ -86,7 +86,9 @@ enum
 #define UPDATE_PROC_DEAD		0x04
 #define UPDATE_CHECKHEALTH_ERR		0x08
 #define RECVPOOL_SEGMENT		'R'
-#define MIN_RECVPOOL_SIZE		(1024 * 1024)
+#define DEFAULT_RECVPOOL_SIZE		(2 << 25)		/* 64MiB */
+#define MIN_RECVPOOL_SIZE		(2 << 19)		/* 1MiB */
+#define MAX_RECVPOOL_SIZE		(0xffffffffll)		/* 4GiB - 1*/
 
 #define GTMRECV_MIN_TCP_SEND_BUFSIZE	(512)		/* anything less than this, issue a warning */
 #define GTMRECV_TCP_SEND_BUFSIZE	(1024)		/* not much outbound traffic, we can live with a low limit */
@@ -96,6 +98,8 @@ enum
 
 #define	IS_RCVR_SRVR_FALSE		FALSE
 #define	IS_RCVR_SRVR_TRUE		TRUE
+
+#include <pthread.h>
 
 /* Note: fields shared between the receiver and update processes
  *	really need to have memory barriers or other appropriate
@@ -144,6 +148,8 @@ typedef struct
 							 * has to insert REPL_HISTREC records for each valid stream
 							 * into the receive pool.
 							 */
+	pthread_mutex_t		write_updated_ctl;
+	pthread_cond_t		write_updated;
 } recvpool_ctl_struct;
 
 #define	INSERT_STRM_HISTINFO_FALSE	FALSE
@@ -347,7 +353,7 @@ typedef struct
 	boolean_t	updateonly;
 	boolean_t	stopsourcefilter;
 	boolean_t	changelog;
-	int4		buffsize;
+	uint4		buffsize;
 	int4		shutdown_time;
 	int4		listen_port;
 	boolean_t	updateresync;

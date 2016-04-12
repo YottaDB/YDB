@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +12,12 @@
 
 #include "mdef.h"
 
-#ifdef GTM_PTHREAD
-#  include <pthread.h>
-#endif
-#include <stdarg.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
+#include <stdarg.h>
+
+#include "gtm_multi_thread.h"
 #include "startup.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
@@ -68,6 +68,7 @@ GBLDEF boolean_t	gtm_startup_active = FALSE;
 void init_gtm(void)
 {
 	struct startup_vector   svec;
+	int i;
 	DEBUG_ONLY(mval		chkmval;)
 	DEBUG_ONLY(mval		chkmval_b;)
 	DCL_THREADGBL_ACCESS;
@@ -114,8 +115,15 @@ void init_gtm(void)
 	unw_prof_frame_ptr = unw_prof_frame;
 	stx_error_fptr = stx_error;
 	show_source_line_fptr = show_source_line;
+	/* For compile time optimization, we need to have the cache for $PIECE enabled */
+	for (i = 0; FNPC_MAX > i; i++)
+	{	/* Initialize cache structure for $[Z]PIECE function */
+		(TREF(fnpca)).fnpcs[i].indx = i;
+	}
+	(TREF(fnpca)).fnpcsteal = (TREF(fnpca)).fnpcs;			/* Starting place to look for cache reuse */
+	(TREF(fnpca)).fnpcmax = &(TREF(fnpca)).fnpcs[FNPC_MAX - 1];	/* The last element */
 	if (MUMPS_COMPILE == invocation_mode)
-		exit(gtm_compile());
+		EXIT(gtm_compile());
 	/* This should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	memset(&svec, 0, SIZEOF(svec));
 	svec.argcnt = SIZEOF(svec);

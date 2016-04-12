@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,9 +49,9 @@ void db_auto_upgrade(gd_region *reg)
 	if (NULL == csd)
 		return;
 
-	if (0 == csd->mutex_spin_parms.mutex_hard_spin_count)
+	if (0 > csd->mutex_spin_parms.mutex_hard_spin_count)
 		csd->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
-	if (0 == csd->mutex_spin_parms.mutex_sleep_spin_count)
+	if (0 > csd->mutex_spin_parms.mutex_sleep_spin_count)
 		csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	/* zero is a legitimate value for csd->mutex_spin_parms.mutex_spin_sleep_mask; so can't detect if need re-initialization */
 	INIT_NUM_CRIT_ENTRY_IF_NEEDED(csd);
@@ -104,7 +104,7 @@ void db_auto_upgrade(gd_region *reg)
 		 * d) Add a new case with the new minor version
 		 * e) Add assert(FALSE) and break (like it was before)
 		 */
-		switch(csd->minor_dbver)
+		switch (csd->minor_dbver)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
 			 */
@@ -115,26 +115,8 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
 			case GDSMV53003:		/* ZSHOW "G" release */
-				/* The following two operations are commented out because they cause issues with backup-and-restore
-				 * operations between versions that do not support encryption and encrypted databases created with
-				 * versions that do. Consider the following example.
-				 *
-				 * Say, we first create a database using an old version that does not support encryption and write a
-				 * few updates to it. Then we back up that database and create a new, encrypted database using the
-				 * current version. Next, we restore the backup onto the new database. Because the file header of
-				 * the new database indicates that it is encrypted, MUPIP RESTORE encrypts all blocks that it pulls
-				 * from the backup and ensures that the is_encrypted field remains TRUE even after overwriting it
-				 * with the backup's file header. So, now we have an encrypted database with encrypted data in it,
-				 * which is how it should be.
-				 *
-				 * However, if we now attempt to write some updates, we would come here and, having noticed that the
-				 * minor version predates encryption, unset the is_encrypted field. As a result, we would produce an
-				 * unencrypted database (according to the file header) with encrypted data in it. That is the reason
-				 * the following two lines are commented out.
-				 *
-				 *   csd->is_encrypted = FALSE;
-				 *   memset(csd->encryption_hash, 0, GTMCRYPT_RESERVED_HASH_LEN);
-				 */
+				 csd->is_encrypted = FALSE;
+				 memset(csd->encryption_hash, 0, GTMCRYPT_RESERVED_HASH_LEN);
 			case GDSMV53004:		/* New encryption fields */
 				csd->db_trigger_cycle = 0;
 			case GDSMV54000:		/* First trigger version */
@@ -171,8 +153,15 @@ void db_auto_upgrade(gd_region *reg)
 				csd->epoch_taper = TRUE;
 		        	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
 		        	csd->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
-				break;
 			case GDSMV62002:
+				/* GT.M V63000 introduced non-null IV encryption and encryption on-the-fly. */
+				 csd->non_null_iv = FALSE;
+				 csd->encryption_hash_cutoff = UNSTARTED;
+				 csd->encryption_hash2_start_tn = 0;
+				 memset(csd->encryption_hash2, 0, GTMCRYPT_RESERVED_HASH_LEN);
+				 SPIN_SLEEP_MASK(csd) = 0;	/* previously unused, but was 7FF and it should now default to 0 */
+				break;
+			case GDSMV63000:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

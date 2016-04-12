@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,6 @@
 
 /* We do not put this in jnl.h, because it needs all including jnl.h must include gdsblk.h */
 void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, blk_hdr_ptr_t blk_ptr,
-	jnl_format_buffer *jfb);
+			jnl_format_buffer *jfb, jnlpool_write_ctx_t *jplctx);
 
 #endif

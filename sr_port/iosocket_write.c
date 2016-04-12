@@ -138,7 +138,7 @@ void iosocket_buffer_error(socket_struct *socketptr)
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);
 		errlen = STRLEN(errptr);
 		devlen = MIN((SIZEOF(iod->dollar.device) - SIZEOF(ONE_COMMA)), errlen);
-		memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, devlen);
+		memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, devlen + 1);
 		if (devlen < errlen)
 			iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
 		socketptr->obuffer_errno = 0;
@@ -190,6 +190,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 	timeout_spec.tv_usec = timeout;
 #	endif
 	llen = length;
+	status = 0;
 	lbuffer = buffer;
 	while (0 < llen)
 	{	/* poll/select tlspolldirection - needed if noblocking */
@@ -225,7 +226,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				break;
 			}
 			if (EAGAIN == save_errno)
-				rel_quant();
+				rel_quant();	/* seems like a legitimate rel_quant */
 			else if (EINTR != save_errno)
 			{
 				status = -1;
@@ -346,8 +347,8 @@ ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t l
 	if ((0 == status ) && (length > socketptr->obuffer_size))
 	{	/* more output than can fit in buffer so just output it now */
 		status = iosocket_output(socketptr, buffer, length, FALSE, FALSE);
-		if (status == length)
-			status = 0;			/* success */
+		if (status != length)
+			status = -1;			/* failure */
 	} else if (0 == status)
 	{	/* put in buffer since room is available */
 		memcpy((void *)(socketptr->obuffer + socketptr->obuffer_offset), buffer, length);

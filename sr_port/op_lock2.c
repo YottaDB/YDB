@@ -367,7 +367,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 				if (MLK_FAIRNESS_DISABLED != TREF(mlk_yield_pid))
 					TREF(mlk_yield_pid) = 0; /* Allow yielding for the other locks */
 				if (pvt_ptr1 != mlk_pvt_root)
-				{
+				{	/* in the absence of contrary evidence this re_quant seems legitimate */
 					rel_quant();		/* attempt to get a full timeslice for maximum chance to get all */
 					mlk_unlock(pvt_ptr1);
 					already_locked = NULL;

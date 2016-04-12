@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,13 +101,9 @@ boolean_t compiler_startup(void)
 	creating_list_file = (cmd_qlf.qlf & CQ_LIST) || (cmd_qlf.qlf & CQ_CROSS_REFERENCE);
 	need_source_lines = (cmd_qlf.qlf & CQ_EMBED_SOURCE) || creating_list_file;
 	use_src_queue = (cmd_qlf.qlf & CQ_EMBED_SOURCE) || (creating_list_file && (cmd_qlf.qlf & CQ_MACHINE_CODE));
-	if (need_source_lines)
-	{
-		if (use_src_queue)
-			dqinit(&src_head, que);
-		if (creating_list_file)
-			open_list_file();
-	}
+	dqinit(&src_head, que);
+	if (creating_list_file)
+		open_list_file();
 	if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
 		open_ceprep_file();
 	tripinit();
@@ -123,24 +120,20 @@ boolean_t compiler_startup(void)
 		if (-1 == (n = read_source_file()))
 			break;
 		rtn_src_chksum_line(&checksum_ctx, source_buffer, n);
-		if (need_source_lines)
-		{
-			if (use_src_queue)
-			{	/* Accumulate list of M source lines */
-				sl = (src_line_struct *)mcalloc(SIZEOF(src_line_struct));
-				dqrins(&src_head, que, sl);
-				sl->str.addr = mcalloc(n + 1);	/* +1 for zero termination */
-				sl->str.len = n;
-				sl->line = source_line;
-				memcpy(sl->str.addr, source_buffer, n + 1);
-				total_source_len += n;
-			}
-			if (creating_list_file && !(cmd_qlf.qlf & CQ_MACHINE_CODE))
-			{	/* list now. for machine_code we intersperse machine code and M code, thus can't list M code yet */
-				NEWLINE_TO_NULL(source_buffer[n - 1]);
-				list_line_number();
-				list_line((char *)source_buffer);
-			}
+		/* Save the source lines; a check later determines whether to include them in the object file */
+		/* Accumulate list of M source lines */
+		sl = (src_line_struct *)mcalloc(SIZEOF(src_line_struct));
+		dqrins(&src_head, que, sl);
+		sl->str.addr = mcalloc(n + 1);	/* +1 for zero termination */
+		sl->str.len = n;
+		sl->line = source_line;
+		memcpy(sl->str.addr, source_buffer, n + 1);
+		total_source_len += n;
+		if (need_source_lines && creating_list_file && !(cmd_qlf.qlf & CQ_MACHINE_CODE))
+		{	/* list now. for machine_code we intersperse machine code and M code, thus can't list M code yet */
+			NEWLINE_TO_NULL(source_buffer[n - 1]);
+			list_line_number();
+			list_line((char *)source_buffer);
 		}
 		NEWLINE_TO_NULL(source_buffer[n - 1]); /* compiler doesn't like trailing newlines (gives SPOREOL errors) */
 		TREF(source_error_found) = 0;

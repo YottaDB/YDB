@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +65,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	rec_hdr_ptr_t		curr_rec_hdr, rp;
 	sm_uc_ptr_t		cp1, buffaddr;
 	unsigned short		rec_size;
+	unsigned int		bsiz;
 	jnl_format_buffer	*jfb;
 	blk_hdr_ptr_t		old_block;
 	sgmnt_addrs		*csa;
@@ -192,8 +194,22 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		{
 			old_block = (blk_hdr_ptr_t)cse->old_block;
 			if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-				cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
-			else
+			{
+				bsiz = old_block->bsiz;
+				/* Note that at this point, validation is still not complete (in caller "t_end"). So it is
+				 * possible we are looking at a block with garbage block-header (possible for example if this
+				 * is a block marked FREE in the bitmap but was read from disk due to concurrency conflicts
+				 * and was all zeroes but because this db is encrypted, the 0-block was decrypted before being
+				 * placed in the global buffer which made the block-header contain garbage. So need edit-checks
+				 * on "bsiz" field in block header.
+				 */
+				if (bsiz > csa->hdr->blk_size)
+				{	/* This is a restartable condition. Restart */
+					assert(CDB_STAGNATE > t_tries);
+					return cdb_sc_mkblk;
+				}
+				cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+			} else
 				cse->blk_checksum = 0;
 		}
 	}

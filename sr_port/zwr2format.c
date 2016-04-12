@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,14 +40,14 @@ LITREF	unsigned char	lower_to_upper_table[];
 /* Routine that transforms a ZWR subscript to the internal string representation */
 boolean_t zwr2format(mstr *src, mstr *des)
 {
-        unsigned char 	ch, chtmp, *cp, *cpstart, *end, *dstptr, *strnext;
+	unsigned char 	ch, chtmp, *cp, *cpstart, *end, *dstptr, *strnext;
 	int 		fastate, num;
 
 	des->len = 0;
 	if (src->len > 0)
 	{
-	        cp = (unsigned char *)src->addr;
-	        end = cp + src->len;
+		cp = (unsigned char *)src->addr;
+		end = cp + src->len;
 		dstptr = (unsigned char*)des->addr;
 		fastate = 0;
 		for (cpstart = cp; cp < end; )
@@ -54,7 +55,7 @@ boolean_t zwr2format(mstr *src, mstr *des)
 			switch(fastate)
 			{
 			case 0: /* state that interprets graphic vs. non-graphic */
-		        	ch = *cp++;
+				ch = *cp++;
 				if ('$' == ch)
 				{
 					ch = chtmp = lower_to_upper_table[*cp++];
@@ -68,8 +69,8 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				{ /* beginning of a quoted string: prepare for the new graphic substring */
 					fastate = 1;
 					cpstart = cp;
-				} else if ('0' <= ch && ch <= '9')
-				{ /* a numeric subscript */
+				} else if (('-' == ch) || ('0' <= ch) && (ch <= '9'))
+				{ /* a numeric */
 					FORMAT_CHAR(ch);
 					fastate = 4;
 				} else if ('.' == ch)
@@ -80,7 +81,7 @@ boolean_t zwr2format(mstr *src, mstr *des)
 					return FALSE;
 				break;
 			case 1: /* Continuation of graphic string */
-		        	ch = *cp++;
+				ch = *cp++;
 				if ('"' == ch)
 				{
 					if (cp < end)
@@ -103,7 +104,6 @@ boolean_t zwr2format(mstr *src, mstr *des)
 						FORMAT_PRINTABLE(cp - 1);
 				}
 				break;
-
 			case 2:	/* parsing the string after $C( */
 				A2I(cp, end, num);	/* NOTE: cp is updated accordingly */
 				if (num < 0)
@@ -114,29 +114,29 @@ boolean_t zwr2format(mstr *src, mstr *des)
 						return FALSE;
 					FORMAT_CHAR(num);
 				}
-#ifdef UNICODE_SUPPORTED
-				else {
+#				ifdef UNICODE_SUPPORTED
+				else
+				{
 					strnext = UTF8_WCTOMB(num, &dstptr[des->len]);
 					if (strnext == &dstptr[des->len])
 						return FALSE;	/* illegal code points in $C() */
 					des->len += (int)(strnext - &dstptr[des->len]);
 				}
-#endif
+#				endif
 				switch(ch = *cp++)
 				{
 				case ',':
 					break;
 				case ')':
-				        if (cp < end && '_' != *cp++)
+					if (cp < end && '_' != *cp++)
 						return FALSE;
 					fastate = 0;
 					break;
-			        default:
+				default:
 					return FALSE;
 					break;
 				}
 				break;
-
 			case 3:	/* parsing the string after $ZCH( */
 				A2I(cp, end, num);	/* NOTE: cp is updated accordingly */
 				if (num < 0 || num > 255)
@@ -147,18 +147,17 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				case ',':
 					break;
 				case ')':
-				        if (cp < end && '_' != *cp++)
+					if (cp < end && '_' != *cp++)
 						return FALSE;
 					fastate = 0;
 					break;
-			        default:
+				default:
 					return FALSE;
 					break;
 				}
 				break;
-
-			case 4: /* a numeric subscript - decimal might still come */
-		        	ch = *cp++;
+			case 4: /* a numeric - decimal might still come */
+				ch = *cp++;
 				if ('0' <= ch && ch <= '9')
 				{
 					FORMAT_CHAR(ch);
@@ -169,8 +168,8 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				} else
 					return FALSE;
 				break;
-			case 5: /* a numeric subscript - already seen decimal */
-		        	ch = *cp++;
+			case 5: /* a numeric - already seen decimal */
+				ch = *cp++;
 				if ('0' <= ch && ch <= '9')
 				{
 					FORMAT_CHAR(ch);
@@ -282,8 +281,7 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 						keystate = 1;
 					}
 					break;
-				}
-				else
+				} else
 					keystate = 1; /* step out of $C(...) */
 			}
 			break;
@@ -292,7 +290,6 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 			break;
 		}
 	}
-
 	if (extfmt)
 	{
 		off = keylength + 1;	/* to point to second exp in $ext format */
@@ -313,8 +310,7 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 		}
 		*val_off = ptr + off + SIZEOF(char); 		/* SIZEOF(char) is used to make adjustment for '=' sign */
 		*val_len = len - (off + SIZEOF(char) + 4); 	/* The prefix '$ze(' account for 4 chars */
-	}
-	else
+	} else
 	{
 		*val_off = ptr + (keylength + SIZEOF(char));	/* SIZEOF(char) is used to make adjustment for '=' sign */
 		*val_len = len - (keylength + SIZEOF(char)); 	/* SIZEOF(char) is used to make adjustment for '=' sign */

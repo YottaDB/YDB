@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,6 +77,7 @@ void zshow_devices(zshow_out *output)
 	char		delim_mstr_buff[(MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11];
 	mstr		delim;
 	int		delim_len, tmpport;
+	boolean_t	same_encr_settings;
 	static readonly char space8_text[] = "        ";
 	static readonly char filchar_text[] = "CHARACTERS";
 	static readonly char filesc_text[] = "ESCAPES";
@@ -97,6 +99,12 @@ void zshow_devices(zshow_out *output)
 	static readonly char devcl[] = "CLOSED ";
 	static readonly char interrupt_text[] = "ZINTERRUPT ";
 	static readonly char stdout_text[] =  "0-out";
+	static readonly char input_key[] = "IKEY=";
+	static readonly char input_iv[] = "IIV=";
+	static readonly char output_key[] = "OKEY=";
+	static readonly char output_iv[] = "OIV=";
+	static readonly char key[] = "KEY=";
+	static readonly char iv[] = "IV=";
 
 	/* gtmsocket specific */
 	static readonly char at_text[] = {'@'};
@@ -407,13 +415,10 @@ void zshow_devices(zshow_out *output)
 					if (rm_ptr->fixed)
 					{
 						ZS_PARM_SP(&v, zshow_fixed);
-					}
-#						ifdef UNIX
-					else if (rm_ptr->stream)
+					} else if (rm_ptr->stream)
 					{
 						ZS_PARM_SP(&v, zshow_stream);
 					}
-#						endif
 					if (rm_ptr->read_only)
 					{
 						ZS_PARM_SP(&v, zshow_read);
@@ -531,6 +536,53 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v, space_text);
 					}
 #endif
+					same_encr_settings = (rm_ptr->input_encrypted && rm_ptr->output_encrypted
+						&& MSTR_EQ(&rm_ptr->input_key, &rm_ptr->output_key)
+						&& MSTR_EQ(&rm_ptr->input_iv, &rm_ptr->output_iv));
+					if (rm_ptr->input_encrypted)
+					{
+						if (same_encr_settings)
+							ZS_STR_OUT(&v, key);
+						else
+							ZS_STR_OUT(&v, input_key);
+						if (NULL != rm_ptr->input_key.addr)
+						{
+							v.str.addr = rm_ptr->input_key.addr;
+							v.str.len = rm_ptr->input_key.len;
+							zshow_output(output, &v.str);
+						}
+						ZS_ONE_OUT(&v, space_text);
+						if (same_encr_settings)
+							ZS_STR_OUT(&v, iv);
+						else
+							ZS_STR_OUT(&v, input_iv);
+						if (NULL != rm_ptr->input_iv.addr)
+						{
+							v.str.addr = rm_ptr->input_iv.addr;
+							v.str.len = rm_ptr->input_iv.len;
+							zshow_output(output, &v.str);
+						}
+						ZS_ONE_OUT(&v, space_text);
+					}
+					if (!same_encr_settings && rm_ptr->output_encrypted)
+					{
+						ZS_STR_OUT(&v, output_key);
+						if (NULL != rm_ptr->output_key.addr)
+						{
+							v.str.addr = rm_ptr->output_key.addr;
+							v.str.len = rm_ptr->output_key.len;
+							zshow_output(output, &v.str);
+						}
+						ZS_ONE_OUT(&v, space_text);
+						ZS_STR_OUT(&v, output_iv);
+						if (NULL != rm_ptr->output_iv.addr)
+						{
+							v.str.addr = rm_ptr->output_iv.addr;
+							v.str.len = rm_ptr->output_iv.len;
+							zshow_output(output, &v.str);
+						}
+						ZS_ONE_OUT(&v, space_text);
+					}
 					break;
 				case gtmsocket:
 					delim.addr = delim_mstr_buff;

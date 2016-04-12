@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,15 +27,17 @@
 
 #include "mdef.h"
 
-#include <execinfo.h>
-#include <signal.h>
-
 #include "gtm_stdlib.h"
+#include "gtm_signal.h"
+#ifndef __CYGWIN__
+#include <execinfo.h>
+#endif
+
 #include "gt_timer.h"
 #include "caller_id.h"
 
 #define MAX_TRACE_DEPTH		3
-/*We need the callers caller of caller_id */
+/* We need the callers caller of caller_id */
 #define RETURN_ADDRESS_DEPTH	2
 
 GBLREF	boolean_t		blocksig_initialized;
@@ -46,8 +49,8 @@ static boolean_t caller_id_reent = FALSE;	/* If ever true, our helper gets a lob
 
 caddr_t caller_id(void)
 {
-	void *trace[MAX_TRACE_DEPTH];
-	int trace_size;
+	void		*trace[MAX_TRACE_DEPTH];
+	int		rc, trace_size;
 	sigset_t	savemask;
 
 	/* We cannot let this routine nest itself due to the impolite things that
@@ -69,14 +72,19 @@ caddr_t caller_id(void)
 	 * that similar code in other places (e.g. dollarh.c) has.
 	 */
 	if (blocksig_initialized)
-        	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
+		SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
 	caller_id_reent = TRUE;
+	#ifndef __CYGWIN__
 	trace_size = backtrace(trace, MAX_TRACE_DEPTH);
+	#else
+	/* Cygwin does not support backtrace() */
+	trace_size = 0;
+	#endif
 	caller_id_reent = FALSE;
 	if (blocksig_initialized)
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
+		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	/* backtrace will return call stack with address.*/
-	if (trace_size >= RETURN_ADDRESS_DEPTH)
+	if (RETURN_ADDRESS_DEPTH <= trace_size)
 		return (caddr_t)trace[RETURN_ADDRESS_DEPTH];
 	else
 		return NULL;

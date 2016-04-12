@@ -41,6 +41,7 @@
 #include "mmrhash.h"
 #include "arlinkdbg.h"
 #include "incr_link.h"
+#include "have_crit.h"
 
 GBLDEF uint4 			lits_text_size, lits_mval_size;
 
@@ -125,6 +126,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	mline		*mlx, *mly;
 	gtm_uint16	objhash;
 	var_tabent	*vptr;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -237,7 +239,9 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	 * hash initialization macro below after the native header is written out but before the GT.M object header is written.
 	 */
 	HASH128_STATE_INIT(TREF(objhash_state), 0);
+	DEFER_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	create_object_file(&rhead);
+	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	cg_phase = CGP_MACHINE;
 	IA64_ONLY(generated_code_size = 0);
 	IA64_DEBUG_ONLY(generated_count = 0);
@@ -316,7 +320,9 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 		assert(STR_LIT_LEN(PADCHARS) >= object_pad_size);
 		emit_immed(PADCHARS, object_pad_size);
 	}
+	DEFER_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	finish_object_file();	/* Flushes object file buffers and writes remaining native object structures */
+	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	/* Get our 128 bit hash though only the first 8 bytes of it get saved in the routine header */
 	gtmmrhash_128_result(TADR(objhash_state), gtm_object_size, &objhash);
 	DBGARLNK((stderr, "obj_code: Computed hash value of 0x"lvaddr" for file %.*s\n", objhash.one, object_name_len,

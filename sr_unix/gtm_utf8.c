@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -213,6 +214,10 @@ int gtm_wcwidth(wint_t code)
  */
 void utf8_badchar(int len, unsigned char *str, unsigned char *strtop, int chset_len, unsigned char *chset)
 {
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+
+	assert(!TREF(compile_time));
 	utf8_badchar_real(err_rts, len, str, strtop, chset_len, chset);
 	return;
 }
@@ -222,6 +227,10 @@ void utf8_badchar(int len, unsigned char *str, unsigned char *strtop, int chset_
  */
 void utf8_badchar_stx(int len, unsigned char *str, unsigned char *strtop, int chset_len, unsigned char *chset)
 {
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+
+	assert(!TREF(compile_time));
 	utf8_badchar_real(err_stx, len, str, strtop, chset_len, chset);
 	return;
 }
@@ -255,6 +264,9 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 	unsigned char 	*strptr, *strend, *outstr;
 	unsigned char	errtxt[OUT_BUFF_SIZE];
 	int		tmplen;
+
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
 
 	assert(gtm_utf8_mode);
 	if (0 == len)
@@ -293,7 +305,8 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 				(*stx_error_fptr)(ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
 				break;
 			case err_dec:
-				dec_err(VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
+				dec_err(VARLSTCNT(6) (TREF(compile_time) ? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING)  : ERR_BADCHAR),
+					4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
 				break;
 			default:
 				assertpro(FALSE /* Invalid error type */);
@@ -312,7 +325,8 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 				(*stx_error_fptr)(ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], LEN_AND_LIT(UTF8_NAME));
 				break;
 			case err_dec:
-				dec_err(VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], LEN_AND_LIT(UTF8_NAME));
+				dec_err(VARLSTCNT(6) (TREF(compile_time) ? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING) : ERR_BADCHAR),
+					4, (outstr - &errtxt[0]), &errtxt[0], LEN_AND_LIT(UTF8_NAME));
 				break;
 			default:
 				assertpro(FALSE /* Invalid error type */);
@@ -371,4 +385,24 @@ int trim_U16_line_term(UChar *buffer, int len)
 		return (len - 1);
 	}
 	return len;		/* no line terminator so return it all */
+}
+
+boolean_t valid_utf_string(const mstr *str)
+{
+	int		charlen, bytelen;
+	char		*ptrtop, *ptr;
+
+	ptr = str->addr;
+	ptrtop = ptr + str->len;
+	charlen = 0;
+
+	for (; ptr < ptrtop; charlen++, ptr += bytelen)
+	{
+		if (!UTF8_VALID(ptr, ptrtop, bytelen))
+		{	/* Emit a warning if there is an issue*/
+			UTF8_BADCHAR_DEC(0, ptr, ptrtop, 0, NULL);
+			return FALSE;
+		}
+	}
+	return TRUE;
 }

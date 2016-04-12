@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +24,7 @@
 #include "gdsbml.h"
 #include "mupint.h"
 #include "gtmmsg.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
@@ -87,10 +86,8 @@ boolean_t mu_int_fhead(void)
 	gtm_uint64_t		size, native_size;
 	trans_num		temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t	mu_data;
-#	ifdef GTM_CRYPT
 	gd_segment		*seg;
 	int			gtmcrypt_errno;
-#	endif
 
 	mu_data = &mu_int_data;
 	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
@@ -168,18 +165,21 @@ boolean_t mu_int_fhead(void)
         }
 	if (MAX_KEY_SZ < mu_data->max_key_size)
 		mu_int_err(ERR_DBMAXKEYEXC, 0, 0, 0, 0, 0, 0, 0);
-#	ifdef GTM_CRYPT
-	if (mu_data->is_encrypted)
+	gtmcrypt_errno = 0;
+	seg = gv_cur_region->dyn.addr;
+	if (IS_ENCRYPTED(mu_data->is_encrypted))
 	{
-		GTMCRYPT_HASH_CHK(cs_addrs, mu_data->encryption_hash, gtmcrypt_errno);
-		if (0 != gtmcrypt_errno)
-		{
-			seg = gv_cur_region->dyn.addr;
-			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
-			return FALSE;
-		}
+		GTMCRYPT_HASH_CHK(cs_addrs, mu_data->encryption_hash, seg->fname_len, (char *)seg->fname, gtmcrypt_errno);
 	}
-#	endif
+	if ((0 == gtmcrypt_errno) && USES_NEW_KEY(mu_data))
+	{
+		GTMCRYPT_HASH_CHK(cs_addrs, mu_data->encryption_hash2, seg->fname_len, (char *)seg->fname, gtmcrypt_errno);
+	}
+	if (0 != gtmcrypt_errno)
+	{
+		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+		return FALSE;
+	}
 	/* !tn_reset_this_reg should ideally be used here instead of (!tn_reset_specified || gv_cur_region->read_only).
 	 * But at this point, tn_reset_this_reg has not yet been set for this region and to avoid taking a risk in
 	 *   changing the code flow, we redo the computation ot tn_reset_this_reg here. This is not as much a performance concern.

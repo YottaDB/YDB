@@ -28,7 +28,6 @@
 
 GBLREF	unsigned char	*source_buffer;
 GBLREF	int		source_column;
-GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	boolean_t	run_time;
@@ -63,14 +62,14 @@ void advancewindow(void)
 
 	SETUP_THREADGBL_ACCESS;
 	TREF(last_source_column) = source_column;
-	source_column = (unsigned char *)lexical_ptr - source_buffer + 1;
+	source_column = (unsigned char *)TREF(lexical_ptr) - source_buffer + 1;
 	TREF(window_token) = TREF(director_token);
 	TREF(window_mval) = TREF(director_mval);
 	(TREF(director_mval)).mvtype = 0; /* keeps mval from being GC'd since it is not useful until re-used */
 	tmp = (TREF(window_ident)).addr;  /* More efficient to swap pointers between window_ident.addr & director_ident.addr */
 	TREF(window_ident) = TREF(director_ident);	/* than to copy text from director_ident to window_ident */
 	(TREF(director_ident)).addr = tmp;
-	x = *lexical_ptr;
+	x = *TREF(lexical_ptr);
 	switch (y = ctypetab[x])
 	{
 	case TK_EOL:
@@ -78,7 +77,7 @@ void advancewindow(void)
 		return;		/* if next character is terminator, avoid incrementing past it */
 	case TK_QUOTE:
 		ENSURE_STP_FREE_SPACE(TREF(max_advancewindow_line));
-		cp1 = (unsigned char *)lexical_ptr + 1;
+		cp1 = (unsigned char *)TREF(lexical_ptr) + 1;
 		cp2 = cp3 = stringpool.free;
 		for (;;)
 		{
@@ -136,7 +135,7 @@ void advancewindow(void)
 #			endif
 			assert(cp2 <= stringpool.top);
 		}
-		lexical_ptr = (char *)cp1;
+		TREF(lexical_ptr) = (char *)cp1;
 		TREF(director_token) = TK_STRLIT;
 		(TREF(director_mval)).mvtype = MV_STR;
 		(TREF(director_mval)).str.addr = (char *)cp3;
@@ -149,7 +148,7 @@ void advancewindow(void)
 		{	/* UTF8 mode and not compiling an indirect gets an optimization to set the
 			 * (true) length of the string into the mval
 			 */
-			charlen = utf8_len_stx(&(TREF(director_mval)).str);
+			charlen = utf8_len_dec(&(TREF(director_mval)).str);
 			if (0 > charlen)	/* got a BADCHAR error */
 				TREF(director_token) = TK_ERROR;
 			else
@@ -169,7 +168,7 @@ void advancewindow(void)
 		{
 			if (cp2 < cp3)
 				*cp2++ = x;
-			y = ctypetab[x = *++lexical_ptr];			/* note assignment */
+			y = ctypetab[x = *++(TREF(lexical_ptr))];			/* note assignment */
 			if ((TK_UPPER != y) && (TK_DIGIT != y) && (TK_LOWER != y))
 				break;
 		}
@@ -177,14 +176,14 @@ void advancewindow(void)
 		TREF(director_token) = TK_IDENT;
 		return;
 	case TK_PERIOD:
-		if (ctypetab[x = *(lexical_ptr + 1)] != TK_DIGIT)		/* note assignment */
+		if (ctypetab[x = *(TREF(lexical_ptr) + 1)] != TK_DIGIT)		/* note assignment */
 			break;
 	case TK_DIGIT:
-		(TREF(director_mval)).str.addr = lexical_ptr;
+		(TREF(director_mval)).str.addr = TREF(lexical_ptr);
 		(TREF(director_mval)).str.len = TREF(max_advancewindow_line);
 		(TREF(director_mval)).mvtype = MV_STR;
 		CLEAR_MVAL_BITS(TADR(director_mval));
-		lexical_ptr = (char *)s2n(&(TREF(director_mval)));
+		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));
 		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
 		{
 			stx_error(ERR_NUMOFLOW);
@@ -198,28 +197,28 @@ void advancewindow(void)
 		} else
 		{
 			TREF(director_token) = TK_INTLIT ;
-			(TREF(director_mval)).str.len = INTCAST(lexical_ptr - (TREF(director_mval)).str.addr);
+			(TREF(director_mval)).str.len = INTCAST(TREF(lexical_ptr) - (TREF(director_mval)).str.addr);
 			ENSURE_STP_FREE_SPACE((TREF(director_mval)).str.len);
 			memcpy(stringpool.free, (TREF(director_mval)).str.addr, (TREF(director_mval)).str.len);
 			assert (stringpool.free <= stringpool.top) ;
 		}
 		return;
 	case TK_APOSTROPHE:
-		if (32 <= (x = *++lexical_ptr))				/* note assignment */
+		if (32 <= (x = *++(TREF(lexical_ptr))))				/* note assignment */
 		{
 			x -= 32;
 			if (x < ARRAYSIZE(apos_ok))
 			{
 				if (y = apos_ok[x])
 				{
-					if (DEL < (x = *++lexical_ptr))		/* note assignment */
+					if (DEL < (x = *++(TREF(lexical_ptr))))		/* note assignment */
 					{
 						TREF(director_token) = TK_ERROR;
 						return;
 					}
 					if (TK_RBRACKET == ctypetab[x])
 					{
-						lexical_ptr++;
+						(TREF(lexical_ptr))++;
 						y = TK_NSORTS_AFTER;
 					}
 					TREF(director_token) = y;
@@ -231,57 +230,57 @@ void advancewindow(void)
 		return;
 	case TK_GREATER:
 	case TK_LESS:
-		if (TK_EQUAL == ctypetab[*(lexical_ptr + 1)])
+		if (TK_EQUAL == ctypetab[*(TREF(lexical_ptr) + 1)])
 		{
-			++lexical_ptr;
+			++(TREF(lexical_ptr));
 			y = ((TK_LESS == y) ? TK_NGREATER : TK_NLESS);
 		}
 		break;
 	case TK_SEMICOLON:
-		while (*++lexical_ptr)
+		while (*++(TREF(lexical_ptr)))
 			;
-		assert(TK_EOL == ctypetab[*lexical_ptr]);
+		assert(TK_EOL == ctypetab[*TREF(lexical_ptr)]);
 		TREF(director_token) = TK_EOL;
 		return;		/* if next character is terminator, avoid incrementing past it */
 	case TK_ASTERISK:
-		if (DEL < (x = *(lexical_ptr + 1)))				/* note assignment */
+		if (DEL < (x = *(TREF(lexical_ptr) + 1)))				/* note assignment */
 		{
 			TREF(director_token) = TK_ERROR;
 			return;
 		}
 		if (TK_ASTERISK == ctypetab[x])
 		{
-			lexical_ptr++;
+			(TREF(lexical_ptr))++;
 			y = TK_EXPONENT;
 		}
 		break;
 	case TK_RBRACKET:
-		if ((x = *(lexical_ptr + 1)) > DEL)				/* note assignment */
+		if ((x = *(TREF(lexical_ptr) + 1)) > DEL)				/* note assignment */
 		{
 			TREF(director_token) = TK_ERROR;
 			return;
 		}
 		if (TK_RBRACKET == ctypetab[x])
 		{
-			lexical_ptr++;
+			(TREF(lexical_ptr))++;
 			y = TK_SORTS_AFTER;
 		}
 		break;
 	case TK_ATSIGN:
-		if (DEL < (x = *(lexical_ptr + 1)))				/* note assignment */
+		if (DEL < (x = *(TREF(lexical_ptr) + 1)))				/* note assignment */
 		{
 			TREF(director_token) = TK_ERROR;
 			return;
 		}
 		if (TK_HASH == ctypetab[x])
 		{
-			lexical_ptr++;
+			(TREF(lexical_ptr))++;
 			y = TK_ATHASH;
 		}
 	default:
 		;
 	}
-	lexical_ptr++;
+	(TREF(lexical_ptr))++;
 	TREF(director_token) = y;
 	return;
 }
@@ -298,8 +297,8 @@ void advancewindow(void)
  * All other uses still prohibit '#' from being in an MNAME. Routines that need to allow # in a name can call this routine to
  * recombine the existing token and the look-ahead (director) token such that '#' is considered part of an mident.
  *
- * Update: Like '#', we need to allow '/' as well to allow for an overriding region name to be specified (where the
- * trigger needs to be searched. So handle that as well in this same function.
+ * Update: Like '#', we need to allow '/' as well to allow for an overriding region name of up to 31 characters to be
+ * specified (where the trigger needs to be searched. So handle that as well in this same function.
  */
 void advwindw_hash_in_mname_allowed(void)
 {
@@ -320,9 +319,9 @@ void advwindw_hash_in_mname_allowed(void)
 		cp2--;
 	*cp2++ = '#';	/* We are only called if director token is '#' so put that char in buffer now */
 	/* Start processing with the token following the '#'. Allow '#' and/or '/' in addition to usual stuff. */
-	for (x = *lexical_ptr, ch = ctypetab[x];
+	for (x = *TREF(lexical_ptr), ch = ctypetab[x];
 	     ((TK_UPPER == ch) || (TK_DIGIT == ch) || (TK_LOWER == ch) || (TK_HASH == ch) || (TK_SLASH == ch));
-	     x = *++lexical_ptr, ch = ctypetab[x])
+	     x = *++(TREF(lexical_ptr)), ch = ctypetab[x])
 	{
 		if (cp2 < cp3)
 			*cp2++ = x;

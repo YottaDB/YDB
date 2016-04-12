@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,16 +17,22 @@
  * the sleep function results in SIGARLM handler being silently deleted on Solaris systems (through Solaris 9 at least). This leads
  * to lost timer pops and has the potential for system hangs. The proper long sleep mechanism is hiber_start which can be accessed
  * through the LONG_SLEEP macro defined in mdef.h.
+ *
+ * On Linux boxes be sure to define USER_HZ macro (in gt_timers.c) appropriately to mitigate the timer clustering imposed by
+ * the OS. Historically, the USER_HZ value has defaulted to 100 (same as HZ), thus resulting in at most 10ms accuracy when
+ * delivering timed events.
  */
 
 void m_usleep(int useconds);
 
-# if !defined(_AIX) && !defined(__osf__) && !defined(__hpux) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__)
-#   if !defined(__MVS__) && !defined(__CYGWIN__)
+#if !defined(_AIX) && !defined(__osf__) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__)
+#   if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
 #      error "Unsure of support for sleep functions on this platform"
 #   endif
-# endif
+#endif
 
+#if defined(__MVS__) || defined(__CYGWIN__) || defined(__hpux) || defined(_AIX)
+/* For HP-UX the clock_* seem to be missing; for AIX the accuracy of clock_* is currently poor */
 #define SET_EXPIR_TIME(NOW_TIMEVAL, EXPIR_TIMEVAL, SECS, USECS)				\
 MBSTART {										\
 	gettimeofday(&(NOW_TIMEVAL), NULL);						\
@@ -58,14 +64,15 @@ MBSTART {										\
 		USECS = (int)((EXPIR_TIMEVAL).tv_usec - (NOW_TIMEVAL).tv_usec);		\
 	}										\
 
-#ifdef __MVS__
+#if defined(__MVS__) || defined(__CYGWIN__)
 /* On z/OS neither clock_nanosleep nor nanosleep is available, so use a combination of sleep, usleep, and gettimeofday instead.
  * Since we do not have a z/OS box presently, this implementation has not been tested, and so it likely needs some casts at the very
  * least. Another note is that sleep is unsafe to mix with timers on other platforms, but on z/OS the documentation does not mention
  * any fallouts, so this should be verified. If it turns out that sleep is unsafe, we might have to use pthread_cond_timewait or
  * call usleep (which, given that we have used it on z/OS before, should be safe) in a loop.
- */
-#  define SLEEP_USEC(MICROSECONDS, RESTART)						\
+ * Due to the above stated limitations the minimum sleep on z/OS is 1 Usec
+ * cywin is a mystery so assume the worst */
+#define SLEEP_USEC(MICROSECONDS, RESTART)						\
 MBSTART {										\
 	int 		secs, interrupted;						\
 	useconds_t	usecs;								\
@@ -100,14 +107,9 @@ MBSTART {										\
 	}										\
 } MBEND
 #else
-/* On most UNIX platforms a combination of nanosleep() and gettimeofday() proved to be the most supported, accurate, and
+
+/* For most UNIX platforms a combination of nanosleep() and gettimeofday() proved to be the most supported, accurate, and
  * operationally sound approach. Alternatives for implementing high-resolution sleeps include clock_nanosleep() and nsleep()
- * (AIX only); however, neither of those provide better accuracy or speed. Additionally, the clock_gettime() function does not
- * prove to be any faster than gettimeofday(), and since we do not (yet) operate at sub-millisecond levels, it is not utilized.
- *
- * On Linux boxes be sure to define USER_HZ macro (in gt_timers.c) appropriately to mitigate the timer clustering imposed by
- * the OS. Historically, the USER_HZ value has defaulted to 100 (same as HZ), thus resulting in at most 10ms accuracy when
- * delivering timed events.
  */
 #  define SLEEP_USEC(MICROSECONDS, RESTART)						\
 MBSTART {										\
@@ -132,4 +134,52 @@ MBSTART {										\
 } MBEND
 #endif
 
+# define NANOSLEEP(NANOSECONDS, RESTART)						\
+MBSTART {										\
+	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);	\
+} MBEND
+#endif
+#if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
+/* Nonetheless, because we continue to press for the highest time discrimination available, where posible we use
+ * clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually promise
+ * sub-millisecond accuracy
+ *
+ * Because, as of this writing, in AIX the clock_* routines are so erratic with short times we use the functions above for most
+ * things but give the following macro a separate name so AIX can use it in op_hang.c to ensure that a 1 second sleep always
+ * puts the process in a different second as measured by $HOROLOG and the like.
+ */
+# define CLOCK_NANOSLEEP(NANOSECONDS, RESTART)							\
+MBSTART {											\
+	int 		STATUS;									\
+	struct timespec	REQTIM;									\
+												\
+	assert(0 < (NANOSECONDS));								\
+	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
+	REQTIM.tv_nsec += (long)(NANOSECONDS);							\
+	if (E_9 <= REQTIM.tv_nsec)								\
+	{											\
+		REQTIM.tv_sec += (time_t)(REQTIM.tv_nsec / E_9);				\
+		REQTIM.tv_nsec %= E_9;								\
+	}											\
+	do											\
+	{											\
+		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
+		if (!RESTART || (0 == STATUS))							\
+			break;									\
+		assertpro (EINTR == STATUS);							\
+	} while (TRUE);										\
+} MBEND
+
+#if !defined(_AIX)
+# define SLEEP_USEC(MICROSECONDS, RESTART)						\
+MBSTART {										\
+	NANOSLEEP(((MICROSECONDS) * 1000), RESTART);					\
+} MBEND
+
+# define NANOSLEEP(NANOSECONDS, RESTART)						\
+MBSTART {										\
+	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);					\
+} MBEND
+#endif
+#endif
 #endif /* SLEEP_H */

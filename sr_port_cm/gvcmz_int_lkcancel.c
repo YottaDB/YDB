@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +12,7 @@
 
 #include "mdef.h"
 
-#if defined(VMS)
-#include <ssdef.h>
-#endif
-
-#if defined(UNIX)
-#include <signal.h>
-#endif
+#include "gtm_signal.h"
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -44,6 +39,9 @@ GBLREF unsigned char	lkerror;
 GBLREF struct CLB	*lkerrlnk;
 GBLREF unsigned char	cmlk_num;
 
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_TEXT);
+
 #define CM_LKCANCEL_WAIT_TIME	100 /* ms */
 
 void gvcmz_int_lkcancel(void)
@@ -56,15 +54,11 @@ void gvcmz_int_lkcancel(void)
 	uint4			status, norm_stat;
 	int			loopcounter = 0;
 	struct CLB		*p;
-	CMI_MUTEX_DECL;
+	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DEBUG_ONLY(void		(*oldast)();)
 
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_TEXT);
-
-	if (!ntd_root)
-		GTMASSERT;
-	CMI_MUTEX_BLOCK;
+	assertpro(ntd_root);
+	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 	action = CMMS_L_LKCANCEL;
 	temp[0] = CMMS_S_INTERRUPT;
 	temp[3] = action;
@@ -103,7 +97,7 @@ void gvcmz_int_lkcancel(void)
 				((link_info *)(p->usr))->neterr = TRUE;
 			/* safe to always enable since error ??? smw 96/11 */
 				VMS_ONLY(was_setast = SS$_WASSET;) /* to force ENABLE_AST in CMI_MUTEX_RESTORE */
-				CMI_MUTEX_RESTORE;
+				CMI_MUTEX_RESTORE(cmi_mutex_rc);
 				gvcmz_error(action, status);
 				return;
 			}
@@ -116,7 +110,7 @@ void gvcmz_int_lkcancel(void)
 					((link_info *)(p->usr))->neterr = TRUE;
 				/* safe to always enable since error ??? smw 96/11 */
 					VMS_ONLY(was_setast = SS$_WASSET;) /* to force ENABLE_AST in CMI_MUTEX_RESTORE */
-					CMI_MUTEX_RESTORE;
+					CMI_MUTEX_RESTORE(cmi_mutex_rc);
 					gvcmz_error(action, status);
 					return;
 				}
@@ -128,7 +122,7 @@ void gvcmz_int_lkcancel(void)
 			count++;
 		}
 	}
-	CMI_MUTEX_RESTORE;
+	CMI_MUTEX_RESTORE(cmi_mutex_rc);
 /* 97/6/23 smw need to rethink break condition here */
 	while (lkcancel_count < count && !lkerror)
 	{
@@ -144,7 +138,7 @@ void gvcmz_int_lkcancel(void)
 			if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 			{
 				SPRINTF(errbuf, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
-				rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 			} else
 				gvcmz_errmsg(lkerrlnk, FALSE);
 		}

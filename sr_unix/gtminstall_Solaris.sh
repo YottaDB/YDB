@@ -1,7 +1,8 @@
 #!/usr/xpg4/bin/sh -
 #################################################################
 #                                                               #
-#       Copyright 2014 Fidelity Information Services, Inc       #
+# Copyright (c) 2014-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -32,6 +33,7 @@
 # 2011-05-03  0.11 K.S. Bhaskar - Allow for letter suffix releases
 # 2011-10-25  0.12 K.S. Bhaskar - Support option to delete .o files on shared library platforms
 # 2014-08-13  0.13 K.S. Bhaskar - Add verbosity around getting latest version and tarball, if requested
+# 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -425,7 +427,6 @@ if [ "Y" = "$gtm_prompt_for_group" -o 54002 -le `echo $gtm_version | cut -s -d V
 fi
 if [ "N" = "$gtm_group_already" ] ; then
     echo $gtm_group_restriction >>$gtm_configure_in
-    if [ "Y" = "$gtm_group_restriction" ] ; then echo $gtm_group >>$gtm_configure_in ; fi
 fi
 echo $gtm_installdir >>$gtm_configure_in
 echo y >>$gtm_configure_in
@@ -458,6 +459,7 @@ chmod +x configure.sh
 if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit ; fi
 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
+if [ $? -gt 0 ] ; then cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Installation complete ; ls -l $gtm_installdir ; fi
 
 # Create copies of environment scripts and gtm executable
@@ -465,7 +467,7 @@ if [ -d "$gtm_linkenv" ] ; then
     ( cd $gtm_linkenv ; ln -s $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 else if [ -d "$gtm_copyenv" ] ; then
-        ( cd $gtm_linkenv ; cp $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
+        ( cd $gtm_copyenv ; cp $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
      fi
 fi
@@ -473,7 +475,7 @@ if [ -d "$gtm_linkexec" ] ; then
     ( cd $gtm_linkexec ; ln -s $gtm_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 else if [ -d "$gtm_copyexec" ] ; then
-        ( cd $gtm_linkexec ; cp $gtm_installdir/gtm ./ )
+        ( cd $gtm_copyexec ; cp $gtm_installdir/gtm ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
      fi
 fi

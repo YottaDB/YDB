@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,11 +96,11 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 			/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
 			if (csd->jnl_sync_io && !mupip_jnl_recover)
 			{
-				OPENFILE_SYNC((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
+				OPENFILE_SYNC_CLOEXEC((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
 				jpc->sync_io = TRUE;
 			} else
 			{
-				OPENFILE((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
+				OPENFILE_CLOEXEC((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
 				jpc->sync_io = FALSE;
 			}
 			/* Check that if ever open errors out (i.e. return status is FD_INVALID=-1),
@@ -149,11 +150,11 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
 		if (csd->jnl_sync_io && !mupip_jnl_recover)
 		{
-			OPENFILE_SYNC((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
+			OPENFILE_SYNC_CLOEXEC((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
 			jpc->sync_io = TRUE;
 		} else
 		{
-			OPENFILE((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
+			OPENFILE_CLOEXEC((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
 			jpc->sync_io = FALSE;
 		}
 		/* Check that if ever open errors out (i.e. return status is FD_INVALID=-1,

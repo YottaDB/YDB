@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +34,7 @@
 #define GDL_DumpOnStackOFlow	0x00000400	/* (1024) When get a stack overflow, generate a core */
 #define GDL_ZSHOWDumpOnSignal	0x00000800	/* (2048) Don't supress GTM_FATAL file creation when get a signal */
 #define GDL_PrintIndCacheStats	0x00001000	/* (4096) Print indirect cacheing stats */
-#define GDL_PrintPieceStats	0x00002000	/* (8192) Print stats on $Piece cacheing (debug only) */
+#define GDL_PrintCacheStats	0x00002000	/* (8192) Print stats on $Piece and UTF8 cacheing (debug only) */
 #define GDL_DebugCompiler	0x00004000	/* (16384) Turn on compiler debugging */
 #define GDL_SmDump		0x00008000	/* (32768) Do full blown storage dump -- only useful in debug mode */
 #define GDL_PrintEntryPoints	0x00010000	/* (65536) Print address of entry points when they are loaded/resolved */
@@ -41,4 +42,5 @@
 #define GDL_SmInitAlloc		0x00040000	/* (262144) Initialize all storage allocated or deallocated with 0xdeadbeef */
 #define GDL_PrintPipeIntStats	0x00080000	/* (524288) Print Pipe/Fifo(rm) interrupt stats on exit */
 #define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
+#define GDL_PrintPMAPStats	0x00200000	/* (2097152) Print process memory map on exit (using pmap or procmap utility) */
 #endif

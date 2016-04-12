@@ -12,11 +12,6 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-# include <ssdef.h>
-# include "efn.h"
-# include "timedef.h"
-#endif
 #ifdef DEBUG
 # include "gtm_stdio.h"
 #endif
@@ -29,7 +24,7 @@
 #include "rel_quant.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
-#if defined(DEBUG) && defined(UNIX)
+#if defined(DEBUG)
 # include "hashtab_mname.h"
 # include "rtnhdr.h"
 # include "stack_frame.h"
@@ -61,10 +56,8 @@
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
-#ifdef UNIX
 #include "sleep.h"
 #include "time.h"
-#endif
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	mv_stent	*mv_chain;
@@ -103,10 +96,7 @@ void op_hang(mval* num)
 	double		tmp;
 	mv_stent	*mv_zintcmd;
 	ABS_TIME	cur_time, end_time;
-#	ifdef VMS
-	uint4 		time[2];
-	int4		efn_mask, status;
-#	endif
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -128,14 +118,14 @@ void op_hang(mval* num)
 	{
 		if (TREF(tpnotacidtime) * 1000 < ms)
 			TPNOTACID_CHECK(HANGSTR);
-#		if defined(DEBUG) && defined(UNIX)
+#		if defined(DEBUG)
 		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > gtm_white_box_test_case_count) && (123000 == ms))
-		{
-			DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+		{	/* LONG_SLEEP messes with signals */
+			DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 			DBGFPF((stderr, "OP_HANG: will sleep for 20 seconds\n"));
 			LONG_SLEEP(20);
 			DBGFPF((stderr, "OP_HANG: done sleeping\n"));
-			ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+			ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 			return;
 		}
 		if (WBTEST_ENABLED(WBTEST_BREAKMPC)&& (0 == gtm_white_box_test_case_count) && (999 == ms))
@@ -182,31 +172,11 @@ void op_hang(mval* num)
 			if (0 == ms)
 				return;		/* done HANGing */
 		}
-#		ifdef UNIX
 		if (ms < 10)
 			SLEEP_USEC(ms * 1000, TRUE);	/* Finish the sleep if it is less than 10ms. */
 		else
 			hiber_start(ms);
-#		elif defined(VMS)
-		time[0] = -time_low_ms(ms);
-		time[1] = -time_high_ms(ms) - 1;
-		efn_mask = (1 << efn_outofband | 1 << efn_timer);
-		if (SS$_NORMAL != (status = sys$setimr(efn_timer, &time, NULL, &time, 0)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$setimr"), CALLFROM, status);
-		if (SS$_NORMAL != (status = sys$wflor(efn_outofband, efn_mask)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$wflor"), CALLFROM, status);
-		if (outofband)
-		{
-			if (SS$_WASCLR == (status = sys$readef(efn_timer, &efn_mask)))
-			{
-				if (SS$_NORMAL != (status = sys$cantim(&time, 0)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$cantim"),
-						CALLFROM, status);
-			} else
-				assertpro(SS$_WASSET == status);
-		}
-#		endif
-	} else
+	} else	/* the rel_quant below seems legitimate */
 		rel_quant();
 	if (outofband)
 	{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,7 @@ Return:
 	cdb_sc_normal on success
 	failure code on concurrency failure
  *******************************************************************************************/
-enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,
+enum cdb_sc gvcst_expand_any_key (srch_blk_status *blk_stat, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,
 	int *rec_size, int *keylen, int *keycmpc, srch_hist *hist_ptr)
 {
 	enum cdb_sc	 	status;
@@ -73,9 +74,10 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 	int			tblk_size;
 	block_id		tblk_num;
 	sm_uc_ptr_t 		rPtr1, rPtr2, curptr;
+	sm_uc_ptr_t		blk_base;
 
-
-	cur_level = ((blk_hdr_ptr_t)blk_base)->levl;
+	blk_base = blk_stat->buffaddr;
+	cur_level = blk_stat->level;
 	curptr = blk_base + SIZEOF(blk_hdr);
 	*rec_size = *keycmpc = *keylen = 0;
 	while (curptr < rec_top)
@@ -83,7 +85,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 		GET_RSIZ(*rec_size, curptr);
 		if (0 == cur_level || BSTAR_REC_SIZE != *rec_size)
 		{
-			READ_RECORD(status, rec_size, keycmpc, keylen, expanded_key, cur_level, blk_base, curptr);
+			READ_RECORD(status, rec_size, keycmpc, keylen, expanded_key, cur_level, blk_stat, curptr);
 			if (cdb_sc_normal != status)
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -135,7 +137,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 			tblk_size = ((blk_hdr_ptr_t)blk_base)->bsiz;
 			/* expand *-key from right most leaf level block of the
 			   sub-tree, of which, the original block is root  */
-			if (cdb_sc_normal != (status = (gvcst_expand_any_key(blk_base, blk_base + tblk_size,
+			if (cdb_sc_normal != (status = (gvcst_expand_any_key(&hist_ptr->h[cur_level], blk_base + tblk_size,
 				expanded_star_key, &star_rec_size, &star_keylen, &star_keycmpc, hist_ptr))))
 				return status;
 			if (*keylen + *keycmpc) /* Previous key exists */
@@ -158,5 +160,3 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 		return cdb_sc_rmisalign;
 	}
 }
-
-

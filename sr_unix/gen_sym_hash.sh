@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010, 2012 Fidelity Information Services, Inc 	#
+# Copyright (c) 2010-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -57,14 +58,15 @@ encrypted_key_file="$1"
 $ECHO $ECHO_OPTIONS $algorithm\\c >$tmp_file
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-elif [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Get passphrase for GnuPG keyring
 $ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
 
-$ECHO $passphrase | $gpg --no-tty --batch --passphrase-fd 0 -d $encrypted_key_file | cat - $tmp_file | $gpg --print-md SHA512 | tr -d ' \n'
+$ECHO $passphrase | $gpg --no-tty --batch --passphrase-fd 0 -d $encrypted_key_file | \
+	cat - $tmp_file | $gpg --print-md SHA512 | tr -d ' \n'
 $ECHO
 
 rm -f $tmp_file

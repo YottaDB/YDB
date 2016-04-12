@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,9 +59,10 @@ THREADGBLDEF(ind_result,			mval *)				/* pointer to indirection return location 
 THREADGBLDEF(ind_source,			mval *)				/* pointer to indirection source location */
 THREADGBLDEF(indirection_mval,			mval)				/* used for parsing subscripted indirection */
 THREADGBLDEF(last_source_column,		int)				/* parser tracker */
-THREADGBLDEF(max_advancewindow_line,		int4)				/* the maximum source line length */
+THREADGBLDEF(lexical_ptr,			char *)				/* parser character position */
 THREADGBLDEF(linkage_first,			struct linkage_entry *)		/* Start of linkage (extern) list this routine */
 THREADGBLDEF(linkage_last,			struct linkage_entry *)		/* Last added entry */
+THREADGBLDEF(max_advancewindow_line,		int4)				/* the maximum source line length */
 #ifdef USHBIN_SUPPORTED
 THREADGBLDEF(objhash_state,			hash128_state_t)		/* Seed value - progressive hash of object file */
 #endif
@@ -144,29 +145,28 @@ THREADGBLDEF(gv_sparekey_mval,			mval)				/* gv_xform_key working memory */
 THREADGBLDEF(gv_sparekey_size,			int4)				/* part gv_xform_key working memory mechanism */
 THREADGBLDEF(gv_tporigkey_ptr,			gv_orig_key_array *)		/* copy of gv_currkey at outermost TSTART */
 THREADGBLDEF(gv_tporig_extnam_str,		mstr)				/* copy of extnam_str at outermost TSTART */
+THREADGBLDEF(in_gvcst_bmp_mark_free,		boolean_t)			/* May need to skip online rollback cleanup or
+										 * gvcst_redo_root_search on a restart */
 THREADGBLDEF(in_gvcst_redo_root_search,		boolean_t)			/* TRUE if gvcst_redo_root_search is in C-stack */
 THREADGBLDEF(in_op_gvget,			boolean_t)			/* TRUE if op_gvget() is a C-stack call ancestor */
 THREADGBLDEF(issue_DBROLLEDBACK_anyways,	boolean_t)			/* currently set by MUPIP LOAD */
 THREADGBLDEF(last_fnquery_return_subcnt,	int)				/* count subscript in last_fnquery_return_sub */
 THREADGBLDEF(last_fnquery_return_varname,	mval)				/* returned varname of last $QUERY() */
-#ifdef VMS
-THREADGBLDEF(new_dbinit_ipc,			int4)				/* indicates whether shared memory/semaphore is
-										 * created by db_init (also used by dbinit_ch) */
-#endif
+THREADGBLDEF(nontprestart_count,		uint4)				/* non-tp restart counter */
+THREADGBLDEF(nontprestart_log_first,		int4)				/* # of non-tp restarts logged unconditionally */
+THREADGBLDEF(nontprestart_log_delta,		int4)				/* defines every n-th restart to be logged for
+										 * non-tp */
+THREADGBLDEF(block_now_locked,			cache_rec_ptr_t)		/* db_csh_getn sets for secshr_sb_clnup exit */
 THREADGBLDEF(ok_to_call_wcs_recover,		boolean_t)			/* Set to TRUE before a few wcs_recover callers.
 										 * Any call to wcs_recover in the final retry
 										 * assert to prevent cache recovery while in a
 										 * transaction and confuse things enough to cause
 										 * further restarts (which is out-of-design while
 										 * in the final retry). */
-THREADGBLDEF(in_gvcst_bmp_mark_free,		boolean_t)			/* May need to skip online rollback cleanup or
-										 * gvcst_redo_root_search on a restart */
 THREADGBLDEF(prev_gv_target,			gv_namehead *)			/* saves the last gv_target for debugging */
 THREADGBLDEF(ready2signal_gvundef,		boolean_t)			/* TRUE if GET operation about to signal GVUNDEF */
-#ifdef UNIX
 THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be saved and restored during
 										 * gvcst_redo_root_search */
-#endif
 THREADGBLDEF(semwait2long,			volatile boolean_t)		/* Waited too long for a semaphore */
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
 THREADGBLDEF(tpnotacidtime,			int4)				/* limit for long non-ACID ops in transactions */
@@ -174,8 +174,8 @@ THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
 THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */
 THREADGBLDEF(tp_restart_failhist_indx,		int4)				/* tp_restart dbg restart history index */
-THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to be logged */
-THREADGBLDEF(tprestart_syslog_limit,		int4)				/* # of TP restarts logged unconditionally */
+THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to be logged for tp */
+THREADGBLDEF(tprestart_syslog_first,		int4)				/* # of TP restarts logged unconditionally */
 THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
@@ -190,8 +190,7 @@ THREADGBLDEF(local_coll_nums_as_strings,	boolean_t)			/* flag controlling whethe
 										 * evaluate to numbers are treated like numbers
 										 * (collating before strings) or like strings in
 										 * local collations */
-THREADGBLDEF(lv_null_subs,			int)				/* UNIX: set in gtm_env_init_sp(),
-										 * VMS: set in gtm$startup() */
+THREADGBLDEF(lv_null_subs,			int)				/* set in gtm_env_init_sp() */
 THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation buffer,which extends
 										 * from 32K each time the buffer overflows */
 
@@ -216,17 +215,13 @@ THREADGBLDEF(dollar_zclose,			int)				/* ISV (set to close status for PIPE devic
 THREADGBLDEF(dollar_zroutines,			mstr)				/* routine search list */
 THREADGBLDEF(error_on_jnl_file_lost,		unsigned int)			/* controls error handling done by jnl_file_lost.
 										 * 0 (default) : Turn off journaling and continue.
-										 * 1 : Keep journaling on, throw rts_error.
-										 * VMS does not supports this and requires it to
-										 * be 0. */
-#ifdef UNIX
+										 * 1 : Keep journaling on, throw rts_error */
 THREADGBLDEF(fnzsearch_lv_vars,			lv_val *)			/* op_fnzsearch lv tree anchor */
 THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* op_fnzsearch subscript constuctor */
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* op_fnzsearch temp for null subs control */
 THREADGBLDEF(fnzsearch_globbuf_ptr,		glob_t *)			/* op_fnzsearch temp for pointing to glob results */
-#endif
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
-#if defined(UNIX) && defined(GTMDBGFLAGS_ENABLED)
+#if defined(GTMDBGFLAGS_ENABLED)
 THREADGBLDEF(gtmdbgflags,			int)
 THREADGBLDEF(gtmdbgflags_freq,			int)
 THREADGBLDEF(gtmdbgflags_freq_cntr,		int)
@@ -259,10 +254,6 @@ THREADGBLDEF(lab_proxy,				lab_tabent_proxy)		/* Placeholder storing lab_ln_ptr 
 										 * pointer and has_parms value, so they are
 										 * contiguous in memory */
 #endif
-#ifdef VMS
-THREADGBLDEF(lbl_tbl_entry_index,		int)				/* Index of currently compiled label table entry */
-THREADGBLAR1DEF(login_time,			int4,		2)		/* */
-#endif
 THREADGBLDEF(mprof_alloc_reclaim,		boolean_t)			/* Flag indicating whether the temporarily allocated
 										 * memory should be reclaimed */
 THREADGBLDEF(mprof_chunk_avail_size,		int)				/* Number of mprof stack frames that can fit in
@@ -287,18 +278,14 @@ THREADGBLDEF(relinkctl_shm_min_index,		int)				/* Minimum size of rtnobj shared 
 										 */
 THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects in rtnobj shm */
 #endif
-#ifdef UNIX
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
-#endif
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
-#ifdef UNIX
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */
 THREADGBLDEF(zpeek_reg_ptr,			gd_region *)			/* Resolved pointer for zpeekop_regname */
 THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or fifo device is
 										 * interrupted */
-#endif
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
 THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted */
 #ifdef AUTORELINK_SUPPORTED
@@ -314,18 +301,18 @@ THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage fo
 THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */
-#ifdef UNIX
 THREADGBLDEF(zsearch_var,			lv_val *)			/* UNIX $zsearch() lookup variable */
-#endif
 THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
 THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
 THREADGBLDEF(socket_handle_counter,		int)				/* Counter for generated socket handles */
 
 /* Larger structures and char strings */
-THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed))	/* Buffer for director_ident */
+THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed)*2)	/* Buffer for director_ident */
 THREADGBLDEF(fnpca,				fnpc_area)			/* $Piece cache structure area */
 THREADGBLAR1DEF(for_stack,			oprtype *,	MAX_FOR_STACK)	/* Stacks FOR scope complete (compilation) addrs */
 THREADGBLAR1DEF(for_temps,			boolean_t,	MAX_FOR_STACK)	/* Stacked flags of FOR control value temps */
+THREADGBLDEF(gtm_utfcgr_strings,		int)				/* Strings we can keep UTF8 parsing cache for */
+THREADGBLDEF(gtm_utfcgr_string_groups,		int)				/* Groups of chars we can keep for each string */
 THREADGBLAR1DEF(last_fnquery_return_sub,	mval,		MAX_LVSUBSCRIPTS)/* Returned subscripts of last $QUERY() */
 THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collation
 										 * transformations, which must not nest - i.e.
@@ -333,22 +320,21 @@ THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collat
 										 * or itself. This kind of nesting would cause
 										 * overwriting of the buffer */
 THREADGBLDEF(protmem_ba,			mstr)				/* Protected buffer */
-#ifdef UNIX
 THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      /* Parameter strings buffer */
 THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* Array element allocation length */
 THREADGBLAR1DEF(parm_str_len,                   int,            MAX_PARMS)      /* Parameter strings lengths */
-#endif
 THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size (32) would allow at
 										 * least 8 Unicode characters, but since most
 										 * commonly used Unicode characters only occupy up
 										 * to 3 bytes, the buffer would at least
 										 * accommodate 10 Unicode characters in a prompt */
-#ifdef VMS
-THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
-#endif
-THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* Buffer for window_ident */
 THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
+THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
+#ifdef UNICODE_SUPPORTED
+THREADGBLDEF(utfcgra,				utfcgr_area)			/* Lookaside cache for UTF8 parsing */
+#endif
+THREADGBLDEF(utfcgr_string_lookmax,		int)				/* How many times to look for unreferenced slot */
+THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* Buffer for window_ident */
 
 /* Utility I/O */
 THREADGBLDEF(last_va_list_ptr,			va_list)			/* Last variable-length argument list used for util
@@ -359,18 +345,14 @@ THREADGBLDEF(util_outptr,			char *)				/* Pointer within util output buffer */
 
 
 /* GTM Call-in related globals */
-#ifdef UNIX
 THREADGBLDEF(callin_hashtab, 			hash_table_str *)		/* Callin hash table */
 THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of a linked list */
-#endif
 THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
-#ifdef UNIX
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
 THREADGBLDEF(temp_fgncal_stack,			unsigned char *)		/* Override for fgncal_stack when non-NULL */
 THREADGBLDEF(midchild_send_locals,		boolean_t)			/* The middle child will send the locals to the
 										 * grandchild using ojmidchild_send_var() if TRUE.
 										 */
-#endif
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select
 										 * killed globals for effective truncate. */
@@ -451,6 +433,9 @@ THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to cou
 										 * process was continued. */
 THREADGBLDEF(gtm_test_fake_enospc,		boolean_t)			/*  DEBUG-only option to enable/disable anticipatory
 										 *  freeze fake ENOSPC testing
+										 */
+THREADGBLDEF(gtm_test_jnlpool_sync,		uint4)				/*  DEBUG-only option to force the journal pool
+										 *  accounting out of sync every n transactions.
 										 */
 THREADGBLDEF(gtm_usesecshr,			boolean_t)			/* Bypass easy methods of dealing with IPCs, files,
 										 * wakeups, etc and always use gtmsecshr (testing).

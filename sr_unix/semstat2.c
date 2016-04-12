@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,9 @@
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 
+#undef EXIT
+#define	EXIT	exit	/* Use system "exit" (not gtm_image_exit) directly since this is a standalone module */
+
 static void	usage (char *prog);
 
 static void	usage (char *prog)
@@ -58,7 +62,7 @@ int main (int argc, char *argv[])
 	if (argc == 1)
 	{
 		usage(argv[0]);
-		exit(EXIT_FAILURE);
+		EXIT(EXIT_FAILURE);
 	}
 	semarg.buf = &semstat;
 	for(i=1; i< argc; i++)
@@ -110,5 +114,5 @@ int main (int argc, char *argv[])
 			PRINTF("sempid=%d)\n", sempid);
 		}
 	}
-	exit(EXIT_SUCCESS);
+	EXIT(EXIT_SUCCESS);
 }

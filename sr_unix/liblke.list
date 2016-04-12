@@ -1,6 +1,7 @@
 lke_clear
 lke_clearlock
 lke_cleartree
+lke_ctrlc_handler
 lke_exit
 lke_fileio
 lke_getansw

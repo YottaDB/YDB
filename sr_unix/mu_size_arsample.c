@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,7 +163,7 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 			CLEAR_VECTOR(a);
 			if (cdb_sc_normal != (status = mu_size_rand_traverse(r, a)))			/* WARNING assignment */
 			{
-				assert(CDB_STAGNATE > t_tries);
+				assert((CDB_STAGNATE > t_tries) || IS_FINAL_RETRY_CODE(status));
 				t_retry(status);
 				continue;
 			}

@@ -196,7 +196,14 @@ if ( -d utf8) then
 	setenv LD_LIBRARY_PATH $libpath
 	setenv LIBPATH $libpath
 	setenv gtm_chset utf-8
-	set utflocale = `locale -a | grep -iE '\.utf.?8$' | head -n1`
+	# depending on the list of locales configured, locale -a might be considered a binary output.
+	# grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
+	if ( "linux" == "$arch" ) then
+		set binaryopt = "-a"
+	else
+		set binaryopt = ""
+	endif
+	set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 	setenv LC_ALL $utflocale
 
 gtm << EOF						>>&! gtm_test_install.out

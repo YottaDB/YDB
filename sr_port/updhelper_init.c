@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc.*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,6 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "cdb_sc.h"
 #include "gtm_string.h"
@@ -54,22 +52,8 @@
 #include "repl_shutdcode.h"
 #include "repl_sp.h"
 #include "jnl_write.h"
-#ifdef UNIX
 #include "gtmio.h"
-#endif
 
-#ifdef VMS
-#include <ssdef.h>
-#include <fab.h>
-#include <rms.h>
-#include <iodef.h>
-#include <secdef.h>
-#include <psldef.h>
-#include <lckdef.h>
-#include <syidef.h>
-#include <xab.h>
-#include <prtdef.h>
-#endif
 #include "util.h"
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
@@ -92,10 +76,8 @@
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		is_updhelper;
-#ifdef UNIX
+GBLREF	uint4			is_updhelper;
 GBLREF	boolean_t		jnlpool_init_needed;
-#endif
 
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_RECVPOOLSETUP);
@@ -106,27 +88,11 @@ void updhelper_init(recvpool_user who)
 {
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	upd_helper_entry_ptr_t	helper, helper_top;
-#ifdef VMS
-	uint4			status;
-	char			proc_name[PROC_NAME_MAXLEN + 1], *proc_prefix;
-	struct dsc$descriptor_s proc_name_desc;
-#endif
-	is_updhelper = TRUE;
+
+	is_updhelper = who;
 	getjobnum();
-	VMS_ONLY(recvpool_init(UPD_HELPER_READER, FALSE, FALSE);)
-	UNIX_ONLY(recvpool_init(UPD_HELPER_READER, FALSE);)
+	recvpool_init(UPD_HELPER_READER, FALSE);
 	upd_log_init(who);
-	VMS_ONLY(
-		/* Get a meaningful process name */
-		proc_prefix = (UPD_HELPER_READER == who) ? "GTMUHR" : "GTMUHW";
-		proc_name_desc.dsc$w_length = get_proc_name(STR_AND_LEN(proc_prefix), process_id, proc_name);
-		proc_name_desc.dsc$a_pointer = proc_name;
-		proc_name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
-		proc_name_desc.dsc$b_class = DSC$K_CLASS_S;
-		if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Unable to change update helper name"), status);
-	)
 	upd_helper_ctl = recvpool.upd_helper_ctl;
 	for (helper = upd_helper_ctl->helper_list, helper_top = helper + MAX_UPD_HELPERS; helper < helper_top; helper++)
 	{
@@ -140,14 +106,13 @@ void updhelper_init(recvpool_user who)
 	OPERATOR_LOG_MSG;
 	if (helper == helper_top)
 	{ /* did not find my entry possibly due to startup directly from command line as opposed to the desired via-rcvr server */
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("Invalid startup, start helper via receiver server"));
 	}
 	helper_entry = helper;
-
 	gvinit();
-	UNIX_ONLY(jnlpool_init_needed = TRUE);
+	jnlpool_init_needed = TRUE;
 	if (!region_init(FALSE))
-		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
 	return;
 }

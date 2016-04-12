@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,8 @@
 #include "mdef.h"
 
 #include <sys/types.h>
-#include <signal.h>
+
+#include "gtm_signal.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_time.h"
@@ -433,7 +435,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	UINTPTR_T		prmpeekadr;
 	struct sigaction	new_action, prev_action_bus, prev_action_segv;
 	sigset_t		savemask;
-	int			errtoraise, rslt;
+	int			errtoraise, rc, rslt;
 	char			fmtcode;
 	boolean_t		arg_supplied, attach_success;
 	unsigned char		mnemonic[NAME_ENTRY_SZ], *nptr, *cptr, *cptrend, *argptr;
@@ -519,7 +521,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			case PO_GLFREPL:		/* These types have an array index argument */
 			case PO_GSLREPL:
 				arryidx = asc2i(argptr, arglen);
-				if ((0 > arryidx) || (NUM_GTMSRC_LCL < arryidx))
+				if ((0 > arryidx) || (NUM_GTMSRC_LCL <= arryidx))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 						      RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 				break;
@@ -667,7 +669,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
 	 */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
@@ -687,7 +689,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	sigaction(SIGBUS, &prev_action_bus, NULL);
 	sigaction(SIGSEGV, &prev_action_segv, NULL);
 	/* Let the timers pop again.. */
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	/* If we didn't complete correctly, raise error */
 	if (0 != errtoraise)
 	{	/* The only time ERR_BADZPEEKARG is driven is when the format code is not recognized so give that error

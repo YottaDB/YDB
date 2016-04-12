@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,18 +38,15 @@
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	uint4			dollar_tlevel;
-GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	seq_num			seq_num_zero;
 
 /* This called for TP and non-TP, but not for ZTP */
-void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
+void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, jnlpool_write_ctx_t *jplctx)
 {
 	struct_jrec_upd		*jrec;
 	struct_jrec_null	*jrec_null;
-	GTMCRYPT_ONLY(
-		struct_jrec_upd	*jrec_alt;
-	)
+	struct_jrec_upd		*jrec_alt;
 	jnl_private_control	*jpc;
 	/* If REPL_WAS_ENABLED(csa) is TRUE, then we would not have gone through the code that initializes
 	 * jgbl.gbl_jrec_time or jpc->pini_addr. But in this case, we are not writing the journal record
@@ -81,9 +79,8 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 	{
 		COMPUTE_LOGICAL_REC_CHECKSUM(jfb->checksum, jrec, com_csum, jrec->prefix.checksum);
 	} else
-		jrec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)jrec, SIZEOF(struct_jrec_null));
-#	ifdef GTM_CRYPT
-	if (csa->hdr->is_encrypted && REPL_ALLOWED(csa))
+		jrec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jrec, SIZEOF(struct_jrec_null));
+	if (REPL_ALLOWED(csa) && USES_ANY_KEY(csa->hdr))
 	{
 		jrec_alt = (struct_jrec_upd *)jfb->alt_buff;
 		jrec_alt->prefix = jrec->prefix;
@@ -91,6 +88,5 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 		jrec_alt->strm_seqno = jrec->strm_seqno;
 		jrec_alt->num_participants = jrec->num_participants;
 	}
-#	endif
-	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
+	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb, jplctx);
 }

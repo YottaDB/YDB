@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,9 @@
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 # include "cdb_sc.h"
+# include "tp_frame.h" /* for tp_frame */
 # include "t_retry.h"
-# include "trigger_source_read_andor_verify.h"
+# include "trigger_read_andor_locate.h"
 # include "gtm_trigger_trc.h"
 # include "zr_unlink_rtn.h"
 #endif
@@ -58,6 +59,7 @@ STATICFNDCL boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 GBLREF stack_frame	*frame_pointer;
+GBLREF tp_frame		*tp_pointer;
 
 LITDEF char		litconst_space = ' ';
 LITDEF mval		literal_null;
@@ -111,18 +113,19 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		DBGIFTRIGR((stderr, "get_src_line: entered $tlevel=%d and $t_tries=%d\n", dollar_tlevel, t_tries));
 	}
 #	ifdef GTM_TRIGGER
-	if ((is_trigger) && ((NULL == rtn_vector) || (NULL == rtn_vector->source_code)))
-	{	/* Need source on a trigger. Get trigger source loaded and/or verified which may involve
-		 * creating a TP fence and dealing with TP restarts.
+	if (is_trigger && (NULL == rtn_vector))
+	{	/* Need source on a trigger. Get trigger loaded and its source becomes available since all triggers
+		 * are compiled with -EMBED_SOURCE.
 		 */
-		/* trigger_source_read_andor_verify may alter the length part of the mstr to remove the +BREG
+		/* Though we should only come in here when the trigger is NOT already loaded, note that
+		 * trigger_locate_andor_load() may alter the length part of the mstr to remove the +BREG
 		 * region-name specification (the string component is unmodified). Pass in a copy of the mstr struct to
 		 * avoid modification to routine->str as it affects the caller which relies on this variable being
 		 * untouched.
 		 */
-		tmprtnname = (NULL == rtn_vector) ? routine->str : rtn_vector->routine_name;
+		tmprtnname = routine->str;
 		DBGTRIGR((stderr, "get_src_line: fetch source for %s\n", tmprtnname.addr));
-		rc = trigger_source_read_andor_verify(&tmprtnname, TRIGGER_SRC_LOAD, &rtn_vector);
+		rc = trigger_locate_andor_load(&tmprtnname, &rtn_vector);
 		if (0 != rc)
 		{
 			if (NULL != rtn_vec)
@@ -138,10 +141,20 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		DBGTRIGR((stderr, "get_src_line: source found @0x%lx(%d) for %lx\n", rtn_vector->trigr_handle,
 					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len, rtn_vector));
 		DBGARLNK((stderr, "get_src_line: Fetch trigger source from rtnhdr 0x"lvaddr"\n", rtn_vector));
+		/* Remove the source buffer from the trigger descriptor since we will use the source embedded in the
+		 * trigger object to return the line to the caller.
+		 */
+		if (0 != ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len)
+		{
+			free(((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr);
+			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len = 0;
+			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr = NULL;
+		}
 	} else
 #	endif
 	if (NULL == rtn_vector)
 	{
+		assert(!is_trigger);
 		if (NULL == (rtn_vector = find_rtn_hdr(&routine->str)))		/* Note assignment */
 		{
 			op_zlink(routine, NULL);
@@ -170,74 +183,14 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	}
 	src_tbl = rtn_vector->source_code;
 	DBGIFTRIGR((stderr, "get_src_line: routine %lx has source_code 0x%lx (%d)\n",
-				rtn_vector, src_tbl, (src_tbl)? src_tbl->srcrecs : 0));
+		    rtn_vector, src_tbl, (src_tbl)? src_tbl->srcrecs : 0));
 	if (NULL == src_tbl)
-	{
-#		ifdef GTM_TRIGGER
-		if (is_trigger)
-		{
-			srcstart = (unsigned char *)((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr;
-			srcsize = ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len;
-			DBGTRIGR((stderr, "get_src_line: %lx source is %d bytes\n%s\n", rtn_vector, srcsize, srcstart));
-			assert(0 < srcsize);
-			assert(NULL != srcstart);
-			/* Calculate source checksum */
-			if (NULL == memchr(srcstart, '\n', srcsize))
-			{	/* In this case, gtm_trigger_complink() would have written an extra newline character to the
-				 * source file. Since we want to take the checksum of the same data, we append a newline character
-				 * here as well.
-				 */
-				eol_srcstart = (unsigned char *)malloc(srcsize + 1);
-				memcpy(eol_srcstart, srcstart, srcsize);
-				eol_srcstart[srcsize] = '\n';
-				rtn_src_chksum_buffer(&checksum_ctx, eol_srcstart, srcsize + 1);
-				free(eol_srcstart);
-			} else
-				rtn_src_chksum_buffer(&checksum_ctx, srcstart, srcsize);
-			srcrecs = (int)rtn_vector->lnrtab_len;
-			/* Allocate the array to hold the mstr array pointing to the src lines. */
-			src_tbl = (routine_source *)malloc(SIZEOF(routine_source) + ((srcrecs - 1) * SIZEOF(mstr)));
-			src_tbl->srcbuff = srcstart;
-			src_tbl->srcrecs = srcrecs;
-			/* Remove the source buffer from the trigger descriptor so nobody frees it inappropriately */
-			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len = 0;
-			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr = NULL;
-			/* Parse code setting the mstrs for each line encountered */
-			srcptr = srcstart;
-			srcptr_max = srcptr + srcsize;
-			for (current = (src_tbl->srclines + 1), top = current + (srcrecs - 1); current < top; current++)
-			{
-				assert(srcptr < srcptr_max);
-				current->addr = (char *)srcstart;
-				/* Find end of this record */
-				for (; (srcptr < srcptr_max) && ('\n' != *srcptr); srcptr++)
-					;
-				size = (srcptr - (unsigned char *)current->addr);
-				if (0 != size)
-				{	/* Set line length */
-					current->len = size;
-				} else
-				{	/* Null record -  point to a single space for the record */
-					current->addr = (char *)&litconst_space;
-					current->len = 1;
-				}
-				srcptr++;	/* Skip line end char */
-				srcstart = srcptr;
-			}
-			if (!rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))
-			{	/* Should never happen inside TP with a trigger unless it ran into some restartable
-				 * concurrency issues. Assert we can restart and do it.
-				 */
-				DBGTRIGR((stderr, "get_src_line: rtn_src_chksum_match failed dumping trigger structure\n"));
-				assert(NULL != rtn_vector->trigr_handle);
-				if (0 < dollar_tlevel)
-					t_retry(cdb_sc_triggermod);
-			}
-		} else
-#		endif
-		{
-			srcstat = fill_src_tbl(&src_tbl, rtn_vector);
-		}
+	{	/* Load source from where it makes sense - note all triggers are compiled with -EMBED_SOURCE
+		 * so we'll always load source from the routine's literal pool. Verify if trigger, not calling
+		 * without source being available.
+		 */
+		assert(!is_trigger || (rtn_vector->compiler_qlf & CQ_EMBED_SOURCE));
+		srcstat = fill_src_tbl(&src_tbl, rtn_vector);
 		src_tbl->srcstat = srcstat;
 		rtn_vector->source_code = src_tbl;
 	} else
@@ -360,7 +313,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	 * especially when tagged with other than ISO8859-1 or IBM-1047. When we resurrect the zOS
 	 * platform, we need to test this out.
 	 */
-	fp = Fopen(srcfile_name, "r");
+	Fopen(fp, srcfile_name, "r");
 	if (NULL == fp)
 	{
 		free(srcfile_name);
@@ -382,7 +335,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 			memcpy(cptr, src.addr, src.len);
 			cptr += src.len;
 			*cptr++ = 0;
-			fp = Fopen(srcfile_name, "r");
+			Fopen(fp, srcfile_name, "r");
 			found = (NULL != fp) ? TRUE : FALSE;
 		} else
 			found = FALSE;

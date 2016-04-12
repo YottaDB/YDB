@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +78,7 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 	if (!BLK_FINI(bs_ptr2, bs_ptr1))
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(&gv_target->hist.h[level-1], t_blkmod_mu_reduce_level);
 		return cdb_sc_blkmod;
 	}
 	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level - 1, TRUE, TRUE, GDS_WRITE_KILLTN);

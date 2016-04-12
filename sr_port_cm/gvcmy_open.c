@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +113,10 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	{
 		status = SS_NORMAL;
 		task2.len = STRLEN(trans_name);
-		memcpy(task2.addr, trans_name, task2.len);
+		if (SIZEOF(buff) > task2.len)
+			memcpy(task2.addr, trans_name, task2.len);
+		else
+			status = SS_LOG2LONG;
 	} else
 		status = SS_NOLOGNAM;
 #else

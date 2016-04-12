@@ -101,6 +101,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	{
 		output.out_var.gv.end = gv_currkey->end;
 		output.out_var.gv.prev = gv_currkey->prev;
+		output.line_cont = 0;	/* currently only used for global output and only initialized here */
 	}
 	MAXSTR_BUFF_INIT;
 	output.type = type;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,10 +42,11 @@
 #include "do_semop.h"
 #include "anticipatory_freeze.h"
 
-GBLREF uint4		process_id;
-GBLREF ipcs_mesg	db_ipcs;
-GBLREF gd_region        *gv_cur_region;
-GBLREF jnl_gbls_t	jgbl;
+GBLREF	uint4		process_id;
+GBLREF	ipcs_mesg	db_ipcs;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnl_gbls_t	jgbl;
+GBLREF	jnlpool_addrs	jnlpool;
 
 error_def (ERR_TEXT);
 error_def (ERR_CRITSEMFAIL);
@@ -66,6 +68,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	gd_region		*temp_region;
 	char			sgmnthdr_unaligned[SGMNT_HDR_LEN + 8], *sgmnthdr_8byte_aligned;
 	sgmnt_addrs             *csa;
+	boolean_t		ftok_counter_halted;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -107,20 +110,26 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	}
 	assert((udi->semid == csd->semid) || (INVALID_SEMID == csd->semid));
 	semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL);	/* Get the counter semaphore's value */
-	assert(1 <= semval);
-	if (1 < semval)
+	assert((DB_COUNTER_SEM_INCR <= semval) || csd->access_counter_halted);
+	/* If csd->access_counter_halted is TRUE, then the semaphore counter is unreliable. So treat it as if there is
+	 * more than one process attached to the database even if the counter is 1.
+	 */
+	if ((DB_COUNTER_SEM_INCR < semval) || csd->access_counter_halted)
 	{
 		assert(jgbl.onlnrlbk); /* everyone else will have total standalone access and hence no one else can be attached */
 		assert(!reg->read_only); /* ONLINE ROLLBACK must be a read/write process */
 		if (!reg->read_only)
 		{
-			if (0 != (save_errno = do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO)))
+			if (!csd->access_counter_halted)
 			{
-				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("db_ipcs_reset - write semaphore release"), save_errno);
-				return FALSE;
+				if (0 != (save_errno = do_semop(udi->semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO)))
+				{
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+						       RTS_ERROR_TEXT("db_ipcs_reset - write semaphore release"), save_errno);
+					return FALSE;
+				}
+				assert(1 == (semval = semctl(udi->semid, DB_CONTROL_SEM, GETVAL)));
 			}
-			assert(1 == (semval = semctl(udi->semid, DB_CONTROL_SEM, GETVAL)));
 			if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
@@ -199,8 +208,12 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	 * remove the ftok semaphore as well. This means, not able to lock or release the ftok semaphore is not treated
 	 * as an error condition.
 	 */
-	if (ftok_sem_lock(reg, FALSE, TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
-		ftok_sem_release(reg, TRUE, TRUE);
+	if (ftok_sem_lock(reg, TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
+	{
+		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY);
+		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || !csd->ftok_counter_halted);
+		ftok_sem_release(reg, !csd->ftok_counter_halted && udi->counter_ftok_incremented, TRUE);
+	}
 	udi->semid = INVALID_SEMID;
 	udi->shmid = INVALID_SHMID;
 	udi->gt_sem_ctime = 0;

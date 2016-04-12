@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +13,11 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtm_multi_thread.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
@@ -45,6 +48,7 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 		*outptr++ = code;
 	if (message)
 	{
+		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		util_out_print(NULL, RESET);	/* Clear any pending messages */
 		util_out_print_vaparm(message, NOFLUSH, var, MAXPOSINT4);
 		msglen = (size_t)(TREF(util_outptr) - TREF(util_outbuff_ptr));

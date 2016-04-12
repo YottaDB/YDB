@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@
 #include "getjobnum.h"
 #include "gtmimagename.h"
 #include "gtm_utf8.h"
+#include "min_max.h"
 #include "common_startup_init.h"
 
 GBLREF	boolean_t		skip_dbtriggers;
@@ -53,6 +55,7 @@ void	common_startup_init(enum gtmImageTypes img_type)
 		len = STRLEN(dist);
 		len = (GTM_PATH_MAX < len) ? GTM_PATH_MAX : len;
 		memcpy(gtm_dist, dist, len);
+		len = MIN(len, PATH_MAX);
 		gtm_dist[len] = '\0';
 	}
 	/* Setup global variables corresponding to signal blocks. */

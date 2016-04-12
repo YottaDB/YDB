@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +82,6 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_ztrigger,		m_ztrigger,	0)
 #endif
 ,INDIR(indir_zhalt,		m_zhalt,	0)
-,INDIR(indir_fnzwrite,		f_zwrite,	OC_FNZWRITE)
 ,INDIR(indir_savglvn0,		indirection,	0)		/* this entry and the following use indirection as a dummy value */
 ,INDIR(indir_savlvn,		indirection,	0)
 ,INDIR(indir_savglvn1,		indirection,	0)		/* 0 and 1 (above) separate 2 variants of generated code */

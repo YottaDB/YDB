@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,10 @@
  * they have not been folded into this routine yet.
  */
 boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_code)
-{
+{	/* this type of lock does not match up well with general models for spin wait (it's too long) or mutex wait
+	 * (probably too many buffers to reasonably maintain a mutex for each); it should notice if r_epid or cr->cycle
+	 * are changing and in, at least, that case keep waiting; alert messages might be nice
+	 */
 	uint4	lcnt, r_epid;
 	int4	n;
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +71,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
  *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
  *	V24	V25	GT.M V6.2-001	No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
+ *	V24	V26	GT.M V6.2-002	No new jnl record but bump needed because of different encryption method
  */
 
 typedef enum
@@ -94,6 +96,7 @@ typedef enum
 	REPL_JNL_V23,		/* enum corresponding to journal format V23 */
 	REPL_JNL_V24,		/* enum corresponding to journal format V24 */
 	REPL_JNL_V25,		/* enum corresponding to journal format V25 */
+	REPL_JNL_V26,		/* enum corresponding to journal format V26 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -161,6 +164,7 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V23_JNL_VER		23
 #define V24_JNL_VER		24
 #define V25_JNL_VER		25
+#define V26_JNL_VER		26
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */

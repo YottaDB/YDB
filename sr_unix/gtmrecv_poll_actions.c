@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +113,6 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	int			upd_exit_status;
 	seq_num			temp_send_seqno;
 	boolean_t		bad_trans_detected = FALSE, onln_rlbk_flg_set = FALSE;
-	uint4			jnl_status;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
@@ -126,7 +126,6 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
 	upd_helper_ctl = recvpool.upd_helper_ctl;
-	jnl_status = 0;
 	if (SHUTDOWN == gtmrecv_local->shutdown)
 	{
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Shutdown signalled\n");

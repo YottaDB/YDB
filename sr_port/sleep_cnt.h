@@ -68,6 +68,7 @@
 #define LOCK_SPINS		1024		/* Inner spin loop base */
 #define LOCK_SPINS_PER_4PROC	256		/* Additional lock spins for every 4 processors past first 8 */
 #define LOCK_SLEEP		1		/* Very short sleep before repoll lock */
+#define LOCK_SPIN_HARD_MASK	0x3		/* Used to cause 4 hard spins */
 #define LOCK_CASLATCH_CHKINTVL	16384		/* Check CASLatch for abandonment/wakeup interval. This interval
 						 * is currently ~4 seconds but checking for 16384 (power of 2) rather
 						 * than (4 * LOCK_TRIES_PER_SEC) allows a faster remainder using AND

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,9 +18,6 @@
 #include "gtm_ctype.h"
 #include "gtm_inet.h"
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmrecv.h */
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -33,9 +31,7 @@
 #include "gtm_stdio.h"
 #include "util.h"
 #include "repl_log.h"
-#ifdef UNIX
 #include "gtm_zlib.h"
-#endif
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -44,16 +40,12 @@ GBLREF	gtmrecv_options_t	gtmrecv_options;
 
 int gtmrecv_get_opt(void)
 {
-
-	boolean_t	log, log_interval_specified, plaintext_fallback;
-	unsigned short 	log_file_len, filter_cmd_len, instfilename_len, instname_len, tlsid_len;
-	boolean_t	buffsize_status;
-	boolean_t	filter;
-	int		status;
-	unsigned short	statslog_val_len;
+	boolean_t	autorollback, cmplvl_status, filter, log, log_interval_specified, plaintext_fallback;
 	char		statslog_val[4]; /* "ON" or "OFF" */
+	gtm_int64_t	buffsize;
+	int		status;
 	uint4		n_readers, n_helpers;
-	boolean_t	cmplvl_status, autorollback;
+	unsigned short 	filter_cmd_len, instfilename_len, instname_len, log_file_len, statslog_val_len, tlsid_len;
 
 	gtmrecv_options.start = (CLI_PRESENT == cli_present("START"));
 	gtmrecv_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
@@ -63,11 +55,9 @@ int gtmrecv_get_opt(void)
 	gtmrecv_options.changelog = (CLI_PRESENT == cli_present("CHANGELOG"));
 	gtmrecv_options.updateonly = (CLI_PRESENT == cli_present("UPDATEONLY"));
 	gtmrecv_options.updateresync = (CLI_PRESENT == cli_present("UPDATERESYNC"));
-#	ifdef UNIX
 	gtmrecv_options.reuse_specified = (CLI_PRESENT == cli_present("REUSE"));
 	gtmrecv_options.resume_specified = (CLI_PRESENT == cli_present("RESUME"));
 	gtmrecv_options.initialize_specified = (CLI_PRESENT == cli_present("INITIALIZE"));
-	/* -UPDATERESYNC=<instance_filename> and optional -REUSE=<instance_name> is supported only in Unix */
 	if (gtmrecv_options.updateresync)
 	{
 		instfilename_len = SIZEOF(gtmrecv_options.updresync_instfilename) - 1;	/* keep 1 byte for trailing NULL */
@@ -111,7 +101,6 @@ int gtmrecv_get_opt(void)
 		}
 	}
 	gtmrecv_options.noresync = (CLI_PRESENT == cli_present("NORESYNC"));
-#	endif
 	gtmrecv_options.helpers = (CLI_PRESENT == cli_present("HELPERS"));
 	gtmrecv_options.listen_port = 0; /* invalid port; indicates listenport not specified */
 	if (gtmrecv_options.start && CLI_PRESENT == cli_present("LISTENPORT"))
@@ -121,18 +110,21 @@ int gtmrecv_get_opt(void)
 			util_out_print("Error parsing LISTENPORT qualifier", TRUE);
 			return (-1);
 		}
-		if (buffsize_status = (CLI_PRESENT == cli_present("BUFFSIZE")))
-		{
-			if (!cli_get_int("BUFFSIZE", &gtmrecv_options.buffsize))
+		if (CLI_PRESENT == cli_present("BUFFSIZE"))
+		{		/* use a big conversion so we have a signed number for comparison */
+			if (!cli_get_int64("BUFFSIZE", &buffsize))
 			{
 				util_out_print("Error parsing BUFFSIZE qualifier", TRUE);
-				return (-1);
+				return(-1);
 			}
-			if (MIN_RECVPOOL_SIZE > gtmrecv_options.buffsize)
+			if (MIN_RECVPOOL_SIZE > buffsize)
 				gtmrecv_options.buffsize = MIN_RECVPOOL_SIZE;
+			else if ((gtm_int64_t)MAX_RECVPOOL_SIZE < buffsize)
+				gtmrecv_options.buffsize = (uint4)MAX_RECVPOOL_SIZE;
+			else
+				gtmrecv_options.buffsize = (uint4)buffsize;
 		} else
 			gtmrecv_options.buffsize = DEFAULT_RECVPOOL_SIZE;
-#		ifdef UNIX
 		/* Check if -autorollback is specified (default is -noautorollback) */
 		autorollback = cli_present("AUTOROLLBACK");
 		gtmrecv_options.autorollback = autorollback ? (CLI_NEGATED != autorollback) : FALSE;
@@ -152,7 +144,6 @@ int gtmrecv_get_opt(void)
 			gtm_zlib_cmp_level = gtmrecv_options.cmplvl;
 		} else
 			gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-#		endif
 		if (filter = (CLI_PRESENT == cli_present("FILTER")))
 		{
 			filter_cmd_len = MAX_FILTER_CMD_LEN;
@@ -184,7 +175,6 @@ int gtmrecv_get_opt(void)
 		}
 #		endif
 	}
-
 	if ((gtmrecv_options.start && 0 != gtmrecv_options.listen_port) || gtmrecv_options.statslog || gtmrecv_options.changelog)
 	{
 		log = (CLI_PRESENT == cli_present("LOG"));
@@ -213,7 +203,6 @@ int gtmrecv_get_opt(void)
 		} /* For changelog, interval == 0 implies don't change log interval already established */
 		  /* We ignore interval specification for statslog, Vinaya 2005/02/07 */
 	}
-
 	if (gtmrecv_options.shut_down)
 	{
 		if (CLI_PRESENT == (status = cli_present("TIMEOUT")))
@@ -233,7 +222,6 @@ int gtmrecv_get_opt(void)
 		else /* TIMEOUT not specified */
 			gtmrecv_options.shutdown_time = DEFAULT_SHUTDOWN_TIMEOUT;
 	}
-
 	if (gtmrecv_options.statslog)
 	{
 		statslog_val_len = 4; /* max(strlen("ON"), strlen("OFF")) + 1 */
@@ -242,9 +230,7 @@ int gtmrecv_get_opt(void)
 			util_out_print("Error parsing STATSLOG qualifier", TRUE);
 			return (-1);
 		}
-#ifdef UNIX
 		cli_strupper(statslog_val);
-#endif
 		if (0 == STRCMP(statslog_val, "ON"))
 			gtmrecv_options.statslog = TRUE;
 		else if (0 == STRCMP(statslog_val, "OFF"))

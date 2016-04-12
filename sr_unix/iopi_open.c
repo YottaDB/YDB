@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +47,7 @@ ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF  volatile boolean_t      timer_in_handler;
 
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_SYSCALL);
@@ -155,7 +157,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	for (str1 = copy_cmd_string; FALSE == notfound ; str1 = NULL)
 	{
 		/* separate into tokens in a pipe */
-		token1 = strtok_r(str1, "|", &saveptr1);
+		token1 = STRTOK_R(str1, "|", &saveptr1);
 		if (NULL == token1)
 			break;
 
@@ -166,7 +168,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 
 		for (str2 = command2; ; str2 = NULL)
 		{
-			token2 = strtok_r(str2, " >&;",&saveptr2);
+			token2 = STRTOK_R(str2, " >&;", &saveptr2);
 			if (NULL != token2 && !strcmp(token2, "cd"))
 			{
 				/* if the command is cd then skip the rest before the next pipe */
@@ -234,7 +236,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 				memcpy(dir_in_path, path, path_len + 1);
 				for (str3 = dir_in_path; TRUE == notfound; str3 = NULL)
 				{
-					token3 = strtok_r(str3, ":", &saveptr3);
+					token3 = STRTOK_R(str3, ":", &saveptr3);
 					if (NULL == token3)
 						break;
 					SPRINTF(buf, "%s/%s", token3, token2);
@@ -549,7 +551,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"));
-			_exit(ERR_DEVOPENFAIL);
+			UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 		}
 		if (return_stdout)
 		{
@@ -561,7 +563,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"));
-				_exit(ERR_DEVOPENFAIL);
+				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
 			if (FALSE == return_stderr)
@@ -574,7 +576,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 							dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
 							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"));
-					_exit(ERR_DEVOPENFAIL);
+					UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 				}
 			}
 		}
@@ -588,7 +590,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
 						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"));
-				_exit(ERR_DEVOPENFAIL);
+				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 		}
 		if (0 == slen[PSHELL])
@@ -612,23 +614,28 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"));
-			_exit(-1);
+			UNDERSCORE_EXIT(-1);
 		}
 	} else
 	{	/* in parent */
 		DEBUG_ONLY(TREF(fork_without_child_wait) = TRUE);	/* set variable to help assert in "relinkctl_rundown()" */
 		CLOSEFILE_RESET(pfd_write[0], rc);          /* Close unused read end; Resets "pfd_write[0]" to FD_INVALID */
+		SETFDCLOEXECALWAYS(pfd_write[1]);
 		ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_write[1], write_cvt[PARENTCVT]))
 			TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_write) failed", errno, realfiletag, ccsid));
 		/* if returning stdout then close unused write end */
 		if (return_stdout)
 		{
 			CLOSEFILE_RESET(pfd_read[1], rc);	/* resets "pfd_read[1]" to FD_INVALID */
+			SETFDCLOEXECALWAYS(pfd_read[0]);
 			ZOS_ONLY(if(-1 == gtm_zos_setcvtmode(pfd_read[0], read_cvt[PARENTCVT]))
 				TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_read) failed", errno, realfiletag, ccsid));
 		}
 		if (return_stderr)
+		{
 			CLOSEFILE_RESET(pfd_read_stderr[1], rc);	/* resets "pfd_read_stderr[1]" to FD_INVALID */
+			SETFDCLOEXECALWAYS(pfd_read_stderr[0]);
+		}
 	}
 	assert((params) *(pp->str.addr) < (unsigned char) n_iops);
 	assert(0 != iod);

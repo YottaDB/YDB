@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,9 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
 GBLREF spdesc		stringpool;
 
+error_def(ERR_ZDEFOFLOW);
+error_def(ERR_BADSRVRNETMSG);
+
 typedef struct bunch_rec_struct {
 	unsigned char	rn;
 	unsigned short	len;
@@ -54,8 +58,6 @@ void gvcmz_bunch(mval *v)
 	short		new_space;
 	bunch_rec 	*brec, nrec;
 	int4		status;
-	error_def(ERR_ZDEFOFLOW);
-	error_def(ERR_BADSRVRNETMSG);
 
 	assert(zdefactive);
 	lnk = gv_cur_region->dyn.addr->cm_blk;
@@ -72,7 +74,6 @@ void gvcmz_bunch(mval *v)
 
 		*msgptr++ = CMMS_B_BUFRESIZE;
 		CM_PUT_USHORT(msgptr, zdefbufsiz, usr->convert_byteorder);
-		msgptr += SIZEOF(unsigned short);
 		lnk->ast = 0;
 		lnk->cbl = S_HDRSIZE + SIZEOF(unsigned short);
 		status = cmi_write(lnk);

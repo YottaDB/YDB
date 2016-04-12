@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
+#include "gtm_multi_thread.h"
 #include "error.h"
 #include "min_max.h"
 #include "stringpool.h"
@@ -76,6 +78,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 		*zstatus_bptr++ = ',';
 	}
 	zstatus_iter = zstatus_bptr;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	util_len = TREF(util_outptr) - TREF(util_outbuff_ptr);
 	if (trans_frame)
 	{	/* currently no inserted message (arg) needs arguments.  The following code needs
@@ -84,7 +87,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 		*(TREF(util_outbuff_ptr)) = '-';
 		memcpy(&zstatus_buff[OUT_BUFF_SIZE], TREF(util_outbuff_ptr), util_len); /* save original message */
 		util_out_print(NULL, RESET); /* clear any pending msgs and reset util_out_buff */
-		gtm_putmsg_noflush(VARLSTCNT(1) arg);
+		gtm_putmsg_noflush_csa(CSA_ARG(NULL) VARLSTCNT(1) arg);
 
 		memcpy(zstatus_bptr, TREF(util_outbuff_ptr), TREF(util_outptr) - TREF(util_outbuff_ptr));
 		zstatus_bptr += (TREF(util_outptr) - TREF(util_outbuff_ptr));

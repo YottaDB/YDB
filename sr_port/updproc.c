@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -171,6 +172,7 @@ error_def(ERR_REPEATERROR);
 error_def(ERR_REPLONLNRLBK);
 error_def(ERR_SECONDAHEAD);
 error_def(ERR_STRMSEQMISMTCH);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFNOSYNC);
@@ -362,6 +364,10 @@ CONDITION_HANDLER(updproc_ch)
 	else if (ERR_REPLONLNRLBK == SIGNAL)
 	{
 		preemptive_db_clnup(SEVERITY);
+		/* We are about to abort the current in-progress transaction (TP or Non-TP). And restart from a potentially older
+		 * transaction. Release crit on any regions we hold (possible in some edge cases).
+		 */
+		have_crit(CRIT_HAVE_ANY_REG | CRIT_RELEASE); /* Note: "have_crit" function is used to release crit in this case */
 		assert(INVALID_GV_TARGET == reset_gv_target);
 		set_onln_rlbk_flg = TRUE;
 		/* Just like the UNWIND done above in the tprestart case, this is a case where an online rollback is signaled
@@ -374,6 +380,10 @@ CONDITION_HANDLER(updproc_ch)
 		UNWIND(NULL, NULL);
 	}
 #	endif
+	/* Assumes we don't fall through and unlock the mutex later
+	 * We don't care if it fails, so ignore the status.
+	 */
+	pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
 	NEXTCH;
 }
 
@@ -534,8 +544,17 @@ int updproc(void)
 			|| (jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled));
 #		endif
 		UNIX_ONLY(assert(updproc_continue && !set_onln_rlbk_flg));
+		/* We should be the only one acquiring the lock, so a single try should be sufficient. */
+		status = pthread_mutex_trylock(&recvpool.recvpool_ctl->write_updated_ctl);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutex_trylock"), CALLFROM, status, 0);
 		while (updproc_continue UNIX_ONLY(&& !set_onln_rlbk_flg))
 			updproc_actions(gld_db_files);
+		status = pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
 #		ifdef UNIX
 		if (set_onln_rlbk_flg)
 		{	/* A concurrent online rollback happened which drove the updproc_ch and called us. Need to let the receiver
@@ -602,6 +621,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	repl_old_triple_jnl_t	*input_old_triple;
 	repl_histrec_jnl_ptr_t	input_histjrec;
 	uint4			expected_rec_len;
+	int			status;
+	struct timespec		waketime;
 #	endif
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
@@ -726,7 +747,17 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 */
 			assert((0 == recvpool.recvpool_ctl->jnl_seqno) || (jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno));
 				/* the 0 == check takes care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
-			SHORT_SLEEP(10);
+			status = clock_gettime(CLOCK_REALTIME, &waketime);
+			if (0 != status)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
+			waketime.tv_sec += 10;
+			status = pthread_cond_timedwait(&recvpool.recvpool_ctl->write_updated,
+							&recvpool.recvpool_ctl->write_updated_ctl,
+							&waketime);
+			if ((0 != status) && (ETIMEDOUT != status))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("pthread_mutex_timedwait"), CALLFROM, status, 0);
 #			ifdef UNIX
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */

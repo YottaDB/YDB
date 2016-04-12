@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +70,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	{
 		csd = csa->hdr;
 		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc); lcnt++)
-		{
+		{	/* should use a mutex */
 			if (0 == (lcnt % FSYNC_WAIT_HALF_TIME))
 			{
 				saved_status = jpc->status;

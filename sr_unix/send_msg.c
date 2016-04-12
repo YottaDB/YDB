@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +14,8 @@
 
 #include <stdarg.h>
 
+#include "gtm_multi_thread.h"
 #include "gtmmsg.h"
-
 #include "error.h"
 #include "fao_parm.h"
 #include "util.h"
@@ -31,13 +32,12 @@
 #include "gtmsource.h"			/* for anticipatory_freeze.h */
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
+GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	bool			caller_id_flag;
-GBLREF	volatile int4		exit_state;
-GBLREF	volatile boolean_t	timer_in_handler;
-GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	volatile int4		exit_state;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;
@@ -52,6 +52,7 @@ void send_msg_va(void *csa, int arg_count, va_list var);
 
 /* This routine is a variation on the unix version of rts_error, and has an identical interface */
 
+/* #GTM_THREAD_SAFE : The below function (send_msg) is thread-safe */
 void send_msg(int arg_count, ...)
 {
         va_list		var;
@@ -59,12 +60,13 @@ void send_msg(int arg_count, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = CUSTOM_ERRORS_LOADED ? REG2CSA(gv_cur_region) : NULL;
+	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
         VAR_START(var, arg_count);
 	send_msg_va(csa, arg_count, var);
 	va_end(var);
 }
 
+/* #GTM_THREAD_SAFE : The below function (send_msg_csa) is thread-safe */
 void send_msg_csa(void *csa, int arg_count, ...)
 {
 	va_list		var;
@@ -74,6 +76,7 @@ void send_msg_csa(void *csa, int arg_count, ...)
 	va_end(var);
 }
 
+/* #GTM_THREAD_SAFE : The below function (send_msg_va) is thread-safe */
 void send_msg_va(void *csa, int arg_count, va_list var)
 {
         int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
@@ -82,10 +85,11 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
-	boolean_t	freeze_needed = FALSE;
+	boolean_t	freeze_needed = FALSE, was_holder;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
 	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. One
 	 * exception to this is if the nested call to send_msg is done by exit handling code in which case the
@@ -97,6 +101,7 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 		|| (EXIT_IMMED == exit_state) || (2 == forced_exit));
 	DEBUG_ONLY(nesting_level++;)
         assert(arg_count > 0);
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 	{
 		SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
@@ -143,4 +148,5 @@ void send_msg_va(void *csa, int arg_count, va_list var)
          */
 	DEBUG_ONLY(nesting_level--;)
 	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id);
+	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 }

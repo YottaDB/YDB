@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Serivces, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,16 +26,17 @@
 
 #define JNLPOOL_SHMDT(RC, SAVE_ERRNO)				\
 {								\
-	jnlpool_ctl_ptr_t save_jnlpool_ctl;			\
+	jnlpool_ctl_ptr_t	save_jnlpool_ctl;		\
+	intrpt_state_t		prev_intrpt_state;		\
 								\
 	SAVE_ERRNO = 0; /* clear any left-over value */		\
 	assert(NULL != jnlpool_ctl);				\
-	DEFER_INTERRUPTS(INTRPT_IN_SHMDT);			\
+	DEFER_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);	\
 	save_jnlpool_ctl = jnlpool.jnlpool_ctl;			\
 	jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;		\
 	RC = SHMDT(save_jnlpool_ctl);				\
 	SAVE_ERRNO = errno;					\
-	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT);			\
+	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);	\
 }
 
 key_t gtm_ftok(const char *path, int id);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +17,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
+#include "wbox_test_init.h"
 
 GBLREF spdesc 		stringpool;
 GBLREF UConverter	*chset_desc[CHSET_MAX_IDX];
@@ -41,8 +43,6 @@ int verify_case(const mstr *parm)
 	if (1 == parm->len)
 	{
 		c = lower_to_upper_table[*(uchar_ptr_t)parm->addr];
-		if (!gtm_utf8_mode && 'T' == c)	/* title case is not supported in "M" mode */
-			return -1;
 		for (index = 0; index < MAX_CASE_IDX; ++index)
 		{
 			if (c == casemaps[index].code[0])
@@ -55,6 +55,13 @@ int verify_case(const mstr *parm)
 int32_t gtm_strToTitle(UChar *dst, int32_t dstlen, const UChar *src, int32_t srclen,
 		const char *locale, UErrorCode *status)
 {
+#       ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR == gtm_white_box_test_case_number))
+	{
+		*status = U_FILE_ACCESS_ERROR;
+		return -1;
+	}
+#	endif
 	return u_strToTitle(dst, dstlen, src, srclen, NULL, locale, status);
 }
 
@@ -95,7 +102,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		if (U_BUFFER_OVERFLOW_ERROR == status)
 		{	/* translation requires more space than the maximum allowed GT.M string size */
 			if (NULL == dstbuff)
-				rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+				rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 			else
 			{
 				/* Insufficient buffer passed. Return the required buffer length */

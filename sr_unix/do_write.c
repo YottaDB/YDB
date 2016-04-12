@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +12,12 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
-#include <signal.h>
+#include "gtm_unistd.h"
+#include "gtm_stdio.h"
+#include "gtm_signal.h"	/* for SIGPROCMASK */
+
 #include <errno.h>
 
-#include "gtm_stdio.h"
 #include "do_write.h"
 
 #define MAX_WRITE_RETRY 2
@@ -27,9 +29,10 @@ int4	do_write (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len)
 	sigset_t	savemask;
 	int4		save_errno, retry_count;
         ssize_t 	status;
+	int		rc;
 
 	/* Block SIGALRM signal - no timers can pop and give us trouble */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 
 	save_errno = 0;
 	retry_count = MAX_WRITE_RETRY;
@@ -52,7 +55,7 @@ int4	do_write (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len)
 		save_errno = -1;	/* Something kept us from getting what we wanted */
 
 	/* Reset signal handlers  */
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 
 	return save_errno;
 }

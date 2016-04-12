@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+# Copyright (c) 2001-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,5 +26,5 @@ if ( $1 == "" ) then
 endif
 
 version $1 d
-$shell $gtm_tools/buildbdp.csh $1 d $gtm_vrt/dbg
+$gtm_tools/buildbdp.csh $1 dbg $gtm_vrt/dbg
 exit $status

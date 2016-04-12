@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,7 @@
 #include "util.h"
 #include "cli.h"
 #include "skan_offset.h"
+#include "dse.h"
 
 #define MAX_UTIL_LEN	80
 
@@ -65,7 +67,7 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 	}
 
 	patch_rec_counter = 1;
-	patch_comp_key[0] = patch_comp_key[1] = 0;
+	CLEAR_DSE_COMPRESS_KEY;
 	for (rp = bp + SIZEOF(blk_hdr); rp < rp_targ ; )
 	{
 		GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);

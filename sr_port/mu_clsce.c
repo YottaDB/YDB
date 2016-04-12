@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +72,6 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key           *gv_currkey;
 GBLREF gv_key           *gv_currkey_next_reorg;
 
-
 /*************************************************************************************************
 Input Parameters:
 	gv_target: working block's history
@@ -129,14 +129,17 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			blk2_ances_hdr, new_levelp_cur_hdr, new_levelp_cur_next_hdr;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	srch_hist	*blk1ptr, *blk2ptr; /* blk2ptr is for right sibling's hist from a minimum sub-tree containing both blocks */
+	srch_blk_status	*old_blk1_stat, *old_blk2_stat, *old_levelp_blk_stat;
 
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 
 	blk1ptr = &(gv_target->hist);
 	blk2ptr = gv_target->alt_hist;
-	old_blk1_base = blk1ptr->h[level].buffaddr;
-	old_blk2_base = blk2ptr->h[level].buffaddr;
+	old_blk1_stat = &blk1ptr->h[level];
+	old_blk1_base = old_blk1_stat->buffaddr;
+	old_blk2_stat = &blk2ptr->h[level];
+	old_blk2_base = old_blk2_stat->buffaddr;
 	old_blk1_sz = ((blk_hdr_ptr_t)old_blk1_base)->bsiz;
 	old_blk2_sz = ((blk_hdr_ptr_t)old_blk2_base)->bsiz;
 	if (0 != level && SIZEOF(blk_hdr) + BSTAR_REC_SIZE == old_blk1_sz)
@@ -150,9 +153,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (++levelp > blk1ptr->depth ||  levelp > blk2ptr->depth)
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
-		old_levelp_blk_base = blk1ptr->h[levelp].buffaddr;
+		old_levelp_blk_stat = &blk1ptr->h[levelp];
+		old_levelp_blk_base = old_levelp_blk_stat->buffaddr;
 		old_levelp_rec_offset = blk1ptr->h[levelp].curr_rec.offset;
 		rec_base = old_levelp_blk_base + old_levelp_rec_offset;
 		GET_RSIZ(rec_size, rec_base);
@@ -167,10 +172,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		old_levelp_cur_prev_keysz = 0;
 	else
 	{
-		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_levelp_blk_base, rec_base,
+		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_levelp_blk_stat, rec_base,
 			&old_levelp_cur_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL)))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(old_levelp_blk_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
 		old_levelp_cur_prev_keysz = tkeylen + tkeycmpc;
@@ -182,10 +188,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	old_levelp_cur_keylen = compressed size of the key
 	*/
 	READ_RECORD(status, &rec_size, &tkeycmpc, &old_levelp_cur_keylen, old_levelp_cur_key,
-			levelp, old_levelp_blk_base, rec_base);
+			levelp, old_levelp_blk_stat, rec_base);
 	if (cdb_sc_normal != status)
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(old_levelp_blk_stat, t_blkmod_mu_clsce);
 		return cdb_sc_blkmod;
 	}
 	if (old_levelp_cur_prev_keysz)
@@ -201,12 +208,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	*/
 	BLK_ADDR(old_levelp_cur_next_key, MAX_KEY_SZ + 1, unsigned char);
 	READ_RECORD(status, &rec_size, &tkeycmpc, &old_levelp_cur_next_keylen, old_levelp_cur_next_key,
-			levelp, old_levelp_blk_base, rec_base);
+			levelp, old_levelp_blk_stat, rec_base);
 	if (cdb_sc_starrecord == status)
 		levelp_next_is_star = TRUE;
 	else if (cdb_sc_normal != status)
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(old_levelp_blk_stat, t_blkmod_mu_clsce);
 		return cdb_sc_blkmod;
 	} else
 	{
@@ -227,10 +235,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	BLK_ADDR(oldblk1_last_key, MAX_KEY_SZ + 1, unsigned char);
 	if (0 == level) /* data block */
 	{
-		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_base, old_blk1_base + old_blk1_sz,
+		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_stat, old_blk1_base + old_blk1_sz,
 			oldblk1_last_key, &rec_size, &oldblk1_last_keylen, &oldblk1_last_cmpc, NULL)))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
 		rec_base = old_blk1_base + old_blk1_sz;
@@ -243,11 +252,12 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
                 memcpy (oldblk1_last_key, &old_levelp_cur_key[0], old_levelp_cur_keysz);
 		if (!old_ref_star_only) /* if the index block is not a *-key only block) */
 		{
-			if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_base,
+			if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_stat,
 				old_blk1_base + old_blk1_sz - BSTAR_REC_SIZE, &oldblk1_prev_key[0],
 				&rec_size, &tkeylen, &tkeycmpc, NULL)))
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
 				return cdb_sc_blkmod;
 			}
 			GET_CMPC(oldblk1_last_cmpc, oldblk1_prev_key, old_levelp_cur_key);
@@ -276,7 +286,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	BLK_ADDR(newblk1_last_key, MAX_KEY_SZ + 1, unsigned char);
 	rec_base = old_blk2_base + SIZEOF(blk_hdr);
 	READ_RECORD(status, &rec_size, &newblk1_last_cmpc, &newblk1_last_keylen, newblk1_last_key,
-			level, old_blk2_base, rec_base);
+			level, old_blk2_stat, rec_base);
 	if (cdb_sc_starrecord == status) /* rtsib index block has *-record only */
 	{
 		if (old_blk1_sz + oldblk1_last_keylen + BSTAR_REC_SIZE > i_max_fill ) /* cannot fit even one record */
@@ -287,6 +297,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	} else if (cdb_sc_normal != status)
 	{
 		assert(t_tries < CDB_STAGNATE);;
+		NONTP_TRACE_HIST_MOD(old_blk2_stat, t_blkmod_mu_clsce);
 		return cdb_sc_blkmod;
 	} else /* for both data and non-* index block */
 	{
@@ -332,10 +343,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				break;
 			}
 			READ_RECORD(status, &rec_size, &newblk1_last_cmpc, &newblk1_last_keylen, newblk1_last_key,
-					level, old_blk2_base, rec_base);
+					level, old_blk2_stat, rec_base);
 			if (cdb_sc_normal != status)
 			{
 				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk2_stat, t_blkmod_mu_clsce);
 				return cdb_sc_blkmod;
 			}
 			newblk1_last_keysz = newblk1_last_keylen + newblk1_last_cmpc;
@@ -359,10 +371,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 					break; /* already we know we can fit this *-record in working block */
 				}
 				READ_RECORD(status, &rec_size, &newblk1_last_cmpc, &newblk1_last_keylen, newblk1_last_key,
-						level, old_blk2_base, rec_base);
+						level, old_blk2_stat, rec_base);
 				if (cdb_sc_normal != status)
 				{
 					assert(t_tries < CDB_STAGNATE);
+					NONTP_TRACE_HIST_MOD(old_blk2_stat, t_blkmod_mu_clsce);
 					return cdb_sc_blkmod;
 				}
 				newblk1_last_keysz = newblk1_last_keylen + newblk1_last_cmpc;
@@ -390,12 +403,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		*/
 		BLK_ADDR(newblk2_first_key, MAX_KEY_SZ + 1, unsigned char);
 		READ_RECORD(status, &rec_size, &tkeycmpc, &newblk2_first_keylen, newblk2_first_key,
-				level, old_blk2_base, new_blk2_first_rec_base);
+				level, old_blk2_stat, new_blk2_first_rec_base);
 		if (cdb_sc_starrecord == status) /* new rtsib will have a *-record only */
 			new_rtsib_star_only = TRUE;
 		else if (cdb_sc_normal != status)
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(old_blk2_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		} else
 		{
@@ -437,10 +451,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				BLK_ADDR(new_blk2_ances_first_key, MAX_KEY_SZ + 1, unsigned char);
 				rec_base =  blk2ptr->h[level2].buffaddr + SIZEOF(blk_hdr);
 				READ_RECORD(status, &rec_size, &tkeycmpc, &tkeylen, new_blk2_ances_first_key,
-						level2, blk2ptr->h[level2].buffaddr, rec_base);
+						level2, &blk2ptr->h[level2], rec_base);
 				if (cdb_sc_normal != status)
 				{
 					assert(t_tries < CDB_STAGNATE);
+					NONTP_TRACE_HIST_MOD(&blk2ptr->h[level2], t_blkmod_mu_clsce);
 					return cdb_sc_blkmod;
 				}
 				/* newblk1_last_key was the last key before *-key.
@@ -452,13 +467,14 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				/* 2nd record will become 1st record of current block at level2 */
 				rec_base += rec_size;
 				READ_RECORD(status, &rec_size, &tkeycmpc, &tkeylen, new_blk2_ances_first_key,
-						level2, blk2ptr->h[level2].buffaddr, rec_base);
+						level2, &blk2ptr->h[level2], rec_base);
 				blk2_ances_remain = rec_base + rec_size - SIZEOF(block_id);
 				if (cdb_sc_starrecord == status)
 					blk2_ances_star_only = TRUE;
 				else if (cdb_sc_normal != status)
 				{
 					assert(t_tries < CDB_STAGNATE);
+					NONTP_TRACE_HIST_MOD(&blk2ptr->h[level2], t_blkmod_mu_clsce);
 					return cdb_sc_blkmod;
 				} else
 				{
@@ -559,7 +575,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		/* Join data from right sibling */
 		BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, SIZEOF(rec_hdr));
 		REORG_BLK_SEG(bs_ptr2, old_blk2_base + SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + newblk1_mid_cmpc,
-				piece_len - SIZEOF(rec_hdr));
+			      piece_len - SIZEOF(rec_hdr), &blk1ptr->h[level]);
 	} else
 	{	/* if an index block */
 		BLK_ADDR(bn_ptr1, SIZEOF(block_id), unsigned char);
@@ -575,7 +591,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		{	/* May be a complete_merge too */
 			/* write a new *-rec only */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr) );
-			REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id));
+			REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id), &blk1ptr->h[level]);
 		} else
 		{
 			if (complete_merge)
@@ -584,7 +600,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				 */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, SIZEOF(rec_hdr));
 				REORG_BLK_SEG(bs_ptr2, old_blk2_base + SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + newblk1_mid_cmpc,
-					piece_len - SIZEOF(rec_hdr) );
+					      piece_len - SIZEOF(rec_hdr), &blk1ptr->h[level]);
 			} else
 			{	/* First key from rtsib had cmpc=0. After coalesce it will be nonzero.
 				 * Remainings from rtsib will be appened without change.
@@ -593,16 +609,19 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				 */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, SIZEOF(rec_hdr));
 				REORG_BLK_SEG(bs_ptr2, old_blk2_base + SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + newblk1_mid_cmpc,
-					piece_len - (newblk1_last_keylen + BSTAR_REC_SIZE)- SIZEOF(rec_hdr) );
+					      piece_len - (newblk1_last_keylen + BSTAR_REC_SIZE) - SIZEOF(rec_hdr),
+					      &blk1ptr->h[level]);
 				/* write a new *-rec only */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr) );
-				REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id));
+				REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id),
+					      &blk1ptr->h[level]);
 			}
 		}
 	}
 	if ( !BLK_FINI(bs_ptr2, bs_ptr1))
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(&blk1ptr->h[level], t_blkmod_mu_clsce);
 		return cdb_sc_blkmod;
 	}
 	t_write(&blk1ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
@@ -627,6 +646,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (!BLK_FINI(bs_ptr2,bs_ptr1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(&blk2ptr->h[level], t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
 		t_write(&blk2ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
@@ -710,6 +730,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	if (!BLK_FINI(bs_ptr2, bs_ptr1))
 	{
 		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(&blk1ptr->h[levelp], t_blkmod_mu_clsce);
 		return cdb_sc_blkmod;
 	}
 	t_write(&blk1ptr->h[levelp], (unsigned char *)bs_ptr1, 0, 0, levelp, FALSE, forward_process, GDS_WRITE_KILLTN);
@@ -738,6 +759,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (!BLK_FINI(bs_ptr2,bs_ptr1))
 		{
 			assert(t_tries < CDB_STAGNATE);
+			NONTP_TRACE_HIST_MOD(&blk2ptr->h[level2], t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
 		t_write(&blk2ptr->h[level2], (unsigned char *)bs_ptr1, 0, 0, level2, TRUE, TRUE, GDS_WRITE_KILLTN);

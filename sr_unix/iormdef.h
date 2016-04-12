@@ -100,12 +100,14 @@ error_def(ERR_CRYPTBADWRTPOS);
 
 #define READ_ENCRYPTED_DATA(DEVICE, NAME, INBUF, INBUF_LEN, OUTBUF)					\
 {													\
-	int rv;												\
+	LITREF gtm_string_t	null_iv;								\
+													\
+	int			rv;									\
 													\
 	if (INBUF_LEN > 0)										\
 	{												\
-		GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(NULL, (DEVICE)->input_cipher_handle,			\
-			INBUF, INBUF_LEN, OUTBUF, GTMCRYPT_OP_DECRYPT, GTMCRYPT_IV_CONTINUE, rv);	\
+		GTMCRYPT_DECRYPT_CONT_IV(NULL, (DEVICE)->input_cipher_handle,				\
+				INBUF, INBUF_LEN, OUTBUF, rv);						\
 		if (0 != rv)										\
 			GTMCRYPT_REPORT_ERROR(rv, rts_error, (NAME)->len, (NAME)->dollar_io);		\
 	}												\
@@ -113,12 +115,14 @@ error_def(ERR_CRYPTBADWRTPOS);
 
 #define WRITE_ENCRYPTED_DATA(DEVICE, NAME, INBUF, INBUF_LEN, OUTBUF)					\
 {													\
-	int rv;												\
+	LITREF gtm_string_t	null_iv;								\
+													\
+	int			rv;									\
 													\
 	if (INBUF_LEN > 0)										\
 	{												\
-		GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(NULL, (DEVICE)->output_cipher_handle,			\
-			INBUF, INBUF_LEN, OUTBUF, GTMCRYPT_OP_ENCRYPT, GTMCRYPT_IV_CONTINUE, rv);	\
+		GTMCRYPT_ENCRYPT_CONT_IV(NULL, (DEVICE)->output_cipher_handle,				\
+				INBUF, INBUF_LEN, OUTBUF, rv);						\
 		if (0 != rv)										\
 			GTMCRYPT_REPORT_ERROR(rv, rts_error, (NAME)->len, (NAME)->dollar_io);		\
 	}												\
@@ -265,6 +269,8 @@ typedef struct
 	mstr		output_key;			/* Name that maps to an output encryption key on disk. */
 	gtmcrypt_key_t	input_cipher_handle;		/* Encryption cipher handle for this device. */
 	gtmcrypt_key_t	output_cipher_handle;		/* Decryption cipher handle for this device. */
+	uint4		fsblock_buffer_size;		/* I/O buffer size; 1 == default size; 0 == no buffering */
+	char		*fsblock_buffer;		/* I/O buffer for, erm, buffered I/O */
 } d_rm_struct;	/*  rms		*/
 
 #ifdef KEEP_zOS_EBCDIC

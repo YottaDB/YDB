@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,73 +61,64 @@
 #include "gtmcrypt.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	tp_region		*grlist;
+GBLREF	bool			in_backup;
+GBLREF	bool			region;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	bool			region;
-GBLREF	bool			in_backup;
+GBLREF	tp_region		*grlist;
 
 LITREF char			*gtm_dbversion_table[];
 
-error_def(ERR_BADTAG);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 error_def(ERR_CRYPTNOMM);
+error_def(ERR_DBFILOPERR);
 error_def(ERR_DBPREMATEOF);
 error_def(ERR_DBRDERR);
 error_def(ERR_DBRDONLY);
 error_def(ERR_INVACCMETHOD);
 error_def(ERR_MMNODYNDWNGRD);
-error_def(ERR_MUNOACTION);
+error_def(ERR_MUPIPSET2BIG);
+error_def(ERR_MUPIPSET2SML);
+error_def(ERR_MUREENCRYPTV4NOALLOW);
 error_def(ERR_NODFRALLOCSUPP);
-error_def(ERR_RBWRNNOTCHG);
+error_def(ERR_NOUSERDB);
+error_def(ERR_SETQUALPROB);
 error_def(ERR_TEXT);
 error_def(ERR_WCERRNOTCHG);
 error_def(ERR_WCWRNNOTCHG);
 
 #define MAX_ACC_METH_LEN	2
-#define MAX_DB_VER_LEN		2
+#define MAX_KEY_SIZE		MAX_KEY_SZ - 4		/* internal and external maximums differ */
 #define MIN_MAX_KEY_SZ		3
 
 #define DO_CLNUP_AND_SET_EXIT_STAT(EXIT_STAT, EXIT_WRN_ERR_MASK)		\
-{										\
-	exit_stat |= EXIT_WRN_ERR_MASK;						\
+MBSTART {									\
+	exit_stat |= EXIT_WRN_ERR_MASK;							\
 	db_ipcs_reset(gv_cur_region);						\
 	mu_gv_cur_reg_free();							\
-}
-
-#define CLOSE_AND_RETURN							\
-{										\
-	CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */		\
-	db_ipcs_reset(gv_cur_region);						\
-	return (int4)ERR_WCWRNNOTCHG;						\
-}
+} MBEND
 
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
-	bool			got_standalone;
-	boolean_t		bypass_partial_recov, need_standalone = FALSE;
-	char			acc_spec[MAX_ACC_METH_LEN], ver_spec[MAX_DB_VER_LEN], exit_stat, *fn;
-	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
-	int			fd, fn_len;
-	int4			status;
-	int4			status1;
-	int			glbl_buff_status, defer_status, rsrvd_bytes_status,
-				extn_count_status, lock_space_status, disk_wait_status,
-				inst_freeze_on_error_status, qdbrundown_status, defer_allocate_status, mutex_space_status,
-				epoch_taper_status;
-	int4			new_disk_wait, new_cache_size, new_extn_count, new_lock_space, reserved_bytes, defer_time,
-				new_mutex_space;
-	int			key_size_status, rec_size_status;
-	int4			new_key_size, new_rec_size;
-	sgmnt_data_ptr_t	csd;
-	tp_region		*rptr, single;
+	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE;
+	char			acc_spec[MAX_ACC_METH_LEN], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
+				ver_spec[MAX_DB_VER_LEN];
 	enum db_acc_method	access, access_new;
 	enum db_ver		desired_dbver;
 	gd_region		*temp_cur_region;
-	char			*errptr, *command = "MUPIP SET VERSION";
-	int			save_errno;
-	int			rc;
-
+	int			defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
+				encryption_complete_status, epoch_taper_status, extn_count_status,
+				fd, fn_len, glbl_buff_status, inst_freeze_on_error_status, key_size_status,
+				lock_space_status, mutex_space_status, qdbrundown_status, rec_size_status, reg_exit_stat, rc,
+				rsrvd_bytes_status, sleep_cnt_status, save_errno, status, status1;
+	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_key_size, new_lock_space,
+				new_mutex_space, new_rec_size, new_sleep_cnt, new_spin_sleep, reserved_bytes, spin_sleep_status;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd, pvt_csd;
+	tp_region		*rptr, single;
+	unix_db_info		*udi;
+	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
 	ZOS_ONLY(int 		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -142,122 +133,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	TREF(skip_file_corrupt_check) = bypass_partial_recov = cli_present("PARTIAL_RECOV_BYPASS") == CLI_PRESENT;
 	if (bypass_partial_recov)
 		need_standalone = TRUE;
-	if (disk_wait_status = cli_present("WAIT_DISK"))
-	{
-		if (cli_get_int("WAIT_DISK", &new_disk_wait))
-		{
-			if (new_disk_wait < 0)
-			{
-				util_out_print("!UL negative, minimum WAIT_DISK allowed is 0.", TRUE, new_disk_wait);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-			need_standalone = TRUE;
-		} else
-		{
-			util_out_print("Error getting WAIT_DISK qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
-		}
-	}
-	if (glbl_buff_status = cli_present("GLOBAL_BUFFERS"))
-	{
-		if (cli_get_int("GLOBAL_BUFFERS", &new_cache_size))
-		{
-			if (new_cache_size > GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS))
-			{
-				util_out_print("!UL too large, maximum write cache buffers allowed is !UL", TRUE, new_cache_size,
-						GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS));
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-			if (new_cache_size < WC_MIN_BUFFS)
-			{
-				util_out_print("!UL too small, minimum cache buffers allowed is !UL", TRUE, new_cache_size,
-						WC_MIN_BUFFS);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-		} else
-		{
-			util_out_print("Error getting GLOBAL BUFFER qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
-		}
-		need_standalone = TRUE;
-	}
-	/* EXTENSION_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
-	if (extn_count_status = cli_present("EXTENSION_COUNT"))
-	{
-		if (cli_get_int("EXTENSION_COUNT", &new_extn_count))
-		{
-			if (new_extn_count > MAX_EXTN_COUNT)
-			{
-				util_out_print("!UL too large, maximum extension count allowed is !UL", TRUE, new_extn_count,
-						MAX_EXTN_COUNT);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-			if (new_extn_count < MIN_EXTN_COUNT)
-			{
-				util_out_print("!UL too small, minimum extension count allowed is !UL", TRUE, new_extn_count,
-						MIN_EXTN_COUNT);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-		} else
-		{
-			util_out_print("Error getting EXTENSION COUNT qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
-		}
-	}
-	if (lock_space_status = cli_present("LOCK_SPACE"))
-	{
-		if (cli_get_int("LOCK_SPACE", &new_lock_space))
-		{
-			if (new_lock_space > MAX_LOCK_SPACE)
-			{
-				util_out_print("!UL too large, maximum lock space allowed is !UL", TRUE,
-						new_lock_space, MAX_LOCK_SPACE);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-			else if (new_lock_space < MIN_LOCK_SPACE)
-			{
-				util_out_print("!UL too small, minimum lock space allowed is !UL", TRUE,
-						new_lock_space, MIN_LOCK_SPACE);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-		} else
-		{
-			util_out_print("Error getting LOCK_SPACE qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
-		}
-		need_standalone = TRUE;
-	}
-	if (mutex_space_status = cli_present("MUTEX_SLOTS"))
-	{
-		if (cli_get_int("MUTEX_SLOTS", &new_mutex_space))
-		{
-			if (new_mutex_space > MAX_CRIT_ENTRY)
-			{
-				util_out_print("!UL too large, maximum number of mutex slots allowed is !UL", TRUE,
-						new_mutex_space, MAX_CRIT_ENTRY);
-				return (int4)ERR_WCWRNNOTCHG;
-			} else if (new_mutex_space < MIN_CRIT_ENTRY)
-			{
-				util_out_print("!UL too small, minimum number of mutex slots allowed is !UL", TRUE,
-						new_mutex_space, MIN_CRIT_ENTRY);
-				return (int4)ERR_WCWRNNOTCHG;
-			}
-		} else
-		{
-			util_out_print("Error getting MUTEX_SPACE qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
-		}
-		need_standalone = TRUE;
-	}
-	if (rsrvd_bytes_status = cli_present("RESERVED_BYTES"))
-	{
-		if (!cli_get_int("RESERVED_BYTES", &reserved_bytes))
-		{
-			util_out_print("Error getting RESERVED BYTES qualifier value", TRUE);
-			return (int4)ERR_RBWRNNOTCHG;
-		}
-		need_standalone = TRUE;
-	}
 	if (cli_present("ACCESS_METHOD"))
 	{
 		cli_get_str("ACCESS_METHOD", acc_spec, &acc_spec_len);
@@ -267,32 +142,197 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		else  if (0 == memcmp(acc_spec, "BG", acc_spec_len))
 			access = dba_bg;
 		else
-			mupip_exit(ERR_INVACCMETHOD);
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVACCMETHOD);
+			exit_stat |= EXIT_ERR;
+		}
 		need_standalone = TRUE;
 	} else
 		access = n_dba;		/* really want to keep current method,
 					    which has not yet been read */
-	if (key_size_status = cli_present("KEY_SIZE"))
+	defer_allocate_status = cli_present("DEFER_ALLOCATE");
+	if (encryptable_status = cli_present("ENCRYPTABLE"))
+		need_standalone = TRUE;
+	encryption_complete_status = cli_present("ENCRYPTIONCOMPLETE");
+	epoch_taper_status = cli_present("EPOCHTAPER");
+	/* EXTENSION_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
+	if (extn_count_status = cli_present("EXTENSION_COUNT"))
 	{
-		if (!cli_get_int("KEY_SIZE", &new_key_size))
+		if (cli_get_int("EXTENSION_COUNT", &new_extn_count))
+		{	/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
+			if (new_extn_count > MAX_EXTN_COUNT)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_extn_count,
+					LEN_AND_LIT("EXTENSION_COUNT"), MAX_EXTN_COUNT);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
 		{
-			util_out_print("Error getting KEY_SIZE qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("EXTENSION COUNT"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
+	if (glbl_buff_status = cli_present("GLOBAL_BUFFERS"))
+	{
+		if (cli_get_int("GLOBAL_BUFFERS", &new_cache_size))
+		{
+			if (new_cache_size > GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_cache_size,
+					LEN_AND_LIT("GLOBAL_BUFFERS"),GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS));
+				exit_stat |= EXIT_ERR;
+			}
+			if (new_cache_size < WC_MIN_BUFFS)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_cache_size,
+					LEN_AND_LIT("GLOBAL_BUFFERS"), WC_MIN_BUFFS);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("GLOBAL_BUFFERS"));
+			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
 	}
-	if (rec_size_status = cli_present("RECORD_SIZE"))
+	inst_freeze_on_error_status = cli_present("INST_FREEZE_ON_ERROR");
+	if (key_size_status = cli_present("KEY_SIZE"))
 	{
-		if (!cli_get_int("RECORD_SIZE", &new_rec_size))
+		if (cli_get_int("KEY_SIZE", &new_key_size))
 		{
-			util_out_print("Error getting RECORD_SIZE qualifier value", TRUE);
-			return (int4)ERR_WCWRNNOTCHG;
+			if (MAX_KEY_SIZE < new_key_size)
+			{	/* bigger than 1019 not supported */
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_key_size,
+					LEN_AND_LIT("KEY_SIZE"), MAX_KEY_SIZE);
+				exit_stat |= EXIT_ERR;
+			}
+			if (MIN_MAX_KEY_SZ > new_key_size)
+			{	/* less than 3 not supported */
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_key_size,
+					LEN_AND_LIT("KEY_SIZE"), MIN_MAX_KEY_SZ);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("KEY_SIZE"));
+			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
+	}
+	if (lock_space_status = cli_present("LOCK_SPACE"))
+	{
+		if (cli_get_int("LOCK_SPACE", &new_lock_space))
+		{
+			if (new_lock_space > MAX_LOCK_SPACE)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_lock_space,
+					LEN_AND_LIT("LOCK_SPACE"), MAX_LOCK_SPACE);
+				exit_stat |= EXIT_ERR;
+			}
+			else if (new_lock_space < MIN_LOCK_SPACE)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_lock_space,
+					LEN_AND_LIT("LOCK_SPACE"), MIN_LOCK_SPACE);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("LOCK_SPACE"));
+			exit_stat |= EXIT_ERR;
+		}
+		need_standalone = TRUE;
+	}
+	if (mutex_space_status = cli_present("MUTEX_SLOTS"))
+	{
+		if (cli_get_int("MUTEX_SLOTS", &new_mutex_space))
+		{
+			if (new_mutex_space > MAX_CRIT_ENTRY)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_mutex_space,
+					LEN_AND_LIT("MUTEX_SLOTS"), MAX_CRIT_ENTRY);
+				exit_stat |= EXIT_ERR;
+			} else if (new_mutex_space < MIN_CRIT_ENTRY)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_mutex_space,
+					LEN_AND_LIT("MUTEX_SLOTS"), MIN_CRIT_ENTRY);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("MUTEX_SLOTS"));
+			exit_stat |= EXIT_ERR;
+		}
+		need_standalone = TRUE;
+	}
+	if (qdbrundown_status = cli_present("QDBRUNDOWN"))
+		need_standalone = TRUE;
+	if (rec_size_status = cli_present("RECORD_SIZE"))
+	{
+		if (cli_get_int("RECORD_SIZE", &new_rec_size))
+		{	/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
+			if (MAX_STRLEN < new_rec_size)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_rec_size,
+					LEN_AND_LIT("RECORD_SIZE"), MAX_STRLEN);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RECORD_SIZE"));
+			exit_stat |= EXIT_ERR;
+		}
+		need_standalone = TRUE;
+	}
+	if (rsrvd_bytes_status = cli_present("RESERVED_BYTES"))
+	{
+		if (!cli_get_int("RESERVED_BYTES", &reserved_bytes))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RESERVED_BYTES"));
+			exit_stat |= EXIT_ERR;
+		}
+		need_standalone = TRUE;
+	}
+	/* SLEEP_SPIN_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
+	if (sleep_cnt_status = cli_present("SLEEP_SPIN_COUNT"))
+	{
+		if (cli_get_int("SLEEP_SPIN_COUNT", &new_sleep_cnt))
+		{	/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
+			if (new_sleep_cnt > MAX_SLEEP_CNT)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_sleep_cnt,
+					LEN_AND_LIT("SLEEP_SPIN_COUNT"), MAX_SLEEP_CNT);
+				exit_stat |= EXIT_ERR;
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SLEEP_SPIN_COUNT"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
+	if (spin_sleep_status = cli_present("SPIN_SLEEP_LIMIT"))
+	{
+		if (cli_get_int("SPIN_SLEEP_LIMIT", &new_spin_sleep))
+		{	/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
+			if (new_spin_sleep > MAX_SPIN_SLEEP)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_spin_sleep,
+					LEN_AND_LIT("SPIN_SLEEP_LIMIT"), MAX_SPIN_SLEEP);
+				exit_stat |= EXIT_ERR;
+			}
+			if (new_spin_sleep)
+			{	/* find the power of 2 equal to or greater than the value */
+				for (spin_sleep_status = 2; spin_sleep_status < new_spin_sleep; spin_sleep_status <<= 1)
+					;
+				new_spin_sleep = spin_sleep_status - 1;	/* make new_spin_sleep a mask; status remains "true" */
+			}
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SPIN_SLEEP_LIMIT"));
+			exit_stat |= EXIT_ERR;
+		}
 	}
 	if (cli_present("VERSION"))
 	{
-		assert(!need_standalone);
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
 		cli_strupper(ver_spec);
 		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
@@ -303,10 +343,25 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			assertpro(FALSE);		/* CLI should prevent us ever getting here */
 	} else
 		desired_dbver = GDSVLAST;	/* really want to keep version, which has not yet been read */
-	inst_freeze_on_error_status = cli_present("INST_FREEZE_ON_ERROR");
-	qdbrundown_status = cli_present("QDBRUNDOWN");
-	defer_allocate_status = cli_present("DEFER_ALLOCATE");
-	epoch_taper_status = cli_present("EPOCHTAPER");
+	if (disk_wait_status = cli_present("WAIT_DISK"))
+	{
+		if (cli_get_int("WAIT_DISK", &new_disk_wait))
+		{
+			if (new_disk_wait < 0)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_disk_wait,
+					LEN_AND_LIT("WAIT_DISK"), 0);
+				exit_stat |= EXIT_ERR;
+			}
+			need_standalone = TRUE;
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("WAIT_DISK"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
+	if (exit_stat & EXIT_ERR)
+		return (int4)ERR_WCERRNOTCHG;
 	if (region)
 		rptr = grlist;
 	else
@@ -314,16 +369,17 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		rptr = &single;
 		memset(&single, 0, SIZEOF(single));
 	}
-
-	csd = (sgmnt_data *)malloc(ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
+	pvt_csd = (sgmnt_data *)malloc(ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	in_backup = FALSE;		/* Only want yes/no from mupfndfil, not an address */
 	for (;  rptr != NULL;  rptr = rptr->fPtr)
 	{
+		reg_exit_stat = EXIT_NRM;
 		if (region)
 		{
 			if (dba_usr == rptr->reg->dyn.addr->acc_meth)
 			{
-				util_out_print("!/Region !AD is not a GDS access type", TRUE, REG_LEN_STR(rptr->reg));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("MUPIP SET"),
+					REG_LEN_STR(rptr->reg));
 				exit_stat |= EXIT_WRN;
 				continue;
 			}
@@ -339,8 +395,195 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		mu_gv_cur_reg_init();
 		memcpy(gv_cur_region->dyn.addr->fname, fn, fn_len);
 		gv_cur_region->dyn.addr->fname_len = fn_len;
-		if (!need_standalone)
+		if (need_standalone)
+		{	/* Following part needs standalone access */
+			got_standalone = STANDALONE(gv_cur_region);
+			if (FALSE == got_standalone)
+			{
+				exit_stat |= EXIT_WRN;
+				continue;
+			}
+			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
+			if (FD_INVALID == (fd = OPEN(fn, O_RDWR)))
+			{
+				save_errno = errno;
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
+				continue;
+			}
+#ifdef __MVS__
+			if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
+#endif
+			LSEEKREAD(fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
+			if (0 != status)
+			{
+				save_errno = errno;
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+				if (-1 != status)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+				else
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
+				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
+				continue;
+			}
+			if ((n_dba != access) && (pvt_csd->acc_meth != access))	/* n_dba is a proxy for no change */
+			{
+				if ((dba_mm == access) && USES_ENCRYPTION(pvt_csd->is_encrypted))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
+					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
+					continue;
+				}
+				if (dba_mm == access)
+					pvt_csd->defer_time = 1;			/* defer defaults to 1 */
+				pvt_csd->acc_meth = access;
+				if (0 == pvt_csd->n_bts)
+				{
+					pvt_csd->n_bts = WC_DEF_BUFFS;
+					pvt_csd->bt_buckets = getprime(pvt_csd->n_bts);
+				}
+			}
+			access_new = (n_dba == access ? pvt_csd->acc_meth : access);
+			if (dba_mm == access_new)
+			{
+				if (CLI_NEGATED == defer_status)
+					pvt_csd->defer_time = 0;
+				else  if (CLI_PRESENT == defer_status)
+				{
+					if (cli_get_num("DEFER_TIME", &defer_time))
+					{
+						if (-1 > defer_time)
+						{
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, defer_time,
+								LEN_AND_LIT("DEFER_TIME"), -1);
+							reg_exit_stat |= EXIT_WRN;
+						} else
+						pvt_csd->defer_time = defer_time;
+					} else
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB,
+							LEN_AND_LIT("DEFER_TIME"));
+						reg_exit_stat |= EXIT_WRN;
+					}
+				}
+				if (pvt_csd->blks_to_upgrd)
+				{
+					util_out_print("MM access method cannot be set if there are blocks to upgrade",	TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				if (GDSVCURR != pvt_csd->desired_db_format)
+				{
+					util_out_print("MM access method cannot be set in DB compatibility mode",
+						TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				if (JNL_ENABLED(pvt_csd) && pvt_csd->jnl_before_image)
+				{
+					util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				pvt_csd->jnl_before_image = FALSE;
+			} else
+			{
+				if (defer_status)
+				{
+					util_out_print("DEFER cannot be specified with BG access method.", TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				}
+			}
+			if (bypass_partial_recov)
+			{
+				pvt_csd->file_corrupt = FALSE;
+				util_out_print("Database file !AD now has partial recovery flag set to  !UL(FALSE) ",
+					TRUE, fn_len, fn, pvt_csd->file_corrupt);
+			}
+			if (encryptable_status)
+			{
+				if (!pvt_csd->fully_upgraded)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREENCRYPTV4NOALLOW, 2, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				} else if (dba_mm == access_new)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				} else if (CLI_PRESENT == encryptable_status)
+					MARK_AS_TO_BE_ENCRYPTED(pvt_csd->is_encrypted);
+				else if (USES_NEW_KEY(pvt_csd))
+				{
+					util_out_print("Database file !AD is being (re)encrypted and must stay encryptable",
+							TRUE, fn_len, fn);
+					reg_exit_stat |= EXIT_WRN;
+				} else if (IS_ENCRYPTED(pvt_csd->is_encrypted))
+					SET_AS_ENCRYPTED(pvt_csd->is_encrypted);
+				else
+					SET_AS_UNENCRYPTED(pvt_csd->is_encrypted);
+			}
+			if (glbl_buff_status)
+			{
+				pvt_csd->n_bts = BT_FACTOR(new_cache_size);
+				pvt_csd->bt_buckets = getprime(pvt_csd->n_bts);
+				pvt_csd->n_wrt_per_flu = 7;
+				pvt_csd->flush_trigger = FLUSH_FACTOR(pvt_csd->n_bts);
+			}
+			if (key_size_status)
+			{
+				key_size_status = pvt_csd->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) - SIZEOF(block_id)
+					- BSTAR_REC_SIZE - pvt_csd->reserved_bytes;
+				if (key_size_status < new_key_size)
+				{	/* too big for block */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_MUPIPSET2BIG, 4, new_key_size,
+						LEN_AND_LIT("KEY_SIZE"), key_size_status,
+						ERR_TEXT, 2, RTS_ERROR_TEXT("for current block size and reserved bytes"));
+					reg_exit_stat |= EXIT_WRN;
+				} else if (pvt_csd->max_key_size > new_key_size)
+				{	/* lowering the maximum key size can cause problems if large keys already exist in db */
+					util_out_print("!UL smaller than current maximum key size !UL", TRUE,
+							new_key_size, pvt_csd->max_key_size);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				pvt_csd->max_key_size = new_key_size;
+			}
+			if (lock_space_status)
+				pvt_csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
+			if (mutex_space_status)
+				NUM_CRIT_ENTRY(pvt_csd) = new_mutex_space;
+			if (qdbrundown_status)
+				pvt_csd->mumps_can_bypass = CLI_PRESENT == qdbrundown_status;
+			if (rec_size_status)
+			{
+				if (pvt_csd->max_rec_size > new_rec_size)
+				{
+					util_out_print("!UL smaller than current maximum record size !UL", TRUE,
+							new_rec_size, pvt_csd->max_rec_size);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				pvt_csd->max_rec_size = new_rec_size;
+			}
+			if (rsrvd_bytes_status)
+			{
+				if (reserved_bytes > MAX_RESERVE_B(pvt_csd))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, reserved_bytes,
+						LEN_AND_LIT("RESERVED_BYTES"), MAX_RESERVE_B(pvt_csd));
+					reg_exit_stat |= EXIT_WRN;
+				}
+				pvt_csd->reserved_bytes = reserved_bytes;
+			}
+			if (EXIT_NRM != reg_exit_stat)
+			{
+				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, reg_exit_stat);
+				continue;
+			}
+			csd = pvt_csd;
+		} else /* if (!need_standalone) */
 		{
+			got_standalone = FALSE;
 			gvcst_init(gv_cur_region);
 			change_reg();	/* sets cs_addrs and cs_data */
 			if (gv_cur_region->read_only)
@@ -351,335 +594,152 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				mu_gv_cur_reg_free();
 				continue;
 			}
+			csd = cs_data;
 			assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
 			grab_crit(gv_cur_region);
-			status = EXIT_NRM;
-			access_new = (n_dba == access ? cs_data->acc_meth : access);
-							/* recalculate; n_dba is a proxy for no change */
-			change_fhead_timer("FLUSH_TIME", cs_data->flush_time,
-					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
-					   FALSE);
-			if (GDSVLAST != desired_dbver)
+		}
+		access_new = (n_dba == access ? csd->acc_meth : access);
+		if (GDSVLAST != desired_dbver)
+		{
+			if ((dba_mm != access_new) || (GDSV4 != desired_dbver))
+				(void)desired_db_format_set(gv_cur_region, desired_dbver, command);
+			else	/* for other errors desired_db_format_set prints appropriate error messages */
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MMNODYNDWNGRD, 2, REG_LEN_STR(gv_cur_region));
+			if (csd->desired_db_format != desired_dbver)
+				reg_exit_stat |= EXIT_WRN;
+			else
+				util_out_print("Database file !AD now has desired DB format !AD", TRUE,
+					fn_len, fn, LEN_AND_STR(gtm_dbversion_table[csd->desired_db_format]));
+		}
+		if (encryption_complete_status)
+		{
+			if (!csd->fully_upgraded)
 			{
-				if ((dba_mm != access_new) || (GDSV4 != desired_dbver))
-					status1 = desired_db_format_set(gv_cur_region, desired_dbver, command);
-				else
-				{
-					status1 = ERR_MMNODYNDWNGRD;
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) status1, 2, REG_LEN_STR(gv_cur_region));
-				}
-				if (SS_NORMAL != status1)
-				{	/* "desired_db_format_set" would have printed appropriate error messages */
-					if (ERR_MUNOACTION != status1)
-					{	/* real error occurred while setting the db format. skip to next region */
-						status = EXIT_ERR;
-					}
-				}
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREENCRYPTV4NOALLOW, 2, fn_len, fn);
+				reg_exit_stat |= EXIT_WRN;
+			} else if (dba_mm == access_new)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, fn_len, fn);
+				reg_exit_stat |= EXIT_WRN;
+			} else if (((NULL == cs_addrs->nl) || (!cs_addrs->nl->reorg_encrypt_pid)) && (!USES_NEW_KEY(csd)))
+				csd->encryption_hash2_start_tn = 0;
+			else
+			{
+				util_out_print("Cannot mark encryption complete on database file !AD due to"
+						" an ongoing MUPIP REORG -ENCRYPT operation", TRUE, fn_len, fn);
+				reg_exit_stat |= EXIT_WRN;
 			}
-			if (EXIT_NRM == status)
+		}
+		if (EXIT_NRM == reg_exit_stat)
+		{
+			if (defer_allocate_status)
 			{
-				if (extn_count_status)
-					cs_data->extension_size = (uint4)new_extn_count;
-				wcs_flu(WCSFLU_FLUSH_HDR);
-				if (extn_count_status)
-					util_out_print("Database file !AD now has extension count !UL",
-						TRUE, fn_len, fn, cs_data->extension_size);
-				if (GDSVLAST != desired_dbver)
-					util_out_print("Database file !AD now has desired DB format !AD", TRUE,
-						fn_len, fn, LEN_AND_STR(gtm_dbversion_table[cs_data->desired_db_format]));
-				if (CLI_NEGATED == inst_freeze_on_error_status)
-				{
-					cs_data->freeze_on_fail = FALSE;
-					util_out_print("Database file !AD now has inst freeze on fail flag set to FALSE",
-							TRUE, fn_len, fn);
-				}
-				else if (CLI_PRESENT == inst_freeze_on_error_status)
-				{
-					cs_data->freeze_on_fail = TRUE;
-					util_out_print("Database file !AD now has inst freeze on fail flag set to TRUE",
-							TRUE, fn_len, fn);
-				}
-				if (qdbrundown_status)
-				{
-					cs_data->mumps_can_bypass = CLI_PRESENT == qdbrundown_status;
-					util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
-						       fn_len, fn, 5, (cs_data->mumps_can_bypass ? " TRUE" : "FALSE"));
-				}
-				if (defer_allocate_status)
-				{
-#					if defined(__sun) || defined(__hpux)
-					if (CLI_NEGATED == defer_allocate_status)
-						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_NODFRALLOCSUPP);
-#					else
-					cs_data->defer_allocate = CLI_PRESENT == defer_allocate_status;
-					util_out_print("Database file !AD now has defer allocation flag set to !AD", TRUE,
-						       fn_len, fn, 5, (cs_data->defer_allocate ? " TRUE" : "FALSE"));
-#					endif
-				}
-				if (epoch_taper_status)
-				{
-					cs_data->epoch_taper = CLI_PRESENT == epoch_taper_status;
-					util_out_print("Database file !AD now has epoch taper flag set to !AD", TRUE,
-						       fn_len, fn, 5, (cs_data->epoch_taper ? " TRUE" : "FALSE"));
-				}
-			} else
-				exit_stat |= status;
-			rel_crit(gv_cur_region);
-			UNIX_ONLY(exit_stat |=)gds_rundown();
-		} else
-		{	/* Following part needs standalone access */
-			assert(GDSVLAST == desired_dbver);
-			got_standalone = STANDALONE(gv_cur_region);
-			if (FALSE == got_standalone)
-				return (int4)ERR_WCERRNOTCHG;
-			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
-			if (FD_INVALID == (fd = OPEN(fn, O_RDWR)))
-			{
-				save_errno = errno;
-				errptr = (char *)STRERROR(save_errno);
-				util_out_print("open : !AZ", TRUE, errptr);
-				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
-				continue;
-			}
-#ifdef __MVS__
-			if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
-				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
-#endif
-			LSEEKREAD(fd, 0, csd, SIZEOF(sgmnt_data), status);
-			if (0 != status)
-			{
-				save_errno = errno;
-				PERROR("Error reading header of file");
-				errptr = (char *)STRERROR(save_errno);
-				util_out_print("read : !AZ", TRUE, errptr);
-				util_out_print("Error reading header of file", TRUE);
-				util_out_print("Database file !AD not changed:  ", TRUE, fn_len, fn);
-				if (-1 != status)
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
-				else
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
-			}
-			if (rsrvd_bytes_status)
-			{
-				if (reserved_bytes > MAX_RESERVE_B(csd))
-				{
-					util_out_print("!UL too large, maximum reserved bytes allowed is !UL for database file !AD",
-							TRUE, reserved_bytes, MAX_RESERVE_B(csd), fn_len, fn);
-					CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
-					db_ipcs_reset(gv_cur_region);
-					return (int4)ERR_RBWRNNOTCHG;
-				}
-				csd->reserved_bytes = reserved_bytes;
-			}
-			if (key_size_status)
-			{
-				if (MAX_KEY_SZ < new_key_size)
-				{	/* bigger than 1023 not supported */
-					util_out_print("!UL too large, highest maximum key size allowed is !UL", TRUE,
-							new_key_size, MAX_KEY_SZ);
-					CLOSE_AND_RETURN;
-				} else if (MIN_MAX_KEY_SZ > new_key_size)
-				{	/* less than 3 not supported */
-					util_out_print("!UL too small, lowest maximum key size allowed is !UL", TRUE,
-							new_key_size, MIN_MAX_KEY_SZ);
-					CLOSE_AND_RETURN;
-				} else if (csd->blk_size < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + new_key_size + SIZEOF(block_id)
-								 + BSTAR_REC_SIZE + csd->reserved_bytes))
-				{	/* too big for block */
-					util_out_print("!UL too large, lowest maximum key size allowed (given block size) is !UL",
-							TRUE, new_key_size, csd->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr)
-							 - SIZEOF(block_id) - csd->reserved_bytes + BSTAR_REC_SIZE);
-					CLOSE_AND_RETURN;
-				} else if (csd->max_key_size > new_key_size)
-				{	/* lowering the maximum key size can cause problems if large keys already exist in db */
-					util_out_print("!UL smaller than current maximum key size !UL", TRUE,
-							new_key_size, csd->max_key_size);
-					CLOSE_AND_RETURN;
-				}
-				csd->max_key_size = new_key_size;
-			}
-			if (rec_size_status)
-			{
-				if (MAX_STRLEN < new_rec_size)
-				{
-					util_out_print("!UL too large, highest maximum record size allowed is !UL", TRUE,
-							new_rec_size, MAX_STRLEN);
-					CLOSE_AND_RETURN;
-				} else if (0 > new_key_size)
-				{
-					util_out_print("!UL too small, lowest maximum record size allowed is !UL", TRUE,
-							new_rec_size, 0);
-					CLOSE_AND_RETURN;
-				} else if (csd->max_rec_size > new_rec_size)
-				{
-					util_out_print("!UL smaller than current maximum record size !UL", TRUE,
-							new_rec_size, csd->max_rec_size);
-					CLOSE_AND_RETURN;
-				}
-				csd->max_rec_size = new_rec_size;
-			}
-			access_new = (n_dba == access ? csd->acc_meth : access);
-							/* recalculate; n_dba is a proxy for no change */
-			change_fhead_timer("FLUSH_TIME", csd->flush_time,
-					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
-					   FALSE);
-			if ((n_dba != access) && (csd->acc_meth != access))	/* n_dba is a proxy for no change */
-			{
-#				ifdef GTM_CRYPT
-				if (dba_mm == access && (csd->is_encrypted))
-				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
-					mupip_exit(ERR_RBWRNNOTCHG);
-				}
+#				if defined(__sun) || defined(__hpux)
+				if (CLI_NEGATED == defer_allocate_status)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NODFRALLOCSUPP);
+#				else
+				csd->defer_allocate = (CLI_PRESENT == defer_allocate_status);
+				util_out_print("Database file !AD now has defer allocation flag set to !AD", TRUE,
+					fn_len, fn, 5, (csd->defer_allocate ? " TRUE" : "FALSE"));
 #				endif
-				if (dba_mm == access)
-					csd->defer_time = 1;			/* defer defaults to 1 */
-				csd->acc_meth = access;
-				if (0 == csd->n_bts)
-				{
-					csd->n_bts = WC_DEF_BUFFS;
-					csd->bt_buckets = getprime(csd->n_bts);
-				}
-			}
-			if (glbl_buff_status)
-			{
-				csd->n_bts = BT_FACTOR(new_cache_size);
-				csd->bt_buckets = getprime(csd->n_bts);
-				csd->n_wrt_per_flu = 7;
-				csd->flush_trigger = FLUSH_FACTOR(csd->n_bts);
 			}
 			if (disk_wait_status)
 				csd->wait_disk_space = new_disk_wait;
-			if (extn_count_status)
-				csd->extension_size = (uint4)new_extn_count;
-			if (lock_space_status)
-				csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
-			if (mutex_space_status)
-				NUM_CRIT_ENTRY(csd) = new_mutex_space;
-			if (qdbrundown_status)
-				csd->mumps_can_bypass = CLI_PRESENT == qdbrundown_status;
-			if (bypass_partial_recov)
-			{
-				csd->file_corrupt = FALSE;
-				util_out_print("Database file !AD now has partial recovery flag set to  !UL(FALSE) ",
-						TRUE, fn_len, fn, csd->file_corrupt);
-			}
 			if (epoch_taper_status)
 				csd->epoch_taper = CLI_PRESENT == epoch_taper_status;
-			if (dba_mm == access_new)
-			{
-				if (CLI_NEGATED == defer_status)
-					csd->defer_time = 0;
-				else  if (CLI_PRESENT == defer_status)
-				{
-					if (!cli_get_num("DEFER_TIME", &defer_time))
-					{
-						util_out_print("Error getting DEFER_TIME qualifier value", TRUE);
-						db_ipcs_reset(gv_cur_region);
-						return (int4)ERR_RBWRNNOTCHG;
-					}
-					if (-1 > defer_time)
-					{
-						util_out_print("DEFER_TIME cannot take negative values less than -1", TRUE);
-						util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-						DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
-						continue;
-					}
-					csd->defer_time = defer_time;
-				}
-				if (csd->blks_to_upgrd)
-				{
-					util_out_print("MM access method cannot be set if there are blocks to upgrade",	TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
-					continue;
-				}
-				if (GDSVCURR != csd->desired_db_format)
-				{
-					util_out_print("MM access method cannot be set in DB compatibility mode",
-						TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
-					continue;
-				}
-				if (JNL_ENABLED(csd) && csd->jnl_before_image)
-				{
-					util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
-					continue;
-				}
-				csd->jnl_before_image = FALSE;
-			} else
-			{
-				if (defer_status)
-				{
-					util_out_print("DEFER cannot be specified with BG access method.", TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
-					continue;
-				}
-			}
+			if (extn_count_status)
+				csd->extension_size = (uint4)new_extn_count;
+			change_fhead_timer("FLUSH_TIME", csd->flush_time,
+					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
+					   FALSE);
 			if (CLI_NEGATED == inst_freeze_on_error_status)
 				csd->freeze_on_fail = FALSE;
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
 				csd->freeze_on_fail = TRUE;
-			DB_LSEEKWRITE(NULL, NULL, fd, 0, csd, SIZEOF(sgmnt_data), status);
-			if (0 != status)
-			{
-				save_errno = errno;
-				errptr = (char *)STRERROR(save_errno);
-				util_out_print("write : !AZ", TRUE, errptr);
-				util_out_print("Error writing header of file", TRUE);
-				util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
-			}
-			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
+			if (sleep_cnt_status)
+				SLEEP_SPIN_CNT(csd) = new_sleep_cnt;
+			if (spin_sleep_status)
+				SPIN_SLEEP_MASK(csd) = new_spin_sleep;
 			/* --------------------- report results ------------------------- */
-			if (glbl_buff_status)
-				util_out_print("Database file !AD now has !UL global buffers",
-						TRUE, fn_len, fn, csd->n_bts);
-			if (defer_status && (dba_mm == csd->acc_meth))
-				util_out_print("Database file !AD now has defer_time set to !SL",
-						TRUE, fn_len, fn, csd->defer_time);
-			if (rsrvd_bytes_status)
-				util_out_print("Database file !AD now has !UL reserved bytes",
-						TRUE, fn_len, fn, csd->reserved_bytes);
-			if (key_size_status)
-				util_out_print("Database file !AD now has maximum key size !UL",
-						TRUE, fn_len, fn, csd->max_key_size);
-			if (rec_size_status)
-				util_out_print("Database file !AD now has maximum record size !UL",
-						TRUE, fn_len, fn, csd->max_rec_size);
-			if (extn_count_status)
-				util_out_print("Database file !AD now has extension count !UL",
-						TRUE, fn_len, fn, csd->extension_size);
-			if (lock_space_status)
-				util_out_print("Database file !AD now has lock space !UL pages",
-						TRUE, fn_len, fn, csd->lock_space_size/OS_PAGELET_SIZE);
-			if (mutex_space_status)
-				util_out_print("Database file !AD now has !UL mutex queue slots",
-						TRUE, fn_len, fn, NUM_CRIT_ENTRY(csd));
-			if (qdbrundown_status)
-				util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
-					       fn_len, fn, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
-			if (epoch_taper_status)
-				util_out_print("Database file !AD now has epoch taper flag set to !AD", TRUE,
-					       fn_len, fn, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
-						TRUE, fn_len, fn, csd->wait_disk_space);
+					TRUE, fn_len, fn, csd->wait_disk_space);
+			if (encryption_complete_status)
+				util_out_print("Database file !AD now has encryption marked complete", TRUE, fn_len, fn);
+			if (epoch_taper_status)
+				util_out_print("Database file !AD now has epoch taper flag set to !AD", TRUE,
+					fn_len, fn, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
+			if (extn_count_status)
+				util_out_print("Database file !AD now has extension count !UL",
+					TRUE, fn_len, fn, csd->extension_size);
 			if (CLI_NEGATED == inst_freeze_on_error_status)
 				util_out_print("Database file !AD now has inst freeze on fail flag set to FALSE",
-						TRUE, fn_len, fn);
+					TRUE, fn_len, fn);
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
 				util_out_print("Database file !AD now has inst freeze on fail flag set to TRUE",
-						TRUE, fn_len, fn);
+					TRUE, fn_len, fn);
+			if (sleep_cnt_status)
+				util_out_print("Database file !AD now has sleep spin count !UL",
+					TRUE, fn_len, fn, SLEEP_SPIN_CNT(csd));
+			if (spin_sleep_status)
+				util_out_print("Database file !AD now has sleep spin mask !UL",
+					TRUE, fn_len, fn, SPIN_SLEEP_MASK(csd));
+			if (got_standalone)
+			{
+				DB_LSEEKWRITE(NULL, NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
+				if (0 != status)
+				{
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					util_out_print("write : !AZ", TRUE, errptr);
+					util_out_print("Error writing header of file", TRUE);
+					util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+				}
+				if (defer_status && (dba_mm == pvt_csd->acc_meth))
+					util_out_print("Database file !AD now has defer_time set to !SL",
+							TRUE, fn_len, fn, pvt_csd->defer_time);
+				if (glbl_buff_status)
+					util_out_print("Database file !AD now has !UL global buffers",
+							TRUE, fn_len, fn, pvt_csd->n_bts);
+				if (key_size_status)
+					util_out_print("Database file !AD now has maximum key size !UL",
+							TRUE, fn_len, fn, pvt_csd->max_key_size);
+				if (encryptable_status)
+					util_out_print("Database file !AD now has encryptable flag set to !AD", TRUE,
+							fn_len, fn, 5,
+							(TO_BE_ENCRYPTED(pvt_csd->is_encrypted) ? " TRUE" : "FALSE"));
+				if (lock_space_status)
+					util_out_print("Database file !AD now has lock space !UL pages",
+							TRUE, fn_len, fn, pvt_csd->lock_space_size/OS_PAGELET_SIZE);
+				if (mutex_space_status)
+					util_out_print("Database file !AD now has !UL mutex queue slots",
+							TRUE, fn_len, fn, NUM_CRIT_ENTRY(pvt_csd));
+				if (qdbrundown_status)
+					util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
+						       fn_len, fn, 5, (pvt_csd->mumps_can_bypass ? " TRUE" : "FALSE"));
+				if (rec_size_status)
+					util_out_print("Database file !AD now has maximum record size !UL",
+							TRUE, fn_len, fn, pvt_csd->max_rec_size);
+				if (rsrvd_bytes_status)
+					util_out_print("Database file !AD now has !UL reserved bytes",
+							TRUE, fn_len, fn, pvt_csd->reserved_bytes);
+			} else
+				wcs_flu(WCSFLU_FLUSH_HDR);
+		} else
+			exit_stat |= reg_exit_stat;
+		if (got_standalone)
+		{
+			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 			db_ipcs_reset(gv_cur_region);
-		} /* end of else part if (!need_standalone) */
-		mu_gv_cur_reg_free();
+		} else
+		{
+			rel_crit(gv_cur_region);
+			exit_stat |=gds_rundown();
+			mu_gv_cur_reg_free();
+		}
 	}
-	free(csd);
+	free(pvt_csd);
 	assert(!(exit_stat & EXIT_INF));
 	return (exit_stat & EXIT_ERR ? (int4)ERR_WCERRNOTCHG :
 		(exit_stat & EXIT_WRN ? (int4)ERR_WCWRNNOTCHG : SS_NORMAL));

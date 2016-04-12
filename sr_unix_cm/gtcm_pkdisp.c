@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +18,7 @@
 #undef UNIX		/* Cause non-GTM-runtime routines to be used since this is a standalone module */
 #include "gtm_stdio.h"
 #define UNIX
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"
 
 /* The use of "open" below involves pulling in gtm_open() (from gtm_fd_trace.c) which in turn pulls in caller_id and the works.
  * To avoid all those from bloating this library, we skip the file-descriptor trace in this module.
@@ -29,12 +30,21 @@
 #include <errno.h>
 #include "gtm_threadgbl_init.h"
 #include "omi.h"
+#include "cli.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
 
 GBLREF char	*omi_oprlist[];
+
+/* This executable does not have any command tables so initialize command array to NULL. The reason why cmd_ary is needed is
+ * because EXIT (invoked by this module) in turn pulls in "gtm_image_exit" which in turn does asserts that in turn pull in
+ * a lot of the database runtime logic which in turn (due to triggers) pulls in the compiler as well
+ * (op_zcompile etc. require cmd_ary). And the reason this is needed in pro too is because pro gtm_malloc_src.h defines
+ * the function "gtm_malloc_dbg" which needs "cmd_ary".
+ */
+GBLDEF	CLI_ENTRY	*cmd_ary = NULL;
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
@@ -61,12 +71,12 @@ int main(int argc, char_ptr_t argv[])
 		{
 			PRINTF("%s: bad command line arguments\n\t%s [ -b ] filename\n",
 				argv[0], argv[0]);
-			exit(-1);
+			EXIT(-1);
 		} else if (INV_FD_P((fd = open(argv[argc - 1], O_RDONLY))))
 		{
 			PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
 				STRERROR(errno));
-			exit(-1);
+			EXIT(-1);
 		}
 	} else if (argc == 2)
 	{
@@ -76,7 +86,7 @@ int main(int argc, char_ptr_t argv[])
 		{
 			PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
 				STRERROR(errno));
-			exit(-1);
+			EXIT(-1);
 		}
 	}
 	else if (argc == 1)
@@ -84,7 +94,7 @@ int main(int argc, char_ptr_t argv[])
 	else
 	{
 		PRINTF("%s: bad command line arguments\n\t%s [ -b ] [ filename ]\n", argv[0], argv[0]);
-		exit(-1);
+		EXIT(-1);
 	}
 	for (blen = 0, bptr = buff, n = 1, rdmr = 1; ; )
 	{
@@ -94,7 +104,7 @@ int main(int argc, char_ptr_t argv[])
 			if ((cc = (int)(read(fd, &bptr[blen], cc))) < 0)
 			{
 				PRINTF("%s: read(): %s", argv[0], STRERROR(errno));
-				exit(-1);
+				EXIT(-1);
 			} else if (cc == 0)
 				break;
 			blen += cc;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,7 @@
 #include "error.h"
 #include "gtm_string.h"
 #include "send_msg.h"
+#include "gtmio.h"
 
 /* This is a GT.M wrapper module for all system calls that open/close file descriptors.
  * This is needed to trace all files that were opened by GT.M (D9I11-002714)
@@ -156,9 +158,12 @@ int gtm_socket(int family, int type, int protocol)
 {
 	int	fd;
 
-	fd = socket(family, type, protocol);
+	fd = socket(family, SETSOCKCLOEXEC(type), protocol);
 	if (-1 != fd)
+	{
+		SETFDCLOEXEC(fd);
 		FD_TRACE(fd_ops_socket, fd, 0);
+	}
 	/* it is possible that fd will be -1 if the address family is not supported */
 	return fd;
 }

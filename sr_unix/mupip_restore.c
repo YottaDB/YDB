@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,7 @@
 
 #include "mdef.h"
 
+#include "gdsdbver.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_socket.h"
@@ -75,6 +77,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			restore_read_errno;
 
 LITREF	char			*gtm_dbversion_table[];
+LITREF	char			*mdb_ver_names[];
 
 error_def(ERR_BADTAG);
 error_def(ERR_IOEOF);
@@ -121,7 +124,7 @@ CONDITION_HANDLER(iob_io_error)
 void mupip_restore(void)
 {
 	static readonly char	label[] =   GDS_LABEL;
-	char			db_name[MAX_FN_LEN + 1], *inbuf = NULL, *p, *blk_ptr;
+	char			db_name[MAX_FN_LEN + 1], *inbuf, *p, *blk_ptr;
 	inc_list_struct 	*ptr;
 	inc_header		inhead;
 	sgmnt_data		old_data;
@@ -143,7 +146,7 @@ void mupip_restore(void)
 	char			buff[DISK_BLOCK_SIZE];
 	char			msg_buffer[1024], *newmap, *newmap_bptr;
 	mstr			msg_string;
-	char			addr[SA_MAXLEN+1];
+	char			addr[SA_MAXLEN + 1];
 	unsigned char		tcp[5];
 	backup_type		type;
 	unsigned short		port;
@@ -153,15 +156,20 @@ void mupip_restore(void)
 	pid_t			waitpid_res;
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	int			rc;
-#	ifdef GTM_CRYPT
-	char			bkup_hash[GTMCRYPT_HASH_LEN], *inptr;
+	char			*inptr;
 	int			in_len, gtmcrypt_errno;
-	gtmcrypt_key_t		bkup_key_handle, target_key_handle;
-	boolean_t		is_bkup_file_encrypted, is_same_hash = FALSE;
-#	endif
+	boolean_t		same_encr_settings;
+	boolean_t		check_mdb_ver, bad_mdb_ver;
+	boolean_t		in_is_encrypted, in_to_be_encrypted;
+	boolean_t		old_is_encrypted, old_to_be_encrypted;
+	boolean_t		in_use_new_key;
+	enc_handles		in_encr_handles, old_encr_handles;
+	int4			cur_mdb_ver;
+	gd_segment		*seg;
 	ZOS_ONLY(int 		realfiletag;)
 	DEBUG_ONLY(unix_db_info	*udi;)
 
+	inbuf = NULL;
 	extend = TRUE;
 	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
 		extend = FALSE;
@@ -224,7 +232,7 @@ void mupip_restore(void)
 	msg_string.len = SIZEOF(msg_buffer);
 	memset(&inhead, 0, SIZEOF(inc_header));
 	rest_blks = 0;
-	for (ptr = in_files.next;  ptr;  ptr = ptr->next)
+	for (ptr = in_files.next; NULL != ptr; ptr = ptr->next)
 	{	/* --- determine source type --- */
 		type = backup_to_file;
 		if (0 == ptr->input_file.len)
@@ -255,7 +263,7 @@ void mupip_restore(void)
 		}
 		/* --- open the input stream --- */
 		restore_read_errno = 0;
-		switch(type)
+		switch (type)
 		{
 			case backup_to_file:
 				common_read = iob_read;
@@ -315,21 +323,65 @@ void mupip_restore(void)
 				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
 		COMMON_READ(in, &inhead, SIZEOF(inc_header), inbuf);
-		if (memcmp(inhead.label, V5_INC_HEADER_LABEL, INC_HDR_LABEL_SZ) &&
-		    (memcmp(inhead.label, INC_HEADER_LABEL, INC_HDR_LABEL_SZ)))
+		check_mdb_ver = FALSE;
+		if (!memcmp(inhead.label, INC_HEADER_LABEL_V5_NOENCR, INC_HDR_LABEL_SZ))
+			assert(!IS_ENCRYPTED(inhead.is_encrypted));
+		else if (!memcmp(inhead.label, INC_HEADER_LABEL_V6_ENCR, INC_HDR_LABEL_SZ))
+			assert(IS_ENCRYPTED(inhead.is_encrypted));
+		else if (!memcmp(inhead.label, INC_HEADER_LABEL_V7, INC_HDR_LABEL_SZ))
+			check_mdb_ver = TRUE;
+		else
 		{
 			util_out_print("Input file !AD has an unrecognizable format", TRUE, ptr->input_file.len,
 				ptr->input_file.addr);
 			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-#		ifdef GTM_CRYPT
-		is_bkup_file_encrypted = FALSE;
-		if (inhead.is_encrypted)
+		if (check_mdb_ver)
 		{
-			COMMON_READ(in, bkup_hash, GTMCRYPT_HASH_LEN, inbuf);
-			is_bkup_file_encrypted = inhead.is_encrypted;
+			COMMON_READ(in, (char *)&cur_mdb_ver, SIZEOF(int4), inbuf);
+			bad_mdb_ver = (old_data.minor_dbver != cur_mdb_ver);
+		} else
+		{
+			cur_mdb_ver = -1;
+			bad_mdb_ver = TRUE;
 		}
-#		endif
+		if (bad_mdb_ver)
+		{
+			if (0 > cur_mdb_ver)
+				util_out_print("Minor DB version in the extract predates that in the database (!AD)", TRUE,
+						LEN_AND_STR(mdb_ver_names[old_data.minor_dbver]));
+			else if (GDSMVLAST <= cur_mdb_ver)
+				util_out_print("Minor DB version in the extract is higher than in the database (!AD)", TRUE,
+						LEN_AND_STR(mdb_ver_names[old_data.minor_dbver]));
+			else
+				util_out_print("Minor DB version in the extract (!AD) is different from that in the database (!AD)",
+						TRUE, LEN_AND_STR(mdb_ver_names[cur_mdb_ver]),
+						LEN_AND_STR(mdb_ver_names[old_data.minor_dbver]));
+			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
+		}
+		if (!SAME_ENCRYPTION_SETTINGS(&inhead, &old_data))
+		{
+			ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file (called from STANDALONE) */
+			same_encr_settings = FALSE;
+			INIT_DB_OR_JNL_ENCRYPTION(&in_encr_handles, &inhead, 0, NULL, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len, ptr->input_file.addr);
+				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
+			}
+			seg = gv_cur_region->dyn.addr;
+			INIT_DB_OR_JNL_ENCRYPTION(&old_encr_handles, &old_data, seg->fname_len, seg->fname, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
+			}
+			in_is_encrypted = IS_ENCRYPTED(inhead.is_encrypted);
+			in_to_be_encrypted = USES_NEW_KEY(&inhead);
+			old_is_encrypted = IS_ENCRYPTED(old_data.is_encrypted);
+			old_to_be_encrypted = USES_NEW_KEY(&old_data);
+		} else
+			same_encr_settings = TRUE;
 		if (curr_tn != inhead.start_tn)
 		{
 			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"
@@ -396,13 +448,13 @@ void mupip_restore(void)
 						TRUE, ptr->input_file.len, ptr->input_file.addr, totblks, totblks);
 				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 			} else
-			{	/* The db must be exteneded which we will do ourselves (to avoid jnl and other interferences
-				   in gdsfilext). These local bit map blocks will be created in GDSVCURR format (always). The
-				   reason for this is that we do not know at this time whether these blocks will be replaced
-				   by blocks in the backup or not. If we are in compatibility mode, this is highly likely
-				   even if before image journaling is on which creates bit maps with TN=0. In either case,
-				   a GDSVCURR format block is the only one that can be added to the database without affecting
-				   the blks_to_upgrd counter.
+			{	/* The db must be extended which we will do ourselves (to avoid jnl and other interferences
+				 * in gdsfilext). These local bit map blocks will be created in GDSVCURR format (always). The
+				 * reason for this is that we do not know at this time whether these blocks will be replaced
+				 * by blocks in the backup or not. If we are in compatibility mode, this is highly likely
+				 * even if before image journaling is on which creates bit maps with TN=0. In either case,
+				 * a GDSVCURR format block is the only one that can be added to the database without affecting
+				 * the blks_to_upgrd counter.
 				 */
 				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
 						+ ((off_t)inhead.db_total_blks * old_blk_size);
@@ -452,39 +504,7 @@ void mupip_restore(void)
 			}
 		}
 		rsize = SIZEOF(muinc_blk_hdr) + inhead.blk_size;
-#		ifdef GTM_CRYPT
-		if (is_bkup_file_encrypted || old_data.is_encrypted)
-		{
-			/* See if the backup file and the target file have the same hash thereby speeding up the most common case */
-			if (!memcmp(bkup_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN))
-				is_same_hash = TRUE;
-			ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file (called from STANDALONE) */
-			if (!is_same_hash)
-			{
-				if (is_bkup_file_encrypted)
-				{
-					GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, bkup_hash, bkup_key_handle, gtmcrypt_errno);
-					if (0 != gtmcrypt_errno)
-					{
-						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
-										ptr->input_file.addr);
-						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
-					}
-				}
-				if (old_data.is_encrypted)
-				{
-					GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data.encryption_hash, target_key_handle,
-						gtmcrypt_errno);
-					if (0 != gtmcrypt_errno)
-					{
-						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
-						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
-					}
-				}
-			}
-		}
-#		endif
-		for ( ; ;)
+		for ( ; ; )
 		{        /* All records are of fixed size so process until we get to a zeroed record marking the end */
 			COMMON_READ(in, inbuf, rsize, inbuf);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
@@ -533,41 +553,56 @@ void mupip_restore(void)
 				} else
 					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
 			}
-#			ifdef GTM_CRYPT
 			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
 			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
-			if (!is_same_hash
-				&& (BLK_NEEDS_ENCRYPTION3(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
+			if (!same_encr_settings && IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)blk_ptr)->levl, in_len))
 			{
-				inptr = blk_ptr + SIZEOF(blk_hdr);
-				GTMCRYPT_DECRYPT(NULL, bkup_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
-				if (0 != gtmcrypt_errno)
+				gtmcrypt_errno = 0;
+				in_use_new_key = in_to_be_encrypted
+					&& (((blk_hdr_ptr_t)blk_ptr)->tn >= inhead.encryption_hash2_start_tn);
+				if (in_use_new_key || in_is_encrypted)
 				{
-					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
-									ptr->input_file.addr);
-					CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
+					inptr = blk_ptr + SIZEOF(blk_hdr);
+					if (in_use_new_key)
+					{
+						GTMCRYPT_DECRYPT(NULL, TRUE, in_encr_handles.encr_key_handle2,
+								inptr, in_len, NULL, blk_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+					} else
+					{
+						GTMCRYPT_DECRYPT(NULL, inhead.non_null_iv, in_encr_handles.encr_key_handle,
+								inptr, in_len, NULL, blk_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+					}
+					if (0 != gtmcrypt_errno)
+					{
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
+										ptr->input_file.addr);
+						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
+					}
+				}
+				if (old_to_be_encrypted || old_is_encrypted)
+				{
+					inptr = blk_ptr + SIZEOF(blk_hdr);
+					if (old_to_be_encrypted)
+					{
+						GTMCRYPT_ENCRYPT(NULL, TRUE, old_encr_handles.encr_key_handle2,
+							inptr, in_len, NULL, blk_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+					} else
+					{
+						GTMCRYPT_ENCRYPT(NULL, old_data.non_null_iv, old_encr_handles.encr_key_handle,
+							inptr, in_len, NULL, blk_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
+					}
+					if (0 != gtmcrypt_errno)
+					{
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
+						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
+					}
 				}
 			}
-#			endif
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
-#			ifdef GTM_CRYPT
-			if (!is_same_hash
-				&& (BLK_NEEDS_ENCRYPTION3(old_data.is_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
-			{
-				inptr = blk_ptr + SIZEOF(blk_hdr);
-				GTMCRYPT_ENCRYPT(NULL, target_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
-				if (0 != gtmcrypt_errno)
-				{
-					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
-					CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
-				}
-			}
-#			endif
 			DB_LSEEKWRITE(NULL, NULL, db_fd, offset, blk_ptr, size, save_errno);
 			if (0 != save_errno)
 			{
-				util_out_print("Error accessing output file !AD. Aborting restore.",
-					TRUE, n_len, db_name);
+				util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("write : !AZ", TRUE, errptr);
 				CLNUP_AND_EXIT(save_errno, inbuf);
@@ -579,10 +614,7 @@ void mupip_restore(void)
 		COMMON_READ(in, inbuf, rsize, inbuf);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
 		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
-		GTMCRYPT_ONLY(
-			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN);
-			((sgmnt_data_ptr_t)inbuf)->is_encrypted = old_data.is_encrypted;
-		)
+		GTMCRYPT_COPY_ENCRYPT_SETTINGS(&old_data, ((sgmnt_data_ptr_t)inbuf));
 		assert((udi->semid == old_data.semid) && (udi->gt_sem_ctime == old_data.gt_sem_ctime.ctime)
 			&& (udi->shmid == old_data.shmid) && (udi->gt_shm_ctime == old_data.gt_shm_ctime.ctime));
 		/* Since the file header we are about to write is taken from the BACKUP database, the semid/shmid (and the
@@ -620,7 +652,7 @@ void mupip_restore(void)
 		rsize = temp;
 		offset = (MM_BLOCK - 1) * DISK_BLOCK_SIZE;
 		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
-		for (i = 0;  ;  i++)			/* Restore master map */
+		for (i = 0; ; i++)			/* Restore master map */
 		{
 			COMMON_READ(in, inbuf, rsize, inbuf);
 			if (!MEMCMP_LIT(inbuf, MAP_MSG))
@@ -677,7 +709,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 #	ifdef DEBUG_ONLINE
 	DBGFPF(stdout, "file descriptor is %d and bytes needed is %d\n", bf->fd, needed);
 #	endif
-	while(0 != (got = (int)(read(bf->fd, curr, needed))))
+	while (0 != (got = (int)(read(bf->fd, curr, needed))))
 	{
 		if (got == needed)
 			break;

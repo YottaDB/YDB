@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +17,18 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "gtm_c_stack_trace_semop.h"
+#ifdef DEBUG
+#ifdef SUNOS
+#define SEMVALMAX 65535
+#else
+#define SEMVALMAX 32767
+#endif
+#endif
 
 #define SEMOP(SEMID, SOPS, NSOPS, RC, TO_WAIT)								\
 {													\
-	int             numsems; 									\
+	int numsems; 											\
+													\
 	for (numsems = NSOPS - 1; numsems >= 0; --numsems)						\
 	{												\
 		CHECK_SEMVAL_GRT_SEMOP(SEMID, SOPS[numsems].sem_num, SOPS[numsems].sem_op);		\
@@ -38,7 +47,7 @@
 		do											\
 		{											\
 			RC = semop(SEMID, SOPS, NSOPS);							\
-		} while(-1 == RC && EINTR == errno);							\
+		} while (-1 == RC && EINTR == errno);							\
 	}												\
 }
 #endif

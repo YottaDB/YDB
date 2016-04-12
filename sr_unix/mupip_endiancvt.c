@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,12 +64,11 @@
 #include "min_max.h"
 #include "spec_type.h"			/* collation info */
 #include "anticipatory_freeze.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "db_ipcs_reset.h"
 
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	mstr			pvt_crypt_buf;
 
 LITREF	char			*gtm_dbversion_table[];
 
@@ -95,11 +95,6 @@ error_def(ERR_TEXT);
 
 #define MAX_CONF_RESPONSE	30
 
-#ifdef GTM_CRYPT
-boolean_t		is_encrypted = FALSE;
-gtmcrypt_key_t		encr_key_handle;
-#endif
-
 /* No journal pool for endiancvt, so ignore csa everywhere. Saves a bunch of CSA_ARG(NULL)s. */
 #define GTM_PUTMSG_CSA(...)	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__)
 
@@ -123,6 +118,11 @@ typedef struct
 	block_id		last_blk_cvt;		/* highest block converted so far not lbm */
 	char			*database_fn;
 	int			database_fn_len;
+	uint4			is_encrypted;
+	block_id		encryption_hash_cutoff;
+	boolean_t		non_null_iv;
+	trans_num		encryption_hash2_start_tn;
+	enc_handles		encr_handles;
 	struct	/* used by find_dtblk related routines */
 	{
 		char		*buff;
@@ -134,12 +134,12 @@ typedef struct
 	}	dtblk;
 } endian_info;
 
-void	endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native);
-int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data);
-void	endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t make_empty);
-void	endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, int blknum);
-char	*endian_read_dbblk(endian_info *info, block_id blk_to_get);
-void	endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec_len, int blk_levl);
+void		endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native);
+int4		endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data);
+void		endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t make_empty);
+void		endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, int blknum);
+char		*endian_read_dbblk(endian_info *info, block_id blk_to_get);
+void		endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec_len, int blk_levl);
 boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *key2);
 block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 
@@ -179,9 +179,7 @@ void mupip_endiancvt(void)
 	char			*from_endian, *to_endian;
 	endian32_struct		endian_check;
 	endian_info		info;
-#	ifdef GTM_CRYPT
 	int			gtmcrypt_errno;
-#	endif
 	ZOS_ONLY(int 		realfiletag;)
 
 	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
@@ -319,6 +317,44 @@ void mupip_endiancvt(void)
 			GTM_PUTMSG_CSA(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
+		/* Now that we got standalone access, re-read uptodate fileheader in case it changed in between.
+		 * And redo the checks that we did before getting standalone access to make sure nothing changed.
+		 */
+		LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
+		if (0 != save_errno)
+		{
+			assert(FALSE);
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
+			free(old_data);
+			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
+			util_out_print("Error reading database file !AD header. Aborting endiancvt.", TRUE, n_len, db_name);
+			if (-1 != save_errno)
+			{
+				errptr = (char *)STRERROR(save_errno);
+				util_out_print("read : !AZ", TRUE, errptr);
+				mupip_exit(save_errno);
+			} else
+				mupip_exit(ERR_IOEOF);
+		}
+		if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL))
+		{
+			assert(FALSE);
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
+			util_out_print("Database file !AD has an unrecognizable format2", TRUE, n_len, db_name);
+			free(old_data);
+			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
+			mupip_exit(ERR_MUNOACTION);
+		}
+		if (endian_check.word32 != (uint4)old_data->minor_dbver)
+		{	/* file header endianness changed between the two LSEEKREADs. abort endiancvt */
+			assert(FALSE);
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
+			util_out_print("Database file !AD endianness changed during endiancvt. Aborting", TRUE, n_len, db_name);
+			free(old_data);
+			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
+			mupip_exit(ERR_MUNOACTION);
+		}
+		/* Now that the redone checks are okay, go ahead with the rest of the endian conversion */
 		if (gv_cur_region->read_only && !outdb_specified)
 		{
 			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
@@ -398,22 +434,39 @@ void mupip_endiancvt(void)
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 		mupip_exit(ERR_MUNOACTION);
 	}
-#	ifdef GTM_CRYPT
-	is_encrypted = endian_native ? old_data->is_encrypted : GTM_BYTESWAP_32(old_data->is_encrypted);
-	if (is_encrypted)
+	info.is_encrypted = endian_native ? old_data->is_encrypted : GTM_BYTESWAP_32(old_data->is_encrypted);
+	info.encryption_hash_cutoff = endian_native
+		? old_data->encryption_hash_cutoff
+		: GTM_BYTESWAP_32(old_data->encryption_hash_cutoff);
+	if (USES_ANY_KEY(&info))
 	{	/* Database is encrypted. Initialize encryption and setup the keys to be used in later encryption/decryption */
+		info.database_fn = &db_name[0];
+		info.database_fn_len = n_len;
 		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
-			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data->encryption_hash, encr_key_handle, gtmcrypt_errno);
+		{
+			info.encr_handles.encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;
+			info.encr_handles.encr_key_handle2 = GTMCRYPT_INVALID_KEY_HANDLE;
+			if (IS_ENCRYPTED(info.is_encrypted))
+			{
+				GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data->encryption_hash,
+						info.database_fn_len, info.database_fn,
+						info.encr_handles.encr_key_handle, gtmcrypt_errno);
+			}
+			if ((0 == gtmcrypt_errno) && USES_NEW_KEY(&info))
+			{
+				GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data->encryption_hash2,
+						info.database_fn_len, info.database_fn,
+						info.encr_handles.encr_key_handle2, gtmcrypt_errno);
+			}
+		}
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
 			mupip_exit(gtmcrypt_errno);
 		}
-		info.database_fn = &db_name[0];
-		info.database_fn_len = n_len;
+		REALLOC_CRYPTBUF_IF_NEEDED(SIZEOF(blk_hdr));
 	}
-#	endif
 	from_endian = endian_check.shorts.big_endian ? "BIG" : "LITTLE";
 	to_endian = endian_check.shorts.big_endian ? "LITTLE" : "BIG";
 	util_out_print("Converting database file !AD from !AZ endian to !AZ endian on a !AZ endian system", TRUE,
@@ -771,6 +824,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 		SWAP_SD8(save_strm_reg_seqno[idx]);
 	}
 	SWAP_SD4(is_encrypted);
+	SWAP_SD4(non_null_iv);
+	SWAP_SD4(encryption_hash_cutoff);
+	SWAP_SD8(encryption_hash2_start_tn);
 #define TAB_BG_TRC_REC(A,B)	new->B##_cntr = (bg_trc_rec_cntr) 0; new->B##_tn = (bg_trc_rec_tn) 0;
 #include "tab_bg_trc_rec.h"
 #undef TAB_BG_TRC_REC
@@ -790,21 +846,21 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 {	/* returns 0 for success
 	   This routine based on mubinccpy and dbcertify_scan_phase
 	*/
-	int4			startvbn;
-	int			save_errno, bsize, lbmap_cnt, lbm_status;
-	int			buff_native, buff_old, buff_new;
-	int			mm_offset, lm_offset;
-	int4			bplmap;
-	uint4			totblks, lbm_done, busy_done, recycled_done, free_done, last_blk_written;
-	off_t			dbptr;
-	block_id		blk_num;
-	boolean_t		new_is_native;
-	char			*blk_buff[2], *lbmap_buff[2], *errptr;
-#	ifdef GTM_CRYPT
-	int			crypt_blk_size, gtmcrypt_errno;
-	blk_hdr_ptr_t		bp_new, bp_native;
-	boolean_t		blk_needs_encryption;
-#	endif
+	int4		startvbn;
+	int		save_errno, bsize, lbmap_cnt, lbm_status;
+	int		buff_native, buff_old, buff_new;
+	int		mm_offset, lm_offset;
+	int4		bplmap;
+	uint4		totblks, lbm_done, busy_done, recycled_done, free_done, last_blk_written;
+	off_t		dbptr;
+	block_id	blk_num;
+	boolean_t	new_is_native;
+	char		*blk_buff[2], *lbmap_buff[2], *errptr;
+	int		crypt_blk_size, gtmcrypt_errno;
+	blk_hdr_ptr_t	bp_new, bp_native, bp_old;
+	boolean_t	blk_needs_encryption, non_null_iv, use_old_key, use_new_key;
+	trans_num	encryption_hash2_start_tn;
+
 	if (info->endian_native)
 	{	/* use fields from old header */
 		bplmap = old_data->bplmap;
@@ -812,6 +868,8 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 		lbmap_cnt = (totblks + bplmap - 1) / bplmap;
 		bsize = old_data->blk_size;
 		startvbn = old_data->start_vbn;
+		non_null_iv = old_data->non_null_iv;
+		encryption_hash2_start_tn = old_data->encryption_hash2_start_tn;
 		buff_native = buff_old = 0;
 		new_is_native = FALSE;
 		buff_new = 1;
@@ -822,15 +880,20 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 		lbmap_cnt = (totblks + bplmap - 1) / bplmap;
 		bsize = new_data->blk_size;
 		startvbn = new_data->start_vbn;
+		non_null_iv = new_data->non_null_iv;
+		encryption_hash2_start_tn = new_data->encryption_hash2_start_tn;
 		buff_native = buff_new = 1;
 		new_is_native = TRUE;
 		buff_old = 0;
 	}
-	GTMCRYPT_ONLY(assert((0 != info->database_fn_len) || !is_encrypted));
+	/* Asserting that the database is either not using any encryption or has set the database_fn_len field for future uses. */
+	assert((0 != info->database_fn_len) || !USES_ANY_KEY(info));
 	dbptr = (off_t)(startvbn - 1) * DISK_BLOCK_SIZE;
 	info->tot_blks = totblks;
 	info->bsize = bsize;
 	info->startvbn = startvbn;
+	info->non_null_iv = non_null_iv;
+	info->encryption_hash2_start_tn = encryption_hash2_start_tn;
 	blk_buff[0] = malloc(bsize);
 	blk_buff[1] = malloc(bsize);
 	lbmap_buff[0] = malloc(bsize);
@@ -904,55 +967,72 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 					return save_errno;
 				}
 				memcpy(blk_buff[buff_new], blk_buff[buff_old], bsize);
-
-#				ifdef GTM_CRYPT
-				if (is_encrypted)
+				bp_new = (blk_hdr_ptr_t)blk_buff[buff_new];
+				bp_old = (blk_hdr_ptr_t)blk_buff[buff_old];
+				bp_native = (blk_hdr_ptr_t)blk_buff[buff_native];
+				if (new_is_native)
+					endian_cvt_blk_hdr(bp_new, new_is_native, BLK_RECYCLED == lbm_status);
+				assert((bp_new->bsiz <= bsize) && (bp_new->bsiz >= SIZEOF(*bp_new)));
+				crypt_blk_size = MIN(bsize, bp_new->bsiz) - (SIZEOF(*bp_new));
+				blk_needs_encryption = BLK_NEEDS_ENCRYPTION(bp_new->levl, crypt_blk_size);
+				if (blk_needs_encryption)
 				{
-					ASSERT_ENCRYPTION_INITIALIZED;
-					bp_new = (blk_hdr_ptr_t)blk_buff[buff_new];
-					bp_native = (blk_hdr_ptr_t)blk_buff[buff_native];
-					if (new_is_native)
-						endian_cvt_blk_hdr(bp_new, new_is_native, BLK_RECYCLED == lbm_status);
-					assert((bp_new->bsiz <= bsize) && (bp_new->bsiz >= SIZEOF(*bp_new)));
-					crypt_blk_size = MIN(bsize, bp_new->bsiz) - (SIZEOF(*bp_new));
-					blk_needs_encryption = BLK_NEEDS_ENCRYPTION(bp_new->levl, crypt_blk_size);
-					if (blk_needs_encryption)
+					use_new_key = NEEDS_NEW_KEY(info, bp_new->tn);
+					use_old_key = IS_ENCRYPTED(info->is_encrypted);
+					if (use_new_key || use_old_key)
 					{
-						GTMCRYPT_DECRYPT(NULL, encr_key_handle, (char *)(bp_new + 1), crypt_blk_size, NULL,
-									gtmcrypt_errno);
+						ASSERT_ENCRYPTION_INITIALIZED;
+						/* We are doing decryption in place on blk_buff[bp_new] because a) the original data
+						 * from blk_buff[bp_old] has already been copied to it, and b) blk_buff[bp_new] is
+						 * where we want the decrypted data to be. Note, however, that we are using the
+						 * block header from the old buffer as IV because the block header from the new
+						 * buffer might have already been endian-converted and thus become incompatible with
+						 * the encrypted data we are operating on.
+						 */
+						if (use_new_key)
+						{
+							GTMCRYPT_DECRYPT(NULL, TRUE, info->encr_handles.encr_key_handle2,
+									(char *)(bp_new + 1), crypt_blk_size, NULL,
+									bp_old, SIZEOF(blk_hdr), gtmcrypt_errno);
+						} else
+						{
+							GTMCRYPT_DECRYPT(NULL, non_null_iv, info->encr_handles.encr_key_handle,
+									(char *)(bp_new + 1), crypt_blk_size, NULL,
+									bp_old, SIZEOF(blk_hdr), gtmcrypt_errno);
+						}
 						if (0 != gtmcrypt_errno)
 						{
-							GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, info->database_fn_len,
-											info->database_fn);
+							GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg,
+									info->database_fn_len, info->database_fn);
 							return gtmcrypt_errno;
 						}
 					}
-					if (!new_is_native)
-						endian_cvt_blk_hdr(bp_new,
-								   new_is_native,
-								   BLK_RECYCLED == lbm_status);
-					endian_cvt_blk_recs(info, (char *)bp_new, bp_native, blk_num);
-					if (blk_needs_encryption)
-					{
-						GTMCRYPT_ENCRYPT(NULL, encr_key_handle, (char *)(bp_new + 1), crypt_blk_size, NULL,
-								     gtmcrypt_errno);
-						if (0 != gtmcrypt_errno)
-						{
-							GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, info->database_fn_len,
-											info->database_fn);
-							return gtmcrypt_errno;
-						}
-					}
-				} else
-				{
-#				endif
-					endian_cvt_blk_hdr((blk_hdr_ptr_t)blk_buff[buff_new],
-								new_is_native, BLK_RECYCLED == lbm_status);
-					endian_cvt_blk_recs(info, blk_buff[buff_new],
-								(blk_hdr_ptr_t)blk_buff[buff_native], blk_num);
-#				ifdef GTM_CRYPT
 				}
-#				endif
+				if (!new_is_native)
+					endian_cvt_blk_hdr(bp_new, new_is_native, BLK_RECYCLED == lbm_status);
+				endian_cvt_blk_recs(info, (char *)bp_new, bp_native, blk_num);
+				if (blk_needs_encryption && (use_new_key || use_old_key))
+				{	/* Now that we have both the block header and the records in the right endianness,
+					 * both stored in blk_buff[bp_new], we proceed to reencrypt the data in place.
+					 */
+					if (use_new_key)
+					{
+						GTMCRYPT_ENCRYPT(NULL, TRUE, info->encr_handles.encr_key_handle2,
+							(char *)(bp_new + 1), crypt_blk_size, NULL,
+							bp_new, SIZEOF(blk_hdr), gtmcrypt_errno);
+					} else
+					{
+						GTMCRYPT_ENCRYPT(NULL, non_null_iv, info->encr_handles.encr_key_handle,
+							(char *)(bp_new + 1), crypt_blk_size, NULL,
+							bp_new, SIZEOF(blk_hdr), gtmcrypt_errno);
+					}
+					if (0 != gtmcrypt_errno)
+					{
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg,
+								info->database_fn_len, info->database_fn);
+						return gtmcrypt_errno;
+					}
+				}
 				if (info->inplace)
 				{
 					DB_LSEEKWRITE(NULL, NULL, info->db_fd, dbptr, blk_buff[buff_new], bsize, save_errno);
@@ -1063,12 +1143,11 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 	int		save_errno;
 	boolean_t	blk_is_native;
 	char		*buff;
-#	ifdef GTM_CRYPT
 	int		gtmcrypt_errno;
 	int		req_dec_blk_size;
 	char		*inbuf;
+	boolean_t	use_old_key, use_new_key;
 	blk_hdr_ptr_t	bp;
-#	endif
 
 	if (DIR_ROOT == blk_to_get)
 	{
@@ -1098,19 +1177,35 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 		blk_is_native = !info->endian_native;	/* already converted */
 	else
 		blk_is_native = info->endian_native;	/* still original endian */
+	/* We need to save a copy of the block header before it is endian-converted because after the conversion it will become
+	 * incompatible with the encrypted data.
+	 */
+	use_new_key = USES_NEW_KEY(info);
+	use_old_key = IS_ENCRYPTED(info->is_encrypted);
+	if (use_new_key || use_old_key)
+		memcpy(pvt_crypt_buf.addr, buff, SIZEOF(blk_hdr));
 	if (!blk_is_native)
 		endian_cvt_blk_hdr((blk_hdr_ptr_t)buff, TRUE, FALSE);
-#	ifdef GTM_CRYPT
-	if (is_encrypted)
+	use_new_key = use_new_key && (((blk_hdr_ptr_t)buff)->tn >= info->encryption_hash2_start_tn);
+	if (use_new_key || use_old_key)
 	{
 		bp = (blk_hdr_ptr_t)buff;
 		assert((bp->bsiz <= info->bsize) && (bp->bsiz >= SIZEOF(*bp)));
 		req_dec_blk_size = MIN(info->bsize, bp->bsiz) - (SIZEOF(*bp));
-		if (BLK_NEEDS_ENCRYPTION3(is_encrypted, bp->levl, req_dec_blk_size))
+		if (BLK_NEEDS_ENCRYPTION(bp->levl, req_dec_blk_size))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
 			inbuf = (char *)(bp + 1);
-			GTMCRYPT_DECRYPT(NULL, encr_key_handle, inbuf, req_dec_blk_size, NULL, gtmcrypt_errno);
+			/* For IV use the block header we copied prior to endian conversion. */
+			if (use_new_key)
+			{
+				GTMCRYPT_DECRYPT(NULL, TRUE, info->encr_handles.encr_key_handle2, inbuf, req_dec_blk_size, NULL,
+						pvt_crypt_buf.addr, SIZEOF(blk_hdr), gtmcrypt_errno);
+			} else
+			{
+				GTMCRYPT_DECRYPT(NULL, info->non_null_iv, info->encr_handles.encr_key_handle, inbuf,
+						req_dec_blk_size, NULL, pvt_crypt_buf.addr, SIZEOF(blk_hdr), gtmcrypt_errno);
+			}
 			if (0 != gtmcrypt_errno)
 			{
 				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, info->database_fn, info->database_fn_len);
@@ -1118,7 +1213,6 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 			}
 		}
 	}
-#	endif
 	if (DIR_ROOT == blk_to_get)
 		info->dtblk.dtrnative = blk_is_native;
 	else

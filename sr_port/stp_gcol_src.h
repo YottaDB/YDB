@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,9 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "fnpc.h"
+#ifdef UNICODE_SUPPORTED
+# include "utfcgr.h"
+#endif
 #include "gdscc.h"
 #include "cache.h"
 #include "comline.h"
@@ -58,9 +61,7 @@
 #include "srcline.h"
 #include "opcode.h"
 #include "glvn_pool.h"
-#ifdef GTM_CRYPT
-# include "iormdef.h"
-#endif
+#include "iormdef.h"
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
@@ -244,29 +245,27 @@ error_def(ERR_STPEXPFAIL);
 
 #endif
 
-#define PROCESS_CACHE_ENTRY(cp)								\
-        if (cp->src.str.len)	/* entry is used */					\
-	{										\
-		MSTR_STPG_ADD(&cp->src.str);						\
-		/* Run list of mvals for each code stream that exists */		\
-		if (cp->obj.len)							\
-		{									\
-			ihdr = (ihdtyp *)cp->obj.addr;					\
-			fixup_cnt = ihdr->fixup_vals_num;				\
-			if (fixup_cnt)							\
-			{								\
-				m = (mval *)((char *)ihdr + ihdr->fixup_vals_off);	\
-				for (mtop = m + fixup_cnt; m < mtop; m++)		\
-					MVAL_STPG_ADD(m);				\
-			}								\
-			fixup_cnt = ihdr->vartab_len;					\
-			if (fixup_cnt)							\
-			{								\
-				vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
-				for (vartop = vent + fixup_cnt; vent < vartop; vent++)	\
-					MSTR_STPG_ADD(&vent->var_name);			\
-			}								\
-		}									\
+#define PROCESS_CACHE_ENTRY(cp)							\
+        if (cp->src.str.len)	/* entry is used */				\
+		MSTR_STPG_ADD(&cp->src.str);					\
+	/* Run list of mvals for each code stream that exists */		\
+	if (cp->obj.len)							\
+	{									\
+		ihdr = (ihdtyp *)cp->obj.addr;					\
+		fixup_cnt = ihdr->fixup_vals_num;				\
+		if (fixup_cnt)							\
+		{								\
+			m = (mval *)((char *)ihdr + ihdr->fixup_vals_off);	\
+			for (mtop = m + fixup_cnt; m < mtop; m++)		\
+				MVAL_STPG_ADD(m);				\
+		}								\
+		fixup_cnt = ihdr->vartab_len;					\
+		if (fixup_cnt)							\
+		{								\
+			vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
+			for (vartop = vent + fixup_cnt; vent < vartop; vent++)	\
+				MSTR_STPG_ADD(&vent->var_name);			\
+		}								\
 	}
 
 #define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta)						\
@@ -499,9 +498,8 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	glvn_pool_entry		*slot, *top;
 	int			i, n;
 	unsigned char		*old_free;
-#	ifdef GTM_CRYPT
 	d_rm_struct		*rm_ptr;
-#	endif
+	UNICODE_ONLY(utfcgr	*utfcgrp;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -624,6 +622,17 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			(TREF(fnpca)).fnpcs[index].last_str.len = 0;
 			(TREF(fnpca)).fnpcs[index].delim = 0;
 		}
+#		ifdef UNICODE_SUPPORTED
+		for (utfcgrp = (TREF(utfcgra)).utfcgrs; (NULL != utfcgrp) && (utfcgrp <= (TREF(utfcgra)).utfcgrmax);
+		     utfcgrp = (utfcgr *)((UINTPTR_T)utfcgrp + (TREF(utfcgra)).utfcgrsize))
+		{	/* Clear string addresses for each cache field since they are likely to change with the
+			 * this garbage collection.
+			 */
+			utfcgrp->last_str.addr = NULL;
+			utfcgrp->last_str.len = 0;
+			utfcgrp->reference = FALSE;
+		}
+#		endif
 #		endif
 		assert(0 != cache_table.size);	/* Must have done a cache_init() */
 		/* These cache entries have mvals in them we need to keep */
@@ -687,7 +696,6 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 				    && (l->iod->pair.out == io_std_device->out))
 					MSTR_STPG_ADD(&l->iod->pair.out->error_handler);
 #				endif
-#				ifdef GTM_CRYPT
 				rm_ptr = (rm == l->iod->type) ? (d_rm_struct *)l->iod->dev_sp : NULL;
 				if (NULL != rm_ptr)
 				{	/* Protect the IVs and KEYs as needed. */
@@ -702,7 +710,6 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 						MSTR_STPG_ADD(&rm_ptr->output_key);
 					}
 				}
-#				endif
 			}
 		}
 		MVAL_STPG_ADD(&dollar_etrap);

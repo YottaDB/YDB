@@ -17,6 +17,7 @@ foreach(v
     gtm_inc
     gtm_tools
     gtmgbldir
+    LC_ALL
     )
   if(DEFINED ${v})
     set("ENV{${v}}" "${${v}}")

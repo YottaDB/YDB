@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,10 @@
  * that it is possible to do an online upgrade of the file header.
  */
 #define GDS_REPL_INST_MINOR_LABEL 	1	/* can go upto 255 at which point the major version has to change */
+
+#define	IN_REPL_INST_EDIT_FALSE		FALSE	/* to indicate we are not in a MUPIP REPLIC -EDITINSTANCE */
+#define	IN_REPL_INST_EDIT_TRUE		TRUE	/* to indicate we are MUPIP REPLIC -EDITINSTANCE */
+#define	IN_REPL_INST_EDIT_CHANGE_OFFSET	2	/* to indicate we are in MUPIP REPLIC -EDITINSTANCE -CHANGE */
 
 /* Replication Instance file format
  *
@@ -118,7 +123,11 @@ typedef struct repl_inst_hdr_struct
 	boolean_t	file_corrupt;		/* Set to TRUE by online rollback at start up. Set to FALSE when online rollback
 						 * completes successfully.
 						 */
-	unsigned char   filler_1024[52];
+	boolean_t	ftok_counter_halted;	/* Whether the ftok counter semaphore overflowed the 32Ki limit */
+	boolean_t	qdbrundown;		/* TRUE if -QDBRUNDOWN was specified at time of instance file creation.
+						 * FALSE otherwise.
+						 */
+	unsigned char   filler_1024[44];
 } repl_inst_hdr;
 
 /* Any changes to the following structure might have to be reflected in "gtmsource_local_struct" structure in gtmsource.h as well.
@@ -199,14 +208,17 @@ typedef enum {
 	issue_gtm_putmsg
 } instname_act;
 
+#define	CLEAR_FTOK_HALTED_FALSE	FALSE
+#define	CLEAR_FTOK_HALTED_TRUE	TRUE
+
 boolean_t	repl_inst_get_name(char *, unsigned int *, unsigned int, instname_act error_action);
 void		repl_inst_create(void);
 void		repl_inst_edit(void);
 void		repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
 void		repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
 void		repl_inst_sync(char *fn);
-void		repl_inst_jnlpool_reset(void);
-void		repl_inst_recvpool_reset(void);
+void		repl_inst_jnlpool_reset(boolean_t clear_ftok_halted);
+void		repl_inst_recvpool_reset(boolean_t clear_ftok_halted);
 void		repl_inst_ftok_sem_lock(void);
 void		repl_inst_ftok_sem_release(void);
 int4		repl_inst_histinfo_get(int4 index, repl_histinfo *histinfo);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@ GTMCRYPT_DEF(gtmcrypt_strerror)
 GTMCRYPT_DEF(gtmcrypt_init_db_cipher_context_by_hash)
 GTMCRYPT_DEF(gtmcrypt_init_device_cipher_context_by_keyname)
 GTMCRYPT_DEF(gtmcrypt_obtain_db_key_hash_by_keyname)
-GTMCRYPT_DEF(gtmcrypt_release_key)
+GTMCRYPT_DEF(gtmcrypt_release_cipher_context)
 GTMCRYPT_DEF(gtmcrypt_encrypt_decrypt)
 GTMCRYPT_DEF(gtmcrypt_same_key)
 GTMCRYPT_DEF(gtmcrypt_close)

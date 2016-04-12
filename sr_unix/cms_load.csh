@@ -202,7 +202,7 @@ endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir
-echo "Copying files from the source version $cms_ver"
+echo "Copying files from $cms_dir"
 set ref_libs = `set | grep "^gtm_s_${platform_library}[ 	]" | sed 's/^gtm_s_'${platform_library}'[ 	][ 	]*//g'`
 foreach ref_library ( $ref_libs )
     if ( -d $ref_library ) then

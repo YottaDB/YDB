@@ -14,7 +14,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include <wctype.h>
@@ -376,7 +376,6 @@ int 	move_cursor_right(int col, int num_cols)
 	 */
 	int		fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
 	int		ret;
-	io_desc		*io_ptr = io_curr_device.in;
 	boolean_t	ch_set;
 
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);

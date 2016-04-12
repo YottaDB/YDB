@@ -1,6 +1,8 @@
+#!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,7 +23,12 @@
 #
 ###########################################################
 
+echo ""
+echo "############# Linking MUMPS ###########"
+echo ""
 set buildshr_status = 0
+
+source $gtm_tools/gtm_env.csh
 
 set dollar_sign = \$
 set mach_type = `uname -m`
@@ -64,13 +71,9 @@ endsw
 
 version $1 $2
 if ( $buildshr_status != 0 ) then
-	echo "buildshr-I-usage, Usage: $shell buildshr.csh <version> <image type> <target directory>"
+	echo "buildshr-I-usage, Usage: buildshr.csh <version> <image type> <target directory>"
 	exit $buildshr_status
 endif
-
-set buildshr_verbose = $?verbose
-set verbose
-set echo
 
 set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o -lmumps -lgnpclient -lcmisockettcp"
 set nolibgtmshr = "no"	# by default build libgtmshr
@@ -104,11 +107,14 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		set aix_binitfini_option = "-binitfini::gtmci_cleanup"
 	endif
 
+	set echo
 	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
 		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
 		${gt_ld_linklib_options} $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/libgtmshr.map
-	if ( $status != 0 ) then
-		set buildshr_status = `expr $buildshr_status + 1`
+	@ exit_status = $status
+	unset echo
+	if ( $exit_status != 0 ) then
+		@ buildshr_status++
 		echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	else if ( ($HOSTOS == "Linux") && (-e /usr/bin/chcon) ) then
@@ -129,11 +135,13 @@ if ( $HOSTOS == "AIX") then
 	set aix_loadmap_option = "-bcalls:$gtm_map/mumps.loadmap -bmap:$gtm_map/mumps.loadmap -bxref:$gtm_map/mumps.loadmap"
 endif
 
+set echo
 gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps ${gt_ld_linklib_options} $gtm_obj/gtm.o \
 	$gt_ld_extra_libs $gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
-
-if ( $status != 0  ||  ! -x $3/mumps ) then
-	set buildshr_status = `expr $buildshr_status + 1`
+@ exit_status = $status
+unset echo
+if ( $exit_status != 0  ||  ! -x $3/mumps ) then
+	@ buildshr_status++
 	echo "buildshr-E-linkmumps, Failed to link mumps (see ${dollar_sign}gtm_map/mumps.map)" \
 		>> $gtm_log/error.`basename $gtm_exe`.log
 else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -142,11 +150,6 @@ else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 	else
 	        chatr +as mpas $3/mumps
         endif
-endif
-
-unset echo
-if ( $buildshr_verbose == "0" ) then
-	unset verbose
 endif
 
 exit $buildshr_status

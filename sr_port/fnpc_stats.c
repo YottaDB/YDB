@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc       *
+ * Copyright (c) 2007-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -15,22 +16,6 @@
 #include "gtm_stdio.h"
 
 #ifdef DEBUG
-GBLREF  uint4   process_id;
-GBLREF  int     c_miss;                         /* cache misses (debug) */
-GBLREF  int     c_hit;                          /* cache hits (debug) */
-GBLREF  int     c_small;                        /* scanned small string brute force */
-GBLREF  int     c_small_pcs;                    /* chars scanned by small scan */
-GBLREF  int     c_pskip;                        /* number of pieces "skipped" */
-GBLREF  int     c_pscan;                        /* number of pieces "scanned" */
-GBLREF  int     c_parscan;                      /* number of partial scans (partial cache hits) */
-GBLREF  int     cs_miss;                        /* cache misses (debug) */
-GBLREF  int     cs_hit;                         /* cache hits (debug) */
-GBLREF  int     cs_small;                       /* scanned small string brute force */
-GBLREF  int     cs_small_pcs;                   /* chars scanned by small scan */
-GBLREF  int     cs_pskip;                       /* number of pieces "skipped" */
-GBLREF  int     cs_pscan;                       /* number of pieces "scanned" */
-GBLREF  int     cs_parscan;                     /* number of partial scans (partial cache hits) */
-GBLREF  int     c_clear;                        /* cleared due to (possible) value change */
 
 void fnpc_stats(void)
 {

@@ -13,7 +13,8 @@
 #include "mdef.h"
 
 #include <sys/types.h>
-#include <signal.h>
+
+#include "gtm_signal.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
@@ -73,7 +74,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	mv_stent		*new_mv_stent;
 	boolean_t		saved_mv_stent;
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
-	int			saved_util_outbuff_len;
+	int			rc, saved_util_outbuff_len;
 	char			save_dump_file_name_buff[GTM_PATH_MAX];
 #	ifdef UNIX
 	struct sigaction	new_action, prev_action;
@@ -105,7 +106,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
 	 */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
@@ -135,6 +136,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	 *	...
 	 *	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	 */
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	saved_util_outbuff_len = 0;
 	if (NULL == TREF(util_outptr))
 		TREF(util_outptr) = TREF(util_outbuff_ptr);
@@ -172,7 +174,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	sigaction(SIGBUS, &prev_action, 0);
 	sigaction(SIGSEGV, &prev_action, 0);
 	/* Let the timers pop again.. */
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 #	endif
 }
 

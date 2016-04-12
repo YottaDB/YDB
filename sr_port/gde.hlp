@@ -101,12 +101,12 @@
    These components may be defined in any order, but the final result must be
    a complete logical path from name to file:
 
-   NAME(s) ---> REGION ---> SEGMENT ---> FILE
+   NAME(s) --> REGION --> SEGMENT --> FILE
 
    The default Global Directory contains one complete mapping that comprises
    these entries for name, region, segment, and file.
 
-   * ---> DEFAULT ---> DEFAULT ---> mumps.dat
+   * --> DEFAULT --> DEFAULT --> mumps.dat
    (NAME) (REGION) (SEGMENT) (FILE)
 
    The * wildcard identifies all possible global names. Subsequent edits
@@ -1211,107 +1211,11 @@
    (time-based or due to a journal file auto-switch) approaches. By default,
    EPOCHTAPER is enabled.
 
-   -K[EY_SIZE]=size in bytes
-
-   Specifies the maximum size of keys, in bytes, which can be stored in the
-   region. The KEY_SIZE must be less than the RECORD_SIZE. GDE rejects the
-   command if the KEY_SIZE is inappropriate for the RECORD_SIZE.
-
-   The minimum KEY_SIZE is three bytes.
-
-   The maximum KEY_SIZE is 1,019 bytes.
-
-   When determining the maximum key size, applications should consider the
-   following:
-
-     * GT.M uses packed decimal representation for numeric subscripts which
-       may be larger or smaller than the original representation.
-     * GT.M substitutes an element terminator for the caret (^), any comma
-       (,), and any right parenthesis ()).
-     * GT.M adds an extra byte for every string element, including the global
-       name.
-
-   For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
-
-   By default, GDE uses a KEY_SIZE of 64 bytes.
-
-   -R[ECORD_SIZE]=size in bytes
-
-   Specifies the maximum size (in bytes) of a global variable node's value
-   that can be stored in a region.
-
-   If the size of a global exceeds one database block, GT.M implicitly spans
-   that global across multiple database blocks. In the event a global
-   variable node spans multiple blocks, and the process is not already within
-   a TP transaction, the GT.M run-time system automatically and transparently
-   performs the entire operation within an implicit TP transaction (as it
-   does for Triggers).
-
-   The minimum RECORD_SIZE is zero. A RECORD_SIZE of zero only allows a
-   global variable node that does not have a value. A typical use of a global
-   variable node with RECORD_SIZE of zero is for creating indices (where the
-   presence of a node is all that is required).
-
-   The maximum RECORD_SIZE is 1,048,576 bytes (1MiB).
-
-   By default, GDE uses a RECORD_SIZE of 256 bytes.
-
-   -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
-
-   Indicates whether GT.M allows null subscripts for global variables stored
-   in the region (that is, whether GT.M permits references such as
-   ^aaa("",1)).
-
-   ALWAYS indicates that the null subscripts for global variables are
-   allowed.
-
-   NEVER indicates that null subscripts for global variables are not allowed.
-
-   EXISTING indicates that null subscripts for global variable can be
-   accessed and updated, but not created anew.
-
-   By default, regions have -NULL_SUBSCRIPTS=NEVER.
-
-   -[NO]STDNULLCOLL
-
-   Determines whether GT.M null subscripts collate in conformance to the M
-   standard.
-
-   If STDNULLCOLL is specified, subscripts of globals in the database follow
-   the M standard where the null subscript collates before all other
-   subscripts.
-
-   If NOSTDNULLCOLL is specified, null subscripts collate between numeric and
-   string subscripts. FIS strongly recommends that you use STDNULL and
-   against using this non-standard null collation, which is the default for
-   historical reasons.
-
    -[NO]INST[_FREEZE_ON_ERROR]
 
    Controls whether custom errors in a region should automatically cause an
    Instance Freeze. This qualifier modifies the value of "Inst Freeze on
    Error" file header element.
-
-   -[NO]Q[DBRUNDOWN]
-
-   Quickens normal process shutdown where a large number of processes
-   accessing a database file are required to shutdown almost simultaneously,
-   for example, in benchmarking scenarios. When a terminating GT.M process
-   observes that a large number of processes are attached to a database file
-   and QDBRUNDOWN is enabled, it bypasses checking whether it is the last
-   process accessing the database. Such a check occurs in a critical section
-   and bypassing it also bypasses the usual RUNDOWN actions which accelerates
-   process shutdown removing a possible impediment to process startup. By
-   default, QDBRUNDOWN is disabled.
-
-   Note that with QDBRUNDOWN there is a possibility of race condition that
-   might leave the database fileheader and IPC resources in need of cleanup.
-   Although QDBRUNDOWN minimizes the probability of such a race condition, it
-   cannot eliminate it. FIS recommends restricting QDBRUNDOWN usage to
-   special circumstances such as benchmarking and recommends NOQDBRUNDOWN for
-   normal GT.M usage. When using QDBRUNDOWN, FIS recommends an explicit MUPIP
-   RUNDOWN of the database file after the last process exits, to ensure the
-   cleanup of database fileheader and IPC resources.
 
    -[NO]J[OURNAL][=journal-option-list]
 
@@ -1337,15 +1241,14 @@
 
    The journal-option-list includes:
 
-     * [NO]BE[FORE_IMAGE]
-     * F[ILE_NAME]=file-specification-name
+     * A[LLOCATION]=blocks
 
      * AUTOSWITCHLIMIT=blocks
 
-     * A[LLOCATION]=blocks
-
-     * E[XTENSION]=blocks
+     * [NO]BE[FORE_IMAGE]
      * BU[FFER_SIZE]=pages
+     * E[XTENSION]=blocks
+     * F[ILE_NAME]=file-specification-name
 
    The following section describes some -JOURNAL options.
 
@@ -1391,6 +1294,113 @@
 
    Summary
 
+   -K[EY_SIZE]=size in bytes
+
+   Specifies the maximum size of keys, in bytes, which can be stored in the
+   region. The KEY_SIZE must be less than the RECORD_SIZE. GDE rejects the
+   command if the KEY_SIZE is inappropriate for the RECORD_SIZE.
+
+   The minimum KEY_SIZE is three bytes.
+
+   The maximum KEY_SIZE is 1,019 bytes.
+
+   When determining the maximum key size, applications should consider the
+   following:
+
+     * GT.M uses packed decimal representation for numeric subscripts which
+       may be larger or smaller than the original representation.
+     * GT.M substitutes an element terminator for the caret (^), any comma
+       (,), and any right parenthesis ()).
+     * GT.M adds an extra byte for every string element, including the global
+       name.
+
+   For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
+
+   By default, GDE uses a KEY_SIZE of 64 bytes.
+
+   -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
+
+   Indicates whether GT.M allows null subscripts for global variables stored
+   in the region (that is, whether GT.M permits references such as
+   ^aaa("",1)).
+
+   ALWAYS indicates that the null subscripts for global variables are
+   allowed.
+
+   NEVER indicates that null subscripts for global variables are not allowed.
+
+   EXISTING indicates that null subscripts for global variable can be
+   accessed and updated, but not created anew.
+
+   By default, regions have -NULL_SUBSCRIPTS=NEVER.
+
+   -[NO]Q[DBRUNDOWN]
+
+   Shortens normal process shutdown when a large number of processes
+   accessing a database file need to shutdown almost simultaneously, for
+   example, in benchmarking scenarios or emergencies.
+
+   When a terminating GT.M process observes that a large number of processes
+   are attached to a database file and QDBRUNDOWN is enabled, it bypasses
+   checking whether it is the last process accessing the database. Such a
+   check occurs in a critical section and bypassing it also bypasses the
+   usual RUNDOWN actions which accelerates process shutdown removing a
+   possible impediment to process startup. By default, QDBRUNDOWN is
+   disabled.
+
+   Note that with QDBRUNDOWN there is a possibility that the last process to
+   exit might leave the database shared memory and IPC resources in need of
+   cleanup. Except after the number of concurrent processes exceeds 32Ki,
+   QDBRUNDOWN minimizes the prossibility of abandoned resources, but it
+   cannot eliminate it. When using QDBRUNDOWN, use an explicit MUPIP RUNDOWN
+   of the database file after the last process exits, to ensure the cleanup
+   of database shared memory and IPC resources; not doing so risk database
+   damage.
+
+   When a database has QDBRUNDOWN enabled, if the number of attached
+   processes ever exceeds 32Ki, GT.M stops tracking the number of attached
+   processes, which means that it cannot recognize when the number reaches
+   zero (0) and the shared resources can be released. The process that
+   detects this event issues a NOMORESEMCNT in the system log. This means an
+   orderly, safe shutdown requires a MUPIP JOURNAL -ROLLBACK -BACKWARD for
+   replicated databases, a MUPIP JOURNAL -RECOVER -BACKWARD for unreplicated
+   journaled databases and a MUPIP RUNDOWN for journal-free databases.
+
+   -R[ECORD_SIZE]=size in bytes
+
+   Specifies the maximum size (in bytes) of a global variable node's value
+   that can be stored in a region.
+
+   If the size of a global exceeds one database block, GT.M implicitly spans
+   that global across multiple database blocks. In the event a global
+   variable node spans multiple blocks, and the process is not already within
+   a TP transaction, the GT.M run-time system automatically and transparently
+   performs the entire operation within an implicit TP transaction (as it
+   does for Triggers).
+
+   The minimum RECORD_SIZE is zero. A RECORD_SIZE of zero only allows a
+   global variable node that does not have a value. A typical use of a global
+   variable node with RECORD_SIZE of zero is for creating indices (where the
+   presence of a node is all that is required).
+
+   The maximum RECORD_SIZE is 1,048,576 bytes (1MiB).
+
+   By default, GDE uses a RECORD_SIZE of 256 bytes.
+
+   -[NO]STDNULLCOLL
+
+   Determines whether GT.M null subscripts collate in conformance to the M
+   standard.
+
+   If STDNULLCOLL is specified, subscripts of globals in the database follow
+   the M standard where the null subscript collates before all other
+   subscripts.
+
+   If NOSTDNULLCOLL is specified, null subscripts collate between numeric and
+   string subscripts. FIS strongly recommends that you use STDNULL and
+   against using this non-standard null collation, which is the default for
+   historical reasons.
+
    The following table summarizes GDE region qualifiers. It provides their
    abbreviations, defaults (as provided by FIS), and allowable minimum and
    maximum values.
@@ -1404,20 +1414,22 @@
  |--------------------------------------------+----------+---------+-----------|
  |-D[YNAMIC_SEGMENT] =segment-name (char)     |-         |1        |16         |
  |--------------------------------------------+----------+---------+-----------|
+ |-[NO]EPOCHTAPER                             |ENABLED   |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]INST[_FREEZE_ON_ERROR]                 |DISABLED  |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]J[OURNAL] [=journal-option-list]       |-NOJ      |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
  |-K[EY_SIZE]=size in bytes (integer)         |64        |3        |1,019      |
+ |--------------------------------------------+----------+---------+-----------|
+ |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER     |-        |-          |
  |--------------------------------------------+----------+---------+-----------|
  |-R[ECORD_SIZE]=size in bytes (integer)      |256       |7        |1,048,576  |
  |                                            |          |         |(1 MiB)    |
  |--------------------------------------------+----------+---------+-----------|
- |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER     |-        |-          |
- |--------------------------------------------+----------+---------+-----------|
- |-[NO]STDNULLCOLL                            |N         |-        |-          |
- |--------------------------------------------+----------+---------+-----------|
- |-[NO]INST[_FREEZE_ON_ERROR]                 |DISABLED  |-        |-          |
- |--------------------------------------------+----------+---------+-----------|
  |-[NO]Q[DBRUNDOWN]                           |DISABLED  |-        |-          |
  |--------------------------------------------+----------+---------+-----------|
- |-[NO]J[OURNAL] [=journal-option-list]       |-NOJ      |-        |-          |
+ |-[NO]STDNULLCOLL                            |N         |-        |-          |
  +-----------------------------------------------------------------------------+
 
 2 Segment_Qualifiers
@@ -1449,9 +1461,9 @@
 
           * MM supports NOBEFORE_IMAGE journaling only. GT.M issues an error
             if you use MM with BEFORE_IMAGE Journaling. MM also supports
-            MUPIP FORWARD RECOVER. MM does not support MUPIP JOURNAL RECOVER
-            -BACKWARD and only supports MUPIP JOURNAL ROLLBACK to generate
-            lost and broken transaction files.
+            MUPIP JOURNAL -RECOVER -FORWARD. MM does not support MUPIP
+            JOURNAL -RECOVER -BACKWARD and only supports MUPIP JOURNAL
+            -ROLLBACK to generate lost and broken transaction files.
           * Depending on your file system, MM may be an option when you need
             performance advantage in situations where the above restrictions
             are acceptable.
@@ -1541,11 +1553,7 @@
    file system when creating or extending a database file; by default UNIX
    file systems, and GT.M, use sparse (or lazy) allocation, which defers
    actual allocation until blocks are first written. Failures to preallocate
-   space produce a PREALLOCATEFAIL error. On platforms where GT.M does not
-   support preallocation (HP-UX and Solaris), although GDE accepts
-   -NODEFER_ALLOCATE, MUPIP CREATE ignores it and sets the database file to
-   DEFER_ALLOCATE. On those platforms, any attempt to change this flag with
-   MUPIP SET produces a NODFRALLOCSUPP error.
+   space produce a PREALLOCATEFAIL error.
 
    -[NO]ENcryption
 
@@ -1969,7 +1977,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2015
+   Copyright 2016
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -1991,7 +1999,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-002 of the
+   This help file is a concise representation of revision V6.3-000 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

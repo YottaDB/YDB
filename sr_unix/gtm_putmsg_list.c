@@ -13,8 +13,10 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+
 #include "gtm_stdio.h"
 
+#include "gtm_multi_thread.h"
 #include "fao_parm.h"
 #include "error.h"
 #include "util.h"
@@ -31,6 +33,8 @@
 #include "filestruct.h"
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
+#define	COLON_SEPARATOR		" : "
+
 /*
  * ----------------------------------------------------------------------------------------
  *  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
@@ -38,6 +42,7 @@
  * ----------------------------------------------------------------------------------------
  */
 
+/* #GTM_THREAD_SAFE : The below function (gtm_putmsg_list) is thread-safe because caller ensures serialization with locks */
 void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
 	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
@@ -46,6 +51,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 	boolean_t	freeze_needed = FALSE;
+	char		*rname;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -54,6 +60,18 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		util_out_print(NULL, RESET);
 	}
 	assert(0 < arg_count);
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
+#	ifdef GTM_PTHREAD
+	if (INSIDE_THREADED_CODE(rname))	/* Note: "rname" is not initialized if macro returns FALSE */
+	{	/* If running with threads, identify which thread is generating this message with a prefix using
+		 * thread-specific-key (which points to the region name for mur* related threads). This helps decipher
+		 * the output of a mupip journal command where the region specific output might be intermixed.
+		 */
+		assert((NULL != rname) && ('\0' != rname[0]));
+		util_out_print(rname, NOFLUSH);
+		util_out_print(COLON_SEPARATOR, NOFLUSH);
+	}
+#	endif
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);

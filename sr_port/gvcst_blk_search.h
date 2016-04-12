@@ -22,6 +22,8 @@
  */
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	uint4			dollar_tlevel;
 
 #ifndef GVCST_SEARCH_EXPAND_PREVKEY
 #	ifdef GVCST_SEARCH_BLK
@@ -229,7 +231,15 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 				if (nTmp > prevKeyCmpLen)
 				{
 					if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp))
+					{
+						if (dollar_tlevel)
+							TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch,
+									  cs_data, pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn,
+									  pStat->level)
+						else
+							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
 						return cdb_sc_blkmod;
+					}
 #					ifdef GVCST_SEARCH_TAIL
 					assert((prevKeyUnCmp > pBlkBase)
 						|| ((prevKeyUnCmp == &prevKey->base[prevKeyCmpLen])
@@ -331,7 +341,14 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 		do
 		{
 			if (tmpPtr >= pTop)
+			{
+				if (dollar_tlevel)
+					TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data,
+							  pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level)
+				else
+					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
 				return cdb_sc_blkmod;
+			}
 			/* It is now safe to do *tmpPtr and *++tmpPtr without worry about exceeding array bounds */
 			if ((KEY_DELIMITER == *tmpPtr++) && (KEY_DELIMITER == *tmpPtr))
 				break;
@@ -340,7 +357,14 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 		prevKeyUnCmpLen = tmpPtr - prevKeyUnCmp;
 		prevKeyStart += prevKeyCmpLen;
 		if (prevKeyStart + prevKeyUnCmpLen > prevKeyTop)
+		{
+			if (dollar_tlevel)
+				TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
+						  ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level)
+			else
+				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
 			return cdb_sc_blkmod;
+		}
 		memcpy(prevKeyStart, prevKeyUnCmp, prevKeyUnCmpLen);
 		gv_altkey->end = prevKeyCmpLen + prevKeyUnCmpLen - 1;	/* remove 2nd KEY_DELIMITER from "end" calculation */
 	} else

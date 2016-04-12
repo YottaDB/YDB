@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,19 +37,10 @@
 #include "dpgbldir.h"
 #include "have_crit.h"
 #include "repl_sem.h"
-#ifdef UNIX
 #include "ftok_sems.h"
 #include "repl_instance.h"
 #include "mu_rndwn_repl_instance.h"
 #include "deferred_signal_handler.h"
-#elif defined(VMS)
-#include <descrip.h>
-#include "gtm_inet.h"
-#include "iosb_disk.h"	/* For mur_read_file.h */
-#include "dpgbldir_sysops.h"
-#include "gbldirnam.h"
-#include "gtmrecv.h"
-#endif
 #include "mu_rndwn_file.h"
 #include "read_db_files_from_gld.h"
 #include "mur_db_files_from_jnllist.h"
@@ -65,7 +57,6 @@
 #include "gtmsource.h"
 #include "mu_rndwn_replpool.h"
 #include "gtm_logicals.h"
-#ifdef UNIX
 #include <sys/sem.h>
 #include "tp.h"			/* for "insert_region" prototype */
 #include "gtm_time.h"
@@ -135,7 +126,6 @@
 		lcl_rctl->standalone = TRUE;										\
 	}														\
 }
-#endif
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
@@ -144,7 +134,6 @@ GBLREF	mur_opt_struct		mur_options;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	sgmnt_data		*cs_data;
-#ifdef UNIX
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int4			strm_index;
@@ -152,57 +141,49 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
-#endif
 
-
-#if defined(VMS)
-error_def (ERR_MUJPOOLRNDWNFL);
-error_def (ERR_MUJPOOLRNDWNSUC);
-error_def (ERR_MURPOOLRNDWNFL);
-error_def (ERR_MURPOOLRNDWNSUC);
-#elif defined(UNIX)
-error_def (ERR_JNLFILEOPNERR);
-error_def (ERR_SYSCALL);
-#endif
-error_def (ERR_CRITSEMFAIL);
-error_def (ERR_DBFILOPERR);
-error_def (ERR_DBFRZRESETFL);
-error_def (ERR_DBFRZRESETSUC);
-error_def (ERR_DBJNLNOTMATCH);
-error_def (ERR_DBRDONLY);
-error_def (ERR_FILENOTFND);
-error_def (ERR_FILEPARSE);
-error_def (ERR_JNLBADRECFMT);
-error_def (ERR_JNLDBTNNOMATCH);
-error_def (ERR_JNLFILEDUP);
-error_def (ERR_JNLNMBKNOTPRCD);
-error_def (ERR_JNLSTATEOFF);
-error_def (ERR_JNLTNOUTOFSEQ);
-error_def (ERR_MUKILLIP);
-error_def (ERR_MUPCLIERR);
-error_def (ERR_MUPJNLINTERRUPT);
-error_def (ERR_MUSTANDALONE);
-error_def (ERR_NOPREVLINK);
-error_def (ERR_NOSTARFILE);
-error_def (ERR_NOTALLJNLEN);
-error_def (ERR_NOTALLREPLON);
-error_def (ERR_ORLBKFRZOVER);
-error_def (ERR_ORLBKFRZPROG);
-error_def (ERR_ORLBKNOV4BLK);
-error_def (ERR_ORLBKSTART);
-error_def (ERR_REPLSTATEOFF);
-error_def (ERR_RLBKNOBIMG);
-error_def (ERR_ROLLBKINTERRUPT);
-error_def (ERR_STARFILE);
-error_def (ERR_TEXT);
-error_def (ERR_WCBLOCKED);
+error_def(ERR_CRITSEMFAIL);
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBFRZRESETFL);
+error_def(ERR_DBFRZRESETSUC);
+error_def(ERR_DBJNLNOTMATCH);
+error_def(ERR_DBRDONLY);
+error_def(ERR_FILENOTFND);
+error_def(ERR_FILEPARSE);
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLDBTNNOMATCH);
+error_def(ERR_JNLDBSEQNOMATCH);
+error_def(ERR_JNLFILEDUP);
+error_def(ERR_JNLFILEOPNERR);
+error_def(ERR_JNLNMBKNOTPRCD);
+error_def(ERR_JNLSTATEOFF);
+error_def(ERR_JNLTNOUTOFSEQ);
+error_def(ERR_MUKILLIP);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUPJNLINTERRUPT);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_NOPREVLINK);
+error_def(ERR_NOSTARFILE);
+error_def(ERR_NOTALLJNLEN);
+error_def(ERR_NOTALLREPLON);
+error_def(ERR_ORLBKFRZOVER);
+error_def(ERR_ORLBKFRZPROG);
+error_def(ERR_ORLBKNOV4BLK);
+error_def(ERR_ORLBKSTART);
+error_def(ERR_REPLSTATEOFF);
+error_def(ERR_RLBKNOBIMG);
+error_def(ERR_ROLLBKINTERRUPT);
+error_def(ERR_STARFILE);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_WCBLOCKED);
 
 #define		STAR_QUOTE "\"*\""
 
 boolean_t mur_open_files()
 {
 	boolean_t			interrupted_rollback;
-	int                             jnl_total, jnlno, regno, max_reg_total;
+	int                             jnl_total, jnlno, regno, max_reg_total, errcode;
 	unsigned int			full_len;
 	unsigned short			jnl_file_list_len; /* cli_get_str requires a short */
 	char                            jnl_file_list[MAX_LINE];
@@ -217,15 +198,7 @@ boolean_t mur_open_files()
 	sgmnt_addrs			*csa;
 	file_control			*fc;
 	freeze_status			reg_frz_status;
-#	if defined(VMS)
-	uint4				status;
-	boolean_t			sgmnt_found;
-	mstr				gbldir_mstr, *tran_name;
-	gds_file_id			file_id;
-	struct dsc$descriptor_s 	name_dsc;
-	char            		res_name[MAX_NAME_LEN + 2];/* +1 for the terminating null and
-						another +1 for the length stored in [0] by global_name() */
-#	else /* ONLINE ROLLBACK specific variables */
+	intrpt_state_t			prev_intrpt_state;
 	onln_rlbk_reg_list		*reglist = NULL, *rl, *rl_last, *save_rl, *rl_new;
 	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk;
 	boolean_t			jnlpool_sem_created;
@@ -235,18 +208,16 @@ boolean_t mur_open_files()
 	int4				llcnt, max_epoch_interval = 0, idx;
 	int				save_errno;
 	unix_db_info			*udi;
-	now_t				now;
-	char				*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
+	char				time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	const char			*verbose_ptr;
 	gtmsource_local_ptr_t		gtmsourcelocal_ptr;
 	DEBUG_ONLY(int			semval;)
 	DEBUG_ONLY(jnl_buffer_ptr_t	jb;)
-#	endif
 	boolean_t			recov_interrupted;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	UNIX_ONLY(jnlpool_init_needed = !mur_options.update);
+	jnlpool_init_needed = !mur_options.update;
 	jnl_file_list_len = MAX_LINE;
 	if (FALSE == CLI_GET_STR_ALL("FILE", jnl_file_list, &jnl_file_list_len))
 		mupip_exit(ERR_MUPCLIERR);
@@ -263,9 +234,9 @@ boolean_t mur_open_files()
 	} else
 	{
 		star_specified = FALSE;
-		if (mur_options.rollback)
+		if (mur_options.rollback && !mur_options.forward)
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOSTARFILE, 2, LEN_AND_LIT("ROLLBACK qualifier"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOSTARFILE, 2, LEN_AND_LIT("ROLLBACK -BACKWARD qualifier"));
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	}
@@ -291,9 +262,11 @@ boolean_t mur_open_files()
 	curr = gld_db_files;
 	murgbl.max_extr_record_length = DEFAULT_EXTR_BUFSIZE;
 	murgbl.repl_standalone = FALSE;
-	if (mur_options.rollback)
-	{	/* Rundown the Jnlpool and Recvpool */
-#		if defined(UNIX)
+	if (mur_options.rollback && !mur_options.forward)
+	{	/* Rundown the Jnlpool and Recvpool. Do it only for backward rollback. For forward rollback, we expect
+		 * the jnlpool/recvpool/database to be rundown already. We do not not currently touch the replication
+		 * instance file nor do we look at jnlpool/recvpool during forward rollback so we skip this step.
+		 */
 		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
 				issue_gtm_putmsg))
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
@@ -321,51 +294,6 @@ boolean_t mur_open_files()
 			strm_index = 0;
 		}
 		ENABLE_FREEZE_ON_ERROR;
-#		elif defined(VMS)
-		gbldir_mstr.addr = GTM_GBLDIR;
-		gbldir_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
-		tran_name = get_name(&gbldir_mstr);
-		memcpy(replpool_id.gtmgbldir, tran_name->addr, tran_name->len);
-		full_len = tran_name->len;
-		if (!get_full_path(replpool_id.gtmgbldir, tran_name->len,
-				replpool_id.gtmgbldir, &full_len, MAX_TRANS_NAME_LEN, &status))
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, tran_name->len, tran_name->addr);
-			return FALSE;
-		} else
-		{
-			tran_name->len = full_len;	/* since on vax, mstr.len is a 'short' */
-			set_gdid_from_file((gd_id_ptr_t)&file_id, replpool_id.gtmgbldir, tran_name->len);
-			global_name("GT$P", &file_id, res_name); /* P - Stands for Journal Pool */
-			res_name[res_name[0] + 1] = '\0';
-			STRCPY(replpool_id.repl_pool_key, &res_name[1]);
-			replpool_id.pool_type = JNLPOOL_SEGMENT;
-			sgmnt_found = FALSE;
-			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
-						tran_name->len, replpool_id.gtmgbldir);
-			else if (sgmnt_found)
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, res_name[0], &res_name[1],
-						tran_name->len, replpool_id.gtmgbldir);
-				return FALSE;
-			}
-			global_name("GT$R", &file_id, res_name); /* R - Stands for Recv Pool */
-			res_name[res_name[0] + 1] = '\0';
-			STRCPY(replpool_id.repl_pool_key, &res_name[1]);
-			replpool_id.pool_type = RECVPOOL_SEGMENT;
-			sgmnt_found = FALSE;
-			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
-						tran_name->len, replpool_id.gtmgbldir);
-			else if (sgmnt_found)
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, res_name[0], &res_name[1],
-					tran_name->len, replpool_id.gtmgbldir);
-				return FALSE;
-			}
-		}
-#		endif
 	}
 	for (murgbl.reg_full_total = 0, rctl = mur_ctl, rctl_top = mur_ctl + max_reg_total;
 										rctl < rctl_top; rctl++, curr = curr->next)
@@ -412,11 +340,8 @@ boolean_t mur_open_files()
 			rctl->db_present = TRUE;
 			if (mur_options.update)
 			{
-#				ifdef UNIX
 				if (!jgbl.onlnrlbk)
 				{
-#				endif
-					VMS_ONLY(gv_cur_region = rctl->gd); /* VMS mu_rndwn_file() assumes gv_cur_region is set */
 					if (!STANDALONE(rctl->gd))	/* STANDALONE macro calls mu_rndwn_file() */
 					{
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSTANDALONE, 2,
@@ -424,15 +349,12 @@ boolean_t mur_open_files()
 						return FALSE;
 					}
 					rctl->standalone = TRUE;
-#				ifdef UNIX
 				}
-#				endif
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
 	        		gvcst_init(rctl->gd);
 				TP_CHANGE_REG(rctl->gd);
-#				ifdef UNIX
 				if (jgbl.onlnrlbk)
 				{
 					if (!cs_data->fully_upgraded)
@@ -445,11 +367,10 @@ boolean_t mur_open_files()
 					assert(!cs_addrs->hold_onto_crit);
 					rctl->standalone = TRUE;
 				}
-#				endif
 				if (mur_options.update)
 				{
 					assert(rctl->standalone);
-					UNIX_ONLY(assert((FILE_INFO(rctl->gd))->grabbed_access_sem));
+					assert((FILE_INFO(rctl->gd))->grabbed_access_sem);
 					if (rctl->gd->read_only)
 					{	/* recover/rollback cannot proceed if the process has read-only permissions */
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2,
@@ -464,7 +385,6 @@ boolean_t mur_open_files()
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
 	DEBUG_ONLY(curr = gld_db_files;)
-#	ifdef UNIX
 	assert(!jgbl.onlnrlbk || (0 != max_epoch_interval));
 	if (jgbl.onlnrlbk)
 	{
@@ -539,10 +459,10 @@ boolean_t mur_open_files()
 				RELEASE_ACCESS_CONTROL(rl);
 			}
 			assert((NULL != save_rl) && (tmpcsa->region == save_rl->reg));
-			GET_CUR_TIME;
-			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr,
+			GET_CUR_TIME(time_str);
+			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_str,
 				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
-			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr,
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_str,
 				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 			while (tmpcsd->freeze)
 			{
@@ -550,10 +470,10 @@ boolean_t mur_open_files()
 					wcs_sleep(llcnt); /* Don't waste CPU cycles anymore */
 				llcnt++;
 			}
-			GET_CUR_TIME;
-			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr,
+			GET_CUR_TIME(time_str);
+			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_str,
 				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
-			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr,
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_str,
 				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 		}
 		inst_requires_rlbk |= TREF(wcs_recover_done);
@@ -638,21 +558,21 @@ boolean_t mur_open_files()
 		}
 		TREF(donot_write_inctn_in_wcs_recover) = FALSE;
 	}
-#	endif
 	for (rctl = mur_ctl, rctl_top = mur_ctl + max_reg_total; rctl < rctl_top; rctl++)
 	{
 		if (rctl->db_present)
 		{
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{	/* NOTE: Only for collation info extract needs database access */
-				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* temporarily disable MUPIP STOP/signal handling. */
+				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);	/* temporarily disable
+												 * MUPIP STOP/signal handling. */
 				TP_CHANGE_REG(rctl->gd);
 				csa = rctl->csa = &FILE_INFO(rctl->gd)->s_addrs;
 				csd = rctl->csd = rctl->csa->hdr;
-				UNIX_ONLY(assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit)));
+				assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit));
 				if (mur_options.update)
 				{
-					assert(!csa->nl->donotflush_dbjnl UNIX_ONLY(|| jgbl.onlnrlbk));
+					assert(!csa->nl->donotflush_dbjnl || jgbl.onlnrlbk);
 					csa->nl->donotflush_dbjnl = TRUE; /* indicate gds_rundown/mu_rndwn_file to not wcs_flu()
 									   * this shared memory until recover/rlbk cleanly exits */
 				}
@@ -668,7 +588,7 @@ boolean_t mur_open_files()
 					{	/* error out. need fresh backup of database for forward recovery */
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2,
 							       DB_LEN_STR(rctl->gd));
-						ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
+						ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);
 						return FALSE;
 					}
 					/* In case rollback with non-zero resync_seqno got interrupted, we would have
@@ -680,7 +600,6 @@ boolean_t mur_open_files()
 						interrupted_rollback = FALSE;
 						if (csd->intrpt_recov_resync_seqno)
 							interrupted_rollback = TRUE;
-#						ifdef UNIX
 						else
 						{
 							for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
@@ -692,12 +611,11 @@ boolean_t mur_open_files()
 								}
 							}
 						}
-#						endif
 						if (interrupted_rollback)
 						{
 							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_ROLLBKINTERRUPT, 2,
 								       DB_LEN_STR(rctl->gd));
-							ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
+							ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);
 							return FALSE;
 						}
 					}
@@ -709,7 +627,7 @@ boolean_t mur_open_files()
 				rctl->repl_state = csd->repl_state;
 				rctl->before_image = csd->jnl_before_image;
 				rctl->initialized = TRUE;
-				ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* reenable the interrupts */
+				ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state); /* reenable the interrupts */
 				if (mur_options.update)
 				{
 					if (!mur_options.rollback)
@@ -724,8 +642,8 @@ boolean_t mur_open_files()
 							}
 							continue;
 						}
-					} else
-					{
+					} else if (!mur_options.forward)
+					{	/* MUPIP JOURNAL -ROLLBACK -BACKWARD */
 						if (!REPL_ENABLED(csd))
 						{	/* Replication is either OFF or WAS_ON. Journaling could be ENABLED or not.
 							 * If replication is OFF and journaling is DISABLED, there is no issue.
@@ -739,16 +657,14 @@ boolean_t mur_open_files()
 								return FALSE;
 							}
 							continue;
-						}
-#						ifdef UNIX
-						else if (!rctl->before_image)
+						} else if (!rctl->before_image)
 						{	/* Replicated database with NOBEFORE_IMAGE journaling.
 							 * ROLLBACK is allowed only if -FETCHRESYNC or -RESYNC is specified.
 							 */
 							if (!mur_options.fetchresync_port && !mur_options.resync_specified)
 							{
-								gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_RLBKNOBIMG, 2,
-									       DB_LEN_STR(rctl->gd));
+								gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4)
+										ERR_RLBKNOBIMG, 2, DB_LEN_STR(rctl->gd));
 								return FALSE;
 							}
 							mur_options.rollback_losttnonly = TRUE;
@@ -757,9 +673,16 @@ boolean_t mur_open_files()
 							 */
 							replinst_file_corrupt = FALSE;
 						}
-#						endif
+					} else
+					{	/* MUPIP JOURNAL -ROLLBACK -FORWARD */
+						if (!JNL_ENABLED(csd))
+							continue; /* this region is not journaled so no rollback needed here */
+						/* Note: We allow NOBEFORE and BEFORE image journaling for -ROLLBACK -FORWARD */
+						/* Note: We allow replication to be enabled for -ROLLBACK -FORWARD. It is disabled
+						 * 	 below.
+						 */
 					}
-					if (csd->freeze UNIX_ONLY(&& !jgbl.onlnrlbk))
+					if (csd->freeze && !jgbl.onlnrlbk)
 					{	/* region_freeze should release freeze here. For ONLINE ROLLBACK we would have
 						 * waited for the freeze to be lifted off before
 						 */
@@ -779,7 +702,9 @@ boolean_t mur_open_files()
 					csd->intrpt_recov_jnl_state = csd->jnl_state;
 					csd->intrpt_recov_repl_state = csd->repl_state;
 					csd->recov_interrupted = TRUE;
-					/* Temporarily change current state. mur_close_files() will restore them as appropriate */
+					/* Temporarily change current state. mur_close_files() will restore them as appropriate.
+					 * Note though that for -RECOVER -FORWARD or -ROLLBACK -FORWARD, jnl state is not restored.
+					 */
 					if (mur_options.forward && JNL_ENABLED(csd))
 						csd->jnl_state = jnl_closed;
 					csd->repl_state = repl_closed;
@@ -799,7 +724,7 @@ boolean_t mur_open_files()
 				csa->jnl_before_image = csd->jnl_before_image;
 			} else
 			{	/* temporarily disable MUPIP STOP/signal handling. */
-				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
+				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);
 				/* NOTE: csa field is NULL, if we do not open database */
 				csd = rctl->csd = (sgmnt_data_ptr_t)malloc(SGMNT_HDR_LEN);
 				assert(0 == rctl->gd->dyn.addr->fname[rctl->gd->dyn.addr->fname_len]);
@@ -815,7 +740,7 @@ boolean_t mur_open_files()
 				rctl->repl_state = csd->repl_state;
 				rctl->before_image = csd->jnl_before_image;
 				rctl->initialized = TRUE;
-				ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* reenable the interrupts */
+				ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state); /* reenable the interrupts */
 			}
 			/* For star_specified we open journal files here.
 			 * For star_specified we cannot do anything if journaling is disabled
@@ -833,10 +758,8 @@ boolean_t mur_open_files()
 				 */
 				if (rctl->standalone || (rctl->csa && rctl->csa->now_crit))
 					cre_jnl_file_intrpt_rename(rctl->csa);
-				if (!mur_fopen(jctl))
-				{
-					return FALSE;
-				}
+				if (SS_NORMAL != mur_fopen(jctl, rctl))
+					return FALSE;	/* mur_fopen() would have done the appropriate gtm_putmsg() */
 				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 				{
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
@@ -845,7 +768,6 @@ boolean_t mur_open_files()
 					return FALSE;
 				}
 				assert((csa == rctl->csa) || !mur_options.update);
-#				ifdef UNIX
 				if (jgbl.onlnrlbk && jctl->jfh->crash
 						&& !csa->dbinit_shm_created && !jctl->jfh->recover_interrupted
 						&& !inst_requires_rlbk)
@@ -879,7 +801,6 @@ boolean_t mur_open_files()
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,
 						       LEN_AND_LIT("      Properly closed"), LEN_AND_STR(verbose_ptr));
 				}
-#				endif
 				if (!is_file_identical((char *)jctl->jfh->data_file_name, (char *)rctl->gd->dyn.addr->fname))
 				{
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
@@ -890,10 +811,8 @@ boolean_t mur_open_files()
 			}
 		} /* End rctl->db_present */
 	} /* End for */
-	UNIX_ONLY(
-		if (jgbl.mur_rollback)
-			jnlpool.repl_inst_filehdr->file_corrupt = replinst_file_corrupt;
-	)
+	if (jgbl.mur_rollback && !mur_options.forward)
+		jnlpool.repl_inst_filehdr->file_corrupt = replinst_file_corrupt;
 	/* At this point mur_ctl[] has been created from the current global directory database file names
 	 * or from the journal file header's database names.
 	 * For star_specified == TRUE implicitly only current generation journal files are specified and already opened
@@ -914,15 +833,13 @@ boolean_t mur_open_files()
 			if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 						(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &jctl->status2))
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr - cptr_last, cptr_last,
 					       jctl->status2);
 				return FALSE;
 			}
 			cptr++;	/* skip separator */
-			if (!mur_fopen(jctl))	/* dont know rctl yet */
-			{
-				return FALSE;
-			}
+			if (SS_NORMAL != mur_fopen(jctl, NULL))	/* dont know rctl yet */
+				return FALSE;	/* mur_fopen() would have done the appropriate gtm_putmsg() */
 			for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 			{
 				if (rctl->gd->dyn.addr->fname_len == jctl->jfh->data_file_name_length &&
@@ -955,15 +872,11 @@ boolean_t mur_open_files()
 			/* Detect and report 1st case of any duplicated files in mupip forward recovery command. */
 			if (mur_options.forward)
 			{
-				VMS_ONLY(set_gdid_from_file(&jctl->fid, (char *)jctl->jnl_fn, jctl->jnl_fn_len);)
-#				if defined(UNIX)
 				if (SS_NORMAL == (save_errno = filename_to_id(&jctl->fid, (char *)jctl->jnl_fn)))
 				{	/* WARNING: assignment above */
-#				endif
 					for (temp_jctl = rctl->jctl_head; temp_jctl; temp_jctl = temp_jctl->next_gen)
 					{
-						if (UNIX_ONLY(is_gdid_identical(&jctl->fid, &temp_jctl->fid))
-							VMS_ONLY(is_gdid_gdid_identical(&jctl->fid, &temp_jctl->fid)))
+						if (is_gdid_identical(&jctl->fid, &temp_jctl->fid))
 						{
 							gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLFILEDUP, 4,
 								       jctl->jnl_fn_len, jctl->jnl_fn, temp_jctl->jnl_fn_len,
@@ -971,14 +884,12 @@ boolean_t mur_open_files()
 							return FALSE;
 						}
 					}
-#				if defined(UNIX)
 				} else
 				{
 					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len,
 						       jctl->jnl_fn, ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, save_errno);
 					return FALSE;
 				}
-#				endif
 			}
 			if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 			{
@@ -1059,10 +970,14 @@ boolean_t mur_open_files()
 		}
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
-	if (!mur_options.rollback && murgbl.reg_total < murgbl.reg_full_total)
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_NOTALLJNLEN);
-	else if (mur_options.rollback && murgbl.reg_total < murgbl.reg_full_total)
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_NOTALLREPLON);
+	if (murgbl.reg_total < murgbl.reg_full_total)
+	{
+		errcode = (!mur_options.rollback ? ERR_NOTALLJNLEN : ERR_NOTALLREPLON);
+		if (0 == murgbl.reg_total)
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (4) MAKE_MSG_ERROR(errcode), 2, LEN_AND_LIT("all"));
+		else
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (4) errcode, 2, LEN_AND_LIT("one or more"));
+	}
 	if (0 == murgbl.reg_total)
 		return FALSE;
 	/* From this point consider only regions with journals to be processed (murgbl.reg_total)
@@ -1078,14 +993,20 @@ boolean_t mur_open_files()
 			{	/* User might have not specified journal file starting tn matching database curr_tn.
 				 * So try to open previous generation journal files and add to linked list */
 				rctl->jctl = jctl;	/* asserted by mur_insert_prev */
-				while (jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
+				while ((jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
+						|| (mur_options.rollback && (jctl->jfh->start_seqno > csd->reg_seqno)))
 				{
 					if (0 == jctl->jfh->prev_jnl_file_name_length)
 					{
-						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
+						if (jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
+							gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
 							       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("beginning"),
 							       &jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn,
 							       &csd->jnl_eovtn);
+						else
+							gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(8) ERR_JNLDBSEQNOMATCH, 6,
+							       jctl->jnl_fn_len, jctl->jnl_fn,
+							       &jctl->jfh->start_seqno, DB_LEN_STR(rctl->gd), &csd->reg_seqno);
 						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_NOPREVLINK, 2,
 								jctl->jnl_fn_len, jctl->jnl_fn);
 						return FALSE;
@@ -1095,13 +1016,25 @@ boolean_t mur_open_files()
 			}
 			if (mur_options.forward)
 			{
-				if (!mur_options.notncheck && (jctl->jfh->bov_tn != csd->trans_hist.curr_tn))
+				assert(!mur_options.rollback || !mur_options.notncheck); /* -ROLLBACK -FORWARD does not support
+											  * -NOCHECKTN. Asserted above. */
+				if (!mur_options.notncheck)
 				{
-					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
-						       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("beginning"),
-						       &jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd),
-						       &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
-					return FALSE;
+					if (jctl->jfh->bov_tn != csd->trans_hist.curr_tn)
+					{
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
+							       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("beginning"),
+							       &jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd),
+							       &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+						return FALSE;
+					}
+					if (mur_options.rollback && (jctl->jfh->start_seqno > csd->reg_seqno))
+					{
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(8) ERR_JNLDBSEQNOMATCH, 6,
+							       jctl->jnl_fn_len, jctl->jnl_fn,
+							       &jctl->jfh->start_seqno, DB_LEN_STR(rctl->gd), &csd->reg_seqno);
+						return FALSE;
+					}
 				}
 			} else /* Backward Recovery */
 			{
@@ -1144,10 +1077,6 @@ boolean_t mur_open_files()
 			csa = rctl->csa;
 			if (NULL != csa)
 			{
-#				if (defined(DEBUG) && defined(VMS))
-				/* set wc_blocked as true to invoke wcs_recover */
-				GTM_WHITE_BOX_TEST(WBTEST_SET_WC_BLOCKED, csa->nl->wc_blocked, TRUE);
-#				endif
 				if (csa->nl->wc_blocked)
 					TREF(donot_write_inctn_in_wcs_recover) = TRUE;
 			}

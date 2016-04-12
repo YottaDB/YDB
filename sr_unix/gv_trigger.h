@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,6 +168,7 @@ typedef struct gvtr_invoke_parms_struct
 	GBLREF	jnl_gbls_t		jgbl;											\
 	GBLREF	uint4			t_err;											\
 	GBLREF	trans_num		local_tn;										\
+	GBLREF	uint4			update_trans;										\
 																\
 	DEBUG_ONLY(GBLREF gv_namehead	*reset_gv_target;)									\
 	DEBUG_ONLY(GBLREF boolean_t	donot_INVOKE_MUMTSTART;)								\
@@ -323,6 +324,10 @@ typedef struct gvtr_invoke_parms_struct
 	} 															\
 	if (set_upd_trans_t_err) /* Reset update_trans/si->update_trans and t_err */						\
 	{															\
+		if (!dollar_tlevel)												\
+		{	/* In t_begin we expect update_trans to always be 0. */							\
+			update_trans = 0;											\
+		}														\
 		/* If non-tp, the below macro will invoke t_begin which will set up the necessary structures for the Non-TP 	\
 		 * update													\
 		 */														\

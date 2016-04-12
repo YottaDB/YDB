@@ -14,4 +14,20 @@
 
 void mupip_integ(void);
 
+enum cum_type
+{
+	BLKS,
+	RECS,
+	SIZE,
+	CUM_TYPE_MAX
+};
+
+enum tot_type
+{
+	DATA,
+	INDX,
+	DIRTREE,
+	TOT_TYPE_MAX
+};
+
 #endif /* MUPIP_INTEG_INCLUDED */

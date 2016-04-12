@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,25 +15,40 @@
 #include "gtm_string.h"
 
 #include "compiler.h"
+#include "mmemory.h"
 #include "opcode.h"
 #include "toktyp.h"
 #include "advancewindow.h"
 #include "fnpc.h"
 #include "gtm_utf8.h"
+#include "stringpool.h"
+#include "op.h"
 
 GBLREF boolean_t	gtm_utf8_mode;
-GBLREF boolean_t	badchar_inhibit;
 
 error_def(ERR_COMMA);
 
+/*
+ * Given a input (op) indicating whether we are using $ZPIECE or $PIECE, create the appropriate triple for runtime execution
+ *	or run $[Z]PIECE if all inputs are literals. There is also a possibility of a OC_FNZP1 being generated if appropriate.
+ * @input[out] a A pointer that will be set to the the result of the expression; in some cases a triple to be evaluated, or
+ *	the string literal representing the result of the $PIECE fnction
+ * @returns An integer flag of; TRUE if the function completed successfully, or FALSE if there was an error
+ * @par Side effects
+ *  - Calls advance window multiple times, and consumes tokens accordingly
+ *  - Calls expr multiple times, which (most notably) adds literals to a hash table
+ *  - Calls ins_triple, which adds triples to the execution chain
+ *  - Calls st2pool, which inserts strings into the string pool
+ */
 int f_piece(oprtype *a, opctype op)
 {
 	delimfmt	unichar;
-	mval		*delim_mval;
-	oprtype		x;
+	mval		*delim_mval, tmp_mval;
+	oprtype		x, *newop;
 	triple		*delimiter, *first, *last, *r;
-	DCL_THREADGBL_ACCESS;
+	static mstr	scratch_space = {0, 0, 0};
 
+	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
@@ -76,6 +92,45 @@ int f_piece(oprtype *a, opctype op)
 			memcpy(unichar.unibytes_val, delim_mval->str.addr, delim_mval->str.len);
 		}
 		delimiter->operand[0] = put_ilit(unichar.unichar_val);
+		/* If we have all literals, run at compile time and return the result. To maintain backwards compatibility,
+		 * we should emit a warning if there is an invalid UTF8 character, but continue compilation anyaway.
+		 */
+		if ((OC_LIT == r->operand[0].oprval.tref->opcode)
+			&& (OC_ILIT == delimiter->operand[0].oprval.tref->opcode)
+			&& (OC_ILIT == first->operand[0].oprval.tref->opcode)
+			&& (!gtm_utf8_mode || (valid_utf_string(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)
+				&& valid_utf_string(&x.oprval.tref->operand[0].oprval.mlit->v.str))))
+		{	/* We don't know how much space we will use; but we know it will be <= the size of the current string */
+			if (scratch_space.len < r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len)
+			{
+				if (NULL != scratch_space.addr)
+					free(scratch_space.addr);
+				scratch_space.addr = malloc(r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len);
+				scratch_space.len = r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len;
+			}
+			tmp_mval.str.addr = scratch_space.addr;
+			if (OC_FNZP1 == r->opcode)
+			{
+				op_fnzp1(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, /* First string */
+					delimiter->operand[0].oprval.tref->operand[0].oprval.ilit,
+					first->operand[0].oprval.tref->operand[0].oprval.ilit,
+					&tmp_mval);
+			} else
+			{
+				op_fnp1(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, /* First string */
+					delimiter->operand[0].oprval.tref->operand[0].oprval.ilit,
+					first->operand[0].oprval.tref->operand[0].oprval.ilit,
+					&tmp_mval);
+			}
+			s2pool(&tmp_mval.str);
+			newop = (oprtype *)mcalloc(SIZEOF(oprtype));
+			*newop = put_lit(&tmp_mval);				/* Copies mval so stack var tmp_mval not an issue */
+			assert(TRIP_REF == newop->oprclass);
+			newop->oprval.tref->src = r->src;
+			*a = put_tref(newop->oprval.tref);
+			return TRUE;
+
+		}
 		ins_triple(r);
 		*a = put_tref(r);
 		return TRUE;
@@ -93,6 +148,44 @@ int f_piece(oprtype *a, opctype op)
 		advancewindow();
 		if (EXPR_FAIL == expr(&(last->operand[0]), MUMPS_INT))
 			return FALSE;
+	}
+	/* If we have all literals, run at compile time and return the result */
+	if ((OC_LIT == r->operand[0].oprval.tref->opcode)
+		&& (OC_LIT == x.oprval.tref->opcode)
+		&& (OC_ILIT == first->operand[0].oprval.tref->opcode)
+		&& (OC_ILIT == last->operand[0].oprval.tref->opcode)
+		&& (!gtm_utf8_mode
+		|| (valid_utf_string(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)
+			&& valid_utf_string(&x.oprval.tref->operand[0].oprval.mlit->v.str))))
+	{	/* We don't know how much space we will use; but we know it will be <= the size of the current string */
+		if (scratch_space.len < r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len)
+		{
+			if (NULL != scratch_space.addr)
+				free(scratch_space.addr);
+			scratch_space.addr = malloc(r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len);
+			scratch_space.len = r->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len;
+		}
+		tmp_mval.str.addr = scratch_space.addr;
+		if (!gtm_utf8_mode || (OC_FNZPIECE == op))
+		{
+			op_fnzpiece(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v,
+				&x.oprval.tref->operand[0].oprval.mlit->v,
+				first->operand[0].oprval.tref->operand[0].oprval.ilit,
+				last->operand[0].oprval.tref->operand[0].oprval.ilit, &tmp_mval);
+		} else
+		{
+			op_fnpiece(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v,
+				&x.oprval.tref->operand[0].oprval.mlit->v,
+				first->operand[0].oprval.tref->operand[0].oprval.ilit,
+				last->operand[0].oprval.tref->operand[0].oprval.ilit, &tmp_mval);
+		}
+		s2pool(&tmp_mval.str);
+		newop = (oprtype *)mcalloc(SIZEOF(oprtype));
+		*newop = put_lit(&tmp_mval);			/* Copies mval so stack var tmp_mval not an issue */
+		assert(TRIP_REF == newop->oprclass);
+		newop->oprval.tref->src = r->src;
+		*a = put_tref(newop->oprval.tref);
+		return TRUE;
 	}
 	ins_triple(r);
 	*a = put_tref(r);

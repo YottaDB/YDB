@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +12,7 @@
 
 #include "mdef.h"
 
-#if defined(VMS)
-#include <ssdef.h>
-#endif
-
-#if defined(UNIX)
-#include <signal.h>
-#endif
+#include "gtm_signal.h"
 
 #include "mlkdef.h"
 #include "locklits.h"
@@ -41,14 +36,14 @@ void gtcml_lkstarve(TID timer_id, int4 data_len, connection_struct **connection)
 {
         static int		on_queue_p = 0;   /* for debugging */
 	connection_struct	*cnx;
-	CMI_MUTEX_DECL;
+	CMI_MUTEX_DECL(cmi_mutex_rc);
 
 	UNIX_ONLY(cnx = *connection;)
 	VMS_ONLY(cnx = connection;)
 #ifdef UNIX
 	/* no need to disable ASTs on VMS since the timer handler gtcml_lkstarve runs as an AST. On Unix though, timer handlers
 	 * block only SIGALRM. Here, we need to block the CMI signals as well. */
-	CMI_MUTEX_BLOCK;
+	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 #endif
 	if (curr_entry != cnx && !cnx->waiting_in_queue)
 	{
@@ -58,6 +53,6 @@ void gtcml_lkstarve(TID timer_id, int4 data_len, connection_struct **connection)
 	} else
 		on_queue_p++;
 #ifdef UNIX
-	CMI_MUTEX_RESTORE;
+	CMI_MUTEX_RESTORE(cmi_mutex_rc);
 #endif
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,20 +19,18 @@
 
 GBLREF spdesc	stringpool;
 
-/* If you update this function, consider updating op_zhorolog() as well */
+/* If you update this function, consider updating op_zhorolog() as well, however at this writing they use different services */
 void op_horolog(mval *s)
 {
 	uint4		days;
 	time_t		seconds;
-	struct timeval	tv;
 	unsigned char	*strpool_free;
 
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.free >= stringpool.base);
 	ENSURE_STP_FREE_SPACE(MAXNUMLEN + 1);
 	strpool_free = stringpool.free;
-	assertpro(-1 != gettimeofday(&tv, NULL));
-	seconds = tv.tv_sec;
+	seconds = time(NULL);
 	dollarh(seconds, &days, &seconds);
 	s->str.addr = (char *)strpool_free;
 	strpool_free = i2asc(strpool_free, days);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +12,7 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
-
-#ifdef VMS
-#include <ssdef.h>
-#include <descrip.h>
-#endif
+#include "gtm_stdlib.h"		/* for EXIT() */
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -33,10 +29,5 @@
 
 void gtmrecv_exit(int exit_status)
 {
-	error_def(ERR_REPLEXITERR);
-#ifdef VMS
-	sys$exit((0 == exit_status) ? SS$_NORMAL : ERR_REPLEXITERR);
-#else
-	exit(exit_status);
-#endif
+	EXIT(exit_status);
 }

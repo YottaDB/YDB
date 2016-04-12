@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 #endif
 #include <errno.h>
 #include "gtm_unistd.h"
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "buddy_list.h"
 #include "gdsroot.h"
@@ -201,7 +201,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	assert((0 < (int)new_blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
 	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
-		assert(FALSE);
+		assert(WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_TOTALBLKMAX);
 		return (uint4)(NO_FREE_SPACE);
 	}

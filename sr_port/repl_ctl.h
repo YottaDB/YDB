@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +13,8 @@
 #ifndef _REPL_CTL_H
 #define _REPL_CTL_H
 
-#ifdef	GTM_CRYPT
 #include "gtmcrypt.h" /* for gtmcrypt_key_t type used in repl_ctl_element */
-#endif
+
 typedef enum
 {
 	JNL_FILE_UNREAD,
@@ -55,6 +55,14 @@ typedef struct {
 } repl_buff_desc;
 
 #define REPL_BLKSIZE(x)		((x)->fc->jfh->alignsize)
+
+#define	MARK_CTL_AS_EMPTY(CTL)						\
+{									\
+	assert(JNL_FILE_UNREAD == CTL->file_state);			\
+	CTL->file_state = JNL_FILE_EMPTY;				\
+	assert(1 <= CTL->repl_buff->fc->jfh->start_seqno);		\
+	CTL->max_seqno = CTL->repl_buff->fc->jfh->start_seqno - 1;	\
+}
 
 typedef struct {
 	uint4		eof_addr;	/* On-disk last byte offset */
@@ -111,15 +119,25 @@ typedef struct repl_ctl_struct
 						 * is noted down */
 	boolean_t		max_seqno_final; /* TRUE ONLY if ctl->eof_addr_final is TRUE and if source server has noted down
 						  * the final max_seqno for this journal file */
-	boolean_t		read_complete;
 	int4			jnl_fn_len;
 	char			jnl_fn[JNL_NAME_SIZE];
+	struct repl_rctl_elem_struct	*repl_rctl;
 	struct repl_ctl_struct	*prev;
 	struct repl_ctl_struct	*next;
-#	ifdef GTM_CRYPT
 	gtmcrypt_key_t		encr_key_handle;
-#	endif
+	gtmcrypt_key_t		encr_key_handle2;
 } repl_ctl_element;
+
+/* The below is one structure per region (each region could have more than one "repl_ctl_element" structures.
+ * All "ctl" structures for a region point back to the same "repl_rctl_elem_t" structure.
+ */
+typedef struct repl_rctl_elem_struct
+{
+	struct repl_rctl_elem_struct	*prev;
+	struct repl_rctl_elem_struct	*next;
+	repl_ctl_element		*ctl_start;
+	boolean_t			read_complete;
+} repl_rctl_elem_t;
 
 typedef struct {
 	seq_num		seqno;		/* the last sequence number seen in a block before linear search returns */

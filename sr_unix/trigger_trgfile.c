@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +12,11 @@
 
 #include "mdef.h"
 
+#ifdef GTM_TRIGGER
 #include "gtm_stat.h"
 #include "gtm_string.h"
 
-#ifdef GTM_TRIGGER
+#include "gtm_multi_thread.h"
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
@@ -209,6 +211,7 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 		 */
 		op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
 		/* Note down length of unprocessed util_out buffer */
+		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		assert(NULL != TREF(util_outptr));
 		utilbuff_len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
 		assert(OUT_BUFF_SIZE >= utilbuff_len);

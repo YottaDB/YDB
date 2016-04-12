@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +16,8 @@
 */
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
-#include <signal.h>
+#include "gtm_stdlib.h"		/* for EXIT() */
+#include "gtm_signal.h"
 
 #include "error.h"
 #include "gtmsiginfo.h"
@@ -102,5 +103,5 @@ void dbcertify_deferred_signal_handler(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 	}
 	/* Drive the exit handler to terminate */
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }

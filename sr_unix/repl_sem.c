@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +108,7 @@ int grab_sem(int set_index, int sem_num)
 	ASSERT_SET_INDEX;
 	sop[0].sem_op  = 0; /* Wait for 0 */
 	sop[0].sem_num = sem_num;
-	sop[1].sem_op  = 1; /* Increment it */
+	sop[1].sem_op  = 1; /* lock it */
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
 	SEMOP(sem_set_id[set_index], sop, 2, rc, FORCED_WAIT);

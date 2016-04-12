@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +14,9 @@
 #include "io.h"
 #include "term_setup.h"
 
-GBLDEF boolean_t    ctrlc_on;		/* TRUE in cenable mode; FALSE in nocenable mode */
-
-GBLREF int4	    outofband;		/*enumerated:ctrap,ctrlc or ctrly*/
-GBLREF io_pair	    io_std_device;	/* standard device	*/
+GBLREF	boolean_t	ctrlc_on;	/* TRUE in cenable mode; FALSE in nocenable mode */
+GBLREF	int4		outofband;	/*enumerated:ctrap,ctrlc or ctrly*/
+GBLREF	io_pair		io_std_device;	/* standard device */
 
 void  term_setup(boolean_t ctrlc_enable)
 {

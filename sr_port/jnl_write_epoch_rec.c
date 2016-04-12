@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -155,12 +156,17 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		 */
 		assert(!jgbl.mur_rollback || !REPL_ALLOWED(csd) || process_exiting);
 		assert(jgbl.mur_rollback || REPL_ALLOWED(csd));
+		/* If caller is MUPIP JOURNAL ROLLBACK, it cannot be FORWARD rollback since that runs with journaling
+		 * turned off and we are writing journal records in this function. Assert accordingly.
+		 */
+		assert(!jgbl.mur_rollback || !jgbl.mur_options_forward);
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 			jb->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 	}
 #	endif
 	epoch_record.filler = 0;
-	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&epoch_record, SIZEOF(struct_jrec_epoch));
-	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL);
+	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+								(unsigned char *)&epoch_record, SIZEOF(struct_jrec_epoch));
+	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL, NULL);
 	jb->post_epoch_freeaddr = jb->freeaddr;
 }

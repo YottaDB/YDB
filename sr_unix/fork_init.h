@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +25,15 @@
  * we anyways have invoked the "fork()" system call just now.
  */
 
-#define FORK(pid)					\
-{							\
-	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
-	pid = fork();					\
-	if (0 == pid)					\
-		clear_timers();				\
-	ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
+#define FORK(pid)							\
+{									\
+	intrpt_state_t	prev_intrpt_state;				\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state)	\
+	pid = fork();							\
+	if (0 == pid)							\
+		clear_timers();						\
+	ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state)	\
 }
 
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,11 @@ GBLREF hash_table_str	*complits_hashtab;
 
 oprtype put_lit(mval *x)
 {
+	return put_lit_s(x, NULL);
+}
+
+oprtype put_lit_s(mval *x, triple *dst_triple)
+{
 	mliteral	*a;
 	triple		*ref;
 	boolean_t	usehtab, added;
@@ -32,7 +38,10 @@ oprtype put_lit(mval *x)
 	assert(MV_DEFINED(x));
 	MV_FORCE_STR(x);
 	DEBUG_ONLY(litent = NULL);
-	ref = newtriple(OC_LIT);
+	if (dst_triple == NULL)
+		ref = newtriple(OC_LIT);
+	else
+		ref = dst_triple;
 	ref->operand[0].oprclass = MLIT_REF;
 	/* Multiple reasons to use hashtab since coerce which processes integer parms to functions will
 	 * actually *remove* literals if they were just put on so we don't want to convert to hashtab

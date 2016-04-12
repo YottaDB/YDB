@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,8 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include <signal.h>
+#include "gtm_signal.h"
+
 #include <stdarg.h>
 #include <errno.h>
 
@@ -61,13 +63,16 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	int		retval;
 	sigset_t	savemask;
 
+	/* Note: cannot use SIGPROCMASK below because this function is used by "gtmsecshr" and using SIGPROCMASK
+	 * pulls in a lot of stuff from libgtmshr.so (due to asserts) and we want minimal stuff in "gtmsecshr".
+	 */
 	if (blocksig_initialized)
-		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
+		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);	/* BYPASSOK(sigprocmask) */
 	va_start(printargs, format);
 	VFPRINTF(stream, format, printargs, retval);
 	va_end(printargs);
 	if (blocksig_initialized)
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
+		sigprocmask(SIG_SETMASK, &savemask, NULL);	/* BYPASSOK(sigprocmask) */
 	return retval;
 }
 

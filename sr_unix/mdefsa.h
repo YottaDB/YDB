@@ -54,6 +54,9 @@
 #elif defined(__MVS__)
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
 #	define	ICU_LIBNAME_EXT		"so"
+#elif defined(__CYGWIN__)
+#	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
+#	define	ICU_LIBNAME_EXT		"dll"
 #else
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
 #	ifdef _AIX
@@ -61,6 +64,8 @@
 	 * So we need to link with a member of the library instead of the library itself.
 	 */
 #		define	ICU_LIBNAME_EXT	"a"
+	/* AIX system default ICU library uses a different convention for the library name */
+#		define	ICU_LIBNAME_DEF	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT "(shr_64.o)"
 #	else
 #		define	ICU_LIBNAME_EXT	"so"
 #	endif

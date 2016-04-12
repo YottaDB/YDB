@@ -124,7 +124,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 							pvt_crypt_buf.addr);
 						out_ptr = pvt_crypt_buf.addr;
 					}
-					DOWRITERL(rm_ptr->fildes, out_ptr, UTF16BE_BOM_LEN, res_size);
+					DOWRITERL_RM(rm_ptr, out_ptr, UTF16BE_BOM_LEN, res_size);
 					ISSUE_NOPRINCIO_IF_NEEDED_RM(res_size, <=, iod);
 					rm_ptr->write_occurred = TRUE;
 					iod->ochset = CHSET_UTF16BE;
@@ -175,7 +175,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 								pvt_crypt_buf.addr);
 							out_ptr = pvt_crypt_buf.addr;
 						}
-						DOWRITERC(rm_ptr->fildes, out_ptr, bytes_per_char, status);
+						DOWRITERC_RM(rm_ptr, out_ptr, bytes_per_char, status);
 						ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 						rm_ptr->write_occurred = TRUE;
 					}
@@ -200,7 +200,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 					WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, pad_size, pvt_crypt_buf.addr);
 					out_ptr = pvt_crypt_buf.addr;
 				}
-				DOWRITERL(rm_ptr->fildes, out_ptr, pad_size, res_size);
+				DOWRITERL_RM(rm_ptr, out_ptr, pad_size, res_size);
 				ISSUE_NOPRINCIO_IF_NEEDED_RM(res_size, <=, iod);
 				rm_ptr->write_occurred = TRUE;
 				assert(res_size == pad_size);
@@ -214,7 +214,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 				WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, RMEOL_LEN, pvt_crypt_buf.addr);
 				out_ptr = pvt_crypt_buf.addr;
 			}
-			DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
+			DOWRITERC_RM(rm_ptr, out_ptr, RMEOL_LEN, status);
 			ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 			rm_ptr->write_occurred = TRUE;
 		}

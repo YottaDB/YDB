@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +52,7 @@
 # include "wbox_test_init.h"
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__CYGWIN__)
 #include <sys/vfs.h>
 #endif
 
@@ -100,6 +101,116 @@ error_def(ERR_PREMATEOF);
 }
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
+
+/* This macro is used when we need to set FD_CLOEXEC whether or not the platform supports O_CLOEXEC.
+ * This is used for system calls, e.g, pipe, that do not support O_CLOEXEC.
+ */
+#define SETFDCLOEXECALWAYS(FDESC) 					\
+{									\
+	int flags, fcntl_res;						\
+	if (-1 != FDESC) 						\
+	{ 								\
+	    flags = 0; 							\
+	    FCNTL2(FDESC, F_GETFD, flags); 				\
+	    if (-1 != flags) 						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	} 								\
+}
+
+/* Versions of the OPEN* macros that cause the file descriptor to be closed before an EXEC. */
+
+/* If the platform really supports O_CLOEXEC use it in the OPEN */
+#if defined(O_CLOEXEC) && !defined(_AIX) && !defined(__sparc)
+#define OPEN_CLOEXEC(FNAME, FFLAGS, FDESC)	\
+{						\
+	FDESC = OPEN(FNAME, FFLAGS | O_CLOEXEC);\
+}
+#define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)  	\
+{							\
+	FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);\
+}
+#define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
+#define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)	OPENFILE_SYNC(FNAME, FFLAGS | O_CLOEXEC, FDESC);
+#define OPENFILE3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)	OPENFILE3(FNAME, FFLAGS | O_CLOEXEC, FMODE, FDESC);
+/* The next two macros are used when the open command needs to return a value and is used as part of control statement.
+ * See comment in io_open_try.c. Between the two macros (see the else case versions) either O_CLOEXEC or FD_CLOEXEC is
+ * used (depending on whether the platform supports O_CLOEXEC (preferred)).
+ */
+#define SETOCLOEXEC(FFLAGS) (FFLAGS | O_CLOEXEC)
+#define SETSOCKCLOEXEC(FFLAGS) (FFLAGS | SOCK_CLOEXEC)
+/* Since the platform support O_CLOEXEC via the OPEN* no need for FD_CLOEXEC */
+#define SETFDCLOEXEC(FDESC)
+#else
+/* If the platform does not support O_CLOEXEC, use fcntl with FD_CLOEXEC */
+#define OPEN_CLOEXEC(FNAME, FFLAGS, FDESC)				\
+{									\
+	int flags, fcntl_res;						\
+	FDESC = OPEN(FNAME, FFLAGS);					\
+	if (-1 != FDESC)						\
+	{								\
+	    flags = 0;							\
+	    FCNTL2(FDESC, F_GETFD, flags);				\
+	    if (-1 != flags)						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	}								\
+}
+#define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)			\
+{									\
+	int flags, fcntl_res;						\
+	FDESC = OPEN3(FNAME, FFLAGS, FMODE);				\
+	if (-1 != FDESC)						\
+	{								\
+	    flags = 0;							\
+	    FCNTL2(FDESC, F_GETFD, flags);				\
+	    if (-1 != flags)						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	}								\
+}
+#define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)				\
+{									\
+	int flags, fcntl_res;						\
+	OPENFILE(FNAME, FFLAGS, FDESC);					\
+	if (-1 != FDESC)						\
+	{								\
+	    flags = 0;							\
+	    FCNTL2(FDESC, F_GETFD, flags);				\
+	    if (-1 != flags)						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	}								\
+}
+
+#define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)			\
+{									\
+	int flags, fcntl_res;						\
+	OPENFILE_SYNC(FNAME, FFLAGS, FDESC);				\
+	if (-1 != FDESC)						\
+	{								\
+	    flags = 0;							\
+	    FCNTL2(FDESC, F_GETFD, flags);				\
+	    if (-1 != flags)						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	}								\
+}
+
+#define OPENFILE3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)			\
+{									\
+	int flags, fcntl_res;						\
+	OPENFILE3(FNAME, FFLAGS, FMODE, FDESC);				\
+	if (-1 != FDESC)						\
+	{								\
+	    flags = 0;							\
+	    FCNTL2(FDESC, F_GETFD, flags);				\
+	    if (-1 != flags)						\
+		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
+	}								\
+}
+#define SETOCLOEXEC(FFLAGS) (FFLAGS)
+#define SETSOCKCLOEXEC(FFLAGS) (FFLAGS)
+#define SETFDCLOEXEC(FDESC)		\
+{					\
+	SETFDCLOEXECALWAYS(FDESC);	\
+}
+#endif
 
 #define FSTYPE_ADVFS	"advfs"
 #define FSTYPE_UFS	"ufs"
@@ -162,7 +273,7 @@ error_def(ERR_PREMATEOF);
 #elif defined(__MVS__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
 #define DIRECTIO_FLAG	0
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__CYGWIN__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #define DIRECTIO_FLAG	O_DIRECT
 #elif defined(__hpux)
@@ -172,7 +283,7 @@ error_def(ERR_PREMATEOF);
 #error UNSUPPORTED PLATFORM
 #endif
 
-#if defined( __linux__)
+#if defined( __linux__) || defined(__CYGWIN__)
 /* A special handling was needed for linux due to its inability to lock
  * over NFS.  The only difference in code is an added check for NFS file
  * thru fstatfs
@@ -653,6 +764,50 @@ error_def(ERR_PREMATEOF);
 	/* assertpro(FALSE)? */								\
 }
 
+#define DOWRITERC_RM(RM, FBUFF, FBUFF_LEN, RC)									\
+{														\
+	if (0 == RM->fsblock_buffer_size)									\
+		DOWRITERC(RM->fildes, FBUFF, FBUFF_LEN, RC)							\
+	else													\
+	{													\
+		GBLREF	int	gtm_non_blocked_write_retries;							\
+		ssize_t		gtmioStatus;									\
+		size_t		gtmioBuffLen;									\
+		sm_uc_ptr_t	gtmioBuff;									\
+		int		block_cnt = 0;									\
+		intrpt_state_t	prev_intrpt_state;								\
+														\
+		gtmioBuffLen = FBUFF_LEN;									\
+		gtmioBuff = (sm_uc_ptr_t)(FBUFF);								\
+		for (;;)											\
+		{												\
+			DEFER_INTERRUPTS(INTRPT_IN_IO_WRITE, prev_intrpt_state);				\
+			gtmioStatus = fwrite(gtmioBuff, 1, gtmioBuffLen, RM->filstr); /* BYPASSOK("fwrite") */	\
+			ENABLE_INTERRUPTS(INTRPT_IN_IO_WRITE, prev_intrpt_state);				\
+			if (gtmioBuffLen >= gtmioStatus)							\
+			{											\
+				gtmioBuffLen -= gtmioStatus;							\
+				if (0 == gtmioBuffLen)								\
+					break;									\
+				gtmioBuff += gtmioStatus;							\
+			}											\
+			else if (EINTR != errno && EAGAIN != errno)						\
+				break;										\
+			else if (EAGAIN == errno)								\
+			{											\
+				if (gtm_non_blocked_write_retries <= block_cnt)					\
+					break;									\
+				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
+				block_cnt++;									\
+			}											\
+		}												\
+		if (0 == gtmioBuffLen)										\
+			RC = 0;											\
+		else												\
+			RC = errno;		/* Something kept us from writing what we wanted */		\
+	}													\
+}
+
 #define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
 {												\
 	GBLREF	int	gtm_non_blocked_write_retries;						\
@@ -712,6 +867,51 @@ error_def(ERR_PREMATEOF);
 		memcpy(DEVPTR->dollar.device, ONE_COMMA_UNAVAILABLE, len);		\
 	} else										\
 		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
+}
+
+#define DOWRITERL_RM(RM, FBUFF, FBUFF_LEN, RLEN)								\
+{														\
+	if (0 == RM->fsblock_buffer_size)									\
+		DOWRITERL(RM->fildes, FBUFF, FBUFF_LEN, RLEN)							\
+	else													\
+	{													\
+		ssize_t		gtmioStatus;									\
+		size_t		gtmioBuffLen;									\
+		sm_uc_ptr_t	gtmioBuff;									\
+		int		block_cnt = 0;									\
+		intrpt_state_t	prev_intrpt_state;								\
+														\
+		GBLREF	int	gtm_non_blocked_write_retries;							\
+														\
+		gtmioBuffLen = FBUFF_LEN;									\
+		gtmioBuff = (sm_uc_ptr_t)(FBUFF);								\
+		for (;;)											\
+		{												\
+			DEFER_INTERRUPTS(INTRPT_IN_IO_WRITE, prev_intrpt_state);				\
+			gtmioStatus = fwrite(gtmioBuff, 1, gtmioBuffLen, RM->filstr); /* BYPASSOK("fwrite") */	\
+			ENABLE_INTERRUPTS(INTRPT_IN_IO_WRITE, prev_intrpt_state);				\
+			if (gtmioBuffLen >= gtmioStatus)							\
+			{											\
+				gtmioBuffLen -= gtmioStatus;							\
+				if (0 == gtmioBuffLen)								\
+					break;									\
+				gtmioBuff += gtmioStatus;							\
+			}											\
+			else if (EINTR != errno && EAGAIN != errno)						\
+				break;										\
+			else if (EAGAIN == errno)								\
+			{											\
+				if (gtm_non_blocked_write_retries <= block_cnt)					\
+					break;									\
+				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
+				block_cnt++;									\
+			}											\
+		}												\
+		if (0 < gtmioStatus)										\
+			RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */		\
+		else						/* Had legitimate error - return it */		\
+			RLEN = -1;										\
+	}													\
 }
 
 #define DOWRITERL(FDESC, FBUFF, FBUFF_LEN, RLEN)						\
@@ -822,10 +1022,44 @@ typedef struct
 		RC = -1;		/* Something kept us from writing what we wanted */	\
 }
 
-#define FFLUSH(STREAM)					\
-{							\
-	DEFER_INTERRUPTS(INTRPT_IN_FFLUSH);		\
-	fflush(STREAM);					\
-	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH);		\
+#define FFLUSH(STREAM)							\
+{									\
+	intrpt_state_t	prev_intrpt_state;				\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_FFLUSH, prev_intrpt_state);		\
+	fflush(STREAM);							\
+	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH, prev_intrpt_state);		\
 }
+
+/* Macros to deal with calls which are not async-signal-safe */
+
+#define GETC(STREAM, RC)							\
+{										\
+	GBLREF boolean_t	multi_thread_in_use;				\
+	char			*rname;						\
+	/* Use the right system call based on threads are in use or not */	\
+	if (!INSIDE_THREADED_CODE(rname))					\
+		RC = getc_unlocked(STREAM);					\
+	else									\
+		RC = getc(STREAM);						\
+}
+
+#define CLEARERR(STREAM)						\
+{									\
+	intrpt_state_t	prev_intrpt_state;				\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
+	clearerr(STREAM);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);	\
+}
+
+#define FEOF(STREAM, RC)						\
+{									\
+	intrpt_state_t	prev_intrpt_state;				\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
+	RC = feof(STREAM);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);	\
+}
+
 #endif

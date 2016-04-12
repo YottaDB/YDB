@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,7 @@
 # include "mutex.h"
 #endif
 #include "wcs_flu.h"
-#include <signal.h>		/* for VSIG_ATOMIC_T */
+#include "gtm_signal.h"
 
 GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	block_id	patch_curr_blk;
@@ -63,6 +64,7 @@ void dse_all(void)
 	tp_region	*region_list, *rg, *rg_last, *rg_new;	/* A handy structure for maintaining a list of regions */
 	int		i;
 	sgmnt_addrs	*old_addrs, *csa;
+	sgmnt_data_ptr_t	csd;
 	gd_region	*old_region;
 	block_id	old_block;
 	int4		stat;
@@ -77,6 +79,7 @@ void dse_all(void)
 	boolean_t	dump = FALSE;
 	boolean_t	override = FALSE;
 	boolean_t	was_crit;
+	boolean_t	clear_corrupt = FALSE;
 	UNIX_ONLY(char	*fgets_res;)
 
 	old_addrs = cs_addrs;
@@ -115,6 +118,8 @@ void dse_all(void)
                         override = TRUE;
                 if (cli_present("DUMP") == CLI_PRESENT)
 			dump = TRUE;
+                if (cli_present("CLEARCORRUPT") == CLI_PRESENT)
+			clear_corrupt = TRUE;
 	}
         if (!dump && gv_cur_region->read_only)
                 rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -151,11 +156,12 @@ void dse_all(void)
 			gv_cur_region = rg->reg;
 			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
 			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+			csd = cs_addrs->hdr;
 			patch_curr_blk = get_dir_root();
 			if (crit)
 			{
-				UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(cs_addrs->hdr), TRUE));
-				VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY(cs_addrs->hdr), TRUE));
+				UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(csd), TRUE));
+				VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY(csd), TRUE));
 				cs_addrs->nl->in_crit = 0;
 				cs_addrs->hold_onto_crit = FALSE;	/* reset this just before cs_addrs->now_crit is reset */
 				cs_addrs->now_crit = FALSE;
@@ -173,21 +179,21 @@ void dse_all(void)
                         	                break;
 					}
 				}
-				if (freeze != !(cs_addrs->hdr->freeze))
+				if (freeze != !(csd->freeze))
 					util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(gv_cur_region));
 			}
 			was_crit = cs_addrs->now_crit;
 			if (seize)
 			{
-				if (!was_crit)
-					grab_crit(gv_cur_region);	/* no point seizing crit if WE already have it held */
-				cs_addrs->hold_onto_crit = TRUE; /* need to do this AFTER grab_crit */
+				if (!was_crit)	/* No point seizing crit if WE already have it held */
+					grab_crit_encr_cycle_sync(gv_cur_region);
+				cs_addrs->hold_onto_crit = TRUE; /* Need to do this AFTER grab_crit */
 				cs_addrs->dse_crit_seize_done = TRUE;
 			}
 			if (wc)
 			{
 				if (!was_crit && !seize)
-					grab_crit(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region);
 				DSE_WCREINIT(cs_addrs);
 				if (!was_crit && (!seize || release))
 					rel_crit(gv_cur_region);
@@ -219,6 +225,8 @@ void dse_all(void)
 			}
 			if (ref)
 				cs_addrs->nl->ref_cnt = 1;
+			if (clear_corrupt)
+				csd->file_corrupt = FALSE;
 		}
 	}
 	cs_addrs = old_addrs;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
+#include "gtm_signal.h" /* for kill(), SIGTERM, SIGQUIT */
 #include "iosp.h"
 
 #include <sys/mman.h>
@@ -24,7 +26,6 @@
 #include <sys/shm.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <signal.h> /* for kill(), SIGTERM, SIGQUIT */
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -35,6 +36,7 @@
 #include "gtm_semutils.h"
 #include "gtmimagename.h"
 #include "do_semop.h"
+#include "filestruct.h"
 
 GBLREF uint4			process_id;
 GBLREF volatile uint4		heartbeat_counter;
@@ -54,8 +56,8 @@ error_def(ERR_TEXT);
 #define IS_FTOK_SEM	(gtm_ftok_sem == semtype)
 
 
-boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr,
-			    semwait_status_t *retstat, gd_region *reg, boolean_t *bypass)
+boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr, semwait_status_t *retstat, gd_region *reg,
+			    boolean_t *bypass, boolean_t *sem_halted, sgmnt_data_ptr_t tsd)
 {
 	boolean_t			need_stacktrace, indefinite_wait;
 	char				*msgstr;
@@ -69,8 +71,11 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 
 	SETUP_THREADGBL_ACCESS;
 	assert(IS_FTOK_SEM || IS_ACCESS_SEM);
+	*sem_halted = FALSE;
+	if (NULL != tsd)
+		*sem_halted = IS_ACCESS_SEM ? tsd->access_counter_halted : tsd->ftok_counter_halted;
 	/* Access control semaphore should not be increased when the process is readonly */
-	SET_GTM_SOP_ARRAY(sop, sopcnt, IS_FTOK_SEM || !reg->read_only, (SEM_UNDO | IPC_NOWAIT));
+	SET_GTM_SOP_ARRAY(sop, sopcnt, (IS_FTOK_SEM || !reg->read_only) && !(*sem_halted), (SEM_UNDO | IPC_NOWAIT));
 	is_editor = (IS_DSE_IMAGE || IS_LKE_IMAGE);
 	max_hrtbt_delta = TREF(dbinit_max_hrtbt_delta);
 	assert(NO_SEMWAIT_ON_EAGAIN != max_hrtbt_delta);
@@ -83,22 +88,38 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 		{	/* Editors are able to bypass after 3 seconds of wait. IPC_NOWAIT smeop every second.
 			 * The semaphore value must be at least 2 to make sure the shared memeory is already created.
 			 */
-			if (-1 == (semval = semctl(semid, 1, GETVAL))) /* semval = number of process attached */
+			if (-1 == (semval = semctl(semid, DB_COUNTER_SEM, GETVAL))) /* semval = number of process attached */
 				RETURN_SEMWAIT_FAILURE(retstat, errno, op_semctl, ERR_CRITSEMFAIL, 0, 0);
-			if (semval > 1)
+			if (semval > DB_COUNTER_SEM_INCR)
 			{
 				if (-1 == (sem_pid = semctl(semid, 0, GETPID)))
 					RETURN_SEMWAIT_FAILURE(retstat, errno, op_semctl, ERR_CRITSEMFAIL, 0, 0);
-				gtm_putmsg(VARLSTCNT(10) ERR_RESRCWAIT, 8, LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg),
-					   DB_LEN_STR(reg), sem_pid, semid);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_RESRCWAIT, 8, LEN_AND_STR(sem_names[semtype]),
+					       REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid, semid);
 				i = 0;
 				do
 				{
 					SEMOP(semid, sop, sopcnt, status, NO_WAIT);
 					save_errno = errno;
-					LONG_SLEEP(1);
-					i++;
-				} while ((-1 == status) && (EAGAIN == save_errno) && (i < MAX_BYPASS_WAIT_SEC));
+					if ((-1 == status) && (ERANGE == save_errno))
+					{
+						if (!(*sem_halted))
+						{
+							if (IS_ACCESS_SEM)
+								SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
+							else
+								SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
+							sopcnt = 2; /* ignore the increment operation */
+							*sem_halted = TRUE;
+							continue; /* Try again */
+						}
+					} else
+					{
+						LONG_SLEEP(1);
+						i++;
+					}
+				} while ((-1 == status) && ((EAGAIN == save_errno) || (ERANGE == save_errno))
+					 && (i < MAX_BYPASS_WAIT_SEC));
 				if (-1 != status)
 					return TRUE;
 				assert(EINTR != save_errno);
@@ -106,25 +127,34 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 				{
 					*bypass = TRUE;
 					save_errno = 0;
-					send_msg(VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
 						 LEN_AND_STR((IS_LKE_IMAGE ? "LKE" : "DSE")), process_id,
 						 LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid);
 					/* If this is a readonly access, we don't increment access semaphore's counter. See
 					 * SET_GTM_SOP_ARRAY definition in gtm_semutils.h and how it is called from db_init().
 					 */
-					if (IS_FTOK_SEM || !reg->read_only)
+					if (!(*sem_halted) && (IS_FTOK_SEM || !reg->read_only))
 					{
 						/* Increase the counter semaphore. */
-						save_errno = do_semop(semid, 1, 1, SEM_UNDO);
+						save_errno = do_semop(semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
 						if (save_errno == 0)
 							return TRUE;
+						else if (ERANGE == save_errno)
+						{
+							*sem_halted = TRUE;
+							if (IS_ACCESS_SEM)
+								SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
+							else if (IS_FTOK_SEM)
+								SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
+							return TRUE;
+						}
 						*bypass = FALSE; /* Semaphore removed when attempting to bypass. Abort bypass. */
 					} else
 						return TRUE;
 				}
 			}
 		}
-		if (!is_editor || (semval < 2))
+		if (!is_editor || (semval <= DB_COUNTER_SEM_INCR))
 		{
 			/* Do not bypass. (We are not LKE/DSE OR) OR (There are less than 2 processes inside) */
 			sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO; /* Enable blocking wait. */
@@ -132,8 +162,21 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 			{
 				status = semop(semid, sop, sopcnt);
 				save_errno = errno;
-			} while ((-1 == status) && (EINTR == errno) && !USER_SPECIFIED_TIME_EXPIRED(max_hrtbt_delta,
-												    start_hrtbt_cntr));
+				if ((-1 == status) && (ERANGE == save_errno))
+				{
+					if (!(*sem_halted))
+					{
+						if (IS_ACCESS_SEM)
+							SEM_COUNTER_OFFLINE(access, tsd, NULL ,reg)
+						else
+							SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
+						sopcnt = 2; /* ignore the increment operation */
+						*sem_halted = TRUE;
+						continue; /* Try again */
+					}
+				}
+			} while ((-1 == status) && ((EINTR == save_errno) || (ERANGE == save_errno))
+				 && !USER_SPECIFIED_TIME_EXPIRED(max_hrtbt_delta, start_hrtbt_cntr));
 			if (-1 != status)
 				return TRUE;
 			/* someone else is holding it and we are done waiting */
@@ -155,7 +198,17 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 				return TRUE;
 			}
 			save_errno = errno;
-			if (EINTR != save_errno)
+			if ((ERANGE == save_errno) && !(*sem_halted))
+			{
+				if (IS_ACCESS_SEM)
+					SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
+				else
+					SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
+				sopcnt = 2;	/* ignore the increment operation */
+				*sem_halted = TRUE;
+				loopcnt--;	/* do not count this attempt */
+				continue;	/* retry semop */
+			} else if (EINTR != save_errno)
 				break;
 			if (lcl_hrtbt_cntr != heartbeat_counter)
 			{	/* We waited for at least one heartbeat. This is to ensure that we don't prematurely conclude
@@ -207,6 +260,14 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 				 * So, log a SEMOP success message in the syslog.
 				 */
 				SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, semtype);
+			} else if ((!*sem_halted) && (ERANGE == save_errno))
+			{
+				*sem_halted = TRUE;
+				if (IS_ACCESS_SEM)
+					SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
+				else
+					SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
+				return TRUE;
 			}
 			/* else some other error occurred; fall-through */
 		}

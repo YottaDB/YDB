@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -521,7 +521,7 @@ boolean_t wcs_flu(uint4 options)
 		 */
 		assert(!jb->need_db_fsync);
 		for (lcnt = 1; FALSE == (GET_SWAPLOCK(&jb->io_in_prog_latch)); lcnt++)
-		{
+		{	/* this is a long lock and hence should be a mutex */
 			if (MAXJNLQIOLOCKWAIT < lcnt)	/* tried too long */
 			{
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
@@ -530,7 +530,6 @@ boolean_t wcs_flu(uint4 options)
 				assertpro(FALSE);
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
-
 			if ((MAXJNLQIOLOCKWAIT / 2 == lcnt) || (MAXJNLQIOLOCKWAIT == lcnt))
 				performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,9 +64,7 @@
 #include "gvcst_lbm_check.h"
 #include "wcs_phase2_commit_wait.h"
 #include "gtm_permissions.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF	bool			record;
 GBLREF	bool			online;
@@ -165,6 +163,7 @@ bool	mubinccpy (backup_reg_list *list)
 	int			user_id;
 	int			group_id;
 	int			perm;
+	int4			cur_mdb_ver;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 	DEBUG_INCBKUP_ONLY(gtm_uint64_t backup_write_offset = 0;)
 
@@ -192,7 +191,7 @@ bool	mubinccpy (backup_reg_list *list)
 
 	/* =================== open backup destination ============================= */
 	backup_write_errno = 0;
-	switch(list->backup_to)
+	switch (list->backup_to)
 	{
 		case backup_to_file:
 			common_write = iob_write;
@@ -274,11 +273,8 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 
 	/* ============================= write inc_header =========================================== */
-	outbuf = (inc_header*)malloc(SIZEOF(inc_header));
-	if (header->is_encrypted)
-		MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL);
-	else
-		MEMCPY_LIT(&outbuf->label[0], V5_INC_HEADER_LABEL);
+	outbuf = (inc_header *)malloc(SIZEOF(inc_header));
+	MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL_V7);
 	stringpool.free = stringpool.base;
 	op_horolog(&val);
 	stringpool.free = stringpool.base;
@@ -290,17 +286,12 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf->db_total_blks = header->trans_hist.total_blks;
 	outbuf->blk_size = header->blk_size;
 	outbuf->blks_to_upgrd = header->blks_to_upgrd;
-	/* is_encrypted field of incremental header is defined for all platforms.
-	 * Hence set the is_encrypted field unconditionally.
-	 */
-	outbuf->is_encrypted = header->is_encrypted;
+	GTMCRYPT_COPY_ENCRYPT_SETTINGS(header, outbuf);
 	util_out_print("MUPIP backup of database file !AD to !AD", TRUE, DB_LEN_STR(gv_cur_region), file->len, file->addr);
 	COMMON_WRITE(backup, (char *)outbuf, SIZEOF(inc_header));
-#	ifdef GTM_CRYPT
-		if (header->is_encrypted)
-			COMMON_WRITE(backup, (char *)header->encryption_hash, GTMCRYPT_HASH_LEN);
-#	endif
 	free(outbuf);
+	cur_mdb_ver = header->minor_dbver;
+	COMMON_WRITE(backup, (char *)&cur_mdb_ver, SIZEOF(int4));
 
 	if (mu_ctrly_occurred  ||  mu_ctrlc_occurred)
 	{
@@ -635,7 +626,7 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 
 	/* ========================== close backup destination ======================================== */
-	switch(list->backup_to)
+	switch (list->backup_to)
 	{
 		case backup_to_file:
 			REVERT;

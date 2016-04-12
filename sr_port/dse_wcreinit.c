@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,11 +45,11 @@ void dse_wcreinit (void)
 #	endif
 
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 
 	if (cs_addrs->hdr->clustered)
 	{
-		rts_error(VARLSTCNT(1) ERR_DSEINVLCLUSFN);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVLCLUSFN);
 		return;
 	}
 	if (cs_addrs->critical)
@@ -56,12 +57,12 @@ void dse_wcreinit (void)
 	GET_CONFIRM_AND_HANDLE_NEG_RESPONSE
 	if (cs_addrs->hdr->acc_meth != dba_bg && cs_addrs->hdr->acc_meth != dba_mm)
 	{
-		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("WCINIT"));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("WCINIT"));
 		return;
 	}
 	was_crit = cs_addrs->now_crit;
 	if (!was_crit)
-		grab_crit(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region);
 	DSE_WCREINIT(cs_addrs);
 	if (!was_crit)
 		rel_crit (gv_cur_region);

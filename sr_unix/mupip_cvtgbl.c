@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -33,6 +34,7 @@
 #include <errno.h>
 #include "muextr.h"
 #include <regex.h>
+#include "op.h"
 
 GBLREF	int		gv_fillfactor;
 GBLREF	bool		mupip_error_occurred;
@@ -41,32 +43,29 @@ GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
 GBLDEF	int		onerror;
 
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_LOADEDBG);
+error_def(ERR_LDBINFMT);
 error_def(ERR_LOADBGSZ);
 error_def(ERR_LOADBGSZ2);
+error_def(ERR_LOADINVCHSET);
+error_def(ERR_LOADEDBG);
 error_def(ERR_LOADEDSZ);
 error_def(ERR_LOADEDSZ2);
-error_def(ERR_LDBINFMT);
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
 
 #define CHAR_TO_READ_LINE1_BIN	STR_LIT_LEN("d0GDS BINARY")  /* read first 12 characters to check file is binary [d\0GDS BINARY] */
-#define CHAR_TO_READ_LINE1	1030 + 1 - CHAR_TO_READ_LINE1_BIN /* line 1 after 12 chars if not BINARY max[Label^%GO]=1030+\n */
-#define CHAR_TO_READ_LINE2	STR_LIT_LEN("GT.M 11-11-2090  12:12:12 ZWR") + 1 /* GT.M 11-11-2090  12:12:12 ZWR + newline*/
 #define	MAX_ONERROR_VALUE_LEN	STR_LIT_LEN("INTERACTIVE") /* PROCEED, STOP, INTERACTIVE are the choices with INTERACTIVE as max */
 #define	MAX_FORMAT_VALUE_LEN	STR_LIT_LEN("BINARY") /* ZWR, BINARY, GO, GOQ are the choices with BINARY being the longest */
 
 void mupip_cvtgbl(void)
 {
-	unsigned short	fn_len, len;
-	char		fn[MAX_FN_LEN + 1];
-	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
-	uint4		begin, end;
-	int		i, file_format;
-	uint4	        cli_status;
+	char		fn[MAX_FN_LEN + 1], *line1_ptr, *line3_ptr;
 	gtm_int64_t	begin_i8, end_i8;
-	char		*line1_ptr, *line2_ptr;
-	int		line1_len, line2_len;
+	int		dos, i, file_format, line1_len, line3_len, utf8;
+	uint4	        begin, cli_status, end, max_rec_size;
+	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
+	unsigned short	fn_len, len;
 
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
@@ -95,7 +94,7 @@ void mupip_cvtgbl(void)
 		mupip_exit(ERR_MUPCLIERR); /* Neither -STDIN nor file name specified. */
 	file_input_init(fn, fn_len, IOP_EOL);
 	if (mupip_error_occurred)
-		exit(-1);
+		EXIT(-1);
 	mu_outofband_setup();
 	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
 	{
@@ -163,39 +162,42 @@ void mupip_cvtgbl(void)
 		}
 	} else
 		onerror = ONERROR_PROCEED; /* Default: Proceed on error */
-	file_format = get_file_format(&line1_ptr, &line2_ptr, &line1_len, &line2_len); /* Get file's format reading it's header */
+	file_format = get_load_format(&line1_ptr, &line3_ptr, &line1_len, &line3_len, &max_rec_size, &utf8, &dos); /* from header */
+	if (MU_FMT_GOQ == file_format)
+		mupip_exit(ERR_LDBINFMT);
+	if (BADZCHSET == utf8)
+		mupip_exit(ERR_MUNOFINISH);
 	if (cli_present("FORMAT") == CLI_PRESENT)
-	{
+	{	/* If the command speficies a format see if it matches the label */
 		len = SIZEOF(buff);
 		if (!cli_get_str("FORMAT", (char *)buff, &len))
-			go_load(begin, end, line1_ptr, line1_len, line2_ptr, line2_len);
+			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, utf8, dos);
 		else
 		{
 		        lower_to_upper(buff, buff, len);
 			if (!memcmp(buff, "ZWR", len))
-			{
-				if (MU_FMT_ZWR == file_format)
-					go_load(begin, end, line1_ptr, line1_len, line2_ptr, line2_len);
+			{	/* If the label did not determine a format let them specify ZWR and they can sort out the result */
+				if ((MU_FMT_ZWR == file_format) || (MU_FMT_UNRECOG == file_format))
+					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
+						MU_FMT_ZWR, utf8, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			}
-			else if (!memcmp(buff, "BINARY", len))
+			} else if (!memcmp(buff, "BINARY", len))
 			{
 				if (MU_FMT_BINARY == file_format)
 					bin_load(begin, end, line1_ptr, line1_len);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			}
-			else if (!memcmp(buff, "GO", len))
-			{
-				if (MU_FMT_GO == file_format)
-					go_load(begin, end, line1_ptr, line1_len, line2_ptr, line2_len);
+			} else if (!memcmp(buff, "GO", len))
+			{	/* If the label did not determine a format let them specify GO and they can sort out the result */
+				if ((MU_FMT_GO == file_format) || (MU_FMT_UNRECOG == file_format))
+					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
+						MU_FMT_GO, utf8, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			}
-			else if (!memcmp(buff, "GOQ", len))
-			{
-				if (MU_FMT_GOQ == file_format)
+			} else if (!memcmp(buff, "GOQ", len))
+			{	/* get_load_format doesn't recognize GOQ labels' */
+				if (MU_FMT_UNRECOG == file_format)
 					goq_load();
 				else
 					mupip_exit(ERR_LDBINFMT);
@@ -209,73 +211,171 @@ void mupip_cvtgbl(void)
 	{
 		if (MU_FMT_BINARY == file_format)
 			bin_load(begin, end, line1_ptr, line1_len);
-		else if (MU_FMT_ZWR == file_format || MU_FMT_GO == file_format)
-			go_load(begin, end, line1_ptr, line1_len, line2_ptr, line2_len);
-		else if (MU_FMT_UNRECOG == file_format)
+		else if ((MU_FMT_ZWR == file_format) || (MU_FMT_GO == file_format))
+			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, utf8, dos);
+		else
+		{
+			assert(MU_FMT_UNRECOG == file_format);
 			mupip_exit(ERR_LDBINFMT);
+		}
 	}
 	mupip_exit(mupip_error_occurred ? ERR_MUNOFINISH : SS_NORMAL);
 }
 
-int get_file_format(char **line1_ptr, char **line2_ptr, int *line1_len, int *line2_len)
-{
-	char	*c, *ctop;
-	char	*line1, *line2;
-	int	tmp_len;
-	regex_t	regexGO, regexZWR;
-	int	count, newlinepos;
+/* Make an attempt to discover the input file format based on its content principally the label */
 
-	line1 = (char *)malloc(CHAR_TO_READ_LINE1_BIN + CHAR_TO_READ_LINE1 + CHAR_TO_READ_LINE2); /* Allocate max space needed */
+int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size, int *utf8_extract,
+		int *dos)
+{
+	char	*c, *c1, *ctop, *line1, *line2, *line3, *ptr;
+	int	len, line2_len, ret;
+	mval	v;
+	uint4	max_io_size;
+
+	max_io_size = MAX_IO_BLOCK_SIZE - 1;				/* label gets less room */
+	*max_rec_size = MAX_STRLEN + ZWR_EXP_RATIO(MAX_KEY_SZ);		/* go for max to avoid interaction with the regex stuff */
+	line1 = *line1_ptr = malloc(*max_rec_size);			/* no corresponding free; released at MUPIP termination */
+	line3 = *line3_ptr = malloc(*max_rec_size);			/*  ditto */
 	*line1_len = file_input_read_xchar(line1, CHAR_TO_READ_LINE1_BIN);
+	*dos = *line3_len = *utf8_extract = 0;
+	ret = MU_FMT_UNRECOG;		/* actually means as yet undetermined; used to decide if still trying to find a format */
 	if (0 < *line1_len)
 	{
-		*line1_ptr = line1;
 		if (0 == memcmp(line1 + 6, "BINARY", STR_LIT_LEN("BINARY"))) /* If file is binary do not look further */
 			return MU_FMT_BINARY;
-		for (newlinepos = -1, count = 0, c = line1, ctop = c + *line1_len; c < ctop; c++, count++)
-		{
+		for (line2_len = 0, c = line1, ctop = c + *line1_len; c < ctop; c++)
+		{	/* that 1st read is fixed length, so look for a terminator */
 			if ('\n' == *c)
-			{
-				newlinepos = count + 1;
+			{	/* found a terminator */
+				line2 = c + 1;
+				line2_len = *line1_len - (line2 - line1);
+				*line1_len -= (line2_len + 1);
 				break;
 			}
 		}
-		if (0 < newlinepos) /* If the line 1 length is less than 12 chars, line1 has characters from line 2 as well */
-		{
-			*line2_len = *line1_len - newlinepos;
-			*line1_len = newlinepos - 1;
-			line2 = line1 + newlinepos;
-			tmp_len = file_input_get_xchar(line2 + *line2_len,  CHAR_TO_READ_LINE2);
-			*line2_len += tmp_len;
+		if (c == ctop)
+		{	/* did not find a terminator - read some more of 1st line */
+			ptr = c;
+			if (0 < (len = go_get(&ptr, 0, max_io_size)))		/* WARNING assignment */
+			{
+				*line1_len += len;
+				line2 = line1 + *line1_len;
+			} else
+			{	/* chances of this are small but we are careful not to overflow buffers */
+				mupip_error_occurred = TRUE;
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+			}
+			line2_len = 0;
+		} else if (line2_len)
+		{	/* If line1 length is actually < 12 chars, the buffer has characters from line2 as well */
+			for (c = line2, ctop = c + line2_len; c < ctop; c++)
+			{	/* look for a line 2 terminator */
+				if ('\n' == *c)
+				{	/* found a terminator */
+					*line3_len = line2_len - (c - line2 + 1);
+					line2_len = c - line2;
+					break;
+				}
+			}
+		}
+		c1 = line1 + *line1_len;
+		*c1-- = 0;				/* null terminate the line to keep util_out_print happy */
+		if (*dos = ('\r' == *c1))		/* WARNING assignment */
+		{	/* [cariage] return before the <LF> / new line - we'll need to keep stripping them off */
+			*line1_len -= 1;
+			*c1 = 0;			/* null terminate earlier to keep util_out_print happy */
+		}
+		util_out_print("!AD", TRUE, *line1_len, line1);
+		if ((0 == line2_len) || (c == ctop))
+		{	/* need to get at least some more of 2nd line */
+			ptr = line2 + line2_len;
+			if (0 < (len = go_get(&ptr, 0, max_io_size)))		/* WARNING assignment */
+				line2_len += len;
+			else
+			{	/* chances of this are small but we are careful not to overflow buffers */
+				ret = MU_FMT_GOQ;	/* abusing this value to mean not working, as we can't discover GOQ */
+				line2_len = 0;
+				mupip_error_occurred = TRUE;
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+			}
+		}
+		if (0 < line2_len)
+		{	/* we have 2 label lines to work with */
+			line2_len -= *dos;
+			c1 = line2 + line2_len;
+			*c1 = 0;	/* null terminate the line to keep regex in bounds */
+			util_out_print("!AD", TRUE, line2_len, line2);
+			if (gtm_regex_perf("ZWR", line2))
+				ret = MU_FMT_ZWR;		/* settle for any ZWR in the second line of the label */
+			if ((MU_FMT_UNRECOG == ret) &&
+				gtm_regex_perf("(GT.M )?[0-9]{2}[-]([A-Z]{3})[-][0-9]{4}[ ]{1,2}[0-9]{2}[:][0-9]{2}[:][0-9]{2}",
+					line2))
+				ret = MU_FMT_GO;	/* GT.M DD-MON-YEAR  24:60:SS used by MUPIP EXTRACT & %GO */
+			if ((MU_FMT_UNRECOG == ret) && gtm_regex_perf("GLO", line2))
+				ret = MU_FMT_GO;	/* settle for any GLO in the second line of the label */
+			for (c = line2 + line2_len + 1, ctop = c + *line3_len, c1 = line3; c < ctop; c++)
+			{	/* if the first 2 lines were really short, move to other buffer looking for a line 3 terminator */
+				if ('\n' == *c)
+				{	/* found a terminator */
+					*line3_len = c1 - line3;
+					break;
+				} else
+					*c1 = *c;
+			}
+			if (c == ctop)
+			{	/* get all or some of line 3 - the first non-label line */
+				ptr = line3 + *line3_len;
+				if (0 < (len = go_get(&ptr, 0, *max_rec_size)))
+				{
+					*line3_len += (len - *dos);
+					c1 = line3 + *line3_len;
+					*c1 = 0;		/* null terminate the line to keep regex in bounds */
+				} else
+				{	/* chances of this are small but we are careful not to overflow buffers */
+					ret = MU_FMT_GOQ;
+					mupip_error_occurred = TRUE;
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				}
+			} else
+			{
+				*line3_len = 0;
+				ret = MU_FMT_GOQ;	/* abusing this value to mean not working, as we can't discover GOQ */
+			}
+			if ((MU_FMT_UNRECOG == ret) && gtm_regex_perf("\\^[%A-Za-z][0-9A-Za-z]*(\\(.*\\))?$", line3))
+				ret = MU_FMT_GO;	/* gvn only */
+			if ((MU_FMT_UNRECOG == ret)
+				&& gtm_regex_perf("\\^[%A-Za-z][0-9A-Za-z]*(\\(.*\\))?=(\".*\"|-?([0-9]+|[0-9]*\\.[0-9]+))$",
+					line3))
+				ret = MU_FMT_ZWR;	 /* gvn=val */
+			if (MU_FMT_UNRECOG != ret)
+			{
+				*utf8_extract = gtm_regex_perf("UTF-8", line1);
+				if ((*utf8_extract && !gtm_utf8_mode) || (!*utf8_extract && gtm_utf8_mode))
+				{	/* extract CHSET doesn't match current $ZCHSET */
+					if (*utf8_extract)
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET,
+							2, LEN_AND_LIT("UTF-8"));
+					else
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+					*utf8_extract = BADZCHSET;
+				}
+			}
 		} else
-		{
-			tmp_len = file_input_get_xchar(line1 + *line1_len,  CHAR_TO_READ_LINE1);
-			*line1_len += tmp_len;
-			line2 = line1 + *line1_len + 1;
-			*line2_len = file_input_get_xchar(line2, CHAR_TO_READ_LINE2);
-		}
-		*line2_ptr = line2;
-		if (0 < *line2_len)
-		{
-			/* Compile regular expression "GT.M DD-MON-YEAR  24:60:SS ZWR"*/
-			regcomp(&regexZWR, "(GT.M )?[0-9]{2}[-]([A-Z]{3})[-][0-9]{4}[ ]{1,2}[0-9]{2}[:][0-9]{2}[:][0-9]{2} ZWR"
-					, REG_EXTENDED);
-			if (!regexec(&regexZWR, line2, 0, NULL, 0) || (0 == memcmp(line2, "; ZWR", STR_LIT_LEN("; ZWR"))))
-			{
-				regfree(&regexZWR);
-				return MU_FMT_ZWR;
-			}
-			regfree(&regexZWR);
-			/* Compile regular expression "GT.M DD-MON-YEAR  24:60:SS"*/
-			regcomp(&regexGO, "(GT.M )?[0-9]{2}[-]([A-Z]{3})[-][0-9]{4}[ ]{1,2}[0-9]{2}[:][0-9]{2}[:][0-9]{2}"
-					, REG_EXTENDED);
-			if (!regexec(&regexGO, line2, 0, NULL, 0) || (0 == memcmp(line2, "; GLO", STR_LIT_LEN("; GLO"))))
-			{
-				regfree(&regexGO);
-				return MU_FMT_GO;
-			}
-			regfree(&regexGO);
-		}
-	}
-	return MU_FMT_UNRECOG;
+			return MU_FMT_GOQ;
+	} else
+		return MU_FMT_GOQ;
+	*max_rec_size = (MU_FMT_GO == ret) ? MAX_STRLEN : *max_rec_size;		/* for GO, keys are separate */
+	return MU_FMT_GOQ == ret ? MU_FMT_UNRECOG : ret;				/* turn the GOQs back into unrecognized */
+}
+
+/* given a regular expression definition and a string run the glibc interface NOT RECOMMENDED for general use */
+boolean_t	gtm_regex_perf(const char *rexpr, char *str_buff)
+{	/* This routine interacts VICIOUSLY with gtm_malloc and gtm_free and thus should only be used if they are not */
+	boolean_t	ret;
+	regex_t		regex;
+
+	regcomp(&regex, rexpr, REG_EXTENDED | REG_ICASE);
+	ret = !regexec(&regex, str_buff, 0, NULL, 0);
+	regfree(&regex);
+	return ret;
 }

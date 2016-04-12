@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +14,6 @@
 
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-
-#ifdef VMS
-#include <rms.h>
-#endif
 
 #include "gtm_string.h"
 #include "stringpool.h"
@@ -40,12 +37,10 @@
 #include "interlock.h"
 #include "add_inter.h"
 
-#ifdef UNIX
 #include "ftok_sems.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmio.h"
-#endif
 
 GBLREF 	spdesc 		stringpool;
 GBLREF 	tp_region 	*grlist;
@@ -54,11 +49,9 @@ GBLREF	bool		online;
 GBLREF  bool            error_mupip;
 GBLREF	boolean_t	backup_interrupted;
 
-#ifdef UNIX
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	boolean_t	jnlpool_init_needed;
-#endif
 
 error_def(ERR_FORCEDHALT);
 
@@ -68,12 +61,8 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	backup_reg_list *ptr, *next;
 	uint4		status;
 	boolean_t	had_lock;
-#ifdef VMS
-	struct FAB	temp_fab;
-#else
 	unix_db_info	*udi;
 	int		rc;
-#endif
 
 	assert(stage >= need_to_free_space && stage < num_of_clnup_stage);
 
@@ -134,31 +123,11 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 							shmpool_unlock_hdr(ptr->reg);
 					}
 					/* get rid of the temporary file */
-#if defined(UNIX)
 					if (ptr->backup_fd > 2)
 					{
 						CLOSEFILE_RESET(ptr->backup_fd, rc);	/* resets "ptr" to FD_INVALID */
 						UNLINK(ptr->backup_tempfile);
 					}
-#elif defined(VMS)
-					temp_fab = cc$rms_fab;
-					temp_fab.fab$b_fac = FAB$M_GET;
-					temp_fab.fab$l_fna = ptr->backup_tempfile;
-					temp_fab.fab$b_fns = strlen(ptr->backup_tempfile);
-					if (RMS$_NORMAL == (status = sys$open(&temp_fab, NULL, NULL)))
-					{
-						temp_fab.fab$l_fop |= FAB$M_DLT;
-						status = sys$close(&temp_fab);
-					}
-					if (RMS$_NORMAL != status)
-					{
-						util_out_print("!/Cannot delete the the temporary file !AD.",
-							TRUE, temp_fab.fab$b_fns, temp_fab.fab$l_fna);
-						gtm_putmsg(VARLSTCNT(1) status);
-					}
-#else
-#error UNSUPPORTED PLATFORM
-#endif
 				} else	/* defreeze the databases */
 					region_freeze(ptr->reg, FALSE, FALSE, FALSE);
 			}
@@ -178,20 +147,18 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 			ptr = next;
 		}
 	}
-	UNIX_ONLY(
-		/* Release FTOK lock on the replication instance file if holding it */
-		assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);
-		if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			assert(NULL != udi);
-			if (NULL != udi)
-			{
-				if (udi->grabbed_ftok_sem)
-					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-				assert(!udi->grabbed_ftok_sem);
-			}
+	/* Release FTOK lock on the replication instance file if holding it */
+	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);
+	if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+	{
+		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+		assert(NULL != udi);
+		if (NULL != udi)
+		{	/* See gv_rundown.c comment for why ftok_sem_release 2nd parameter is FALSE below */
+			if (udi->grabbed_ftok_sem)
+				ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE);
+			assert(!udi->grabbed_ftok_sem);
 		}
-	)
+	}
 	return;
 }

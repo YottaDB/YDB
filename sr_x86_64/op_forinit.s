@@ -48,13 +48,12 @@ ENTRY	op_forinit
 l1:
 	movq	arg0_save(REG_SP), REG64_ARG0		# Compare first with third
 	movq	arg2_save(REG_SP), REG64_ARG1
-	call	numcmp
-	jmp	done
+	jmp	comp
 l2:
 	movq	arg2_save(REG_SP), REG64_ARG0		# Compare third with first
 	movq	arg0_save(REG_SP), REG64_ARG1
+comp:
 	call	numcmp
-done:
 	addq	$FRAME_SIZE, REG_SP			# Unwind stack frame savearea
 	movq	frame_pointer(REG_IP), REG64_SCRATCH1
 	pushq	msf_mpc_off(REG64_SCRATCH1)		# Push return addr back on stack

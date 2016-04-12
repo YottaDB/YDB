@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2010, 2012 Fidelity Information Services, Inc #
+# Copyright (c) 2010-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -17,8 +18,9 @@
 #	avoid duplication of 'setenv LD_LIBRARY_PATH'.
 ###########################################################################################
 
-if ($HOSTOS == "AIX" || $HOSTOS == "SunOS" || $HOSTOS == "OS/390") then
-	setenv LIBPATH /usr/local/lib64:/usr/local/lib
+if ($HOSTOS == "AIX") then
+	setenv LIBPATH
+else if ($HOSTOS == "SunOS") then
 	setenv LD_LIBRARY_PATH /usr/local/lib64:/usr/local/lib
 else
 # Its worth noting that SuSE+RedHat, Debian & Ubuntu handle the lib32 vs lib64 differently

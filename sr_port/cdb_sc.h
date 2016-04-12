@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,15 +21,64 @@
 
 enum cdb_sc
 {
-#define CDB_SC_NUM_ENTRY(code, value)			code = value,
-#define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)	code = value,
-#define CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)	code = value,
+#define CDB_SC_NUM_ENTRY(code, final_retry_ok, value)			code = value,
+#define CDB_SC_UCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	code = value,
+#define CDB_SC_LCHAR_ENTRY(code, final_retry_ok, is_wcs_code, value)	code = value,
 #include "cdb_sc_table.h"
 #undef CDB_SC_NUM_ENTRY
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
 
-#define FUTURE_READ 0		/* used by dsk_read and t_qread */
+GBLREF	boolean_t	is_final_retry_code_num[];
+GBLREF	boolean_t	is_final_retry_code_uchar[];
+GBLREF	boolean_t	is_final_retry_code_lchar[];
+
+#define	IS_FINAL_RETRY_CODE(STATUS)								\
+	(DBG_ASSERT(STATUS <= 'z')								\
+	((STATUS < 'A')										\
+		? is_final_retry_code_num[STATUS]			/* numeric */		\
+		: ((STATUS <= 'Z')								\
+			? is_final_retry_code_uchar[STATUS - 'A']	/* upper case */	\
+			: is_final_retry_code_lchar[STATUS - 'a'])))	/* lower case */
+
+#define TP_TRACE_HIST_MOD(BLK_NUM, BLK_TARGET, N, CSD, HISTTN, BTTN, LEVEL)						\
+{															\
+	GBLREF	block_id		t_fail_hist_blk[];								\
+	GBLREF	gd_region		*tp_fail_hist_reg[];								\
+	GBLREF	gv_namehead		*tp_fail_hist[];								\
+	GBLREF	int4			blkmod_fail_type;								\
+	GBLREF	int4			blkmod_fail_level;								\
+	GBLREF	trans_num		tp_fail_histtn[], tp_fail_bttn[];						\
+	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)									\
+	DCL_THREADGBL_ACCESS;												\
+															\
+	SETUP_THREADGBL_ACCESS;												\
+	assert(dollar_tlevel);												\
+	if (TREF(tprestart_syslog_delta))										\
+	{														\
+		tp_fail_hist_reg[t_tries] = gv_cur_region;								\
+		t_fail_hist_blk[t_tries] = ((block_id)BLK_NUM);								\
+		tp_fail_hist[t_tries] = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
+		(CSD)->tp_cdb_sc_blkmod[(N)]++;										\
+		blkmod_fail_type = (N);											\
+		blkmod_fail_level = (LEVEL);										\
+		tp_fail_histtn[t_tries] = (HISTTN);									\
+		tp_fail_bttn[t_tries] = (BTTN);										\
+	}														\
+}
+
+#define NONTP_TRACE_HIST_MOD(BLK_SRCH_STAT, N)			\
+{								\
+	GBLREF	int4		blkmod_fail_type;		\
+	GBLREF	int4		blkmod_fail_level;		\
+	GBLREF	block_id	t_fail_hist_blk[];		\
+	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)		\
+								\
+	assert(!dollar_tlevel);					\
+	t_fail_hist_blk[t_tries] = (BLK_SRCH_STAT)->blk_num;	\
+	blkmod_fail_type = (N);					\
+	blkmod_fail_level = (BLK_SRCH_STAT)->level;		\
+}
 
 #endif

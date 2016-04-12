@@ -64,19 +64,21 @@
 #include "gtmsource.h"
 #include "change_reg.h"		/* for "change_reg" prototype */
 #include "gvnh_spanreg.h"	/* for "gvnh_spanreg_subs_gvt_init" prototype */
+#include "mu_interactive.h"	/* for prompt looping */
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_addr			*gd_header;
 GBLREF	io_pair			io_curr_device;
+GBLREF	trans_num		local_tn;
+GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	int			tprestart_state;
-GBLREF	gv_namehead		*reset_gv_target;
-GBLREF	uint4			dollar_tlevel;
-GBLREF	boolean_t		dollar_ztrigger_invoked;
-GBLREF	trans_num		local_tn;
+GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 #ifdef DEBUG
@@ -98,6 +100,9 @@ LITREF	mval			gvtr_cmd_mval[GVTR_CMDTYPES];
 LITREF	int4			gvtr_cmd_mask[GVTR_CMDTYPES];
 LITREF	mval			literal_one;
 LITREF	char 			*trigger_subs[];
+
+static	boolean_t		mustprompt   = TRUE;
+static	boolean_t		promptanswer = TRUE;
 
 #define	MAX_COMMANDS_LEN	32		/* Need room for S,K,ZK,ZTK + room for expansion */
 #define	MAX_OPTIONS_LEN		32		/* Need room for NOI,NOC + room for expansion */
@@ -138,7 +143,7 @@ LITREF	char 			*trigger_subs[];
 														\
 	memcpy(lcl_cmds, COMMANDS, STRLEN(COMMANDS) + 1);							\
 	BITMAP = 0;												\
-	lcl_ptr = strtok_r(lcl_cmds, ",", &strtok_ptr);								\
+	lcl_ptr = STRTOK_R(lcl_cmds, ",", &strtok_ptr);								\
 	do													\
 	{													\
 		switch (*lcl_ptr)										\
@@ -181,7 +186,7 @@ LITREF	char 			*trigger_subs[];
 				assertpro(FALSE && lcl_ptr[0]);							\
 				break;										\
 		}												\
-	} while (lcl_ptr = strtok_r(NULL, ",", &strtok_ptr));							\
+	} while (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr));							\
 }
 
 #define	COMMAND_BITMAP_TO_STR(COMMANDS, BITMAP, LEN)										\
@@ -211,7 +216,7 @@ LITREF	char 			*trigger_subs[];
 														\
 	memcpy(lcl_options, OPTIONS, STRLEN(OPTIONS) + 1);							\
 	BITMAP = 0;												\
-	lcl_ptr = strtok_r(lcl_options, ",", &strtok_ptr);							\
+	lcl_ptr = STRTOK_R(lcl_options, ",", &strtok_ptr);							\
 	if (NULL != lcl_ptr)											\
 		do												\
 		{												\
@@ -244,7 +249,7 @@ LITREF	char 			*trigger_subs[];
 					assertpro(FALSE && lcl_ptr[0]);						\
 					break;									\
 			}											\
-		} while (lcl_ptr = strtok_r(NULL, ",", &strtok_ptr));						\
+		} while (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr));						\
 }
 
 #define	OPTION_BITMAP_TO_STR(OPTIONS, BITMAP, LEN)								\
@@ -898,7 +903,6 @@ STATICFNDEF boolean_t subtract_trigger_cmd_attributes(char *trigvn, int trigvn_l
 	} else
 	{	/* Both cmds are the same - candidate for delete */
 		trig_cmds[0] = '\0';
-		db_cmd_bm |= restore_set;
 	}
 	return SUB_UPDATE_CMDS;
 }
@@ -1209,17 +1213,15 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 				trig_stats[STATS_ERROR_TRIGFILE]++;
 				return TRIG_FAILURE;
 			}
-			if (!noprompt)
+			mustprompt = (noprompt)? FALSE : mustprompt;
+			if (mustprompt)
 			{
 				util_out_print("This operation will delete all triggers.", FLUSH);
-				util_out_print("Proceed? [y/n]: ", FLUSH);
-				SCANF("%1s", ans);	/* We only need one char, any more would overflow our buffer */
-				if ('y' != ans[0] && 'Y' != ans[0])
-				{
-					util_out_print_gtmio("Triggers NOT deleted", FLUSH);
-					return TRIG_SUCCESS;
-				}
+				promptanswer = mu_interactive("Triggers NOT deleted");
+				mustprompt = FALSE;
 			}
+			if (FALSE == promptanswer)
+				return TRIG_SUCCESS;
 			trigger_delete_all(--trigger_rec, len + 1, trig_stats);	/* updates trig_stats[] appropriately */
 			return TRIG_SUCCESS;
 		} else if ((0 == len) || ('^' != *trigger_rec))

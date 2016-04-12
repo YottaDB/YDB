@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,7 +178,8 @@ int gtmsource_send_heartbeat(time_t *now)
 	REPL_SEND_LOOP(gtmsource_sock_fd, &heartbeat_element->heartbeat, MIN_REPL_MSGLEN, REPL_POLL_NOWAIT)
 	{
 		gtmsource_poll_actions(FALSE);  /* Recursive call */
-		if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_CHANGING_MODE == gtmsource_state))
+		if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+				|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
 	}
 	if (SS_NORMAL == status)

@@ -20,7 +20,7 @@ STATICFNDEF void remove_session_callback(SSL_CTX *ctx, SSL_SESSION *session);
 STATICFNDEF DH *read_dhparams(const char *dh_fn);
 STATICFNDEF int init_dhparams(void);
 STATICFNDEF DH *tmp_dh_callback(SSL *ssl, int is_export, int keylength);
-STATICFNDEF int ssl_error(SSL *ssl, int err);
+STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_result);
 
 typedef struct gtmtls_passwd_list_struct
 {

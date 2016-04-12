@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010, 2014 Fidelity Information Services, Inc #
+# Copyright (c) 2010-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -39,8 +40,8 @@ if [ "Linux" = "$hostos" ] ; then ECHO_OPTIONS="-e" ; fi
 if [ $# -lt 2 ] ; then $ECHO Usage: "`basename $0` key_strength[0-2] output_file" ; exit 1 ; fi
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-elif [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Confirm ability to create output file
@@ -82,4 +83,4 @@ notty=$gtm_encrypt_notty
 
 # Generate random key and save the output encrypted and signed
 $gpg $notty --gen-random $random_strength $SYM_KEY_LEN | \
-	$gpg --armor --encrypt --default-recipient-self --comment "$comment" --output $output_file $notty
+	$gpg $notty --armor --encrypt --default-recipient-self --comment "$comment" --output $output_file

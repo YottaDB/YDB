@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +58,8 @@ int gtcm_dmpstat(int sig)
     int tag_status;
     tag_status = gtm_zos_create_tagged_file(GTCM_STAT, TAG_EBCDIC);
 #endif
-    if (!(fp = Fopen(GTCM_STAT, "a")))
+    Fopen(fp, GTCM_STAT, "a");
+    if (!fp)
 	return -1;
 
     t = time((time_t *)0);

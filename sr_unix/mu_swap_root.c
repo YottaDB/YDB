@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012, 2015 Fidelity National Information	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,6 @@ GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	kill_set		*kill_set_tail;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF  gv_key                  *gv_altkey;

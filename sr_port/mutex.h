@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,10 +25,7 @@
 
 #define MUTEXLCKALERT_INTERVAL		32	/* seconds [UNIX only] */
 #define MUTEX_SLEEP_SPIN_COUNT		128
-#define MUTEX_SHORT_WAIT_MS		2 /* ms.  Keep this a power of 2 */
-#define MUTEX_SHORT_WAIT_US		(MUTEX_SHORT_WAIT_MS << 10) /* micro sec */
-#define MUTEX_SPIN_SLEEP_MASK		(MUTEX_SHORT_WAIT_US - 1)
-
+#define MUTEX_SPIN_SLEEP_MASK		0	/* default to cause rel_quant */
 #define MUTEX_WRITE_HARD_SPIN_COUNT	MUTEX_HARD_SPIN_COUNT
 #define MUTEX_WRITE_SLEEP_SPIN_COUNT	MUTEX_SLEEP_SPIN_COUNT
 #define MUTEX_WRITE_SPIN_SLEEP_MASK	MUTEX_SPIN_SLEEP_MASK

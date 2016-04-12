@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2014 Fidelity Infromation Services, Inc	#
+# Copyright (c) 2014-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -49,7 +50,7 @@ foreach hlp (${hlpdir}/*.hlp)
 	set prefix=${hlp:t:r:s/mumps/gtm/}
 
 	# If the HLP files are newer than the help database create a new one, otherwise skip it
-	if ( `filetest -C ${hlp}` > `filetest -C $gtm_dist/${prefix}help.dat` ) then
+	if ( -C ${hlp} > -C $gtm_dist/${prefix}help.dat ) then
 		\rm -f  ${gtm_dist}/${prefix}help.gld ${gtm_dist}/${prefix}help.dat
 	else
 		continue
@@ -64,6 +65,7 @@ foreach hlp (${hlpdir}/*.hlp)
 	${gtm_dist}/mumps -run GDE <<GDE_in_help
 Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/${prefix}help.dat
 Change -region DEFAULT	-record=1020	-key=255
+change -region DEFAULT  -qdbrundown
 GDE_in_help
 
 	if ($status) then
@@ -91,6 +93,8 @@ GTM_in_gtmhelp
 		echo "genreatehelp-E-hlp, Error while processing ${hlp}" $errout
 		continue
 	endif
+	if ("gtm" == "$prefix") $gtm_exe/mumps -run GTMDEFINEDTYPESTODB
+	chmod ugo-x ${gtm_dist}/${prefix}help.{gld,dat}
 end
 
 # Restore read-only status
@@ -99,4 +103,3 @@ if ($?restorePerms) then
 endif
 
 exit ${script_stat}
-

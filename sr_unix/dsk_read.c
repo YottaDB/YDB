@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 #include <sys/types.h>
 #include "gtm_unistd.h"
 #include "gtm_string.h"
-#include <signal.h>
+#include "gtm_signal.h"
 #include <errno.h>
 #ifdef DEBUG
 #include "gtm_stdio.h"
@@ -32,9 +33,8 @@
 #include "gtmio.h"
 #include "gds_blk_upgrade.h"
 #include "gdsbml.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
+#include "t_retry.h"
 #include "gdsdbver.h"
 #include "min_max.h"
 #include "gtmimagename.h"
@@ -44,7 +44,10 @@
 #include "jnl.h"
 #include "buddy_list.h"         /* needed for tp.h */
 #include "hashtab_int4.h"       /* needed for tp.h */
+#include "have_crit.h"
 #include "tp.h"
+#include "cdb_sc.h"
+#include "mupip_reorg_encrypt.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -57,6 +60,8 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	uint4			process_id;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
 error_def(ERR_DYNUPGRDFAIL);
 
@@ -68,6 +73,9 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
 	boolean_t		fully_upgraded, buff_is_modified_after_lseekread;
 	int			bsiz;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 #	ifdef DEBUG
 	unsigned int		effective_t_tries;
 	boolean_t		killinprog;
@@ -86,34 +94,37 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 */
 	static sm_uc_ptr_t	read_reformat_buffer;
 	static int		read_reformat_buffer_len;
-#	ifdef GTM_CRYPT
 	int			in_len, gtmcrypt_errno;
 	char			*in, *out;
-	boolean_t		is_encrypted;
-#	endif
+	boolean_t		db_is_encrypted, use_new_key;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	save_errno = 0;
+	csa = cs_addrs;
+	csd = csa->hdr;
+	cnl = csa->nl;
 	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
 	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
 	 */
-	assert(!blk_free || SNAPSHOTS_IN_PROG(cs_addrs)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
+	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
 	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
 	DEBUG_ONLY(in_dsk_read++;)
 	udi = (unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info);
-	assert(cs_addrs->hdr == cs_data);
-	size = cs_data->blk_size;
-	assert (cs_data->acc_meth == dba_bg);
-	/* Since cs_data->fully_upgraded is referenced more than once in this module (once explicitly and once in
+	assert(csd == cs_data);
+	size = csd->blk_size;
+	assert(csd->acc_meth == dba_bg);
+	/* Since csd->fully_upgraded is referenced more than once in this module (once explicitly and once in
 	 * GDS_BLK_UPGRADE_IF_NEEDED macro used below), take a copy of it and use that so all usages see the same value.
 	 * Not doing this, for example, can cause us to see the database as fully upgraded in the first check causing us
 	 * not to allocate save_buff (a temporary buffer to hold a V4 format block) at all but later in the macro
 	 * we might see the database as NOT fully upgraded so we might choose to call the function gds_blk_upgrade which
-	 * does expect a temporary buffer to have been pre-allocated. It is ok if the value of cs_data->fully_upgraded
+	 * does expect a temporary buffer to have been pre-allocated. It is ok if the value of csd->fully_upgraded
 	 * changes after we took a copy of it since we have a buffer locked for this particular block (at least in BG)
 	 * so no concurrent process could be changing the format of this block. For MM there might be an issue.
 	 */
-	fully_upgraded = cs_data->fully_upgraded;
+	fully_upgraded = csd->fully_upgraded;
 	if (!blk_free && !fully_upgraded) /* No V4->V5 translations required if block is FREE */
 	{
 		buff_is_modified_after_lseekread = TRUE;
@@ -131,47 +142,76 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		buff = read_reformat_buffer;
 	} else
 		buff_is_modified_after_lseekread = FALSE;
-	assert(NULL != cs_addrs->nl);
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
+	assert(NULL != cnl);
+	INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
 	enc_save_buff = buff;
-#	ifdef GTM_CRYPT
-	is_encrypted = cs_data->is_encrypted;
-	if (is_encrypted)
+	/* The value of MUPIP_REORG_IN_PROG_LOCAL_DSK_READ indicates that this is a direct call from mupip_reorg_encrypt, operating
+	 * on a local buffer.
+	 */
+	if (USES_ENCRYPTION(csd->is_encrypted) && (MUPIP_REORG_IN_PROG_LOCAL_DSK_READ != mu_reorg_encrypt_in_prog))
 	{
-		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(cs_addrs, cs_data, buff);
-		enc_save_buff = GDS_ANY_ENCRYPTGLOBUF(buff, cs_addrs);
-		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(cs_addrs, cs_data, enc_save_buff);
+		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, buff);
+		enc_save_buff = GDS_ANY_ENCRYPTGLOBUF(buff, csa);
+		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, enc_save_buff);
 	}
-#	endif
 	LSEEKREAD(udi->fd,
-		  (DISK_BLOCK_SIZE * (cs_data->start_vbn - 1) + (off_t)blk * size),
+		  (DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * size),
 		  enc_save_buff,
 		  size,
 		  save_errno);
 	assert((0 == save_errno) GTM_TRUNCATE_ONLY(|| (-1 == save_errno)));
 	WBTEST_ASSIGN_ONLY(WBTEST_PREAD_SYSCALL_FAIL, save_errno, EIO);
-#	ifdef GTM_CRYPT
-	if (is_encrypted && (0 == save_errno))
+	if ((enc_save_buff != buff) && (0 == save_errno))
 	{
-		bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
-		in_len = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
-		buff_is_modified_after_lseekread = TRUE;
-		/* Do not do encryption/decryption if block is FREE */
-		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, in_len)))
-		{	/* Due to concurrency conflicts, we are potentially reading a free block even though blk_free is
-			 * FALSE. Go ahead and safely "decrypt" such a block, even though it contains no valid contents.
-			 * We expect GTMCRYPT_DECRYPT to return success even if it is presented with garbage data.
-			 */
-			ASSERT_ENCRYPTION_INITIALIZED;
-			memcpy(buff, enc_save_buff, SIZEOF(blk_hdr));
-			in = (char *)(enc_save_buff + SIZEOF(blk_hdr));
-			out = (char *)(buff + SIZEOF(blk_hdr));
-			GTMCRYPT_DECRYPT(cs_addrs, cs_addrs->encr_key_handle, in, in_len, out, gtmcrypt_errno);
-			save_errno = gtmcrypt_errno;
+		assert(USES_ENCRYPTION(csd->is_encrypted) && (MUPIP_REORG_IN_PROG_LOCAL_DSK_READ != mu_reorg_encrypt_in_prog));
+		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_RECONFIG, prev_intrpt_state);
+		db_is_encrypted = IS_ENCRYPTED(csd->is_encrypted);
+		assert(NULL != csa->encr_ptr);
+		assert(csa->encr_ptr->reorg_encrypt_cycle == cnl->reorg_encrypt_cycle);	/* caller should have ensured this */
+		use_new_key = NEEDS_NEW_KEY(csd, ((blk_hdr_ptr_t)enc_save_buff)->tn);
+		if (use_new_key || db_is_encrypted)
+		{
+			bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
+			in_len = MIN(csd->blk_size, bsiz) - SIZEOF(blk_hdr);
+			buff_is_modified_after_lseekread = TRUE;
+			if (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, in_len))
+			{	/* Due to concurrency conflicts, we are potentially reading a free block even though
+				 * blk_free is FALSE. Go ahead and safely "decrypt" such a block, even though it contains no
+				 * valid contents. We expect GTMCRYPT_DECRYPT to return success even if it is presented with
+				 * garbage data.
+				 */
+				ASSERT_ENCRYPTION_INITIALIZED;
+				memcpy(buff, enc_save_buff, SIZEOF(blk_hdr));
+				in = (char *)(enc_save_buff + SIZEOF(blk_hdr));
+				out = (char *)(buff + SIZEOF(blk_hdr));
+				if (use_new_key)
+				{
+					GTMCRYPT_DECRYPT(csa, TRUE, csa->encr_key_handle2, in, in_len, out,
+							enc_save_buff, SIZEOF(blk_hdr), gtmcrypt_errno);
+					assert(0 == gtmcrypt_errno);
+				} else
+				{
+					GTMCRYPT_DECRYPT(csa, csd->non_null_iv, csa->encr_key_handle, in, in_len, out,
+							enc_save_buff, SIZEOF(blk_hdr), gtmcrypt_errno);
+					assert(0 == gtmcrypt_errno);
+				}
+				save_errno = gtmcrypt_errno;
+				DBG_RECORD_BLOCK_READ(csd, csa, cnl, process_id, blk, ((blk_hdr_ptr_t)enc_save_buff)->tn,
+					1, use_new_key, enc_save_buff, buff, size, in_len);
+			} else
+			{
+				memcpy(buff, enc_save_buff, size);
+				DBG_RECORD_BLOCK_READ(csd, csa, cnl, process_id, blk, ((blk_hdr_ptr_t)enc_save_buff)->tn,
+					2, use_new_key, enc_save_buff, buff, size, in_len);
+			}
 		} else
+		{
 			memcpy(buff, enc_save_buff, size);
+			DBG_RECORD_BLOCK_READ(csd, csa, cnl, process_id, blk, ((blk_hdr_ptr_t)enc_save_buff)->tn,
+				3, use_new_key, enc_save_buff, buff, size, 0);
+		}
+		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_RECONFIG, prev_intrpt_state);
 	}
-#	endif
 	if (!blk_free && (0 == save_errno))
 	{	/* See if block needs to be converted to current version. Assuming buffer is at least short aligned */
 		assert(0 == (long)buff % 2);
@@ -180,11 +220,11 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		 * bitmap). This is possible due to concurrency issues while traversing down the tree. But if we have
 		 * crit on this region, we should not see these either.
 		 */
-		assert(!IS_MCODE_RUNNING || !cs_addrs->now_crit || ((blk_hdr_ptr_t)buff)->bver);
+		assert(!IS_MCODE_RUNNING || !csa->now_crit || ((blk_hdr_ptr_t)buff)->bver);
 		/* Block must be converted to current version (if necessary) for use by internals.
 		 * By definition, all blocks are converted from/to their on-disk version at the IO point.
 		 */
-		GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, cs_data, &tmp_ondskblkver, save_errno, fully_upgraded);
+		GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, csd, &tmp_ondskblkver, save_errno, fully_upgraded);
 		DEBUG_DYNGRD_ONLY(
 			if (GDSVCURR != tmp_ondskblkver)
 				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);
@@ -226,14 +266,14 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
 	effective_t_tries = MAX(effective_t_tries, t_tries);
 	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
-	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog
-			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)));
-	if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
+	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog
+			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || (csa->now_crit != (CDB_STAGNATE > effective_t_tries)));
+	if (!blk_free && csa->now_crit && !dse_running && (0 == save_errno))
 	{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 		 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
 		 */
 		blk_hdr_val = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
-		GDS_BLK_HDR_CHECK(cs_data, blk_hdr_val, fully_upgraded);
+		GDS_BLK_HDR_CHECK(csd, blk_hdr_val, fully_upgraded);
 	}
 #	endif
 	return save_errno;

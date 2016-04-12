@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,7 @@
 #include "dpgbldir_sysops.h"
 #include "targ_alloc.h"
 #include "gtm_logicals.h"
+#include "zshow.h"
 
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
@@ -132,13 +134,13 @@ Notes:          A) While checking may be done earlier for duplicate names,
 gd_addr *gd_load(mstr *v)
 {
 	void			*file_ptr; /* is a temporary structure as the file open and manipulations are currently stubs */
-	header_struct		*header, temp_head;
+	header_struct		*header, temp_head, disp_head;
 	gd_addr			*table, *gd_addr_ptr;
 	gd_binding		*map, *map_top;
 	gd_region		*reg, *reg_top;
 	uint4			t_offset, size;
 	gd_gblname		*gnam, *gnam_top;
-	int			i, n_regions, arraysize;
+	int			i, n_regions, arraysize, disp_len;
 	trans_num		*array;
 #	ifdef DEBUG
 	boolean_t		prevMapIsSpanning, currMapIsSpanning, gdHasSpanGbls;
@@ -165,8 +167,10 @@ gd_addr *gd_load(mstr *v)
 	if (GDE_LABEL_NUM == i)
 	{
 		close_gd_file(file_ptr);
+		disp_len = SIZEOF(disp_head.label);
+		format2disp(temp_head.label, SIZEOF(temp_head.label), disp_head.label, &disp_len);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
-				SIZEOF(temp_head.label), temp_head.label);
+				disp_len, disp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
 	header = (header_struct *)malloc(size);

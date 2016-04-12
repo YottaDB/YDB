@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,8 @@ block_id dse_getblk(char *element, boolean_t nobml, boolean_t carry_curr)
 
 	if (!cli_get_hex(element, (uint4 *)&blk))
 		blk = patch_curr_blk;
+	else
+		CLEAR_DSE_COMPRESS_KEY;
 	if ((blk < 0) || (blk >= cs_addrs->ti->total_blks))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BLKINVALID, 4, blk, DB_LEN_STR(gv_cur_region),

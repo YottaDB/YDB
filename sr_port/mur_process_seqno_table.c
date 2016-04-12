@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +42,11 @@ GBLREF mur_gbls_t	murgbl;
 LITREF char		first_zerobit_position[256];
 DEBUG_ONLY(GBLREF mur_opt_struct	mur_options;)
 
+/* Determines "losttn_seqno" and "min_broken_seqno" based on input "losttn_seqno" (and seqno-hashtable maintained during
+ * backward phase of rollback.
+ *	losttn_seqno     : is an input AND output parameter.
+ *	min_broken_seqno : is an output-only parameter.
+ */
 void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 {
 	size_t		seq_arr_size, index, seqno_span, byte, offset;
@@ -52,6 +58,9 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 	NATIVE_PTR_TYPE	*ptr, *ptr_top;
 
 	assert(mur_options.rollback);
+	/* Determine minimum and maximum seqno in the hash table "min_resolve_seqno" and "max_resolve_seqno".
+	 * Also determine minimum seqno that is also a broken transaction "min_brkn_seqno".
+	 */
 	min_resolve_seqno = min_brkn_seqno = MAXUINT8;
 	max_resolve_seqno = 0;
 	for (curent = murgbl.token_table.base, topent = murgbl.token_table.top; curent < topent; curent++)
@@ -62,26 +71,44 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 				min_resolve_seqno = multi->token;
 			if (multi->token > max_resolve_seqno)
 				max_resolve_seqno = multi->token;
-			if (0 < multi->partner && multi->token < min_brkn_seqno)
+			if ((0 < multi->partner) && (multi->token < min_brkn_seqno))
 				min_brkn_seqno = multi->token;	/* actually sequence number */
 			assert(NULL == (multi_struct *)multi->next);
 		}
 	}
-	lcl_losttn_seqno = *losttn_seqno;
-	if (murgbl.resync_seqno)
-		stop_rlbk_seqno = murgbl.resync_seqno;	/* do not process after resync_seqno */
-	else
-		stop_rlbk_seqno = MAXUINT8;/* allow default rollback to continue forward processing till last valid record */
-	assert(lcl_losttn_seqno <= min_resolve_seqno); /* Usually it will be ==; but it can be < as found in C9D11-002465 */
-	/* If the losttn seqno is equal to the min_resolve_seqno, then determine the first seqno that is missing (gap) from
-	 * min_resolve_seqno to max_resolve_seqno. Since this involves some computation, avoid this if we know for sure
-	 * the losttn_seqno cannot eventually lie in the (min,max) range. This is possible if one of stop_rlbk_seqno or
-	 * min_brkn_seqno is lesser than the min_resolve_seqno (in this case that will be the eventual value of losttn_seqno).
+	assert(min_resolve_seqno <= min_brkn_seqno);
+	lcl_losttn_seqno = *losttn_seqno;	/* Note down "pre_resolve_seqno" passed in through "losttn_seqno" variable */
+	if (0 == lcl_losttn_seqno)
+	{	/* Possible only in case of MUPIP JOURNAL -ROLLBACK -FORWARD. In this case, set losttn_seqno to
+		 * earliest seqno added in the hash table (note: hash table additions happen only till the tp_resolve_time).
+		 * So the lowest hash table seqno actually gives us the losttn_seqno that "mur_back_process" would have computed.
+		 */
+		assert(mur_options.forward);
+		lcl_losttn_seqno = min_resolve_seqno;
+	}
+	/* "lcl_losttn_seqno" is the first possible seqno at the tp-resolve-time determined in mur_back_process based on
+	 * the seqno of journal records seen BEFORE the tp-resolve-time. "min_resolve_seqno" is the earliest seqno found at
+	 * or after tp-resolve-time. It is not possible for "min_resolve_seqno" to be LESSER than "lcl_losttn_seqno" since
+	 * the latter is computed by adding 1 to the seqno seen in the journal file and seqnos increase only by 1 atmost.
+	 * So it can only be LESSER THAN OR EQUAL TO "lcl_losttn_seqno".  Usually it will be ==; but it can be < as found
+	 * in C9D11-002465. Assert this.
 	 */
-	if ((lcl_losttn_seqno >= min_resolve_seqno)
-		&& (stop_rlbk_seqno >= min_resolve_seqno) && (min_brkn_seqno >= min_resolve_seqno))
+	assert(lcl_losttn_seqno <= min_resolve_seqno);
+	/* If resync_seqno is specified, do not process after resync_seqno. If not, continue till last valid record */
+	stop_rlbk_seqno = murgbl.resync_seqno ? murgbl.resync_seqno : MAXUINT8;
+	/* If the losttn seqno is EQUAL to the min_resolve_seqno, then determine the first seqno that is missing (gap) from
+	 *   min_resolve_seqno to max_resolve_seqno. Since this involves some computation, avoid this if we know for sure
+	 *   the losttn_seqno cannot eventually lie in the (min,max) range. This is possible if stop_rlbk_seqno
+	 *   is lesser than the min_resolve_seqno (in this case that will be the eventual value of losttn_seqno).
+	 * If the losttn seqno is LESS than min_resolve_seqno, the seqno at lcl_losttn_seqno is broken so we have the
+	 *   answer (the first seqno that is missing) right away.
+	 * Note that losttn seqno cannot be GREATER than min_resolve_seqno (asserted above).
+	 * Note: It is possible the hashtable is empty (i.e. min_resolve_seqno == MAXUINT8 and max_resolve_seqno = 0).
+	 *	Dont do any gap-related processing in that case.
+	 */
+	if ((lcl_losttn_seqno == min_resolve_seqno) && (stop_rlbk_seqno >= min_resolve_seqno)
+			&& (max_resolve_seqno >= min_resolve_seqno))
 	{	/* Update losttn_seqno to the first seqno gap from min_resolve_seqno to max_resolve_seqno */
-		assert(max_resolve_seqno >= min_resolve_seqno);
 		seqno_span = (max_resolve_seqno - min_resolve_seqno + 1);
 		seq_arr_size = DIVIDE_ROUND_UP(seqno_span, 8); /* Need only an 8th of the actual memory since we use bit-array */
 		seq_arr = (uchar_ptr_t) malloc(seq_arr_size);

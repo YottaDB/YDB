@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@ extern unsigned char a2e[];
  */
 int4	ojchkfs (char *addr, int4 len, bool exist)
 {
-	char	*fnp, es[MAX_FILSPC_LEN];
+	char	es[MAX_FILSPC_LEN + 1];
 	int	fclose_res;
 	FILE	*fp;
 
@@ -49,15 +50,10 @@ int4	ojchkfs (char *addr, int4 len, bool exist)
 	strncpy(es, addr, len);
 	*(es + len) = '\0';
 
-	/* If directory path exist, skip it */
-	if (fnp = strrchr(es, SLSH))
-		fnp += 1;
-	else
-		fnp = es;
 	if (!exist)
 		return(TRUE);
-
-	if ((fp = Fopen(es, "r")) == 0)
+	Fopen(fp, es, "r");
+	if (0 == fp)
 		return (FALSE);
 	FCLOSE(fp, fclose_res);
 

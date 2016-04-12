@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,10 +35,7 @@
 #include "copy.h"
 #include "jnl_get_checksum.h"
 #include "gdsblk.h"		/* for blk_hdr usage in JNL_MAX_SET_KILL_RECLEN macro */
-
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 #ifdef GTM_TRIGGER
 /* In case of a ZTWORMHOLE, it should be immediately followed by a SET or KILL record. We do not maintain different
@@ -107,18 +105,21 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	uint4			align_fill_size, jrec_size, tmp_jrec_size, update_length;
 	boolean_t		is_ztworm_rec = FALSE;
 	uint4			cursum;
-	DEBUG_ONLY(
-		static boolean_t	dbg_in_jnl_format = FALSE;
-	)
-#	ifdef GTM_CRYPT
 	int			gtmcrypt_errno;
 	gd_segment		*seg;
-#	endif
+	char			iv[GTM_MAX_IV_LEN];
+	boolean_t		use_new_key;
+	enc_info_t		*encr_ptr;
 #	ifdef GTM_TRIGGER
 	boolean_t		ztworm_matched, match_possible;
 	mstr			prev_str, *cur_str;
 #	endif
+#	ifdef DEBUG
+	static boolean_t	dbg_in_jnl_format = FALSE;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	/* The below assert ensures that if ever jnl_format is interrupted by a signal, the interrupt handler never calls
 	 * jnl_format again. This is because jnl_format plays with global pointers and we would possibly end up in a bad
 	 * state if the interrupt handler calls jnl_format again.
@@ -253,10 +254,8 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 		assert((1 << JFB_ELE_SIZE_IN_BITS) == JNL_REC_START_BNDRY);
 		assert(JFB_ELE_SIZE == JNL_REC_START_BNDRY);
 		jfb->buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
-		GTMCRYPT_ONLY(
-			if (REPL_ALLOWED(csa))
-				jfb->alt_buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
-		)
+		if (REPL_ALLOWED(csa))
+			jfb->alt_buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
 		/* assume an align record will be written while computing maximum jnl-rec size requirements */
 		si->total_jnl_rec_size += (int)(jrec_size + MIN_ALIGN_RECLEN);
 	}
@@ -310,35 +309,51 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	((jrec_suffix *)local_buffer)->backptr = jrec_size;
 	((jrec_suffix *)local_buffer)->suffix_code = JNL_REC_SUFFIX_CODE;
 	update_length = (jrec_size - (JREC_SUFFIX_SIZE + FIXED_UPD_RECLEN));
-#	ifdef GTM_CRYPT
+	/* If the fields in the database file header have been updated by a concurrent MUPIP REORG -ENCRYPT, we may end up not
+	 * encrypting the journal records or encrypting them with wrong settings, which is OK because t_end / tp_tend will detect
+	 * that the mupip_reorg_cycle flag in cnl has been updated, and restart the transaction.
+	 */
 	assert(REPL_ALLOWED(csa) || !is_ztworm_rec || jgbl.forw_phase_recovery);
-	if (csd->is_encrypted)
-	{
-		/* At this point we have all the components of *SET, *KILL, *ZTWORM and *ZTRIG records filled. */
+	encr_ptr = csa->encr_ptr;
+	if ((NULL != encr_ptr) && USES_ANY_KEY(encr_ptr))
+	{	/* At this point we have all the components of *SET, *KILL, *ZTWORM and *ZTRIG records filled. */
+#		ifdef DEBUG
+		if (encr_ptr->reorg_encrypt_cycle != csa->nl->reorg_encrypt_cycle)
+		{	/* This is a restartable situation for sure. But we cannot return a restart code from this function.
+			 * So set a dbg-only variable to indicate we never expect this to commit and alert us if it does.
+			 */
+			/* Note: Cannot add assert(CDB_STAGNATE > t_tries) here (like we do for other donot_commit cases)
+			 * because cdb_sc_reorg_encrypt restart code is possible in final retry too.
+			 */
+			TREF(donot_commit) |= DONOTCOMMIT_JNL_FORMAT;
+		}
+#		endif
 		if (REPL_ALLOWED(csa))
-		{
-			/* Before encrypting the journal record, copy the unencrypted buffer to an alternate buffer
-			 * that eventually gets copied to the journal pool (in jnl_write). This way, the replication
-			 * stream sends unencrypted data.
+		{	/* Before encrypting the journal record, copy the unencrypted buffer to an alternate buffer that eventually
+			 * gets copied to the journal pool (in jnl_write). This way, the replication stream sends unencrypted data.
 			 */
 			memcpy(jfb->alt_buff, rec, jrec_size);
 			SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, (jfb->alt_buff + FIXED_UPD_RECLEN));
 		}
 		ASSERT_ENCRYPTION_INITIALIZED;
-		/* Encrypt the logical portion of the record which eventually gets written to the journal buffer/file */
-		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, mumps_node_ptr, update_length, NULL, gtmcrypt_errno);
+		use_new_key = USES_NEW_KEY(encr_ptr);
+		/* Encrypt the logical portion of the record, which eventually gets written to the journal buffer/file */
+		if (use_new_key || encr_ptr->non_null_iv)
+			PREPARE_LOGICAL_REC_IV(jrec_size, iv);
+		GTMCRYPT_ENCRYPT(csa, (use_new_key ? TRUE : encr_ptr->non_null_iv),
+				(use_new_key ? csa->encr_key_handle2 : csa->encr_key_handle),
+				mumps_node_ptr, update_length, NULL, iv, GTM_MAX_IV_LEN, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			seg = gv_cur_region->dyn.addr;
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 		}
 	} else
-#	endif
 	{
 		SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, mumps_node_ptr);
 	}
 	/* The below call to jnl_get_checksum makes sure that checksum computation happens AFTER the encryption (if turned on) */
-	jfb->checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)mumps_node_ptr, (int)(local_buffer - mumps_node_ptr));
+	jfb->checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)mumps_node_ptr, (int)(local_buffer - mumps_node_ptr));
 	assert(0 == ((UINTPTR_T)local_buffer % SIZEOF(jrec_suffix)));
 	DEBUG_ONLY(dbg_in_jnl_format = FALSE;)
 	return jfb;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,10 +12,7 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#include <ssdef.h>
-#endif
-
+#include "gtm_signal.h"
 #include "ast.h"	/* needed for JNL_ENSURE_OPEN_WCS_WTSTART macro in gdsfhead.h */
 #include "copy.h"
 #include "gdsroot.h"
@@ -49,16 +46,13 @@
 #include "wbox_test_init.h"
 #include "memcoherency.h"
 #include "wcs_flu.h"		/* for SET_CACHE_FAIL_STATUS macro */
-#ifdef UNIX
-# ifdef GTM_CRYPT
-#  include "gtmcrypt.h"
-# endif
+#include "gtmcrypt.h"
 #include "io.h"			/* needed by gtmsecshr.h */
 #include "gtmsecshr.h"		/* for continue_proc */
-#endif
 #include "wcs_phase2_commit_wait.h"
 #include "gtm_c_stack_trace.h"
 #include "gtm_time.h"
+#include "process_reorg_encrypt_restart.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -80,6 +74,9 @@ GBLREF	boolean_t		disk_blk_read;
 GBLREF	uint4			t_err;
 GBLREF	boolean_t		block_is_free;
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG ENCRYPT is in progress */
+GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+GBLREF	uint4			update_trans;
 
 /* There are 3 passes (of the do-while loop below) we allow now.
  * The first pass which is potentially out-of-crit and hence can end up not locating the cache-record for the input block.
@@ -92,10 +89,13 @@ GBLREF	boolean_t		mupip_jnl_recover;
 #define BAD_LUCK_ABOUNDS 2
 
 #define	RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, newcr, newcycle)				\
+MBSTART {												\
+	assert(dollar_tlevel);										\
 	assert((first_tp_srch_status)->cr != (newcr) || (first_tp_srch_status)->cycle != (newcycle));	\
 	(first_tp_srch_status)->cr = (newcr);								\
 	(first_tp_srch_status)->cycle = (newcycle);							\
-	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);
+	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);			\
+} MBEND
 
 #define REL_CRIT_IF_NEEDED(CSA, REG, WAS_CRIT, HOLD_ONTO_CRIT)						\
 {	/* If currently have crit, but didn't have it upon entering, release crit now. */		\
@@ -117,7 +117,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
-	boolean_t		clustered, hold_onto_crit, was_crit;
+	boolean_t		clustered, hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
 	int			dummy, lcnt, ocnt;
 	cw_set_element		*cse;
 	off_chain		chain1;
@@ -133,11 +133,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			stuck_cnt = 0;
 	boolean_t		lcl_blk_free;
 	node_local_ptr_t	cnl;
-#	ifdef GTM_CRYPT
 	gd_segment		*seg;
-#	endif
-	uint4		buffs_per_flush, flush_target;
-
+	uint4			buffs_per_flush, flush_target;
+	enc_info_t		*encr_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -302,27 +300,78 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		*cr_out = 0;
 		return (sm_uc_ptr_t)(mm_read(blk));
 	}
-#	ifdef GTM_CRYPT
-	if (csd->is_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE == csa->encr_key_handle) && !IS_BITMAP_BLK(blk))
-	{	/* A non-GT.M process is attempting to read a non-bitmap block but doesn't have a valid encryption key handle. This
-		 * is an indication that the process encountered an error during db_init and reported it with a -W- severity. But,
-		 * since the block it is attempting to read can be in the unencrypted shared memory, we cannot let it access it
-		 * without a valid handle. So, issue an rts_error
+	was_crit = csa->now_crit;
+	cnl = csa->nl;
+	encr_ptr = csa->encr_ptr;
+	if (NULL != encr_ptr)
+	{
+		/* If this is an encrypted database and we hold crit, make sure our private cycle matches the shared cycle.
+		 * Or else we would need to call "process_reorg_encrypt_restart" below (a heavyweight operation) holding crit.
 		 */
-		assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
-		gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));
+		assert(!was_crit || (cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle));
 		seg = gv_cur_region->dyn.addr;
-		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		issued_db_init_crypt_warning = encr_ptr->issued_db_init_crypt_warning;
+		if (!IS_BITMAP_BLK(blk) && issued_db_init_crypt_warning)
+		{	/* A non-GT.M process is attempting to read a non-bitmap block, yet it has previously encountered an error
+			 * during db_init (because it did not have access to the encryption keys) and reported it with a -W-
+			 * severity. Since the block it is attempting to read can be in the unencrypted shared memory (read from
+			 * disk by another process with access to the encryption keys), we cannot let it access it without a valid
+			 * handle, so issue an rts_error.
+			 *
+			 * TODO: DSE and LKE could bypass getting the ftok semaphore. LKE is not an issue, but DSE does care about
+			 *       the csa->reorg_encrypt_cycle. So it means DSE could get an inconsistent copy of reorg_encrypt_cycle
+			 *       and associated hashes if it had done a bypass and a concurrent REORG -ENCRYPT is holding the ftok
+			 *       semaphore and changing these values at the same time.
+			 */
+			assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
+			gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		} else if (cnl->reorg_encrypt_cycle != encr_ptr->reorg_encrypt_cycle)
+		{	/* A concurrent MUPIP REORG ENCRYPT occurred. Cannot proceed with the read even if the block is
+			 * already loaded from disk into the unencrypted global buffers (security issue). Need to load the
+			 * new encryption keys and only let those processes which are able to successfully do this proceed
+			 * with the read. First, copy the key hashes from csd into csa->encr_ptr. That needs crit
+			 * to ensure a concurrent MUPIP REORG ENCRYPT does not sneak in.
+			 *
+			 * Note: Even though we asserted a few lines above that if "was_crit" is TRUE, then we expect
+			 * the encryption cycles to be in sync, we handle this out-of-design situation in "pro" by fixing
+			 * the cycles while holding crit (hopefully rare case so it is okay to hold crit for a heavyweight call).
+			 */
+			if (!was_crit)
+				grab_crit(gv_cur_region);
+			/* Now that we have crit, sync them up by copying the new keys inside crit and opening the key handles
+			 * outside crit (a potentially long running operation).
+			 */
+			SIGNAL_REORG_ENCRYPT_RESTART(mu_reorg_encrypt_in_prog, reorg_encrypt_restart_csa,
+					cnl, csa, csd, rdfail_detail, process_id);
+			assert(csa == reorg_encrypt_restart_csa);
+			if (!was_crit)
+				rel_crit(gv_cur_region);
+			/* If we are inside a TP read-write transaction, it is possible we already used the old keys for
+			 * prior calls to "jnl_format" so we have to restart (cannot sync up cycles). Do the same for
+			 * TP read-only transaction as well as NON-TP read-write transaction. In all these cases we know
+			 * the caller is capable of restarting. All other cases we dont know if the caller is capable so
+			 * sync up the cycles and proceed using the new keys for the read.
+			 *
+			 * But since it is possible the caller does not call t_retry right away (e.g. mupip reorg which can
+			 * choose to abandone this tree path and move on to another block without aborting this transaction)
+			 * it is better we finish the pending call to "process_reorg_encrypt_restart" right here before returning.
+			 */
+			process_reorg_encrypt_restart();
+			assert(NULL == reorg_encrypt_restart_csa);
+			if (IS_NOT_SAFE_TO_SYNC_NEW_KEYS(dollar_tlevel, update_trans))
+			{
+				assert(cdb_sc_reorg_encrypt == rdfail_detail);	/* set by SIGNAL_REORG_ENCRYPT_RESTART macro */
+				return (sm_uc_ptr_t)NULL;
+			}
+		}
 	}
-#	endif
 	assert(dba_bg == csd->acc_meth);
 	assert(!first_tp_srch_status || !first_tp_srch_status->cr
 					|| first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle);
 	if (FALSE == (clustered = csd->clustered))
 		bt = NULL;
-	was_crit = csa->now_crit;
 	ocnt = 0;
-	cnl = csa->nl;
 	set_wc_blocked = FALSE;	/* to indicate whether cnl->wc_blocked was set to TRUE by us */
 	hold_onto_crit = csa->hold_onto_crit;	/* note down in local to avoid csa-> dereference in multiple usages below */
 	do
@@ -351,7 +400,21 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if ((flush_target <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, dummy_errno);
 						/* a macro that dclast's "wcs_wtstart" and checks for errors etc. */
-				grab_crit(gv_cur_region);
+				/* Get crit but also ensure encryption cycles are in sync ("dsk_read" relies on this).
+				 * Note: "sync_needed" should be TRUE very rarely since we synced the cycles just a few lines
+				 * above. But in case a MUPIP REORG ENCRYPT concurrently sneaked in between these lines we
+				 * need to resync.
+				 */
+				sync_needed = grab_crit_encr_cycle_sync(gv_cur_region);
+				assert(NULL == reorg_encrypt_restart_csa);
+				assert(!sync_needed || (NULL != encr_ptr));
+				if (sync_needed && IS_NOT_SAFE_TO_SYNC_NEW_KEYS(dollar_tlevel, update_trans))
+				{
+					assert(cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle);
+					rel_crit(gv_cur_region);
+					rdfail_detail = cdb_sc_reorg_encrypt;	/* set by SIGNAL_REORG_ENCRYPT_RESTART macro */
+					return (sm_uc_ptr_t)NULL;
+				}
 				cr = db_csh_get(blk);			/* in case blk arrived before crit */
 			}
 			if (clustered && (NULL != (bt = bt_get(blk))) && (TRUE == bt->flushing))
@@ -388,21 +451,27 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(cr->read_in_progress >= 0);
 				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
 				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+#				ifdef DEBUG
+				/* stop self to test sechshr_db_clnup clears the read state */
+				if (gtm_white_box_test_case_enabled
+					&& (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number))
+				{	/* this should never fail, but because of the way we developed the test we got paranoid */
+					dummy = kill(process_id, SIGTERM);
+					assert(0 == dummy);
+					for (dummy = 10; dummy; dummy--)
+						LONG_SLEEP(10); /* time for sigterm to take hit before we clear block_now_locked */
+				}
+#				endif
 				if (SS_NORMAL != (status = dsk_read(blk, buffaddr, &ondsk_blkver, lcl_blk_free)))
-				{	/* buffer does not contain valid data, so reset blk to be empty */
+				{
+					/* buffer does not contain valid data, so reset blk to be empty */
 					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
 					cr->blk = CR_BLKEMPTY;
 					cr->r_epid = 0;
 					RELEASE_BUFF_READ_LOCK(cr);
+					TREF(block_now_locked) = NULL;
 					assert(-1 <= cr->read_in_progress);
 					assert(was_crit == csa->now_crit);
-					if (FUTURE_READ == status)
-					{	/* in cluster, block can be in the "future" with respect to the local history */
-						assert(TRUE == clustered);
-						assert(FALSE == csa->now_crit);
-						rdfail_detail = cdb_sc_future_read;	/* t_retry forces the history up to date */
-						return (sm_uc_ptr_t)NULL;
-					}
 					if (ERR_DYNUPGRDFAIL == status)
 					{	/* if we dont hold crit on the region, it is possible due to concurrency conflicts
 						 * that this block is unused (i.e. marked free/recycled in bitmap, see comments in
@@ -429,14 +498,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						 */
 						rdfail_detail = cdb_sc_truncate;
 						return (sm_uc_ptr_t)NULL;
-					}
-#					ifdef GTM_CRYPT
-					else if (IS_CRYPTERR_MASK(status))
+					} else if (IS_CRYPTERR_MASK(status))
 					{
 						seg = gv_cur_region->dyn.addr;
 						GTMCRYPT_REPORT_ERROR(status, rts_error, seg->fname_len, seg->fname);
 					}
-#					endif
 					else
 					{	/* A DBFILERR can be thrown for two possible reasons:
 						 * (1) LSEEKREAD returned an unexpected error due to a filesystem problem; or
@@ -458,13 +524,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				cr->ondsk_blkver = (lcl_blk_free ? GDSVCURR : ondsk_blkver);
 				cr->r_epid = 0;
 				RELEASE_BUFF_READ_LOCK(cr);
+				TREF(block_now_locked) = NULL;
 				assert(-1 <= cr->read_in_progress);
 				*cr_out = cr;
 				assert(was_crit == csa->now_crit);
 				if (reset_first_tp_srch_status)
-				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
-				}
 				return buffaddr;
 			} else  if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
 			{
@@ -595,9 +660,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					}
 				}
 				if (reset_first_tp_srch_status)
-				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
-				}
 				assert(!csa->now_crit || !cr->twin || cr->bt_index);
 				assert(!csa->now_crit || (NULL == (bt = bt_get(blk)))
 					|| (CR_NOTVALID == bt->cache_index)
@@ -613,7 +676,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
 			{
 				if (!csa->now_crit && !hold_onto_crit)
-					grab_crit(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region);
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
 					BG_TRACE_PRO(t_qread_out_of_design);
@@ -704,7 +767,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		assertpro((BAD_LUCK_ABOUNDS - was_crit) >= ocnt);
 		if (!csa->now_crit && !hold_onto_crit)
-			grab_crit(gv_cur_region);
+			grab_crit_encr_cycle_sync(gv_cur_region);
 	} while (TRUE);
 	assert(set_wc_blocked && (cnl->wc_blocked || !csa->now_crit));
 	SET_CACHE_FAIL_STATUS(rdfail_detail, csd);

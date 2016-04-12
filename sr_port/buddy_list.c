@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +58,7 @@ void    initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc)
 	list->free_que = NULL; /* initialize the list to have no free element queue */
 	DEBUG_ONLY(list->used_free_last_n_elements = FALSE;)
 	DEBUG_ONLY(list->used_free_element = FALSE;)
+	DEBUG_ONLY(list->nElems_greater_than_one = FALSE;)
 }
 
 /* Any changes to this routine need corresponding changes to the VERIFY_LIST_IS_REINITIALIZED macro (defined in buddy_list.h) */
@@ -70,6 +72,7 @@ void	reinitialize_list(buddy_list *list)
 	list->free_que = NULL; /* reset the list to have no free element queue */
 	DEBUG_ONLY(list->used_free_last_n_elements = FALSE;)
 	DEBUG_ONLY(list->used_free_element = FALSE;)
+	DEBUG_ONLY(list->nElems_greater_than_one = FALSE;)
 }
 
 boolean_t	free_last_n_elements(buddy_list *list, int4 num)
@@ -118,6 +121,7 @@ char    *get_new_element(buddy_list *list, int4 nElements)
 		assert(FALSE);
 		return NULL;
 	}
+	DEBUG_ONLY(if (1 < nElements) list->nElems_greater_than_one = TRUE;)
 	nElems = list->nElems;
 	cumulMaxElems = list->cumulMaxElems;
 	elemSize = list->elemSize;
@@ -149,6 +153,7 @@ char	*get_new_free_element(buddy_list *list)
 	char	*elem;
 
 	assert(!list->used_free_last_n_elements);
+	assert(!list->nElems_greater_than_one);
 	DEBUG_ONLY(list->used_free_element = TRUE;)
 	/* Assert that each element has enough space to store a pointer. This will be used to maintain the singly linked list
 	 * of freed up elements in the buddy list. The head of this list will be list->free_que.
@@ -167,6 +172,7 @@ char	*get_new_free_element(buddy_list *list)
 void	free_element(buddy_list *list, char *elem)
 {
 	assert(!list->used_free_last_n_elements);
+	assert(!list->nElems_greater_than_one);
 	DEBUG_ONLY(list->used_free_element = TRUE;)
 	assert(elem);
 	assert(elem != list->free_que);
@@ -177,10 +183,10 @@ void	free_element(buddy_list *list, char *elem)
 
 char    *find_element(buddy_list *list, int4 index)
 {
-        char    **ptrArrayCurr;
         int4    i, initAllocBits;
 
-        if (index > list->nElems)
+	assert(!list->nElems_greater_than_one);
+        if (index >= list->nElems)
                 return NULL;
 	initAllocBits = list->initAllocBits;
 	for (i = initAllocBits; index >> i; i++)	/* not sure if "ceil_log2_32bit" would be faster here */
@@ -202,4 +208,47 @@ void    cleanup_list(buddy_list *list)
                 curr++;
 	}
         free(list->ptrArray);
+}
+
+/* Copy the first "numElems" elements of a buddy_list into a contiguous buffer pointed to by "dst".
+ * This function assumes caller has allocated "dst" as appropriate.
+ * Returns : The # of bytes copied onto "dst".
+ */
+size_t	copy_list_to_buf(buddy_list *list, int4 numElems, char *dst)
+{
+	int4	cumulMaxElems, curElems, copyElems, elemSize;
+	size_t	copysize, totalsize;
+        char    **ptrArrayCurr;
+
+	assert(numElems);
+	assert(list->nElems >= numElems);
+	assert(!list->used_free_element);
+	assert(!list->nElems_greater_than_one);
+	cumulMaxElems = list->initAlloc;
+	curElems = cumulMaxElems;
+	elemSize = list->elemSize;
+	ptrArrayCurr = list->ptrArray;
+	totalsize = 0;
+	do
+	{
+		if (numElems < curElems)
+		{
+			copyElems = numElems;
+			numElems = 0;
+		} else
+		{
+			copyElems = curElems;
+			numElems = numElems - copyElems;
+		}
+		copysize = (size_t)copyElems * elemSize;
+		memcpy(dst, *ptrArrayCurr, copysize);
+		totalsize += copysize;
+		if (!numElems)
+			break;
+		dst += copysize;
+		curElems = cumulMaxElems;
+		cumulMaxElems *= 2;
+		ptrArrayCurr++;
+	} while (TRUE);
+	return totalsize;
 }

@@ -14,6 +14,11 @@
 #	Get rid of debug options producing huge amounts of output if set
 unsetenv gtmdbglvl
 
+# Unconditionally switch to C locale. UTF-8 locales have shown issues in various stages of runall.
+unsetenv LC_ALL
+setenv LC_CTYPE C
+setenv LC_COLLATE C
+
 if ($?RUNALL_DEBUG != 0) then
 	set verbose
 	set echo
@@ -142,7 +147,7 @@ set user=`id -u -n`
 rm -f $gtm_log/error.$RUNALL_IMAGE.log >& /dev/null
 
 set TMP_DIR_PREFIX = "/tmp/__${user}__runall"
-set TMP_DIR = "${TMP_DIR_PREFIX}__`date +"%y%m%d_%H_%M_%S"`_$$"
+setenv TMP_DIR "${TMP_DIR_PREFIX}__`date +"%y%m%d_%H_%M_%S"`_$$" # needed by runall_cc_many.csh/runall_cc_one.csh hence "setenv"
 rm -f ${TMP_DIR}_* >& /dev/null
 
 onintr cleanup
@@ -187,8 +192,8 @@ LABEL
 
 # this first set of excluded modules are from the list above of modules that get built as plugins. Only plugins
 # should be metioned in this list.
-set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass gtm_tls_impl"
-set exclude_compile_list = "$exclude_compile_list gtmcrypt_util"
+set exclude_compile_list = (gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass gtm_tls_impl)
+set exclude_compile_list = ($exclude_compile_list gtmcrypt_util)
 # modules that should never be built or compiled are in this list. They are used in other capacities (e.g. used to
 # generate other routines) but are NOT part of the GTM runtime. Other scripts compile and use these routines.
 set exclude_build_list = "gtm_threadgbl_deftypes"
@@ -405,107 +410,24 @@ echo ""
 
 set exclude_compile_list_modified = "FALSE"
 if (! -z ${TMP_DIR}_src_files) then
-	foreach file (`cat ${TMP_DIR}_src_files`)
-		set file = $file:t
-		set ext = $file:e
-		if ("$ext" == "") then
-			set ext = "c"
-		endif
-		set file = $file:r		# take the non-extension part for the obj file
-		set objfile = ${file}.o
-
+	set filelist = `cat ${TMP_DIR}_src_files`
+	set newfilelist = ""
+	foreach file ( $filelist )
+		set newfile = $file:t
 		# Do not compile plugin files if they are modified. Compilation and subsequent build will happen in
 		# buildaux.csh.
-		foreach exclude_file ($exclude_compile_list)
-			if ($exclude_file == $file) then
-				set exclude_compile_list_modified = "TRUE"
-				break
-			endif
-		end
-		if ("TRUE" == $exclude_compile_list_modified) then
-			continue
-		endif
-
-		alias runall_cc gt_cc_${RUNALL_IMAGE}
-		alias gt_as $gt_as_assembler $gt_as_options_common $gt_as_option_I $RUNALL_EXTRA_AS_FLAGS
-		alias runall_as gt_as_${RUNALL_IMAGE}
-
-		if ($linkonly == 0) then
-			# remove pre-existing object files before the current compilation
-			# to ensure they do not get used if the current compile fails
-			rm -f $gtm_obj/$file.o
-			if ($ext == "s") then
-				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
-				if ( "ia64" == $mach_type && "linux" == $platform_name ) then
-					# assembler differences in HPUX on Linux. Send preprocessed assembly file on Linux.
-					set lfile = `basename ${file}`
-					set lfile = $lfile:r
-					gt_cpp -E ${gtm_src}/${file}.s > ${gtm_src}/${lfile}_cpp.s
-					if (0 != $status) @ runall_status = $status
-					runall_as ${gtm_src}/${lfile}_cpp.s  -o ${lfile}.o
-					if (0 != $status) @ runall_status = $status
-					\rm -f ${gtm_src}/${lfile}_cpp.s
-				else if ( "os390" == $platform_name ) then
-					runall_as $gtm_src/${file}.s
-					if (0 != $status) @ runall_status = $status
-					if ( -e $gtm_obj/${file}.dbg )  chmod ugo+r $gtm_obj/${file}.dbg
-				else
-				 	runall_as $gtm_src/${file}.s
-					if (0 != $status) @ runall_status = $status
-				endif
-			else if ($ext == "c") then
-				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
-				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
-				if (0 != $status) @ runall_status = $status
-				if ($file == "omi_srvc_xct") then
-					chmod a+w $gtm_src/omi_sx_play.c
-					\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
-					chmod a-w $gtm_src/omi_sx_play.c
-					echo "$gtm_src/omi_sx_play.c   ---->  $gtm_obj/omi_sx_play.o"
-					# remove pre-existing object
-					rm -f $gtm_obj/omi_sx_play.o
-					runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
-					if (0 != $status) @ runall_status = $status
-				endif
-			else if ($ext == "msg") then
-				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
-				# gtm_startup_chk requires gtm_dist setup
-				rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
-				set real_gtm_dist = "$gtm_dist"
-				if ($?gtmroutines) set save_gtmroutines = "$gtmroutines"
-				setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
-				setenv gtmroutines "$gtm_obj($gtm_pct)"
-				$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
-				if (0 != $status) @ runall_status = $status
-				setenv gtm_dist "$real_gtm_dist"
-				unset real_gtm_dist
-				if ($?save_gtmroutines) setenv gtmroutines "$save_gtmroutines"
-				\mv -f ${file}_ctl.c $gtm_src/${file}_ctl.c
-				if ( -f ${file}_ansi.h ) then
-					\mv -f ${file}_ansi.h $gtm_inc
-				endif
-				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
-				if (0 != $status) @ runall_status = $status
-				set objfile = ${file}_ctl.o
-			endif
-		endif
-		set library=`grep "^$file " ${TMP_DIR}_exclude`
-		if ("$library" == "") then
-			set library=`grep " $file " ${TMP_DIR}_list | awk '{print $1}'`
-			if ("$library" == "") then
-				set library="libmumps.a"
-			endif
-			echo $objfile >> ${TMP_DIR}_lib_.$library
+		set skip_file_compile = 0
+		set tmplist = ($exclude_compile_list)
+		set -f tmplist = ($tmplist $newfile:r)
+		if ($#tmplist == $#exclude_compile_list) then
+			# $newfile is part of $exclude_compile_list
+			set exclude_compile_list_modified = "TRUE"
 		else
-			if ("$library[1]" != "$library") then
-				echo $library[2] >> ${TMP_DIR}_main_.misc
-				if ($file == "omi_srvc_xct.c") then
-					echo "gtcm_play" >> ${TMP_DIR}_main_.misc
-				endif
-			endif
+			set newfilelist = "$newfilelist $file"
 		endif
-	end   # foreach
-
+	end
+	echo $newfilelist | xargs -n25 $gtm_tools/runall_cc_many.csh $linkonly
+	@ runall_status = $status
 	if ($compileonly || (0 != $runall_status)) then
 		goto cleanup
 	endif
@@ -573,7 +495,7 @@ else
 		echo "gde" >>! ${TMP_DIR}_build_routine.final
 	endif
 	set build_routine = `cat ${TMP_DIR}_build_routine.final`
-	$shell $gtm_tools/buildaux.csh $RUNALL_VERSION $RUNALL_IMAGE $gtm_root/$RUNALL_VERSION/$RUNALL_IMAGE $build_routine
+	$gtm_tools/buildaux.csh $RUNALL_VERSION $RUNALL_IMAGE $gtm_root/$RUNALL_VERSION/$RUNALL_IMAGE $build_routine
 	if (0 != $status) @ runall_status = $status
 endif
 

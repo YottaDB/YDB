@@ -120,6 +120,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	socket_interrupt 	*sockintr;
 	socket_struct		*socketptr;
 	zintcmd_ops		zintcmd_command;
+	intrpt_state_t		prev_intrpt_state;
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
@@ -464,7 +465,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				dollar_ztrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
-			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);
+			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
 			CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
 			CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
 			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
@@ -481,7 +482,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
 			active_ch = ctxt;
 			ctxt->ch_active = FALSE;
-			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);
+			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
 			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
 			    && !dollar_zininterrupt)
 			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and/or we are no

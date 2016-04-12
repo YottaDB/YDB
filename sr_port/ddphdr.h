@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,15 +111,13 @@ typedef int4 condition_code;
 
 #define DDP_LOG_ERROR(err_len, err_string)											\
 {																\
-	now_t	now;	/* for GET_CUR_TIME macro */										\
 	char	time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro*/							\
-	char	*time_ptr; /* for GET_CUR_TIME macro*/										\
 	bool	save_dec_nofac;													\
 																\
-	GET_CUR_TIME;														\
+	GET_CUR_TIME(time_str);													\
 	save_dec_nofac = dec_nofac; /* save for later restore */								\
 	dec_nofac = TRUE; /* don't need error mnemonic prefix, just print the message contents */				\
-	dec_err(VARLSTCNT(6) ERR_DDPLOGERR, 4, CTIME_BEFORE_NL, time_ptr, (err_len), (err_string));				\
+	dec_err(VARLSTCNT(6) ERR_DDPLOGERR, 4, CTIME_BEFORE_NL, &time_str[0], (err_len), (err_string));				\
 	dec_nofac = save_dec_nofac; /* back to what it was */									\
 }
 

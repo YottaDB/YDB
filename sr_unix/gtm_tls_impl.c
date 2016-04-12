@@ -43,7 +43,6 @@ STATICDEF	config_t	gtm_tls_cfg;
 STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffie-Hellman key exchange. */
 
 #define MAX_CONFIG_LOOKUP_PATHLEN	64
-#define GTMTLS_RENEGOTIATE_NO_HANDSHAKE
 
 /* Older, but still commonly used, OpenSSL versions don't have macros for TLSv1.1 and TLSv1.2 versions.
  * They are hard coded to 0x0302 and 0x0303 respectively. So, define them here for use in gtm_tls_get_conn_info.
@@ -72,6 +71,11 @@ struct gtm_ssl_options
 {
 	const char	*opt_str;
 	long		opt_val;
+};
+STATICDEF struct gtm_ssl_options gtm_ssl_verify_level_list[]=
+{
+	{ "CHECK", GTMTLS_OP_VERIFY_LEVEL_CHECK },
+	{NULL, 0}
 };
 STATICDEF struct gtm_ssl_options gtm_ssl_verify_mode_list[] =
 {
@@ -272,11 +276,13 @@ STATICFNDEF int format_ASN1_TIME(ASN1_TIME *tm, char *buf, int maxlen)
 	return 0;
 }
 
-STATICFNDEF int ssl_error(SSL *ssl, int err)
+STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_result)
 {
 	int		error_code;
 	char		*errptr, *end;
+	SSL		*ssl;
 
+	ssl = tls_sock->ssl;
 	error_code = SSL_get_error(ssl, err); /* generic error code */
 	switch (error_code)
 	{
@@ -305,9 +311,20 @@ STATICFNDEF int ssl_error(SSL *ssl, int err)
 			assert(FALSE);
 
 		case SSL_ERROR_SSL:
+		case SSL_ERROR_NONE:
 			errptr = gtmcrypt_err_string;
 			end = errptr + MAX_GTMCRYPT_ERR_STRLEN;
 			tls_errno = -1;
+			if ((GTMTLS_OP_VERIFY_LEVEL_CHECK & tls_sock->flags) && (X509_V_OK != verify_result))
+			{
+				UPDATE_ERROR_STRING("certificate verification error: %s",
+					X509_verify_cert_error_string(verify_result));
+				return -1;
+			} else if (SSL_ERROR_NONE == error_code)
+			{	/* we are ignoring verify result and no other error */
+				tls_errno = 0;
+				return 0;
+			}
 			do
 			{
 				error_code = ERR_get_error();
@@ -355,6 +372,11 @@ STATICFNDEF int	passwd_callback(char *buf, int size, int rwflag, void *userdata)
 	assert(NULL != pwent->passwd);
 	len = STRLEN(pwent->passwd);
 	strncpy(buf, pwent->passwd, size);
+	if (len >= size)
+	{
+		buf[size] = '\0';
+		len = size - 1;
+	}
 	return len;
 }
 
@@ -442,14 +464,15 @@ const char *gtm_tls_get_error(void)
 gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 {
 	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr, *cipher_list, *options_string, *verify_mode_string;
+	const char		*verify_level_string;
 	char			*config_env, *parse_ptr, *optionendptr;
-	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode, parse_len;
+	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode, parse_len, verify_level;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
 #	else
 	long int		verify_depth, session_timeout;
 #	endif
-	long			options_mask, options_current, options_clear, verify_long;
+	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
 	SSL_CTX			*ctx;
 	X509_STORE		*store;
 	X509_LOOKUP		*lookup;
@@ -508,6 +531,19 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		config_destroy(cfg);
 		return NULL;
 	}
+	if (!(GTMTLS_OP_ABSENT_CONFIG & flags))
+	{	/* check for tls section */
+		if (NULL == config_lookup(cfg, "tls"))
+			if ((GTMTLS_OP_INTERACTIVE_MODE & flags))
+				flags |= GTMTLS_OP_ABSENT_CONFIG;
+			else
+			{
+				UPDATE_ERROR_STRING("No tls: section in config file: %s", config_env);
+				SSL_CTX_free(ctx);
+				config_destroy(cfg);
+				return NULL;
+			}
+	}
 	/* Get global SSL configuration parameters */
 	if (config_lookup_int(cfg, "tls.verify-depth", &verify_depth))
 		SSL_CTX_set_verify_depth(ctx, verify_depth);
@@ -532,6 +568,32 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		SSL_CTX_set_verify(ctx, verify_mode, NULL);
 	} else
 		flags |= GTMTLS_OP_ABSENT_VERIFYMODE;
+	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.verify-level", &verify_level_string))
+	{
+		level_long = GTMTLS_OP_VERIFY_LEVEL_MASK & flags;
+		level_clear = 0;
+		parse_ptr = parse_SSL_options(&gtm_ssl_verify_level_list[0], SIZEOF(gtm_ssl_verify_level_list),
+					verify_level_string, &level_long, &level_clear);
+		if (NULL != parse_ptr)
+		{
+			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			if (NULL == optionendptr)
+				parse_len = strlen(parse_ptr);
+			else
+				parse_len = optionendptr - parse_ptr;
+			UPDATE_ERROR_STRING("Unknown verify-level option: %.*s",
+				parse_len, parse_ptr);
+			return NULL;
+		}
+		if (0 != level_clear)
+		{
+			verify_level = (int)level_clear;
+			flags &= ~verify_level;
+		}
+		verify_level = (int)level_long;
+		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+	} else
+		flags |= GTMTLS_OP_VERIFY_LEVEL_DEFAULT;
 	rv1 = config_lookup_string(cfg, "tls.CAfile", &CAfile);
 	rv2 = config_lookup_string(cfg, "tls.CApath", &CApath);
 	/* Setup trust locations for peer verifications. This adds on to any trust locations that was previously loaded. */
@@ -550,6 +612,8 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		config_destroy(cfg);
 		return NULL;
 	}
+	if (rv1 || rv2)
+		flags |= GTMTLS_OP_CA_LOADED;
 	/* Load the default verification paths as well. On most Unix distributions, the default path is set to /etc/ssl/certs. */
 	if (!SSL_CTX_set_default_verify_paths(ctx))
 	{
@@ -585,6 +649,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		}
 		X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
 	}
+	SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
 	/* Set callbacks to called whenever a SSL session is added. */
 	SSL_CTX_sess_set_new_cb(ctx, new_session_callback);
@@ -637,7 +702,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			cfg_file = config_setting_source_file(cfg_setting);
 			cfg_line = config_setting_source_line(cfg_setting);
 			UPDATE_ERROR_STRING("Unable to negate values in %s - need OpenSSL 0.9.8m or newer in %s line %d",
-				"tls.ssl-options", cfg_file, cfg_line, "tls.ssl-options");
+				"tls.ssl-options", cfg_file, cfg_line);
 			SSL_CTX_free(ctx);
 			config_destroy(cfg);
 			return NULL;
@@ -779,7 +844,6 @@ static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting
 			config_setting_set_int(elem, config_setting_get_int(srcelem));
 			config_setting_set_format(elem, config_setting_get_format(srcelem));
 		} else
-		if (NULL == elem)
 		{
 			UPDATE_ERROR_STRING("gtm_tls_impl.c/copy_tlsid_elem:  Unexpected CONFIG_TYPE %d for item %s", type,
 				elemname);
@@ -844,6 +908,12 @@ int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *co
 		return -1;
 	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "verify-depth", CONFIG_TYPE_INT))
 		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "verify-level", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "session-id-hex", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "CAfile", CONFIG_TYPE_STRING))
+		return -1;
 	config_destroy(&tmpcfg);
 	return 0;
 #	endif
@@ -851,8 +921,10 @@ int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *co
 
 gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
 {
-	int			len, verify_mode, verify_mode_set, nocert, nopkey, parse_len;
-	long			options_mask, options_current, options_clear, verify_long;
+	int			len, verify_mode, verify_mode_set, nocert, nopkey, parse_len, verify_level, verify_level_set;
+	int			tlscafile;
+	int			session_id_len;
+	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
 	char			*optionendptr, *parse_ptr;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
@@ -862,6 +934,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], input_env_name[PASSPHRASE_ENVNAME_MAX + 1], *env_name_ptr;
 	char			prompt[GTM_PASSPHRASE_MAX_ASCII + 1];
 	const char		*cert, *private_key, *format, *cipher_list, *options_string, *verify_mode_string;
+	const char		*verify_level_string, *session_id_hex, *CAfile = NULL;
+	unsigned char		session_id_string[SSL_MAX_SSL_SESSION_ID_LENGTH];
 	FILE			*fp;
 	SSL			*ssl;
 	SSL_CTX			*ctx;
@@ -875,6 +949,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 	gtm_tls_socket_t	*socket;
+	STACK_OF(X509_NAME)	*CAcerts;
 #	ifndef SSL_OP_NO_COMPRESSION
 	STACK_OF(SSL_COMP)*	compression;
 #	endif
@@ -923,10 +998,35 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			verify_mode_set = TRUE;
 		} else if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
 		{
-			verify_mode = (GTMTLS_OP_VERIFY_PEER & flags) ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+			verify_mode = SSL_VERIFY_PEER;
 			verify_mode_set = TRUE;
 		} else
 			verify_mode_set = FALSE;
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-level", id);
+		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_level_string))
+		{
+			level_long = GTMTLS_OP_VERIFY_LEVEL_MASK & tls_ctx->flags;
+			level_clear = 0;
+			parse_ptr = parse_SSL_options(&gtm_ssl_verify_level_list[0], SIZEOF(gtm_ssl_verify_level_list),
+						verify_level_string, &level_long, &level_clear);
+			if (NULL != parse_ptr)
+			{
+				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				if (NULL == optionendptr)
+					parse_len = strlen(parse_ptr);
+				else
+					parse_len = optionendptr - parse_ptr;
+				UPDATE_ERROR_STRING("In TLSID: %s - unknown verify-level option: %.*s",
+					id, parse_len, parse_ptr);
+				SSL_free(ssl);
+				return NULL;
+			}
+			if (0 != level_clear)
+				level_long &= ~level_clear;
+			verify_level = (int)level_long;
+			verify_level_set = TRUE;
+		} else
+			verify_level_set = FALSE;
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.cipher-list", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &cipher_list))
 		{
@@ -945,16 +1045,21 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		cipher_list = NULL;
 		if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
 		{
-			verify_mode = (GTMTLS_OP_VERIFY_PEER & flags) ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+			verify_mode = SSL_VERIFY_PEER;
 			verify_mode_set = TRUE;
 		} else
 			verify_mode_set = FALSE;
+		verify_level_set = FALSE;
 	}
 	if (verify_mode_set)
 		SSL_set_verify(ssl, verify_mode, NULL);
+	if (verify_level_set)
+		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+	else
+		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | (GTMTLS_OP_VERIFY_LEVEL_MASK & tls_ctx->flags);
 	if (NULL == cipher_list)
 	{	/* no cipher-list in labelled section or no section */
-		if (0 != ((GTMTLS_OP_ABSENT_CIPHER | GTMTLS_OP_DEFAULT_CIPHER) &tls_ctx->flags))
+		if (0 != ((GTMTLS_OP_ABSENT_CIPHER | GTMTLS_OP_DEFAULT_CIPHER) & tls_ctx->flags))
 		{	/* no or default cipher specified top level */
 			cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? GTM_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
 		}
@@ -1154,7 +1259,27 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	{	/* Socket created for server mode operation. Set a session ID context for session resumption at the time of
 		 * reconnection.
 		 */
-		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)id, STRLEN(id)))
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.session-id-hex", id);
+		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &session_id_hex))
+		{	/* convert hex to char and set len */
+			session_id_len = STRLEN(session_id_hex);
+			if (MAX_SESSION_ID_LEN < session_id_len)
+				session_id_len = MAX_SESSION_ID_LEN;	/* avoid overrun */
+			GC_UNHEX(session_id_hex, session_id_string, session_id_len);
+			if (-1 == session_id_len)
+			{
+				UPDATE_ERROR_STRING("In TLSID: %s - invalid session-id-hex value: %s", id, session_id_hex);
+				tls_errno = -1;
+				SSL_free(ssl);
+				return NULL;
+			}
+			session_id_len = session_id_len / 2;		/* bytes */
+		} else
+		{
+			strcpy((char *)session_id_string, id);		/* default to tlsid */
+			session_id_len = STRLEN(id);
+		}
+		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
 		{
 			GC_APPEND_OPENSSL_ERROR("Failed to set Session-ID context to enable session resumption.");
 			SSL_free(ssl);
@@ -1174,6 +1299,34 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		{
 			SSL_set_options(ssl, SSL_OP_SINGLE_DH_USE);
 			SSL_set_tmp_dh_callback(ssl, tmp_dh_callback);
+		}
+	}
+	tlscafile = config_lookup_string(cfg, "tls.CAfile", &CAfile);
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", id);
+	config_lookup_string(cfg, cfg_path, &CAfile);	/* if absent CAfile retains value */
+	if (NULL != CAfile)
+	{
+		if (!(GTMTLS_OP_CA_LOADED & tls_ctx->flags))
+		{	/* no CAfile or CApath before so do now */
+			if (!SSL_CTX_load_verify_locations(tls_ctx->ctx, CAfile, NULL))
+			{
+				GC_APPEND_OPENSSL_ERROR("Failed to load CA verification location: %s.", CAfile);
+				SSL_free(ssl);
+				return NULL;
+			}
+			tls_ctx->flags |= GTMTLS_OP_CA_LOADED;
+		}
+		if (!CLIENT_MODE(flags))
+		{	/* these SSL calls are server side only */
+			CAcerts = SSL_load_client_CA_file(CAfile);
+			if (NULL == CAcerts)
+			{
+				GC_APPEND_OPENSSL_ERROR("Failed to load client CA file %s", CAfile);
+				SSL_free(ssl);
+				return NULL;
+			}
+			SSL_set_client_CA_list(ssl, CAcerts);
+			flags |= GTMTLS_OP_CLIENT_CA;
 		}
 	}
 	/* Finally, wrap the Unix TCP/IP socket into SSL/TLS object */
@@ -1207,6 +1360,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 int gtm_tls_connect(gtm_tls_socket_t *socket)
 {
 	int		rv;
+	long		verify_result;
 
 	assert(CLIENT_MODE(socket->flags));
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
@@ -1214,48 +1368,47 @@ int gtm_tls_connect(gtm_tls_socket_t *socket)
 	{	/* Old session available. Reuse it. */
 		SSL_DPRINT(stdout, "gtm_tls_connect(1): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
 		if (0 >= (rv = SSL_set_session(socket->ssl, socket->session)))
-			return ssl_error(socket->ssl, rv);
+			return ssl_error(socket, rv, X509_V_OK);
 		SSL_DPRINT(stdout, "gtm_tls_connect(2): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
 	}
 	if (0 < (rv = SSL_connect(socket->ssl)))
 	{
 		if (NULL != socket->session)
 			SSL_DPRINT(stdout, "gtm_tls_connect(3): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
-		return 0;
-	}
-	return ssl_error(socket->ssl, rv);
+		verify_result = SSL_get_verify_result(socket->ssl);
+		if (X509_V_OK == verify_result)
+			return 0;
+	} else
+		verify_result = SSL_get_verify_result(socket->ssl);
+	return ssl_error(socket, rv, verify_result);
 }
 
 int gtm_tls_accept(gtm_tls_socket_t *socket)
 {
 	int		rv;
+	long		verify_result;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
-	if (0 < (rv = SSL_accept(socket->ssl)))
-		return 0;
-	return ssl_error(socket->ssl, rv);
+	rv = SSL_accept(socket->ssl);
+	verify_result = SSL_get_verify_result(socket->ssl);
+	if ((0 < rv) && (X509_V_OK == verify_result))
+			return 0;
+	return ssl_error(socket, rv, verify_result);
 }
 
 int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	gtm_tls_ctx_t	*tls_ctx;
+	long		vresult;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 >= (rv = SSL_renegotiate(socket->ssl)))
-		return ssl_error(socket->ssl, rv);
-#	ifdef GTMTLS_RENEGOTIATE_NO_HANDSHAKE
-	tls_ctx = socket->gtm_ctx;
-	assert(tls_ctx);
-	if (GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags)
-	{	/* avoid hanging until client does I/O */
-		socket->flags |= GTMTLS_OP_RENEGOTIATE_REQUESTED;
-		return 0;
-	}
-#	endif
+		return ssl_error(socket, rv, SSL_get_verify_result(socket->ssl));
 	do
 	{
-		if (0 < (rv = SSL_do_handshake(socket->ssl)))
+		rv = SSL_do_handshake(socket->ssl);
+		vresult = SSL_get_verify_result(socket->ssl);
+		if ((0 < rv) && (X509_V_OK == vresult))
 			return 0;
 		/* On a blocking socket, SSL_do_handshake returns ONLY after successful completion. However, if the system call
 		 * is interrupted (say, by a SIGALRM), it can return with a WANT_READ or WANT_WRITE. Handle it by retrying.
@@ -1263,15 +1416,216 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 		 * since renegotiation is done seldomly and returning the control back to the caller causes interface issues, we
 		 * handle GTMTLS_WANT_READ or GTMTLS_WANT_WRITE by retrying.
 		 */
-		rv = ssl_error(socket->ssl, rv);
+		rv = ssl_error(socket, rv, vresult);
 	} while ((GTMTLS_WANT_READ == rv) || (GTMTLS_WANT_WRITE == rv));
+	return rv;
+}
+
+#	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
+#define VERIFY_DEPTH_TYPE	int
+#	else
+#define VERIFY_DEPTH_TYPE	long int
+#endif
+
+STATICFNDEF int gtm_tls_renegotiate_options_config(char *idstr, int flags, config_t *cfg, VERIFY_DEPTH_TYPE *verify_depth,
+			int *verify_depth_set, int *verify_mode, int *verify_mode_set, int *verify_level, int *verify_level_set,
+			int *session_id_len, unsigned char *session_id_string, const char **CAfile);
+
+STATICFNDEF int gtm_tls_renegotiate_options_config(char *idstr, int flags, config_t *cfg, VERIFY_DEPTH_TYPE *verify_depth,
+			int *verify_depth_set, int *verify_mode, int *verify_mode_set, int *verify_level, int *verify_level_set,
+			int *session_id_len, unsigned char *session_id_string, const char **CAfile)
+{
+	int			rv, parse_len;
+	config_setting_t	*tlsid, *tlssect, *cfg_setting;
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
+	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
+	char			*optionendptr, *parse_ptr;
+	const char		*verify_mode_string, *verify_level_string, *session_id_hex;
+	STACK_OF(X509_NAME)	*CAcerts;
+
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-depth", idstr);
+	if (CONFIG_TRUE == config_lookup_int(cfg, cfg_path, verify_depth))
+		*verify_depth_set = TRUE;
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-mode", idstr);
+	if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_mode_string))
+	{
+		verify_long = 0;
+		parse_ptr = parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
+				verify_mode_string, &verify_long, NULL);
+		if (NULL != parse_ptr)
+		{
+			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			if (NULL == optionendptr)
+				parse_len = strlen(parse_ptr);
+			else
+				parse_len = optionendptr - parse_ptr;
+			UPDATE_ERROR_STRING("In TLSID: %s - unknown verify-mode option: %.*s",
+				idstr, parse_len, parse_ptr);
+			tls_errno = -1;
+			return -1;
+		}
+		*verify_mode = (int)verify_long;
+		*verify_mode_set = TRUE;
+	}
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-level", idstr);
+	if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_level_string))
+	{
+		level_long = GTMTLS_OP_VERIFY_LEVEL_MASK & flags;
+		level_clear = 0;
+		parse_ptr = parse_SSL_options(&gtm_ssl_verify_level_list[0], SIZEOF(gtm_ssl_verify_level_list),
+				verify_level_string, &level_long, &level_clear);
+		if (NULL != parse_ptr)
+		{
+			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			if (NULL == optionendptr)
+				parse_len = strlen(parse_ptr);
+			else
+				parse_len = optionendptr - parse_ptr;
+			UPDATE_ERROR_STRING("In TLSID: %s - unknown verify-level option: %.*s",
+				idstr, parse_len, parse_ptr);
+			tls_errno = -1;
+			return -1;
+		}
+		if (0 != level_clear)
+			level_long &= ~level_clear;
+		*verify_level = (int)level_long;
+		*verify_level_set = TRUE;
+	}
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", idstr);
+	rv = config_lookup_string(cfg, cfg_path, CAfile);
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.session-id-hex", idstr);
+	if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &session_id_hex))
+	{	/* convert hex to char and set len */
+		*session_id_len = STRLEN(session_id_hex);
+		if (MAX_SESSION_ID_LEN < *session_id_len)
+			*session_id_len = MAX_SESSION_ID_LEN;	/* avoid overrun */
+		GC_UNHEX(session_id_hex, session_id_string, *session_id_len);
+		if (-1 == *session_id_len)
+		{
+			UPDATE_ERROR_STRING("In TLSID: %s - invalid session-id-hex value: %s",
+				idstr, session_id_hex);
+			tls_errno = -1;
+			return -1;
+		}
+		*session_id_len = *session_id_len / 2;		/* bytes */
+	}
+	return 0;
+}
+
+int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char *idstr, char *configstr, int tlsid_present)
+{
+	int			rv;
+	config_t		*cfg, tmpcfg;
+	config_setting_t	*tlsid, *tlssect, *cfg_setting;
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
+	int			verify_mode, parse_len, verify_level;
+	int			verify_mode_set, verify_level_set, verify_depth_set, flags;
+	int			session_id_len;
+	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
+	char			*optionendptr, *parse_ptr;
+	const char		*verify_mode_string, *verify_level_string;
+	const char		*CAfile = NULL, *session_id_hex;
+	unsigned char		session_id_string[SSL_MAX_SSL_SESSION_ID_LENGTH];
+#	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
+	int			verify_depth;
+#	else
+	long int		verify_depth;
+#	endif
+	SSL			*ssl;
+	STACK_OF(X509_NAME)	*CAcerts;
+
+	ssl = socket->ssl;
+	flags = socket->flags;
+	verify_mode_set = verify_level_set = verify_depth_set = FALSE;
+	if ('\0' != idstr[0])
+	{	/* process options from config file and/or options */
+		cfg = &gtm_tls_cfg;
+		session_id_len = 0;
+		if (tlsid_present)
+		{	/* process config file first if real tlsid */
+			SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s", idstr);
+			cfg_setting = config_lookup(cfg, cfg_path);
+			if (NULL == cfg_setting)
+			{
+				UPDATE_ERROR_STRING("TLSID %s not found in configuration file.", idstr);
+				tls_errno = -1;
+				return -1;
+			}
+			if (0 != gtm_tls_renegotiate_options_config(idstr, flags, cfg, &verify_depth, &verify_depth_set,
+					&verify_mode, &verify_mode_set, &verify_level, &verify_level_set, &session_id_len,
+					session_id_string, &CAfile))
+				return -1;
+		}
+		if (NULL != configstr)
+		{	/* now process any options given on WRITE /TLS */
+#			ifndef LIBCONFIG_VER_MAJOR
+			UPDATE_ERROR_STRING("TLSID: %s: libconfig 1.4.x is needed to support providing options on WRITE /TLS",
+				idstr);
+			tls_errno = -1;
+			return -1;
+#			else
+			config_init(&tmpcfg);
+			if (CONFIG_FALSE == config_read_string(&tmpcfg, configstr))
+			{
+				UPDATE_ERROR_STRING("Failed to process options: %s in line %d:\n%s",
+					config_error_text(&tmpcfg),
+					config_error_line(&tmpcfg), configstr);
+				tls_errno = -1;
+				return -1;
+			}
+			if (0 != gtm_tls_renegotiate_options_config(idstr, flags, &tmpcfg, &verify_depth, &verify_depth_set,
+					&verify_mode, &verify_mode_set, &verify_level, &verify_level_set, &session_id_len,
+					session_id_string, &CAfile))
+				return -1;
+#			endif
+		}
+		/* now really process verify-* and CAfile options */
+		if (verify_depth_set)
+			SSL_set_verify_depth(ssl, verify_depth);
+		if (verify_mode_set)
+			SSL_set_verify(ssl, verify_mode, NULL);
+		if (verify_level_set)
+			flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+		if ((NULL == CAfile) && !(GTMTLS_OP_CLIENT_CA & flags))
+		{	/* check for tlsid.CAfile or tls.CAfile */
+			SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", socket->tlsid);
+			rv = config_lookup_string(cfg, cfg_path, &CAfile);
+			if (CONFIG_FALSE == rv)
+			{
+				rv = config_lookup_string(cfg, "tls.CAfile", &CAfile);
+			}
+		}
+		if (NULL != CAfile)
+		{
+			CAcerts = SSL_load_client_CA_file(CAfile);
+			if (NULL == CAcerts)
+			{
+				GC_APPEND_OPENSSL_ERROR("Failed to load client CA file %s", CAfile);
+				tls_errno = -1;
+				return -1;
+			}
+			SSL_set_client_CA_list(ssl, CAcerts);
+			flags |= GTMTLS_OP_CLIENT_CA;
+		}
+		if ((0 < session_id_len)
+			&& (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string,
+						(unsigned int)session_id_len)))
+		{
+			GC_APPEND_OPENSSL_ERROR("Failed to set Session-ID context to enable session resumption.");
+			tls_errno = -1;
+			return -1;
+		}
+	}
+	socket->flags = flags;
+	rv = gtm_tls_renegotiate(socket);
 	return rv;
 }
 
 int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info)
 {
 	long			verify_result, timeout, creation_time;
-	unsigned int		session_id_length, ssl_version;
+	int			session_id_length;
+	unsigned int		ssl_version;
 	const SSL_CIPHER	*cipher;
 	const COMP_METHOD	*compression_method;
 	char			*ssl_version_ptr, *session_id_ptr;
@@ -1339,8 +1693,11 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 				UPDATE_ERROR_STRING("Failed to obtain the handle to negotiated SSL/TLS session");
 				return -1;
 			}
-			session_id_ptr = (char *)SSL_SESSION_get_id(session, &session_id_length);
-			assert(session_id_length <= MAX_SESSION_ID_LEN / 2);
+			session_id_ptr = (char *)SSL_SESSION_get_id(session, (unsigned int *)&session_id_length);
+			assert(session_id_length <= (MAX_SESSION_ID_LEN / 2));
+			assert(MAX_SESSION_ID_LEN >= (SSL_MAX_SSL_SESSION_ID_LENGTH * 2));
+			if ((MAX_SESSION_ID_LEN / 2) < session_id_length)
+				session_id_length = MAX_SESSION_ID_LEN / 2;	/* avoid overrun */
 			GC_HEX(session_id_ptr, conn_info->session_id, session_id_length * 2);
 			conn_info->session_id[session_id_length * 2] = '\0';
 			/* Session expiry timeout. */
@@ -1349,7 +1706,10 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			else
 			{
 				creation_time = SSL_SESSION_get_time(session);
-				conn_info->session_expiry_timeout = creation_time + timeout;
+				if (0 == creation_time)
+					conn_info->session_expiry_timeout = -1;
+				else
+					conn_info->session_expiry_timeout = creation_time + timeout;
 			}
 			SSL_SESSION_free(session);
 			/* Is compression supported? */
@@ -1381,10 +1741,15 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			}
 			if (GTM_TLS_API_VERSION_SOCK <= socket->gtm_ctx->version)
 				conn_info->options = SSL_get_options(ssl);
+			if (GTM_TLS_API_VERSION_RENEGOPT <= socket->gtm_ctx->version)
+			{
+				conn_info->total_renegotiations = SSL_total_renegotiations(ssl);
+				conn_info->verify_mode = SSL_get_verify_mode(ssl);
+			}
 			return 0;
 		} else
 		{
-			UPDATE_ERROR_STRING("Peer certificate invalid: %ld", verify_result);
+			UPDATE_ERROR_STRING("Peer certificate invalid: %s", X509_verify_cert_error_string(verify_result));
 			X509_free(peer);
 			return -1;
 		}
@@ -1396,27 +1761,35 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 int gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 {
 	int		rv;
+	long		verify_result;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 < (rv = SSL_write(socket->ssl, buf, send_len)))
 	{
 		assert(SSL_ERROR_NONE == SSL_get_error(socket->ssl, rv));
-		return rv;
-	}
-	return ssl_error(socket->ssl, rv);
+		verify_result = SSL_get_verify_result(socket->ssl);
+		if (X509_V_OK == verify_result)
+			return rv;
+	} else
+		verify_result = SSL_get_verify_result(socket->ssl);
+	return ssl_error(socket, rv, verify_result);
 }
 
 int gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len)
 {
 	int		rv;
+	long		verify_result;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 < (rv = SSL_read(socket->ssl, buf, recv_len)))
 	{
 		assert(SSL_ERROR_NONE == SSL_get_error(socket->ssl, rv));
-		return rv;
-	}
-	return ssl_error(socket->ssl, rv);
+		verify_result = SSL_get_verify_result(socket->ssl);
+		if (X509_V_OK == verify_result)
+			return rv;
+	} else
+		verify_result = SSL_get_verify_result(socket->ssl);
+	return ssl_error(socket, rv, verify_result);
 }
 
 int gtm_tls_cachedbytes(gtm_tls_socket_t *socket)

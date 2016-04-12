@@ -81,8 +81,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 	uint4			freeze_id, sleep_counter;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	now_t			now;                                            /* for GET_CUR_TIME macro */
-	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
+	char			time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
 	boolean_t		was_crit;
 	DCL_THREADGBL_ACCESS;
 
@@ -119,9 +118,9 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 			/* MUPIP FREEZE/INTEG and BACKUP's DBG qualifier prints extra debug messages while waiting for KIP */
 			if (debug_mupip)
 			{
-				GET_CUR_TIME;
+				GET_CUR_TIME(time_str);
 				util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
-					       CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(region));
+					       CTIME_BEFORE_NL, time_str, DB_LEN_STR(region));
 			}
 			do
 			{
@@ -135,9 +134,9 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 			} while (MAX_CRIT_TRY > sleep_counter++);
 			if (debug_mupip)
 			{
-				GET_CUR_TIME;
+				GET_CUR_TIME(time_str);
 				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on region", TRUE,
-					       CTIME_BEFORE_NL, time_ptr);
+					       CTIME_BEFORE_NL, time_str);
 			}
 		}
 		/* if can't ever be true when override is true. */

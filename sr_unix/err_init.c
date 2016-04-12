@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +23,8 @@
 #include "gtmimagename.h"
 #include "error.h"
 #include "send_msg.h"
+#include "have_crit.h"
+#include "eintr_wrappers.h"
 
 #define	COREDUMPFILTERFN	"/proc/%i/coredump_filter"
 #define FILTERPARMSIZE		(8 + 1)
@@ -72,7 +75,7 @@ void err_init(void (*x)())
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sprintf()"), CALLFROM, rc);
 			return;
 		}
-		filterstrm = fopen(procfn, "r");
+		Fopen(filterstrm, procfn, "r");
 		if (NULL == filterstrm)
 		{
 			rc = errno;
@@ -85,7 +88,7 @@ void err_init(void (*x)())
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fgets()"), CALLFROM, rc);
 			return;
 		}
-		rc = fclose(filterstrm);
+		FCLOSE(filterstrm, rc);
 		if (0 > rc)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fclose()"), CALLFROM, rc);
@@ -96,7 +99,7 @@ void err_init(void (*x)())
 		if (FILTERENABLEBITS != (filterbits & FILTERENABLEBITS))
 		{	/* At least one flag was missing - reset them */
 			filterbits = filterbits | FILTERENABLEBITS;
-			filterstrm = fopen(procfn, "w");
+			Fopen(filterstrm, procfn, "w");
 			if (NULL == filterstrm)
 			{
 				rc = errno;
@@ -111,7 +114,7 @@ void err_init(void (*x)())
 					     CALLFROM, rc);
 				return;
 			}
-			fclose(filterstrm);
+			FCLOSE(filterstrm, rc);
 			if (0 > rc)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fclose()"),

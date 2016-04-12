@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +49,7 @@
 #include "copy.h"
 #include "shmpool.h"
 #include "do_semop.h"
+#include "gtm_semutils.h"
 
 GBLREF	uint4			process_id;
 
@@ -68,7 +70,8 @@ void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, u
 	 * Otherwise, we should have crit when called from wcs_recover or mu_truncate.
 	 */
 	udi = FILE_INFO(reg);
-	assert((udi->grabbed_access_sem && (1 == (semval = semctl(udi->semid, 1, GETVAL)))) || csa->now_crit);
+	assert((udi->grabbed_access_sem && (DB_COUNTER_SEM_INCR == (semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL))))
+		|| csa->now_crit);
 	hash_hdr = (cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array;
 	cr_lo = hash_hdr + csd->bt_buckets;
 	cr_top = cr_lo + csd->n_bts;

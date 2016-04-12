@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@ static char rcsid[] = "$Header:$";
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 
 #include "error.h"
 #include "gtcm.h"
@@ -48,5 +49,5 @@ void gtcm_exit()
 	rc_rundown();
 #endif
 	GTMCRYPT_CLOSE;
-	exit(gtcm_exi_condition);
+	EXIT(gtcm_exi_condition);
 }

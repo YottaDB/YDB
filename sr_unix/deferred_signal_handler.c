@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +13,8 @@
 /* Perform necessary functions for signal handling that was deferred */
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
-
-#include <signal.h>
+#include "gtm_stdlib.h"		/* for EXIT() */
+#include "gtm_signal.h"
 
 #include "error.h"
 #include "gtmsiginfo.h"
@@ -52,10 +52,14 @@ error_def(ERR_KILLBYSIGUINFO);
 
 void deferred_signal_handler(void)
 {
-	void (*signal_routine)();
+	void		(*signal_routine)();
+	char		*rname;
+	intrpt_state_t	prev_intrpt_state;
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does EXIT() etc. */
 	/* To avoid nested calls to this routine, progress the forced_exit state. */
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;
 
@@ -116,11 +120,11 @@ void deferred_signal_handler(void)
 	if (gtm_white_box_test_case_enabled && (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
 		&& (2 == gtm_white_box_test_case_count))
 	{
-		DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+		DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: will sleep for 20 seconds\n"));
 		LONG_SLEEP(20);
 		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: done sleeping\n"));
-		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 	}
 #	endif
 	/* If any special routines are registered to be driven on a signal, drive them now */
@@ -133,5 +137,5 @@ void deferred_signal_handler(void)
 	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
 	 * by definition not fatal.
 	 */
-	exit(-exi_condition);
+	EXIT(-exi_condition);
 }

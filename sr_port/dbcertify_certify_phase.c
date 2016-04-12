@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,7 @@ void dbcertify_certify_phase(void)
 	if (CLI_PRESENT == cli_present("BLOCKS"))
 	{
 		if (!cli_get_hex("BLOCKS", &psa->blocks_to_process))
-			exit(EXIT_FAILURE);		/* Error message already raised */
+			EXIT(EXIT_FAILURE);		/* Error message already raised */
 	} else
 		psa->blocks_to_process = MAXTOTALBLKS_V4;
 	if (CLI_PRESENT == cli_present("TEMPFILE_DIR"))
@@ -414,8 +414,8 @@ void dbcertify_certify_phase(void)
 boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl)
 {
 	int		blk_len, blk_size, restart_cnt, save_block_depth, tmp_blk_levl;
-	int		gvtblk_index, dtblk_index, blk_index, bottom_tree_index, bottom_created_index;
-	int		curr_blk_len, curr_blk_levl, curr_rec_len, ins_key_len, ins_rec_len;
+	int		gvtblk_index, dtblk_index, blk_index, bottom_tree_index;
+	int		curr_blk_len, curr_blk_levl, curr_rec_len, ins_rec_len;
 	int		curr_rec_shrink, curr_rec_offset, blks_this_lmap;
 	int		prev_rec_offset, new_blk_len, new_rec_len, remain_offset, remain_len, blk_seg_cnt;
 	int		new_lh_blk_len, new_rh_blk_len, created_blocks, extent_size;
@@ -793,12 +793,10 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		curr_blk_len = blk_set_p->blk_len;
 		curr_blk_levl = blk_set_p->blk_levl;
 		if (0 != blk_set_p->ins_rec.ins_key->end)
-		{
-			ins_key_len = blk_set_p->ins_rec.ins_key->end + 1;
-			ins_rec_len = ins_key_len + SIZEOF(block_id);	/* We only ever insert index records */
+		{	/* We only ever insert index records */
+			ins_rec_len = blk_set_p->ins_rec.ins_key->end + 1 + SIZEOF(block_id);
 		} else
-			ins_key_len = ins_rec_len = 0;
-		blk_p = blk_set_p->old_buff;
+			ins_rec_len = 0;
 		/* If ins_rec_len has a non-zero value, then we need to reset the values for prev_match and
 		 * key_match. These values were computed using the original scan key as their basis. Now we
 		 * are using these fields to insert a new key. The positioning is still correct but the
@@ -1319,9 +1317,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		return TRUE;
 	}
 	/* The update arrarys are complete, we know there are sufficient free blocks in the database to accomodate
-	 * the splitting we have to do.
+	 * the splitting we have to do. From here on out are bit map blocks: psa->block_depth
 	 */
-	bottom_created_index = psa->block_depth;	/* From here on out are bit map blocks */
 	bplmap = psa->dbc_cs_data->bplmap;
 	if (0 != created_blocks)
 	{	/* Run through the created blocks assigning block numbers and filling the numbers into the buffers

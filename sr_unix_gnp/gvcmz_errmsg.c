@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_multi_thread.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
@@ -55,7 +58,7 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	if (1 != msgnum)	/* Need to start with msg 1 for severity and signal values */
 	{
 		assert(FALSE);
-		rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BADSRVRNETMSG);
 	}
 	CM_GET_SHORT(msglen, bufptr, li->convert_byteorder);
 	bufptr += SIZEOF(short);
@@ -63,7 +66,7 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	bufptr += SIZEOF(SIGNAL);
 	CM_GET_LONG(SEVERITY, bufptr, li->convert_byteorder);
 	bufptr += SIZEOF(SEVERITY);
-
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	memcpy(TREF(util_outptr), bufptr, msglen);
 	TREF(util_outptr) += msglen;
 	while(cont)

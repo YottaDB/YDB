@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,15 +121,6 @@
 	if (do_lev)										\
 		lvzwr_var((lv_val *)NODE, n + 1);						\
 }
-
-#ifdef UNIX
-/* job command needs to send the local variables to the child */
-#define MIDCHILD_SEND_VAR			\
-{						\
-	if (TREF(midchild_send_locals))		\
-		ojmidchild_send_var();		\
-}
-#endif
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF int4		outofband;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,25 +72,25 @@ int repl_log_init(repl_log_file_t log_type,
 
 	strcpy(log_file_name, log);
 	ZOS_ONLY(STAT_FILE(log_file_name, &info, status);)
-	OPENFILE3(log_file_name, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, tmp_fd);
+	OPENFILE3_CLOEXEC(log_file_name, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, tmp_fd);
 	if (tmp_fd < 0)
 	{
 		if ((REPL_GENERAL_LOG == log_type) && (FD_INVALID == *log_fd))
 		{
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
 				   LEN_AND_STR(err_code),LEN_AND_STR(NULL_DEVICE));
 			strcpy(log_file_name, NULL_DEVICE);
 			if (log_type == REPL_GENERAL_LOG)
 				strcpy(log, NULL_DEVICE);
-			OPENFILE(log_file_name, O_RDWR, tmp_fd); /* Should not fail */
-			exit(EREPL_LOGFILEOPEN);
+			OPENFILE_CLOEXEC(log_file_name, O_RDWR, tmp_fd); /* Should not fail */
+			EXIT(EREPL_LOGFILEOPEN);
 		} else
 		{
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
 				   LEN_AND_STR(err_code), LEN_AND_STR(log));
 			return(EREPL_LOGFILEOPEN);
 		}
@@ -137,7 +138,7 @@ int repl_log_init(repl_log_file_t log_type,
 		} else
 		{
 			err_code = STRERROR(save_errno);
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLLOGOPN, 6,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLLOGOPN, 6,
 			 	   LEN_AND_STR(log_file_name),
 				   LEN_AND_STR(err_code),
 				   strlen(log),

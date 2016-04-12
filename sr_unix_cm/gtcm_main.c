@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +21,11 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_time.h"		/* for time() */
+#include "gtm_signal.h"
 
 #include <sys/types.h>
-#include <signal.h>
 #include <errno.h>
 
 #include "gtcm.h"
@@ -90,7 +91,7 @@ int main(int argc, char_ptr_t argv[])
 	SPRINTF(image_id,"%s=gtcm_server", image_id);
 #	ifdef SEQUOIA
 	if (!set_pset())
-		exit(-1);
+		EXIT(-1);
 #	endif
 	/*  Initialize everything but the network */
 	err_init(gtcm_exit_ch);
@@ -105,7 +106,7 @@ int main(int argc, char_ptr_t argv[])
 #	endif
 	REVERT;
 	if (OMI_ER_NO_ERROR != omi_errno)
-		exit(omi_errno);
+		EXIT(omi_errno);
 	/*  Initialize the network interface */
 	if (0 != (ret_val = gtcm_bgn_net(&conns)))	/* Warning - assignment */
 	{

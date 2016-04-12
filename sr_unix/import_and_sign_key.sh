@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc #
+# Copyright (c) 2010-2015 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -43,14 +44,14 @@ public_key_file=$1
 email_id=$2
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-elif [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
+elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Exit if the public key for this id already exists in the keyring
 $gpg --list-keys $email_id 2>/dev/null 1>/dev/null
 if [ $? -eq 0 ] ; then
-    $ECHO  "Public key of $email_id already exists in keyring." ; exit 1
+    $ECHO  "Public key of $email_id already exists in keyring."
 fi
 
 # Ensure that the public key file exists and is readable

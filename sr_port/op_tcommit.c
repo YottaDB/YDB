@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +60,9 @@
 #include "util.h"
 #include "op_tcommit.h"
 #include "caller_id.h"
+#include "process_deferred_stale.h"
+#include "wcs_timer_start.h"
+#include "mupipbckup.h"
 
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
@@ -93,6 +97,7 @@ GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transact
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		block_is_free;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int4			gtm_trigger_depth;
@@ -198,9 +203,9 @@ enum cdb_sc	op_tcommit(void)
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
 	boolean_t		before_image_needed;
 	boolean_t		skip_invoke_restart;
-	uint4			update_trans;
 #	ifdef DEBUG
 	boolean_t		forw_recov_lgtrig_only;
+	enum cdb_sc		prev_status;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -451,15 +456,14 @@ enum cdb_sc	op_tcommit(void)
 				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, status);
 				TP_RETRY_ACCOUNTING(csa, cnl);
 			}
-			if ((cdb_sc_normal == status) && tp_tend())
-				;
-			else	/* commit failed BEFORE invoking or DURING "tp_tend" */
-			{
+			if ((cdb_sc_normal != status) || !tp_tend())
+			{	/* Commit failed BEFORE invoking or DURING "tp_tend" */
+				DEBUG_ONLY(prev_status = status;)
 				if (cdb_sc_normal == status) /* get failure return code from tp_tend (stored in t_fail_hist) */
 					status = (enum cdb_sc)t_fail_hist[t_tries];
 				assert(cdb_sc_normal != status);	/* else will go into an infinite try loop */
 				DEBUG_ONLY(
-					for (si = first_sgm_info;  si != temp_si; si = si->next_sgm_info)
+					for (si = first_sgm_info; si != temp_si; si = si->next_sgm_info)
 						assert(NULL == si->kip_csa);
 				)
 				if (cdb_sc_gbloflow == status)
@@ -472,6 +476,28 @@ enum cdb_sc	op_tcommit(void)
 					INVOKE_RESTART;
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)
 				return status;	/* return status to caller who cares about it */
+			} else
+			{	/* Now that tp_tend() is done and we do not hold crit, check if we had an unhandled IO timer pop. */
+				if (unhandled_stale_timer_pop)
+					process_deferred_stale();
+				for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+				{
+					csa = si->tp_csa;
+					cnl = csa->nl;
+					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
+					if (!si->update_trans)
+					{
+						INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
+						continue;
+					}
+					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readwrite, 1);
+					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkwrite, si->cw_set_depth);
+					GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, si->start_tn);
+					TP_TEND_CHANGE_REG(si);
+					wcs_timer_start(gv_cur_region, TRUE);
+					if (si->backup_block_saved)
+						backup_buffer_flush(gv_cur_region);
+				}
 			}
 			assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 			csa = jnl_fence_ctl.fence_list;
@@ -505,7 +531,7 @@ enum cdb_sc	op_tcommit(void)
 		/* the following section is essentially deferred garbage collection, freeing release block a bitmap at a time */
 		if (NULL != first_sgm_info)
 		{
-			for (si = first_sgm_info;  si != temp_si;  si = si->next_sgm_info)
+			for (si = first_sgm_info; si != temp_si; si = si->next_sgm_info)
 			{
 				if (NULL == si->kill_set_head)
 				{

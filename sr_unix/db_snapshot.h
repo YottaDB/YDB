@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 
 #include "gtm_limits.h"
 
-#define		SNAPSHOT_HDR_LABEL		"SNAPSHOTV1"
+#define	SNAPSHOT_HDR_LABEL	"SNAPSHOTV1"
 
 #define SET_FAST_INTEG(X)	((X)->proc_property |= 0x0001)
 #define SET_NORM_INTEG(X)	((X)->proc_property &= 0xfffe)
@@ -55,6 +56,7 @@ typedef struct shm_snapshot_struct
 	boolean_t	preserve_snapshot;
 	global_latch_t	bitmap_latch;		/* latch to be passed on to add_inter while modifying the shadow bitmap */
 	trans_num	ss_tn_count;		/* count of transactions after the snapshot started */
+	sgmnt_data	shadow_file_header;
 } shm_snapshot_t;
 
 typedef shm_snapshot_t		*shm_snapshot_ptr_t;

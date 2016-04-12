@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +41,7 @@ typedef struct	buddy_list_struct
 	 */
 	boolean_t	used_free_last_n_elements;	/* TRUE if "free_last_n_elements" was called in this buddy_list */
 	boolean_t	used_free_element;		/* TRUE if "get_new_free_element" or "free_element" was called */
+	boolean_t	nElems_greater_than_one;	/* TRUE if "get_new_element" was ever called with "nElements" > 1 */
 #	endif
 } buddy_list;
 
@@ -51,6 +53,7 @@ void		reinitialize_list(buddy_list *list);	/* used for reusing already allocated
 boolean_t	free_last_n_elements(buddy_list *list, int4 num);	/* to free up the last contiguous "num" elements */
 void		free_element(buddy_list *list, char *elem);	/* to free up an element and reuse it later */
 char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if available otherwise gets a new one */
+size_t		copy_list_to_buf(buddy_list *list, int4 numElems, char *dst);
 
 #define	PROBE_FREEUP_BUDDY_LIST(list)		\
 {						\

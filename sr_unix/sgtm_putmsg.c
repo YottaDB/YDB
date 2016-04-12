@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +13,11 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#include <stdarg.h>
 #include "gtm_stdio.h"
 
+#include <stdarg.h>
+
+#include "gtm_multi_thread.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -52,6 +54,7 @@ void sgtm_putmsg(char *out_str, ...)
 	arg_count = va_arg(var, int);
 
 	assert(arg_count > 0);
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	util_out_print(NULL, RESET);
 
 	for (;;)

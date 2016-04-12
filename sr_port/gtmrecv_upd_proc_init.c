@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +69,7 @@ error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLINFO);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_UPDPROC);
 
@@ -86,6 +88,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	uint4	cmd_channel;
 	$DESCRIPTOR(cmd_desc, UPDPROC_CMD_STR);
 #endif
+	pthread_mutexattr_t	write_updated_ctl_attr;
 
 	/* Check if the update process is alive */
 	if ((upd_status = is_updproc_alive()) == SRV_ERR)
@@ -128,6 +131,23 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 		repl_errno = EREPL_UPDSTART_BADPATH;
 		return(UPDPROC_START_ERR);
 	}
+	/* Destroy/Reinitialize the mutex.
+	 * Needed here in case the update process exited while holding the mutex, and the system didn't clean it up.
+	 * Robust mutexes should handle this case, in theory, but they are unreliable, at least on Ubuntu 12.04.
+	 */
+	pthread_mutex_destroy(&recvpool.recvpool_ctl->write_updated_ctl);
+	status = pthread_mutexattr_init(&write_updated_ctl_attr);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
+	status = pthread_mutexattr_setpshared(&write_updated_ctl_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+	status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
 	FORK(upd_pid);
 	if (0 > upd_pid)
 	{
@@ -147,7 +167,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_UPDPROC, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not exec Update Process"), errno);
 			repl_errno = EREPL_UPDSTART_EXEC;
-			_exit(UPDPROC_START_ERR);
+			UNDERSCORE_EXIT(UPDPROC_START_ERR);
 		}
 	}
 #elif defined(VMS)

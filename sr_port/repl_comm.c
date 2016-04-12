@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -182,7 +183,7 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 				repl_log(stderr, TRUE, TRUE, "Communication subsytem warning: System appears to be resource "
 						"starved. EAGAIN returned from select()/poll() %d times\n", EAGAIN_cnt);
 			}
-			rel_quant();
+			rel_quant();	/* this seems legit */
 		} else
 			return -1;
 		/* Just in case select() modifies the incoming arguments, restore fd_set and timeout_spec */
@@ -293,7 +294,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				{
 					repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: System appears to be "
 							"running slow; EWOULDBLOCK returned from send %d times\n", EWOULDBLOCK_cnt);
-				}
+				}	/* the rel_quant below might be legit */
 				rel_quant(); /* Relinquish our quanta in the hope that things get cleared next time around */
 			} else
 				break;
@@ -552,7 +553,7 @@ void repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket)
 	else
 	{
 		GTM_LOCALTIME(localtm, (time_t *)&conn_info.session_expiry_timeout);
-		expiry = asctime(localtm);
+		expiry = asctime(localtm);	/* BYPASSOK to prevent workcheck wanting to convert *time(..) to GTM_*TIME(..)*/
 	}
 	repl_log(logfp, FALSE, TRUE, "  Session Expiry: %s", expiry);
 	repl_log(logfp, FALSE, TRUE, "  Secure Renegotiation %s supported\n", conn_info.secure_renegotiation ? "IS" : "IS NOT");

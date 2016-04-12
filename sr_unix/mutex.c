@@ -49,7 +49,7 @@
 #include "is_proc_alive.h"
 #include "compswap.h"
 #include "gtmsecshr.h"
-#include "rel_quant.h"
+#include "gtm_rel_quant.h"
 #include "add_inter.h"
 #include "mutex_deadlock_check.h"
 #include "gt_timer.h"
@@ -95,8 +95,7 @@
 }
 
 #define	ONE_MUTEX_TRY(CSA, ADDR, CRASH_CNT, PID, LOCK_TYPE, SPINS, SPIN_CNT, YIELDS, YIELD_CNT, Q_SLPS, IN_EPOCH, ATSTART)	\
-MBSTART																\
-{																\
+MBSTART {															\
 	ABS_TIME 		ATEND;												\
 	enum cdb_sc		STATUS;												\
 	gtm_uint64_t		FAILED_LOCK_ATTEMPTS;										\
@@ -154,13 +153,13 @@ MBSTART																\
 		}														\
 		return STATUS;													\
 	}															\
-}																\
-MBEND
+} MBEND
+
 
 GBLREF int			num_additional_processors;
 GBLREF jnl_gbls_t		jgbl;
 GBLREF jnlpool_addrs		jnlpool;
-GBLREF pid_t			process_id;
+GBLREF uint4			process_id;
 GBLREF uint4			image_count, mutex_per_process_init_pid;
 #ifdef MUTEX_MSEM_WAKE
 GBLREF volatile uint4           heartbeat_counter;
@@ -442,7 +441,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 		{
 			timeout.tv_sec = MUTEX_CONST_TIMEOUT_VAL;
 			timeout.tv_usec = (gtm_tv_usec_t)(nrand48(next_rand) & ((1U << MUTEX_NUM_WAIT_BITS) - 1)) + 1;
-			timeout_val = timeout.tv_sec * ONE_MILLION + timeout.tv_usec;
+			timeout_val = (timeout.tv_sec * E_6) + timeout.tv_usec;
 			/*
 			 * Can add backoff logic here to increase the timeout
 			 * as the number of attempts increase
@@ -472,8 +471,8 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex select. Running in degraded mode"), errno);
 				timeout_val >>= 1;
-				timeout.tv_sec = timeout_val / ONE_MILLION;
-				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % ONE_MILLION);
+				timeout.tv_sec = timeout_val / E_6;
+				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % E_6);
 				MUTEX_DPRINT4("%d: Interrupted select, new timeout %d s %d us\n", process_id, timeout.tv_sec,
 					timeout.tv_usec);
 				/* the next line deals with the case that an interrupted select has changed mutex_wait_on_descs */
@@ -617,7 +616,7 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr, mutex_spin_parms_ptr_t 
 						/* Too many failures */
 						return (cdb_sc_dbccerr);
 					} else
-						rel_quant();
+						GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
 				} while (quant_retry_counter_insq);	/* actually terminated by return 3 lines above */
 			} else if ((mutex_que_entry_ptr_t)NULL == free_entry)
 			{
@@ -634,7 +633,7 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr, mutex_spin_parms_ptr_t 
 		if (!(--quant_retry_counter_remq))
 			return (cdb_sc_dbccerr); /* Too many queue failures */
 		else
-			rel_quant();
+			GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
 	} while (quant_retry_counter_remq);
 	return (cdb_sc_dbccerr); /* This will never get executed, added to make compiler happy */
 }
@@ -662,16 +661,13 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	mutex_struct_ptr_t 	addr;
 	mutex_que_entry_ptr_t	free_slot;
 	node_local		*cnl;
-	pid_t			in_crit_pid;
+	uint4			in_crit_pid;
 	sgmnt_addrs		*csa;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_alert_uint4;
 	ABS_TIME 		atstart;
 #	ifdef MUTEX_MSEM_WAKE
 	int			rc;
-#	endif
-#	ifdef MUTEX_REAL_SLEEP
-	int			micro_sleep_time;
 #	endif
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -727,19 +723,15 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			else
 				MUTEX_TRACE_CNTR(mutex_trc_wtim_short_slp);
 #			endif
-#			ifdef MUTEX_REAL_SLEEP
-			micro_sleep_time = (nrand48(next_rand) & mutex_spin_parms->mutex_spin_sleep_mask) + 1;
-			assert(micro_sleep_time < ONE_MILLION);
-			assert(FALSE == csa->now_crit);
-			SLEEP_USEC(micro_sleep_time, FALSE);
-#			else
-			rel_quant();
-#			endif
 			if (-1 == sleep_spin_cnt)	/* save memory reference on fast path */
 			{
 				sleep_spin_cnt = mutex_spin_parms->mutex_sleep_spin_count;
+				if (0 == sleep_spin_cnt)
+					break;
 				yields += sleep_spin_cnt;				/* start with max */
 			}
+			assert(!csa->now_crit);
+			GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
 		} while (--sleep_spin_cnt);
 		MUTEX_DPRINT4("%d: Could not acquire WRITE %sLOCK, held by %d\n", process_id,
 			(MUTEX_LOCK_WRITE == mutex_lock_type) ? "" : "IMMEDIATE ", addr->semaphore.u.parts.latch_pid);
@@ -879,18 +871,21 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						break;
 					if (-1 == sleep_spin_cnt)		/* save memory reference on fast path */
 					{
-						sleep_spin_cnt = MAX(E_4 - mutex_spin_parms->mutex_hard_spin_count,
-							mutex_spin_parms->mutex_sleep_spin_count);
+						sleep_spin_cnt = mutex_spin_parms->mutex_sleep_spin_count;
+						if (0 == sleep_spin_cnt)
+							break;
+						sleep_spin_cnt = MAX(E_4 - mutex_spin_parms->mutex_hard_spin_count, sleep_spin_cnt);
 						yields += sleep_spin_cnt;	/* start with max */
 					}
 #					ifndef MUTEX_MSEM_WAKE
 					if (wake_this_pid != process_id)
 						mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
 #					endif
-					if (!(--sleep_spin_cnt))
+					if (0 != (--sleep_spin_cnt))
 						return (cdb_sc_dbccerr);	/* Too many failures */
-					rel_quant();
-				} while (sleep_spin_cnt);		/* actually terminated by the return two lines above */
+					assert(!csa->now_crit);
+					GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
+				} while (sleep_spin_cnt);		/* actually terminated by the return three lines above */
 			}
 			if (sleep_spin_cnt)
 			{
@@ -917,7 +912,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			if (redo_cntr--)
 			{
 				yields++;
-				SLEEP_USEC(HUNDRED_MSEC, FALSE);	/* Wait a tenth of a second, then try again */
+				SLEEP_USEC(HUNDRED_MSEC, FALSE);	/* Wait .1 second or until interrupted, then try again */
 				continue;
 			}
 		} while (redo_cntr);
@@ -976,7 +971,7 @@ void mutex_salvage(gd_region *reg)
 {
 	sgmnt_addrs	*csa;
 	int		salvage_status;
-	pid_t		holder_pid, onln_rlbk_pid;
+	uint4		holder_pid, onln_rlbk_pid;
 	boolean_t	mutex_salvaged;
 	VMS_ONLY(uint4	holder_imgcnt;)
 	DCL_THREADGBL_ACCESS;

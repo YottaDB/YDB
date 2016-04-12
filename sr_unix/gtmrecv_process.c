@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,6 +215,7 @@ error_def(ERR_REUSEINSTNAME);
 error_def(ERR_SECONDAHEAD);
 error_def(ERR_STRMNUMIS);
 error_def(ERR_SUPRCVRNEEDSSUPSRC);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_TLSCONVSOCK);
 error_def(ERR_TLSHANDSHAKE);
@@ -240,7 +241,7 @@ static	long		recvpool_high_watermark, recvpool_low_watermark;
 static	uint4		write_loc, write_wrap;
 static	uint4		write_off;
 static	double		time_elapsed;
-static	int		recvpool_size;
+static	uint4		recvpool_size;
 static	int		heartbeat_period;
 #ifdef REPL_CMP_SOLVE_TESTING
 static	boolean_t	repl_cmp_solve_timer_set;
@@ -312,12 +313,16 @@ static	boolean_t	repl_cmp_solve_timer_set;
 		return;								\
 }
 
+#if defined(GTM_REPLIC_FLOW_CONTROL_ENABLED)
 #define	DO_FLOW_CONTROL(write_loc)						\
 {										\
 	do_flow_control(write_loc);						\
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
 		return;								\
 }
+#else
+#define	DO_FLOW_CONTROL(write_loc)	/* nothing */
+#endif
 
 /* Wrapper for gtmrecv_poll_actions to handle connection reset. The arguments passed in are typically either the static variables
  * `data_len', `buff_unprocessed' and `buffp'. But, these values are relevant only when this is being called from do_main_loop as
@@ -483,12 +488,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			}
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			{
-				/* This code will need changes in case the jnl-ver changes from V25 to V26 so add an assert to
+			{	/* This code will need changes in case the jnl-ver changes from V26 to V27 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V25_JNL_VER);
+				assert(JNL_VER_THIS == V26_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -920,6 +924,7 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	assert(!mur_options.rollback || (NULL == recvpool.gtmrecv_local));
 	assert(mur_options.rollback || (NULL != recvpool.gtmrecv_local));
 	assert((REPL_MULTISITE_MSG_START > type) || (REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver));
@@ -969,6 +974,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	grab_lock_needed = is_rcvr_srvr || ((NULL != jnlpool_ctl) && !repl_csa->hold_onto_crit);
 	remote_side_is_supplementary = need_instinfo_msg->is_supplementary;
@@ -1416,7 +1422,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 
 STATICFNDEF int	gtmrecv_start_onln_rlbk(void)
 {
-	char			command[ONLN_RLBK_CMD_MAXLEN], *errptr;
+	char			command[ONLN_RLBK_CMD_MAXLEN + 1], *errptr;
 	int			status, save_errno, cmdlen;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 
@@ -1434,7 +1440,7 @@ STATICFNDEF int	gtmrecv_start_onln_rlbk(void)
 	MEMCPY_LIT(&command[cmdlen], ONLN_RLBK_QUALIFIERS);
 	cmdlen += STR_LIT_LEN(ONLN_RLBK_QUALIFIERS);
 	assert(0 < gtmrecv_local->listen_port);
-	SNPRINTF(&command[cmdlen], ONLN_RLBK_CMD_MAXLEN, "%d", gtmrecv_local->listen_port); /* will add '\0' at the end */
+	SNPRINTF(&command[cmdlen], ONLN_RLBK_CMD_MAXLEN - cmdlen, "%d", gtmrecv_local->listen_port); /* will add '\0' at the end */
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Executing %s\n", command);
 	status = SYSTEM(((char *)command));
 	if (0 != status)
@@ -1809,8 +1815,9 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						 * allocate new buffer and redo transformation from scratch.
 						 */
 						gtmrecv_free_filter_buff();
-						gtmrecv_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
-						in_size = write_len;	/* just in case in_size was modified */
+						in_size = pre_filter_write_len;	/* just in case in_size was modified */
+						write_len = write_len + (write_len >> 1); /* increase the buffer size by half */
+						gtmrecv_alloc_filter_buff(write_len);
 					}
 					if (SS_NORMAL == status)
 						write_len = out_size;
@@ -2059,15 +2066,15 @@ STATICFNDEF void process_tr_buff(int msg_type)
 					}
 				}
 				assert((INVALID_SUPPL_STRM != strm_index) || (0 == pool_histinfo->strm_index));
+				cur_histinfo = &recvpool_ctl->last_rcvd_histinfo;
+				*cur_histinfo = *pool_histinfo;
 				if ((INVALID_SUPPL_STRM == strm_index) || (strm_index == pool_histinfo->strm_index))
 				{
 					assert((pool_histinfo->start_seqno > recvpool_ctl->last_valid_histinfo.start_seqno)
 						 || ((pool_histinfo->start_seqno == recvpool_ctl->last_valid_histinfo.start_seqno)
 							&& gtm_white_box_test_case_enabled
 							&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number)));
-					cur_histinfo = &recvpool_ctl->last_rcvd_histinfo;
 					assert(pool_histinfo->start_seqno >= cur_histinfo->start_seqno);
-					*cur_histinfo = *pool_histinfo;
 				} else
 				{
 					assert(!recvpool_ctl->insert_strm_histinfo);
@@ -2214,6 +2221,11 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
 		recvpool_ctl->write = write_loc;
+		/* Signal the update process to check for the update. */
+		PTHREAD_COND_SIGNAL(&recvpool_ctl->write_updated, status);
+		if (0 != status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	} while (is_repl_cmpc);
 	return;
 }
@@ -2479,12 +2491,15 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 	{	/* Both receiver and source sides are supplementary instances */
 		/* strm_index is 0 at this point (already asserted above) */
 		assert(INVALID_SUPPL_STRM != need_histinfo_strm_num);
-		if (INVALID_HISTINFO_NUM == need_histinfo_num)
+		if ((INVALID_HISTINFO_NUM == need_histinfo_num) || (UNKNOWN_HISTINFO_NUM == need_histinfo_num))
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for Stream %d : "
 				"Seqno "INT8_FMT" "INT8_FMTX"\n", need_histinfo_strm_num, need_histinfo_seqno, need_histinfo_seqno);
 		else
+		{
+			assert(0 <= need_histinfo_num);
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for History Number %d\n",
 				need_histinfo_num);
+		}
 	}
 	/* The only two histinfo_num values that have special meaning are negative. So we can check for a valid value
 	 * by checking for positive. Assert that below before doing the positive check.
@@ -3426,13 +3441,14 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							}
 							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 							GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
-							/* The ONLINE ROLLBACK did not change the physical or the logical state as
-							 * otherwise the above macro would have returned to the caller. But, since
-							 * we have already disconnected the connection by now, we cannot resume the
-							 * flow from this point on. So, go ahead and release the lock and shutdown
-							 * the Receiver Server.
+							/* The ONLINE ROLLBACK did not change the physical or the logical state.
+							 * Otherwise the above macro would have returned to the caller. Since we
+							 * have already disconnected the connection by now, we cannot resume the
+							 * flow from this point on. Return to the calling function to continue
+							 * reconnecting.
 							 */
 							rel_lock(jnlpool.jnlpool_dummy_reg);
+							return;
 						} else
 						{
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver was not started with "

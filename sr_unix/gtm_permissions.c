@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,9 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 
+GBLREF  char		gtm_dist[GTM_PATH_MAX];
+GBLREF  boolean_t	gtm_dist_ok_to_use;
+
 #if defined(__hpux) && defined(__hppa)
 #	define LIBGTMSHR "%s/libgtmshr.sl"
 #elif defined(__MVS__)
@@ -41,9 +44,8 @@
  */
 gid_t	gtm_get_group_id(struct stat *stat_buff)
 {
-	char			*env_var;
 	int			ret_stat;
-	char			temp[PATH_MAX + SIZEOF("libgtmshr.dll")];
+	char			temp[GTM_PATH_MAX];
 	static boolean_t	first_time = TRUE;
 	static struct stat	st_buff;
 
@@ -52,11 +54,10 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 		*stat_buff = st_buff;
 		return st_buff.st_gid;
 	}
-	env_var = GETENV("gtm_dist");
-	if (NULL != env_var)
+	if (gtm_dist_ok_to_use)
 	{
 		/* build a path to libgtmshr.so or .sl on hpux or .dll on zos */
-		SNPRINTF(temp, SIZEOF(temp), LIBGTMSHR, env_var);
+		SNPRINTF(temp, SIZEOF(temp), LIBGTMSHR, gtm_dist);
 		STAT_FILE(temp, stat_buff, ret_stat);
 		if (0 == ret_stat)
 		{
@@ -65,7 +66,7 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 			return(stat_buff->st_gid);
 		}
 	}
-	/* return INVALID_GID if $gtm_dist found or if STAT_FILE returned a -1 */
+	/* return INVALID_GID if STAT_FILE returned a -1 or gtm_dist has not been validated */
 	return (INVALID_GID);
 }
 

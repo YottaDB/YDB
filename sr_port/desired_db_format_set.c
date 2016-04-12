@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,19 +69,18 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	assert(reg->open);
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
-	GTMCRYPT_ONLY(
-		/* We don't allow databases to be encrypted if the version is V4 */
-		if (csd->is_encrypted && (GDSV4 == new_db_format))
-		{
-			gtm_putmsg(VARLSTCNT(4) ERR_CRYPTNOV4, 2, DB_LEN_STR(reg));
-			return ERR_CRYPTNOV4;
-		}
-	)
+	/* We do not allow databases to be encrypted if the version is V4. */
+	if (USES_ENCRYPTION(csd->is_encrypted) && (GDSV4 == new_db_format))
+	{
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRYPTNOV4, 2, DB_LEN_STR(reg));
+		return ERR_CRYPTNOV4;
+	}
 	GTM_SNAPSHOT_ONLY(
 		/* We don't allow databases to be downgraded when snapshots are in progress */
 		if (SNAPSHOTS_IN_PROG(csa->nl) && (GDSV4 == new_db_format))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_SNAPSHOTNOV4, 3, csa->nl->num_snapshots_in_effect, DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SNAPSHOTNOV4,
+				3, csa->nl->num_snapshots_in_effect, DB_LEN_STR(reg));
 			return ERR_SNAPSHOTNOV4;
 		}
 	)
@@ -95,13 +95,10 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		assert(csd->trans_hist.curr_tn <= csd->max_tn);
 		if ((GDSV4 == new_db_format) && (MAX_TN_V4 < csd->max_tn))
 		{	/* reset max_tn to MAX_TN_V4 only if V4 format and the new value will still be greater than curr_tn */
-			if (MAX_TN_V4 >= csd->trans_hist.curr_tn)
-			{
-				csd->max_tn = MAX_TN_V4;
-				/* since max_tn changed above, max_tn_warn might also need to correspondingly change */
-				SET_TN_WARN(csd, csd->max_tn_warn);
-			} else
-				GTMASSERT;	/* out-of-design state where curr_tn > MAX_TN_V4 in GDSV4 */
+			assertpro(MAX_TN_V4 >= csd->trans_hist.curr_tn);
+			csd->max_tn = MAX_TN_V4;
+			/* since max_tn changed above, max_tn_warn might also need to correspondingly change */
+			SET_TN_WARN(csd, csd->max_tn_warn);
 		}
 		if (FALSE == was_crit)
 			rel_crit(reg);
@@ -110,7 +107,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	if (dba_mm == csd->acc_meth)
 	{
 		status = ERR_MMNODYNDWNGRD;
-		gtm_putmsg(VARLSTCNT(4) status, 2, REG_LEN_STR(reg));
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) status, 2, REG_LEN_STR(reg));
 		if (FALSE == was_crit)
 			rel_crit(reg);
 		return status;
@@ -120,7 +117,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	if ((GDSV4 == new_db_format) && (MAX_TN_V4 <= curr_tn))
 	{
 		status = ERR_MUDWNGRDTN;
-		gtm_putmsg(VARLSTCNT(5) status, 3, &curr_tn, DB_LEN_STR(reg));
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, &curr_tn, DB_LEN_STR(reg));
 		if (FALSE == was_crit)
 			rel_crit(reg);
 		return status;
@@ -130,10 +127,11 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	{	/* Set wc_blocked so next process to get crit will trigger cache-recovery */
 		SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
 		wcblocked_ptr = WCS_PHASE2_COMMIT_WAIT_LIT;
-		send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
 			process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));
 		status = ERR_COMMITWAITSTUCK;
-		gtm_putmsg(VARLSTCNT(7) status, 5, process_id, 1, csa->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(reg));
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) status, 5, process_id,
+				1, csa->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(reg));
 		if (FALSE == was_crit)
 			rel_crit(reg);
 		return status;
@@ -159,12 +157,12 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 			jnl_write_inctn_rec(csa);
 			inctn_opcode = save_inctn_opcode;
 		} else
-			gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 	}
 	csd->desired_db_format = new_db_format;
 	csd->fully_upgraded = FALSE;
 	csd->desired_db_format_tn = curr_tn;
-	switch(new_db_format)
+	switch (new_db_format)
 	{
 		case GDSV4:
 			csd->max_tn = MAX_TN_V4;
@@ -173,7 +171,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 			csd->max_tn = MAX_TN_V6;
 			break;
 		default:
-			GTMASSERT;
+			assertpro((GDSV4 == new_db_format) || (GDSV6 == new_db_format));
 	}
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* if max_tn changed above, max_tn_warn also needs a corresponding change */
 	assert(curr_tn < csd->max_tn);	/* ensure CHECK_TN macro below will not issue TNTOOLARGE rts_error */
@@ -185,7 +183,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	if (FALSE == was_crit)
 		rel_crit(reg);
 	status = SS_NORMAL;
-	send_msg(VARLSTCNT(11) ERR_DBDSRDFMTCHNG, 9, DB_LEN_STR(reg), LEN_AND_STR(gtm_dbversion_table[new_db_format]),
-		LEN_AND_STR(command_name), process_id, process_id, &curr_tn);
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBDSRDFMTCHNG, 9, DB_LEN_STR(reg),
+		LEN_AND_STR(gtm_dbversion_table[new_db_format]), LEN_AND_STR(command_name), process_id, process_id, &curr_tn);
 	return status;
 }

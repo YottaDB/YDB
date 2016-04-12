@@ -9,6 +9,7 @@
 #								#
 #################################################################
 
+set(srdir "sr_linux")
 if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   set(arch "x86")
   set(bits 32)
@@ -16,6 +17,14 @@ if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   # Set arch to i586 in order to compile for Galileo
   set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=i586")
   set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586")
+# (Sam): I am not really sure if we need this at all. The Linker has
+#        no issues finding the symbols. If we add _, it now has trouble.
+# For Cygwin, we need to change the assembly symbols to start with _.
+# See http://www.drpaulcarter.com/pcasm/faq.php, esp. the examples in the zip files.
+# UPDATE: Now I figure out that this is needed for 32 bit CYGWIN ONLY. 64 bit keeps the same symbols!
+  if(CYGWIN)
+    list(APPEND CMAKE_ASM_COMPILE_OBJECT "objcopy --prefix-symbols=_ <OBJECT>")
+  endif()
 else()
   set(arch "x86_64")
   set(bits 64)
@@ -34,11 +43,17 @@ endif()
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 
 # Compiler
-set(CMAKE_C_FLAGS
-  "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
-
-set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -fno-defer-pop -fno-strict-aliasing -ffloat-store")
+if(${CYGWIN})
+  # (VEN/SMH): Looks like we need to add the defsym to tell the assembler to define 'cygwin'
+  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,--defsym,cygwin=1")
+else()
+  # Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
+  #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
+  # Cygwin warns if you add -fPIC that the compiled code is already position
+  # independent. So don't add -fPIC
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
+endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR

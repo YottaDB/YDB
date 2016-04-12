@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,8 @@
  * in addition to the other handlers for each trigger frame, the maximums may need to be re-visited.
  */
 #ifdef DEBUG
-#  define CONDSTK_INITIAL_INCR	3	/* Low initial limit for DEBUG to exercise extensions */
+#  define CONDSTK_INITIAL_INCR	5	/* Lower initial limit for DEBUG to exercise extensions. Note that values below 5 cause
+					 * issues with nested malloc()s when using certain gtmdbglvl values. */
 #else
 #  define CONDSTK_INITIAL_INCR	8	/* Initial increment value used when expanding condition handler stack */
 #endif
@@ -75,6 +76,7 @@ typedef struct condition_handler_struct
 								 */
 	ch_ret_type			(*ch)();		/* Condition handler address */
 	jmp_buf				jmp;			/* setjmp/longjmp buffer associated with ESTABLISH point */
+	intrpt_state_t			intrpt_ok_state;	/* intrpt_ok_state at time of ESTABLISH_RET/ESTABLISH */
 } condition_handler;
 
 /* The values below usually expand as GBLREF. If CHEXPAND is defined, they will
@@ -149,52 +151,35 @@ void ch_trace_point() {return;}
  * ENABLE_INTERRUPTS macro can be removed from these MUM_TSTART macros and handled instead in the longjmp() return of the
  * setjmp() call there.
  */
-#ifdef GTM_TRIGGER
-/* Note the 3rd assert makes sure we are NOT returning to a trigger-invoking frame which does not have a valid msp to
- * support a return since a call to op_gvput or op_kill does not save a return addr in the M stackframe but only in the C
- * stackframe. But if proc_act_type is non-zero we set an error frame flag and getframe instead detours to
- * error_return which deals with the module appropriately.
+/* Note the 3rd assert makes sure we are NOT returning to a ANY frame which does not have a valid msp to support a return
+ * since a call to op_gvput or op_kill does not save a return addr in the M stackframe but only in the C stackframe. But
+ * if proc_act_type is non-zero we set an error frame flag and getframe instead detours to error_return which deals with
+ * the module appropriately.
  */
 #define MUM_TSTART		{												\
 					GBLREF unsigned short	proc_act_type;							\
 					GBLREF int		process_exiting;						\
 																\
+					intrpt_state_t		prev_intrpt_state;						\
+																\
+					assert(!multi_thread_in_use);								\
 					assert(!process_exiting);								\
 					CHTRACEPOINT;										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
 					CHECKLOWBOUND(ctxt);									\
 					assert((ctxt->ch == &mdb_condition_handler)						\
 					       && (FALSE == ctxt->save_active_ch->ch_active));					\
 					/* Absolutely critical that this *never* occur hence assertpro() */			\
-					assertpro(!(SFF_IMPLTSTART_CALLD & frame_pointer->flags) || (0 != proc_act_type)	\
+					assertpro(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (0 != proc_act_type)	\
 						  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
 					ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
 					longjmp(ctxt->jmp, 1);									\
 				}
-#else
-#define MUM_TSTART		{												\
-					GBLREF int		process_exiting;						\
-																\
-					assert(!process_exiting);								\
-					CHTRACEPOINT;										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
-					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--); 			\
-					CHECKLOWBOUND(ctxt);									\
-					assert((ctxt->ch == &mdb_condition_handler)						\
-					       && (FALSE == ctxt->save_active_ch->ch_active));					\
-					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
-					ctxt->ch_active = FALSE; 								\
-					restart = mum_tstart;									\
-					active_ch = ctxt;									\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
-					longjmp(ctxt->jmp, 1);									\
-				}
-#endif
 
 /* Assumed that when this macro is used, interrupts are disabled. One case where that is not done exists which is in
  * sr_unix/gtm_asm_establish.c (called by assembler routines). Once the assembler ESTABLISH macros support doing the
@@ -203,6 +188,7 @@ void ch_trace_point() {return;}
 #define GTM_ASM_ESTABLISH	{	/* So named because gtm_asm_establish does exactly this */		\
 					GBLREF uint4 dollar_tlevel;						\
 														\
+					assert(IS_PTHREAD_LOCKED_AND_HOLDER);					\
 					CHTRACEPOINT;								\
 					ctxt++;									\
 					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
@@ -216,99 +202,195 @@ void ch_trace_point() {return;}
 /* Currently the ESTABLISH_NOJMP macro is only used internal to this header file - if ever used outside this header file, it
  * needs to be protected with DEFER/ENABLE_INTERRUPTS macros.
  */
-#define ESTABLISH_NOJMP(x)	{										\
-					GTM_ASM_ESTABLISH;							\
-					ctxt->ch = x;								\
+#define ESTABLISH_NOJMP(x)	{								\
+					GTM_ASM_ESTABLISH;					\
+					ctxt->ch = x;						\
 				}
 
-#define ESTABLISH_NOUNWIND(x)	ESTABLISH_NOJMP(x)
-#define ESTABLISH_RET(x, ret)	{										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
+#define ESTABLISH_NOUNWIND(x)	{										\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
 					ESTABLISH_NOJMP(x);							\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);		\
+				}
+
+#define ESTABLISH_RET(x, ret)	{										\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
+					ESTABLISH_NOJMP(x);							\
+					/* Save "prev_intrpt_state" input parameter in "ctxt". This is later	\
+					 * needed if/when "setjmp" returns non-zero (through longjmp). At that	\
+					 * time, local variable values are not restored correctly on Solaris	\
+					 * most likely because the local variable "prev_intrpt_state" defined	\
+					 * in the ESTABLISH_RET macro block goes out-of-scope the moment the	\
+					 * macro returns whereas on other platforms it stays in-scope most	\
+					 * likely because this gets allocated in the outermost {...} of the	\
+					 * calling function. Just in case this behavior changes in the future,	\
+					 * we store it in a global var for all platforms (not just Solaris).	\
+					 */									\
+					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						REVERT;								\
+						/* The only way we should reach here is if a "longjmp" happened	\
+						 * inside the condition handler "x". In that case, we dont	\
+						 * know the state of the global variable "intrpt_ok_state" so	\
+						 * reset it to what it was before the DEFER_INTERRUPTS macro	\
+						 * call in the ESTABLISH_RET macro.				\
+						 */								\
+						if (!multi_thread_in_use)					\
+						{								\
+							assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state);	\
+							assert(INTRPT_NUM_STATES > prev_intrpt_state);		\
+							intrpt_ok_state = prev_intrpt_state;			\
+						}								\
 						return ret;							\
 					} else									\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
 				}
 
 #ifdef __cplusplus  /* must specify return value (if any) for C++ */
 # define ESTABLISH(x, ret)	ESTABLISH_RET(x, ret)
 #else
 # define ESTABLISH(x)		{										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
 					ESTABLISH_NOJMP(x);							\
+					/* See ESTABLISH_RET macro comment for below assert */			\
+					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						REVERT;								\
+						/* See ESTABLISH_RET macro comment for below assert */		\
+						if (!multi_thread_in_use)					\
+						{								\
+							assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state);	\
+							assert(INTRPT_NUM_STATES > prev_intrpt_state);		\
+							intrpt_ok_state = prev_intrpt_state;			\
+						}								\
 						return;								\
 					} else									\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
 				}
 # define ESTABLISH_NORET(x, did_long_jump)									\
 				{										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
 					did_long_jump = FALSE;							\
 					ESTABLISH_NOJMP(x);							\
+					/* See ESTABLISH_RET macro comment for below assert */			\
+					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
+					{									\
+						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						did_long_jump = TRUE;						\
-					else									\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
+						/* See ESTABLISH_RET macro comment for below assert */		\
+						assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state);		\
+						assert(INTRPT_NUM_STATES > prev_intrpt_state);			\
+						/* Assert "intrpt_ok_state" and "prev_intrpt_state" are same in	\
+						 * "dbg" but restore "intrpt_ok_state" in "pro" just in case	\
+						 */								\
+						assert(prev_intrpt_state == intrpt_ok_state);			\
+						intrpt_ok_state = prev_intrpt_state;				\
+					} else									\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
 				}
+
+# define WITH_CH(HANDLER, OP, ERR_OP)										\
+MBSTART {													\
+	boolean_t	ERROR_SEEN;										\
+														\
+	ESTABLISH_NORET(HANDLER, ERROR_SEEN);									\
+	if (!ERROR_SEEN)											\
+	{													\
+		OP;												\
+		REVERT;												\
+	} else													\
+	{													\
+		REVERT;												\
+		ERR_OP;												\
+	}													\
+} MBEND
 #endif
 
 #define REVERT			{										\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					assert(IS_PTHREAD_LOCKED_AND_HOLDER);					\
 					CHTRACEPOINT;								\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
 					active_ch = ctxt->save_active_ch;					\
 					CHECKHIGHBOUND(active_ch);						\
 					CHECKLOWBOUND(active_ch);						\
 					ctxt--;									\
 					CHECKLOWBOUND(ctxt);							\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);					\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);		\
 				}
 
-#define CONTINUE		{									\
-					CHTRACEPOINT;							\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);				\
-					active_ch++;							\
-					CHECKHIGHBOUND(active_ch);					\
-					chnd[current_ch].ch_active = FALSE;				\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
-					return;								\
+#define CONTINUE		{											\
+					intrpt_state_t		prev_intrpt_state;					\
+															\
+					/* If threads are in use, a CONTINUE inside a condition-handler transitions	\
+					 * the thread from error-handling to a no-error state which can cause an	\
+					 * out-of-design situation because we assume that all threads which go		\
+					 * through any condition-handler exit and never resume execution.		\
+					 */										\
+					assert(!multi_thread_in_use);							\
+					CHTRACEPOINT;									\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
+					active_ch++;									\
+					CHECKHIGHBOUND(active_ch);							\
+					chnd[current_ch].ch_active = FALSE;						\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
+					return;										\
 				}
 
-#define DRIVECH(x)		{									\
-					error_def(ERR_TPRETRY);		/* BYPASSOK */			\
-					CHTRACEPOINT;							\
-					if (ERR_TPRETRY != error_condition)				\
-						ch_cond_core();						\
-					if (NULL != active_ch)						\
-					{								\
-						DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);			\
-						while (active_ch >= &chnd[0])				\
-						{							\
-							if (!active_ch->ch_active)			\
-							       break;					\
-							active_ch--;					\
-						}							\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);			\
-						if (active_ch >= &chnd[0] && *active_ch->ch)		\
-							(*active_ch->ch)(x);				\
-						else							\
-							ch_overrun();					\
-					} else								\
-					{	/* No condition handler has been ESTABLISHed yet.	\
-						 * Most likely error occuring at process startup.	\
-						 * Just print error and exit with error status.		\
-						 */							\
-						stop_image_ch();					\
-					}								\
-					assert((SUCCESS == SEVERITY) || (INFO == SEVERITY));		\
+#define DRIVECH(x)		{										\
+					intrpt_state_t		prev_intrpt_state;				\
+														\
+					error_def(ERR_TPRETRY);		/* BYPASSOK */				\
+														\
+					assert(IS_PTHREAD_LOCKED_AND_HOLDER);					\
+					/* See comment before SET_FORCED_THREAD_EXIT in GTM_PTHREAD_EXIT macro	\
+					 * for why the below PTHREAD_EXIT_IF_FORCED_EXIT is necessary.		\
+					 */									\
+					if (multi_thread_in_use)						\
+						PTHREAD_EXIT_IF_FORCED_EXIT;					\
+					CHTRACEPOINT;								\
+					if (ERR_TPRETRY != error_condition)					\
+						ch_cond_core();							\
+					if (NULL != active_ch)							\
+					{									\
+						DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);		\
+						while (active_ch >= &chnd[0])					\
+						{								\
+							if (!active_ch->ch_active)				\
+							       break;						\
+							active_ch--;						\
+						}								\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
+						if (active_ch >= &chnd[0] && *active_ch->ch)			\
+							(*active_ch->ch)(x);					\
+						else								\
+							ch_overrun();						\
+					} else									\
+					{	/* No condition handler has been ESTABLISHed yet.		\
+						 * Most likely error occuring at process startup.		\
+						 * Just print error and exit with error status.			\
+						 */								\
+						stop_image_ch();						\
+					}									\
+					assert((SUCCESS == SEVERITY) || (INFO == SEVERITY));			\
 				}
 
 #define NEXTCH			{									\
+					assert(IS_PTHREAD_LOCKED_AND_HOLDER);				\
 					CHTRACEPOINT;							\
 					chnd[current_ch].ch_active = FALSE;				\
 					DRIVECH(arg);							\
@@ -338,18 +420,26 @@ void ch_trace_point() {return;}
 					GBLREF	volatile boolean_t	in_wcs_recover;						\
 					GBLREF	uint4			dollar_tlevel;						\
 																\
+					intrpt_state_t			prev_intrpt_state;					\
+																\
+					/* If threads are in use, an UNWIND inside a condition-handler transitions		\
+					 * the thread from error-handling to a no-error state which can cause an		\
+					 * out-of-design situation because we assume that all threads which go			\
+					 * through any condition-handler exit and never resume execution.			\
+					 */											\
+					assert(!multi_thread_in_use);								\
 					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);				\
 					/* When we hit an error in the midst of commit, t_ch/t_commit_cleanup should be invoked	\
 					 * and clean it up before any condition handler on the stack unwinds. 			\
 					 */											\
 					assert((0 == have_crit(CRIT_IN_COMMIT)) || in_wcs_recover);				\
 					CHTRACEPOINT;										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 					chnd[current_ch].ch_active = FALSE;							\
 					active_ch++;										\
 					CHECKHIGHBOUND(active_ch);								\
 					ctxt = active_ch;									\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
 					assert(UNWINDABLE(active_ch));								\
 					assert(active_ch->dollar_tlevel == dollar_tlevel);					\
 					longjmp(active_ch->jmp, -1);								\
@@ -365,19 +455,23 @@ void ch_trace_point() {return;}
  */
 #define START_CH(continue_on_success) 		/* info is a form of success */				\
 	GBLREF boolean_t	ctrlc_on;								\
+													\
 	error_def(ERR_CTRLC);			/* BYPASSOK */						\
 	error_def(ERR_CTRLY);			/* BYPASSOK */						\
+													\
 	int 		current_ch;									\
+	intrpt_state_t	prev_intrpt_state;								\
 	DCL_THREADGBL_ACCESS;										\
 													\
 	SETUP_THREADGBL_ACCESS;										\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);								\
 	CHTRACEPOINT;											\
-	DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);								\
+	DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);						\
 	current_ch = (active_ch - chnd);								\
 	active_ch->ch_active = TRUE;									\
 	active_ch--;											\
 	CHECKLOWBOUND(active_ch);									\
-	ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);								\
+	ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 	DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",		\
 		 __FILE__, __LINE__, arg, SIGNAL));							\
 	if ((continue_on_success) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)			\
@@ -405,19 +499,21 @@ void stop_image_no_core(void);
 #define SUPPRESS_DUMP		(created_core || dont_want_core)
 #define DUMP_CORE               gtm_dump_core();
 
-#define MUMPS_EXIT		{							\
-					GBLREF int4 exi_condition;			\
-					GBLREF int  mumps_status;			\
-					CHTRACEPOINT;					\
-					mumps_status = SIGNAL;				\
-					exi_condition = -mumps_status;  		\
-					EXIT(-exi_condition);				\
+#define MUMPS_EXIT		{										\
+					GBLREF int4 exi_condition;						\
+					GBLREF int  mumps_status;						\
+														\
+					/* We are about to manipulate global variable "mumps_status"		\
+					 * and "exi_condition" so assert we are not inside threaded code.	\
+					 */									\
+					assert(!multi_thread_in_use);						\
+					CHTRACEPOINT;								\
+					mumps_status = SIGNAL;							\
+					exi_condition = -mumps_status;						\
+					EXIT(-exi_condition);							\
 				}
 
-#define PROCDIE(x)		_exit(x)	/* No exit handler, no cleanup, just die */
-#define EXIT(x)			{					\
-						exit(x);		\
-				}
+#define PROCDIE(x)		UNDERSCORE_EXIT(x)	/* No exit handler, no cleanup, just die */
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -470,6 +566,7 @@ CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
 CONDITION_HANDLER(mu_extract_handler);
 CONDITION_HANDLER(mu_extract_handler1);
+CONDITION_HANDLER(mu_extract_handler2);
 CONDITION_HANDLER(mu_rndwn_all_helper_ch);
 CONDITION_HANDLER(mu_rndwn_repl_instance_ch);
 CONDITION_HANDLER(mu_rndwn_replpool_ch);

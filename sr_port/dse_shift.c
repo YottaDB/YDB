@@ -128,7 +128,7 @@ void dse_shift(void)
 	{
 		if (shift + size >= cs_addrs->hdr->blk_size)
 		{
-			util_out_print("Error:  block not large enough to accomodate shift.", TRUE);
+			util_out_print("Error:  block not large enough to accommodate shift.", TRUE);
 			t_abort(gv_cur_region, cs_addrs);
 			if (lbp)
 				free(lbp);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 
 GBLREF spdesc	stringpool;
 
-/* If you update this function, consider updating op_horolog() as well */
+/* If you update this function, consider updating op_horolog() as well, however at this writing they use different services */
 void op_zhorolog(mval *s)
 {
 	uint4		days;

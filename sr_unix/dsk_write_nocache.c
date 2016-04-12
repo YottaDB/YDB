@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 #include <sys/types.h>
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
-#include <signal.h>
+#include "gtm_signal.h"
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -29,9 +30,7 @@
 #include "gds_blk_downgrade.h"
 #include "add_inter.h"
 #include "anticipatory_freeze.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 #include "min_max.h"
 #include "jnl.h"
 
@@ -52,11 +51,10 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		save_buff;
-#	ifdef GTM_CRYPT
 	int			in_len, this_blk_size, gtmcrypt_errno;
 	char			*in;
 	gd_segment		*seg;
-#	endif
+	boolean_t		use_new_key;
 
 	udi = (unix_db_info *)(reg->dyn.addr->file_cntl->file_info);
 	csa = &udi->s_addrs;
@@ -105,18 +103,20 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	assert(size <= csd->blk_size);
 	if (udi->raw)
 		size = ROUND_UP(size, DISK_BLOCK_SIZE);	/* raw I/O must be a multiple of DISK_BLOCK_SIZE */
-#	ifdef GTM_CRYPT
-	/* Make sure we don't end up encrypting a zero length'ed record */
-	if (csd->is_encrypted)
+	use_new_key = USES_NEW_KEY(csd);
+	if (IS_ENCRYPTED(csd->is_encrypted) || use_new_key)
 	{
 		this_blk_size = ((blk_hdr_ptr_t)buff)->bsiz;
 		assert((this_blk_size <= csd->blk_size) && (this_blk_size >= SIZEOF(blk_hdr)));
 		in_len = MIN(csd->blk_size, this_blk_size) - SIZEOF(blk_hdr);
+		/* Make sure we do not end up encrypting a zero-length record */
 		if (BLK_NEEDS_ENCRYPTION(((blk_hdr_ptr_t)buff)->levl, in_len))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
 			in = (char *)(buff + SIZEOF(blk_hdr));
-			GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, NULL, gtmcrypt_errno);
+			GTMCRYPT_ENCRYPT(csa, (use_new_key ? TRUE : csd->non_null_iv),
+					(use_new_key ? csa->encr_key_handle2 : csa->encr_key_handle),
+					in, in_len, NULL, buff, SIZEOF(blk_hdr), gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				seg = reg->dyn.addr;
@@ -124,7 +124,6 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 			}
 		}
 	}
-#	endif
 	DB_LSEEKWRITE(csa, udi->fn, udi->fd,
 		(DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * csd->blk_size),
 		buff,

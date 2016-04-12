@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,8 +42,10 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			bml_save_dollar_tlevel;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	uint4			update_trans;
 
 error_def(ERR_GVKILLFAIL);
 error_def(ERR_IGNBMPMRKFREE);
@@ -59,7 +62,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	kill_set		*ks;
     	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
-	uint4			save_dollar_tlevel;
+	uint4			save_update_trans;
 	sm_uc_ptr_t		temp_buff;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -82,7 +85,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 			if (0 != ksb->level)
 			{
 				if (!(was_crit = csa->now_crit))
-					grab_crit(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region); /* needed so t_qread does not return NULL below */
 #				ifdef UNIX
 				if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 				{	/* Concurrent online rollback. We don't want to continue with rest of the logic to add more
@@ -148,12 +151,10 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					GET_LONG(temp_long, (block_id_ptr_t)((sm_uc_ptr_t)rp1 - SIZEOF(block_id)));
 					if (dollar_tlevel)
 					{
+						assert(sgm_info_ptr->tp_csa == cs_addrs);
 						chain = *(off_chain *)&temp_long;
-						if ((1 == chain.flag) && ((int)chain.cw_index >= sgm_info_ptr->cw_set_depth))
-						{
-							assert(sgm_info_ptr->tp_csa == cs_addrs);
-							GTMASSERT;
-						}
+						assertpro(!((1 == chain.flag) &&
+							((int)chain.cw_index >= sgm_info_ptr->cw_set_depth)));
 						assert(chain.flag || temp_long < csa->ti->total_blks);
 					}
 					level = ((blk_hdr_ptr_t)temp_buff)->levl;
@@ -169,11 +170,17 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 			}
 		}
 		gvcst_kill_sort(ks);
-		save_dollar_tlevel = dollar_tlevel;
+		assert(!bml_save_dollar_tlevel);
+		bml_save_dollar_tlevel = dollar_tlevel;
+		/* Resetting and restoring of update_trans is necessary to avoid blowing an assert in t_begin that it is 0. */
+		save_update_trans = update_trans;
 		assert(1 >= dollar_tlevel);
 		dollar_tlevel = 0;	/* temporarily for gvcst_bmp_mark_free */
+		update_trans = 0;
 		GVCST_BMP_MARK_FREE(ks, ret_tn, inctn_invalid_op, inctn_bmp_mark_free_gtm, inctn_opcode, csa)
-		dollar_tlevel = save_dollar_tlevel;
+		update_trans = save_update_trans;
+		dollar_tlevel = bml_save_dollar_tlevel;
+		bml_save_dollar_tlevel = 0;
 	}
 	free(temp_buff);
 }

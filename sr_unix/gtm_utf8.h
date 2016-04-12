@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -840,6 +841,7 @@ void		utf8_badchar_stx(int len, unsigned char* str, unsigned char *strtop, int c
 STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned char* str, unsigned char *strtop, int chset_len,
 				   unsigned char* chset);
 unsigned char	*gtm_utf8_trim_invalid_tail(unsigned char *str, int len);
+boolean_t       valid_utf_string(const mstr *str);
 
 /* To prevent GTMSECSHR from pulling in the function "gtmwcswidth" (used in util_output.c) and in turn the entire Unicode
  * codebase, we define a function-pointer variable and initialize it at startup to NULL only in GTMSECSHR and not-null

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +35,6 @@
 #include "iosp.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF  jnl_fence_control       jnl_fence_ctl;
 GBLREF  uint4			dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
@@ -62,9 +62,9 @@ void    op_ztcommit(int4 n)
 
 	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
         if (n < 0)
-                rts_error(VARLSTCNT(1) ERR_TRANSMINUS);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRANSMINUS);
         if (jnl_fence_ctl.level == 0  ||  n > jnl_fence_ctl.level)
-                rts_error(VARLSTCNT(1) ERR_TRANSNOSTART);
+                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRANSNOSTART);
         assert(jnl_fence_ctl.level > 0);
         assert(!dollar_tlevel);
 
@@ -139,10 +139,11 @@ void    op_ztcommit(int4 n)
 			if (jnl_status)
 			{
 				if (SS_NORMAL != jpc->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
-						jpc->status);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4,
+							JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region), jpc->status);
 				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4,
+							JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 			}
 		}
 	}
@@ -152,7 +153,7 @@ void    op_ztcommit(int4 n)
 	if (replication) /* instance is replicated */
 	{
 		if (yes_jnl_no_repl) /* journal is ON but replication is OFF for a region in the replicated instance */
-			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
 	}
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 	{
@@ -165,8 +166,8 @@ void    op_ztcommit(int4 n)
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
 		ztcom_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
-									(uint4 *)&ztcom_record, SIZEOF(struct_jrec_ztcom));
-		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
+									(unsigned char *)&ztcom_record, SIZEOF(struct_jrec_ztcom));
+		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL, NULL);
 		if (!csa->hold_onto_crit)
 			rel_crit(jpc->region);
 	}

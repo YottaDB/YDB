@@ -128,38 +128,67 @@ error_def(ERR_TEXT);
 error_def(ERR_NONUTF8LOCALE);
 error_def(ERR_ICUVERLT36);
 
-static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_verptr, char **minor_verptr)
+/*
+ * The ICU project has used two different formats to specify the version. These format are visible to us
+ * through icu-config, the library name and renamed symbols.
+ *
+ * icu-config reported the version in the following format from ICU 3.6 until ICU 4.8
+ * 	<major> . <minor> . <sub minor vers...>
+ * As of ICU 49 (aka 4.9), the format returned is:
+ * 	<major><minor> . <sub minor vers...>
+ *
+ *
+ * The version numbers used in the ICU library file names from ICU 3.6 until ICU 4.8 were
+ * 	<major> . <minor> . <sub minor vers...>	(symlinked to the below name)
+ * 	<major> . <minor>
+ *
+ * As of ICU 49 (aka 4.9) the version used in the library file names is (note the missing dot between major and minor)
+ * 	<major><minor> . <sub minor vers...>	(symlinked to the below name)
+ * 	<major><minor>
+ *
+ *
+ * The version number extension for renamed symbols from ICU 3.6 until ICU 4.2 was (confirmed on
+ * http://icu-project.org/apiref/icu4c/uvernum_8h.html, search for U_ICU_ENTRY_POINT_RENAME)
+ * 	_<major> _ <minor>
+ * As of ICU 4.4, the version number extension changed to (note the missing underscore)
+ * 	_<major><minor>
+ *
+ * The function below parses gtm_icu_version to determine the strings used in the library and symbol versions
+ */
+static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymver, char *iculibver)
 {
-	char		*ptr, *top, ch;
+	char		*ptr;
 	char		tmp_errstr[SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX)]; /* "$gtm_icu_version is" */
 	int4		major_ver, minor_ver;
-	boolean_t	dot_seen;
+	int		i;
 
 	if (NULL == icu_ver_buf)
 		return FALSE;	/* empty string */
-	major_ver = 0;	/* Initialize to values that are guaranteed to be < 3.6 */
-	minor_ver = 0;	/* This way if these dont get set inside the for loop, the IS_ICU_VER* check fails later */
-	dot_seen = FALSE;
-	for (ptr = icu_ver_buf, top = ptr + len; ptr < top; ptr++)
-	{
-		ch = *ptr;
-		if ('.' == ch)
-		{	/* major version scanned. determine the integer value */
-			dot_seen = TRUE;
-			if (-1 == (major_ver = asc2i((uchar_ptr_t)icu_ver_buf, INTCAST(ptr - icu_ver_buf))))
-				return FALSE;
-			*ptr++ = '\0';	/* skip the '.' byte */
-			if (ptr == top)
-				return FALSE;	/* empty minor version */
-			if (-1 == (minor_ver = asc2i((uchar_ptr_t)ptr, INTCAST(top - ptr))))
-				return FALSE;
-			*major_verptr = icu_ver_buf;
-			*minor_verptr = ptr;
-			break;
-		}
-	}
-	if (!dot_seen)
-		return FALSE;	/* empty minor version */
+	
+	/* Deconstruct the two known forms of gtm_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
+	ptr = icu_ver_buf;
+	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
+		return FALSE;
+	if ('.' == *ptr)
+		ptr++;
+	if (-1 == (minor_ver = asc2i((uchar_ptr_t)ptr, 1)))
+		return FALSE;
+
+	/* Generate the ICU symbol renaming string */
+	i = 0;
+	icusymver[i++] = '_';
+	icusymver[i++] = *icu_ver_buf;
+	if ( 44 > ((major_ver * 10) + minor_ver))
+		icusymver[i++] = '_';
+	icusymver[i++] = *ptr;
+	icusymver[i++] = '\0';
+
+	/* Generate the ICU library name string */
+	i = 0;
+	iculibver[i++] = *icu_ver_buf;
+	iculibver[i++] = *ptr;
+	iculibver[i++] = '\0';
+
 	/* Check if the formatted version is greater than or equal to 3.6 */
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
@@ -174,13 +203,12 @@ void gtm_icu_init(void)
 {
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
 	char		icu_final_fname[MAX_ICU_FNAME_LEN + 1 + MAX_ICU_VERSION_STRLEN];	/* 1 for '_' in between */
-	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN];
+	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN], icusymver[MAX_ICU_VERSION_STRLEN], iculibver[MAX_ICU_VERSION_STRLEN];
 	char		tmp_errstr[SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
-	char		*major_ver_ptr, *minor_ver_ptr;
 	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	char		*strtokptr;
 	const char	*cur_icu_fname;
-	int		icu_final_fname_len, icu_libname_len, len, major_ver_len, minor_ver_len, save_fname_len;
+	int		icu_final_fname_len, icu_libname_len, len, save_fname_len, icusymver_len, iculibver_len;
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
@@ -220,23 +248,20 @@ void gtm_icu_init(void)
 	gtm_icu_ver_defined = FALSE;
 	if (SS_NORMAL == TRANS_LOG_NAME(&icu_ver, &trans, icu_ver_buf, SIZEOF(icu_ver_buf), do_sendmsg_on_log2long))
 	{	/* GTM_ICU_VERSION is defined. Do edit check on the value before considering it really defined */
-		gtm_icu_ver_defined = parse_gtm_icu_version(trans.addr, trans.len, &major_ver_ptr, &minor_ver_ptr);
+		gtm_icu_ver_defined = parse_gtm_icu_version(trans.addr, trans.len, icusymver, iculibver);
 	}
-	DEBUG_ONLY(major_ver_len = minor_ver_len = -1;)
 	if (gtm_icu_ver_defined)
 	{	/* User explicitly specified an ICU version. So load version specific icu file (e.g. libicuio.so.36) */
 		icu_libname_len = 0;
-		major_ver_len = STRLEN(major_ver_ptr);
-		minor_ver_len = STRLEN(minor_ver_ptr);
-#		if defined(_AIX) || defined(__MVS__)
+		iculibver_len = STRLEN(iculibver);
+		icusymver_len = STRLEN(icusymver);
+#		if defined(_AIX) || defined(__MVS__) || defined(__CYGWIN__)
 		/* Transform (e.g. libicuio.a  -> libicuio36.a  ) */
 		len = STR_LIT_LEN(ICU_LIBNAME_ROOT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_ROOT, len);
 		icu_libname_len += len;
-		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
-		icu_libname_len += major_ver_len;
-		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
-		icu_libname_len += minor_ver_len;
+		memcpy(&icu_libname[icu_libname_len], iculibver, iculibver_len);
+		icu_libname_len += iculibver_len;
 		icu_libname[icu_libname_len++] = '.';
 		len = STR_LIT_LEN(ICU_LIBNAME_EXT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_EXT, len);
@@ -247,10 +272,8 @@ void gtm_icu_init(void)
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME, len);
 		icu_libname_len += len;
 		icu_libname[icu_libname_len++] = '.';
-		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
-		icu_libname_len += major_ver_len;
-		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
-		icu_libname_len += minor_ver_len;
+		memcpy(&icu_libname[icu_libname_len], iculibver, iculibver_len);
+		icu_libname_len += iculibver_len;
 #		endif
 		icu_libname[icu_libname_len] = '\0';
 		assert(SIZEOF(icu_libname) > icu_libname_len);
@@ -258,63 +281,67 @@ void gtm_icu_init(void)
 	} else
 		libname = ICU_LIBNAME;	/* go with default name */
 #	ifdef _AIX
-	/* AIX has a unique packaging convention in that shared objects are conventionally
-	 * archived into a static (.a) library. To resolve the shared library name at runtime
-	 * in a version independent way we use loadquery to fetch the paths that might contain
-	 * the ICU shared library. By running through each of these paths, we see if any of them
-	 * contains the libicuio.a. If so, we use realpath to find the versioned ICU library
-	 * that is symbolically linked from libicuio.a. This realpath can then be used to construct
-	 * the fully qualified archive + member combination that will be finally dlopen'ed. */
-	prev_dyn_size = MAX_SEARCH_PATH_LEN;
-	search_path_ptr = search_paths;
-	while(-1 == loadquery(L_GETLIBPATH, search_path_ptr, prev_dyn_size))
+	if (gtm_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
+			NULL == (handle = dlopen(ICU_LIBNAME_DEF, ICU_LIBFLAGS | RTLD_MEMBER)))
 	{
-		/* We don't expect loadquery to fail for reason other than ENOMEM */
-		assertpro(ENOMEM == errno);
-		/* If the previous call to loadquery fails and if it's because the input buffer's length was not
-		 * enough for loadquery to fill the library search paths, then do a malloc equal to double the previous
-		 * size and call loadquery again. It's relatively unlikely that this condition would be reached
-		 */
+		/* AIX has a unique packaging convention in that shared objects are conventionally
+		 * archived into a static (.a) library. To resolve the shared library name at runtime
+		 * in a version independent way we use loadquery to fetch the paths that might contain
+		 * the ICU shared library. By running through each of these paths, we see if any of them
+		 * contains the libicuio.a. If so, we use realpath to find the versioned ICU library
+		 * that is symbolically linked from libicuio.a. This realpath can then be used to construct
+		 * the fully qualified archive + member combination that will be finally dlopen'ed. */
+		prev_dyn_size = MAX_SEARCH_PATH_LEN;
+		search_path_ptr = search_paths;
+		while(-1 == loadquery(L_GETLIBPATH, search_path_ptr, prev_dyn_size))
+		{
+			/* We don't expect loadquery to fail for reason other than ENOMEM */
+			assertpro(ENOMEM == errno);
+			/* If the previous call to loadquery fails and if it's because the input buffer's length was not
+			 * enough for loadquery to fill the library search paths, then do a malloc equal to double the previous
+			 * size and call loadquery again. It's relatively unlikely that this condition would be reached
+			 */
+			if (NULL != dyn_search_paths)
+				free(dyn_search_paths);
+			prev_dyn_size *= 2;
+			dyn_search_paths = (char *)malloc(prev_dyn_size);
+			search_path_ptr = dyn_search_paths;
+		}
+		/* At this point we have all the library search paths pointed by search_path_ptr seperated by ":". */
+		each_libpath = STRTOK_R(search_path_ptr, DELIM, &strtokptr);
+		while (NULL != each_libpath)
+		{
+			SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
+			if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
+			{
+				each_libpath = STRTOK_R(NULL, DELIM, &strtokptr);
+				continue;
+			}
+			/* At this point we would have in real_path the fully qualified path to the version'ed libicuio archive.
+			 * ICU_LIBNAME - libicuio.a would have resulted in libicuio36.0.a
+			 * Now, we need to construct the archive library name along with it's shared object member. This is done
+			 * below.
+			 */
+			buflen = 0;
+			/* real_path = /usr/local/lib64/libicuio36.0.a */
+			ptr = basename(real_path);
+			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
+			ptr = strrchr(buf, '.');
+			strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */
+			buflen += STR_LIT_LEN(".so)");
+			buf[buflen] = '\0';			/* NULL termination */
+			break;
+		}
 		if (NULL != dyn_search_paths)
 			free(dyn_search_paths);
-		prev_dyn_size *= 2;
-		dyn_search_paths = (char *)malloc(prev_dyn_size);
-		search_path_ptr = dyn_search_paths;
+		/* If each_libpath is NULL then we were not able to look for libicuio.a in the loader search path */
+		if (NULL == each_libpath)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
+					ERR_TEXT, 2, LEN_AND_LIT(ICU_NOT_FOUND_ERR));
+		libname = buf;
+		handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
 	}
-	/* At this point we have all the library search paths pointed by search_path_ptr seperated by ":". */
-	each_libpath = STRTOK_R(search_path_ptr, DELIM, &strtokptr);
-	while (NULL != each_libpath)
-	{
-		SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
-		if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
-		{
-			each_libpath = STRTOK_R(NULL, DELIM, &strtokptr);
-			continue;
-		}
-		/* At this point we would have in real_path the fully qualified path to the version'ed libicuio archive.
-		 * ICU_LIBNAME - libicuio.a would have resulted in libicuio36.0.a
-		 * Now, we need to construct the archive library name along with it's shared object member. This is done
-		 * below.
-		 */
-		buflen = 0;
-		/* real_path = /usr/local/lib64/libicuio36.0.a */
-		ptr = basename(real_path);
-		SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
-		buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
-		ptr = strrchr(buf, '.');
-		strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */
-		buflen += STR_LIT_LEN(".so)");
-		buf[buflen] = '\0';			/* NULL termination */
-		break;
-	}
-	if (NULL != dyn_search_paths)
-		free(dyn_search_paths);
-	/* If each_libpath is NULL then we were not able to look for libicuio.a in the loader search path */
-	if (NULL == each_libpath)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
-				ERR_TEXT, 2, LEN_AND_LIT(ICU_NOT_FOUND_ERR));
-	libname = buf;
-	handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
 #else
 	handle = dlopen(libname, ICU_LIBFLAGS);
 #endif
@@ -347,7 +374,6 @@ void gtm_icu_init(void)
 	handle = dlopen(NULL, ICU_LIBFLAGS);
 	assertpro(handle);
 #	endif
-	assert(((-1 != major_ver_len) && (-1 != minor_ver_len)) || !gtm_icu_ver_defined);
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
@@ -363,32 +389,24 @@ void gtm_icu_init(void)
 		assert((0 != findx) || (-1 == symbols_renamed));
 		assert((0 == findx) || (FALSE == symbols_renamed) || (TRUE == symbols_renamed));
 		if ((0 == findx) || !symbols_renamed)
+#ifdef __CYGWIN__ /* Don't ask why... I have no idea how all the funcs are just in the global space in Cygwin */
+			fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 			fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+#endif
 		if (NULL == fptr)
 		{	/* If gtm_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
 			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
 			{
-				icu_final_fname[icu_final_fname_len++] = '_';
-				memcpy(&icu_final_fname[icu_final_fname_len], major_ver_ptr, major_ver_len);
-				icu_final_fname_len += major_ver_len;
-				save_fname_len = icu_final_fname_len;
-				icu_final_fname[icu_final_fname_len++] = '_';
-				memcpy(&icu_final_fname[icu_final_fname_len], minor_ver_ptr, minor_ver_len);
-				icu_final_fname_len += minor_ver_len;
+				memcpy(&icu_final_fname[icu_final_fname_len], icusymver, icusymver_len);
+				icu_final_fname_len += icusymver_len;
 				icu_final_fname[icu_final_fname_len] = '\0';
 				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
+#ifdef __CYGWIN__
+				fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
+#else
 				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
-				if (NULL == fptr)
-				{	/* from ICU 4.4, symbols renaming is done differently. u_getVersion_4_4 now becomes
-					 * u_getVersion_44. Try the new renaming instead
-					 */
-					assert(0 < save_fname_len);
-					memcpy(&icu_final_fname[save_fname_len], minor_ver_ptr, minor_ver_len);
-					save_fname_len += minor_ver_len;
-					icu_final_fname[save_fname_len] = '\0';
-					assert(SIZEOF(icu_final_fname) > save_fname_len);
-					fptr = (icu_func_t)dlsym(handle, icu_final_fname);
-				}
+#endif
 			}
 			if (NULL == fptr)
 			{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -276,15 +277,6 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 				fname_len, fname, GDS_LABEL_SZ - 1, nl_addr->label, GDS_LABEL_SZ - 1, GDS_LABEL);
 			*exit_stat = ERR_MUNOTALLSEC;
 		}
-		shmdt((void *)start_addr);
-		return FALSE;
-	}
-	if (memcmp(nl_addr->now_running, gtm_release_name, gtm_release_name_len + 1))
-	{
-		SNPRINTF(msgbuff, OUT_BUFF_SIZE, "Cannot rundown database %s. Attempt to access with version %s, "
-				"while already using %s", fname, gtm_release_name, nl_addr->now_running);
-		PRINT_AND_SEND_DBRNDWN_FAILURE_MSG(msgbuff, fname, shmid);
-		*exit_stat = ERR_MUNOTALLSEC;
 		shmdt((void *)start_addr);
 		return FALSE;
 	}

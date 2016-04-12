@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,14 @@
 #include "semwt2long_handler.h"
 
 #ifdef DEBUG
+#include "gdsroot.h"		/* needed for gdsfhead.h */
+#include "gtm_facility.h"	/* needed for gdsfhead.h */
+#include "gdskill.h"		/* needed for gdsfhead.h */
+#include "fileinfo.h"		/* needed for gdsfhead.h */
+#include "gdsbt.h"		/* needed for gdsfhead.h */
+#include "gdsblk.h"		/* needed for gdsfhead.h */
+#include "gdsfhead.h"		/* needed for gtm_semutils.h */
+#include "gtm_semutils.h"
 #include "wbox_test_init.h"
 #define CHECK_SEMVAL_GRT_SEMOP(SEMID, SEMNUM, SEM_OP)								\
 {														\
@@ -23,8 +32,8 @@
 	{													\
 		sems_val = semctl(SEMID, SEMNUM, GETVAL);							\
 		if (-1 != sems_val)										\
-			assert ((sems_val >= abs(SEM_OP)) ||(gtm_white_box_test_case_enabled && 		\
-					(WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)));\
+			assert((sems_val >= abs(SEM_OP)) || (gtm_white_box_test_case_enabled &&			\
+				(WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)));	\
 	}													\
 }
 #else

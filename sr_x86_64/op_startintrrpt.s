@@ -34,7 +34,7 @@ ENTRY	op_startintrrpt
 	call	gvcmz_neterr
 l1:
 	movl	$1, REG32_ARG0
-	call	async_action
+	call	async_action			# Normally does not return but just in case..
 	addq	$16, REG_SP			# Remove alignment stack bump & burn return addr
 	getframe				# Load regs for possible new frame and push return addr
 	ret

@@ -413,28 +413,30 @@ enum
 
 GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V25 to V17) */
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V25 to V18) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V25 to V19) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V25 to V20) */
-	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V25 to V21) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V25 to V22) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V25 to V23) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V24) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V25) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V26 to V17) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V26 to V18) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V26 to V19) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V26 to V20) */
+	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V26 to V21) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V26 to V22) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V26 to V23) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V24) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V25) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V26) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V25) */
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V25) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V25) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V25) */
-	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V25) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V25) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V25) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V25) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V25) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V26) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V26) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V26) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V26) */
+	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V26) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V26) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V26) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V26) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V26) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V26) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -646,7 +648,7 @@ int repl_filter_init(char *filter_cmd)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;
-			UNIX_ONLY(_exit(FILTERSTART_ERR);)
+			UNIX_ONLY(UNDERSCORE_EXIT(FILTERSTART_ERR);)
 			VMS_ONLY(return(FILTERSTART_ERR);) /* maintain existing for VMS */
 		}
 	} else
@@ -2715,9 +2717,9 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
-	/* Since filter format V24 corresponds to journal format V24 or V25, in case of a V24 source and V25 receiver,
+	/* Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
 	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
-	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V25 jnl format conversion.
+	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
 	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
 	 * version corresponds to only ONE journal version.
 	 *	assert(is_src_server);

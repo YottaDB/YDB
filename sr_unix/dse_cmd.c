@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,6 +81,7 @@ static readonly CLI_ENTRY dse_cache_qual[] = {
 static readonly CLI_ENTRY dse_all_qual[] = {
 { "ALL",          0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "BUFFER_FLUSH", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
+{ "CLEARCORRUPT", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "CRITINIT",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "DUMP",         0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "FREEZE",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
@@ -160,7 +161,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
  */
 { "MUTEX_HARD_SPIN_COUNT",     0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "MUTEX_SLEEP_SPIN_COUNT",    0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "MUTEX_SPIN_SLEEP_TIME",     0, 0, 0,                     0, 		         0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "MUTEX_SPIN_SLEEP_MASK",     0, 0, 0,                     0, 		         0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 /* End MUTEX_* qualifiers */
 { "NULL_SUBSCRIPTS",           0, 0, 0,                     never_always_allowexisting, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0     },
 { "ONLINE_NBB",                0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
@@ -174,7 +175,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "RESERVED_BYTES",            0, 0, 0, 	   	    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "SIZE",                      0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "SLEEP_SPIN_COUNT",          0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "SPIN_SLEEP_TIME",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "SPIN_SLEEP_MASK",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "STDNULLCOLL",               0, 0, 0, 		    true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "STRM_NUM",                  0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "STRM_REG_SEQNO",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },

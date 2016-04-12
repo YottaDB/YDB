@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 #ifdef UNIX
@@ -58,7 +57,10 @@ void jfh_from_jnl_info(jnl_create_info *info, jnl_file_header *header)
 	header->before_images = info->before_images;
 	/* Note that in case of MUPIP JOURNAL -ROLLBACK, we need to set header->repl_state to repl_open although replication
 	 * is currently not ON in the database. This is so future ROLLBACKs know this journal is replication enabled.
+	 * Assert that this code can be reached only for MUPIP JOURNAL -ROLLBACK -BACKWARD. In case of MUPIP JOURNAL -ROLLBACK
+	 * -FORWARD, journaling would have been turned OFF in the database at the start.
 	 */
+	assert(!jgbl.mur_options_forward);
 	header->repl_state = jgbl.mur_rollback ? repl_open : info->repl_state;
 	header->data_file_name_length = info->fn_len;
 	memcpy(header->data_file_name, info->fn, info->fn_len);
@@ -76,9 +78,7 @@ void jfh_from_jnl_info(jnl_create_info *info, jnl_file_header *header)
 	header->virtual_size = info->alloc;
 	header->jnl_deq = info->extend;
 	header->checksum = info->checksum;
-	GTMCRYPT_ONLY(
-		GTMCRYPT_COPY_HASH(info, header);
-	)
+	GTMCRYPT_COPY_ENCRYPT_SETTINGS(info, header);
 #	ifdef UNIX
 	if (INVALID_SUPPL_STRM != strm_index)
 	{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 
 #include <errno.h>
 #include "gtm_stdio.h"
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdlib.h"		/* for EXIT() */
 #include "gtm_unistd.h"
 
 #include "gdsroot.h"
@@ -83,13 +84,13 @@ void mucblkini (void)
 	if (0 != status)
 	{
 		PERROR("Error writing to disk");
-		exit(status);
+		EXIT(status);
 	}
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_DATA, (uchar_ptr_t)bp2, cs_addrs->hdr->desired_db_format, status);
 	if (0 != status)
 	{
 		PERROR("Error writing to disk");
-		exit(status);
+		EXIT(status);
 	}
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,14 +60,7 @@ error_def(ERR_CLOSEFAIL);
 error_def(ERR_JOBSETUP);
 error_def(ERR_STRINGOFLOW);
 error_def(ERR_JOBLVN2LONG);
-error_def(ERR_JOBLVNDETAIL);
 error_def(ERR_MAXACTARG);
-
-#ifdef __hpux
-#define MAX_COMM_FRAME	1
-#else
-#define MAX_COMM_FRAME	5
-#endif
 
 /*
  * ------------------------------------------------
@@ -90,8 +83,7 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 	d_socket_struct		*dsocketptr;
 	socket_struct		*socketptr;
 	char			*local_buff = NULL;
-	int			comm_arg_count;
-	mval			*command_str[MAX_COMM_FRAME];
+	mval			*command_str;
 
 	if ((NULL == sp) && (!((sp = GETENV(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
 		return;
@@ -180,14 +172,18 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 			ENSURE_STP_FREE_SPACE(arg_count * MAX_JOB_LEN);
 			for (i = 0; i < arg_count; i++)
 			{
-				DOREADRC(setup_fd, &arg_msg, SIZEOF(arg_msg), rc);
+				DOREADRC(setup_fd, &arg_msg.len, SIZEOF(arg_msg.len), rc);
 				if (rc < 0)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument"),
-							errno, 0);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument length"),
+						      errno, 0);
 				if (0 > arg_msg.len)
 					g_args->argval[i] = op_nullexp();	/* negative len indicates null arg */
 				else
 				{
+					DOREADRC(setup_fd, &arg_msg.data, arg_msg.len, rc);
+					if (rc < 0)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument"),
+							errno, 0);
 					assertpro(arg_msg.len <= MAX_JOB_LEN);
 					arglst[i].str.len = arg_msg.len;
 					arglst[i].str.addr = (char *)stringpool.free;
@@ -224,43 +220,33 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 			assert(NULL == jparms);
 			if (NULL == local_buff)
 			{	/* Initializations to receive the local vars */
-				receive_child_locals_init(&local_buff, command_str);
-				comm_arg_count = 0;
+				receive_child_locals_init(&local_buff, &command_str);
 			}
-			command_str[comm_arg_count]->mvtype = MV_STR;
-			command_str[comm_arg_count]->str.addr = local_buff;
+			command_str->mvtype = MV_STR;
+			command_str->str.addr = local_buff;
 			DOREADRC(setup_fd, &buffer_size, SIZEOF(buffer_size), rc);
 			if (rc < 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
 					      LEN_AND_LIT("receive buffer size"), errno, 0);
-			if (buffer_size > MAX_STRLEN)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVNDETAIL, 2, MAX_STRLEN, buffer_size);
+			if(buffer_size > MAX_STRLEN)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN, buffer_size);
 			assert(buffer_size > 0);
 			DOREADRC(setup_fd, local_buff, buffer_size, rc);
 			if (rc < 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
 					      LEN_AND_LIT("local fragment"), errno, 0);
-			assert((NULL != command_str[comm_arg_count]->str.addr) && (0 != buffer_size));
-			command_str[comm_arg_count]->str.len = buffer_size;
-			s2pool(&command_str[comm_arg_count]->str);
-			op_commarg(command_str[comm_arg_count], indir_set);
-			comm_arg_count++;
-			if (MAX_COMM_FRAME == comm_arg_count)
-			{	/* grouping op_commargs() for one dm_start() is faster */
-				dm_start();
-				comm_arg_count = 0;
-			}
+			assert((NULL != command_str->str.addr) && (0 != buffer_size));
+			command_str->str.len = buffer_size;
+			s2pool(&command_str->str);
+			op_commarg(command_str, indir_set);
+			dm_start();
 			break;
 		default:
 			assertpro(FALSE && setup_op);
 		}
 	}
 	if (NULL != local_buff)
-	{
-		if (comm_arg_count != 0)
-			dm_start();
 		receive_child_locals_finalize(&local_buff);
-	}
 	/* Keep the pipe alive until local transfer is done which is done at the second call to this function */
 	if (local_trans_done == setup_op)
 		if ((rc = close(setup_fd)) < 0)
@@ -283,17 +269,12 @@ STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str
 	/* Get space from the stack to save the command strings before putting the base stack frame This must be done first (before
 	 * putting the base frame) so that dm_start does not unintentionally pop strings off the stack
 	 */
-	for (i = 0; i < MAX_COMM_FRAME; i++)
-	{
-		PUSH_MV_STENT(MVST_MVAL);
-		command_str[i] = &mv_chain->mv_st_cont.mvs_mval;
-	}
+	PUSH_MV_STENT(MVST_MVAL);
+	*command_str = &mv_chain->mv_st_cont.mvs_mval;
 	/* Setup the base frame */
 	base_addr = make_cimode();
-	frame_pointer->flags |= SFF_IMPLTSTART_CALLD; 	/* Do not return to this frame via MUM_TSTART */
 	base_frame(base_addr);
 	/* Finish base frame initialization - reset mpc/context to return to us without unwinding base frame */
-	frame_pointer->type |= SFT_TRIGR;
 	frame_pointer->mpc = CODE_ADDRESS(gtm_levl_ret_code);
 	frame_pointer->ctxt = GTM_CONTEXT(gtm_levl_ret_code);
 }
@@ -314,9 +295,7 @@ STATICFNDEF void receive_child_locals_finalize(char **local_buff)
 	TREF(max_advancewindow_line) = MAX_SRCLINE;
 	source_buffer = (unsigned char *)aligned_source_buffer;
 	/* Return the space saved for command strings */
-	i = MAX_COMM_FRAME;
-	while (i--)
-		POP_MV_STENT();
+	POP_MV_STENT();
 	ctxt = active_ch = chnd;		/* Clear extra condition handlers added by dm_start()s */
 	assert(save_msp == msp);
 }

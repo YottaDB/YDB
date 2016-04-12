@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,3 +61,8 @@ LITDEF	char	first_zerobit_position[256] =	{        /* 0x0 0x1 0x2 0x3 0x4 0x5 0x
 						  /* 0xE */  0,  1,  0,  2,  0,  1,  0,  3,  0,  1,  0,  2,  0,  1,  0,  4,
 						  /* 0xF */  0,  1,  0,  2,  0,  1,  0,  3,  0,  1,  0,  2,  0,  1,  0,  -1
 						};
+
+GBLDEF	int		mur_forw_mp_hash_buckets;	/* # of buckets in "mur_shm_hdr->hash_bucket_array" */
+GBLDEF	mur_shm_hdr_t	*mur_shm_hdr;	/* Pointer to mur_forward-specific header in shared memory */
+GBLDEF	boolean_t	mur_forward_multi_proc_done;
+GBLDEF	readonly char 	*ext_file_type[] = {STR_JNLEXTR, STR_BRKNEXTR, STR_LOSTEXTR};

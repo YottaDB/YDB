@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -426,13 +426,12 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 				/* $get(^#t(GVN,"COUNT") */
 				BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
 				if (!gvcst_get(trigger_count))
-				{
-					UTIL_PRINT_PREFIX_IF_NEEDED(first_gtmio, utilprefix, &utilprefixlen);
-					util_out_print_gtmio("Trigger named !AD exists in the lookup table, "
-							"but global ^!AD has no triggers",
-							FLUSH, curr_name_len, curr_name, disp_trigvn_len, disp_trigvn);
-					trig_stats[STATS_ERROR_TRIGFILE]++;
-					RETURN_AND_POP_MVALS(TRIG_FAILURE);
+				{	/* We just looked this up, if it doesn't exist then assume a concurrent update occurred */
+					if (CDB_STAGNATE > t_tries)
+						t_retry(cdb_sc_triggermod);
+					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+					rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+							trigvn_len, trigvn, trigvn_len, trigvn, LEN_AND_LIT("\"#COUNT\""));
 				}
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
@@ -765,6 +764,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 	int			count;
 	sgmnt_addrs		*csa;
 	mval			curr_gbl_name;
+	mval			after_hash_cycle;
 	int			cycle;
 	mval			*mv_count_ptr;
 	mval			*mv_cycle_ptr;
@@ -777,6 +777,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 	uint4			triggers_deleted;
 	mval			trigjrec;
 	boolean_t		jnl_format_done;
+	boolean_t		delete_required;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -819,49 +820,83 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 			/* quit:$length(curr_gbl_name)=0 */
 			if (0 == curr_gbl_name.str.len)
 				break;
+			count = cycle = 0;
 			/* $get(^#t(curr_gbl_name,#COUNT)) */
 			BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
 							LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
-			if (gvcst_get(&trigger_count))
+			if (TRUE == (delete_required = gvcst_get(&trigger_count))) /* inline assignment */
+			{
+				mv_count_ptr = &trigger_count;
+				count = MV_FORCE_UINT(mv_count_ptr);
+			}
+			/* $get(^#t(curr_gbl_name,#CYCLE)) */
+			BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
+				LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
+			if (!gvcst_get(&trigger_cycle))
+			{	/* Found hasht record, there must be #CYCLE */
+				if (CDB_STAGNATE > t_tries)
+					t_retry(cdb_sc_triggermod);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
+						curr_gbl_name.str.len, curr_gbl_name.str.addr,
+						curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#CYCLE\""),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
+						curr_gbl_name.str.len, curr_gbl_name.str.addr,
+						curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#CYCLE\""),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			} else {
+				mv_cycle_ptr = &trigger_cycle;
+				cycle = MV_FORCE_UINT(mv_cycle_ptr);
+				cycle++;
+				MV_FORCE_MVAL(&trigger_cycle, cycle);
+			}
+			if (!delete_required)
+			{	/* $order(^#t(curr_gbl_name,#LABEL)); should be the NULL string if #COUNT not found
+				 * Use #LABEL vs #CYCLE because MUPIP TRIGGER -UPGRADE unconditionally inserts it */
+				BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
+					LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
+				op_gvorder(&after_hash_cycle);
+				/* quit:$length(after_hash_cycle)=0 */
+				if (0 != after_hash_cycle.str.len)
+				{	/* Found hasht record after #LABEL, but #COUNT is not defined; Force removal */
+					if (CDB_STAGNATE > t_tries)
+						t_retry(cdb_sc_triggermod);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
+							curr_gbl_name.str.len, curr_gbl_name.str.addr,
+							curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#COUNT\""),
+							ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is missing. Skipped in results"));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
+							curr_gbl_name.str.len, curr_gbl_name.str.addr,
+							curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#COUNT\""),
+							ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is missing. Skipped in results"));
+					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+					delete_required = TRUE;
+				}
+			}
+			if (delete_required)
 			{
 				/* Now that we know there is something to kill, check if we have permissions to touch ^#t global */
 				if (reg->read_only)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
-				mv_count_ptr = &trigger_count;
-				count = MV_FORCE_UINT(mv_count_ptr);
-				/* $get(^#t(curr_gbl_name,#CYCLE)) */
-				BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
-					LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
-				if (!gvcst_get(&trigger_cycle))
-				{	/* Found #COUNT, there must be #CYCLE */
-					if (CDB_STAGNATE > t_tries)
-						t_retry(cdb_sc_triggermod);
-					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_TRIGDEFBAD, 6,
-							curr_gbl_name.str.len, curr_gbl_name.str.addr,
-							curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#CYCLE\""),
-							ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
-				}
-				mv_cycle_ptr = &trigger_cycle;
-				cycle = MV_FORCE_UINT(mv_cycle_ptr);
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
 					jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
 					jnl_format_done = TRUE;
 				}
-				/* kill ^#t(curr_gbl_name) */
+				/* kill ^#t(curr_gbl_name); kills ^#t(curr_gbl_name,"#TRHASH") as well */
 				BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
 				gvcst_kill(TRUE);
-				/* Note : ^#t(curr_gbl_name,"#TRHASH") is also killed as part of the above */
-				cycle++;
-				MV_FORCE_MVAL(&trigger_cycle, cycle);
-				/* set ^#t(curr_gbl_name,#CYCLE)=trigger_cycle */
-				SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(curr_gbl_name.str.addr, curr_gbl_name.str.len,
-					LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE), trigger_cycle, result);
-				assert(PUT_SUCCESS == result);
+				if (0 < cycle)
+				{
+					/* set ^#t(curr_gbl_name,#CYCLE)=trigger_cycle */
+					SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(curr_gbl_name.str.addr, curr_gbl_name.str.len,
+						LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE), trigger_cycle, result);
+					assert(PUT_SUCCESS == result);
+				}
 				this_db_updated = TRUE;
 				triggers_deleted += count;
-			} /* else there is no #COUNT, then no triggers, leave #CYCLE alone */
+			} /* else there is nothing under the hasht record, leave #CYCLE alone */
 			/* get ready for op_gvorder() call for next trigger under ^#t */
 			BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
 		}

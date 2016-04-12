@@ -33,6 +33,6 @@ ENTRY	op_forintrrpt
 	call	gvcmz_neterr
 l1:
 	movl	$0, REG32_ARG0
-	call	async_action
+	call	async_action			# Normally does not return but in case..
 	addq	$8, REG_SP			# Remove alignment stack bump
 	ret

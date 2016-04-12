@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,10 +45,10 @@ error_def(ERR_MUTEXRELEASED);
 /* Return number of regions (including jnlpool dummy region) if have or are aquiring crit or in_wtstart
  * ** NOTE **  This routine is called from signal handlers and is thus called asynchronously.
  * If CRIT_IN_COMMIT bit is set, we check if in middle of commit (PHASE1 inside crit or PHASE2 outside crit) on some region.
- * If CRIT_RELEASE bit is set, we release crit on region(s) that:
- *   1)  we hold crit on (neither CRIT_IN_COMMIT NOR CRIT_TRANS_NO_REG is specified)
- *   2)  are part of the current transactions except those regions that are marked as being valid
- *       to have crit in by virtue of their crit_check_cycle value is the same as crit_deadlock_check_cycle.
+ * If CRIT_RELEASE bit is set AND
+ *	a) If CRIT_TRANS_NO_REG is not specified, we release crit on ALL regions that we hold crit on.
+ *	b) If CRIT_TRANS_NO_REG is specified, we release crit on ONLY those regions that are not part of the current TP transaction
+ *		(detected by their crit_check_cycle value being the same as crit_deadlock_check_cycle).
  * Note: CRIT_RELEASE implies CRIT_ALL_REGIONS
  * If CRIT_ALL_REGIONS bit is set, go through the entire list of regions
  */
@@ -62,6 +63,7 @@ uint4 have_crit(uint4 crit_state)
 	if (crit_state & CRIT_RELEASE)
 	{
 		UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* should not request crit to be released if online rollback */
+		assert(0 == crit_count);	/* Make sure we dont return right away in the next "if" block in case of release */
 		crit_state |= CRIT_ALL_REGIONS;
 	}
 	if ((0 != crit_count) && (crit_state & CRIT_HAVE_ANY_REG))
@@ -79,7 +81,7 @@ uint4 have_crit(uint4 crit_state)
 				csa = &FILE_INFO(r_local)->s_addrs;
 				if (NULL != csa)
 				{
-					if ((csa->now_crit) && (crit_state & CRIT_HAVE_ANY_REG))
+					if (csa->now_crit && (crit_state & CRIT_HAVE_ANY_REG))
 					{
 						crit_reg_cnt++;
 						/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
@@ -88,15 +90,14 @@ uint4 have_crit(uint4 crit_state)
 						 * and it should die at the earliest opportunity, there being no way to know if
 						 * that is what happened anyway.
 						 */
-						if (csa->nl->in_crit != process_id)
-							GTMASSERT;
+						assertpro(csa->nl->in_crit == process_id);
 						/* If we are releasing (all) regions with critical section or if special
 						 * TP case, release if the cycle number doesn't match meaning this is a
 						 * region we should not hold crit in (even if it is part of tp_reg_list).
 						 */
-						if ((0 != (crit_state & CRIT_RELEASE)) &&
-						    (0 == (crit_state & CRIT_NOT_TRANS_REG) ||
-						     crit_deadlock_check_cycle != csa->crit_check_cycle))
+						if ((0 != (crit_state & CRIT_RELEASE))
+							&& (0 == (crit_state & CRIT_NOT_TRANS_REG)
+								|| (crit_deadlock_check_cycle != csa->crit_check_cycle)))
 						{
 							assert(WBTEST_HOLD_CRIT_ENABLED);
 							assert(!csa->hold_onto_crit);

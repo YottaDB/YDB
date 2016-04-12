@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,16 +13,16 @@
 #ifndef MUR_EXT_SET_H
 #define MUR_EXT_SET_H
 
-void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_null(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_align(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_blk(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_eof(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_trunc(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_pfin(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_pini(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
-void	mur_extract_tcom(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_null(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_align(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void    mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_eof(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_trunc(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_pfin(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_pini(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_tcom(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst);
 int 	extract_process_vector(jnl_process_vector *pv, int extract_len);
 #endif

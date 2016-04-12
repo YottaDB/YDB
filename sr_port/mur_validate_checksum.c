@@ -1,6 +1,7 @@
 /****************************************************************
  *
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +9,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #include "mdef.h"
 
 #include "gtm_string.h"
@@ -29,6 +31,7 @@
 #include "mur_validate_checksum.h"
 #include "jnl_get_checksum.h"
 
+/* #GTM_THREAD_SAFE : The below function (mur_validate_checksum) is thread-safe */
 boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 {
 	enum jnl_record_type 	rectype;
@@ -50,15 +53,15 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 		assert(&jnlrec->jrec_set_kill.mumps_node == &jnlrec->jrec_lgtrig.lgtrig_str);
 		start_ptr = (unsigned char *)&jnlrec->jrec_set_kill.mumps_node;
 		end_ptr =  (unsigned char *)(jnlrec) + mur_desc->jreclen - JREC_SUFFIX_SIZE;
-		rec_csum = jnl_get_checksum((uint4 *)start_ptr, NULL, (int)(end_ptr - start_ptr));
+		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)start_ptr, (int)(end_ptr - start_ptr));
 		COMPUTE_LOGICAL_REC_CHECKSUM(rec_csum, &jnlrec->jrec_set_kill, tmp_csum, rec_csum);
 
 	} else if (JRT_PBLK == rectype || JRT_AIMG == rectype)
 	{
 		COMPUTE_COMMON_CHECKSUM(tmp_csum, jnlrec->prefix);
 		start_ptr = (unsigned char *)jnlrec->jrec_pblk.blk_contents;
-		rec_csum = jnl_get_checksum((uint4 *)start_ptr, NULL, MIN(jnlrec->jrec_pblk.prefix.forwptr,
-										jnlrec->jrec_pblk.bsiz));
+		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)start_ptr,
+								MIN(jnlrec->jrec_pblk.prefix.forwptr, jnlrec->jrec_pblk.bsiz));
 		COMPUTE_PBLK_CHECKSUM(rec_csum, &jnlrec->jrec_pblk, tmp_csum, rec_csum);
 	} else if (IS_FIXED_SIZE(rectype) || rectype == JRT_ALIGN)
 	{
@@ -67,11 +70,12 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 		switch (rectype)
 		{
 		case JRT_ALIGN:
-			rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnlrec->jrec_align, SIZEOF(jrec_prefix));
+			rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jnlrec->jrec_align, SIZEOF(jrec_prefix));
 			break;
 		default:
 			if (JRT_TRIPLE != rectype && JRT_HISTREC != rectype)
-			rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnlrec->jrec_set_kill, jnlrec->prefix.forwptr);
+			rec_csum = compute_checksum(INIT_CHECKSUM_SEED,
+							(unsigned char *)&jnlrec->jrec_set_kill, jnlrec->prefix.forwptr);
 			break;
 		}
 		jnlrec->prefix.checksum = tmp_csum;

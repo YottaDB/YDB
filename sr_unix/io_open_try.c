@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +44,7 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "gtmimagename.h"
+#include "gtmio.h"
 
 #define  LOGNAME_LEN 255
 /* avoid calling getservbyname for shell and Kerberos shell */
@@ -433,7 +435,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		 * no OPEN EINTR macros in the following while loop  due to complex error checks and processing between
 		 * top of while and calls to OPEN3
 		 */
-		while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
+		while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 		{
 			if (timed && (0 == msec_timeout))
 				out_of_time = TRUE;
@@ -455,7 +457,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					/* oflag must be O_RDWR, set it to be O_RDONLY 	*/
 					oflag &= ~O_WRONLY;
 					oflag |= O_NONBLOCK;
-					while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
+					while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 					{
 						if (0 == msec_timeout)
 							out_of_time = TRUE;
@@ -476,7 +478,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					/* oflag was just made O_RDONLY, now set it to be O_WRONLY */
 					oflag |= O_WRONLY;
 					oflag &= ~O_RDONLY;
-					while ((-1 == (file_des_w = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
+					while ((-1 == (file_des_w = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 					{
 						if (0 == msec_timeout)
 							out_of_time = TRUE;
@@ -496,6 +498,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				break;
 			}
 		}
+		SETFDCLOEXEC(file_des);
 		if (out_of_time && (-1 == file_des))
 		{
 			if ((ff == tl->iod->type) && filecreated)

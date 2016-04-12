@@ -122,7 +122,7 @@ ENTRY	op_mprofextexfun
 	jmp	justgo						# Bypass autorelink check for indirects (done by caller)
 	#
 	# We have a non-negative index. Use args as indexes into caller's linkage table. Note we cannot overwrite
-	# REG_FRAME_POINTER as it is being used as %rbp in this routine (copy of %rsp before we did 'enter' above).
+	# REG_FRAME_POINTER as it is being used as %rbp in this routine (copy of %rsp before allocating save area above).
 	#
 loadandgo:
 	movq	frame_pointer(%rip), REG_RET0			# -> frame_pointer

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -433,7 +433,7 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
    */
 	{"U", &lower_to_upper, NULL},
 	{"L", &upper_to_lower, NULL},
-	{"T", NULL,            NULL}
+	{"T", &str_to_title, NULL}
 };
 #endif
 
@@ -442,6 +442,14 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 LITDEF mstr	nsb_dummy = {0, 1, "\0"};
 /*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
 #endif
+
+#define	ENUM_ENTRY(NAME)	#NAME
+LITDEF char *mdb_ver_names[] =
+{
+#include "gdsdbver_sp.h"
+};
+#undef	ENUM_ENTRY
+
 
 #ifdef DEBUG
 /* These instructions follow the definitions made

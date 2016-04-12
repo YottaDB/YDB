@@ -61,7 +61,6 @@ void zro_load(mstr *str)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	(TREF(set_zroutines_cycle))++;		/* Signal need to recompute zroutines histories for each linked routine */
 	ARLINK_ONLY(TREF(arlink_enabled) = FALSE);	/* Set if any zro entry is enabled for autorelink */
 	memset(array, 0, SIZEOF(array));
 	lp = str->addr;
@@ -314,4 +313,5 @@ void zro_load(mstr *str)
 			}
 		}
 	}
+	(TREF(set_zroutines_cycle))++;		/* Signal need to recompute zroutines histories for each linked routine */
 }

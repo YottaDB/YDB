@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,9 +56,7 @@
 #include "jnl_write.h"
 #include "op_tcommit.h"
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 GBLREF	boolean_t		write_after_image;
 GBLREF	gd_region		*gv_cur_region;
@@ -99,10 +98,9 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	sgmnt_data_ptr_t	csd;
 	jnl_ctl_list		*jctl;
 	jnl_format_buffer	*ztworm_jfb;
-#	ifdef GTM_CRYPT
 	blk_hdr_ptr_t		aimg_blk_ptr;
-	int			in_len, gtmcrypt_errno ;
-#	endif
+	int			in_len, gtmcrypt_errno;
+	boolean_t		use_new_key;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -141,24 +139,23 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		prc_vec = &plst->jpv;
 		csa->jnl->pini_addr = plst->new_pini_addr;
 		rctl->mur_plst = plst;
-		if (mur_options.rollback && IS_REPLICATED(rectype))
+	}
+	if (mur_options.rollback && IS_REPLICATED(rectype))
+	{
+		jgbl.mur_jrec_seqno = GET_JNL_SEQNO(rec);
+		if (jgbl.mur_jrec_seqno >= murgbl.consist_jnl_seqno)
 		{
-			jgbl.mur_jrec_seqno = GET_JNL_SEQNO(rec);
-			if (jgbl.mur_jrec_seqno >= murgbl.consist_jnl_seqno)
-			{
-				assert(murgbl.losttn_seqno >= (jgbl.mur_jrec_seqno + 1));
-				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno + 1;
-			}
-			UNIX_ONLY(
-				jgbl.mur_jrec_strm_seqno = GET_STRM_SEQNO(rec);
-				if (strm_seqno = jgbl.mur_jrec_strm_seqno)	/* caution: assignment */
-				{	/* maintain csd->strm_reg_seqno */
-					strm_num = GET_STRM_INDEX(strm_seqno);
-					strm_seqno = GET_STRM_SEQ60(strm_seqno);
-					assert(csd->strm_reg_seqno[strm_num] <= (strm_seqno + 1));
-					csd->strm_reg_seqno[strm_num] = strm_seqno + 1;
-				}
-			)
+			assert(murgbl.losttn_seqno >= (jgbl.mur_jrec_seqno + 1));
+			murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno + 1;
+		}
+		jgbl.mur_jrec_strm_seqno = GET_STRM_SEQNO(rec);
+		strm_seqno = jgbl.mur_jrec_strm_seqno;
+		if (strm_seqno)
+		{	/* maintain csd->strm_reg_seqno */
+			strm_num = GET_STRM_INDEX(strm_seqno);
+			strm_seqno = GET_STRM_SEQ60(strm_seqno);
+			assert(csd->strm_reg_seqno[strm_num] <= (strm_seqno + 1));
+			csd->strm_reg_seqno[strm_num] = strm_seqno + 1;
 		}
 	}
 	/* Assert that TREF(gd_targ_gvnh_reg) is NULL for every update that journal recovery/rollback plays forward;
@@ -258,7 +255,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		}
 		return SS_NORMAL;
 	}
-	switch(rectype)
+	switch (rectype)
 	{
 #	ifdef GTM_TRIGGER
 	case JRT_TZTWORM:
@@ -359,22 +356,23 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		if (!mur_options.apply_after_image)
 			return SS_NORMAL;
 		write_after_image = TRUE;
-#		ifdef GTM_CRYPT
 		aimg_blk_ptr = (blk_hdr_ptr_t)&rec->jrec_aimg.blk_contents[0];
-		if (csd->is_encrypted)
+		assert((aimg_blk_ptr->bsiz <= csd->blk_size) && (aimg_blk_ptr->bsiz >= SIZEOF(blk_hdr)));
+		in_len = MIN(csd->blk_size, aimg_blk_ptr->bsiz) - SIZEOF(blk_hdr);
+		if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, in_len))
 		{
-			assert((aimg_blk_ptr->bsiz <= csd->blk_size) && (aimg_blk_ptr->bsiz >= SIZEOF(blk_hdr)));
-			in_len = MIN(csd->blk_size, aimg_blk_ptr->bsiz) - SIZEOF(blk_hdr);
-			ASSERT_ENCRYPTION_INITIALIZED;
-			if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, in_len))
+			use_new_key = NEEDS_NEW_KEY(jctl->jfh, aimg_blk_ptr->tn);
+			if (use_new_key || IS_ENCRYPTED(jctl->jfh->is_encrypted))
 			{
-				GTMCRYPT_DECRYPT(csa, jctl->encr_key_handle, (char *)(aimg_blk_ptr + 1), in_len, NULL,
-							gtmcrypt_errno)
+				ASSERT_ENCRYPTION_INITIALIZED;
+				GTMCRYPT_DECRYPT(csa, (use_new_key ? TRUE : jctl->jfh->non_null_iv),
+						(use_new_key ? jctl->encr_key_handle2 : jctl->encr_key_handle),
+						(char *)(aimg_blk_ptr + 1), in_len, NULL,
+						aimg_blk_ptr, SIZEOF(blk_hdr), gtmcrypt_errno);
 				if (0 != gtmcrypt_errno)
 					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, jctl->jnl_fn_len, jctl->jnl_fn);
 			}
 		}
-#		endif
 		mur_put_aimg_rec(rec);
 		write_after_image = FALSE;
 		break;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +58,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 
 	MV_FORCE_STR(kase);
 	if (-1 == (index = verify_case(&kase->str)))
-		rts_error(VARLSTCNT(4) ERR_BADCASECODE, 2, kase->str.len, kase->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCASECODE, 2, kase->str.len, kase->str.addr);
 
 	MV_FORCE_STR(src);
 	/* allocate stringpool */
@@ -77,21 +78,9 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			src_ustr_ptr = src_ustr;
 			src_ustr_len = MAX_ZCONVBUFF;
 		} else
-		{ /* Fake the conversion from UTF-8 to UTF-16 to compute the required number of UChars */
-			status = U_ZERO_ERROR;
-			u_strFromUTF8(NULL, 0, &src_ustr_len, src->str.addr, src->str.len, &status);
-			if (U_FAILURE(status))
-			{	/* Since there is no ustring.h API to return the actual illegal sequence,
-				 * we need to search the UTF-8 source to identify the BADCHAR sequence
-				 * might get buffer overflow on the way to ensuring enough space
-				 */
-				if (U_FAILURE(status) && (U_BUFFER_OVERFLOW_ERROR != status))
-				{
-					if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
-						utf8_len_strict((unsigned char *)src->str.addr, src->str.len);
-					rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* ICU said bad, we say good */
-				}
-			}
+		{
+		  /* To avoid preflight, allocate (2 * lenght of src->str.char_len). */
+			src_ustr_len = 2 * src->str.char_len;
 			src_ustr_ptr = (UChar*)malloc(src_ustr_len * SIZEOF(UChar));
 		}
 		/* Convert UTF-8 src to UTF-16 (UChar*) representation */
@@ -102,21 +91,24 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);	/* to report BADCHAR error */
-			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status); /* ICU said bad, we say good or don't recognize error*/
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
+						1, status); /* ICU said bad, we say good or don't recognize error*/
 		}
-		/* Next, fake conversion to compute the required buffer size (aka preflighting in ICU) */
 		status = U_ZERO_ERROR;
-		dst_chlen = (*casemaps[index].u)(NULL, 0, src_ustr_ptr, src_chlen, NULL, &status);
-		assert(U_BUFFER_OVERFLOW_ERROR == status);
-		if (dst_chlen >  MAX_ZCONVBUFF) /* conversion increases the string length, allocate in heap instead */
+		dst_ustr_ptr = dst_ustr;
+		dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, MAX_ZCONVBUFF, src_ustr_ptr, src_chlen, NULL, &status);
+		if ( U_BUFFER_OVERFLOW_ERROR == status )
+		{
+			status = U_ZERO_ERROR;
 			dst_ustr_ptr = (UChar*)malloc(dst_chlen * SIZEOF(UChar));
-		else
-			dst_ustr_ptr = dst_ustr;
-		/* Now, perform the real conversion with sufficient buffers */
-		status = U_ZERO_ERROR;
-		dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, dst_chlen, src_ustr_ptr, src_chlen, NULL, &status);
-		if (U_FAILURE(status))
-			GTMASSERT;
+			/* Now, perform the real conversion with sufficient buffers */
+			dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, dst_chlen, src_ustr_ptr, src_chlen, NULL, &status);
+		} else if ( U_FILE_ACCESS_ERROR == status )
+		{
+			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
+					1, status);
+		}
 		RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 		/* Fake the conversion from UTF-16 to UTF-8 to compute the required buffer size */
 		status = U_ZERO_ERROR;
@@ -126,16 +118,20 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		if (MAX_STRLEN < dstlen)
 		{
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 		ENSURE_STP_FREE_SPACE(dstlen);
 		dstbase = (char *)stringpool.free;
 		status = U_ZERO_ERROR;
 		u_strToUTF8(dstbase, dstlen, &ulen, dst_ustr_ptr, dst_chlen, &status);
 		if (U_FAILURE(status))
-			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status); /* ICU said bad, but same call above just returned OK */
-		if (ulen != dstlen)
-			GTMASSERT;
+		{
+			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
+			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
+					1, status); /* ICU said bad, but same call above just returned OK */
+		}
+		assertpro(ulen == dstlen);
 		RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 	}
 	MV_INIT_STRING(dst, dstlen, dstbase);
@@ -150,16 +146,16 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	MV_FORCE_STR(src);
 	if (!gtm_utf8_mode)
 	{ /* Unicode not enabled, report error rather than silently ignoring the conversion */
-		rts_error(VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Three-argument form of $ZCONVERT() is not allowed in the current $ZCHSET"));
 	}
 	MV_FORCE_STR(ichset);
 	MV_FORCE_STR(ochset);
 	/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
 	if (NULL == (from = get_chset_desc(&ichset->str)))
-		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
 	if (NULL == (to = get_chset_desc(&ochset->str)))
-		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
 
 	dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
 	assert(-1 != dstlen);

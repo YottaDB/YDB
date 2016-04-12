@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,25 +24,41 @@
 #include <stdio.h>
 
 #ifdef UNIX
-/* If interrupted, this function has previously caused hangs to do a subsequent gtm_putmsg() invocation from
- * generic_signal_handler(), so just defer interrupts to be safe. UNIX is a GT.M-specific compiler switch, which
- * we expect to be undefined for any non-GT.M compilation that might include this file.
+/* If interrupted, the following functions have previously caused hangs, so defer interrupts for their duration to be safe. However,
+ * since gtm_stdio.h may be included in a non-GT.M compilation, we define the macros differently based on the UNIX compiler switch,
+ * which should only be defined within GT.M.
  */
-#  define FDOPEN(VAR, FILE_DES, MODE)		\
-{						\
-	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN);	\
-	VAR = fdopen(FILE_DES, MODE);		\
-	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN);	\
+#  define FDOPEN(VAR, FILE_DES, MODE)					\
+{									\
+	intrpt_state_t		prev_intrpt_state;			\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);		\
+	VAR = fdopen(FILE_DES, MODE);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);		\
+}
+
+/* Fopen() is not fully capitalized because there is an FOPEN() macro on AIX. */
+#  define Fopen(VAR, PATH, MODE)						\
+{										\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
+	VAR = fopen(PATH, MODE);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 }
 #else
-#  define FDOPEN(VAR, FILE_DES, MODE)		\
-{						\
-	VAR = fdopen(FILD_DES, MODE);		\
+#  define FDOPEN(VAR, FILE_DES, MODE)			\
+{							\
+	VAR = fdopen(FILD_DES, MODE);			\
+}
+
+#  define Fopen(VAR, PATH, MODE)			\
+{							\
+	VAR = fopen(PATH, MODE);			\
 }
 #endif
 
 #define FGETS(strg, n, strm, fgets_res)	(fgets_res = fgets(strg,n,strm))
-#define Fopen				fopen
 #define GETS(buffer, gets_res)		syntax error
 #define PERROR				perror
 #define	POPEN				popen

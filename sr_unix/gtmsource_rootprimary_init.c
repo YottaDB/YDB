@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,7 +134,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
-				if (EXIT_ERR == jnl_file_extend(jpc, 0))	/* Force jnl switch by passing in a 0 jrec_len */
+				if (EXIT_ERR == SWITCH_JNL_FILE(jpc))
 					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
 			} else
 			{

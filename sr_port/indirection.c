@@ -22,7 +22,6 @@
 #include "stringpool.h"
 
 GBLREF	boolean_t	run_time;
-GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	unsigned char	*source_buffer;
 GBLREF	int		source_column;
@@ -65,7 +64,7 @@ int indirection(oprtype *a)
 		CLEAR_MVAL_BITS(TADR(indirection_mval));
 		do
 		{
-			start = lexical_ptr;
+			start = TREF(lexical_ptr);
 			advancewindow();
 			if (TK_LPAREN != TREF(window_token))
 			{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,12 +62,13 @@ int gtmsource_changelog(void)
 		changelog_desired |= REPLIC_CHANGE_LOGFILE;
 		if (0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 		{	/*check if the new log file is writable*/
-			OPENFILE3(gtmsource_options.log_file,
+			OPENFILE3_CLOEXEC(gtmsource_options.log_file,
 				      O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, log_fd);
-			if (log_fd < 0) {
+			if (log_fd < 0)
+			{
 				save_errno = ERRNO;
 				err_code = STRERROR(save_errno);
-				gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
 						   LEN_AND_STR(gtmsource_options.log_file),
 						   LEN_AND_STR(err_code),
 						   LEN_AND_STR(NULL_DEVICE));

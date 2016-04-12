@@ -32,7 +32,7 @@
 #include "wcs_sleep.h"
 #include "relqop.h"
 #include "error.h"		/* for gtm_fork_n_core() prototype */
-#include "rel_quant.h"
+#include "gtm_rel_quant.h"
 #include "performcaslatchcheck.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wcs_recover.h"
@@ -94,7 +94,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
 	cache_que_head_ptr_t	q0, base;
-	int4			n, save_errno = 0, k, i, dummy_errno, max_count, count;
+	int4			count, dummy_errno, i, k, max_count, max_sleep_mask, n, save_errno = 0;
 	int			maxspins, retries, spins;
 	uint4			lcnt, size, to_wait, to_msg, this_idx;
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
@@ -197,19 +197,20 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		if (cr->in_tend && !wcs_phase2_commit_wait(csa, cr))
 			return FALSE;	/* assumption is that caller will set wc_blocked and trigger cache recovery */
 		maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+		max_sleep_mask = -1;	/* initialized to -1 to defer memory reference until needed */
 		for (retries = LOCK_TRIES - 1; retries > 0 ; retries--)
 		{
 			for (spins = maxspins; spins > 0 ; spins--)
 			{
 				if (GET_SWAPLOCK(&base->latch)) /* Lock queue to prevent interference */
-				{
+				{	/* This appears to be a valid place for a spin lock - refactoring might improve things */
 					if (0 != cr->state_que.fl)
 					{	/* If it is still in the active queue, then insert it at the head of the queue */
-						csa->wbuf_dqd++;
+						csa->wbuf_dqd++;	/* unnecessary under tm and would cause aborts */
 						q0 = (cache_que_head_ptr_t)((sm_uc_ptr_t)&cr->state_que + cr->state_que.fl);
 						shuffqth((que_ent_ptr_t)q0, (que_ent_ptr_t)base);
 						csa->wbuf_dqd--;
-						VERIFY_QUEUE(base);
+						VERIFY_QUEUE(base);	/* debug only */
 					}
 					/* release the queue header lock so that the writers can proceed */
 					RELEASE_SWAPLOCK(&base->latch);
@@ -244,8 +245,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 							return FALSE;
 						}
 						/* loop till the active queue is exhausted */
-						for (count = 0; 0 != cr->dirty && 0 != cnl->wcs_active_lvl &&
-							     max_count > count; count++)
+						for (count = max_count; (0 != cr->dirty) && (0 != cnl->wcs_active_lvl) && count;
+							 count--)
 						{
 							BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_retries);
 							JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, save_errno);
@@ -298,15 +299,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					}
 				}
 			}
-			if (retries & 0x3)	/* On all but every 4th pass, do a simple rel_quant */
-				rel_quant();	/* Release processor to holder of lock (hopefully) */
-			else
-			{	/* On every 4th pass, we bide for awhile */
-				wcs_sleep(LOCK_SLEEP);
-				/* Check if we're due to check for lock abandonment check or holder wakeup */
-				if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
-					performCASLatchCheck(&base->latch, TRUE);
-			}
+			REST_FOR_LATCH(&base->latch, (-1 == max_sleep_mask) ? SPIN_SLEEP_MASK(csd) : max_sleep_mask, retries);
 		}
 		--fast_lock_count;
 		assert(0 <= fast_lock_count);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,10 +16,6 @@
 #include "gtm_inet.h"
 
 #include <stddef.h> /* for offsetof() macro */
-
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -43,7 +39,6 @@
 #include "wbox_test_init.h"
 #include "gtmimagename.h"
 
-GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -85,7 +80,7 @@ error_def(ERR_JNLWRTDEFER);
 
 #define	JNL_PUTSTR(lcl_free, lcl_buff, src, len, lcl_size)			\
 {										\
-	int	size_before_wrap;						\
+	uint4	size_before_wrap;						\
 										\
 	size_before_wrap = lcl_size - lcl_free;					\
 	if (len <= size_before_wrap)						\
@@ -132,18 +127,20 @@ error_def(ERR_JNLWRTDEFER);
 
 int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_freeaddr, sgmnt_addrs *csa,
 					enum jnl_record_type rectype, blk_hdr_ptr_t blk_ptr, jnl_format_buffer *jfb,
-					gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec);
+					gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec,
+					jnlpool_write_ctx_t *jplctx);
 
-#define	DO_JNL_FILE_EXTEND_IF_NEEDED(JREC_LEN, JB, LCL_FREEADDR, CSA, RECTYPE, BLK_PTR, JFB, REG, JPC, JNL_REC)		\
+#define	DO_JNL_FILE_EXTEND_IF_NEEDED(JREC_LEN, JB, LCL_FREEADDR, CSA, RECTYPE, BLK_PTR, JFB, REG, JPC, JNL_REC, JPLCTX)		\
 MBSTART {														\
 	if (0 != jnl_write_extend_if_needed(JREC_LEN, JB, LCL_FREEADDR, CSA, RECTYPE, BLK_PTR, JFB,			\
-						REG, JPC, JNL_REC))							\
+						REG, JPC, JNL_REC, JPLCTX))							\
 		return;	/* return from calling routine */								\
 } MBEND
 
 int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_freeaddr, sgmnt_addrs *csa,
 					enum jnl_record_type rectype, blk_hdr_ptr_t blk_ptr, jnl_format_buffer *jfb,
-					gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec)
+					gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec,
+					jnlpool_write_ctx_t *jplctx)
 {
 	int4			jrec_len_padded;
 	int4			blocks_needed;
@@ -208,9 +205,9 @@ int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_fre
 				jnl_rec->prefix.pini_addr = jpc->pini_addr;
 				/* Checksum needs to be recomputed since prefix.pini_addr is changed in above statement */
 				jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
-				jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
-									(uint4 *)jnl_rec, jnl_rec->prefix.forwptr);
-				jnl_write(jpc, rectype, jnl_rec, NULL, NULL);
+				jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jnl_rec,
+													jnl_rec->prefix.forwptr);
+				jnl_write(jpc, rectype, jnl_rec, NULL, NULL, jplctx);
 			}
 			DEBUG_ONLY(jnl_write_recursion_depth--);
 			return 1;
@@ -227,9 +224,9 @@ int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_fre
  * 	     For JRT_PBLK and JRT_AIMG it contains partial records
  */
 void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, blk_hdr_ptr_t blk_ptr,
-	jnl_format_buffer *jfb)
+	jnl_format_buffer *jfb, jnlpool_write_ctx_t *jplctx)
 {
-	int4			align_rec_len, rlen, rlen_with_align, dstlen, lcl_size, lcl_free, lcl_orig_free;
+	uint4			align_rec_len, rlen, rlen_with_align, dstlen, lcl_size, lcl_free, lcl_orig_free;
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -242,7 +239,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	uint4			checksum, jnlpool_size, lcl_freeaddr;
 	sm_uc_ptr_t		lcl_buff;
 	gd_region		*reg;
-	char			*ptr;
+	uchar_ptr_t		jnlrecptr;
 	int			jnl_wrt_start_modulus, jnl_wrt_start_mask;
 	uint4			jnl_fs_block_size, aligned_lcl_free, padding_size;
 	uint4			tmp_csum1, tmp_csum2;
@@ -287,16 +284,16 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	assert((NULL == blk_ptr) || (JNL_MAX_PBLK_RECLEN(csd) >= rlen));			/* PBLK and AIMG */
 	jb->bytcnt += rlen;
 	assert (0 == rlen % JNL_REC_START_BNDRY);
-	rlen_with_align = rlen + (int4)MIN_ALIGN_RECLEN;
+	rlen_with_align = rlen + MIN_ALIGN_RECLEN;
 	assert(0 == rlen_with_align % JNL_REC_START_BNDRY);
-	assert((uint4)rlen_with_align < ((uint4)1 << jb->log2_of_alignsize));
+	assert(rlen_with_align < (1 << jb->log2_of_alignsize));
 	if ((lcl_freeaddr >> jb->log2_of_alignsize) == ((lcl_freeaddr + rlen_with_align - 1) >> jb->log2_of_alignsize))
 		rlen_with_align = rlen;
 	else
 	{
 		align_rec.align_str.length = ROUND_UP2(lcl_freeaddr, ((uint4)1 << jb->log2_of_alignsize))
 			- lcl_freeaddr - (uint4)MIN_ALIGN_RECLEN;
-		align_rec_len = (int4)(MIN_ALIGN_RECLEN + align_rec.align_str.length);
+		align_rec_len = MIN_ALIGN_RECLEN + align_rec.align_str.length;
 		assert (0 == align_rec_len % JNL_REC_START_BNDRY);
 		rlen_with_align = rlen + align_rec_len;
 	}
@@ -314,7 +311,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	{
 		DO_JNL_WRITE_ATTEMPT_IF_NEEDED(jpc, jb, lcl_dskaddr, lcl_freeaddr, lcl_size,
 						jnl_wrt_start_mask, align_rec_len, jnl_wrt_start_modulus);
-		DO_JNL_FILE_EXTEND_IF_NEEDED(align_rec_len, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec);
+		DO_JNL_FILE_EXTEND_IF_NEEDED(align_rec_len, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec,
+						jplctx);
 		align_rec.prefix.jrec_type = JRT_ALIGN;
 		assert(align_rec_len <= jb->max_jrec_len);
 		align_rec.prefix.forwptr = suffix.backptr = align_rec_len;
@@ -327,10 +325,10 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_FILE_FIRST_RECORD : jnl_rec->prefix.pini_addr;
 		align_rec.prefix.checksum = INIT_CHECKSUM_SEED;
 		suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		align_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&align_rec, SIZEOF(jrec_prefix));
+		align_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&align_rec, SIZEOF(jrec_prefix));
 		ADJUST_CHECKSUM(align_rec.prefix.checksum, lcl_freeaddr, align_rec.prefix.checksum);
 		ADJUST_CHECKSUM(align_rec.prefix.checksum, csd->jnl_checksum, align_rec.prefix.checksum);
-		assert(lcl_free >= 0 && lcl_free < lcl_size);
+		assert(lcl_free < lcl_size);
 		if (lcl_size >= (lcl_free + align_rec_len))
 		{	/* before the string for zeroes */
 			memcpy(lcl_buff + lcl_free, (uchar_ptr_t)&align_rec, FIXED_ALIGN_RECLEN);
@@ -387,7 +385,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			/* Checksum needs to be recomputed since prefix.pini_addr is changed in above statement */
 			jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
 			jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
-								(uint4 *)&jnl_rec->jrec_pini, SIZEOF(struct_jrec_pini));
+								(unsigned char *)&jnl_rec->jrec_pini, SIZEOF(struct_jrec_pini));
 		}
 	}
 	checksum = jnl_rec->prefix.checksum;
@@ -399,7 +397,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	if ((JRT_PBLK == rectype) || (JRT_AIMG == rectype))
 	{
 		COMPUTE_COMMON_CHECKSUM(tmp_csum2, jnl_rec->prefix);
-		tmp_csum1 = jnl_get_checksum((uint4 *)blk_ptr, NULL, jnl_rec->jrec_pblk.bsiz);
+		tmp_csum1 = jnl_get_checksum(blk_ptr, NULL, jnl_rec->jrec_pblk.bsiz);
 		COMPUTE_PBLK_CHECKSUM(tmp_csum1, &jnl_rec->jrec_pblk, tmp_csum2, tmp_csum1);
 		assert(checksum == tmp_csum1);
 	} else if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
@@ -407,21 +405,22 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		COMPUTE_COMMON_CHECKSUM(tmp_csum2, jnl_rec->prefix);
 		mumps_node_ptr = jfb->buff + FIXED_UPD_RECLEN;
 		mumps_node_sz = jfb->record_size - (FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE);
-		tmp_csum1 = jnl_get_checksum((uint4 *)mumps_node_ptr, NULL, mumps_node_sz);
+		tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)mumps_node_ptr, mumps_node_sz);
 		COMPUTE_LOGICAL_REC_CHECKSUM(tmp_csum1, &jnl_rec->jrec_set_kill, tmp_csum2, tmp_csum1);
 		assert(checksum == tmp_csum1);
-	}else if (jrt_fixed_size[rectype] || JRT_ALIGN == rectype)
+	} else if (jrt_fixed_size[rectype] || JRT_ALIGN == rectype)
 	{
 		jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
-		switch(rectype)
+		switch (rectype)
 		{
 		case JRT_ALIGN:
-			tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnl_rec->jrec_align, SIZEOF(jrec_prefix));
+			tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED,
+								(unsigned char *)&jnl_rec->jrec_align, SIZEOF(jrec_prefix));
 			break;
 		default:
 			if(JRT_TRIPLE != rectype && JRT_HISTREC != rectype)
-				tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnl_rec->jrec_set_kill,
-						jnl_rec->prefix.forwptr);
+				tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED,
+								(unsigned char *)&jnl_rec->jrec_set_kill, jnl_rec->prefix.forwptr);
 			break;
 		}
 		assert(checksum == tmp_csum1);
@@ -433,7 +432,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jnl_rec->prefix.checksum = checksum;
 	DO_JNL_WRITE_ATTEMPT_IF_NEEDED(jpc, jb, lcl_dskaddr, lcl_freeaddr, lcl_size,
 					jnl_wrt_start_mask, rlen, jnl_wrt_start_modulus);
-	DO_JNL_FILE_EXTEND_IF_NEEDED(rlen, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec);
+	DO_JNL_FILE_EXTEND_IF_NEEDED(rlen, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec, jplctx);
 	lcl_orig_free = lcl_free;
 	nowrap = (lcl_size >= (lcl_free + rlen));
 	assert(jrt_fixed_size[JRT_EOF]);
@@ -458,7 +457,6 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			jnl_fs_block_size = jb->fs_block_size;
 			aligned_lcl_free = ROUND_UP2(lcl_free, jnl_fs_block_size);
 			padding_size = aligned_lcl_free - lcl_free;
-			assert(0 <= (int4)padding_size);
 			if (padding_size)
 				memset(lcl_buff + lcl_free, 0, padding_size);
 		}
@@ -522,32 +520,30 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, rlen);
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
 	if (REPL_ENABLED(csa) && is_replicated && is_replicator)
-	{	/* If the database is encrypted, then at this point jfb->buff will contain encrypted
+	{
+		assert(NULL != jplctx);
+		assert(NULL != jnlpool.jnlpool_ctl && NULL != jnlpool_ctl); /* ensure we haven't yet detached from the jnlpool */
+		assert((&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs)->now_crit);	/* ensure we have the jnl pool lock */
+		DEBUG_ONLY(jgbl.cu_jnl_index++;)
+
+		/* If the database is encrypted, then at this point jfb->buff will contain encrypted
 		 * data which we don't want to to push into the jnlpool. Instead, we make use of the
 		 * alternate alt_buff which is guaranteed to contain the original unencrypted data.
 		 */
 		if (jrt_fixed_size[rectype])
-			ptr = (char *)jnl_rec;
+			jnlrecptr = (uchar_ptr_t)jnl_rec;
+		else if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) && USES_ANY_KEY(csd))
+			jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
 		else
-		{
-#			ifdef GTM_CRYPT
-			if (csd->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			 	ptr = jfb->alt_buff;
-			else
-#			endif
-				ptr = jfb->buff;
-		}
-		assert(NULL != jnlpool.jnlpool_ctl && NULL != jnlpool_ctl); /* ensure we haven't yet detached from the jnlpool */
-		assert((&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs)->now_crit);	/* ensure we have the jnl pool lock */
-		DEBUG_ONLY(jgbl.cu_jnl_index++;)
-		jnlpool_size = temp_jnlpool_ctl->jnlpool_size;
-		dstlen = jnlpool_size - temp_jnlpool_ctl->write;
+			jnlrecptr = (uchar_ptr_t)jfb->buff;
+		jnlpool_size = jnlpool_ctl->jnlpool_size;
+		dstlen = jnlpool_size - jplctx->write;
 		if (rlen <= dstlen)		/* dstlen >= rlen  (most frequent case) */
-			memcpy(jnldata_base + temp_jnlpool_ctl->write, ptr, rlen);
+			memcpy(jnldata_base + jplctx->write, jnlrecptr, rlen);
 		else if (rlen <= jnlpool_size)	/* dstlen < rlen <= jnlpool_size */
 		{
-			memcpy(jnldata_base + temp_jnlpool_ctl->write, ptr, dstlen);
-			memcpy(jnldata_base, ptr + dstlen, rlen - dstlen);
+			memcpy(jnldata_base + jplctx->write, jnlrecptr, dstlen);
+			memcpy(jnldata_base, jnlrecptr + dstlen, rlen - dstlen);
 		} else				/* dstlen <= jnlpool_size < rlen */
 		{	/* Copy just the last "jnlpool_size" bytes of the journal record (which could be arbitrarily large)
 			 * onto the journal pool. Adjust pointers as appropriate. Note that this transaction can never be
@@ -556,19 +552,14 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			 * instead of the last "jnlpool_size" bytes and still things should work as well but we copy valid
 			 * data just in case it helps in debug situations.
 			 */
-			ptr = ptr + rlen - jnlpool_size;
-			temp_jnlpool_ctl->write += rlen % jnlpool_size;
-			if (temp_jnlpool_ctl->write >= jnlpool_size)
-				temp_jnlpool_ctl->write -= jnlpool_size;
-			assert(temp_jnlpool_ctl->write < jnlpool_size);
-			dstlen = jnlpool_size - temp_jnlpool_ctl->write;
-			memcpy(jnldata_base + temp_jnlpool_ctl->write, ptr, dstlen);
-			memcpy(jnldata_base, ptr + dstlen, jnlpool_size - dstlen);
-			rlen = 0;
+			jnlrecptr = jnlrecptr + rlen - jnlpool_size;
+			memcpy(jnldata_base + jplctx->write, jnlrecptr, dstlen);
+			memcpy(jnldata_base, jnlrecptr + dstlen, jnlpool_size - dstlen);
 		}
-		temp_jnlpool_ctl->write += rlen;
-		if (temp_jnlpool_ctl->write >= jnlpool_size)
-			temp_jnlpool_ctl->write -= jnlpool_size;
+		jplctx->write += rlen;
+		jplctx->write_total += rlen;
+		if (jplctx->write >= jnlpool_size)
+			jplctx->write %= jnlpool_size;
 	}
 	SET_JNLBUFF_PREV_JREC_TIME(jb, jnl_rec->prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE); /* Keep jb->prev_jrec_time up to date */
 	jpc->temp_free = lcl_free; /* set jpc->temp_free BEFORE setting free_update_pid (secshr_db_clnup relies on this) */
@@ -589,15 +580,5 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jb->free = lcl_free;
 	jb->free_update_pid = 0;
 	DBG_CHECK_JNL_BUFF_FREEADDR(jb);
-	VMS_ONLY(
-		if (((lcl_freeaddr - jb->dskaddr) > jb->min_write_size)
-		    && (SS_NORMAL != (status = jnl_qio_start(jpc))) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
-	        {
-			jb->blocked = 0;
-			jnl_file_lost(jpc, status);
-			DEBUG_ONLY(jnl_write_recursion_depth--);
-			return;
-		}
-	)
 	DEBUG_ONLY(jnl_write_recursion_depth--);
 }

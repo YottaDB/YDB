@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+#include "gtm_string.h"
 
 #include "io.h"
 #include "gtm_limits.h"
@@ -21,6 +23,8 @@
 #include "gtmcrypt.h"
 
 GBLREF	io_log_name	*io_root_log_name;
+
+error_def(ERR_CRYPTKEYRELEASEFAILED);
 
 void remove_rms (io_desc *ciod)
 {
@@ -46,9 +50,19 @@ void remove_rms (io_desc *ciod)
 	if (rm_ptr && (rm_ptr->read_filstr != NULL))
 		FCLOSE(rm_ptr->read_filstr, fclose_res);
 	if (rm_ptr && rm_ptr->input_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle))
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle);
+	{
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle, rc);
+		if (0 != rc)
+			GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
+	}
 	if (rm_ptr && rm_ptr->output_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle);
+	{
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle, rc);
+		if (0 != rc)
+			GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
+	}
+	if (rm_ptr && (NULL != rm_ptr->fsblock_buffer))
+		free(rm_ptr->fsblock_buffer);
 	if (ciod->newly_created && rm_ptr && !rm_ptr->pipe)
 	{
 		UNLINK(ciod->trans_name->dollar_io);
@@ -96,5 +110,5 @@ void remove_rms (io_desc *ciod)
 		}
 		free (rm_ptr);
 	}
-	free (ciod);
+	free(ciod);
 }

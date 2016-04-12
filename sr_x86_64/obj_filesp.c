@@ -152,7 +152,6 @@ void finish_object_file(void)
 
         buff_flush();
         bufSize = gtm_object_size;
-        actualSize = 0;
         string_tbl = malloc(SPACE_STRING_ALLOC_LEN);
         symIndex = 0;
         strEntrySize = SIZEOF(static_string_tbl);

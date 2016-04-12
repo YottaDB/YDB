@@ -43,16 +43,14 @@
 
 #include "mdef.h"
 
-#include <errno.h>
-#include <stddef.h>
-#include <stdarg.h>
-#ifdef GTM_PTHREAD
-#  include <pthread.h>
-#endif
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtmimagename.h"
+
+#include <errno.h>
+#include <stddef.h>
+#include <stdarg.h>
 
 #if (defined(__ia64) && defined(__linux__)) || defined(__MVS__)
 # include "gtm_unistd.h"
@@ -72,12 +70,12 @@
 # include <sys/param.h>
 #endif
 #include "send_msg.h"
-#include "eintr_wrappers.h"
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
 #include "sleep.h"
 #include "error.h"
+#include "gtm_multi_thread.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -128,7 +126,16 @@ STATICDEF boolean_t		in_setitimer_error;
 #endif
 
 #define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
-#define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !(fast_lock_count))
+#define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !fast_lock_count)
+/* In case threads are running, we dont want any unsafe timers to be handled during a timer handler pop. This is because we
+ * dont know if the threads will modify the same global variable that the unsafe timer modifies concurrently.
+ * But it is okay for timers to be started by individual threads. For example the iott_flush_timer will be started inside
+ * thread code only while holding a mutex lock (e.g. inside gtm_putmsg_list or so) and even though a "setitimer" call is done
+ * inside one thread, the SIGALRM pop will happen only in the parent process because all threads have SIGALRM disabled in their
+ * signal mask. Define SAFE_FOR_TIMER_POP and SAFE_FOR_TIMER_START variables accordingly.
+ */
+#define	SAFE_FOR_TIMER_POP	(SAFE_FOR_ANY_TIMER && !multi_thread_in_use)
+#define	SAFE_FOR_TIMER_START	(SAFE_FOR_ANY_TIMER)
 
 STATICDEF volatile GT_TIMER *timeroot = NULL;	/* chain of pending timer requests in time order */
 STATICDEF boolean_t first_timeset = TRUE;
@@ -182,6 +189,9 @@ GBLREF	void		(*heartbeat_timer_ptr)(void);		/* Initialized only in gtm_startup()
 GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
+#ifdef DEBUG
+GBLREF	boolean_t	in_nondeferrable_signal_handler;
+#endif
 
 error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
@@ -279,12 +289,14 @@ void sys_get_curr_time(ABS_TIME *atp)
 {
 #	ifdef BSD_TIMER
 	struct timeval	tv;
-	struct timezone	tz;
+	struct timespec	elp_time;
 
-	/* getclock or clock_gettime perhaps to avoid tz just to ignore */
-	gettimeofday(&tv, &tz);
-	atp->at_sec = (int4)tv.tv_sec;
-	atp->at_usec = (int4)tv.tv_usec;
+	/* Note: This function is called from timer_handler and so needs to be async-signal safe.
+	 * POSIX defines "clock_gettime" as safe but not "gettimeofday" so dont use the latter.
+	 */
+	clock_gettime(CLOCK_REALTIME, &elp_time);
+	atp->at_sec = (int4)elp_time.tv_sec;
+	atp->at_usec = (int4)elp_time.tv_nsec / 1000;
 #	else
 	atp->at_sec = time((int4 *) 0);
 	atp->at_usec = 0;
@@ -298,8 +310,9 @@ void hiber_start(uint4 hiber)
 	int4		*waitover_addr;
 	TID		tid;
 	sigset_t	savemask;
+	int		rc;
 
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	/* sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a member of savemask,
 	 * this process will never receive SIGALRM, and it will hang indefinitely. One such scenario would be if we interrupted a
 	 * timer handler with kill -15, thus getting all timer setup reset by generic_signal_handler, and the gtm_exit_handler
@@ -310,7 +323,7 @@ void hiber_start(uint4 hiber)
 	{	/* normally, if SIGALRMs are blocked, we must already be inside a timer handler, but someone can actually disable
 		 * SIGALRMs, in which case we do not want this assert to trip in pro */
 		assert(1 <= timer_stack_count);
-		SLEEP_USEC(hiber, TRUE);
+		SLEEP_USEC(hiber * 1000, TRUE);
 	} else
 	{
 		assertpro(1 > timer_stack_count);	/* if SIGALRMs are not blocked, we cannot be inside a timer handler */
@@ -330,13 +343,14 @@ void hiber_start(uint4 hiber)
 			}
 		} while (FALSE == waitover);
 	}
-	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }
 
 /* Hibernate by starting a timer and waiting for it or any other timer to pop. */
 void hiber_start_wait_any(uint4 hiber)
 {
-	sigset_t savemask;
+	sigset_t	savemask;
+	int		rc;
 
 	if (1000 > hiber)
 	{
@@ -344,7 +358,7 @@ void hiber_start_wait_any(uint4 hiber)
 		return;
 	}
 	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal and set new timer */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal and set new timer */
 	/* Even though theoretically it is possible for any signal other than SIGALRM to discontinue the wait in sigsuspend,
 	 * the intended use of this function targets only timer-scheduled events. For that reason, assert that SIGALRMs are
 	 * not blocked prior to scheduling a timer, whose delivery we will be waiting upon, as otherwise we might end up
@@ -356,7 +370,7 @@ void hiber_start_wait_any(uint4 hiber)
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
-	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }
 
 /* Wrapper function for start_timer() that is exposed for outside use. The function ensures that time_to_expir is positive. If
@@ -387,15 +401,11 @@ void gtm_start_timer(TID tid,
  *      	hdata_len       - length of handler data next arg
  *      	hdata           - data to pass to handler (if any)
  */
-void start_timer(TID tid,
-		 int4 time_to_expir,
-		 void (*handler)(),
-		 int4 hdata_len,
-		 void *hdata)
+void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
 {
 	sigset_t	savemask;
 	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
-	int		i;
+	int		i, rc;
 
 	assertpro(0 <= time_to_expir);			/* Callers should verify non-zero time */
 	DUMP_TIMER_INFO("At the start of start_timer()");
@@ -425,14 +435,14 @@ void start_timer(TID tid,
                         }
 		}
 	}
-	if (!safe_to_add && !(SAFE_FOR_ANY_TIMER))
+	if (!safe_to_add && !SAFE_FOR_TIMER_START)
 	{
 		assert(FALSE);
 		return;
 	}
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	start_timer_int(tid, time_to_expir, handler, hdata_len, hdata, safe_timer);
-	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 	DUMP_TIMER_INFO("At the end of start_timer()");
 }
 
@@ -475,8 +485,9 @@ void cancel_timer(TID tid)
         ABS_TIME	at;
 	sigset_t	savemask;
 	boolean_t	first_timer;
+	int		rc;
 
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	DUMP_TIMER_INFO("At the start of cancel_timer()");
 	sys_get_curr_time(&at);
 	first_timer = (timeroot && (timeroot->tid == tid));
@@ -488,14 +499,15 @@ void cancel_timer(TID tid)
 		else if (timer_active)
 			sys_canc_timer();
 	}
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	DUMP_TIMER_INFO("At the end of cancel_timer()");
 }
 
 /* Clear the timers' state for the forked-off process. */
 void clear_timers(void)
 {
-	sigset_t savemask;
+	sigset_t	savemask;
+	int		rc;
 
 	if (NULL == timeroot)
 	{	/* If no timers have been initialized in this process, take fast path (avoid system call) */
@@ -505,14 +517,14 @@ void clear_timers(void)
 		assert(FALSE == deferred_timers_check_needed);
 		return;
 	}
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	while (timeroot)
 		remove_timer(timeroot->tid);
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
 	heartbeat_started = FALSE;
 	deferred_timers_check_needed = FALSE;
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	return;
 }
 
@@ -559,7 +571,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		deferred_timers_check_needed = FALSE;
 		return;
 	}
-	if (SAFE_FOR_ANY_TIMER)
+	if (SAFE_FOR_TIMER_START)
 	{	/* Check if some timer expired while this function was getting invoked. */
 		while (timeroot)
 		{
@@ -613,7 +625,10 @@ STATICFNDEF void timer_handler(int why)
 	boolean_t	tid_found;
 	char 		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
-	boolean_t	util_copy_saved = FALSE;
+	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop;
+#	ifdef DEBUG
+	boolean_t	save_in_nondeferrable_signal_handler;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -630,6 +645,11 @@ STATICFNDEF void timer_handler(int why)
 		tpop = find_timer((TID)heartbeat_timer_ptr, &tpop);
 		assert(process_exiting || (((NULL != tpop) && heartbeat_started) || ((NULL == tpop) && !heartbeat_started)));
 	}
+	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
+	 * (say to handle sig-3) and then had a timer handler pop while inside there (possible for example in receiver server).
+	 * So save current value of global and restore it at end of this function.
+	 */
+	save_in_nondeferrable_signal_handler = in_nondeferrable_signal_handler;
 #	endif
 	if (0 < timer_stack_count)
 		return;
@@ -641,7 +661,19 @@ STATICFNDEF void timer_handler(int why)
 	sys_get_curr_time(&at);
 	tpop = (GT_TIMER *)timeroot;
 	timer_defer_cnt = 0;				/* reset the deferred timer count, since we are in timer_handler */
-	SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	safe_for_timer_pop = SAFE_FOR_TIMER_POP;
+	/* If "multi_thread_in_use" is TRUE, it is possible util_out* buffers are concurrently being manipulated by the running
+	 * threads. So do not use SAVE/RESTORE_UTIL_OUT_BUFFER macros. Thankfully in this case, "safe_for_timer_pop" will
+	 * be FALSE (asserted below) and so only safe timer handlers will be driven. We expect the safe timer handlers to
+	 * not play with the util_out* buffers. So it is actually okay to not do the SAVE/RESTORE_UTIL_OUT_BUFFER.
+	 */
+	assert(!multi_thread_in_use || !safe_for_timer_pop);
+	if (safe_for_timer_pop)
+		SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+#	ifdef DEBUG
+	if (safe_for_timer_pop)
+		in_nondeferrable_signal_handler = IN_TIMER_HANDLER;
+#	endif
 	while (tpop)					/* fire all handlers that expired */
 	{
 		cmp = abs_time_comp(&at, (ABS_TIME *)&tpop->expir_time);
@@ -650,7 +682,7 @@ STATICFNDEF void timer_handler(int why)
 		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
 		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
 		 */
-		if (SAFE_FOR_ANY_TIMER || (tpop->safe))
+		if (safe_for_timer_pop || tpop->safe)
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -733,8 +765,9 @@ STATICFNDEF void timer_handler(int why)
 				break;
 		}
 	}
-	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
-	if (SAFE_FOR_ANY_TIMER || (0 < safe_timer_cnt))
+	if (safe_for_timer_pop)
+		RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	if (safe_for_timer_pop || (0 < safe_timer_cnt))
 		start_first_timer(&at);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
 		deferred_timers_check_needed = TRUE;
@@ -745,6 +778,10 @@ STATICFNDEF void timer_handler(int why)
 	SET_ERROR_CONDITION(save_error_condition);	/* restore error_condition & severity */
 	errno = save_errno;			/* restore mainline errno by similar reasoning as mainline error_condition */
 	timer_stack_count--;
+#	ifdef DEBUG
+	if (safe_for_timer_pop)
+		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;
+#	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");
 }
 
@@ -915,11 +952,12 @@ void cancel_unsafe_timers(void)
         ABS_TIME	at;
 	sigset_t	savemask;
 	GT_TIMER	*active, *curr, *next;
-	DEBUG_ONLY(int4 cnt = 0;)
+	int		rc;
+	DEBUG_ONLY(int4	cnt = 0;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	active = curr = (GT_TIMER *)timeroot;
 	while (curr)
 	{	/* If the timer is unsafe, remove it from the chain. */
@@ -952,7 +990,7 @@ void cancel_unsafe_timers(void)
 		DBGFPF((stderr, " Timers canceled: %d\n", cnt));
 	}
 #	endif
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 }
 
 /* Initialize timers. */
@@ -982,12 +1020,15 @@ STATICFNDEF void init_timers()
  */
 void check_for_deferred_timers(void)
 {
-	sigset_t savemask;
+	sigset_t	savemask;
+	int		rc;
+	char		*rname;
 
+	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
 	deferred_timers_check_needed = FALSE;
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	timer_handler(DUMMY_SIG_NUM);
-	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }
 
 /* Check for timer pops. If any timers are on the queue, pretend a sigalrm occurred, and we have to
@@ -997,7 +1038,7 @@ void check_for_deferred_timers(void)
  */
 void check_for_timer_pops()
 {
-	int			stolenwhen = 0;		/* 0 = no, 1 = not first, 2 = first time */
+	int			rc, stolenwhen = 0;		/* 0 = no, 1 = not first, 2 = first time */
 	sigset_t 		savemask;
 	struct sigaction 	current_sa;
 
@@ -1027,9 +1068,9 @@ void check_for_timer_pops()
 	}
 	if (timeroot && (1 > timer_stack_count))
 	{
-		sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 		timer_handler(DUMMY_SIG_NUM);
-		sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
+		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 	}
 	if (stolenwhen)
 	{
@@ -1046,14 +1087,15 @@ GT_TIMER *find_timer_intr_safe(TID tid, GT_TIMER **tprev)
 {
 	sigset_t 	savemask;
 	GT_TIMER	*tcur;
+	int		rc;
 
 	/* Before scanning timer queues, block SIGALRM signal as otherwise that signal could cause an interrupt
 	 * timer routine to be driven which could in turn modify the timer queues while this mainline code is
 	 * examining the very same queue. This could cause all sorts of invalid returns (of tcur and tprev)
 	 * from the find_timer call below.
 	 */
-	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	tcur = find_timer(tid, tprev);
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	return tcur;
 }

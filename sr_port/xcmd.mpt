@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright  2012 Fidelity Information Services, Inc.    	;
+; Copyright (c) 2016 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,7 +15,7 @@
 	; If no $ETRAP defined, use CLIERR^%XCMD overriding a potential $ZTRAP error handler
 	if ""=$ETRAP new $ETRAP set $ETRAP="goto CLIERR^%XCMD"
 	new etrap set etrap=$ETRAP
-	; Protect %XCMD's error handler by NEWing and SETing $ETRAP at the begining of the XECUTEd command
+	; Protect %XCMD's error handler by NEWing and SETing $ETRAP at the beginning of the XECUTEd command
 	xecute "new $ETRAP set $ETRAP=etrap "_$zcmdline
 	quit
 
@@ -29,10 +30,11 @@ CLIERR
 
 	; Perform a given command on every line of input
 	;
-LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] --xec=|<string>|
+LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] [--xec=|<string>|]
+	; %l keeps the current line contents and %NR keeps its line #
 	; If no $ETRAP defined, use LOOPERR^%XCMD overriding a potential $ZTRAP error handler
 	if ""=$ETRAP new $ETRAP set $ETRAP="goto LOOPERR^%XCMD"
-	new %cli,%l,%NR,%xcmd,etrap
+	new %cli,%l,%NR,%xcmd,etrap,xec
 	set %cli=$zcmdline,etrap=$ETRAP
 	for  quit:'$$trimleadingstr(.%cli,"--")  do 	; process command line options
 	. if $$trimleadingstr(.%cli,"after=") set %xcmd("after")=$$trimleadingdelimstr(.%cli)
@@ -40,11 +42,11 @@ LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] -
 	. else  if $$trimleadingstr(.%cli,"xec=") set %xcmd("xec")=$$trimleadingdelimstr(.%cli)
 	. else  set $ecode=",U254,"
 	. if $$trimleadingstr(.%cli," ")
-	set:'$length($get(%xcmd("xec"))) $ecode=",U253,"
 	set:$length(%cli) $ecode=",U252,"
 	kill %cli
+	set xec=$length($get(%xcmd("xec"))) ; xec=0 means nothing to do on each line
 	do cmd($get(%xcmd("before")),0,"",etrap)
-	for %NR=1:1 read %l quit:$zeof  do cmd(%xcmd("xec"),%NR,%l,etrap)
+	for %NR=1:1 read %l quit:$zeof  do:xec cmd(%xcmd("xec"),%NR,%l,etrap)
 	do cmd($get(%xcmd("after")),%NR,%l,etrap)
 	quit
 
@@ -87,5 +89,4 @@ trimleadingstr(str,x)
 
 ;	Error message texts
 U252	;"-F-UNRECCMD Unrecognized commands starting with "_%cli
-U253	;"-F-EMPTYXEC String to Xecute with --xec is required but not provided"
 U254	;"-F-ILLEGALCMD Illegal command line option(s) starting with --"_%cli

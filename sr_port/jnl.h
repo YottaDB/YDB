@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,9 +20,7 @@
 #ifndef JNLSP_H_INCLUDED
 #include "jnlsp.h"
 #endif
-#ifdef GTM_CRYPT
 #include "gtmcrypt.h"
-#endif
 
 error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLENDIANBIG);
@@ -55,8 +53,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL25"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		25
+#define JNL_LABEL_TEXT		"GDSJNL26"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		26
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -123,7 +121,7 @@ error_def(ERR_JNLENDIANLITTLE);
 									 */
 
 #define	JNL_WRT_END_MODULUS	8
-#define JNL_WRT_END_MASK	~(JNL_WRT_END_MODULUS - 1)
+#define JNL_WRT_END_MASK	((uint4)~(JNL_WRT_END_MODULUS - 1))
 
 #ifdef UNIX
 #  define JNL_MIN_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
@@ -233,14 +231,14 @@ error_def(ERR_JNLENDIANLITTLE);
  * checks if journaling is enabled and if so invokes "jnl_write" else it invokes "jnl_write_poolonly" which
  * writes only to the journal pool.
  */
-#define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, BLKPTR, JFB)							\
+#define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, BLKPTR, JFB, JPLCTX)							\
 {															\
 	assert(JNL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));								\
 	assert((NULL == JFB) || (RECTYPE == ((jnl_record *)(((jnl_format_buffer *)JFB)->buff))->prefix.jrec_type));	\
 	if (JNL_ENABLED(CSA))												\
-		jnl_write(JPC, RECTYPE, JREC, BLKPTR, JFB); /* write to jnlbuffer, jnlfile, jnlpool */			\
+		jnl_write(JPC, RECTYPE, JREC, BLKPTR, JFB, JPLCTX); /* write to jnlbuffer, jnlfile, jnlpool */			\
 	else														\
-		jnl_write_poolonly(JPC, RECTYPE, JREC, JFB);	/* write to jnlpool only */				\
+		jnl_write_poolonly(JPC, RECTYPE, JREC, JFB, JPLCTX);	/* write to jnlpool only */				\
 }
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
@@ -399,6 +397,8 @@ typedef struct pini_list
 	uint4			new_pini_addr;	/* used in forward phase of recovery */
 	jnl_process_vector	jpv;		/* CURR_JPV. Current process's JPV. For GTCM server we also use this. */
 	jnl_process_vector	origjpv;	/* ORIG_JPV. Used for GTCM client only */
+	jnl_proc_time		pini_jpv_time;	/* Original PINI record timestamp (before forward phase of
+						 *	journal recovery modifies jpv->jpv_time */
 	enum pini_rec_stat	state;		/* used for show qualifier */
 } pini_list_struct;
 
@@ -489,6 +489,7 @@ typedef struct
 							 * primarily used in Unix, 512 in VMS */
 	volatile uint4		post_epoch_freeaddr;	/* virtual on-disk address after last epoch */
 	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
+	uint4			end_of_data_at_open;	/* Offset of EOF record when jnl file is first opened in shm */
 	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.
@@ -682,9 +683,14 @@ typedef struct
 	unsigned char		data_file_name[JNL_NAME_SIZE];		/* Database file name */
 	unsigned char		prev_jnl_file_name[JNL_NAME_SIZE];	/* Previous generation journal file name */
 	unsigned char		next_jnl_file_name[JNL_NAME_SIZE];	/* Next generation journal file name */
-	/* encryption related fields */
-	uint4			is_encrypted;
+	/* Encryption-related fields (mirror those in the database file header) */
+	int4			is_encrypted;
 	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
+	char			encryption_hash2[GTMCRYPT_RESERVED_HASH_LEN];
+	boolean_t		non_null_iv;
+	block_id		encryption_hash_cutoff;
+	trans_num		encryption_hash2_start_tn;
+	char			encr_filler[80];
 	/* The below two arrays are unused in VMS but defined there to keep the layout similar between Unix & VMS */
 	seq_num			strm_start_seqno[MAX_SUPPL_STRMS];
 	seq_num			strm_end_seqno[MAX_SUPPL_STRMS];
@@ -724,8 +730,12 @@ typedef struct
 	uint4 			checksum;
 	uint4			free_blocks;		/* free  blocks counter at time of epoch */
 	uint4			total_blks;		/* total blocks counter at time of epoch */
-	uint4			is_encrypted;
-	char			encryption_hash[GTMCRYPT_HASH_LEN];
+	int4			is_encrypted;
+	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
+	char			encryption_hash2[GTMCRYPT_RESERVED_HASH_LEN];
+	boolean_t		non_null_iv;
+	block_id		encryption_hash_cutoff;
+	trans_num		encryption_hash2_start_tn;
 	sgmnt_addrs		*csa;
 } jnl_create_info;
 
@@ -788,10 +798,8 @@ typedef struct jnl_format_buff_struct
 	char 				*buff;
 	uint4				checksum;
 	jnl_action			ja;
-#	ifdef GTM_CRYPT
 	char				*alt_buff; /* for storing the unencrypted jnl *SET and *KILL records to be pushed
 						    * into the jnl pool. */
-#	endif
 } jnl_format_buffer;
 
 /* All fixed size records are 8-byte-multiple size.
@@ -1115,6 +1123,7 @@ typedef enum
 	SET_JNL_FILE_CLOSE_SETJNL,
 	SET_JNL_FILE_CLOSE_EXTEND,
 	SET_JNL_FILE_CLOSE_RUNDOWN,
+	SET_JNL_FILE_CLOSE_REORG_ENCRYPT,
         SET_JNL_FILE_CLOSE_INVALID_OP
 } set_jnl_file_close_opcode_t;
 
@@ -1178,8 +1187,15 @@ typedef struct
 #	endif
 	boolean_t			mur_extract;		/* a copy of mur_options.extr[0] to be accessible to GTM runtime*/
 	boolean_t			save_dont_reset_gbl_jrec_time;	/* save a copy of dont_reset_gbl_jrec_time */
+	boolean_t			mur_update;		/* a copy of mur_options.update to be accessible to GTM runtime */
 } jnl_gbls_t;
 
+/* Include this here as it is needed for the interface to jnl_write() and jnl_write_poolonly() */
+typedef struct
+{
+	uint4			write;			/* Incrementally changing version of jnlpool_ctl_struct::write */
+	uint4			write_total;		/* Total bytes written */
+} jnlpool_write_ctx_t;
 
 #define JNL_SHARE_SIZE(X)	(JNL_ALLOWED(X) ? 							\
 				(ROUND_UP(JNL_NAME_EXP_SIZE + SIZEOF(jnl_buffer), OS_PAGE_SIZE)		\
@@ -1199,6 +1215,9 @@ typedef struct
  * only be used to do "!=" checks and never to do ordered checks like "<", ">", "<=" or ">=".
  */
 #define JNL_FILE_SWITCHED(JPC) 	((JPC)->cycle != (JPC)->jnl_buff->cycle)
+
+/* The jrec_len of 0 causes a switch. */
+#define SWITCH_JNL_FILE(JPC)	jnl_file_extend(JPC, 0)
 
 #define REG_STR		"region"
 #define FILE_STR	"database file"
@@ -1225,26 +1244,30 @@ typedef struct
  * VMS does not support supplementary instances so the below macro does not apply there at all.
  */
 #ifdef UNIX
-#define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)				\
-{										\
-	int			strm_num;					\
-	seq_num			strm_seqno;					\
-										\
-	GBLREF	int		process_exiting;				\
-										\
-	if (jgbl.mur_jrec_strm_seqno && !process_exiting)			\
-	{									\
-		assert(jgbl.mur_rollback);					\
-		VMS_ONLY(assert(FALSE);)					\
-		strm_seqno = jgbl.mur_jrec_strm_seqno;				\
-		strm_num = GET_STRM_INDEX(strm_seqno);				\
-		strm_seqno = GET_STRM_SEQ60(strm_seqno);			\
-		if (CSD->strm_reg_seqno[strm_num] == (strm_seqno + 1))		\
-		{								\
-			assert(DST[strm_num] == (strm_seqno + 1));		\
-			DST[strm_num] = strm_seqno;				\
-		}								\
-	}									\
+#define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)							\
+{													\
+	int			strm_num;								\
+	seq_num			strm_seqno;								\
+													\
+	GBLREF	int		process_exiting;							\
+													\
+	if (jgbl.mur_jrec_strm_seqno && !process_exiting)						\
+	{												\
+		assert(jgbl.mur_rollback);								\
+		/* This macro should be called only when journal records are about to be written	\
+		 * and that is not possible in case of a FORWARD rollback. Assert that.			\
+		 */											\
+		assert(!jgbl.mur_options_forward);							\
+		VMS_ONLY(assert(FALSE);)								\
+		strm_seqno = jgbl.mur_jrec_strm_seqno;							\
+		strm_num = GET_STRM_INDEX(strm_seqno);							\
+		strm_seqno = GET_STRM_SEQ60(strm_seqno);						\
+		if (CSD->strm_reg_seqno[strm_num] == (strm_seqno + 1))					\
+		{											\
+			assert(DST[strm_num] == (strm_seqno + 1));					\
+			DST[strm_num] = strm_seqno;							\
+		}											\
+	}												\
 }
 #else
 #define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)
@@ -1431,20 +1454,45 @@ typedef struct
 	 */												\
 	assert((NULL == jnlpool_ctl) || (csd->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1)));		\
 }
-#ifdef GTM_CRYPT
-# define MUR_DECRYPT_LOGICAL_RECS(MUMPS_NODE_PTR, REC_SIZE, KEY_HANDLE, RC)				\
+/* Given the record size, construct an IV to be used for a subsequent encryption or decryption operation. Currently, the maximum IV
+ * length our encryption plug-in supports is 16 bytes, and we only have three bytes of information suitable for an IV at the
+ * encryption time (explained below), so just fit four copies of a three-byte integer into the IV array.
+ */
+# define PREPARE_LOGICAL_REC_IV(REC_SIZE, IV_ARRAY)							\
 {													\
-	int span_length, fixed_prefix;									\
+	uint4 *iv_ptr, iv_val;										\
+													\
+	/* Encryption happens prior to grabbing crit, when the only initialized fields of a journal	\
+	 * record prefix are jrec_type and forwptr, collectively occupying the first four bytes of the	\
+	 * jrec_prefix structure. However, if a JRT_TZTWORM-type record remains unused in a particular	\
+	 * transaction, it is removed, while the preceding record's type is modified from UUPD to TUPD, \
+	 * via the REMOVE_ZTWORM_JFB_IF_NEEDED macro. Since we cannot be changing IV after encryption,	\
+	 * jrec_type does not qualify. Therefore, we are left with three bytes taken by forwptr.	\
+	 */												\
+	assert((ARRAYSIZE(IV_ARRAY) == GTM_MAX_IV_LEN) && (GTM_MAX_IV_LEN == 4 * SIZEOF(uint4)));	\
+	iv_ptr = (uint4 *)IV_ARRAY;									\
+	iv_val = REC_SIZE;										\
+	*iv_ptr++ = iv_val;										\
+	*iv_ptr++ = iv_val;										\
+	*iv_ptr++ = iv_val;										\
+	*iv_ptr = iv_val;										\
+}
+
+/* Decrypt a logical journal record. */
+# define MUR_DECRYPT_LOGICAL_RECS(MUMPS_NODE_PTR, USE_NON_NULL_IV, REC_SIZE, KEY_HANDLE, RC)		\
+{													\
+	int	span_length;										\
+	char	iv[GTM_MAX_IV_LEN];									\
 													\
 	RC = 0;												\
 	assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);						\
 	assert(FIXED_UPD_RECLEN == FIXED_LGTRIG_RECLEN);						\
-	fixed_prefix = FIXED_UPD_RECLEN;								\
-	ASSERT_ENCRYPTION_INITIALIZED;									\
-	span_length = REC_SIZE - fixed_prefix - JREC_SUFFIX_SIZE;					\
-	GTMCRYPT_DECRYPT(NULL, KEY_HANDLE, (char *)MUMPS_NODE_PTR, span_length, NULL, RC);		\
+	span_length = REC_SIZE - FIXED_UPD_RECLEN - JREC_SUFFIX_SIZE;					\
+	if (USE_NON_NULL_IV)										\
+		PREPARE_LOGICAL_REC_IV(REC_SIZE, iv);							\
+	GTMCRYPT_DECRYPT(NULL, USE_NON_NULL_IV, KEY_HANDLE, (char *)MUMPS_NODE_PTR, span_length, NULL,	\
+			iv, GTM_MAX_IV_LEN, RC);							\
 }
-#endif
 
 /* The following define an appendix message, used along with JNLBUFFREGUPD and JNLBUFFDBUPD messages in
  * various places, as well as its length, allowing for six digits for both lower and upper journal buffer
@@ -1504,11 +1552,13 @@ uint4	jnl_ensure_open(void);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
 void	jnl_write_epoch_rec(sgmnt_addrs *csa);
 void	jnl_write_inctn_rec(sgmnt_addrs *csa);
-void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum);
-void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum);
+void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, jnlpool_write_ctx_t *jplctx);
+void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, seq_num jnl_seqno,
+				jnlpool_write_ctx_t *jplctx);
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record);
 void	jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_free_blocks, uint4 total_blks_after_trunc);
-void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb);
+void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb,
+				jnlpool_write_ctx_t *jplctx);
 
 jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, uint4 nodeflags);
 

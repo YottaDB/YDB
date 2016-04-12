@@ -50,7 +50,6 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	int		outlen, mblen, status;
 	wint_t		utf_code;
 	unsigned char	*outstart, *out, *top, *outptr, *nextoutptr, *outptrtop, *nextmb;
-	char		*out_ptr;
 	d_rm_struct	*rm_ptr;
 	boolean_t	ch_set;
 
@@ -96,10 +95,10 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 		{
 			REALLOC_CRYPTBUF_IF_NEEDED(outlen);
 			WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, outstart, outlen, pvt_crypt_buf.addr);
-			out_ptr = pvt_crypt_buf.addr;
+			outptr = (unsigned char *)pvt_crypt_buf.addr;
 		} else
-			out_ptr = (char *)outstart;
-		DOWRITERC(rm_ptr->fildes, out_ptr, outlen, status);
+			outptr = outstart;
+		DOWRITERC_RM(rm_ptr, outptr, outlen, status);
 		ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 		rm_ptr->write_occurred = TRUE;
 		rm_ptr->out_bytes += outlen;
@@ -168,7 +167,6 @@ void iorm_write_utf(mstr *v)
 				{
 					memcpy(outptr, UTF16BE_BOM, UTF16BE_BOM_LEN);
 					outbytes = UTF16BE_BOM_LEN;
-					outptr += UTF16BE_BOM_LEN;
 					if (rm_ptr->output_encrypted)
 					{
 						REALLOC_CRYPTBUF_IF_NEEDED(outbytes);
@@ -177,7 +175,7 @@ void iorm_write_utf(mstr *v)
 						out_ptr = pvt_crypt_buf.addr;
 					} else
 						out_ptr = (char *)outstart;
-					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
+					DOWRITERC_RM(rm_ptr, out_ptr, outbytes, status);
 					ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 					rm_ptr->write_occurred = TRUE;
 					outptr = outstart;
@@ -246,7 +244,7 @@ void iorm_write_utf(mstr *v)
 					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, outbytes, status);
 				} else
 				{
-					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
+					DOWRITERC_RM(rm_ptr, out_ptr, outbytes, status);
 				}
 				ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 				rm_ptr->write_occurred = TRUE;
@@ -291,7 +289,7 @@ void iorm_write_utf(mstr *v)
 							out_ptr = pvt_crypt_buf.addr;
 						} else
 							out_ptr = (char *)temppadarray;
-						DOWRITERC(rm_ptr->fildes, out_ptr, padsize, status);
+						DOWRITERC_RM(rm_ptr, out_ptr, padsize, status);
 						ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 						rm_ptr->write_occurred = TRUE;
 					}
@@ -350,6 +348,7 @@ void iorm_write(mstr *v)
 	struct stat	statbuf;
 	int		fstat_res, save_errno;
 	boolean_t	ch_set;
+	unsigned int	save_dollarx;
 
 	iod = io_curr_device.out;
 	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
@@ -456,7 +455,11 @@ void iorm_write(mstr *v)
 		outlen = inlen;
 	else
 	{
-		outlen = iod->width - iod->dollar.x;
+		if (iod->width < iod->dollar.x)
+			save_dollarx = iod->width;
+		else
+			save_dollarx = iod->dollar.x;
+		outlen = iod->width - save_dollarx;
 		if (!wrap && !stream && (inlen > outlen))
 			inlen = outlen; /* implicit input truncation for non-stream files with the "nowrap" option. */
 	}
@@ -475,7 +478,7 @@ void iorm_write(mstr *v)
 			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, len, status);
 		} else
 		{
-			DOWRITERC(rm_ptr->fildes, out_ptr, len, status);
+			DOWRITERC_RM(rm_ptr, out_ptr, len, status);
 		}
 		ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 		rm_ptr->write_occurred = TRUE;
@@ -493,7 +496,7 @@ void iorm_write(mstr *v)
 					WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, RMEOL_LEN, pvt_crypt_buf.addr);
 					out_ptr = pvt_crypt_buf.addr;
 				}
-				DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
+				DOWRITERC_RM(rm_ptr, out_ptr, RMEOL_LEN, status);
 				ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 				rm_ptr->write_occurred = TRUE;
 			}

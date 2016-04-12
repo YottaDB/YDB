@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "gtm_termios.h"
+#include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
 
 #include "eintr_wrappers.h"
 #include "mu_term_setup.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -522,10 +522,11 @@ typedef struct
  * be (re)set by the s2n/n2s calls we do. If not, the mval could have random bits in it which, as far as the mval is concerned
  * is not a problem but interferes with getting a consistent object hash value when the same source is (re)compiled.
  */
-#define CLEAR_MVAL_BITS(mvalptr) 		\
-{						\
-	((mval_b *)(mvalptr))->sgne = 0;	\
-	(mvalptr)->fnpc_indx = 0xff;		\
+#define CLEAR_MVAL_BITS(mvalptr) 			\
+{							\
+	((mval_b *)(mvalptr))->sgne = 0;		\
+	(mvalptr)->fnpc_indx = 0xff;			\
+	UNICODE_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
 }
 
 /* Autorelink enabled platforms pass a different argument to glue code when calling a non-local M
@@ -652,6 +653,7 @@ oprtype		put_cdidx(mstr *x);
 oprtype		put_ilit(mint x);
 oprtype		put_indr(oprtype *x);
 oprtype		put_lit(mval *x);
+oprtype		put_lit_s(mval *x, triple *dst);
 oprtype		put_mfun(mident *l);
 oprtype		put_mlab(mident *l);
 oprtype		put_mnxl(void);

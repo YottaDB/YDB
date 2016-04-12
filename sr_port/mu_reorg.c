@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -315,14 +316,13 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			complete_merge = FALSE;
 			blks_processed++;
 			t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
-			/* Folllowing for loop is to handle concurrency retry for split/coalesce */
+			/* Following for loop is to handle concurrency retry for split/coalesce */
 			for (; ;)		/* === SPLIT-COALESCE LOOP STARTS === */
 			{
 				gv_target->clue.end = 0;
 				/* search gv_currkey and get the result in gv_target */
 				if ((status = gvcst_search(gv_currkey, NULL)) != cdb_sc_normal)
 				{
-					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
                                 }
@@ -379,7 +379,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						assert(0 == cw_map_depth); /* mu_swap_blk (that changes cw_map_depth) comes later */
 					} else
 					{
-						assert(CDB_STAGNATE > t_tries);
 						t_retry(status);
 						continue;
 					}
@@ -389,7 +388,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				status = gvcst_rtsib(rtsib_hist, level);
 				if (cdb_sc_normal != status && cdb_sc_endtree != status)
 				{
-					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
 				}
@@ -463,7 +461,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						assert(0 == cw_map_depth); /* mu_swap_blk (that changes cw_map_depth) comes later */
 					} else
 					{
-						assert(CDB_STAGNATE > t_tries);
 						t_retry(status);
 						continue;
 					}
@@ -510,7 +507,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							log_detailed_log("NOU", rtsib_hist, NULL, level, NULL, ret_tn);
 					} else
 					{
-						assert(CDB_STAGNATE > t_tries);
 						t_retry(status);
 						continue;
 					}
@@ -536,7 +532,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				/* search gv_currkey and get the result in gv_target */
 				if ((status = gvcst_search(gv_currkey, NULL)) != cdb_sc_normal)
 				{
-					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
                                 }
@@ -609,7 +604,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							gv_target->hist.h[level].blk_num);
 				} else
 				{
-					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
 				}
@@ -650,7 +644,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			/* search gv_currkey and get the result in gv_target */
 			if ((status = gvcst_search(gv_currkey, NULL)) != cdb_sc_normal)
 			{
-				assert(CDB_STAGNATE > t_tries);
 				t_retry(status);
 				continue;
 			}
@@ -660,7 +653,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			status = mu_reduce_level(&kill_set_list);
 			if (cdb_sc_oprnotneeded != status && cdb_sc_normal != status)
 			{
-				assert(CDB_STAGNATE > t_tries);
 				t_retry(status);
 				continue;
 			} else if (cdb_sc_normal == status)

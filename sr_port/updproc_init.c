@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +18,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
-#ifdef UNIX
 #include <sys/sem.h>
-#endif
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -42,17 +38,12 @@
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
 #include "repl_dbg.h"
-#ifdef VMS
-#include "dpgbldir_sysops.h"	/* for dpzgbini prototype */
-#endif
 
 GBLREF	boolean_t	pool_init;
 GBLREF	gd_addr		*gd_header;
 GBLREF	recvpool_addrs	recvpool;
-#ifdef UNIX
 GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	FILE		*updproc_log_fp;
-#endif
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
@@ -67,8 +58,12 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	sgmnt_data_ptr_t	csd;
 	gld_dbname_list		*curr;
 
-	VMS_ONLY(recvpool_init(UPDPROC, FALSE, FALSE);)
-	UNIX_ONLY(recvpool_init(UPDPROC, FALSE);)
+	/* Do jnlpool_init ahead of recvpool_init so in case we have a ftok_counter_halted situation we have
+	 * jnlpool.repl_inst_filehdr initialized to set it to TRUE. This is later relied upon by "gtmsource_shutdown"
+	 * or "gtmrecv_shutdown" when they do the "ftok_sem_release".
+	 */
+	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
+	recvpool_init(UPDPROC, FALSE);
 	/* The log file can be initialized only after having attached to the receive pool as the update process log file name
 	 * is derived from the receiver server log file name which is in turn available only in the receive pool.
 	 */
@@ -84,20 +79,15 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 			return UPDPROC_EXISTS;
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Receive pool semop error"), UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
+				RTS_ERROR_LITERAL("Receive pool semop error"), save_errno);
 	}
-	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
-#	ifdef UNIX
 	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
 	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
-#	endif
-	/* In case of Unix dpzgbini() is called as part of gtm_startup which in turn is invoked by init_gtm.
-	 * In VMS though, this is not the case. But the update process needs to initialize dollar_zgbldir as
-	 * tp_restart relies on this (fails an assert otherwise). So do this initialization now for VMS.
+	/* Note: dpzgbini() is already called as part of gtm_startup which in turn is invoked by init_gtm.
+	 * So no need to do this initialization.
 	 */
-	VMS_ONLY(dpzgbini();)
 	gvinit();	/* get the desired global directory */
 	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,6 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 
-#include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/mman.h>
 #include <errno.h>
@@ -58,6 +58,7 @@
 #include "anticipatory_freeze.h"
 #include "heartbeat_timer.h"
 #include "mutex.h"
+#include "do_semop.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -68,7 +69,9 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	gd_addr			*gd_header;
 
+error_def(ERR_NOMORESEMCNT);
 error_def(ERR_MUJPOOLRNDWNFL);
 error_def(ERR_MUJPOOLRNDWNSUC);
 error_def(ERR_MURPOOLRNDWNFL);
@@ -89,20 +92,22 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 					boolean_t *jnlpool_sem_created)
 {
 	boolean_t		jnlpool_stat = SS_NORMAL, recvpool_stat = SS_NORMAL, decr_cnt, sem_created = FALSE, ipc_rmvd;
+	boolean_t		clear_ftok_halted;
 	char			*instfilename;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 	gd_region		*r_save;
 	repl_inst_hdr		repl_instance;
 	static	gd_region	*reg = NULL;
-	struct semid_ds		semstat;
 	struct shmid_ds		shmstat;
+	union semun		semarg;
 	unix_db_info		*udi;
 	int			save_errno, sem_id, shm_id, status;
 	sgmnt_addrs		*repl_csa;
-	boolean_t		was_crit, remove_sem;
+	boolean_t		was_crit, remove_sem, ftok_counter_halted = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	if (NULL == reg)
 	{
 		r_save = gv_cur_region;
@@ -142,14 +147,17 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	memcpy((char *)reg->dyn.addr->fname, instfilename, reg->dyn.addr->fname_len + 1);
 	udi = FILE_INFO(reg);
 	udi->fn = (char *)reg->dyn.addr->fname;
+	ftok_sem_reg = NULL;	/* clean any residue from region work as we have now moved on to an instance */
 	/* Lock replication instance using ftok semaphore so that no other replication process can startup until we are done with
 	 * rundown
 	 */
-	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, immediate))
+	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, immediate, &ftok_counter_halted))
 		return FALSE;
 	ESTABLISH_RET(mu_rndwn_repl_instance_ch, FALSE);
 	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	assert(rndwn_both_pools || JNLPOOL_SEGMENT == replpool_id->pool_type || RECVPOOL_SEGMENT == replpool_id->pool_type);
+	if (!ftok_counter_halted && repl_instance.ftok_counter_halted && udi->counter_ftok_incremented)
+		udi->counter_ftok_incremented = FALSE;	/* See comment in mu_rndwn_file.c WHY this is necessary */
 	if (rndwn_both_pools || (JNLPOOL_SEGMENT == replpool_id->pool_type))
 	{	/* --------------------------
 		 * First rundown Journal pool
@@ -181,7 +189,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 							(jnlpool_stat ? ERR_MUJPOOLRNDWNFL : ERR_MUJPOOLRNDWNSUC),
 							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
 			}
-			assert(ipc_rmvd || (NULL != jnlpool_ctl));
+			assert(ipc_rmvd || (NULL != jnlpool_ctl) || !mur_options.rollback);
 			assert((NULL == jnlpool.jnlpool_ctl) || (SS_NORMAL == jnlpool_stat) || jgbl.onlnrlbk);
 			assert((INVALID_SHMID != repl_instance.jnlpool_shmid) || (0 == repl_instance.jnlpool_shmid_ctime));
 			assert((INVALID_SHMID == repl_instance.jnlpool_shmid) || (0 != repl_instance.jnlpool_shmid_ctime));
@@ -192,7 +200,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				 */
 				if (NULL == jnlpool_ctl)
 				{
-					remove_sem = sem_created || (SS_NORMAL == jnlpool_stat);
+					remove_sem = (sem_created || ((SS_NORMAL == jnlpool_stat) && ipc_rmvd));
 					if (!remove_sem)
 						add_to_semids_list(repl_instance.jnlpool_semid);
 					status = mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, remove_sem);
@@ -211,11 +219,58 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 									LEN_AND_STR(ipcs_buff),
 									LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, sem_id);
 						}
-						repl_inst_jnlpool_reset();
+						/* If "ftok_counter_halted" is TRUE, and the recvpool shmid is already cleared in
+						 * the instance file, we can be sure there is no one interesting in this instance
+						 * file (because we just now run down the jnlpool shm as well). So clear the
+						 * halted flag.
+						 */
+						clear_ftok_halted = CLEAR_FTOK_HALTED_FALSE;
+						if (repl_instance.ftok_counter_halted
+							&& (INVALID_SHMID == repl_instance.recvpool_shmid))
+						{
+							/* ftok counter is not guaranteed to be at 1. So fix it that way a
+							 * "ftok_sem_release" done later WILL remove the ftok semaphore.
+							 */
+							semarg.val = 0;
+							if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
+							{
+								save_errno = errno;
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+									ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
+									CALLFROM, save_errno);
+								/* In case not able to set counter to 1, proceed with rundown
+								 * without deleting the ftok semaphore (so keep
+								 * counter_ftok_incremented at FALSE)
+								 */
+							} else
+							{
+								save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM,
+												DB_COUNTER_SEM_INCR, SEM_UNDO);
+								if (save_errno)
+								{
+									gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+										ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
+										CALLFROM, save_errno);
+									/* In case not able to set counter to 1, proceed with
+									 * rundown without deleting the ftok semaphore (so keep
+									 * counter_ftok_incremented at FALSE)
+									 */
+								} else
+								{
+									udi->counter_ftok_incremented = TRUE;
+									/* repl_instance.ftok_counter_halted will be set to
+									 * FALSE by the below call to repl_inst_jnlpool_reset.
+									 */
+									clear_ftok_halted = CLEAR_FTOK_HALTED_TRUE;
+								}
+							}
+						}
+						repl_inst_jnlpool_reset(clear_ftok_halted);
 					}
 				} else
-				{	/* Anticipatory Freeze scheme is turned ON. So, release just the JNL_POOL_ACCESS_SEM. The
-					 * semaphore will be released/removed in the caller (mupip_rundown)
+				{	/* This is MUPIP RUNDOWN -REG "*" and anticipatory freeze scheme is turned ON.
+					 * So, release just the JNL_POOL_ACCESS_SEM. The semaphore will be released/removed
+					 * in the caller (mupip_rundown).
 					 */
 					assert(INST_FREEZE_ON_ERROR_POLICY);
 					assertpro(SS_NORMAL == (status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)));
@@ -302,6 +357,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						 * fields in the file header as the function expects the caller to hold crit
 						 * if the journal pool is available
 						 */
+						assert(INVALID_SHMID != repl_instance.jnlpool_shmid);
 						repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 						assert(!repl_csa->now_crit);
 						assert(!repl_csa->hold_onto_crit);
@@ -315,7 +371,50 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						if (!was_crit)
 							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 					}
-					repl_inst_recvpool_reset();
+					/* If "ftok_counter_halted" is TRUE, and the jnlpool shmid is already cleared in
+					 * the instance file, we can be sure there is no one interesting in this instance file
+					 * (because we just now ran down the recvpool shm as well). So clear the halted flag.
+					 */
+					clear_ftok_halted = CLEAR_FTOK_HALTED_FALSE;
+					if (repl_instance.ftok_counter_halted && (INVALID_SHMID == repl_instance.jnlpool_shmid))
+					{
+						/* ftok counter is not guaranteed to be at 1. So fix it that way a
+						 * "ftok_sem_release" done later WILL remove the ftok semaphore.
+						 */
+						semarg.val = 0;
+						if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
+						{
+							save_errno = errno;
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+								ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
+								CALLFROM, save_errno);
+							/* In case not able to set counter to 1, proceed with rundown without
+							 * deleting the ftok semaphore (so keep counter_ftok_incremented unchanged)
+							 */
+						} else
+						{
+							save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM,
+											DB_COUNTER_SEM_INCR, SEM_UNDO);
+							if (save_errno)
+							{
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+									ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
+									CALLFROM, save_errno);
+								/* In case not able to set counter to 1, proceed with
+								 * rundown without deleting the ftok semaphore (so keep
+								 * counter_ftok_incremented at FALSE)
+								 */
+							} else
+							{
+								udi->counter_ftok_incremented = TRUE;
+								/* repl_instance.ftok_counter_halted will be set to FALSE by the
+								 * below call to repl_inst_recvpool_reset.
+								 */
+								clear_ftok_halted = CLEAR_FTOK_HALTED_TRUE;
+							}
+						}
+					}
+					repl_inst_recvpool_reset(clear_ftok_halted);
 					if ((NULL != jnlpool_ctl) && !was_crit)
 						rel_lock(jnlpool.jnlpool_dummy_reg);
 				}
@@ -361,10 +460,10 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 		/* Flush changes to the replication instance file header to disk */
 		repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	} else /* for MUPIP RUNDOWN, semid fields in the file header are reset and is written in mu_replpool_release_sem() above */
-		decr_cnt = (NULL == jnlpool_ctl); /* for anticipatory freeze, mupip_rundown releases the semaphore */
+		decr_cnt = (NULL == jnlpool_ctl); /* for anticipatory freeze, "mupip_rundown" releases the ftok semaphore */
 	REVERT;
-	/* Release replication instance ftok semaphore lock */
-	if (!ftok_sem_release(reg, decr_cnt, immediate)) /* Do not decrement the counter if ROLLBACK */
+	/* Release replication instance ftok semaphore lock. Do not decrement the counter if ROLLBACK */
+	if (!ftok_sem_release(reg, decr_cnt && udi->counter_ftok_incremented, immediate))
 		return FALSE;
 	return ((SS_NORMAL == jnlpool_stat) && (SS_NORMAL == recvpool_stat));
 }
@@ -383,7 +482,7 @@ CONDITION_HANDLER(mu_rndwn_repl_instance_ch)
 		udi = FILE_INFO(reg);
 		csa = &udi->s_addrs;
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(reg, FALSE, TRUE);
+			ftok_sem_release(reg, udi->counter_ftok_incremented, TRUE);
 	}
 	NEXTCH;
 }

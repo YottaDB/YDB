@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +40,7 @@ GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	boolean_t				pool_init;
 GBLREF	boolean_t				mupip_jnl_recover;
 #ifdef DEBUG
-GBLREF	uint4	  				lseekwrite_target;
+GBLREF	uint4					lseekwrite_target;
 #endif
 
 error_def(ERR_DSKNOSPCAVAIL);
@@ -116,8 +117,8 @@ error_def(ERR_TEXT);
 #define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
 							((NULL != jnlpool.jnlpool_ctl)						\
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
-							    		|| mupip_jnl_recover	/* recover or rollback */	\
-									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid )))
+									|| mupip_jnl_recover	/* recover or rollback */	\
+									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid)))
 #define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)							\
 							&& CUSTOM_ERRORS_LOADED							\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
@@ -155,11 +156,11 @@ error_def(ERR_TEXT);
  * Note: Do not use "hiber_start" as that uses timers and if we are already in a timer handler now, nested timers
  * wont work. Since SHORT_SLEEP allows a max of 1000, we use 500 (half a second) for now.
  */
+/* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE(CSA)											\
 {																\
 	gd_region	*reg;													\
-	char		*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */					\
-	now_t		now;													\
+	char		time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */						\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
@@ -169,15 +170,15 @@ error_def(ERR_TEXT);
 		reg = ((sgmnt_addrs *)CSA)->region;										\
 		if (!IS_GTM_IMAGE)												\
 		{														\
-			GET_CUR_TIME;												\
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, time_ptr,		\
+			GET_CUR_TIME(time_str);											\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, &time_str[0],		\
 					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
 		}														\
 		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;										\
 		if (!IS_GTM_IMAGE)												\
 		{														\
-			GET_CUR_TIME;												\
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTUNFROZEN, 5, CTIME_BEFORE_NL, time_ptr,		\
+			GET_CUR_TIME(time_str);											\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTUNFROZEN, 5, CTIME_BEFORE_NL, &time_str[0],		\
 					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
 		}														\
 	}															\
@@ -186,6 +187,7 @@ error_def(ERR_TEXT);
  * to be lifted off but is not sure if the process has access to the journal pool yet.
  * If it does not, then it assumes the instance is not frozen.
  */
+/* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_SAFE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA)		\
 {							\
 	GBLREF	jnlpool_addrs	jnlpool;		\
@@ -196,6 +198,7 @@ error_def(ERR_TEXT);
 }
 
 /* Below are similar macros like the above but with no CSA to specifically check for */
+/* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_NOCSA) is thread-safe */
 #define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA						\
 {											\
 	GBLREF	jnlpool_addrs	jnlpool;						\
@@ -211,7 +214,7 @@ error_def(ERR_TEXT);
 		{									\
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
-			exit(-exi_condition);						\
+			EXIT(-exi_condition);						\
 		}									\
 		SHORT_SLEEP(SLEEP_INSTFREEZEWAIT);					\
 		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);				\
@@ -270,30 +273,32 @@ error_def(ERR_TEXT);
 #define	LSEEKWRITE_IS_TO_JNL		2
 
 #ifdef DEBUG
-#define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)						\
-{															\
-	GBLREF	jnlpool_addrs		jnlpool;									\
-	if (NULL != CSA)												\
-	{														\
-		if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC))								\
-		{	/* This test case is only used by mupip */							\
-			gtm_wbox_input_test_case_count++;								\
-			if ((0 != gtm_white_box_test_case_count)							\
-			    && (gtm_white_box_test_case_count <= gtm_wbox_input_test_case_count))			\
-			{												\
-				LCL_STATUS = ENOSPC;									\
-				if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,				\
-					     LEN_AND_LIT("Turning on fake ENOSPC for exit status test"));		\
-			}												\
-		} else if (!IS_DSE_IMAGE /*DSE does not freeze so let it work as normal */				\
-			   && ((NULL != jnlpool.jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl))			\
-			   && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)						\
-		{													\
-			LCL_STATUS = ENOSPC;										\
-			lseekwrite_target = LSEEKWRITE_TARGET;								\
-		}													\
-	}														\
+#define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)							\
+{																\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	boolean_t		multi_thread_in_use;									\
+																\
+	if ((NULL != CSA) && !multi_thread_in_use) /* Do not manipulate fake-enospc (global variable) while in threaded code */	\
+	{															\
+		if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC))									\
+		{	/* This test case is only used by mupip */								\
+			gtm_wbox_input_test_case_count++;									\
+			if ((0 != gtm_white_box_test_case_count)								\
+			    && (gtm_white_box_test_case_count <= gtm_wbox_input_test_case_count))				\
+			{													\
+				LCL_STATUS = ENOSPC;										\
+				if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)				\
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,					\
+					     LEN_AND_LIT("Turning on fake ENOSPC for exit status test"));			\
+			}													\
+		} else if (!IS_DSE_IMAGE /*DSE does not freeze so let it work as normal */					\
+			   && ((NULL != jnlpool.jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl))				\
+			   && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)							\
+		{														\
+			LCL_STATUS = ENOSPC;											\
+			lseekwrite_target = LSEEKWRITE_TARGET;									\
+		}														\
+	}															\
 }
 
 void clear_fake_enospc_if_master_dead(void);
@@ -301,16 +306,17 @@ void clear_fake_enospc_if_master_dead(void);
 #define CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD	clear_fake_enospc_if_master_dead()
 
 #else
-#define	FAKE_ENOSPC(CSA, FAKE_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS) {}
+#define	FAKE_ENOSPC(CSA, FAKE_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)
 #endif
 
-
+/* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITE) is thread-safe */
 #define	DB_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status)							\
 	DO_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status, fake_db_enospc, LSEEKWRITE_IS_TO_DB)
 
 #define	JNL_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status)							\
 	DO_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status, fake_jnl_enospc, LSEEKWRITE_IS_TO_JNL)
 
+/* #GTM_THREAD_SAFE : The below macro (DO_LSEEKWRITE) is thread-safe */
 #define DO_LSEEKWRITE(csa, fnptr, fd, new_eof, buff, size, status, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)			\
 {																\
 	int	lcl_status;													\

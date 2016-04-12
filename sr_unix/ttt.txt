@@ -983,11 +983,12 @@ OC_ZTCOMMIT:	pushl	val.1
 		calls	#1,xfer.xf_ztcommit
 OC_ZTRIGGER:	calls	#0,xfer.xf_ztrigger
 OC_ZTSTART:	calls	#0,xfer.xf_ztstart
-OC_ZWRITESVN:   pushl   val.1
-                calls   #1,xfer.xf_zwritesvn
-OC_FNZWRITE:    pushab  val.0                   ; /* destination mval */
-                pushab  val.1                   ; /* string */
-                calls   #2,xfer.xf_fnzwrite
+OC_ZWRITESVN:	pushl	val.1
+		calls	#1,xfer.xf_zwritesvn
+OC_FNZWRITE:	pushab	val.0			; /* destination mval */
+		pushab	val.1			; /* source (string) mval */
+		pushl	val.2			; /* conversion direction indicator */
+		calls   #3,xfer.xf_fnzwrite
 OC_IGETDST:	calls	#0,xfer.xf_igetdst
 		movl    r0,addr.0
 OC_INDGET1:	pushab	val.0

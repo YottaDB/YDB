@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +13,10 @@
 #include "mdef.h"
 #include "main_pragma.h"
 
-#include <signal.h>
 #include <stdarg.h>
+
 #include "gtm_inet.h"
+#include "gtm_signal.h"
 
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
@@ -119,6 +121,7 @@ int main(int argc, char *argv[])
 	rts_stringpool = stringpool;
 	getjobname();
 	INVOKE_INIT_SECSHR_ADDRS;
+	io_init(TRUE);
 	getzdir();
 	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();
@@ -145,12 +148,11 @@ int main(int argc, char *argv[])
 		util_out_print("DSE is ready. MUPIP can start. Note: This message is a part of WBTEST_SEMTOOLONG_STACK_TRACE test. "
 			       "It will not appear in PRO version.", TRUE);
 		while (2 != cnl->wbox_test_seq_num) /*Wait for another process to get hold of the semaphore and signal next step*/
-			LONG_SLEEP(10);
+			LONG_SLEEP(1);
 	}
 #	endif
 	if (argc < 2)
                 display_prompt();
-	io_init(TRUE);
 	while (1)
 	{
 		if (!dse_process(argc))

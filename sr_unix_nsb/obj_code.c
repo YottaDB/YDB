@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,7 @@
 #include "gtm_string.h"
 #include "stringpool.h"
 #include "rtn_src_chksum.h"
+#include "have_crit.h"
 
 GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
@@ -92,6 +94,7 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
 	int4		lnr_pad_len;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -138,7 +141,9 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	code_size += src_lines * SIZEOF(int4);
 	lnr_pad_len = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lnr_pad_len;
+	DEFER_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	create_object_file(&rhead);
+	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	cg_phase = CGP_MACHINE;
 	code_gen();
 	/* Variable table: */
@@ -178,7 +183,9 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	assert(code_size == psect_use_tab[GTM_CODE]);
 #	endif
 	emit_literals();
+	DEFER_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	finish_object_file();
+	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	CLOSE_OBJECT_FILE(object_file_des, status);
 	if (-1 == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);

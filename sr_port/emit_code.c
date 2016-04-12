@@ -1614,7 +1614,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
  */
 int get_arg_reg(void)
 {
-	int	arg_reg_i;
+	int	arg_reg_i = GTM_REG_ACCUM; /* Default never used due to the assert in the switch below */
 
 	switch (cg_phase)
 	{

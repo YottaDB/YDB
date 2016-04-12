@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +63,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	srcbase = (unsigned char *)src->str.addr;
 	srctop = srcbase + srclen;
 	for (srcptr = srcbase, skip = schar - 1; ((0 < skip) && (srcptr < srctop)); --skip)
-	{	/* skip the first schar - 1 characters */
+	{	/* Skip the first schar - 1 characters */
 		if (!UTF8_VALID(srcptr, srctop, bytelen) && !badchar_inhibit)
 			utf8_badchar(0, srcptr, srctop, 0, NULL);
 		srcptr += bytelen;
@@ -85,7 +86,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 		sfxoff = INTCAST(srcptr - srcbase);
 		sfxlen = INTCAST(srctop - srcptr);
 		if (!badchar_inhibit && (0 <sfxlen))
-		{	/* validate the suffix, and we can compute char_len as well */
+		{	/* Validate the suffix, and we can compute char_len as well */
 			for (; (srcptr < srctop); ++char_len)
 			{
 				if (!UTF8_VALID(srcptr, srctop, bytelen))
@@ -104,22 +105,22 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	srcbase = (unsigned char *)src->str.addr;
 	straddr = stringpool.free;
 	if (0 < pfxlen)
-	{	/* copy prefix */
+	{	/* Copy prefix */
 		memcpy(straddr, srcbase, pfxlen);
 		straddr += pfxlen;
 	}
 	if (0 < padlen)
-	{	/* insert padding */
+	{	/* Insert padding */
 		memset(straddr, ' ', padlen);
 		straddr += padlen;
 	}
 	if (0 < expr->str.len)
-	{	/* copy expression */
+	{	/* Copy expression */
 		memcpy(straddr, expr->str.addr, expr->str.len);
 		straddr += expr->str.len;
 	}
 	if (0 < sfxlen)
-	{	/* copy suffix */
+	{	/* Copy suffix */
 		memcpy(straddr, srcbase + sfxoff, sfxlen);
 		straddr += sfxlen;
 	}

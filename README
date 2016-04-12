@@ -1,5 +1,5 @@
 All software in this package is part of FIS GT.M (http://fis-gtm.com)
-which is Copyright 2015 Fidelity Information Services, Inc., and
+which is Copyright 2016 Fidelity Information Services, Inc., and
 provided to you under the terms of a license. If there is a COPYING
 file included in this package, it contains the terms of the license under
 which the package is provided to you. If there is not a COPYING file in
@@ -11,7 +11,7 @@ package.
 GT.M relies on CMake to generate the Makefiles to build GT.M from source. The
 prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
 (either x86 or x86_64), libraries and development files for libz, Unicode,
-OpenSSL and GPG. Debian 6, Ubuntu 12.04/14.04 LTS and RHEL 6.0 were used to do
+OpenSSL and GPG. Debian 7, Ubuntu 12.04/14.04 LTS and RHEL 6.0 were used to do
 the test builds for this distribution. The default ICU and GPG packages were
 taken from the distribution repositories.
 
@@ -19,44 +19,21 @@ To build GT.M for Linux, do the following steps:
 
 1. Fulfill the pre-requisites
    Install developement libraries libelf, zlib, libicu, libgpgme, libgpg-error,
-   libgcrypt, libssl, libconfig.
-
-   Ensure that your locale settings are correct, otherwise you will see
-   GTM-E-NONUTF8LOCALE messages. Refer the Messages and Recovery Procedures
-   Manual if you do encounter these messages. The following should give you a
-   valid locale:
-
-   $ locale -a | gawk 'BEGIN{IGNORECASE=1}/en_us.utf-*8/{print;exit}'
-   en_US.utf8
-   $ export LANG=C LC_ALL= LC_CTYPE="<answer from above>" LC_COLLATE=C
-
-   [optional] The GT.M source tarball includes pre-generated files. To generate
-   these files requires a binary distribution of GT.M.  You can download GT.M
-   from http://sourceforge.net/projects/fis-gtm/ Unpack the tar file and run
-   the configure script as root. Note: the tar file unpacks everything into
-   your current working directory, not a new subdirectory. The Linux Standard
-   Base (LSB) install path for GT.M V6.2-002A is /opt/fis-gtm/V6.2-002A_i586 or
-   /opt/fis-gtm/V6.2-002A_x8664. These instructions are written using x8664, please
-   use i586 as necessary.
-
-   $ tar xfz gtm_V62002A_linux_x8664_pro.tar.gz
-
-   # Note down the installation path for use with cmake below
-
-   $ sudo sh ./configure
+   libgcrypt, libssl, libconfig. There may be other library dependencies. If
+   CMake issues a  NOTFOUND error, please see the FAQ below.
 
 2. Unpack the GT.M sources
    The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.2-002A
-   $ tar xfz fis-gtm-V6.2-002A.tar.gz
-   $ cd fis-gtm-V6.2-002A
+   the name, fis-gtm-V6.3-000
+   $ tar xfz fis-gtm-V6.3-000.tar.gz
+   $ cd fis-gtm-V6.3-000
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
    <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.2-002A, or any other valid path.
+   fis-gtm-V6.3-000, or any other valid path.
 
    $ mkdir <fis-gtm-build>
    $ cd <fis-gtm-build>
@@ -75,16 +52,16 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-002A
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-000
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.2-002A_x86_64
+   $ cd package/lib/fis-gtm/V6.3-000_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.2-002A_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.3-000_x86_64
 
    $ sudo ./configure
 

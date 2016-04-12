@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,26 +16,14 @@
 #include "gtm_string.h"
 #include "gtm_time.h"
 #include "gtm_inet.h"
-#if defined(UNIX)
+
 #include <errno.h>
+
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "interlock.h"
 #include "lockconst.h"
 #include "aswp.h"
-#elif defined(VMS)
-#include <descrip.h>
-#include <fab.h>
-#include <iodef.h>
-#include <lckdef.h>
-#include <nam.h>
-#include <psldef.h>
-#include <rmsdef.h>
-#include <ssdef.h>
-#include <xab.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -60,6 +48,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		pool_init;
 GBLREF  jnl_process_vector      *prc_vec;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
 error_def(ERR_FILEIDMATCH);
 error_def(ERR_JNLOPNERR);
@@ -72,9 +61,7 @@ error_def(ERR_JNLWRERR);
 error_def(ERR_JNLVSIZE);
 error_def(ERR_PREMATEOF);
 error_def(ERR_JNLPREVRECOV);
-#ifdef GTM_CRYPT
-error_def(ERR_CRYPTJNLWRONGHASH);
-#endif
+error_def(ERR_CRYPTJNLMISMATCH);
 
 /* note: returns 0 on success */
 uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
@@ -89,9 +76,6 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	unsigned char		*eof_rec_buffer;
 	unsigned char		eof_rec[(DISK_BLOCK_SIZE * 2) + MAX_IO_BLOCK_SIZE];
 	off_jnl_t		adjust;
-#if defined(VMS)
-	io_status_block_disk	iosb;
-#endif
 	uint4			jnl_fs_block_size, read_write_size, read_size;
 	gtm_uint64_t		header_virtual_size;
 
@@ -122,8 +106,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		 * filesystem block size. And so in case of a previous version created journal file, it is possible the
 		 * entire unaligned journal file size is lesser than the aligned journal file header size.
 		 */
-		UNIX_ONLY(assert(ERR_PREMATEOF == jpc->status);)
-		VMS_ONLY(assert(FALSE);)
+		assert(ERR_PREMATEOF == jpc->status);
 		return ERR_JNLRDERR;
 	}
 	/* Check if the header format matches our format. Cannot access any fields inside header unless this matches */
@@ -175,14 +158,15 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		jpc->status = ERR_JNLBADRECFMT;
 		return ERR_JNLOPNERR;
 	}
-	GTMCRYPT_ONLY(
-		if (memcmp(header->encryption_hash, csd->encryption_hash, GTMCRYPT_HASH_LEN))
-		{
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_CRYPTJNLWRONGHASH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-			jpc->status = ERR_CRYPTJNLWRONGHASH;
-			return ERR_JNLOPNERR;
-		}
-	)
+	if (!mu_reorg_encrypt_in_prog && !SAME_ENCRYPTION_SETTINGS(header, csd))
+	{	/* We expect encryption settings in the journal to be in sync with those in the file header. The only exception is
+		 * MUPIP REORG -ENCRYPT, which switches the journal file upon changing encryption-specific fields in the file
+		 * header, thus temporarily violating this expectation.
+		 */
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_CRYPTJNLMISMATCH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+		jpc->status = ERR_CRYPTJNLMISMATCH;
+		return ERR_JNLOPNERR;
+	}
 	assert(header->eov_tn == eof_record.prefix.tn);
 	header->eov_tn = eof_record.prefix.tn;
 	assert(header->eov_timestamp == eof_record.prefix.time);
@@ -203,19 +187,16 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	/* For performance reasons (to be able to do aligned writes to the journal file), we need to ensure the journal buffer
 	 * address is filesystem-block-size aligned in Unix. Although this is needed only in case of sync_io/direct-io, we ensure
 	 * this alignment unconditionally in Unix. jb->buff_off is the number of bytes to go past before getting an aligned buffer.
-	 * For VMS, this performance enhancement is currently not done and can be revisited later.
 	 */
-	UNIX_ONLY(jb->buff_off = (uintszofptr_t)ROUND_UP2((uintszofptr_t)&jb->buff[0], jnl_fs_block_size)
-					- (uintszofptr_t)&jb->buff[0];)
-	VMS_ONLY(jb->buff_off = 0;)
+	jb->buff_off = (uintszofptr_t)ROUND_UP2((uintszofptr_t)&jb->buff[0], jnl_fs_block_size) - (uintszofptr_t)&jb->buff[0];
 	jb->size = ROUND_DOWN2(csd->jnl_buffer_size * DISK_BLOCK_SIZE - jb->buff_off, jnl_fs_block_size);
 	/* Assert that journal buffer does NOT spill past the allocated journal buffer size in shared memory */
 	assert((sm_uc_ptr_t)&jb->buff[jb->buff_off + jb->size] < ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE(csd)
 											+ JNL_SHARE_SIZE(csd)));
 	assert((sm_uc_ptr_t)jb == ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE(csd) + JNL_NAME_EXP_SIZE));
 	jb->last_eof_written = header->last_eof_written;
-	jb->freeaddr = jb->dskaddr = UNIX_ONLY(jb->fsync_dskaddr = ) header->end_of_data;
-	jb->post_epoch_freeaddr = jb->freeaddr;
+	jb->freeaddr = jb->dskaddr = jb->fsync_dskaddr = header->end_of_data;
+	jb->post_epoch_freeaddr = jb->end_of_data_at_open = jb->freeaddr;
 	jb->fs_block_size = jnl_fs_block_size;
 	/* The following is to make sure that the data in jnl_buffer is aligned with the data in the
 	 * disk file on an jnl_fs_block_size boundary. Since we assert that jb->size is a multiple of jnl_fs_block_size,
@@ -223,16 +204,8 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	 */
 	assert(0 == (jb->size % jnl_fs_block_size));
 	jb->free = jb->dsk = header->end_of_data % jb->size;
-	UNIX_ONLY(
-		SET_LATCH_GLOBAL(&jb->fsync_in_prog_latch, LOCK_AVAILABLE);
-		SET_LATCH_GLOBAL(&jb->io_in_prog_latch, LOCK_AVAILABLE);
-	)
-	VMS_ONLY(
-		assert(0 == jb->now_writer);
-		bci(&jb->io_in_prog);
-		jb->now_writer = 0;
-		assert((jb->free % DISK_BLOCK_SIZE) == adjust);
-	)
+	SET_LATCH_GLOBAL(&jb->fsync_in_prog_latch, LOCK_AVAILABLE);
+	SET_LATCH_GLOBAL(&jb->io_in_prog_latch, LOCK_AVAILABLE);
 	assert(0 == (jnl_fs_block_size % DISK_BLOCK_SIZE));
 	if (adjust)
 	{	/* if jb->free does not start at a filesystem-block-size aligned boundary (which is the alignment granularity used
@@ -261,10 +234,6 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jb->max_jrec_len = header->max_jrec_len;
 	memcpy(&header->who_opened, prc_vec, SIZEOF(jnl_process_vector));
 	header->crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */
-	VMS_ONLY(
-		if (REPL_ENABLED(csd) && pool_init)
-			header->update_disabled = jnlpool_ctl->upd_disabled;
-	)
 	JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
 	{
