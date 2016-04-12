@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2012, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2012-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,7 +39,7 @@ endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
   set(GTM_BUILD_TYPE "pro")
-elseif("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+else() # if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug") always assume Debug
   set(GTM_BUILD_TYPE "dbg")
 endif()
 
@@ -63,7 +64,7 @@ set(gen_xfer_desc 0)
 set(gtm_osarch_libs "")
 
 # Define these ahead of establishing platforms
-set(gt_src_list)
+set(gt_src_list gen)
 set(sources_used "")
 set(extralibs "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
@@ -77,6 +78,8 @@ elseif("${CMAKE_SYSTEM_NAME}" MATCHES "AIX")
   include(sr_aix/platform.cmake)
 elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
   include(sr_sun/platform.cmake)
+elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  include(sr_darwin/platform.cmake)
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
@@ -129,18 +132,18 @@ foreach(d ${gt_src_list})
   file(GLOB sources_${d} RELATIVE ${source_dir_${d}}
 	  ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
 endforeach()
+# Prefer generated sources over all other locations.
+file(MAKE_DIRECTORY ${GTM_BINARY_DIR}/gen)
+set(source_dir_gen ${GTM_BINARY_DIR}/gen)
+# Hard-code list since we cannot glob files that do not exist.
+set(sources_gen gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
 if(gen_bootstrap)
-  # Prefer generated sources over all other locations.
-  set(gt_src_list gen ${gt_src_list})
-  set(source_dir_gen ${GTM_BINARY_DIR}/gen)
-  # Hard-code list since we cannot glob files that do not exist.
-  set(sources_gen cmerrors_ctl.c cmierrors_ctl.c gdeerrors_ctl.c merrors_ctl.c ttt.c
-  		  gtmthreadgblasm.m gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
+  set(sources_gen ${sources_gen} cmerrors_ctl.c cmierrors_ctl.c gdeerrors_ctl.c merrors_ctl.c ttt.c)
 endif()
 
 # The C preprocessor include search path consists of every source
 # directory ordered by 'gt_src_list'.
-set(includes)
+set(includes ${GTM_BINARY_DIR}/gen)
 foreach(d ${gt_src_list})
   list(APPEND includes ${source_dir_${d}})
 endforeach()
@@ -215,7 +218,7 @@ set_source_list(dse              dse dse_cmd)
 set_source_list(ftok             ftok)
 set_source_list(geteuid          geteuid)
 set_source_list(gtcm_gnp_server  gtcm_gnp_server)
-set_source_list(gtcm_pkdisp      gtcm_pkdisp)
+set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_srvc_xct)
 set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
 set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
 set_source_list(gtcm_shmclean    gtcm_shmclean)
@@ -229,14 +232,15 @@ set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(mumps            gtm)
 set_source_list(mupip            mupip mupip_cmd)
 set_source_list(semstat2         semstat2)
+set_source_list(dtgbldir         dtgbldir)
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
-set(source_used_dtgbldir.c 1) # exclude unused source
+#set(source_used_dtgbldir.c 1) # exclude unused source
 set(libmumps_SOURCES "")
 foreach(d ${gt_src_list})
   foreach(s ${sources_${d}})
-    if(NOT source_used_${s})
+    if(NOT source_used_${s} AND "${s}" MATCHES "\\.(c|s|si)$")
       list(APPEND libmumps_SOURCES ${d}/${s})
       set(source_used_${s} 1)
       list(APPEND sources_used ${source_dir_${d}}/${s})
@@ -341,53 +345,31 @@ endif()
 add_executable(gtm_threadgbl_deftypes ${gtm_threadgbl_deftypes_SOURCES})
 if(gen_xfer_desc)
   add_dependencies(gtm_threadgbl_deftypes gen_xfer_desc)
-elseif(gen_bootstrap)
-  add_dependencies(gtm_threadgbl_deftypes gen_bootstrap)
 endif()
 
-if(gen_bootstrap)
-  add_custom_command(
-    OUTPUT gen/gtm_threadgbl_deftypes.h
-    DEPENDS gtm_threadgbl_deftypes
-    COMMAND gtm_threadgbl_deftypes > gen/gtm_threadgbl_deftypes.h
-    )
-  set(gtmthreadgblasmaccess "${gtmthreadgblasmaccessdir}/gtm_threadgbl_asm_access.txt")
-  select_file(gtmthreadgblasmaccess "gtm_threadgbl_asm_access.txt")
-  add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/gtmthreadgblasm.m
-    COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/sr_unix/gtmthreadgblasm.m ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m
-    )
-  add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si
-    DEPENDS ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m gen/gtm_threadgbl_deftypes.h ${gtmthreadgblasmaccess}
-	    ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
-    WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
-    COMMAND ${CMAKE_COMMAND}
-      -D gtm_dist=${gen_bootstrap_dist}
-      -D gtm_inc=${GTM_BINARY_DIR}/gen
-      -D gtmroutines=.
-      -D mumps=${gen_bootstrap_mumps}
-      -D "args=-r;gtmthreadgblasm;${gtmthreadgblasmaccess};gtm_threadgbl_deftypes.h;gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si"
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
-    VERBATIM
-    )
-  add_custom_command(
-    OUTPUT gen/gtm_threadgbl_deftypes_asm.si
-    DEPENDS gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si
-    COMMAND ${CMAKE_COMMAND} -E copy gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si gen/gtm_threadgbl_deftypes_asm.si
-    )
-  add_custom_target(gen_gtm_threadgbl_deftypes
-  	DEPENDS ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes.h ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes_asm.si)
-else()
-  select_file(gtm_threadgbl_deftypes_asm "gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si")
-  add_custom_command(
-    OUTPUT gtm_threadgbl_deftypes_asm.si
-    DEPENDS ${gtm_threadgbl_deftypes_asm}
-    COMMAND ${CMAKE_COMMAND} -E copy ${gtm_threadgbl_deftypes_asm} gtm_threadgbl_deftypes_asm.si
-    )
-  add_custom_target(gen_gtm_threadgbl_deftypes DEPENDS gtm_threadgbl_deftypes_asm.si)
-endif()
+# gtm_threadgbl_deftypes
+set(gtmthreadgblasmhdr   "gen/gtm_threadgbl_deftypes.h")
+add_custom_command(
+  OUTPUT ${gtmthreadgblasmhdr}
+  DEPENDS gtm_threadgbl_deftypes
+  COMMAND gtm_threadgbl_deftypes > ${gtmthreadgblasmhdr}
+  )
+# gtm_threadgbl_deftypes_asm.si
+set(gtmthreadgblasmfile   "gen/gtm_threadgbl_deftypes_asm.si")
+select_file(gtmthreadgblasmaccess "gtm_threadgbl_asm_access.txt")
+add_custom_command(
+  OUTPUT ${gtmthreadgblasmfile}
+  DEPENDS ${gtmthreadgblasmhdr}
+  COMMAND ${CMAKE_COMMAND}
+    -D "gtmthreadgblasmfile=${gtmthreadgblasmfile}"
+    -D "gtmthreadgblasmhdr=${gtmthreadgblasmhdr}"
+    -D "gtmthreadgblasmaccess=${gtmthreadgblasmaccess}"
+    -P ${GTM_SOURCE_DIR}/${srdir}/gen_threadgbl_asm.cmake
+  VERBATIM
+  )
+
+add_custom_target(gen_gtm_threadgbl_deftypes
+  DEPENDS ${GTM_BINARY_DIR}/${gtmthreadgblasmhdr} ${GTM_BINARY_DIR}/${gtmthreadgblasmfile})
 
 foreach(exp exe shr)
   set(out gtm${exp}_symbols.export)
@@ -422,6 +404,7 @@ endforeach()
 # TODO: find_package or find_library for system libs?
 include_directories (/usr/local/include)
 target_link_libraries(libmumps		${libmumpslibs})
+add_dependencies(libmumps		gen_gtm_threadgbl_deftypes)
 if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
@@ -437,6 +420,7 @@ add_executable(dbcertify		${dbcertify_SOURCES})
 target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
 
 add_executable(geteuid			${geteuid_SOURCES})
+add_executable(dtgbldir			${dtgbldir_SOURCES})
 target_link_libraries(geteuid		libmumps)
 add_dependencies(geteuid		gen_gtm_threadgbl_deftypes)
 
@@ -444,7 +428,7 @@ add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
-target_link_libraries(gtmsecshr_real libmumps)
+target_link_libraries(gtmsecshr_real libmumps libstub)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/gtmsecshrdir
@@ -484,7 +468,7 @@ add_dependencies(semstat2		gen_gtm_threadgbl_deftypes)
 add_executable(ftok 			${ftok_SOURCES})
 target_link_libraries(ftok 		libmumps libstub)
 
-add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
+add_library(libgtmshr SHARED ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
 target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
 set_target_properties(libgtmshr PROPERTIES
@@ -494,6 +478,7 @@ set_target_properties(libgtmshr PROPERTIES
 add_dependencies(libgtmshr gen_export)
 add_dependencies(mumps libgtmshr)
 
+if(0)
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)
   # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
@@ -576,6 +561,7 @@ set_target_properties(maskpass PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
   )
 install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+endif()
 
 # Always copy files into the plugin directory
 foreach(f
@@ -664,13 +650,15 @@ set(m_files_sr_port
   gdetempl.m
   )
 file(GLOB m_files_sr_unix RELATIVE ${GTM_SOURCE_DIR}/sr_unix ${GTM_SOURCE_DIR}/sr_unix/*.m)
+file(GLOB m_files_sr_x86_64 RELATIVE ${GTM_SOURCE_DIR}/sr_x86_64 ${GTM_SOURCE_DIR}/sr_x86_64/*.m)
+file(GLOB m_files_sr_i386 RELATIVE ${GTM_SOURCE_DIR}/sr_i386 ${GTM_SOURCE_DIR}/sr_i386/*.m)
 file(GLOB mpt_files_sr_port RELATIVE ${GTM_SOURCE_DIR}/sr_port ${GTM_SOURCE_DIR}/sr_port/*.mpt)
 file(GLOB mpt_files_sr_unix RELATIVE ${GTM_SOURCE_DIR}/sr_unix ${GTM_SOURCE_DIR}/sr_unix/*.mpt)
 
 set(gtm_chset_dir_ "")
 set(gtm_chset_dir_UTF-8 "/utf8")
 
-foreach(d sr_port sr_unix)
+foreach(d ${gt_src_list})
   foreach(m ${m_files_${d}})
     get_filename_component(m_name "${m}" NAME_WE)
     string(TOUPPER "${m_name}" m_upper)
@@ -686,7 +674,11 @@ foreach(d sr_port sr_unix)
         list(APPEND gtm_chset_routines_${gtm_chset} "${m_out}")
       endforeach()
     else()
-      set(m_out "${GTM_BINARY_DIR}/${m_upper}.m")
+      if(";${m_name};" MATCHES ";GTMDefinedTypesInit[a-zA-Z]*;")
+	set(m_out "${GTM_BINARY_DIR}/${m_name}.m")
+      else()
+        set(m_out "${GTM_BINARY_DIR}/${m_upper}.m")
+      endif()
       add_custom_command(
         OUTPUT "${m_out}"
         DEPENDS ${GTM_SOURCE_DIR}/${d}/${m}
@@ -774,10 +766,31 @@ else()
   message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
 endif()
 
-if (gtm_icu_version GREATER 10)
-  message("libicu version ${gtm_icu_version} > 10")
-  string(REGEX REPLACE "([0-9])([0-9]).*" "\\1.\\2" gtm_icu_version "${gtm_icu_version}")
-  message("Fixing gtm_icu_version to ${gtm_icu_version}.\nThis had better be the default")
+find_program(LOCALECFG NAMES locale)
+if(LOCALECFG)
+  execute_process(
+  COMMAND ${LOCALECFG} -a
+    OUTPUT_VARIABLE locale_list
+    RESULT_VARIABLE locale_failed
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  if(locale_failed)
+    message(FATAL_ERROR "Command\n ${LOCALECFG} -a\nfailed (${locale_failed}).")
+  endif()
+  STRING(REGEX REPLACE "\n" ";" locale_list "${locale_list}")
+  foreach(lc ${locale_list})
+    string(TOLOWER "${lc}" lc_lower)
+    if("x${lc_lower}" MATCHES "^xen_us\\.?utf-?8")
+      set(LC_ALL ${lc})
+      message("-- Setting locale to ${LC_ALL}")
+      break()
+    endif()
+  endforeach(lc)
+  if("${LC_ALL}" STREQUAL "")
+    message("Locale undefined. Expect to see NONUTF8LOCALE during MUMPS routine compilation\n")
+  endif()
+else()
+  message(FATAL_ERROR "Unable to find 'locale'.  Set LOCALECFG in CMake cache.")
 endif()
 
 foreach(gtm_chset "" "UTF-8")
@@ -792,6 +805,7 @@ foreach(gtm_chset "" "UTF-8")
         -D gtmroutines=.
         -D gtm_chset=${gtm_chset}
         -D gtm_icu_version=${gtm_icu_version}
+        -D LC_ALL=${LC_ALL}
         -D mumps=$<TARGET_FILE:mumps>
         -D "args=${in}"
         -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
@@ -875,4 +889,3 @@ install(FILES sr_unix/lowerc_cp.sh DESTINATION ${GTM_INSTALL_DIR}
 install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
-
