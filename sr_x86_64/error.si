@@ -33,7 +33,7 @@ chnd_jmp	=	24
 	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
 	movq	$0, REG64_ARG1
 	movq	REG64_ACCUM, REG64_ARG0
-	call 	__sigsetjmp@PLT
+	call 	_sigsetjmp
 	incl  	REG32_RET0
 	jne  	\label
 	REVERT
