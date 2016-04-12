@@ -50,7 +50,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
-#if !defined(VMS) && !defined(__MVS__)
+#if !defined(VMS) && !defined(__MVS__) && !defined(__APPLE__)
 #  include <malloc.h>
 #endif
 #include "gtm_stdio.h"

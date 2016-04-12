@@ -30,7 +30,7 @@
 #include "gtm_socket.h"
 #include <sys/param.h>
 #include <signal.h>
-#if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__) && !defined(__MVS__)
+#if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__) && !defined(__MVS__) && !defined(__APPLE__)
 # include <siginfo.h>
 #endif
 #include "gtm_syslog.h"

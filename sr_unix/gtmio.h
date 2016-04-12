@@ -165,6 +165,10 @@ error_def(ERR_PREMATEOF);
 #elif defined(__linux__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #define DIRECTIO_FLAG	O_DIRECT
+#elif defined(__APPLE__)
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
+#define O_DIRECT	0
+#define DIRECTIO_FLAG	0
 #elif defined(__hpux)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #define DIRECTIO_FLAG	O_DIRECT
@@ -220,7 +224,7 @@ error_def(ERR_PREMATEOF);
 }
 
 #if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || \
-	defined(__CYGWIN__) || defined(__MVS__)
+	defined(__CYGWIN__) || defined(__MVS__) || defined(__APPLE__)
 /* These platforms are known to support pread/pwrite.
  * !!!!!!!!!!!!!! Note !!!!!!!!!!!!!!
  * pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would,

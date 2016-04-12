@@ -40,6 +40,7 @@
  * runtime logic which in turn (due to triggers) pulls in the compiler as well (op_zcompile etc. require cmd_ary).
  */
 GBLDEF	CLI_ENTRY	*cmd_ary = NULL;
+GBLDEF int4 gtcm_exi_condition;
 
 int	quiet = 0;
 

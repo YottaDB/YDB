@@ -21,6 +21,7 @@
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/types.h>
 #include <sys/time.h>
 #include <errno.h>
 #include <signal.h> /* for kill(), SIGTERM, SIGQUIT */

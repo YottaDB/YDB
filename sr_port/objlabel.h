@@ -60,6 +60,8 @@
 #	define OBJ_PLATFORM_LABEL	0		/* CYGWIN on Windows i386 */
 #elif defined(VMS)
 #	define OBJ_PLATFORM_LABEL	0		/* Alpha/VMS */
+#elif defined(__APPLE__)
+#	define	OBJ_PLATFORM_LABEL	0		/* OS390 aka z/OS */
 #else
 #error UNSUPPORTED PLATFORM
 #endif

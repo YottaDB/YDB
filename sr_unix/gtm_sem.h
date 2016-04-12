@@ -14,7 +14,7 @@
 
 #define FTOK_SEM_PER_ID 3
 
-
+#ifndef __APPLE__
 union   semun {
 	int     val;
 	struct  semid_ds *buf;
@@ -24,6 +24,7 @@ union   semun {
 	void *__pad;
 #endif
 } arg;
+#endif
 
 #endif /* GTM_SEM_INCLUDED */
 

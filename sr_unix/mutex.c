@@ -24,7 +24,7 @@
 #include "gtm_un.h"
 
 #include <errno.h>
-#if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
+#if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__) || defined(__APPLE__)
 #include "gtm_limits.h"
 #else
 #include <sys/limits.h>
@@ -66,6 +66,10 @@
 #ifdef MUTEX_MSEM_WAKE
 #define MUTEX_MAX_HEARTBEAT_WAIT        2 /* so that total wait for both select and msem wait will be the same */
 #define MUTEX_LCKALERT_PERIOD		4
+#endif
+
+#ifndef ONE_MILLION
+#define ONE_MILLION 1000000
 #endif
 
 /* The following PROBE_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
@@ -883,7 +887,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 							mutex_spin_parms->mutex_sleep_spin_count);
 						yields += sleep_spin_cnt;	/* start with max */
 					}
-#					ifndef MUTEX_MSEM_WAKE
+#					if 0
 					if (wake_this_pid != process_id)
 						mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
 #					endif

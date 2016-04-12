@@ -18,7 +18,7 @@
 #ifdef _SYSTYPE_SVR4
 #include <s2/mtio.h>
 #else
-#ifndef __MVS__
+#ifndef __APPLE__
 #include <sys/mtio.h>
 #endif	/* MVS */
 #endif	/* SVR4 */

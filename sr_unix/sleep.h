@@ -21,7 +21,7 @@
 
 void m_usleep(int useconds);
 
-# if !defined(_AIX) && !defined(__osf__) && !defined(__hpux) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__)
+# if !defined(_AIX) && !defined(__osf__) && !defined(__hpux) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__) && !defined(__APPLE__)
 #   if !defined(__MVS__) && !defined(__CYGWIN__)
 #      error "Unsure of support for sleep functions on this platform"
 #   endif

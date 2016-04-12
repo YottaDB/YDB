@@ -362,7 +362,7 @@ unsigned char mu_cre_file(void)
 		CLEANUP(EXIT_ERR);
 		return EXIT_ERR;
 	}
-#	if !defined(__sun) && !defined(__hpux)
+#	if !defined(__sun) && !defined(__hpux) && !defined(__APPLE__)
 	if (!cs_data->defer_allocate)
 	{
 		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) +

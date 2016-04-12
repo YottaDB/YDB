@@ -297,9 +297,13 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 
 #ifndef _AIX
-#	ifndef __sparc
+# ifndef __sparc
+#  ifdef __APPLE__
+	typedef unsigned int	boolean_t;
+#  else
 	typedef int		boolean_t;
-#	endif
+#  endif
+# endif
 #endif
 typedef char		bool;
 typedef unsigned char	mreg;
@@ -346,8 +350,8 @@ typedef struct
  * initialize literal_ptr field apppropriately.
  *
  */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) &&  \
-	(defined(__ia64) || defined(__x86_64__) || defined(__s390__)))
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__)  || defined(__APPLE__) \
+	|| (defined(__linux__) && (defined(__ia64) || defined(__x86_64__) || defined(__s390__)))
 #	define HAS_LITERAL_SECT
 #endif
 

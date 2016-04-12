@@ -106,7 +106,7 @@ error_def(ERR_WAITDSKSPACE);
 
 OS_PAGE_SIZE_DECLARE
 
-#if !defined(__sun) && !defined(__hpux)
+#if !defined(__sun) && !defined(__hpux) && !defined(__APPLE__)
 STATICFNDCL int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total);
 STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total)
 {
@@ -365,7 +365,8 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	new_total = old_total + new_blocks;
 	new_eof = BLK_ZERO_OFF(cs_data) + ((off_t)new_total * cs_data->blk_size);
-#	if !defined(__sun) && !defined(__hpux)
+#if !defined(__sun) && !defined(__hpux) && !defined(__APPLE__)
+
 	if (!cs_data->defer_allocate)
 	{
 		save_errno = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) + (off_t)new_total * cs_data->blk_size +
