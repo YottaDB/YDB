@@ -138,6 +138,20 @@ error_def(ERR_TEXT);
 error_def(ERR_TRACINGON);
 error_def(ERR_VIEWNOTFOUND);
 
+#ifdef __APPLE__
+/* TODO
+http://stackoverflow.com/questions/5167269/clock-gettime-alternative-in-mac-os-x
+https://developer.apple.com/library/mac/qa/qa1398/_index.html
+*/
+#define CLOCK_REALTIME 1
+#define CLOCK_MONOTONIC 1
+typedef clock_t clockid_t;
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_gettime(clockid_t clk_id, struct timespec *tp)
+{
+}
+#endif
+
 #ifdef UNIX
 STATICFNDEF void times_usec(ext_tms *curr)
 {
