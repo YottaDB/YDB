@@ -15,15 +15,15 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_indlvarg
+	.extern	_op_indlvarg
 
-ENTRY	opp_indlvarg
+ENTRY	_opp_indlvarg
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	addq	$8, %rsp		# Burn return PC & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_indlvarg
+	call	_op_indlvarg
 	getframe
 	ret

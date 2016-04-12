@@ -15,36 +15,36 @@
 	.include "debug.si"
 
 	.data
-	.extern	dollar_truth
-	.extern	frame_pointer
+	.extern	_dollar_truth
+	.extern	_frame_pointer
 
 	.text
-	.extern	exfun_frame
-	.extern	push_tval
+	.extern	_exfun_frame
+	.extern	_push_tval
 
 #
 # op_callsp - Used to build a new stack level for argumentless DO (also saves $TEST)
 #
 # Argument:
-#	REG64_ARG0 - Value from OCNT_REF triple that contains the byte offset from the return address
+#	%rdi - Value from OCNT_REF triple that contains the byte offset from the return address
 #		     to return to when the level pops.
 #
 # Note this routine calls exfun_frame() instead of copy_stack_frame() because this routine needs to provide a
 # separate set of compiler temps for use by the new frame. Particularly when it called on same line with FOR.
 #
-ENTRY	op_callspl
-ENTRY	op_callspw
-ENTRY	op_callspb
-	movq	(REG_SP), REG64_ACCUM			# Save return addr in reg
-	subq	$8, REG_SP				# Bump stack for 16 byte alignment
+ENTRY	_op_callspl
+ENTRY	_op_callspw
+ENTRY	_op_callspb
+	movq	(%rsp), %rax			# Save return addr in reg
+	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
-	movq	frame_pointer(REG_IP), REG64_SCRATCH1
-	movq	REG64_ACCUM, msf_mpc_off(REG64_SCRATCH1) # Save return addr in M frame
-	addq	REG64_ARG0, msf_mpc_off(REG64_SCRATCH1) # Add in return offset
-	call	exfun_frame				# Copies stack frame and creates new temps
-	movl	dollar_truth(REG_IP), REG32_ARG0
-	call	push_tval
-	movq	frame_pointer(REG_IP), REG_FRAME_POINTER
-	movq	msf_temps_ptr_off(REG_FRAME_POINTER), REG_FRAME_TMP_PTR
-	addq	$8, REG_SP				# Remove stack alignment bump
+	movq	_frame_pointer(%rip), %r11
+	movq	%rax, msf_mpc_off(%r11) # Save return addr in M frame
+	addq	%rdi, msf_mpc_off(%r11) # Add in return offset
+	call	_exfun_frame				# Copies stack frame and creates new temps
+	movl	_dollar_truth(%rip), %edi
+	call	_push_tval
+	movq	_frame_pointer(%rip), %rbp
+	movq	msf_temps_ptr_off(%rbp), %r14
+	addq	$8, %rsp				# Remove stack alignment bump
 	ret

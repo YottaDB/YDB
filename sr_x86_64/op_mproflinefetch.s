@@ -15,12 +15,12 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	gtm_fetch
-	.extern pcurrpos
-	.extern	stack_leak_check
+	.extern	_gtm_fetch
+	.extern _pcurrpos
+	.extern	_stack_leak_check
 
 	#
 	# This routine does local variable fetch for all variables on a given line of code, or alternatively, all
@@ -30,15 +30,15 @@
 	#
 	# Since this routine pops its return address off the stack, the stack becomes 16 byte aligned. Verify that.
 	#
-ENTRY	op_mproflinefetch
-	movq	frame_pointer(REG_IP), REG64_ACCUM
-	popq	msf_mpc_off(REG64_ACCUM)		# Save incoming return PC in frame_pointer->mpc
-	movq	REG_PV, msf_ctxt_off(REG64_ACCUM)	# Save linkage pointer
+ENTRY	_op_mproflinefetch
+	movq	_frame_pointer(%rip), %rax
+	popq	msf_mpc_off(%rax)		# Save incoming return PC in frame_pointer->mpc
+	movq	%r15, msf_ctxt_off(%rax)	# Save linkage pointer
 	CHKSTKALIGN					# Verify stack alignment
-	movb    $0, REG8_ACCUM				# No variable length arguments
-	call	gtm_fetch
-	call	pcurrpos
-	call	stack_leak_check
-	movq	frame_pointer(REG_IP), REG64_ACCUM
-	pushq	msf_mpc_off(REG64_ACCUM)		# Push return address back on stack for return
+	movb    $0, %al				# No variable length arguments
+	call	_gtm_fetch
+	call	_pcurrpos
+	call	_stack_leak_check
+	movq	_frame_pointer(%rip), %rax
+	pushq	msf_mpc_off(%rax)		# Push return address back on stack for return
 	ret

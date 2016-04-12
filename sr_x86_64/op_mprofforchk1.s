@@ -15,15 +15,15 @@
 	.include "debug.si"
 
 	.text
-	.extern forchkhandler
+	.extern _forchkhandler
 
 #
 # This is the M profiling version which calls different routine(s) for M profiling purposes.
 #
-ENTRY	op_mprofforchk1
-	movq    (REG_SP), REG64_ARG0		# Send return address to forchkhandler
-	subq	$8, REG_SP			# Bump stack for 16 byte alignment
+ENTRY	_op_mprofforchk1
+	movq    (%rsp), %rdi		# Send return address to forchkhandler
+	subq	$8, %rsp			# Bump stack for 16 byte alignment
 	CHKSTKALIGN				# Verify stack alignment
-	call	forchkhandler
-	addq	$8, REG_SP			# Remove stack alignment bump
+	call	_forchkhandler
+	addq	$8, %rsp			# Remove stack alignment bump
 	ret

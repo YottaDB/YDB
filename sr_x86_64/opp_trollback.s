@@ -15,15 +15,15 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_trollback
+	.extern	_op_trollback
 
-ENTRY	opp_trollback
+ENTRY	_opp_trollback
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	addq	$8, %rsp		# Burn return PC & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_trollback
+	call	_op_trollback
 	getframe
 	ret

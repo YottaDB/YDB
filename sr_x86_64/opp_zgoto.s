@@ -21,15 +21,15 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_zgoto
+	.extern	_op_zgoto
 
-ENTRY	opp_zgoto
+ENTRY	_opp_zgoto
 	putframe
-	addq	$8, REG_SP		# Burn return address & 16 byte align stack
+	addq	$8, %rsp		# Burn return address & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_zgoto		# All 4 arg regs passed to opp_zgoto
+	call	_op_zgoto		# All 4 arg regs passed to opp_zgoto
 	getframe
 	ret

@@ -16,33 +16,33 @@
 	.include "debug.si"
 
 	.data
-	.extern	literal_null
-	.extern	undef_inhibit
+	.extern	_literal_null
+	.extern	_undef_inhibit
 
 	.text
-	.extern	underr
+	.extern	_underr
 
-ENTRY	op_sto
-	subq	$8, REG_SP					# Bump stack for 16 byte alignment
+ENTRY	_op_sto
+	subq	$8, %rsp					# Bump stack for 16 byte alignment
 	CHKSTKALIGN						# Verify stack alignment
-	mv_if_notdefined REG64_RET1, notdef
+	mv_if_notdefined %r10, notdef
 nowdef:
-	movl	$mval_byte_len, REG32_ARG3
-	movq	REG64_RET1, REG64_ARG1
-	movq	REG64_RET0, REG64_ARG0
+	movl	$mval_byte_len, %ecx
+	movq	%r10, %rsi
+	movq	%rax, %rdi
 	REP
 	movsb
-	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
+	andw	$~mval_m_aliascont, mval_w_mvtype(%rax)	# Don't propagate alias container flag
 done:
-	addq	$8, REG_SP					# Remove stack alignment bump
+	addq	$8, %rsp					# Remove stack alignment bump
 	ret
 notdef:
-	cmpb	$0, undef_inhibit(REG_IP)
+	cmpb	$0, _undef_inhibit(%rip)
 	je	clab
-	leaq	literal_null(REG_IP), REG_RET1
+	leaq	_literal_null(%rip), %r10
 	jmp	nowdef
 clab:
-	movq	REG_RET1, REG64_ARG0
-	movb    $0, REG8_ACCUM             			# Variable length argument
-	call	underr
+	movq	%r10, %rdi
+	movb    $0, %al             			# Variable length argument
+	call	_underr
 	jmp	done

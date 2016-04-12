@@ -14,9 +14,9 @@
 	.include "g_msf.si"
 
 	.data
-	.extern	restart_pc
-	.extern restart_ctxt
-	.extern frame_pointer
+	.extern	_restart_pc
+	.extern _restart_ctxt
+	.extern _frame_pointer
 
 	.text
 #
@@ -26,11 +26,11 @@
 # Since this is a leaf routine (makes no calls), the stack frame alignment is not important so is not adjusted
 # or tested. Should that change, the alignment should be fixed and implement use of the CHKSTKALIGN macro made.
 #
-ENTRY op_restartpc
-	movq	(REG_SP), REG64_ACCUM
-	subq	$6, REG64_ACCUM 				# XFER call size is constant
-	movq	REG64_ACCUM, restart_pc(REG_IP)
-	movq	frame_pointer(REG_IP), REG64_ACCUM
-	movq	msf_ctxt_off(REG64_ACCUM), REG64_SCRATCH1
-	movq	REG64_SCRATCH1, restart_ctxt(REG_IP)
+ENTRY	_op_restartpc
+	movq	(%rsp), %rax
+	subq	$6, %rax 				# XFER call size is constant
+	movq	%rax, _restart_pc(%rip)
+	movq	_frame_pointer(%rip), %rax
+	movq	msf_ctxt_off(%rax), %r11
+	movq	%r11, _restart_ctxt(%rip)
 	ret

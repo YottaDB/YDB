@@ -15,24 +15,24 @@
 	.include "debug.si"
 
 	.data
-	.extern	neterr_pending
-	.extern	restart_pc
+	.extern	_neterr_pending
+	.extern	_restart_pc
 
 	.text
-	.extern	gvcmz_neterr
-	.extern	async_action
-	.extern	outofband_clear
+	.extern	_gvcmz_neterr
+	.extern	_async_action
+	.extern	_outofband_clear
 
-ENTRY	op_forintrrpt
-	subq	$8, REG_SP			# Allocate save area and align stack to 16 bytes
+ENTRY	_op_forintrrpt
+	subq	$8, %rsp			# Allocate save area and align stack to 16 bytes
 	CHKSTKALIGN				# Verify stack alignment
-	cmpb	$0, neterr_pending(REG_IP)
+	cmpb	$0, _neterr_pending(%rip)
 	je	l1
-	call	outofband_clear
-	movq	$0, REG64_ARG0
-	call	gvcmz_neterr
+	call	_outofband_clear
+	movq	$0, %rdi
+	call	_gvcmz_neterr
 l1:
-	movl	$0, REG32_ARG0
-	call	async_action
-	addq	$8, REG_SP			# Remove alignment stack bump
+	movl	$0, %edi
+	call	_async_action
+	addq	$8, %rsp			# Remove alignment stack bump
 	ret

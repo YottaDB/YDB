@@ -15,9 +15,9 @@
 	.include "mval_def.si"
 
 	.data
-	.extern	dollar_truth
-	.extern	literal_one
-	.extern	literal_zero
+	.extern	_dollar_truth
+	.extern	_literal_one
+	.extern	_literal_zero
 
 	.text
 	#
@@ -26,20 +26,20 @@
 	# Note this routine is a leaf routine so does no stack-alignment or checking. If that changes, this routine
 	# needs to use CHKSTKALIGN macro and make sure stack is 16 byte aligned.
 	#
-ENTRY	op_gettruth
-	cmpl	$0, dollar_truth(REG_IP)
+ENTRY	_op_gettruth
+	cmpl	$0, _dollar_truth(%rip)
 	jne	l1
-	leaq	literal_zero(REG_IP), REG64_ARG1
+	leaq	_literal_zero(%rip), %rsi
 	jmp	doit
 
 l1:
-	leaq	literal_one(REG_IP), REG64_ARG1
+	leaq	_literal_one(%rip), %rsi
 doit:
 	#
-	# Copy/return literal_zero or literal_one mval to caller
+	# Copy/return literal_zero or _literal_one mval to caller
 	#
-	movq	REG64_RET1, REG64_ARG0
-	movl	$mval_byte_len, REG32_ARG3
+	movq	%r10, %rdi
+	movl	$mval_byte_len, %ecx
 	REP
 	movsb
 	ret

@@ -19,5 +19,5 @@
 # check stack alignment (which is off due to the return address on the stack). If ever a call is
 # added then this routine should take care to align the stack to 16 bytes and add a CHKSTKALIGN macro.
 #
-ENTRY	op_forchk1
+ENTRY	_op_forchk1
 	ret

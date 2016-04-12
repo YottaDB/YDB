@@ -30,14 +30,14 @@
 #   -1	mval1 < mval2
 #
 	.text
-	.extern	sorts_after
+	.extern	_sorts_after
 
-ENTRY	op_sorts_after
-	subq	$8, REG_SP				# Bump stack for 16 byte alignment
+ENTRY	_op_sorts_after
+	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
-	movq	REG64_RET1, REG64_ARG1
-	movq	REG64_RET0, REG64_ARG0
-	call	sorts_after
-	addq	$8, REG_SP				# Remove stack alignment bump
-	cmpl	$0, REG32_ACCUM				# Set flags according to result from
+	movq	%r10, %rsi
+	movq	%rax, %rdi
+	call	_sorts_after
+	addq	$8, %rsp				# Remove stack alignment bump
+	cmpl	$0, %eax				# Set flags according to result from
 	ret

@@ -13,8 +13,8 @@
 # mint2mval.s
 #	Convert int to mval
 # args:
-#	%rax   - (aka REG64_RET0) - Destination mval pointer
-#	%r10d  - (aka REG32_RET1) - Input integer value to convert
+#	%rax   - (aka %rax) - Destination mval pointer
+#	%r10d  - (aka %r10d) - Input integer value to convert
 #
 	.include "g_msf.si"
 	.include "linkage.si"
@@ -22,13 +22,13 @@
 	.include "debug.si"
 
 	.text
-	.extern	i2mval
+	.extern	_i2mval
 
-ENTRY	mint2mval
-	subq	$8, REG_SP		# Align stack to 16 bytes
+ENTRY	_mint2mval
+	subq	$8, %rsp		# Align stack to 16 bytes
 	CHKSTKALIGN			# Verify stack alignment
-	movl	REG32_RET1, REG32_ARG1
-        movq	REG64_RET0, REG64_ARG0
-	call	i2mval
-	addq	$8, REG_SP
+	movl	%r10d, %esi
+        movq	%rax, %rdi
+	call	_i2mval
+	addq	$8, %rsp
 	ret

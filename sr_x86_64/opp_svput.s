@@ -15,15 +15,15 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_svput
+	.extern	_op_svput
 
-ENTRY	opp_svput
+ENTRY	_opp_svput
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	addq	$8, %rsp		# Burn return PC & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_svput		# For some ISVs ($ET/$ZT) may cause stack shift
+	call	_op_svput		# For some ISVs ($ET/$ZT) may cause stack shift
 	getframe
 	ret

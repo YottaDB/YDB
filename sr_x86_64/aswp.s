@@ -18,8 +18,8 @@
 # Note since this routine makes no calls, stack alignment is not critical. If ever a call is added then this
 # routine should take care to align the stack to 16 bytes and add a CHKSTKALIGN macro.
 #
-ENTRY	aswp
-	movl	REG32_ARG1, REG32_RET0
+ENTRY	_aswp
+	movl	%esi, %eax
 	lock
-	xchg	(REG64_ARG0),REG32_RET0		# Return original value
+	xchg	(%rdi),%eax		# Return original value
 	ret

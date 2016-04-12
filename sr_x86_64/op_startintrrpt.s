@@ -15,26 +15,26 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
-	.extern	neterr_pending
+	.extern	_frame_pointer
+	.extern	_neterr_pending
 
 	.text
-	.extern	gvcmz_neterr
-	.extern	async_action
-	.extern	outofband_clear
+	.extern	_gvcmz_neterr
+	.extern	_async_action
+	.extern	_outofband_clear
 
-ENTRY	op_startintrrpt
+ENTRY	_op_startintrrpt
 	putframe
-	subq	$8, REG_SP			# Allocate save area and align stack to 16 bytes
+	subq	$8, %rsp			# Allocate save area and align stack to 16 bytes
 	CHKSTKALIGN				# Verify stack alignment
-	cmpb	$0, neterr_pending(REG_IP)
+	cmpb	$0, _neterr_pending(%rip)
 	je	l1
-	call	outofband_clear
-	movq	$0, REG64_ARG0
-	call	gvcmz_neterr
+	call	_outofband_clear
+	movq	$0, %rdi
+	call	_gvcmz_neterr
 l1:
-	movl	$1, REG32_ARG0
-	call	async_action
-	addq	$16, REG_SP			# Remove alignment stack bump & burn return addr
+	movl	$1, %edi
+	call	_async_action
+	addq	$16, %rsp			# Remove alignment stack bump & burn return addr
 	getframe				# Load regs for possible new frame and push return addr
 	ret

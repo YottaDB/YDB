@@ -15,7 +15,7 @@
 	.include "debug.si"
 
 	.text
-	.extern	opp_ret
+	.extern	_opp_ret
 #
 # This routine is only ever "returned to" since its address stored into the mpc field of stack frames
 # during certain types of error recovery. Because of that, there is no "return address" on the stack
@@ -23,6 +23,6 @@
 # address. So this routine has no caller and no return. Nevertheless, we check the stack alignment to
 # verify it before passing control to opp_ret for the unwind.
 #
-ENTRY	pseudo_ret
+ENTRY	_pseudo_ret
 	CHKSTKALIGN			# Verify stack alignment
-	call	opp_ret
+	call	_opp_ret

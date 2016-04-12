@@ -15,10 +15,10 @@
 	.include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	unw_retarg
+	.extern	_unw_retarg
 
 #
 # Routine to unwind the M stack returning a value. Note this routine burns the return value like many others
@@ -26,15 +26,15 @@
 # But because we wait, we need an initial bump to the C stack pointer to get it aligned.
 #
 # Args:
-#   REG64_RET0 - return value mval
-#   REG64_RET1 - alias value flag
+#   %rax - return value mval
+#   %r10 - alias value flag
 #
-ENTRY	op_retarg
-	subq	$8, REG_SP				# Bump stack for 16 byte alignment
+ENTRY	_op_retarg
+	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
-	movq	REG64_RET0, REG64_ARG0
-	movq	REG64_RET1, REG64_ARG1
-	call	unw_retarg
-	addq	$16, REG_SP				# Remove stack alignment bump & burn return address
+	movq	%rax, %rdi
+	movq	%r10, %rsi
+	call	_unw_retarg
+	addq	$16, %rsp				# Remove stack alignment bump & burn return address
 	getframe					# Load regs for prev stack frame & push return addr
 	ret
