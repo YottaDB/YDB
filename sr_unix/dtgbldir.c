@@ -8,7 +8,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
+#undef DEBUG
 #include "mdef.h"
 #include "main_pragma.h"
 
@@ -38,6 +38,9 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+
+#undef PRINTF
+#define PRINTF printf
 
 #define asc2i(str,len) atoi((const char*)str)
 #ifdef BIGENDIAN
