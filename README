@@ -64,9 +64,10 @@ To build GT.M for Linux, do the following steps:
    # [optional] If you installed GT.M, provide the directory path to cmake
    #   -D GTM_DIST:PATH=$gtm_dist
    #
+   ###### You should really be doing debug builds on Mac OS X ######
    # By default the build produces release versions of GT.M. To build a debug
    # version of GT.M supply the following parameter to cmake
-   #     -D CMAKE_BUILD_TYPE=DEBUG
+   #     -D CMAKE_BUILD_TYPE=Debug
    #
    # Note that the cmake install does not create the final installed GT.M.
    # Instead, it stages GT.M for distribution. Change the CMAKE_INSTALL_PREFIX
@@ -77,8 +78,23 @@ To build GT.M for Linux, do the following steps:
    #
    $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-002A
 
-   $ make
+   $ make -j 16 gen_gtm_threadgbl_deftypes all
+   # Something about the parallelized make doesn't work right so force
+   # gen_gtm_threadgbl_deftypes to go first.
+   
+   # WARNING WARNING WARNING
+   # The build leaves the terminal in a pretty bad shape. Do the following to
+   # restore sanity
+   $ stty sane
 
+   $ gtm_dist=$PWD ./mumps -direct
+   # This is what I have so far
+	GTM>zwrite $zversion zsystem "uname -a" halt
+	$ZVERSION="GT.M V6.2-002 Darwin x86_64"
+	Darwin Tower.lan 15.3.0 Darwin Kernel Version 15.3.0: Thu Dec 10 18:40:58 PST 2015; root:xnu-3248.30.4~1/RELEASE_X86_64 x86_64
+
+
+   # Let's not try to install just now.
    $ make install
 
    $ cd package/lib/fis-gtm/V6.2-002A_x86_64
@@ -99,4 +115,4 @@ FAQ:
 	Please set them or make sure they are set and tested correctly in the CMake files:
   This indicates that required libraries are not found. Please consult the list
   of libraries and check your distributions package manager.
-
+- On Mac OS X, use one of macports/pkgsrc/gentoo prefix. I'm using macports.
