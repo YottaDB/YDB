@@ -174,10 +174,10 @@ ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8*NO_REG_SAVED)
 	movq	frame_pointer(%rip), REG_FRAME_POINTER
 	movb	msf_flags_off(REG_FRAME_POINTER), REG8_SCRATCH1
 	andb	$SFF_ETRAP_ERR, REG8_SCRATCH1
-	jz	lab1\@
+	jz	1f
 	call	error_return
 	movq	frame_pointer(%rip), REG_FRAME_POINTER
-lab1\@:
+1:
 	movq	msf_temps_ptr_off(REG_FRAME_POINTER), REG_FRAME_TMP_PTR
 	movq	msf_l_symtab_off(REG_FRAME_POINTER), REG_FRAME_VAR_PTR
 	movq	msf_literal_ptr_off(REG_FRAME_POINTER), REG_LITERAL_BASE
