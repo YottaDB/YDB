@@ -56,6 +56,13 @@
 #include <sys/pstat.h>
 #endif
 
+/* Mac OS X does not have a /proc FS to retrieve the exe's path. Use a Mac OS X specific call
+ * https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/dyld.3.html
+ */
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+
 GBLREF	char		gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t	gtm_dist_ok_to_use;
 LITREF	gtmImageName	gtmImageNames[];
@@ -157,6 +164,14 @@ int gtm_image_path(char *realpath)
 	assertpro(status != 0); /* Can only happen if the path name is not in the system cache */
 	if (status < 0) /* errno is set */
 		return status;
+#elif defined(__APPLE__)
+	uint32_t size = GTM_PATH_MAX;
+	if (_NSGetExecutablePath(realpath, &size) < 0)
+	{
+		printf("buffer too small; need size %u\n", size);
+		return size;
+	}
+	return 0;
 #elif defined(__linux__) || defined(__sparc) ||  defined(_AIX)
 	SNPRINTF(realpath, GTM_PATH_MAX, PROCSELF, process_id);
 #else
