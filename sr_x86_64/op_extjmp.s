@@ -84,7 +84,7 @@ ENTRY	_op_extjmp
 	# We have a negative index. Use lnk_proxy as a proxy linkage table.
 	#
 	movq	_gtm_threadgbl(%rip), %r10		# %r10 contains threadgbl base
-	leaq	2568(%r10), %rax		# -> &lnk_proxy.rtnhdr_adr FIXME : needs to use ggo_lnk_proxy
+	leaq	ggo_lnk_proxy(%r10), %rax		# -> &lnk_proxy.rtnhdr_adr
 	cmpq	$0, %rdi					# Using proxy table, rtnhdr index must be 0
 	jne	gtmcheck
 	movq	(%rax), %rdi			# -> rtnhdr
