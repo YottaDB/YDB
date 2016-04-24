@@ -478,6 +478,8 @@ set_target_properties(libgtmshr PROPERTIES
 add_dependencies(libgtmshr gen_export)
 add_dependencies(mumps libgtmshr)
 
+set(CMAKE_LIBRARY_PATH /lib /usr/lib /usr/local/lib /opt/local/lib)
+
 if(0)
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)

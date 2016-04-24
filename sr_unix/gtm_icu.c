@@ -228,8 +228,23 @@ void gtm_icu_init(void)
 		icu_libname_len = 0;
 		major_ver_len = STRLEN(major_ver_ptr);
 		minor_ver_len = STRLEN(minor_ver_ptr);
-#		if defined(_AIX) || defined(__MVS__)
-		/* Transform (e.g. libicuio.a  -> libicuio36.a  ) */
+#		if defined(__APPLE__)
+		/* Transform (e.g. libicuio.a  -> libicuio.55.1.dylib) */
+		len = STR_LIT_LEN(ICU_LIBNAME_ROOT);
+		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_ROOT, len);
+		icu_libname_len += len;
+		icu_libname[icu_libname_len++] = '.';
+		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
+		icu_libname_len += major_ver_len;
+		icu_libname[icu_libname_len++] = '.';
+		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
+		icu_libname_len += minor_ver_len;
+		icu_libname[icu_libname_len++] = '.';
+		len = STR_LIT_LEN(ICU_LIBNAME_EXT);
+		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_EXT, len);
+		icu_libname_len += len;
+#		elif defined(_AIX) || defined(__MVS__)
+		/* Transform (e.g. libicuio.a  -> libicuio36.a	) */
 		len = STR_LIT_LEN(ICU_LIBNAME_ROOT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_ROOT, len);
 		icu_libname_len += len;
