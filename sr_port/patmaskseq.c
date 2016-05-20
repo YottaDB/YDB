@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,11 @@
 #include "mdef.h"
 #include "patcode.h"
 
+/* The below array is initialized based on the character classes ordering in PATM_CODELIST.
+ * For example PATM_UTF8_ALPHABET = (1 << 5). So patmask_seq[5+1] = 22 because 0 (the external name assigned to
+ *	PATM_UTF8_ALPHABET) is the 22nd character (counting from 0) in PATM_CODELIST.
+ * For example PATM_L = (1 << 2). So patmask_seq[2+1] = 2 because L is the 2nd character (counting from 0) in PATM_CODELIST.
+ */
 static	int	patmask_seq[] =
 {
      -1, 0,  1,  2,  3,  4, 22, 23, -1,

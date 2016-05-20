@@ -146,12 +146,15 @@ void mupip_rundown(void)
 					 * were other processes still attached to it) but got an error while trying to grab the
 					 * access control semaphore for the receive pool (because a receiver server was still
 					 * running) and because anticipatory_freeze_available is TRUE, we did not detach from
-					 * the journal pool inside "mu_rndwn_repl_instance". We need to do the detach here.
+					 * the journal pool inside "mu_rndwn_repl_instance". We need to do the detach here,
+					 * except if IFOE is configured, in which case we need the journal pool attached
+					 * so that we can check for instance freeze in database rundown.
+					 * In that case, the detach will happen automatically when the process terminates.
 					 * No need to do any instance file cleanup since there is nothing to rundown there
 					 * from either the journal pool or receive pool.
 					 */
 					assert((NULL == jnlpool_ctl) || anticipatory_freeze_available);
-					if (NULL != jnlpool_ctl)
+					if ((NULL != jnlpool_ctl) && !anticipatory_freeze_available)
 					{
 						shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
 						JNLPOOL_SHMDT(status, save_errno);
@@ -253,7 +256,7 @@ void mupip_rundown(void)
 				*ipcs_ptr = '\0';
 				if (0 == shm_buf.shm_nattch)
 				{	/* No one else attached and no new process can attach (as we hold the ftok and access
-					 * control semaphore on the journal pool)
+					 * control semaphore on the journal pool).
 					 */
 					if (SS_NORMAL != shm_rmid(shmid))
 					{
@@ -291,44 +294,6 @@ void mupip_rundown(void)
 								       ERR_SEMREMOVED, 1, semid);
 						}
 						repl_instance.crash = FALSE; /* No more semaphore IDs. Reset crash bit */
-						if (repl_instance.ftok_counter_halted)
-						{	/* recvpool has already been rundown in "mu_rndwn_repl_instance" above */
-							assert(INVALID_SEMID == repl_instance.recvpool_semid);
-							assert(INVALID_SHMID == repl_instance.recvpool_shmid);
-							/* ftok counter is not guaranteed to be at 1. So fix it that way the
-							 * "ftok_sem_release" done later WILL remove the ftok semaphore.
-							 */
-							semarg.val = 0;
-							if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
-							{
-								save_errno = errno;
-								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
-									ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
-									CALLFROM, save_errno);
-								/* In case not able to set counter to 1, proceed with rundown
-								 * without deleting the ftok semaphore (so keep
-								 * counter_ftok_incremented unchanged)
-								 */
-							} else
-							{
-								save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM,
-												DB_COUNTER_SEM_INCR, SEM_UNDO);
-								if (save_errno)
-								{
-									gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
-										ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
-										CALLFROM, save_errno);
-									/* In case not able to set counter to 1, proceed with
-									 * rundown without deleting the ftok semaphore (so keep
-									 * counter_ftok_incremented at FALSE)
-									 */
-								} else
-								{
-									udi->counter_ftok_incremented = TRUE;
-									repl_instance.ftok_counter_halted = FALSE;
-								}
-							}
-						}
 					}
 				} else
 				{	/* REPLACCESSSEM is issued from within mu_replpool_release_sem */

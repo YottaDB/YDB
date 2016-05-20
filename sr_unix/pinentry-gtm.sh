@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information 	#
+# Copyright (c) 2010-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -33,23 +33,30 @@ if [ -z "$gtm_dist" ] ; then
 fi
 
 if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
+	pinentry=PINENTRY
 	# Password and MUMPS exists, perform some extended setup checks
 	if [ -z "$gtmroutines" ] ; then
-		# $gtmroutines is not set in the environment, attempt to pick it up from libgtmutil.so, $gtm_dist, $gtm_dist/plugin
+		utfodir=""
+		if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+			utfodir="/utf8"
+		fi
+		# $gtmroutines is not set in the environment, attempt to pick it up from libgtmutil.so, $gtm_dist, $gtm_dist/plugin/o
 		if [ -e "$gtm_dist/libgtmutil.so" ] ; then
 			export gtmroutines="$gtm_dist/libgtmutil.so"
 		elif [ -e "$gtm_dist/PINENTRY.o" ] ; then
 			export gtmroutines="$gtm_dist"
+		elif [ -e "$gtm_dist/plugin/o${utfodir}/pinentry.o" ] ; then
+			pinentry=pinentry
+			export gtmroutines="$gtm_dist $gtm_dist/plugin/o${utfodir}"
 		fi
 	fi
 
 	# Validate gtmroutines. Redirect output or it will affect the password protocol
-	PINENTRY=PINENTRY
-	printf 'zhalt (0=$zlength($text(pinentry^PINENTRY)))' | $gtm_dist/mumps -direct >> /dev/null 2>&1
+	printf 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | gtm_local_collate= LD_PRELOAD= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -direct >> /dev/null 2>&1
 	needsprivroutines=$?
 
 	if [ 0 -ne "${needsprivroutines}" ] ; then
-		PINENTRY=pinentry
+		pinentry=pinentry
 		# Need to create a temporary directory for object routines
 		if [ -x "`which mktemp 2>/dev/null`" ] ; then
 			tmpdir=`mktemp -d`
@@ -58,10 +65,10 @@ if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
 		fi
 		trapstr="rm -rf $tmpdir"
 		trap "$trapstr" HUP INT QUIT TERM TRAP
-		export gtmroutines="$tmpdir($dir)"
+		export gtmroutines="$tmpdir($dir $gtm_dist/plugin/gtmcrypt)"
 	fi
 
-	gtm_local_collate= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -run $PINENTRY
+	gtm_local_collate= LD_PRELOAD= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -run $pinentry
 	punt=$?
 	if [ -d "$tmpdir" ] ; then rm -rf "$tmpdir" ; fi
 fi

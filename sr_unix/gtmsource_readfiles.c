@@ -1422,9 +1422,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	sgmnt_addrs		*csa;
 	gtmsource_state_t	gtmsource_state_sav;
 	repl_rctl_elem_t	*repl_rctl;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	trans_read = FALSE;
 	num_tcom = -1;
 	tot_tcom_len = 0;
@@ -1485,8 +1483,6 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 								csa->jnl->jnl_buff->freeaddr, ctl->repl_rctl->read_complete);
 						}
 					}
-					if (TREF(gtm_environment_init) && !IS_REPL_INST_FROZEN)
-						gtm_fork_n_core();
 				}
 			}
 		}

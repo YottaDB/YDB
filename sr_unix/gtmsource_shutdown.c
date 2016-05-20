@@ -302,12 +302,12 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 * other error occurs in that function causing it to return ABNORMAL_SHUTDOWN, then we should return ABNORMAL_SHUTDOWN
 	 * from this function as well.
 	 */
-	ftok_counter_halted = jnlpool.repl_inst_filehdr->ftok_counter_halted;	/* Note down before repl_inst_filehdr is NULLed */
+	ftok_counter_halted = jnlpool.jnlpool_ctl->ftok_counter_halted;	/* Note down before jnlpool.jnlpool_ctl is NULLed */
 	if (FALSE == gtmsource_ipc_cleanup(auto_shutdown, &exit_status, &num_src_servers_running))
 		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 	else
 	{	/* Journal Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
-		repl_inst_jnlpool_reset(CLEAR_FTOK_HALTED_FALSE);
+		repl_inst_jnlpool_reset();
 	}
 	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);

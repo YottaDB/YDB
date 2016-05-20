@@ -47,12 +47,12 @@ static readonly struct
 	(unsigned char)iop_newversion,	(unsigned char)iop_wrap,
 	(unsigned char)iop_recordsize,
 #	ifdef BIGENDIAN
-	(unsigned char)0, (unsigned char)0, (unsigned char)0, (unsigned char)132,
+	{(unsigned char)0, (unsigned char)0, (unsigned char)0, (unsigned char)132},
 #	else
-	(unsigned char)132, (unsigned char)0, (unsigned char)0, (unsigned char)0,
+	{(unsigned char)132, (unsigned char)0, (unsigned char)0, (unsigned char)0},
 #	endif
 #	ifdef __MVS__
-	(unsigned char)iop_chset, 6, 'E', 'B', 'C', 'D', 'I', 'C',
+	{(unsigned char)iop_chset, 6, 'E', 'B', 'C', 'D', 'I', 'C'},
 #	endif
 	(unsigned char)iop_eol
 	};
@@ -84,7 +84,7 @@ void open_list_file(void)
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
 	if (!(status = parse_file(&fstr, &pblk)) & 1)
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 	file.mvtype = parms.mvtype = MV_STR;
 	file.str.len = pblk.b_esl;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@
 #define	ZTRAP_FORM			"$gtm_ztrap_form"
 #define	ZTRAP_NEW			"$gtm_ztrap_new"
 #define	ZYERROR				"$gtm_zyerror"
+#define	GTM_ZSTEP			"$gtm_zstep"
 
 /* -------------------------- UNIX only --------------------------  */
 

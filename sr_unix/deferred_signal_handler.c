@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "have_crit.h"
 #include "deferred_signal_handler.h"
 #include "gtmmsg.h"
+#include "forced_exit_err_display.h"
 #ifdef DEBUG
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
@@ -72,42 +73,8 @@ void deferred_signal_handler(void)
 	 * This routine will output those delayed messages from the appropriate structures to both the
 	 * user and the system console.
 	 */
-	/* note can't use switch here because ERR_xxx are not defined as constants */
-	if (ERR_KILLBYSIG == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type),
-			process_id, signal_info.signal);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type),
-			process_id, signal_info.signal);
-	} else if (ERR_KILLBYSIGUINFO == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type), process_id,
-						signal_info.signal, signal_info.send_pid, signal_info.send_uid);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type), process_id,
-						signal_info.signal, signal_info.send_pid, signal_info.send_uid);
-	} else if (ERR_KILLBYSIGSINFO1 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.int_iadr, signal_info.bad_vadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.int_iadr, signal_info.bad_vadr);
-	} else if (ERR_KILLBYSIGSINFO2 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.int_iadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.int_iadr);
-	} else if (ERR_KILLBYSIGSINFO3 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.bad_vadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.bad_vadr);
-	} else if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt)
-	{	/* No HALT messages if quiet halt is requested */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-	}
+	if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt) /* No HALT messages if quiet halt is requested */
+		forced_exit_err_display();
 	assert(OK_TO_INTERRUPT);
 	/* Signal intent to exit BEFORE driving condition handlers. This avoids checks that will otherwise fail (for example
 	 * if mdb_condition_handler/preemptive_db_clnup gets called below, that could invoke the RESET_GV_TARGET macro which in turn

@@ -37,6 +37,8 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 
 	assert(MV_DEFINED(x));
 	MV_FORCE_STR(x);
+	if (MV_IS_CANONICAL(x))
+		MV_FORCE_NUM(x);
 	DEBUG_ONLY(litent = NULL);
 	if (dst_triple == NULL)
 		ref = newtriple(OC_LIT);

@@ -160,8 +160,12 @@ void db_auto_upgrade(gd_region *reg)
 				 csd->encryption_hash2_start_tn = 0;
 				 memset(csd->encryption_hash2, 0, GTMCRYPT_RESERVED_HASH_LEN);
 				 SPIN_SLEEP_MASK(csd) = 0;	/* previously unused, but was 7FF and it should now default to 0 */
-				break;
 			case GDSMV63000:
+				/* GT.M V63001 moved ftok_counter_halted and access_counter_halted from filehdr to node_local */
+				csd->filler_ftok_counter_halted = FALSE;
+				csd->filler_access_counter_halted = FALSE;
+				break;
+			case GDSMV63000A:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

@@ -58,6 +58,15 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 
+enum rundown_state
+{
+	rundown_state_mprof,
+	rundown_state_lock,
+	rundown_state_db,
+	rundown_state_io,
+	rundown_state_last
+};
+
 static	enum rundown_state	attempting;
 
 #ifdef DEBUG
@@ -141,15 +150,6 @@ GBLREF	int			process_exiting;
 error_def(ERR_GVRUNDOWN);
 error_def(ERR_LKRUNDOWN);
 error_def(ERR_MPROFRUNDOWN);
-
-enum rundown_state
-{
-	rundown_state_mprof,
-	rundown_state_lock,
-	rundown_state_db,
-	rundown_state_io,
-	rundown_state_last
-};
 
 /* Function that is invoked at process exit time to do cleanup.
  * The general flow here is to do various types of rundowns (e.g. db rundown, lock rundown, io rundown etc.).

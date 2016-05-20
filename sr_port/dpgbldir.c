@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ Prototype:      ?
 Return:         *gd_addr -- a pointer to the global directory structure
 
 Arguments:      mval *v	-- an mval that contains the name of the global
-		directory to be accessed.  The name may require translation.
+		directory to be accessed.
 
 Side Effects:   NONE
 
@@ -105,6 +105,37 @@ gd_addr *zgbldir(mval *v)
 	gdr_name_head = name;
 	gdr_name_head->gd_ptr = gd_ptr;
 	return gd_ptr;
+}
+
+/*+
+Function:       ZGBLDIR_NAME_LOOKUP_ONLY
+
+		This function searches the list of global directory names for
+		the specified names.  If not found, it retruns NULL.
+
+Syntax:         gd_addr *zgbldir_name_lookup_only(mval *v)
+
+Prototype:      ?
+
+Return:         *gd_addr -- a pointer to the global directory structure
+
+Arguments:      mval *v	-- an mval that contains the name of the global
+		directory to be accessed.  The name may require translation.
+
+Side Effects:   NONE
+
+Notes:          NONE
+-*/
+gd_addr *zgbldir_name_lookup_only(mval *v)
+{
+	gd_addr		*gd_ptr;
+	gdr_name	*name;
+	mstr		temp_mstr, *tran_name;
+
+	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
+		if (v->str.len == name->name.len && !memcmp(v->str.addr, name->name.addr, v->str.len))
+			return name->gd_ptr;
+	return NULL;
 }
 
 /*+

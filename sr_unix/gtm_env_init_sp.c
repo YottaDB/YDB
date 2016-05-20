@@ -103,6 +103,7 @@ GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
 GBLREF	mval			dollar_etrap;
 GBLREF	mval			dollar_ztrap;
+GBLREF	mval			dollar_zstep;
 GBLREF	boolean_t		dmterm_default;
 GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
@@ -374,6 +375,20 @@ void	gtm_env_init_sp(void)
 		dollar_ztrap.mvtype = MV_STR;
 		dollar_ztrap.str.len = SIZEOF(init_break);
 		dollar_ztrap.str.addr = (char *)init_break;
+	}
+	/* Initiaalize $ZSTEP fro $gtm_zstep enviroment variable. Default value is initailzed in gbldefs.c */
+	val.addr = GTM_ZSTEP;
+	val.len = SIZEOF(GTM_ZSTEP) - 1;
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{
+		if (MAX_SRCLINE >= trans.len)
+		{
+			dollar_zstep.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+			memcpy(dollar_zstep.str.addr, trans.addr, trans.len);
+			dollar_zstep.str.addr[trans.len] = '\0';
+			dollar_zstep.str.len = trans.len;
+			dollar_zstep.mvtype = MV_STR;
+		}
 	}
 	/* See if gtm_link is set */
 	val.addr = GTM_LINK;

@@ -296,7 +296,14 @@ CONDITION_HANDLER(mu_rndwn_replpool_ch)
 	PRN_ERROR; /* flush the error string */
 	if (SEVERITY == SEVERE)
 		NEXTCH;
-	if (NULL != jnlpool.jnlpool_ctl)
+	/* If we have a journal pool, detach it to prevent leaking the shared memory.
+	 * However, if IFOE is configured, we may need the journal pool attached so that we can check for instance freeze
+	 * in database rundown.
+	 * In that case, the detach will happen automatically when the process terminates.
+	 * On the other hand, we don't respect IFOE in argumentless rundown, so go ahead and detach in that case, since otherwise
+	 * we could potentially leak the shared memory of multiple journal pools.
+	 */
+	if ((NULL != jnlpool.jnlpool_ctl) && (!INST_FREEZE_ON_ERROR_POLICY || argumentless_rundown))
 	{
 		JNLPOOL_SHMDT(status, save_errno);
 		if (0 > status)

@@ -274,6 +274,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
 		util_out_print(0, TRUE);
 		util_out_print("  Quick database rundown is active    !AD", TRUE, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
+		util_out_print("  Access control counter halted       !AD", FALSE,
+									5, cnl->access_counter_halted ? " TRUE" : "FALSE");
+		util_out_print("  FTOK counter halted          !AD", TRUE, 5, cnl->ftok_counter_halted ? " TRUE" : "FALSE");
 		util_out_print("  Access control rundown bypasses !9UL", FALSE, cnl->dbrndwn_access_skip);
 		util_out_print("  FTOK rundown bypasses   !10UL", TRUE, cnl->dbrndwn_ftok_skip);
 		util_out_print("  Epoch taper    !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));

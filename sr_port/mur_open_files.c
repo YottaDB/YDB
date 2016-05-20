@@ -272,7 +272,7 @@ boolean_t mur_open_files()
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
 		}
-		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
+		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
 		assert(NULL == jnlpool.repl_inst_filehdr);
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created))
@@ -567,7 +567,8 @@ boolean_t mur_open_files()
 				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);	/* temporarily disable
 												 * MUPIP STOP/signal handling. */
 				TP_CHANGE_REG(rctl->gd);
-				csa = rctl->csa = &FILE_INFO(rctl->gd)->s_addrs;
+				udi = FILE_INFO(rctl->gd);
+				csa = rctl->csa = &udi->s_addrs;
 				csd = rctl->csd = rctl->csa->hdr;
 				assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit));
 				if (mur_options.update)
@@ -768,9 +769,9 @@ boolean_t mur_open_files()
 					return FALSE;
 				}
 				assert((csa == rctl->csa) || !mur_options.update);
+				assert(!jgbl.onlnrlbk || (csa == &udi->s_addrs));
 				if (jgbl.onlnrlbk && jctl->jfh->crash
-						&& !csa->dbinit_shm_created && !jctl->jfh->recover_interrupted
-						&& !inst_requires_rlbk)
+						&& !udi->shm_created && !jctl->jfh->recover_interrupted && !inst_requires_rlbk)
 				{	/* If the journal file is crashed, mur_fread_eof invokes mur_fread_eof_crash to read the
 					 * last valid record from the journal file and marks the journal file as NOT properly
 					 * closed. However, for online rollback, if the shared memory exists and the journal file

@@ -21,29 +21,29 @@ static char *encode_os(void);
 
 LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 {
-	LIT_AND_LEN("IA64"),			"IA64",
-	LIT_AND_LEN("RS6000"),			"PPC",
-	LIT_AND_LEN("AXP"),			"AXP",
-	LIT_AND_LEN("HP-PA"),			"PAR",
-	LIT_AND_LEN("x86"),			"X86",
-	LIT_AND_LEN("x86_64"),			"X86_64",
-	LIT_AND_LEN("S390"),			"390",
-	LIT_AND_LEN("S390X"),			"390",
-	LIT_AND_LEN("SPARC"),			"SPA",
-	LIT_AND_LEN("VAX"),			"VAX",
-	LIT_AND_LEN(GTCM_PROTO_BAD_CPU),	GTCM_PROTO_BAD_CPU
+	{LIT_AND_LEN("IA64"),			"IA64"},
+	{LIT_AND_LEN("RS6000"),			"PPC"},
+	{LIT_AND_LEN("AXP"),			"AXP"},
+	{LIT_AND_LEN("HP-PA"),			"PAR"},
+	{LIT_AND_LEN("x86"),			"X86"},
+	{LIT_AND_LEN("x86_64"),			"X86_64"},
+	{LIT_AND_LEN("S390"),			"390"},
+	{LIT_AND_LEN("S390X"),			"390"},
+	{LIT_AND_LEN("SPARC"),			"SPA"},
+	{LIT_AND_LEN("VAX"),			"VAX"},
+	{LIT_AND_LEN(GTCM_PROTO_BAD_CPU),	GTCM_PROTO_BAD_CPU}
 };
 
 LITDEF	gtcm_proto_os_info_t	gtcm_proto_os_info[] =
 {
-	LIT_AND_LEN("AIX"),			"AIX",
-	LIT_AND_LEN("OSF1"),			"OSF",
-	LIT_AND_LEN("HP-UX"),			"HPX",
-	LIT_AND_LEN("Linux"),			"LNX",
-	LIT_AND_LEN("OS390"),			"zOS",
-	LIT_AND_LEN("Solaris"),			"SOL",
-	LIT_AND_LEN("VMS"),			"VMS",
-	LIT_AND_LEN(GTCM_PROTO_BAD_OS),		GTCM_PROTO_BAD_OS
+	{LIT_AND_LEN("AIX"),			"AIX"},
+	{LIT_AND_LEN("OSF1"),			"OSF"},
+	{LIT_AND_LEN("HP-UX"),			"HPX"},
+	{LIT_AND_LEN("Linux"),			"LNX"},
+	{LIT_AND_LEN("OS390"),			"zOS"},
+	{LIT_AND_LEN("Solaris"),		"SOL"},
+	{LIT_AND_LEN("VMS"),			"VMS"},
+	{LIT_AND_LEN(GTCM_PROTO_BAD_OS),	GTCM_PROTO_BAD_OS}
 };
 
 LITREF	char		gtm_release_name[];
@@ -124,7 +124,7 @@ static char *encode_cpu()
 				return gtcm_proto_cpu_info[cpuidx].proto_cpu;
 		}
 	}
-	GTMASSERT;
+	assertpro(FALSE && "cpu match");
 	return NULL; /* Added to make compiler happy and not throw warning */
 }
 
@@ -151,6 +151,6 @@ static char *encode_os()
 				return gtcm_proto_os_info[osidx].proto_os;
 		}
 	}
-	GTMASSERT;
+	assertpro(FALSE && "os match");
 	return NULL; /* Added to make compiler happy and not throw warning */
 }

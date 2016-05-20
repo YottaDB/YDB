@@ -229,7 +229,7 @@ STATICFNDEF void accum_stats_impsmpl(stat_t *stat, double *r, double *a)
 STATICFNDEF void finalize_stats_impsmpl(stat_t *stat)
 {
 	double		ess; /* effective sample size */
-	int		k, l;
+	unsigned int	k, l;
 
 	for (l = 1; MAX_BT_DEPTH >= l; l++)
 		if (stat->W[l] > 0)

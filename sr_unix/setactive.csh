@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -64,14 +65,6 @@ $shell -f $gtm_tools/setactive1.csh "$setactive_p1" "$setactive_p2" $setactive_i
 set setactive_status = $status
 if ($setactive_status) @ exit_status++
 
-# This is needed to ensure the current values of these environment variables don't persist past the
-# invocation of 'setactive_setenv' and 'gtmsrc.csh' in case the version to which we are changing
-# does not contain appropriate code to reset them (prior to V3.2).  This comment and the code following
-# it can (and probably should) be removed once we remove all V3.1 versions from the system.
-unsetenv	gtm_inc_list
-unsetenv	gtm_pct_list
-unsetenv	gtm_src_list
-unsetenv	gtm_tools_list
 unsetenv	gtm_log
 unsetenv	gtm_map
 unsetenv	gtm_obj

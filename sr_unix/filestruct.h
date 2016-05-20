@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,14 +30,16 @@ typedef struct unix_db_info_struct
 	int		shmid;
 	time_t		gt_shm_ctime;
 	int		ftok_semid;
-	boolean_t	new_shm;
-	boolean_t	new_sem;
-	boolean_t	grabbed_ftok_sem;
-	boolean_t	grabbed_access_sem;
-	boolean_t	counter_acc_incremented;
-	boolean_t	counter_ftok_incremented;
+	unsigned int	shm_created : 1;
+	unsigned int	shm_deleted : 1;
+	unsigned int	sem_created : 1;
+	unsigned int	sem_deleted : 1;
+	unsigned int	grabbed_ftok_sem : 1;
+	unsigned int	grabbed_access_sem : 1;
+	unsigned int	counter_acc_incremented : 1;
+	unsigned int	counter_ftok_incremented : 1;
         key_t           key;
-	bool		raw;
+	boolean_t	raw;
 } unix_db_info;
 
 typedef struct unix_file_info_struct

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "dbcertify.h"
+#include "forced_exit_err_display.h"
 
 /* These fields are defined as globals not because they are used globally but
  * so they will be easily retrievable even in 'pro' cores.
@@ -141,8 +142,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 				return;
 			}
 			exit_state = EXIT_IMMED;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			forced_exit_err_display();
 			dont_want_core = TRUE;
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
@@ -224,8 +224,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 				return;
 			}
 			exit_state = EXIT_IMMED;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			forced_exit_err_display();
 			dont_want_core = TRUE;
 			break;
 #endif

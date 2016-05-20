@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2014 Fidelity Information Services, Inc       #
+# Copyright (c) 2011-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -175,7 +176,7 @@ if (! $?logfile) then
 	echo "output will be in $fname"
 	$0 logfile $arguments >&! $fname
 	set save_status = $status
-	grep "Test of installation" $fname
+	grep -E "PASS|FAIL" $fname
 	exit $save_status
 endif
 ########################################################################################
@@ -205,7 +206,8 @@ set dist = "$gtm_ver/dist"
 set tmp_dist = "$gtm_ver/tmp_dist"
 set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
-set notdistributed = '_*.o GDE*.m *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass'
+set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om]'
+set notdistributed = '_*.o GDE*.m *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass plugin/r plugin/o'
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
 
 if (-d $dist || -d $tmp_dist || -d $install) then
@@ -236,11 +238,11 @@ foreach image ($imagetype)
 	if ("solaris" == $osname) set cpflags="-rH"
 	cp ${cpflags} ${gtm_ver}/${image}/* . || exit 8
 	echo ""
-	echo "Removing files that are not distributed (${notdistributed})"
-	/bin/rm -rf ${notdistributed} || exit 9
+	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
+	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
 	if (-e utf8) then
 		cd utf8
-		/bin/rm -rf ${utf8_notdistributed} || exit 9
+		/bin/rm -rf ${utf8_notdistributed} ${mnotdistributed} || exit 9
 		cd ..
 	endif
 	# add the README.txt file
@@ -315,7 +317,7 @@ foreach image ($imagetype)
 		endif
 	else
 		echo ""
-		echo "No GTMDefinedTypesInit"
+		echo "FAIL:GTMDefinedTypesInit was not found"
 	endif
 	set dist_file = "${dist}/${dist_prefix}_${image}.${package_ext}"
 	# no files to be executable or writeable

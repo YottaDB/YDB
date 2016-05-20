@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,10 +113,8 @@ void op_newintrinsic(int intrtype)
 		dollar_estack_delta.m[0] = dollar_zlevel() - 1;
 	} else if (SV_ZGBLDIR == intrtype)
 	{
-		if (dollar_zgbldir.str.len != 0)
-			gd_header = zgbldir(&dollar_zgbldir);
-		else
-			dpzgbini();	/* sets gd_header to NULL */
+		assert(0 == dollar_zgbldir.str.len);	/* "gtm_newintrinsic" call above should have cleared it */
+		dpzgbini();				/* SET $ZGBLDIR="" */
 		if (gv_currkey)
 		{
 			gv_currkey->base[0] = 0;

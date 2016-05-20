@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,17 +79,19 @@ GBLREF	unsigned int	t_tries;
 
 error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
+error_def(ERR_LOCKTIMINGINTP);
 
 #define LOCKTIMESTR "LOCK time too long"
 #define ZALLOCTIMESTR "ZALLOCATE time too long"
+#define MAX_WARN_STR_ARG_LEN 256
 
-/* We made this a error seperate function because we did not wanted to do the MAXSTR_BUFF_DECL(buff) declartion in op_lock2,
+/* We made these messages seperate functions because we did not want to do the MAXSTR_BUFF_DECL(buff) declaration in op_lock2,
  * because  MAXSTR_BUFF_DECL macro would allocate a huge stack every time op_lock2 is called.
  */
-STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr); /* This definition is made here because there is no appropriate place to
-						  * put this prototype. This will not be used anywhere else so we did not
-						  * wanted to create a op_lock2.h just for this function.
-						  */
+STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr);  /* These definitions are made here because there is no appropriate place to */
+STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr); /* put these prototypes. These will not be used anywhere else so we did not
+						   * want to create a op_lock2.h just for these functions.
+						   */
 STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 {
 	MAXSTR_BUFF_DECL(buff);
@@ -97,7 +99,17 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
 }
+STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
+{
+	MAXSTR_BUFF_DECL(buff);
+	mval		zpos;
 
+	getzposition(&zpos);
+	MAXSTR_BUFF_INIT;
+	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_LOCKTIMINGINTP, 2, zpos.str.len, zpos.str.addr,
+		     ERR_LOCKIS, 2, LEN_AND_STR(buff));
+}
 /*
  * -----------------------------------------------
  * Arguments:
@@ -270,13 +282,11 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			assert(pvt_ptr2->granted && (pvt_ptr2 != pvt_ptr1));
 			mlk_bckout(pvt_ptr2, action);
 		}
-		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
-		{	/* upper TPNOTACID_CHECK conditioned on no short timeout; this one rel_crits to avoid potential deadlock */
-			assert(TREF(tpnotacidtime) >= timeout);
-			if (CM_ZALLOCATES == action)
-				TPNOTACID_CHECK(ZALLOCTIMESTR)
-			else
-				TPNOTACID_CHECK(LOCKTIMESTR)
+		assert(!pvt_ptr2->granted && (pvt_ptr2 == pvt_ptr1));
+		if (dollar_tlevel && timeout && (CDB_STAGNATE <= t_tries))
+		{
+			assert(have_crit(CRIT_HAVE_ANY_REG));
+			tp_warning(pvt_ptr2);
 		}
 		for (;;)
 		{

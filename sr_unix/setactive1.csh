@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -312,6 +313,20 @@ echo "setenv gtm_dist	$gtm_exe"	>> $4
 echo "setenv gtm_lint	$gtm_exe/lint"	>> $4
 echo "setenv gtm_map	$gtm_exe/map"	>> $4
 echo "setenv gtm_obj	$gtm_exe/obj"	>> $4
+
+# Strip off the trailing $gtm_dist/plugin/o($gtm_dist/plugin/r). This is necessary for prior version testing
+if ($?gtmroutines) then
+	set rtns = ($gtmroutines:x)
+	if (0 < $#rtns) then
+		@ rtncnt = $#rtns
+		if ("$rtns[$#rtns]" =~ "*/plugin/o*(*/plugin/r)") then
+			@ rtncnt--
+			echo "setenv gtmroutines '$rtns[-$rtncnt]' " >> $4
+		endif
+		unset rtncnt
+	endif
+	unset rtns
+endif
 
 FINI:
 

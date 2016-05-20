@@ -539,6 +539,8 @@ void t_retry(enum cdb_sc failure)
 					gvcst_redo_root_search();
 				}
 				break;
+			default:
+				break;
 		}
 		assert(NULL == reorg_encrypt_restart_csa);
 	} else

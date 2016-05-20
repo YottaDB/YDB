@@ -376,7 +376,7 @@ void	repl_inst_sync(char *fn)
  * Return Value:
  *	None
  */
-void repl_inst_jnlpool_reset(boolean_t clear_ftok_halted)
+void repl_inst_jnlpool_reset(void)
 {
 	repl_inst_hdr	repl_instance;
 	unix_db_info	*udi;
@@ -385,11 +385,6 @@ void repl_inst_jnlpool_reset(boolean_t clear_ftok_halted)
 	assert(udi->grabbed_ftok_sem);
 	if (NULL != jnlpool.repl_inst_filehdr)
 	{	/* If journal pool exists, reset sem/shm ids in the file header in the journal pool and flush changes to disk */
-		if (clear_ftok_halted)
-		{
-			assert(INVALID_SHMID == jnlpool.repl_inst_filehdr->recvpool_shmid);
-			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
-		}
 		jnlpool.repl_inst_filehdr->jnlpool_semid = INVALID_SEMID;
 		jnlpool.repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
 		jnlpool.repl_inst_filehdr->jnlpool_semid_ctime = 0;
@@ -398,11 +393,6 @@ void repl_inst_jnlpool_reset(boolean_t clear_ftok_halted)
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
 		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-		if (clear_ftok_halted)
-		{
-			assert(INVALID_SHMID == repl_instance.recvpool_shmid);
-			repl_instance.ftok_counter_halted = FALSE;
-		}
 		repl_instance.jnlpool_semid = INVALID_SEMID;
 		repl_instance.jnlpool_shmid = INVALID_SHMID;
 		repl_instance.jnlpool_semid_ctime = 0;
@@ -418,7 +408,7 @@ void repl_inst_jnlpool_reset(boolean_t clear_ftok_halted)
  * Return Value:
  *	None
  */
-void repl_inst_recvpool_reset(boolean_t clear_ftok_halted)
+void repl_inst_recvpool_reset(void)
 {
 	repl_inst_hdr	repl_instance;
 	unix_db_info	*udi;
@@ -427,11 +417,6 @@ void repl_inst_recvpool_reset(boolean_t clear_ftok_halted)
 	assert(udi->grabbed_ftok_sem);
 	if (NULL != jnlpool.repl_inst_filehdr)
 	{	/* If journal pool exists, reset sem/shm ids in the file header in the journal pool and flush changes to disk */
-		if (clear_ftok_halted)
-		{
-			assert(INVALID_SHMID == jnlpool.repl_inst_filehdr->jnlpool_shmid);
-			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
-		}
 		jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;
 		jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
 		jnlpool.repl_inst_filehdr->recvpool_semid_ctime = 0;
@@ -440,11 +425,6 @@ void repl_inst_recvpool_reset(boolean_t clear_ftok_halted)
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
 		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-		if (clear_ftok_halted)
-		{
-			assert(INVALID_SHMID == repl_instance.jnlpool_shmid);
-			repl_instance.ftok_counter_halted = FALSE;
-		}
 		repl_instance.recvpool_semid = INVALID_SEMID;
 		repl_instance.recvpool_shmid = INVALID_SHMID;
 		repl_instance.recvpool_semid_ctime = 0;
@@ -1047,7 +1027,6 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 		inst_hdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
 		inst_hdr->recvpool_semid_ctime = 0;
 		inst_hdr->recvpool_shmid_ctime = 0;
-		inst_hdr->ftok_counter_halted = FALSE;
 	} /* else for rollback, we reset the IPC fields in mu_replpool_release_sem() and crash in mur_close_files */
 	/* Flush all file header changes in jnlpool.repl_inst_filehdr to disk */
 	repl_inst_flush_filehdr();
@@ -1173,7 +1152,6 @@ void	repl_inst_flush_jnlpool(boolean_t reset_replpool_fields, boolean_t reset_cr
 			jnlpool.repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
 			jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;	/* Just in case it is not already reset */
 			jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
-			jnlpool.repl_inst_filehdr->ftok_counter_halted = FALSE;
 		}
 	}
 	/* If the source server that created the journal pool died before it was completely initialized in "gtmsource_seqno_init"

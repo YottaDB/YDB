@@ -1438,6 +1438,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							(int4)(tmpcsa->region)->max_rec_size, REG_LEN_STR(tmpcsa->region),
 							ERR_GVIS, 2, end - buff, buff);
 						break;
+					default:
+						assert(FALSE && bad_trans_type);
+						break;					/* NOTREACHED */
 				}
 			} else
 			{

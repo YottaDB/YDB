@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +71,8 @@
 #define PAT_YZMAXLEN	8	/* maximum number of characters in name of YxxxY pattern code */
 
 /* PATM_UTF8_ALPHABET and PATM_UTF8_NONBASIC are assigned an external name of 0 and 1 below as we have run out of alphabets */
-#define PATM_CODELIST	"NPLUCBDFGHIJKMOQRSTVWX01"
+#define PATM_CODELIST	"NPLUCBDFGHIJKMOQRSTVWX01"	/* "patmask_seq[]" in patmaskseq.c is defined based on this macro */
+#define CHAR_CLASSES	STR_LIT_LEN(PATM_CODELIST)
 #define PATM_DFA	254		/* Deterministic Finite Automaton */
 #define PATM_ACS	255
 #define PATM_SHORTFLAGS	0x7F		/* original 5 flags + the two recently introduced PATM_UTF8_* flags */
@@ -90,15 +92,14 @@
 #define MAX_PATTERN_LENGTH	(MAX_PATOBJ_LENGTH - MAX_PATTERN_OVERHEAD)
 #define PATENTS		256	/* Size of the builtin pattern/typemask table in M mode */
 #define PATENTS_UTF8	128	/* Size of the builtin pattern/typemask table in UTF-8 mode */
-#define CHAR_CLASSES 24
 #define	PAT_STRLIT_PADDING	3	/* # of int4s for storing bytelen, charlen, flags in PATM_STRLIT type */
 
-#define MAX_SYM	16
-#define FST	0
-#define LST	1
+#define	MAX_DFA_STATES	(2 * MAX_SYM)
+#define MAX_SYM		32
+#define FST		0
+#define LST		1
 
 #define MAX_DFA_STRLEN 64	/* needs to be > PAT_BASIC_CLASSES */
-#define MAX_DFA_REP    10
 
 /* The macro to perform 64-bit multiplication without losing precision due to overflow with 32-bit
  * multiplication. With the increase of PAT_MAX_REPEAT from 32K to 1MB, the values of result and
@@ -153,7 +154,7 @@ struct leaf
 struct node
 {
 	boolean_t	nullable[MAX_SYM];
-	boolean_t	last[MAX_SYM][MAX_SYM];
+	boolean_t	last[MAX_SYM][MAX_DFA_STATES];
 };
 
 struct e_table
@@ -164,9 +165,9 @@ struct e_table
 
 struct c_trns_tb
 {
-	int	c[2 * MAX_SYM];
-	int4	p_msk[2 * MAX_SYM][CHAR_CLASSES];
-	int	trns[2 * MAX_SYM][CHAR_CLASSES];
+	int	c[MAX_DFA_STATES];
+	int4	p_msk[MAX_DFA_STATES][CHAR_CLASSES];
+	int	trns[MAX_DFA_STATES][CHAR_CLASSES];
 };
 
 typedef struct ptstr_struct {

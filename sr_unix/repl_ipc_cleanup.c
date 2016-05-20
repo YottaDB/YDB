@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,11 +40,11 @@
 #include "wbox_test_init.h"
 #include "have_crit.h"
 #include "gtm_ipc.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		pool_init;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	int			gtmsource_srv_count;
 GBLREF	int			gtmrecv_srv_count;
 
 GBLREF	recvpool_addrs		recvpool;
@@ -55,7 +56,9 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	int		status, detach_status, remove_status, semval, save_errno;
 	unix_db_info	*udi;
 	struct shmid_ds	shm_buf;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Attempt cleaning up the IPCs */
 	attempt_ipc_cleanup = TRUE;
 	*num_src_servers_running = 0;
@@ -79,6 +82,12 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 			*exit_status = ABNORMAL_SHUTDOWN;
 		}
 	}
+	/* If the instance is frozen, there is no point checking if we are the last user, since we need to keep the journal pool
+	 * around, and we will need the journal pool attached so that we can check for instance freeze in database rundown.
+	 * In that case, the detach will happen automatically when the process terminates.
+	 */
+	if (IS_REPL_INST_FROZEN)
+		return FALSE;
 	udi = (unix_db_info *)FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	assert(INVALID_SHMID != udi->shmid);
 	if (attempt_ipc_cleanup)
@@ -106,6 +115,12 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 			repl_inst_flush_jnlpool(TRUE, TRUE);
 		}
 	}
+	/* We need to keep the journal pool attached when IFOE is configured so that we can check for instance freeze
+	 * in database rundown.
+	 * However, if we are about to cleanup ipcs, it doesn't matter, so we are better off cleaning up.
+	 */
+	if (INST_FREEZE_ON_ERROR_POLICY && !(attempt_ipc_cleanup && (INVALID_SHMID != udi->shmid)))
+		return FALSE;
 	/* detach from shared memory irrespective of whether we need to cleanup ipcs or not */
 	JNLPOOL_SHMDT(detach_status, save_errno);
 	if (0 == detach_status)
@@ -182,7 +197,7 @@ int	gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 	if (!i_am_the_last_user)
 	{
 		if (status < 0)
-			repl_log(stderr, TRUE, TRUE, "Error in jnlpool shmctl : %s\n", STRERROR(errno));
+			repl_log(stderr, TRUE, TRUE, "Error in recvpool shmctl : %s\n", STRERROR(errno));
 		else
 			repl_log(stderr, TRUE, TRUE,
 				"Not deleting receive pool ipcs. %d processes still attached to receive pool\n",

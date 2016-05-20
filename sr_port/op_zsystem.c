@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,12 +13,7 @@
 #include "mdef.h"
 
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h>
-#include <ssdef.h>
-#else
 #include <sys/wait.h>
-#endif
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
@@ -58,53 +53,49 @@ error_def(ERR_SYSCALL);
 
 void op_zsystem(mval *v)
 {
-	int		len;
-#ifdef UNIX
+	int		len, shlen;
 	char		*sh, cmd_buf[MAXZSYSSTRLEN + 1], *cmd;
 #ifdef _BSD
         union wait      wait_stat;
 #else
         int4            wait_stat;
 #endif
-#elif defined VMS
-	uint4		status;
-	$DESCRIPTOR(d_cmd,"");
-#else
-#error UNSUPPORTED PLATFORM
-#endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
-#ifdef UNIX
 	/* get SHELL environment */
 	sh = GETENV("SHELL");
-	len = ((sh)? STRLEN(sh):STRLEN("/bin/sh")) + STRLEN(" -c ''"); /* Include the command " -c ''" string */
-	if (v->str.len > (MAXZSYSSTRLEN - len))
+	shlen = (NULL == sh)? 0 : STRLEN(sh);
+	len = (0 < shlen)? shlen : STRLEN("/bin/sh");
+	/* Include " -c ''" in the total string length */
+	len += STRLEN(" -c ''");
+	if ((v->str.len + len) > MAXZSYSSTRLEN)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len,
 				(MAXZSYSSTRLEN > len)? (MAXZSYSSTRLEN - len) : 0);
-	/* use bourn shell as default */
-	if (!sh)
-		strncpy(cmd_buf, "/bin/sh", STRLEN("/bin/sh"));
-	else
-		strncpy(cmd_buf, sh, len); /* sh is null terminated, using len is ok even though it's longer */
 	cmd = cmd_buf;
 	if (v->str.len)
 	{
-		strcat(cmd, " -c '");
+		/* Use bourne shell as default */
+		if (0 < shlen)
+			SNPRINTF(cmd_buf, MAXZSYSSTRLEN, "%s -c '", sh);
+		else
+			STRNCPY_LIT_FULL(cmd_buf, "/bin/sh -c '");
 		len = STRLEN(cmd);
 		memcpy(cmd + len, v->str.addr, v->str.len);
 		*(cmd + len + v->str.len) = 39; /* ' = 39 */
 		*(cmd + len + v->str.len + 1) = 0;
+	} else
+	{
+		if (0 < shlen)
+			SNPRINTF(cmd_buf, MAXZSYSSTRLEN, "%s", sh);
+		else
+			STRNCPY_LIT_FULL(cmd_buf, "/bin/sh");
 	}
-#elif defined VMS
-	MVAL_TO_DSC(v, d_cmd);
-#endif
 	flush_pio();
 	if (io_std_device.in->type == tt)
 		resetterm(io_std_device.in);
-#ifdef UNIX
 	dollar_zsystem = SYSTEM(cmd);
 	if (-1 == dollar_zsystem)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
@@ -116,14 +107,7 @@ void op_zsystem(mval *v)
 #endif
 	if (WIFEXITED(wait_stat))
 		dollar_zsystem = WEXITSTATUS(wait_stat);
-#elif defined VMS
-	status = spawn_and_bgwait(&d_cmd, 0, 0, &trust, 0, 0, &dollar_zsystem);
-#endif
 	if (io_std_device.in->type == tt)
 		setterm(io_std_device.in);
-#ifdef VMS
-	if (status != SS$_NORMAL)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-#endif
 	return;
 }

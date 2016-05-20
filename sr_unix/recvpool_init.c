@@ -48,7 +48,6 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "util.h"		/* For OUT_BUFF_SIZE */
-#include "repl_inst_ftok_counter_halted.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
@@ -79,7 +78,7 @@ error_def(ERR_SYSCALL);
 
 void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 {
-	boolean_t	shm_created, new_ipc = FALSE, ftok_counter_halted = FALSE, counter_halted_by_me;
+	boolean_t	shm_created, new_ipc = FALSE, ftok_counter_halted;
 	char		instfilename[MAX_FN_LEN + 1];
         char           	machine_name[MAX_MCNAMELEN];
 	char		scndry_msg[OUT_BUFF_SIZE];
@@ -136,8 +135,13 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	save_errno = errno;
 	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-	CHECK_IF_REPL_INST_FTOK_COUNTER_HALTED(repl_instance, udi, ftok_counter_halted, counter_halted_by_me,
-							ERR_RECVPOOLSETUP, recvpool.recvpool_dummy_reg, save_errno);
+	/* At this point, we might not have yet attached to the jnlpool so we do not know if the ftok counter got halted
+	 * previously or not. So be safe and assume it has halted in case the jnlpool_shmid indicates it is up and running.
+	 * This means we might not delete the ftok semaphore in some cases of error codepaths but it should be rare
+	 * and is better than incorrectly deleting it while live processes are concurrently using it.
+	 */
+	assert(udi->counter_ftok_incremented == !ftok_counter_halted);
+	udi->counter_ftok_incremented = udi->counter_ftok_incremented && (INVALID_SHMID == repl_instance.jnlpool_shmid);
 	if (INVALID_SEMID == repl_instance.recvpool_semid)
 	{
 		assertpro(INVALID_SHMID == repl_instance.recvpool_shmid);
@@ -147,7 +151,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
 		}
 		new_ipc = TRUE;
-		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
+		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		if (INVALID_SEMID == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, RWDALL | IPC_CREAT)))
 		{
 			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -433,8 +437,6 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		repl_inst_flush_filehdr();
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
-	if (counter_halted_by_me)
-		repl_inst_ftok_counter_halted(udi, FILE_TYPE_REPLINST, &repl_instance);
 	/* Release control lockout and ftok semaphore now that the receive pool has been attached.
 	 * The only exception is receiver server shutdown command. In this case, all these locks will be released
 	 * once the receiver server shutdown is actually complete. Note that if -UPDATEONLY or -HELPERS is specified

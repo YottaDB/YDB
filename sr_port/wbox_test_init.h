@@ -92,7 +92,7 @@ typedef enum {
 	WBTEST_UTIL_OUT_BUFFER_PROTECTION,	/* 61 : Start a timer that would mess with util_out buffers by frequently
 						 *	printing long messages via util_out_print */
 	WBTEST_SET_WC_BLOCKED,			/* 62 : Set the wc_blocked when searching the tree to start wcs_recover process*/
-	WBTEST_REORG_DEBUG,			/* 63 : mupip reorg will print GTMPOOLLIMIT value */
+	WBTEST_REORG_DEBUG,			/* 63 : mupip reorg Will print GTMPOOLLIMIT value */
 	WBTEST_WCS_FLU_IOERR,			/* 64 : Force an I/O error (other than ENOSPC) when wcs_wtstart is invoked from
 						 *      wcs_flu */
 	WBTEST_WCS_WTSTART_IOERR,		/* 65 : Force an I/O error (other than ENOSPC) within wcs_wtstart */
@@ -158,9 +158,10 @@ typedef enum {
 	WBTEST_TEND_GBLJRECTIME_SLEEP,		/* 119 : Sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
 	WBTEST_SIGTSTP_IN_T_QREAD,		/* 120 : Stop ourselves in t_qread to force secshr_db_clnup to clear read state */
 	WBTEST_SLAM_SECSHR_ADDRS,		/* 121 : SIGTERM in init_secshr_addrs - verify secshr_db_clnup does not assert */
-	WBTEST_UNUSED_122,			/* 122 : **************** UNUSED PLEASE REUSE **************** */
+	WBTEST_MM_CONCURRENT_FILE_EXTEND,	/* 122 : Extend database concurrently in MM */
 	WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT,	/* 123 : Sleep in mupip_reorg_encrypt() upon releasing crit */
-	WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR   /* 124 : gtm_strToTitle() returning U_FILE_ACCESS_ERROR error */
+	WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR,	/* 124 : gtm_strToTitle() returning U_FILE_ACCESS_ERROR error */
+	WBTEST_MUEXTRACT_GVCST_RETURN_FALSE	/* 125 : check return value of gvcst_get in concurrent update. */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

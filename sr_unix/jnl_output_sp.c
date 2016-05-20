@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -305,8 +305,8 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	   * does the dirty job more efficiently
 	   */
 	spin_sleep_mask = csa->hdr->mutex_spin_parms.mutex_spin_sleep_mask;
-	for (yield_cnt = 0; yield_cnt < csa->hdr->yield_lmt; yield_cnt++)
-	{	/* wait until someone has finished your job or no one else is active on the jnl file */
+	for (yield_cnt = 0; !csa->now_crit && (yield_cnt < csa->hdr->yield_lmt); yield_cnt++)
+	{	/* If not in crit, wait until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
 		GTM_REL_QUANT(spin_sleep_mask);
 		/* Purpose of this memory barrier is to get a current view of asyncrhonously changed fields

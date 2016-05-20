@@ -51,7 +51,8 @@
  ************************************************************/
 
 static readonly CLI_PARM dse_ftime_parm_values[] = {
-	{ "FLUSH_TIME", 1, PARM_REQ}
+	{ "FLUSH_TIME", "Flush Time: ", PARM_REQ},
+	{ "", "" }
 };
 
 static readonly CLI_ENTRY dse_add_qual[] = {
@@ -62,7 +63,7 @@ static readonly CLI_ENTRY dse_add_qual[] = {
 { "POINTER", 0,          0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD",  0,          0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "STAR",    dse_adstar, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,       0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_cache_qual[] = {
@@ -75,7 +76,7 @@ static readonly CLI_ENTRY dse_cache_qual[] = {
 { "SIZE",    0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_DCM },
 { "VALUE",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "VERIFY",  0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_all_qual[] = {
@@ -91,14 +92,14 @@ static readonly CLI_ENTRY dse_all_qual[] = {
 { "RENEW",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "SEIZE",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "WCINIT",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY true_false_nochange[] = {
 	{ "FALSE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	 0 },
 	{ "NOCHANGE",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A, 0 },
 	{ "TRUE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	 0 },
-	{ 0, 0, 0 }
+	{ "", 0, 0 }
 };
 
 static readonly CLI_ENTRY never_always_allowexisting[] = {
@@ -107,12 +108,13 @@ static readonly CLI_ENTRY never_always_allowexisting[] = {
 	{ "FALSE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
 	{ "NEVER",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
 	{ "TRUE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ 0, 0, 0 }
+	{ "", 0, 0 }
 };
 
 static readonly CLI_ENTRY db_vers[] = {
 	{ "V4",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	 0 },
 	{ "V6",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A, 	 0 },
+	{ "" }
 };
 
 static readonly CLI_ENTRY dse_cfhead_qual[] = {
@@ -190,7 +192,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "WRITES_PER_FLUSH",          0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "ZQGBLMOD_SEQNO",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "ZQGBLMOD_TN",               0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_change_qual[] = {
@@ -203,7 +205,7 @@ static readonly CLI_ENTRY dse_change_qual[] = {
 { "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
 { "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
 { "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_crit_qual[] = {
@@ -216,7 +218,7 @@ static readonly CLI_ENTRY dse_crit_qual[] = {
 { "REMOVE",  0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
 { "RESET",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
 { "SEIZE",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_rdmp_qual[] = {
@@ -226,7 +228,7 @@ static readonly CLI_ENTRY dse_rdmp_qual[] = {
 { "OFFSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "ZWR",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_fdmp_qual[] = {
@@ -245,7 +247,7 @@ static readonly CLI_ENTRY dse_fdmp_qual[] = {
 { "TPBLKMOD",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "TPRETRIES",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "UPDPROC",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_dump_qual[] = {
@@ -258,18 +260,19 @@ static readonly CLI_ENTRY dse_dump_qual[] = {
 { "OFFSET",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "ZWR",        0,             0,             0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_eval_qual[] = {
 { "DECIMAL",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "HEXADECIMAL", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "NUMBER",      0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_PARM dse_freg_parm_values[] = {
-	{ "REGION", "*", PARM_REQ}
+	{ "REGION", "*", PARM_REQ},
+	{ "", "" }
 };
 
 static readonly CLI_ENTRY dse_find_qual[] = {
@@ -282,13 +285,13 @@ static readonly CLI_ENTRY dse_find_qual[] = {
 { "KEY",        dse_f_key,  0, 0,                    0, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR, 0       },
 { "REGION",     dse_f_reg,  0, dse_freg_parm_values, 0, 0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "SIBLINGS",   0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NON_NEG, 0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_integrit_qual[] = {
 { "BLOCK",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "CRIT",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_map_qual[] = {
@@ -297,13 +300,13 @@ static readonly CLI_ENTRY dse_map_qual[] = {
 { "FREE",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "MASTER",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "RESTORE_ALL", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_open_qual[] = {
 { "FILE", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0   },
 { "OCHSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
-{ 0 }
+{ "" }
 };
 
 
@@ -312,7 +315,7 @@ static readonly CLI_ENTRY dse_over_qual[] = {
 { "DATA",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "OFFSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "OCHSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, 0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_range_qual[] = {
@@ -325,7 +328,7 @@ static readonly CLI_ENTRY dse_range_qual[] = {
 { "STAR",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG,	VAL_N_A, 0	 },
 { "TO",	   0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_NUM, VAL_HEX },
 { "UPPER", 0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_STR, 0	 },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_remove_qual[] = {
@@ -334,7 +337,7 @@ static readonly CLI_ENTRY dse_remove_qual[] = {
 { "OFFSET",  dse_rmrec, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD",  dse_rmrec, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "VERSION", 0,         0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_DCM },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_restore_qual[] = {
@@ -342,7 +345,7 @@ static readonly CLI_ENTRY dse_restore_qual[] = {
 { "FROM",    0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "REGION",  0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "VERSION", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_DCM },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_save_qual[] = {
@@ -350,7 +353,7 @@ static readonly CLI_ENTRY dse_save_qual[] = {
 { "COMMENT", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "CRIT",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
 { "LIST",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,       0,       0       },
-{ 0 }
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_shift_qual[] = {
@@ -358,7 +361,7 @@ static readonly CLI_ENTRY dse_shift_qual[] = {
 { "BLOCK",    0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "FORWARD",  0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "OFFSET",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
-{ 0 }
+{ "" }
 };
 
 GBLDEF CLI_ENTRY dse_cmd_ary[] = {
@@ -388,7 +391,7 @@ GBLDEF CLI_ENTRY dse_cmd_ary[] = {
 { "SPAWN",        util_spawn,     0,                 0, 0, 0,                       0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "VERSION",      dse_version,    0,                 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "WCINIT",       dse_wcreinit,   0,                 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
-{ 0 }
+{ "" }
 };
 
 /* for SPAWN actually value is disallowed, but parameter is allowed. */

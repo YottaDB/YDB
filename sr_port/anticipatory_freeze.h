@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "sleep_cnt.h"			/* needed for SLEEP_INSTFREEZEWAIT macro */
 #include "wait_for_disk_space.h"	/* needed by DB_LSEEKWRITE macro for prototype */
 #include "gtmimagename.h"		/* needed for IS_GTM_IMAGE */
+#include "forced_exit_err_display.h"
 
 boolean_t		is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id);
 void			set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id);
@@ -110,10 +111,26 @@ error_def(ERR_TEXT);
 }
 
 #define AFREEZE_MASK				0x01
+/* Only use CUSTOM_ERRORS_AVAILABLE if you are specifically interested in whether the custom errors variable is set,
+ * 		or if you know the journal pool isn't open (yet).
+ * 	Otherwise, use INST_FREEZE_ON_ERROR_POLICY.
+ * Only use CUSTOM_ERRORS_LOADED if you are in the code path towards checking a custom error.
+ * 	Otherwise, use INST_FREEZE_ON_ERROR_POLICY.
+ * Use INST_FREEZE_ON_ERROR_POLICY to select alternative journal pool attach/detach behavior.
+ */
 #define CUSTOM_ERRORS_AVAILABLE			(0 != (TREF(gtm_custom_errors)).len)
 #define CUSTOM_ERRORS_LOADED			((NULL != jnlpool.jnlpool_ctl)							\
 							&& jnlpool.jnlpool_ctl->instfreeze_environ_inited)
 #define INST_FREEZE_ON_ERROR_POLICY		(CUSTOM_ERRORS_AVAILABLE || CUSTOM_ERRORS_LOADED)
+
+/* INSTANCE_FREEZE_HONORED determines whether operations on a particular database can trigger an instance freeze.
+ * INST_FREEZE_ON_ERROR_ENABLED() determines whether operations on a particular database can trigger an instance freeze in the
+ * 	current operating environment.
+ * INST_FREEZE_ON_MSG_ENABLED() determines whether the given message should trigger an instance freeze when associated with
+ * 	the specified database.
+ * INST_FREEZE_ON_NOSPC_ENABLED() determines whether an out-of-space condition associated with the specified database should
+ * 	trigger an instance freeze.
+ */
 #define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
 							((NULL != jnlpool.jnlpool_ctl)						\
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
@@ -126,6 +143,10 @@ error_def(ERR_TEXT);
 							&& (NULL != is_anticipatory_freeze_needed_fnptr)			\
 							&& (*is_anticipatory_freeze_needed_fnptr)(CSA, MSG))
 #define INST_FREEZE_ON_NOSPC_ENABLED(CSA)	INST_FREEZE_ON_MSG_ENABLED(CSA, ERR_DSKNOSPCAVAIL)
+
+/* IS_REPL_INST_FROZEN is TRUE if we know that the instance is frozen.
+ * IS_REPL_INST_UNFROZEN is TRUE if we know that the instance is not frozen.
+ */
 #define IS_REPL_INST_FROZEN			((NULL != jnlpool.jnlpool_ctl) && jnlpool.jnlpool_ctl->freeze)
 #define IS_REPL_INST_UNFROZEN			((NULL != jnlpool.jnlpool_ctl) && !jnlpool.jnlpool_ctl->freeze)
 
@@ -204,7 +225,6 @@ error_def(ERR_TEXT);
 	GBLREF	jnlpool_addrs	jnlpool;						\
 	GBLREF	int4		exit_state;						\
 	GBLREF	int4		exi_condition;						\
-	GBLREF	int4		forced_exit_err;					\
 											\
 	assert(NULL != jnlpool.jnlpool_ctl);						\
 	/* If this region is not replicated, do not care for instance freezes */	\
@@ -212,8 +232,7 @@ error_def(ERR_TEXT);
 	{										\
 		if (exit_state != 0)							\
 		{									\
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);	\
+			forced_exit_err_display();					\
 			EXIT(-exi_condition);						\
 		}									\
 		SHORT_SLEEP(SLEEP_INSTFREEZEWAIT);					\

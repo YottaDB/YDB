@@ -57,7 +57,7 @@ error_def(ERR_TEXT);
 
 
 boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr, semwait_status_t *retstat, gd_region *reg,
-			    boolean_t *bypass, boolean_t *sem_halted, sgmnt_data_ptr_t tsd)
+			    boolean_t *bypass, boolean_t *sem_halted)
 {
 	boolean_t			need_stacktrace, indefinite_wait;
 	char				*msgstr;
@@ -72,10 +72,8 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	SETUP_THREADGBL_ACCESS;
 	assert(IS_FTOK_SEM || IS_ACCESS_SEM);
 	*sem_halted = FALSE;
-	if (NULL != tsd)
-		*sem_halted = IS_ACCESS_SEM ? tsd->access_counter_halted : tsd->ftok_counter_halted;
 	/* Access control semaphore should not be increased when the process is readonly */
-	SET_GTM_SOP_ARRAY(sop, sopcnt, (IS_FTOK_SEM || !reg->read_only) && !(*sem_halted), (SEM_UNDO | IPC_NOWAIT));
+	SET_GTM_SOP_ARRAY(sop, sopcnt, (IS_FTOK_SEM || !reg->read_only), (SEM_UNDO | IPC_NOWAIT));
 	is_editor = (IS_DSE_IMAGE || IS_LKE_IMAGE);
 	max_hrtbt_delta = TREF(dbinit_max_hrtbt_delta);
 	assert(NO_SEMWAIT_ON_EAGAIN != max_hrtbt_delta);
@@ -85,17 +83,15 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	if (!need_stacktrace)
 	{	/* Since the user specified wait time is less than the default wait, wait that time without any stack trace */
 		if (is_editor)
-		{	/* Editors are able to bypass after 3 seconds of wait. IPC_NOWAIT smeop every second.
+		{	/* Editors are able to bypass after 3 seconds of wait. IPC_NOWAIT semop every second.
 			 * The semaphore value must be at least 2 to make sure the shared memeory is already created.
 			 */
 			if (-1 == (semval = semctl(semid, DB_COUNTER_SEM, GETVAL))) /* semval = number of process attached */
 				RETURN_SEMWAIT_FAILURE(retstat, errno, op_semctl, ERR_CRITSEMFAIL, 0, 0);
-			if (semval > DB_COUNTER_SEM_INCR)
+			if (DB_COUNTER_SEM_INCR < semval)
 			{
 				if (-1 == (sem_pid = semctl(semid, 0, GETPID)))
 					RETURN_SEMWAIT_FAILURE(retstat, errno, op_semctl, ERR_CRITSEMFAIL, 0, 0);
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_RESRCWAIT, 8, LEN_AND_STR(sem_names[semtype]),
-					       REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid, semid);
 				i = 0;
 				do
 				{
@@ -105,16 +101,18 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 					{
 						if (!(*sem_halted))
 						{
-							if (IS_ACCESS_SEM)
-								SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
-							else
-								SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
 							sopcnt = 2; /* ignore the increment operation */
 							*sem_halted = TRUE;
 							continue; /* Try again */
 						}
 					} else
 					{
+						if (0 == i)
+						{
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_RESRCWAIT, 8,
+								LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg),
+								DB_LEN_STR(reg), sem_pid, semid);
+						}
 						LONG_SLEEP(1);
 						i++;
 					}
@@ -142,10 +140,6 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 						else if (ERANGE == save_errno)
 						{
 							*sem_halted = TRUE;
-							if (IS_ACCESS_SEM)
-								SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
-							else if (IS_FTOK_SEM)
-								SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
 							return TRUE;
 						}
 						*bypass = FALSE; /* Semaphore removed when attempting to bypass. Abort bypass. */
@@ -166,10 +160,6 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 				{
 					if (!(*sem_halted))
 					{
-						if (IS_ACCESS_SEM)
-							SEM_COUNTER_OFFLINE(access, tsd, NULL ,reg)
-						else
-							SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
 						sopcnt = 2; /* ignore the increment operation */
 						*sem_halted = TRUE;
 						continue; /* Try again */
@@ -200,10 +190,6 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 			save_errno = errno;
 			if ((ERANGE == save_errno) && !(*sem_halted))
 			{
-				if (IS_ACCESS_SEM)
-					SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
-				else
-					SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
 				sopcnt = 2;	/* ignore the increment operation */
 				*sem_halted = TRUE;
 				loopcnt--;	/* do not count this attempt */
@@ -263,10 +249,6 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 			} else if ((!*sem_halted) && (ERANGE == save_errno))
 			{
 				*sem_halted = TRUE;
-				if (IS_ACCESS_SEM)
-					SEM_COUNTER_OFFLINE(access, tsd, NULL, reg)
-				else
-					SEM_COUNTER_OFFLINE(ftok, tsd, NULL, reg)
 				return TRUE;
 			}
 			/* else some other error occurred; fall-through */

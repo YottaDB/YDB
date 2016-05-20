@@ -338,15 +338,28 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		assert(csa == (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs);
 		assert(csd == csa->hdr);
 		if (mur_options.forward)
-		{
-			assert(rec->jrec_inctn.prefix.tn == csd->trans_hist.curr_tn || mur_options.notncheck);
-			if (FALSE == ((was_crit = csa->now_crit)))
-				grab_crit(reg);
-			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
-			INCREMENT_CURR_TN(csd);
-			if (!was_crit)
-				rel_crit(reg);
+		{	/* It is possible a process got killed after writing a journal record (INCTN, SET etc.) but
+			 * before incrementing csd->trans_hist.curr_tn. In that case, the next process would have done
+			 * a "wcs_recover" to salvage the crit from the dead pid and as part of that would have written
+			 * an INCTN. This INCTN would have the same tn as the previous record (i.e. a DUPTN situation)
+			 * but since this is an INCTN record and not a logical record, we can skip incrementing the
+			 * curr_tn in this case thereby keeping the db curr_tn in sync with the next jnl rec tn.
+			 * In case NOTNCHECK is specified though, the user could present forward recovery with two
+			 * identical jnl files with just one tn (e.g. v54003/C9K08003315 subtest) in which case it is not
+			 * easy to keep the db in sync with the jnl tn so do not skip the curr_tn increment in that case.
+			 */
+			assert((rec->jrec_inctn.prefix.tn == csd->trans_hist.curr_tn)
+				|| ((rec->jrec_inctn.prefix.tn + 1) == csd->trans_hist.curr_tn) || mur_options.notncheck);
+			if (mur_options.notncheck || (rec->jrec_inctn.prefix.tn >= csd->trans_hist.curr_tn))
+			{
+				if (FALSE == ((was_crit = csa->now_crit)))
+					grab_crit(reg);
+				CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+				csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+				INCREMENT_CURR_TN(csd);
+				if (!was_crit)
+					rel_crit(reg);
+			}
 		}
 		break;
 	case JRT_AIMG:

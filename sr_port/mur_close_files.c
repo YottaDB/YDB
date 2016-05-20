@@ -766,7 +766,7 @@ boolean_t mur_close_files(void)
 		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
 		if (rctl->standalone && (EXIT_NRM == rundown_status))
 			/* Avoid db_ipcs_reset if gds_rundown did not remove shared memory */
-			if ((NULL != udi) && !udi->new_shm && !db_ipcs_reset(reg))
+			if ((NULL != udi) && udi->shm_deleted && !db_ipcs_reset(reg))
 				wrn_count++;
 		rctl->standalone = FALSE;
 		rctl->gd = NULL;
@@ -798,42 +798,8 @@ boolean_t mur_close_files(void)
 		repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		repl_instance.file_corrupt = inst_hdr->file_corrupt;
 		if (NULL == jnlpool_ctl)
-		{
 			repl_instance.crash = inst_hdr->crash = FALSE;
-			/* We have standalone access on the instance file so can safely clear halted fields if set */
-			if (repl_instance.ftok_counter_halted)
-			{	/* Clear the halted field and reset ftok counter semaphore value to set counter back to reliable */
-				semarg.val = 0;
-				if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
-				{
-					save_errno = errno;
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
-						ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl(SETVAL)"),
-						CALLFROM, save_errno);
-					/* In case not able to set counter to 1, proceed with rundown without deleting the
-					 * ftok semaphore (so set counter_ftok_incremented to FALSE)
-					 */
-					udi->counter_ftok_incremented = FALSE;
-				} else
-				{
-					save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
-					if (save_errno)
-					{
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
-							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("do_semop()"),
-							CALLFROM, save_errno);
-						/* In case not able to set counter to 1, proceed with rundown without deleting the
-						 * ftok semaphore (so set counter_ftok_incremented to FALSE)
-						 */
-						udi->counter_ftok_incremented = FALSE;
-					} else
-					{
-						udi->counter_ftok_incremented = TRUE;
-						repl_instance.ftok_counter_halted = FALSE;
-					}
-				}
-			}
-		} else
+		else
 		{	/* Online Rollback OR Anticipatory Freeze is in effect. Detach from the journal pool as all the database
 			 * writes are now over. Since the attach count is 1 (we are the only one attached) go ahead and remove the
 			 * journal pool. We've already flushed all the contents to the instance file at the beginning of rollback
@@ -928,7 +894,6 @@ boolean_t mur_close_files(void)
 		 * Since we should be holding the ftok lock to release it, grab the ftok lock first. We don't expect ftok_sem_lock
 		 * to error out because the semaphore should still exist in the system
 		 */
-		assert(!repl_instance.ftok_counter_halted || jgbl.onlnrlbk || anticipatory_freeze_available);
 		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || anticipatory_freeze_available);
 		if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE)
 				|| !ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))

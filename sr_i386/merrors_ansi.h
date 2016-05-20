@@ -1450,4 +1450,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUREENCRYPTV4NOALLOW */
 	   0,	/* ENCRYPTCONFLT */
 	   0,	/* JNLPOOLRECOVERY */
+	   0,	/* LOCKTIMINGINTP */
 	};

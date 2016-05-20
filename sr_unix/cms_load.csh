@@ -1,7 +1,8 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -157,7 +158,7 @@ cp $preserve_time $cms_dir/*/gtmsrc.csh .
 # if you add a platform or a platform specific directory below you must modify
 # tools/cms_tools/cms_cshrc.csh
 # tools/work_tools/get_lib_dirs.csh
-# sr_unix/get_lib_dirs.mk
+# CMakeLists.txt / sr_*/platform.cmake
 #
 # platform ordering goes:
 # platform+OS arch arch_common OS {portable,nsb_portable}

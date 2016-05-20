@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +53,7 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	VMS_ONLY(va_count(count));
 	MAXSTR_BUFF_INIT;
 
+	merge_args = 0;
 	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;

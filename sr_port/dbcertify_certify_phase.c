@@ -517,6 +517,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			case gdsblk_gvtleaf:
 				tmp_blk_type = (tmp_blk_levl ? gdsblk_gvtindex : gdsblk_gvtleaf);
 				break;
+			default:
+				assert(FALSE && tmp_blk_type);
+				break;						/* NOTREACHED */
 		}
 	} while (TRUE);
 	assert(psa->first_rec_key->end);

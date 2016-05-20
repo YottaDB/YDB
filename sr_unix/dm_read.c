@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -654,12 +654,21 @@ void	dm_read (mval *v)
 			} else if (NATIVE_ESC == inchar)
 			{
 				escape_sequence[escape_length++] = (unsigned char)inchar;
+				assert(ESC_LEN > escape_length);
 				io_ptr->esc_state = START;
 				iott_escape(&escape_sequence[escape_length - 1], &escape_sequence[escape_length], io_ptr);
 			} else if (0 != escape_length)
 			{
 				if (utf8_active && (ASCII_MAX < inchar))
 					continue;		/* skip invalid char in escape sequence */
+				/* If the escape sequence happens to be more than ESC_LEN (allocated buffer length), truncate
+				 * the escape sequence but do call "iott_escape" to know when the sequence terminates and the
+				 * rest of the command line can be parsed. We do not expect the regular cursor key escape
+				 * sequences (UP/DOWN/LEFT/RIGHT/DELETE/INSERT) to be more than ESC_LEN (and hence not suffer
+				 * from truncation) and that is what we care about later in this code.
+				 */
+				if (ESC_LEN <= escape_length)
+					escape_length--;
 				escape_sequence[escape_length++] = (unsigned char)inchar;
 				iott_escape(&escape_sequence[escape_length - 1], &escape_sequence[escape_length], io_ptr);
 			} else

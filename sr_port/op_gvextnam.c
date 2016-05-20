@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,14 +95,15 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	MV_FORCE_STR(val1);
 	val1 = gtm_env_translate(val1, val2, &val_xlated);
 	assert(!TREF(gv_extname_size) || (NULL != extnam_str.addr));
-	if (!gd_header)
-		gvinit();
 	if (val1->str.len)
 	{
 		tmp_mstr_ptr = &val1->str;
 		tmpgd = zgbldir(val1);
 	} else
 	{
+		/* Null external reference, ensure that gd_header is not NULL */
+		if (!gd_header)
+			gvinit();
 		tmp_mstr_ptr = &dollar_zgbldir.str;
 		tmpgd = gd_header;
 	}

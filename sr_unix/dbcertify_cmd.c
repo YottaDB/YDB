@@ -38,7 +38,7 @@ static	CLI_ENTRY	dbscan_qual[] = {
 	{ "OUTFILE",       0, 0, 0,            0,                  0, 0, VAL_REQ,         1, NON_NEG, VAL_STR, 0       },
 	{ "REPORT_ONLY",   0, 0, 0,            0,                  0, 0, VAL_DISALLOWED,  1, NEG,     VAL_N_A, 0       },
 	{ "TEMPFILE_DIR",  0, 0, 0,            0,                  0, 0, VAL_REQ,         1, NON_NEG, VAL_STR, 0       },
-	{ 0 }
+	{ "" }
 };
 
 static readonly CLI_PARM dbcertify_parm[] = {
@@ -51,12 +51,12 @@ static	CLI_ENTRY	dbcertify_qual[] = {
 	{ "DEBUG",         0, 0, 0,            0,                  0, 0, VAL_DISALLOWED,  1, NEG,     VAL_N_A, 0       },
 	{ "KEEP_TEMPS",    0, 0, 0,            0,                  0, 0, VAL_DISALLOWED,  1, NEG,     VAL_N_A, 0       },
 	{ "TEMPFILE_DIR",  0, 0, 0,            0,                  0, 0, VAL_REQ,         1, NON_NEG, VAL_STR, 0       },
-	{ 0 }
+	{ "" }
 };
 
 
 GBLDEF	CLI_ENTRY	dbcertify_cmd_ary[] = {
 	{ "CERTIFY",   dbcertify_certify_phase, dbcertify_qual,   dbcertify_parm,   0, 0,    0, VAL_DISALLOWED, 1, 0, 0, 0 },
 	{ "SCAN",      dbcertify_scan_phase,	dbscan_qual,	  dbscan_parm,      0, 0,    0, VAL_DISALLOWED, 1, 0, 0, 0 },
-	{ 0 }
+	{ "" }
 };

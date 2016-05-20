@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,7 +140,6 @@ int m_write(void)
 			ptx--;
 			stringpool.free = (unsigned char *) cp;
 			lit.str.len = INTCAST(cp - lit.str.addr);
-			s2n(&lit);
 			t1->opcode = OC_WRITE;
 			t1->operand[0] = put_lit(&lit);
 		}

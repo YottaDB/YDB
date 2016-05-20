@@ -16,7 +16,7 @@
 #include "gtm_semutils.h"
 
 boolean_t ftok_sem_get2(gd_region *reg, uint4 stacktrace_on_wait, semwait_status_t *retstat, boolean_t *bypass,
-			boolean_t *ftok_counter_halted);
+			boolean_t *ftok_counter_halted, boolean_t incr_cnt);
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate,
 		       boolean_t *ftok_counter_halted);
 boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate);

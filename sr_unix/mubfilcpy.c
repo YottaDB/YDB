@@ -45,6 +45,7 @@
 #include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
+#include "wbox_test_init.h"
 
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
@@ -145,7 +146,16 @@ bool	mubfilcpy (backup_reg_list *list)
 	file->addr[file->len] = '\0';
 	header_cpy = list->backup_hdr;
 	hdrsize = (int4)ROUND_UP(SIZEOF_FILE_HDR(header_cpy), DISK_BLOCK_SIZE);
-
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
+		&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !cs_addrs->nl->wbox_test_seq_num)
+	{
+		printf ("reached here\n");
+		cs_addrs->nl->wbox_test_seq_num = 1;
+		while (1 == cs_addrs->nl->wbox_test_seq_num)
+			SHORT_SLEEP(1);	/* wait for signal from gdsfilext that mupip backup can continue */
+	}
+#	endif
 	/* the temporary file should be located in the destination directory */
 	ptr = file->addr + file->len - 1;
 	while (('/' != *ptr) && (ptr > file->addr))

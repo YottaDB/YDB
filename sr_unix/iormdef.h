@@ -48,6 +48,8 @@ int pid;
 	case CHSET_UTF16LE:			\
 		width_bytes = 2;		\
 		width_chset = iod->ichset;	\
+	default:				\
+		break;				\
 	}					\
 	switch (iod->ochset)			\
 	{					\
@@ -56,6 +58,8 @@ int pid;
 	case CHSET_UTF16LE:			\
 		width_bytes = 2;		\
 		width_chset = iod->ochset;	\
+	default:				\
+		break;				\
 	}
 #else
 #define SET_WIDTH_BYTES	width_bytes = 1;

@@ -247,7 +247,7 @@ STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, double *a)
 
 STATICFNDCL void finalize_stats_ar(stat_t *stat)
 {
-	int	j, k;
+	unsigned int	j, k;
 
 	for (j = 0; MAX_BT_DEPTH >= j; j++)
 		/* Variance of the mean (mean referes to avg number of records per block) is Var(R)/N where N is samples size */

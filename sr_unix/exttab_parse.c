@@ -202,53 +202,53 @@ STATICFNDEF enum gtm_types scan_keyword(char **c)
 	{
 	/*	typename		type			type *			type **			*/
 
-		{"void",		gtm_void,		gtm_notfound,		gtm_notfound		},
+		{"void",		{gtm_void,		gtm_notfound,		gtm_notfound}		},
 
-		{"gtm_int_t",		gtm_int,		gtm_int_star,		gtm_notfound		},
-		{"gtm_jboolean_t",	gtm_jboolean,		gtm_notfound,		gtm_notfound		},
-		{"gtm_jint_t",		gtm_jint,		gtm_notfound,		gtm_notfound		},
-		{"xc_int_t",		gtm_int,		gtm_int_star,		gtm_notfound		},
-		{"int",			gtm_int,		gtm_notfound,		gtm_notfound		},
+		{"gtm_int_t",		{gtm_int,		gtm_int_star,		gtm_notfound}		},
+		{"gtm_jboolean_t",	{gtm_jboolean,		gtm_notfound,		gtm_notfound}		},
+		{"gtm_jint_t",		{gtm_jint,		gtm_notfound,		gtm_notfound}		},
+		{"xc_int_t",		{gtm_int,		gtm_int_star,		gtm_notfound}		},
+		{"int",			{gtm_int,		gtm_notfound,		gtm_notfound}		},
 
-		{"gtm_uint_t",		gtm_uint,		gtm_uint_star,		gtm_notfound		},
-		{"xc_uint_t",		gtm_uint,		gtm_uint_star,		gtm_notfound		},
-		{"uint",		gtm_uint,		gtm_uint_star,		gtm_notfound		},
+		{"gtm_uint_t",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
+		{"xc_uint_t",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
+		{"uint",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
 
-		{"gtm_long_t",		gtm_long,		gtm_long_star,		gtm_notfound		},
-		{"gtm_jlong_t",		gtm_jlong,		gtm_notfound,		gtm_notfound		},
-		{"xc_long_t",		gtm_long,		gtm_long_star,		gtm_notfound		},
-		{"long",		gtm_long,		gtm_long_star,		gtm_notfound		},
+		{"gtm_long_t",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
+		{"gtm_jlong_t",		{gtm_jlong,		gtm_notfound,		gtm_notfound}		},
+		{"xc_long_t",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
+		{"long",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
 
-		{"gtm_ulong_t",		gtm_ulong,		gtm_ulong_star,		gtm_notfound		},
-		{"xc_ulong_t",		gtm_ulong,		gtm_ulong_star,		gtm_notfound		},
-		{"ulong",		gtm_ulong,		gtm_ulong_star,		gtm_notfound		},
+		{"gtm_ulong_t",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
+		{"xc_ulong_t",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
+		{"ulong",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
 
-		{"gtm_status_t",	gtm_status,		gtm_notfound,		gtm_notfound		},
-		{"xc_status_t",		gtm_status,		gtm_notfound,		gtm_notfound		},
+		{"gtm_status_t",	{gtm_status,		gtm_notfound,		gtm_notfound}		},
+		{"xc_status_t",		{gtm_status,		gtm_notfound,		gtm_notfound}		},
 
-		{"gtm_char_t",		gtm_notfound,		gtm_char_star,		gtm_char_starstar	},
-		{"gtm_jstring_t",	gtm_jstring,		gtm_notfound,		gtm_notfound		},
-		{"gtm_jbyte_array_t",	gtm_jbyte_array, 	gtm_notfound,		gtm_notfound		},
-		{"gtm_jbig_decimal_t",	gtm_jbig_decimal,	gtm_notfound,		gtm_notfound		},
-		{"xc_char_t",		gtm_notfound,		gtm_char_star,		gtm_char_starstar	},
-		{"char",		gtm_notfound,		gtm_char_star,		gtm_char_starstar	},
+		{"gtm_char_t",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
+		{"gtm_jstring_t",	{gtm_jstring,		gtm_notfound,		gtm_notfound}		},
+		{"gtm_jbyte_array_t",	{gtm_jbyte_array, 	gtm_notfound,		gtm_notfound}		},
+		{"gtm_jbig_decimal_t",	{gtm_jbig_decimal,	gtm_notfound,		gtm_notfound}		},
+		{"xc_char_t",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
+		{"char",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
 
-		{"gtm_string_t",	gtm_notfound,		gtm_string_star,	gtm_notfound		},
-		{"xc_string_t",		gtm_notfound,		gtm_string_star,	gtm_notfound		},
-		{"string",		gtm_notfound,		gtm_string_star,	gtm_notfound		},
+		{"gtm_string_t",	{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
+		{"xc_string_t",		{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
+		{"string",		{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
 
-		{"gtm_float_t",		gtm_float,		gtm_float_star,		gtm_notfound		},
-		{"gtm_jfloat_t",	gtm_jfloat,		gtm_notfound,		gtm_notfound		},
-		{"xc_float_t",		gtm_float,		gtm_float_star,		gtm_notfound		},
-		{"float",		gtm_float,		gtm_float_star,		gtm_notfound		},
+		{"gtm_float_t",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
+		{"gtm_jfloat_t",	{gtm_jfloat,		gtm_notfound,		gtm_notfound}		},
+		{"xc_float_t",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
+		{"float",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
 
-		{"gtm_double_t",	gtm_double,		gtm_double_star,	gtm_notfound		},
-		{"gtm_jdouble_t",	gtm_jdouble,		gtm_notfound,		gtm_notfound		},
-		{"xc_double_t",		gtm_double,		gtm_double_star,	gtm_notfound		},
-		{"double",		gtm_double,		gtm_double_star,	gtm_notfound		},
+		{"gtm_double_t",	{gtm_double,		gtm_double_star,	gtm_notfound}		},
+		{"gtm_jdouble_t",	{gtm_jdouble,		gtm_notfound,		gtm_notfound}		},
+		{"xc_double_t",		{gtm_double,		gtm_double_star,	gtm_notfound}		},
+		{"double",		{gtm_double,		gtm_double_star,	gtm_notfound}		},
 
-		{"gtm_pointertofunc_t", gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound		},
-		{"xc_pointertofunc_t", 	gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound		}
+		{"gtm_pointertofunc_t", {gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound}		},
+		{"xc_pointertofunc_t", 	{gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound}		}
 	};
 	char	*b = *c;
 	char	*d;

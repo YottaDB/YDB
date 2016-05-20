@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +42,53 @@ typedef struct
 	unsigned char	*next;
 	ptstr		altpat;
 } alternation;
+
+#define	TERMINATE_DFA(PATMASKPTR, OUTCHAR, DFA_FIXED_LEN, LV_PTR, LEAF_NUM, EXP_PTR, FSTCHAR,			\
+			TOPCHAR, MIN, MAX, SIZE, TOTAL_MIN, TOTAL_MAX, COUNT, LASTPATPTR, LAST_INFINITE,	\
+			MIN_DFA, ALTMIN, ALTMAX, INSTR, INCHAR, DFA)						\
+{														\
+	gtm_uint64_t		bound;										\
+	int			cursize, i;									\
+														\
+	PATMASKPTR = OUTCHAR;											\
+	/* If this is a fixed pattern, generate code to invoke do_patfixed as that takes up less space in	\
+	 * the object code and has same runtime performance as the DFA. Else go through DFA.			\
+	 */													\
+	if (!DFA_FIXED_LEN)											\
+	{													\
+		assert(OUTCHAR <= TOPCHAR);									\
+		cursize = dfa_calc(LV_PTR, LEAF_NUM, EXP_PTR, &FSTCHAR, &OUTCHAR);				\
+	} else													\
+		cursize = -1;											\
+	if (cursize >= 0)											\
+	{													\
+		assert(OUTCHAR <= TOPCHAR);									\
+		MIN[COUNT] = MIN_DFA;										\
+		MAX[COUNT] = PAT_MAX_REPEAT;									\
+		SIZE[COUNT] = cursize;										\
+		TOTAL_MIN += BOUND_MULTIPLY(MIN[COUNT], SIZE[COUNT], bound);					\
+		if (TOTAL_MIN > PAT_MAX_REPEAT)									\
+			TOTAL_MIN = PAT_MAX_REPEAT;								\
+		TOTAL_MAX += BOUND_MULTIPLY(MAX[COUNT], SIZE[COUNT], bound);					\
+		if (TOTAL_MAX > PAT_MAX_REPEAT)									\
+			TOTAL_MAX = PAT_MAX_REPEAT;								\
+		LASTPATPTR = PATMASKPTR;									\
+		LAST_INFINITE = TRUE;										\
+		COUNT++;											\
+	} else													\
+	{													\
+		OUTCHAR = PATMASKPTR;										\
+		if (!pat_unwind(&COUNT, LV_PTR, LEAF_NUM, &TOTAL_MIN, &TOTAL_MAX,				\
+			&MIN[0], &MAX[0], &SIZE[0], ALTMIN, ALTMAX,						\
+			&LAST_INFINITE, &FSTCHAR, &OUTCHAR, &LASTPATPTR))					\
+		{												\
+			INSTR->addr = (char *)INCHAR;								\
+			return ERR_PATMAXLEN;									\
+		}												\
+		assert(OUTCHAR <= TOPCHAR);									\
+	}													\
+	DFA = FALSE;												\
+}
 
 /*  This procedure is part of the MUMPS compiler.  The function of this procedure is to parse a pattern specification
  *  and compile it into a data structure that will be used by the run-time engine to actually attempt to match the pattern.
@@ -87,7 +135,8 @@ typedef struct
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
 	pat_strlit		strlit;
-	boolean_t		dfa, dfa_attempt_failed, done, fixed_len, infinite, prev_fixed_len, split_atom;
+	boolean_t		dfa, done, infinite;
+	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa;
 	int4			lower_bound, upper_bound, alloclen;
 	gtm_uint64_t		bound;
 	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
@@ -176,7 +225,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 		}
 		saw_delimiter = 0;
 		if (!altactive || altend)
-		{
+		{	/* Use DFA for patterns by default (fast at runtime even if time/space consuming at compile time).
+			 * If at the end of the parse we find that the input pattern is of fixed length we will decide
+			 * to compile it so (invoke do_patfixed instead of do_pattern which in turn invokes the DFA).
+			 */
+			start_dfa = TRUE;
 			instr->addr = (char*)inchar;
 			if (!topseen && (TK_PERIOD == ctypetab[curchar]))
 			{
@@ -203,33 +256,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			} else
 			{
 				if (dfa)
-				{
-					assert(outchar <= topchar);
-					patmaskptr = outchar;
-					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
-					if (cursize >= 0)
-					{
-						assert(outchar <= topchar);
-						min[count] = min_dfa;
-						max[count] = PAT_MAX_REPEAT;
-						size[count] = cursize;
-						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
-						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
-						lastpatptr = patmaskptr;
-						last_infinite = TRUE;
-						count++;
-					} else
-					{
-						outchar = patmaskptr;
-						if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
-							&min[0], &max[0], &size[0], altmin, altmax,
-							&last_infinite, &fstchar, &outchar, &lastpatptr))
-						{
-							instr->addr = (char *)inchar;
-							return ERR_PATMAXLEN;
-						}
-						assert(outchar <= topchar);
-					}
+				{	/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
+					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
+						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
+						min_dfa, altmin, altmax, instr, inchar, dfa);
 				}
 				if (outchar == &obj->buff[PAT_MASK_BEGIN_OFFSET])
 				{
@@ -354,7 +384,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					}
 					if (!gtm_utf8_mode)
 						bytelen = 1;
-					UNICODE_ONLY(
+#					ifdef UNICODE_SUPPORTED
 					else
 					{
 						if (!UTF8_VALID(inchar, in_top, bytelen))
@@ -364,7 +394,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						}
 						assert(1 <= bytelen);
 					}
-					)
+#					endif
 					if (!IS_ASCII(curchar))
 						strlit.flags |= PATM_STRLIT_NONASCII;
 					strlit.bytelen += bytelen;
@@ -392,19 +422,13 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			} else if (!topseen && ('(' == curchar))
 			{	/* start of 'alternation' */
 				if (dfa)
-				{
-					assert(outchar <= topchar);
-					if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
-						&min[0], &max[0], &size[0], altmin, altmax,
-						&last_infinite, &fstchar, &outchar, &lastpatptr))
-					{
-						instr->addr = (char *)inchar;
-						return ERR_PATMAXLEN;
-					}
-					assert(outchar <= topchar);
-					dfa_attempt_failed = TRUE;
-					dfa = FALSE;
+				{	/* Finish ongoing DFA and start compiling alternation afresh at a nested depth */
+					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
+					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
+						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
+						min_dfa, altmin, altmax, instr, inchar, dfa);
 				}
+				start_dfa = FALSE;	/* reset start_dfa for entire duration of alternation */
 				if (inchar >= in_top)
 				{
 					assert(inchar == in_top);
@@ -533,10 +557,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			upper_bound = lower_bound;
 		}
 		done = FALSE;
-		/* If dfa_attempt_failed is set to TRUE, it means we tried DFA for the current pattern match string
-		 * and decided that was not possible. In this case, we should not retry the DFA for this pattern.
-		 */
-		dfa_attempt_failed = FALSE;
 		while (!done)
 		{
 			done = TRUE;
@@ -546,19 +566,23 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			 * non-ASCII UTF-8 byte sequences are currently not processed through the DFA logic.
 			 */
 			assert(outchar <= topchar);
-			if (infinite && !any_alt && !dfa && !dfa_attempt_failed
+			if (start_dfa && !any_alt && !dfa
 				&& (!(pattern_mask & PATM_STRLIT) || (strlit.charlen && !(strlit.flags & PATM_STRLIT_NONASCII)))
-				&& ((outchar - &obj->buff[0]) <= (MAX_PATTERN_LENGTH / 2)))
+					&& ((outchar - &obj->buff[0]) <= (MAX_PATTERN_LENGTH / 2)))
 			{
 				dfa = TRUE;
 				last_leaf_mask = 0;
 				leaf_num = 0;
 				sym_num = 0;
 				min_dfa = 0;
+				/* Maintain this just like "fixed_len" but starting from current atom
+				 * whereas "fixed_len" starts from beginning of input pattern string.
+				 */
+				dfa_fixed_len = !infinite;
 				atom_map = count;
 				memset(expand.num_e, 0, SIZEOF(expand.num_e));
 			}
-			dfa_attempt_failed = FALSE;
+			start_dfa = FALSE;
 			if (!dfa)
 			{
 				assert(outchar <= topchar);
@@ -608,7 +632,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					 *    			20 = 5 + 5 + 5 + 5
 					 */
 					altsimplify = ((1 == altcount) && cur_alt) ? TRUE : FALSE;
-					if (altsimplify && (cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET] & (PATM_ALT | PATM_DFA)))
+					if (altsimplify && ((cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET] & PATM_ALT)
+								|| (PATM_DFA == cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET])))
 						altsimplify = FALSE;
 					if (altsimplify)
 					{
@@ -637,11 +662,9 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						lower_bound = min[count - 1];
 						if (!cur_alt->altpat.buff[0])
 							fixed_len = FALSE;
+						max[count - 1] = BOUND_MULTIPLY(high_in, upper_bound, bound);
 						if (!fixed_len)
-						{
-							max[count - 1] = BOUND_MULTIPLY(high_in, upper_bound, bound);
 							upper_bound = max[count - 1];
-						}
 						outchar--;
 						if ((outchar + (jump - PAT_MASK_BEGIN_OFFSET + 1)) > topchar)
 						{
@@ -698,199 +721,145 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					charpos *= strlit.bytelen;
 					leafcnt = MAX(charpos, leafcnt);
 				}
-				if ((lower_bound > MAX_DFA_REP)
-					|| ((pattern_mask & PATM_STRLIT) && (strlit.flags & PATM_STRLIT_NONASCII))
-					|| (!infinite && lower_bound != upper_bound)
+				if (((pattern_mask & PATM_STRLIT) && (strlit.flags & PATM_STRLIT_NONASCII))
+					|| (!infinite && ((lower_bound != upper_bound) || !lower_bound))
 					|| ((leaf_num + leafcnt) >= (MAX_SYM - 1))
 					|| (charpos > MAX_DFA_STRLEN))
 				{
-					patmaskptr = outchar;
-					assert(outchar <= topchar);
-					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
-					if (cursize >= 0)
-					{
-						assert(outchar <= topchar);
-						min[count] = min_dfa;
-						max[count] = PAT_MAX_REPEAT;
-						size[count] = cursize;
-						total_min += BOUND_MULTIPLY(min[count], size[count], bound);
-						if (total_min > PAT_MAX_REPEAT)
-							total_min = PAT_MAX_REPEAT;
-						total_max += BOUND_MULTIPLY(max[count], size[count], bound);
-						if (total_max > PAT_MAX_REPEAT)
-							total_max = PAT_MAX_REPEAT;
-						lastpatptr = patmaskptr;
-						last_infinite = TRUE;
-						count++;
-					} else
-					{
-						outchar = patmaskptr;
-						if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
-							&min[0], &max[0], &size[0], altmin, altmax,
-							&last_infinite, &fstchar, &outchar, &lastpatptr))
-						{
-							instr->addr = (char *)inchar;
-							return ERR_PATMAXLEN;
-						}
-						assert(outchar <= topchar);
-						dfa_attempt_failed = TRUE;
-					}
-					dfa = FALSE;
+					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
+					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
+						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
+						min_dfa, altmin, altmax, instr, inchar, dfa);
+					start_dfa = ((MAX_DFA_STRLEN >= charpos) /* Try another DFA for remainder if possible */
+							&& (infinite || (lower_bound == upper_bound) && lower_bound) && leaf_num);
 					done = FALSE;
 					continue;
+				}
+				curr_min_dfa = min_dfa;
+				curr_leaf_num = leaf_num;
+				if (pattern_mask & PATM_STRLIT)
+				{
+					memset(&exp_temp[0], 0, SIZEOF(exp_temp));
+					min[atom_map] = lower_bound;
+					max[atom_map] = upper_bound;
+					size[atom_map] = strlit.bytelen;
+					atom_map++;
+					min_dfa += lower_bound * strlit.bytelen;
+					cursize = MAX(lower_bound, 1);
+					for (seqcnt = 0; seqcnt < cursize; seqcnt++)
+					{
+						for (charpos = 0; charpos < strlit.bytelen; charpos++)
+						{
+							symbol = strlit.buff[charpos];
+							/* It is ok to use typemask[] below because we are guaranteed
+							 * that "symbol" is a 1-byte valid ASCII character. Assert that.
+							 */
+							assert(!(strlit.flags & PATM_STRLIT_NONASCII) && IS_ASCII(symbol));
+							bitpos = patmaskseq(typemask[symbol]);
+							if (expand.num_e[bitpos] + exp_temp[bitpos] == 0)
+								exp_temp[bitpos]++;
+							for (leafcnt = 1;
+								(leafcnt < (expand.num_e[bitpos] + exp_temp[bitpos]))
+									&& (expand.meta_c[bitpos][leafcnt] != symbol);
+								leafcnt++)
+								;
+							if (leafcnt == expand.num_e[bitpos] + exp_temp[bitpos])
+								exp_temp[bitpos]++;
+							expand.meta_c[bitpos][leafcnt] = symbol;
+							if (!infinite)
+							{
+								leaves.letter[leaf_num][0] = symbol;
+								leaves.letter[leaf_num][1] = -1;
+								leaves.nullable[leaf_num++] = FALSE;
+							} else
+								leaves.letter[leaf_num][charpos] = symbol;
+						}
+						if (infinite)
+						{
+							leaves.letter[leaf_num][charpos] = -1;
+							leaves.nullable[leaf_num++] = infinite;
+						}
+					}
+					last_leaf_mask = PATM_STRLIT;
+					last_infinite = infinite;
+					sym_num = 0;
+					for (leafcnt = 0; leafcnt < leaf_num; leafcnt++)
+					{
+						for (charpos = 0; leaves.letter[leafcnt][charpos] >= 0; charpos++)
+						{
+							if (!(leaves.letter[leafcnt][charpos] & DFABIT))
+								sym_num++;
+							else
+							{
+								bitpos = patmaskseq(leaves.letter[leafcnt][charpos]);
+								sym_num += expand.num_e[bitpos] + exp_temp[bitpos];
+							}
+						}
+					}
 				} else
 				{
-					curr_min_dfa = min_dfa;
-					curr_leaf_num = leaf_num;
-					if (pattern_mask & PATM_STRLIT)
+					if (!(last_leaf_mask & PATM_STRLIT) && infinite && last_infinite)
 					{
-						memset(&exp_temp[0], 0, SIZEOF(exp_temp));
-						min[atom_map] = lower_bound;
-						max[atom_map] = upper_bound;
-						size[atom_map] = strlit.bytelen;
-						atom_map++;
-						min_dfa += lower_bound * strlit.bytelen;
-						cursize = MAX(lower_bound, 1);
-						for (seqcnt = 0; seqcnt < cursize; seqcnt++)
+						y_max = MAX(pattern_mask, last_leaf_mask);
+						if ((last_leaf_mask & pattern_mask) &&
+						   ((last_leaf_mask | pattern_mask) == y_max))
 						{
-							for (charpos = 0; charpos < strlit.bytelen; charpos++)
-							{
-								symbol = strlit.buff[charpos];
-								/* It is ok to use typemask[] below because we are guaranteed
-								 * that "symbol" is a 1-byte valid ASCII character. Assert that.
-								 */
-								assert(!(strlit.flags & PATM_STRLIT_NONASCII) && IS_ASCII(symbol));
-								bitpos = patmaskseq(typemask[symbol]);
-								if (expand.num_e[bitpos] + exp_temp[bitpos] == 0)
-									exp_temp[bitpos]++;
-								for (leafcnt = 1;
-									leafcnt < expand.num_e[bitpos] + exp_temp[bitpos] &&
-										expand.meta_c[bitpos][leafcnt] != symbol;
-									leafcnt++)
-									;
-								if (leafcnt == expand.num_e[bitpos] + exp_temp[bitpos])
-									exp_temp[bitpos]++;
-								expand.meta_c[bitpos][leafcnt] = symbol;
-								if (!infinite)
-								{
-									leaves.letter[leaf_num][0] = symbol;
-									leaves.letter[leaf_num][1] = -1;
-									leaves.nullable[leaf_num++] = FALSE;
-								} else
-									leaves.letter[leaf_num][charpos] = symbol;
-							}
-							if (infinite)
-							{
-								leaves.letter[leaf_num][charpos] = -1;
-								leaves.nullable[leaf_num++] = infinite;
-							}
+							if (last_leaf_mask == y_max)
+								continue;
+							leaf_num--;
+							atom_map--;
 						}
-						last_leaf_mask = PATM_STRLIT;
-						last_infinite = infinite;
-						sym_num = 0;
-						for (leafcnt = 0; leafcnt < leaf_num; leafcnt++)
-						{
-							for (charpos = 0; leaves.letter[leafcnt][charpos] >= 0; charpos++)
-							{
-								if (!(leaves.letter[leafcnt][charpos] & DFABIT))
-									sym_num++;
-								else
-								{
-									bitpos = patmaskseq(leaves.letter[leafcnt][charpos]);
-									sym_num += expand.num_e[bitpos] + exp_temp[bitpos];
-								}
-							}
-						}
-					} else
+					}
+					min[atom_map] = lower_bound;
+					max[atom_map] = upper_bound;
+					size[atom_map] = 1;
+					atom_map++;
+					min_dfa += lower_bound;
+					charpos = MAX(lower_bound, 1);
+					last_infinite = infinite;
+					last_leaf_mask = pattern_mask;
+					for (seqcnt = 0; seqcnt < charpos; seqcnt++)
 					{
-						if (!(last_leaf_mask & PATM_STRLIT) && infinite && last_infinite)
+						bitpos = 0;
+						leaves.nullable[leaf_num] = infinite;
+						/* Check all PAT_MAX_BITS bits if there are flags for internationalization,
+						 * otherwise, check only the original PAT_BASIC_CLASSES bits
+						 * (C, L, N, P, U, 0, 1) where
+						 *	0 = PATM_UTF8_ALPHABET, 1 = PATM_UTF8_NONBASIC
+						 */
+						if (PATM_E != pattern_mask)
 						{
-							y_max = MAX(pattern_mask, last_leaf_mask);
-							if ((last_leaf_mask & pattern_mask) &&
-							   ((last_leaf_mask | pattern_mask) == y_max))
+							chidx = (pattern_mask & PATM_I18NFLAGS)
+								? PAT_MAX_BITS : PAT_BASIC_CLASSES;
+						} else
+							chidx = PAT_BASIC_CLASSES;
+						for (bit = 0; bit < chidx; bit++)
+						{
+							mbit = 1 << bit;
+							if ((allmask & mbit) && (pattern_mask & mbit))
 							{
-								if (last_leaf_mask == y_max)
-									continue;
-								leaf_num--;
-								atom_map--;
+								seq = patmaskseq((uint4)mbit);
+								if (expand.num_e[seq] == 0)
+									expand.num_e[seq]++;
+								sym_num += expand.num_e[seq];
+								assert(MAX_DFA_STRLEN >= bitpos);
+								leaves.letter[leaf_num][bitpos++] = DFABIT | mbit;
 							}
 						}
-						min[atom_map] = lower_bound;
-						max[atom_map] = upper_bound;
-						size[atom_map] = 1;
-						atom_map++;
-						min_dfa += lower_bound;
-						charpos = MAX(lower_bound, 1);
-						last_infinite = infinite;
-						last_leaf_mask = pattern_mask;
-						for (seqcnt = 0; seqcnt < charpos; seqcnt++)
-						{
-							bitpos = 0;
-							leaves.nullable[leaf_num] = infinite;
-							/* Check all PAT_MAX_BITS bits if there are flags for internationalization,
-							 * otherwise, check only the original PAT_BASIC_CLASSES bits
-							 * (C, L, N, P, U, 0, 1) where
-							 *	0 = PATM_UTF8_ALPHABET, 1 = PATM_UTF8_NONBASIC
-							 */
-							if (PATM_E != pattern_mask)
-							{
-								chidx = (pattern_mask & PATM_I18NFLAGS)
-									? PAT_MAX_BITS : PAT_BASIC_CLASSES;
-							} else
-								chidx = PAT_BASIC_CLASSES;
-							for (bit = 0; bit < chidx; bit++)
-							{
-								mbit = 1 << bit;
-								if ((allmask & mbit) && (pattern_mask & mbit))
-								{
-									seq = patmaskseq((uint4)mbit);
-									if (expand.num_e[seq] == 0)
-										expand.num_e[seq]++;
-									sym_num += expand.num_e[seq];
-									assert(MAX_DFA_STRLEN >= bitpos);
-									leaves.letter[leaf_num][bitpos++] = DFABIT | mbit;
-								}
-							}
-							assert(MAX_DFA_STRLEN >= bitpos);
-							leaves.letter[leaf_num][bitpos] = -1;
-							leaf_num++;
-						}
+						assert(MAX_DFA_STRLEN >= bitpos);
+						leaves.letter[leaf_num][bitpos] = -1;
+						leaf_num++;
 					}
 				}
 				if (sym_num >= MAX_SYM - 1)
 				{
-					patmaskptr = outchar;
-					assert(outchar <= topchar);
-					cursize = dfa_calc(lv_ptr, curr_leaf_num, exp_ptr, &fstchar, &outchar);
-					if (cursize >= 0)
-					{
-						assert(outchar <= topchar);
-						min[count] = curr_min_dfa;
-						max[count] = PAT_MAX_REPEAT;
-						size[count] = cursize;
-						total_min += BOUND_MULTIPLY(min[count], size[count], bound);
-						if (total_min > PAT_MAX_REPEAT)
-							total_min = PAT_MAX_REPEAT;
-						total_max += BOUND_MULTIPLY(max[count], size[count], bound);
-						if (total_max > PAT_MAX_REPEAT)
-							total_max = PAT_MAX_REPEAT;
-						lastpatptr = patmaskptr;
-						last_infinite = TRUE;
-						count++;
-					} else
-					{
-						outchar = patmaskptr;
-						if (!pat_unwind(&count, lv_ptr, curr_leaf_num, &total_min, &total_max,
-							&min[0], &max[0], &size[0], altmin, altmax,
-							&last_infinite, &fstchar, &outchar, &lastpatptr))
-						{
-							instr->addr = (char *)inchar;
-							return ERR_PATMAXLEN;
-						}
-						assert(outchar <= topchar);
-						dfa_attempt_failed = TRUE;
-					}
-					dfa = FALSE;
+					leaf_num = curr_leaf_num;
+					min_dfa = curr_min_dfa;
+					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
+					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
+						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
+						min_dfa, altmin, altmax, instr, inchar, dfa);
+					start_dfa = curr_leaf_num; /* Try another DFA for remainder if possible */
 					done = FALSE;
 					continue;
 				} else
@@ -907,8 +876,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				infinite = TRUE;
 				split_atom = FALSE;
 				done = FALSE;
+				if (dfa)
+					dfa_fixed_len = FALSE;
 			}
 		}
+		if (dfa && infinite)
+			dfa_fixed_len = FALSE;
 		for (cur_alt = &init_alt; cur_alt; )
 		{
 			let_go = (cur_alt != (alternation *)&init_alt) ? (unsigned char *)cur_alt : NULL;

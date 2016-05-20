@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,8 +116,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn);
 		} else if (exit_state != 0)
 		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+			forced_exit_err_display();
 			EXIT(-exi_condition);
 		}
 		/* Sleep for a while before retrying the write. Do not use "hiber_start" as that

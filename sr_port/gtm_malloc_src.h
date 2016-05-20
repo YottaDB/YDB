@@ -339,7 +339,7 @@ GBLRDEF readonly struct
 /* Note, tiz important the first 4 bytes of this are same as markerChar defined below as that is the value both nullHMark
  * and nullTMark are asserted against to validate against corruption.
  */
-= {0xde, 0xad, 0xbe, 0xef, 0x00, 0xde, 0xad, 0xbe, 0xef}
+= {{0xde, 0xad, 0xbe, 0xef}, {0x00}, {0xde, 0xad, 0xbe, 0xef}}
 #endif
 ;
 #ifdef DEBUG

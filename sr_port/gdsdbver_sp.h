@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information		*
+ * Copyright (c) 2015-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,4 +31,5 @@ ENUM_ENTRY(GDSMV60002),		/* New field mutex_spin_parms.mutex_que_entry_space_siz
 ENUM_ENTRY(GDSMV62001),		/* New field hasht_upgrade_needed for ^#t upgrade */
 ENUM_ENTRY(GDSMV62002),		/* New field defer_allocate needed for database file preallocation and ^#t upgrade */
 ENUM_ENTRY(GDSMV63000),		/* New field non_null_iv to indicate IV mode for encrypted blocks */
+ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_halted from fileheader to nodelocal */
 ENUM_ENTRY(GDSMVLAST)

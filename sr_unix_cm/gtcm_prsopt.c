@@ -64,23 +64,23 @@ static struct
   int args;
 } optlist[] =
 {
-	"-D",		opt_debug, 1,	/* debugging output */
-	"-log",		opt_debug, 1,
-	"-P",		opt_pktlog, 1,	/* packet log file template */
-	"-pktlog",	opt_pktlog, 1,
-	"-S",		opt_service, 1,	/* service name in /etc/services */
-	"-service",	opt_service, 1,
-	"-I",		opt_rc_id, 1,	/* RC server ID */
-	"-id",		opt_rc_id, 1,
-	"-A",		opt_pktlog_addr, 1, /* IP address of DT agent to log */
-	"-logaddr",	opt_pktlog_addr, 1,
-	"-auth",	opt_authenticate, 0, /* authenticate connections */
-	"-multiple",	opt_multipleconn,  0, /* allow multiple conn from same IP address */
-	"-ping",	opt_ping, 0,	/* ping connections to keepalive */
-	"-timeout",	opt_conn_timeout, 1,
-	"-servtime",	opt_servtime,	1, /* Used for setup the timer for servicing each connection, default 60 sec */
-	"-hist",	opt_history, 0, /* flag:  keep packet history in mem */
-	NULL,		opt_null, 0
+	{"-D",		opt_debug,		1}, /* debugging output */
+	{"-log",	opt_debug,		1},
+	{"-P",		opt_pktlog,		1}, /* packet log file template */
+	{"-pktlog",	opt_pktlog,		1},
+	{"-S",		opt_service,		1}, /* service name in /etc/services */
+	{"-service",	opt_service,		1},
+	{"-I",		opt_rc_id,		1}, /* RC server ID */
+	{"-id",		opt_rc_id,		1},
+	{"-A",		opt_pktlog_addr,	1}, /* IP address of DT agent to log */
+	{"-logaddr",	opt_pktlog_addr,	1},
+	{"-auth",	opt_authenticate,	0}, /* authenticate connections */
+	{"-multiple",	opt_multipleconn,	0}, /* allow multiple conn from same IP address */
+	{"-ping",	opt_ping,		0}, /* ping connections to keepalive */
+	{"-timeout",	opt_conn_timeout,	1},
+	{"-servtime",	opt_servtime,		1}, /* Used for setup the timer for servicing each connection, default 60 sec */
+	{"-hist",	opt_history,		0}, /* flag:  keep packet history in mem */
+	{NULL,		opt_null,		0}
 };
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may

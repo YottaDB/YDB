@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2016 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,14 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef DO_SEMOP_INCLUDED
-#define DO_SEMOP_INCLUDED
+#ifndef FORCED_EXIT_ERR_DISPLAY_INCLUDED
+#define FORCED_EXIT_ERR_DISPLAY_INCLUDED
 
-error_def(ERR_NOMORESEMCNT);
+void forced_exit_err_display(void);
 
-int do_semop(int sems, int num, int op, int flg);
-
-/* Check whether a counter semaphore is ignored or not */
-#define IS_SEM_COUNTER_ONLINE(HDR, COUNTER_HALTED) (!((HDR)->mumps_can_bypass) || !(COUNTER_HALTED))
-
-#endif /* DO_SEMOP_INCLUDED */
+#endif /* FORCED_EXIT_ERR_DISPLAY_INCLUDED */

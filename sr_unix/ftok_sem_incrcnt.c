@@ -88,11 +88,8 @@ boolean_t ftok_sem_incrcnt(gd_region *reg, const char *file_type_str, boolean_t 
 			if (repl_instance.qdbrundown)
 			{
 				issue_error = FALSE;
-				if (!repl_instance.ftok_counter_halted)
-				{
-					assert(NULL != jnlpool.repl_inst_filehdr);
-					repl_inst_ftok_counter_halted(udi, FILE_TYPE_REPLINST, &repl_instance);
-				}
+				if (!jnlpool.jnlpool_ctl->ftok_counter_halted)
+					repl_inst_ftok_counter_halted(udi);
 			}
 			DEBUG_ONLY(udi->grabbed_ftok_sem = FALSE;)
 		}

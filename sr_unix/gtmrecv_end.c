@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "repl_comm.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -125,7 +126,9 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	int		fclose_res, rc;
 	seq_num		log_seqno, log_seqno1, jnlpool_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	uint4		savepid;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	exit_status = gtmrecv_end_helpers(TRUE);
 	exit_status = gtmrecv_endupd();
 	log_seqno = recvpool.recvpool_ctl->jnl_seqno;
@@ -154,8 +157,11 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		/* Also take this opportunity to detach from the journal pool except in the auto_shutdown case. This is because
 		 * the fields "jnlpool_ctl->repl_inst_filehdr->recvpool_semid" and "jnlpool_ctl->repl_inst_filehdr->recvpool_shmid"
 		 * need to be reset by "gtmrecv_jnlpool_reset" (called from "gtmrecv_shutdown") which is invoked a little later.
+		 * However, if IFOE is configured we need the journal pool attached so that we can check for instance freeze in
+		 * database rundown, so skip the detach.
+		 * In that case, the detach will happen automatically when the process terminates.
 		 */
-		if (!auto_shutdown)
+		if (!auto_shutdown && !INST_FREEZE_ON_ERROR_POLICY)
 		{
 			JNLPOOL_SHMDT(status, save_errno);
 			if (0 > status)

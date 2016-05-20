@@ -649,6 +649,8 @@ typedef struct node_local_struct
 	boolean_t	lastwriterbypas_msg_issued;	/* whether a LASTWRITERBYPAS message has been once issued for this db */
 	boolean_t	first_writer_seen;	/* Has a process with read-write access to the database opened it yet */
 	boolean_t	first_nonbypas_writer_seen;	/* TRUE when first writer is seen that also does not bypass ftok/access */
+	boolean_t	ftok_counter_halted;		/* The ftok semaphore counter reached 32K at some point in time */
+	boolean_t	access_counter_halted;		/* The access semaphore counter reached 32K at some point in time */
 	uint4		filler_8byte_align1;
 #	ifdef GTM_CRYPT_UPDATES_REPORT
 	blk_info	blk_infos[BLK_INFO_ARRAY_SIZE];
@@ -887,9 +889,10 @@ MBSTART	{															\
 		tmp_epoch_taper_start_dbuffs = MAX(1,CNL->epoch_taper_start_dbuffs); /* stable value for all calculations */	\
 		if ((relative_overall_taper > 64) && (relative_overall_taper < 96)) 						\
 			CNL->epoch_taper_need_fsync = TRUE;									\
-		if (DO_FSYNC && (relative_overall_taper > 75) && CNL->epoch_taper_need_fsync)					\
+		if (DO_FSYNC && (relative_overall_taper > 96) && CNL->epoch_taper_need_fsync)					\
 		{														\
 			CNL->epoch_taper_need_fsync = FALSE;									\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_db_fsync, 1);								\
 			fsync(FILE_INFO(REG)->fd);										\
 		}														\
 		FLUSH_TARGET = MIN(tmp_epoch_taper_start_dbuffs, MAX(1,(tmp_epoch_taper_start_dbuffs *				\

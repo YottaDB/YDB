@@ -26,10 +26,10 @@ static readonly CLI_ENTRY gtcm_gnp_qual[] = {
 { "SERVICE", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0},
 { "TIMEOUT", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0},
 { "TRACE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0},
-{ 0 }
+{ "" }
 };
 
 GBLDEF CLI_ENTRY gtcm_gnp_cmd_ary[] = {
 { "GTCM_GNP_SERVER", 0, gtcm_gnp_qual, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
-{ 0 }
+{ "" }
 };

@@ -270,6 +270,8 @@ int resolve_ref(int errknt)
 				case TRIP_REF:
 					resolve_tref(curtrip, opnd);
 					continue;
+				default:
+					break;
 				}
 			}
 			opnd = &curtrip->destination;
@@ -357,8 +359,23 @@ STATICFNDCL bool do_optimize(triple *curtrip)
 				{
 					if (label->operand[0].oprval.mlit->v.str.len > cur_line->str.len)
 						continue;
-					if (strncmp(label->operand[0].oprval.mlit->v.str.addr, cur_line->str.addr,
-						label->operand[0].oprval.mlit->v.str.len) == 0)
+					if (label->operand[0].oprval.mlit->v.str.len != cur_line->str.len)
+					{
+						switch (cur_line->str.addr[label->operand[0].oprval.mlit->v.str.len])
+						{
+							case ' ':
+							case ';':
+							case '(':
+							case ':':
+								break;
+							default:
+								/* If we get here, it means we have a superstring of the label; 
+								 * i.e. searching for "a" found "abc" */
+								continue;
+						}
+					}
+					if (!strncmp(label->operand[0].oprval.mlit->v.str.addr, cur_line->str.addr,
+						label->operand[0].oprval.mlit->v.str.len))
 						break;
 				}
 				if (&src_head == cur_line)

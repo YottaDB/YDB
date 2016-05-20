@@ -57,6 +57,7 @@
 #include "gtmsource_srv_latch.h"
 #include "util.h"			/* For OUT_BUFF_SIZE */
 #include "repl_inst_ftok_counter_halted.h"
+#include "eintr_wrapper_semop.h"
 
 GBLREF	jnlpool_addrs				jnlpool;
 GBLREF	recvpool_addrs				recvpool;
@@ -167,7 +168,7 @@ error_def(ERR_TEXT);
 void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator)
 {
 	boolean_t		hold_onto_ftok_sem, is_src_srvr, new_ipc, reset_gtmsrclcl_info, slot_needs_init, srv_alive;
-	boolean_t		cannot_activate, counter_halted_by_me, ftok_counter_halted = FALSE, skip_locks;
+	boolean_t		cannot_activate, ftok_counter_halted, skip_locks;
 	char			instfilename[MAX_FN_LEN + 1], machine_name[MAX_MCNAMELEN], scndry_msg[OUT_BUFF_SIZE];
 	gd_region		*r_save, *reg;
 	int			status, save_errno;
@@ -189,14 +190,15 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	seq_num			reuse_slot_seqnum, instfilehdr_seqno;
 	repl_histinfo		last_histinfo;
 	jnlpool_ctl_ptr_t	tmp_jnlpool_ctl;
+	struct sembuf   	sop[3];
+	uint4           	sopcnt;
 	DEBUG_ONLY(int4		semval;)
 	DEBUG_ONLY(boolean_t	sem_created = FALSE;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(gtmsource_startup == gtmsource_options.start);
-	skip_locks = (gtmsource_options.setfreeze && (gtmsource_options.freezeval == FALSE)) ||
-			gtmsource_options.showfreeze;
+	skip_locks = (gtmsource_options.setfreeze && (gtmsource_options.freezeval == FALSE)) || gtmsource_options.showfreeze;
 	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
@@ -242,8 +244,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			      RTS_ERROR_LITERAL("Error grabbing the ftok semaphore"), errno);
 	save_errno = errno;
 	repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-	CHECK_IF_REPL_INST_FTOK_COUNTER_HALTED(repl_instance, udi, ftok_counter_halted, counter_halted_by_me,
-							ERR_JNLPOOLSETUP, recvpool.recvpool_dummy_reg, save_errno);
+	/* At this point, we have not yet attached to the jnlpool so we do not know if the ftok counter got halted
+	 * previously or not. So be safe and assume it has halted in case the jnlpool_shmid indicates it is up and running.
+	 * We will set udi->counter_ftok_incremented back to an accurate value after we attach to the jnlpool.
+	 * This means we might not delete the ftok semaphore in some cases of error codepaths but it should be rare
+	 * and is better than incorrectly deleting it while live processes are concurrently using it.
+	 */
+	assert(udi->counter_ftok_incremented == !ftok_counter_halted);
+	udi->counter_ftok_incremented = udi->counter_ftok_incremented && (INVALID_SHMID == repl_instance.jnlpool_shmid);
 	is_src_srvr = (GTMSOURCE == pool_user);
 	/* If caller is source server and secondary instance name has been specified check if it is different from THIS instance */
 	if (is_src_srvr && gtmsource_options.instsecondary)
@@ -276,7 +284,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		}
 		DEBUG_ONLY(sem_created = TRUE);
 		new_ipc = TRUE;
-		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
+		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		if (INVALID_SEMID == (udi->semid = init_sem_set_source(IPC_PRIVATE, NUM_SRC_SEMS, RWDALL | IPC_CREAT)))
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -444,6 +452,19 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
 	jnlpool.jnlpool_ctl = tmp_jnlpool_ctl;
+	/* Now that we have attached to the journal pool, fix udi->counter_ftok_incremented back to an accurate value */
+	udi->counter_ftok_incremented = !ftok_counter_halted;
+	if (udi->counter_ftok_incremented && jnlpool.jnlpool_ctl->ftok_counter_halted)
+	{	/* If shared counter has overflown previously, undo the counter bump we did.
+		 * There is no specific reason but just in case a future caller invokes "jnlpool_init", followed by
+		 * "jnlpool_detach" followed by "mu_rndwn_repl_instance". (See comment in "db_init" where similar
+		 * cleanup is done.
+		 */
+		SET_SOP_ARRAY_FOR_DECR_CNT(sop, sopcnt, (SEM_UNDO | IPC_NOWAIT));
+		SEMOP(udi->ftok_semid, sop, sopcnt, status, NO_WAIT);
+		udi->counter_ftok_incremented = FALSE;
+		assert(-1 != status);	/* since we hold the access control lock, we do not expect any errors */
+	}
 	/* Set a flag to indicate the journal pool is uninitialized. Do this as soon as attaching to shared memory.
 	 * This flag will be reset by "gtmsource_seqno_init" when it is done with setting the jnl_seqno fields.
 	 */
@@ -557,8 +578,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("Journal pool is incompletely initialized. Run MUPIP RUNDOWN first."));
 	}
-	if (counter_halted_by_me)
-		repl_inst_ftok_counter_halted(udi, FILE_TYPE_REPLINST, &repl_instance);
+	if (ftok_counter_halted && !jnlpool.jnlpool_ctl->ftok_counter_halted)
+		repl_inst_ftok_counter_halted(udi);
 	slot_needs_init = FALSE;
 	/* Do not release ftok semaphore in the following cases as each of them involve the callers writing to the instance file
 	 * which requires the ftok semaphore to be held. The callers will take care of releasing the semaphore.

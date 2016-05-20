@@ -478,12 +478,13 @@ error_def(ERR_CRYPTOPFAILED);
 #  define GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(CSA, KEY_HANDLE, INBUF, INBUF_LEN, OUTBUF, OPERATION, IV_MODE, IV, RC)		\
 {																\
 	intrpt_state_t	prev_intrpt_state;											\
+	char		*gcedwiv_inbuf = (char *)(INBUF);									\
 																\
-	assert(INBUF);														\
+	assert(gcedwiv_inbuf);													\
 	if (gtmcrypt_initialized && (GTMCRYPT_INVALID_KEY_HANDLE != KEY_HANDLE))						\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
-		if (0 == gtmcrypt_encrypt_decrypt(KEY_HANDLE, (char *)(INBUF), INBUF_LEN, (char *)(OUTBUF),			\
+		if (0 == gtmcrypt_encrypt_decrypt(KEY_HANDLE, gcedwiv_inbuf, INBUF_LEN, (char *)(OUTBUF),			\
 				OPERATION, IV_MODE, IV))									\
 			RC = 0;													\
 		else														\

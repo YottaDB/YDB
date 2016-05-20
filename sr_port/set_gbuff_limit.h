@@ -10,27 +10,12 @@
  *								*
  ****************************************************************/
 
+#ifndef SET_GBUFF_LIMIT_INCLUDED
+#define SET_GBUFF_LIMIT_INCLUDED
+
 #include "mdef.h"
+#include "gdsfhead.h"
 
-#include "gtm_string.h"
+void set_gbuff_limit(sgmnt_addrs **csaptr, sgmnt_data_ptr_t *csdptr, mval *poollimit_arg);
 
-#include "compiler.h"
-#include "stringpool.h"
-
-GBLREF spdesc stringpool;
-
-oprtype put_str(char *pt, mstr_len_t n)
-{
-	mval p;
-
-	ENSURE_STP_FREE_SPACE(n);
-	memcpy(stringpool.free, pt, n);
-	memset(&p, 0, SIZEOF(mval));
-	p.mvtype = MV_STR;
-	p.str.len = n;
-	p.str.addr = (char *) stringpool.free;
-	stringpool.free += n;
-	/* The line below should be removed as part of GTM-8540; but I can't find a negative test case */
-	s2n(&p);
-	return put_lit(&p);
-}
+#endif

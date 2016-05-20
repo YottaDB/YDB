@@ -58,6 +58,7 @@
 #include "gvt_hashtab.h"
 #include "gtmmsg.h"
 #include "op.h"
+#include "set_gbuff_limit.h"	/* Needed for set_gbuff_limit() */
 #ifdef UNIX
 #include "heartbeat_timer.h"
 #include "anticipatory_freeze.h"
@@ -72,8 +73,6 @@
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		gtcm_connection;
 GBLREF	bool			licensed;
@@ -706,17 +705,8 @@ void gvcst_init(gd_region *greg)
 	{	/* if reorg or dbg apply env var */
 		reg_nam_mval.str.len = greg->rname_len;
 		reg_nam_mval.str.addr = (char *)&greg->rname;
-		op_view(VARLSTCNT(3) &literal_poollimit, &reg_nam_mval, &(TREF(gbuff_limit)));
+		set_gbuff_limit(&csa, &csd, &(TREF(gbuff_limit)));
 #		ifdef DEBUG
-		if (!mu_reorg_process)		/* in dbg, randomize sizes to get test coverage */
-		{
-			if ((process_id & 1) ^ csa->regnum)
-			{
-				csa->gbuff_limit ^= process_id;
-				csa->gbuff_limit &= ((csd->n_bts / 2) - 1);
-			} else
-				csa->gbuff_limit = 0;
-		}
 		if (process_id & 2)		/* also randomize our_midnite */
 		{
 			csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;

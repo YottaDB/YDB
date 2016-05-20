@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,10 +152,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					tptimeout_set(0);
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
-				if (0 != dollar_zgbldir.str.len)
-					gd_header = zgbldir(&dollar_zgbldir);
-				else
-					dpzgbini();	/* sets gd_header to NULL */
+				/* Restore GLD if a match is found, otherwise defer setting gd_header */
+				gd_header = zgbldir_name_lookup_only(&dollar_zgbldir);
 				if (gv_currkey)
 				{
 					gv_currkey->base[0] = 0;

@@ -69,7 +69,7 @@ typedef struct semwait_status_struct
 } semwait_status_t;
 
 boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr, semwait_status_t *status, gd_region *reg,
-			    boolean_t *bypass, boolean_t *sem_halted, sgmnt_data_ptr_t tsd);
+			    boolean_t *bypass, boolean_t *sem_halted);
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 {																 \
@@ -184,6 +184,16 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	} else															\
 		SOPCNT = FTOK_SOPCNT_NO_INCR_COUNTER;										\
 	SOP[0].sem_flg = SOP[1].sem_flg = SOP[2].sem_flg = SEMFLG;								\
+}
+
+#define SET_SOP_ARRAY_FOR_DECR_CNT(SOP, SOPCNT, SEMFLG)										\
+{																\
+	/* Typically, multiple statements are not specified in a single line. However, each of the 2 lines below represent	\
+	 * "one" semaphore operation and hence an acceptible exception to the coding guidelines.				\
+	 */															\
+	SOP[0].sem_num = DB_COUNTER_SEM; SOP[0].sem_op = -DB_COUNTER_SEM_INCR;	/* Decrement counter semaphore */		\
+	SOPCNT = 1;														\
+	SOP[0].sem_flg = SEMFLG;												\
 }
 
 #define SET_SEMWAIT_FAILURE_RETSTAT(RETSTAT, ERRNO, OP, STATUS1, STATUS2, SEMPID)					\

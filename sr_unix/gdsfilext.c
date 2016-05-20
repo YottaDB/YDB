@@ -232,6 +232,14 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			}
 		}
 	}
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
+	{
+		SYSTEM("$gtm_dist/mumps -run $gtm_wbox_mrtn");
+		assert(1 == cs_addrs->nl->wbox_test_seq_num);	/* should have been set by mubfilcpy */
+		cs_addrs->nl->wbox_test_seq_num = 2;	/* signal mupip backup to stop sleeping in mubfilcpy */
+	}
+#	endif
 	/* From here on, we need to use GDSFILEXT_CLNUP before returning to the caller */
 	was_crit = cs_addrs->now_crit;
 	assert(!cs_addrs->hold_onto_crit || was_crit);

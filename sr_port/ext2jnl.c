@@ -272,6 +272,8 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 			rec->jrec_tcom.prefix.forwptr =  rec->jrec_tcom.suffix.backptr = TCOM_RECLEN;
 			rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 			return ((char_ptr_t)rec) + TCOM_RECLEN;
+		default:
+			break;
 	}
 	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	ptr = STRTOK_R(NULL, "\\", &strtokptr);	/* get the update_num field */

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -66,7 +66,7 @@ endif
 
 source $gtm_root/$gtm_verno/tools/gtm_cshrc.csh
 
-\unalias unalias
+\unalias unalias >& /dev/null  # TCSH does not let you alias unalias
 unalias cd chown rm touch echo grep sed awk sort cat mv ls
 
 if ($?RUNALL_VERSION == 0) then

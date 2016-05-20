@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,9 @@
 #include "gtm_string.h"
 #include "stringpool.h"
 #include "op.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
+#include "mv_stent.h"
 
 #define PLUS 	1
 #define MINUS 	2
@@ -21,7 +25,8 @@
 #define PAREN 	16
 #define FNERROR 7
 
-GBLREF spdesc stringpool;
+GBLREF spdesc	stringpool;
+GBLREF mv_stent	*mv_chain;
 
 LITREF mval	literal_zero;
 
@@ -32,12 +37,13 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 {
 	boolean_t	comma, paren;
 	int 		ct, x, xx, y, z;
-	mval		t_src, *t_src_p;
+	mval		*t_src_p;
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t;
 
 	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
-	t_src_p = &t_src;		/* operate on src in a temp, so conversions are possible without modifying src */
+	PUSH_MV_STENT(MVST_MVAL);			/* Create a temporary on M stack so garbage collection can see it */
+	t_src_p = &mv_chain->mv_st_cont.mvs_mval;	/* Operate on copy of src so can modify without changing original */
 	*t_src_p = *src;
 	if (use_fract)
 		op_fnj3(t_src_p, 0, fract, t_src_p);
@@ -57,6 +63,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	if (0 == fmt->str.len)
 	{
 		*dst = *t_src_p;
+		POP_MV_STENT(); 	/* Done with temporary */
 		return;
 	}
 	ch = (unsigned char *)t_src_p->str.addr;
@@ -167,6 +174,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		dst->str.addr = (char *)stringpool.free;
 		dst->str.len = INTCAST(cp - stringpool.free);
 		stringpool.free = cp;
+		POP_MV_STENT(); 	/* Done with temporary */
 		return;
 	}
 	assertpro(FALSE);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +53,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	VMS_ONLY(va_count(count));
 	assert(1 < count);
 	local_buff = FALSE;
+	merge_args = 0;
 	if (!arg1)
 	{	/* If ZWRite, this parm is NULL */
 		local_buff = TRUE;

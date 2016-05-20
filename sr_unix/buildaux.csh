@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -201,15 +201,16 @@ rm $outlist
 
 if ($stat) then
 	cat $cmdout
-	@ buildaux_status = 1
+	@ buildaux_status++
 else
 	rm $cmdfile.csh
 	rm $cmdout
 endif
 
 if (-e $cmdfile.err) then
-	rm $cmdfile.err
-	@ buildaux_status = 1
+	cat $cmdfile.err
+	rm -f $cmdfile.err
+	@ buildaux_status++
 endif
 
 exit $buildaux_status

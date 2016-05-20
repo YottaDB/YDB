@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,8 +89,12 @@ int gtmsource_end1(boolean_t auto_shutdown)
 		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
 	jnlpool.gtmsource_local->gtmsource_pid = 0;
 	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
-	if (!auto_shutdown && !CUSTOM_ERRORS_LOADED)
-	{	/* Detach from journal pool */
+	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached
+	 * so that we can check for instance freeze in database rundown, or if auto_shutdown is set.
+	 * In those cases, the detach will happen automatically when the process terminates.
+	 */
+	if (!auto_shutdown && !INST_FREEZE_ON_ERROR_POLICY)
+	{
 		JNLPOOL_SHMDT(status, save_errno);
 		if (0 > status)
 			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", STRERROR(save_errno));

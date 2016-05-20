@@ -109,7 +109,7 @@ error_def(ERR_TEXT);
 }
 
 boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t *retstat, boolean_t *bypass,
-			boolean_t *ftok_counter_halted)
+			boolean_t *ftok_counter_halted, boolean_t incr_cnt)
 {
 	int			status = SS_NORMAL, save_errno;
 	int			ftok_sopcnt, sem_pid;
@@ -127,7 +127,7 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 	if (-1 == (udi->key = FTOK(udi->fn, GTM_ID)))
 		RETURN_SEMWAIT_FAILURE(retstat, errno, op_ftok, 0, ERR_FTOKERR, 0);
 	/* First try is always IPC_NOWAIT */
-	SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, TRUE, (SEM_UNDO | IPC_NOWAIT));
+	SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 	/* The following loop deals with the possibility that the semaphores can be deleted by someone else AFTER a successful
 	 * semget but BEFORE semop locks it, in which case we should retry.
 	 */
@@ -165,7 +165,7 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 					RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, ERR_SEMWT2LONG, 0, sem_pid);
 				save_errno = errno; /* fall-through */
 			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, start_hrtbt_cntr, retstat, reg, bypass,
-						     ftok_counter_halted, NULL))
+						     ftok_counter_halted))
 			{
 				if (*ftok_counter_halted)	/* set by "do_blocking_semop" */
 					ftok_sopcnt = FTOK_SOPCNT_NO_INCR_COUNTER;

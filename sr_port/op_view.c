@@ -75,6 +75,7 @@
 #endif
 #include "gtmimagename.h"
 #include "cache.h"
+#include "set_gbuff_limit.h"	/* Needed for set_gbuff_limit() */
 
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
 
@@ -915,14 +916,7 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 			case VTK_POOLLIMIT:
 				csa = cs_addrs;
 				csd = csa->hdr;
-				nbuffs = ((dba_bg == csd->acc_meth) && (NULL != thirdarg)) ? MV_FORCE_INT(thirdarg) : 0;
-				if (nbuffs && (MV_STR & thirdarg->mvtype) && ('%' == thirdarg->str.addr[thirdarg->str.len - 1]))
-					nbuffs = (100 == nbuffs) ? 0 : (csd->n_bts * nbuffs) / 100;		/* Percentage */
-				csa->gbuff_limit = (0 == nbuffs) ? 0 : MAX(MIN(nbuffs, csd->n_bts * .5), MIN_GBUFF_LIMIT);
-				/* To pick the current "hand" as a pseudo-random spot for our area see dbg code in gvcst_init
-				 * but for the first release of this always pick the end of the buffer
-				 */
-				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts;
+				set_gbuff_limit(&csa, &csd, thirdarg);
 				break;
 		}
 	}

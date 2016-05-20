@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2014-2015 Fidelity National Information 	;
+; Copyright (c) 2014-2016 Fidelity National Information		;
 ;  Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -132,7 +132,7 @@
 ; Routine to take a line of input from the gtm_threadgbl_asm_access.txt file and syntax check it. We allow the following:
 ;
 ;   - trailing white space
-;   - trailing comments preceeded by a '#' character potentially preceeded by white space
+;   - trailing comments preceded by a '#' character potentially preceded by white space
 ;
 ; In either of the above conditions, the input line (passed by reference) is stripped of its trailing junk so only the
 ; variable name itself is left when we return.

@@ -254,11 +254,11 @@ int gtmsource()
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 			/* If the child source server process got a ftok counter overflow, it would have recorded that in
-			 * jnlpool.repl_inst_filehdr->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
+			 * jnlpool.jnlpool_ctl->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
 			 * child process got a counter overflow.
 			 */
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented
-									&& !jnlpool.repl_inst_filehdr->ftok_counter_halted, TRUE);
+									&& !jnlpool.jnlpool_ctl->ftok_counter_halted, TRUE);
 		} else
 		{	/* Child source server process errored out at startup and is no longer alive.
 			 * If we were the one who created the journal pool, let us clean it up.

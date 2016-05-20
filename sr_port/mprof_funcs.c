@@ -92,15 +92,21 @@ LITDEF  MIDENT_CONST(above_routine, "*above*");
 }
 #endif
 
-#define UPDATE_TIME(x)													\
+#define UPDATE_TIME(MPP)												\
 {															\
-	x->e.usr_time += ((TREF(mprof_ptr))->tcurr.tms_utime - (TREF(mprof_ptr))->tprev.tms_utime);			\
-	x->e.sys_time += ((TREF(mprof_ptr))->tcurr.tms_stime - (TREF(mprof_ptr))->tprev.tms_stime);			\
-	x->e.elp_time += ((TREF(mprof_ptr))->tcurr.tms_etime - (TREF(mprof_ptr))->tprev.tms_etime);			\
+	mprof_wrapper *mpp = (MPP);											\
+															\
+	if (mpp->tcurr.tms_utime > mpp->tprev.tms_utime)								\
+		mpp->curr_tblnd->e.usr_time += (mpp->tcurr.tms_utime - mpp->tprev.tms_utime);				\
+	if (mpp->tcurr.tms_stime > mpp->tprev.tms_stime)								\
+		mpp->curr_tblnd->e.sys_time += (mpp->tcurr.tms_stime - mpp->tprev.tms_stime);				\
+	if (mpp->tcurr.tms_etime > mpp->tprev.tms_etime)								\
+		mpp->curr_tblnd->e.elp_time += (mpp->tcurr.tms_etime - mpp->tprev.tms_etime);				\
 	/* It should be a reasonable assumption that in debug no M process will use more than a week of either user,	\
 	 * system, or even absolute runtime.										\
 	 */														\
-	assert((x->e.usr_time < RUNTIME_LIMIT) && (x->e.sys_time < RUNTIME_LIMIT) && (x->e.elp_time < RUNTIME_LIMIT));	\
+	assert((mpp->curr_tblnd->e.usr_time < RUNTIME_LIMIT) && (mpp->curr_tblnd->e.sys_time < RUNTIME_LIMIT)		\
+			&& (mpp->curr_tblnd->e.elp_time < RUNTIME_LIMIT));						\
 }
 
 #define RTS_ERROR_VIEWNOTFOUND(x)	MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len,	\
@@ -310,7 +316,7 @@ void turn_tracing_off(mval *gvn)
 	/* Update the time of previous M line if there was one. */
 	if (NULL != (TREF(mprof_ptr))->curr_tblnd)
 	{
-		UPDATE_TIME((TREF(mprof_ptr))->curr_tblnd);
+		UPDATE_TIME(TREF(mprof_ptr));
 	}
 	if (NULL != gvn)
 		parse_gvn(gvn);
@@ -416,7 +422,7 @@ void pcurrpos(void)
 	/* Update the time of previous M line. */
 	if (NULL != (TREF(mprof_ptr))->curr_tblnd)
 	{
-		UPDATE_TIME((TREF(mprof_ptr))->curr_tblnd);
+		UPDATE_TIME(TREF(mprof_ptr));
 	}
 	get_entryref_information(TRUE, &tmp_trc_tbl_entry);
 	if (FALSE == (TREF(mprof_ptr))->is_tracing_ini)
@@ -478,7 +484,7 @@ void new_prof_frame(int real_frame)
 		if (NULL != (TREF(mprof_ptr))->curr_tblnd)
 		{
 			TIMES(&(TREF(mprof_ptr))->tcurr);
-			UPDATE_TIME((TREF(mprof_ptr))->curr_tblnd);
+			UPDATE_TIME(TREF(mprof_ptr));
 		}
 		(TREF(prof_fp))->curr_node = (TREF(mprof_ptr))->curr_tblnd;
 		(TREF(mprof_ptr))->curr_tblnd = NULL;
@@ -523,7 +529,7 @@ void unw_prof_frame(void)
 		/* Update the time of last line in this frame before returning. */
 		if (NULL != (TREF(mprof_ptr))->curr_tblnd)
 		{
-			UPDATE_TIME((TREF(mprof_ptr))->curr_tblnd);
+			UPDATE_TIME(TREF(mprof_ptr));
 		}
 		get_entryref_information(TRUE, &tmp_trc_tbl_entry);
 		/* If prof_fp is NULL, it was set so in get_entryref_information, which means

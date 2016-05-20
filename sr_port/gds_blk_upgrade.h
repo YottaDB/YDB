@@ -73,7 +73,7 @@ GBLREF	boolean_t	dse_running;
 		if ((fully_upgraded) || (SIZEOF(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
 		{														\
 			upgrdstatus = SS_NORMAL;										\
-			if (NULL != (ondskblkver))										\
+			if (NULL != (void *)(ondskblkver))									\
 				*(ondskblkver) = GDSV6;										\
 		} else														\
 		{														\
@@ -85,13 +85,13 @@ GBLREF	boolean_t	dse_running;
 	} else if (UPGRADE_NEVER == gtm_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = SS_NORMAL;											\
-		if (NULL != (ondskblkver))											\
+		if (NULL != (void *)(ondskblkver))										\
 			*(ondskblkver) = GDSV6;											\
 	} else if (UPGRADE_ALWAYS == gtm_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),				\
 					      (curcsd)->blk_size, (ondskblkver));						\
-		if (NULL != (ondskblkver))											\
+		if (NULL != (void *)(ondskblkver))										\
 			*(ondskblkver) = GDSV4;											\
                 if (srcbuffptr != trgbuffptr)											\
                         srcbuffptr = NULL;											\

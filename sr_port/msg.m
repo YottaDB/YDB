@@ -137,7 +137,7 @@
  . . Write !,"Format item count (fao) not specified."
  . . Quit
  . Set outmsg(cnt,"code")=(facnum+2048)*65536+((cnt+4096)*8)+severity
- . If 'vms Use out Write $Char(9),"""",outmsg(cnt),""", ",text,", ",fao,",",!
+ . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao," },",!
  . If ansiopen,ansi="none" Set ansi=0 ; Make !/ansi= specification optional (except for first one)
  . Quit:ansi="none"
  . Do:'ansiopen

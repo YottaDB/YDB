@@ -30,12 +30,13 @@
 #include "gtcml.h"
 #include "mlk_pvtblk_equ.h"
 #include "copy.h"
+#include "gtcm_find_region.h"
 
 GBLREF connection_struct *curr_entry;
 
 void gtcml_lklist(void)
 {
-	cm_region_list *reg_ref, *gtcm_find_region();
+	cm_region_list *reg_ref;
 	unsigned char *ptr, regnum, list_len, i, translev, subcnt;
 	unsigned short top,len;
 	mlk_pvtblk *new_entry;

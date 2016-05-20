@@ -137,7 +137,7 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 		if (gds_t_writemap != cse->mode)
 		{
 			array = (blk_segment *)cse->upd_addr;
-			stop_ptr = cse->first_copy ? array : array + 1;
+			stop_ptr = array; /* Note: No cse->first_copy optimization done here (like in gvcst_blk_build). GTM-8523 */
 			seg = (blk_segment *)array->addr;
 			while (seg != stop_ptr)
 			{
@@ -279,6 +279,14 @@ enum cdb_sc	op_tcommit(void)
 				cnl = csa->nl;
 				is_mm = (dba_mm == csa->hdr->acc_meth);
 				si->cr_array_index = 0;
+#				ifdef DEBUG
+				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
+					&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !csa->nl->wbox_test_seq_num)
+				{
+					while (0 == csa->nl->wbox_test_seq_num)
+						SHORT_SLEEP(1);	/* wait for signal from mubfilcpy that it has reached sync point */
+				}
+#				endif
 				if (!is_mm && (si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2))))
 				{	/* reallocate a bigger cr_array. We need atmost read-set (si->num_of_blks) +
 					 * write-set (si->cw_set_depth) + bitmap-write-set (a max. of si->cw_set_depth)

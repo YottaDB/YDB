@@ -339,14 +339,15 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
  */
 #define	GVKEY_INCREMENT_ORDER(KEY)			\
 {							\
-	int	end;					\
+	int		end;				\
+	unsigned char 	*base = KEY->base;		\
 							\
 	end = KEY->end;					\
-	assert(KEY_DELIMITER == KEY->base[end - 1]);	\
-	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(KEY_DELIMITER == base[end - 1]);		\
+	assert(KEY_DELIMITER == base[end]);		\
 	assert(end + 1 < KEY->top);			\
-	KEY->base[end - 1] = 1;				\
-	KEY->base[end + 1] = KEY_DELIMITER;		\
+	base[end - 1] = 1;				\
+	base[end + 1] = KEY_DELIMITER;			\
 	KEY->end = end + 1;				\
 }
 
@@ -1520,13 +1521,7 @@ n_db_csh_acct_rec_types
 	sgmnt_data_ptr_t	CSD;							\
 											\
 	CSD = CSA->hdr;									\
-	assert((256 == GTMCRYPT_RESERVED_ENCR_SPACE)					\
-		&& (GTMCRYPT_RESERVED_ENCR_SPACE == 2 * GTMCRYPT_RESERVED_HASH_LEN	\
-			+ SIZEOF(CSD->non_null_iv)					\
-			+ SIZEOF(CSD->encryption_hash_cutoff)				\
-			+ SIZEOF(CSD->encryption_hash2_start_tn)			\
-			+ SIZEOF(CSD->filler_encrypt)));				\
-	CHPTR = (char *)&CSD->encryption_hash + GTMCRYPT_RESERVED_ENCR_SPACE;		\
+	CHPTR = (char *)CSD->filler_encrypt + SIZEOF(CSD->filler_encrypt);		\
 	CLRLEN = (char *)&CSD->intrpt_recov_resync_strm_seqno - CHPTR;			\
 	memset(CHPTR, 0, CLRLEN);							\
 	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */			\
@@ -1934,8 +1929,8 @@ typedef struct sgmnt_data_struct
 	boolean_t	maxkeysz_assured;	/* All the keys in the database are less than MAX_KEY_SIZE */
 	boolean_t	hasht_upgrade_needed;	/* ^#t global needs to be upgraded from V62000 to post-V62000 format */
 	boolean_t	defer_allocate;		/* If FALSE: Use fallocate() preallocate space from the disk */
-	boolean_t	ftok_counter_halted;	/* Stop increasing/decreasing the ftok counter semaphore */
-	boolean_t	access_counter_halted;	/* Stop increasing/decreasing the access counter semaphore */
+	boolean_t	filler_ftok_counter_halted;	/* Used only in V6.3-000. Kept as a filler just to be safe */
+	boolean_t	filler_access_counter_halted;	/* Used only in V6.3-000. Kept as a filler just to be safe */
 	char		filler_7k[708];
 	char		filler_8k[1024];
 	/********************************************************/
@@ -2416,7 +2411,6 @@ typedef struct	sgmnt_addrs_struct
 	uint4		root_search_cycle;	/* local copy of cnl->root_search_cycle */
 	uint4		onln_rlbk_cycle;	/* local copy of cnl->onln_rlbk_cycle */
 	uint4		db_onln_rlbkd_cycle;	/* local copy of cnl->db_onln_rlbkd_cycle */
-	boolean_t	dbinit_shm_created;	/* TRUE if shared memory for this region was created by this process */
 	boolean_t	read_only_fs;		/* TRUE if the region is read_only and the header was not updated due to EROFS */
 	boolean_t	crit_probe;		/* flag for indicating the process is doing a crit probe on this region */
 	probecrit_rec_t	probecrit_rec;		/* fields defined in tab_probecrit_rec.h and initialized in probecrit_rec.h */

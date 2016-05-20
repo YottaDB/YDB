@@ -222,7 +222,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	int			csd_size;
 	char                    now_running[MAX_REL_NAME];
 	boolean_t		rc_cpt_removed, is_gtm_shm;
-	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, ftok_counter_halted = FALSE;
+	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, ftok_counter_halted;
 	boolean_t		crypt_warning, do_crypt_init;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
 	sgmnt_addrs		*csa;
@@ -305,21 +305,14 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	}
 	csa->hdr = tsd;
 	csa->region = gv_cur_region;
-	/* If we were able to increment the ftok semaphore counter but the file header indicates the counter increment
-	 * has halted previously. So treat ourselves as not having made the increment (as otherwise when we go to
-	 * "ftok_sem_release" we would decrement the counter and if it is 1 we will incorrectly remove the semaphore
-	 * even though processes which did not bump the counter are still accessing the database). If we later determine
-	 * that there is no one else attached to the database (shm_nattch is 0) then we will remove the ftok semaphore.
+	/* At this point, we have not yet attached to the database shared memory so we do not know if the ftok counter got halted
+	 * previously or not. So be safe and assume it has halted in case the db shmid indicates it is up and running.
+	 * We will set udi->counter_ftok_incremented back to an accurate value after we attach to the db shm.
+	 * This means we might not delete the ftok semaphore in some cases of error codepaths but it should be rare
+	 * and is better than incorrectly deleting it while live processes are concurrently using it.
 	 */
-	if (tsd->ftok_counter_halted)
-	{	/* If counter is halted, we should never remove ftok semaphore as part of a later "ftok_sem_release" call.
-		 * So make sure "counter_ftok_incremented" is set to FALSE in case it was TRUE after the "ftok_sem_get" call.
-		 */
-		udi->counter_ftok_incremented = FALSE;
-	} else if (ftok_counter_halted)
-		assert(!udi->counter_ftok_incremented);
-	else
-		assert(udi->counter_ftok_incremented);
+	assert(udi->counter_ftok_incremented == !ftok_counter_halted);
+	udi->counter_ftok_incremented = udi->counter_ftok_incremented && (INVALID_SHMID == udi->shmid);
 	if (USES_ENCRYPTION(tsd->is_encrypted))
 	{
 		csa = &(udi->s_addrs);
@@ -459,7 +452,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	}
 	/* Now rundown database if shared memory segment exists. We try this for both values of 'standalone'. */
 	if (no_shm_exists)
-	{
+	{	/* Since we know no shm exists, we can safely say the counter has not halted so restore counter_ftok_incremented */
+		udi->counter_ftok_incremented = !ftok_counter_halted;
+		assert(udi->counter_ftok_incremented);
 		if (prevent_mu_rndwn)
 		{
 			if (override_present)
@@ -515,34 +510,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			tsd->gt_shm_ctime.ctime = udi->gt_shm_ctime = 0;
 			if (standalone)
 			{
-				if (tsd->ftok_counter_halted || tsd->access_counter_halted)
-				{
-					if (reg->read_only)
-					{	/* No current way to clear these flags through gtmsecshr. So disallow it */
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(reg));
-						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					}
-					/* Access counter is already guaranteed to be 1 as otherwise we would have issued
-					 * a "File already open by another process" error after the SEMOP above. But ftok
-					 * counter is not guaranteed to be the same. So fix it that way a "ftok_sem_release"
-					 * done later WILL remove the ftok semaphore.
-					 */
-					semarg.val = 0;
-					if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
-					{
-						RNDWN_ERR("!AD -> Error with semctl with SETVAL1", reg);
-						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					}
-					save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
-					if (save_errno)
-					{
-						RNDWN_ERR("!AD -> Error with do_semop with SETVAL1", reg);
-						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					}
-					tsd->ftok_counter_halted = FALSE;
-					tsd->access_counter_halted = FALSE;
-					udi->counter_ftok_incremented = TRUE;
-				}
 				if (!reg->read_only)
 				{
 					if (mupip_jnl_recover)
@@ -615,25 +582,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			}
 		}
 		assert(!standalone);
-		/* Fix up ftok semaphore counter now that we know we are the only one accessing this database */
-		if (tsd->ftok_counter_halted || tsd->access_counter_halted)
-		{
-			semarg.val = 0;
-			if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
-			{
-				RNDWN_ERR("!AD -> Error with semctl with SETVAL2", reg);
-				CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-			}
-			save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
-			if (save_errno)
-			{
-				RNDWN_ERR("!AD -> Error with do_semop with SETVAL2", reg);
-				CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-			}
-			tsd->ftok_counter_halted = FALSE;	/* clear this just in case it is TRUE */
-			tsd->access_counter_halted = FALSE;	/* clear this just in case it is TRUE */
-			udi->counter_ftok_incremented = TRUE;
-		}
 		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, tsd, tsd_size, status);
 		if (0 != status)
 		{
@@ -644,7 +592,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		free(tsd);
 		REVERT;
 		/* For mupip rundown (standalone = FALSE), we release/remove ftok semaphore here. */
-		assert(udi->counter_ftok_incremented);
 		if (!ftok_sem_release(reg, udi->counter_ftok_incremented, TRUE))
 		{
 			RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
@@ -802,6 +749,13 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			 */
 			if (db_shm_in_sync)
 			{
+				/* Now that we have attached to db shm and verified it is usable, fix udi->counter_ftok_incremented
+				 * to take into account the "ftok_counter_halted" flag. This will make sure we do not incorrectly
+				 * delete the ftok semaphore in any error codepaths from now on until the end. In the end when we
+				 * are sure it is safe to rundown this shm, we will fix udi->counter_ftok_incremented to what it
+				 * should be to correctly remove the ftok semaphore.
+				 */
+				udi->counter_ftok_incremented = udi->counter_ftok_incremented && !cs_addrs->nl->ftok_counter_halted;
 				if (!udi->counter_acc_incremented)
 				{	/* Now that we have ensured db & shm are in sync and will be doing the "actual"
 					 * rundown, we need to ensure that no one is attached to the database (counter
@@ -1041,25 +995,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					 */
 					RESET_SEMID_CTIME(csd);
 				}
-				/* Fix up ftok semaphore counter now that we know we are the only one accessing this database */
-				if (csd->ftok_counter_halted || csd->access_counter_halted)
-				{
-					semarg.val = 0;
-					if (-1 == semctl(udi->ftok_semid, DB_COUNTER_SEM, SETVAL, semarg))
-					{
-						RNDWN_ERR("!AD -> Error with semctl with SETVAL3", reg);
-						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					}
-					save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, DB_COUNTER_SEM_INCR, SEM_UNDO);
-					if (save_errno)
-					{
-						RNDWN_ERR("!AD -> Error with do_semop with SETVAL3", reg);
-						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					}
-					csd->ftok_counter_halted = FALSE;	/* clear this just in case it is TRUE */
-					csd->access_counter_halted = FALSE;	/* clear this just in case it is TRUE */
-					udi->counter_ftok_incremented = TRUE;
-				}
 				DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, csd_size, status);
 				if (0 != status)
 				{
@@ -1178,6 +1113,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	 * Otherwise, just release ftok semaphore lock. Counter will be one more for this process.
 	 * Exit handlers must take care of removing if necessary.
 	 */
+	/* We successfully ran down the database. So restore udi->counter_ftok_incremented before "ftok_sem_release"
+	 * that way the ftok semaphore gets deleted correctly as part of the counter decrement.
+	 */
+	udi->counter_ftok_incremented = !ftok_counter_halted;
 	assert(udi->counter_ftok_incremented || (!wcs_flu_success && override_present && !standalone));
 	if (!ftok_sem_release(reg, udi->counter_ftok_incremented && !standalone, !standalone))
 		return FALSE;

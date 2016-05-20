@@ -697,6 +697,9 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 		else
 			util_out_print( PREFIX_JNLPOOLCTL "Freeze Comment: !AZ", TRUE, jnlpool_ctl->freeze_comment);
 	}
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, ftok_counter_halted), SIZEOF(jnlpool_ctl->ftok_counter_halted));
+	PRINT_BOOLEAN( PREFIX_JNLPOOLCTL  "FTOK Counter Halted                         !R10AZ",
+									jnlpool_ctl->ftok_counter_halted, -1);
 
 }
 

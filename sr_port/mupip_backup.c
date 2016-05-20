@@ -56,7 +56,6 @@
 #include "repl_instance.h"
 #include "mu_gv_cur_reg_init.h"
 #include "ftok_sems.h"
-#include "repl_inst_ftok_counter_halted.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "do_shmat.h"		/* for do_shmat() prototype */
@@ -245,7 +244,7 @@ void mupip_backup(void)
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
 	boolean_t		sync_io, sync_io_specified, wait_for_zero_kip;
-	boolean_t		counter_halted_by_me, ftok_counter_halted = FALSE, repl_inst_available;
+	boolean_t		dummy_ftok_counter_halted, repl_inst_available;
 	struct stat		stat_buf;
 	int			fstat_res, fclose_res, tmpfd;
 	gd_segment		*seg;
@@ -742,7 +741,7 @@ void mupip_backup(void)
 			}
 			do
 			{
-				if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &ftok_counter_halted))
+				if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &dummy_ftok_counter_halted))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 					error_mupip = TRUE;
@@ -750,35 +749,20 @@ void mupip_backup(void)
 				}
 				save_errno = errno;
 				repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-				CHECK_IF_REPL_INST_FTOK_COUNTER_HALTED(repl_instance, udi, ftok_counter_halted,
-						counter_halted_by_me, ERR_JNLPOOLSETUP, jnlpool.jnlpool_dummy_reg, save_errno);
-				if (!repl_instance.ftok_counter_halted && !counter_halted_by_me)
-					break;
-				/* Even though the ftok counter has halted, if we notice no jnlpool semid open then it means
-				 * the journal pool has not been established by the source server. In that case, there is
-				 * no point trying to attach to a non-existent jnlpool. Break out and proceed with the backup.
+				/* If we notice no jnlpool semid open then it means the journal pool has not been established
+				 * by the source server. In that case, there is no point trying to attach to a non-existent
+				 * jnlpool. Break out and proceed with the backup while still holding the ftok lock.
 				 */
 				sem_id = repl_instance.jnlpool_semid;
 				if (INVALID_SEMID == sem_id)
 					break;
-				/* This is VERY unlikely because we had "pool_init" set to FALSE even after the
-				 * "jnlpool_init" call which means the source server had not created a journal pool
-				 * then. And a few lines later we have a situation where our ftok_sem_get on that
-				 * replication instance file ftok semaphore overflowed the 32Ki counter and we have proof
-				 * in repl_instance.jnlpool_semid that a jnlpool has been set up by a source server which means
-				 * 32K processes started within a few lines. If "counter_halted_by_me" is TRUE, then we need
-				 * to update the "ftok_counter_halted" flag in the instance file header on disk as well as
-				 * in the journal pool. But we have not yet attached to the journal pool. So do that now
-				 * but release the ftok lock first. If we successfully attached to the journal pool
-				 * "jnlpool_init" would itself do the halted counter update so no more work needed here.
-				 * Since this is a rare situation (32K processes halting or coming up within a few lines)
-				 * we keep retrying until we have a situation where "counter_halted_by_me" is FALSE.
+				/* A source server sneaked in between when we did the "jnlpool_init" above and set up a
+				 * journal pool. Attach to it after releasing the ftok lock. We expect this situation to be
+				 * rare that we keep retrying.
 				 */
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 				jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
-					/* "jnlpool_init" will set "pool_init" if successful and issue the NOMORESEMCNT
-					 * syslog message if the ftok counter got halted by us.
-					 */
+					/* "jnlpool_init" will set "pool_init" if successful */
 				if (pool_init)
 					break;
 			} while (TRUE);
@@ -786,7 +770,7 @@ void mupip_backup(void)
 		if (pool_init)
 		{
 			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			assert(udi->ftok_semid && (INVALID_SEMID != udi->ftok_semid));
+			assert(INVALID_SEMID != udi->ftok_semid);
 			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
@@ -795,9 +779,9 @@ void mupip_backup(void)
 			}
 			/* (Re-)read the instance file header now that we have the ftok lock */
 			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+			if (jnlpool_ctl->ftok_counter_halted)
+				udi->counter_ftok_incremented = FALSE;	/* so we do not inadvertently delete the ftok semaphore */
 		}
-		if (repl_instance.ftok_counter_halted)
-			udi->counter_ftok_incremented = FALSE;	/* so we do not inadvertently delete the ftok semaphore */
 		assert(NULL != jnlpool.jnlpool_dummy_reg);
 		assert(!pool_init || (NULL != jnlpool_ctl));
 		shm_id = repl_instance.jnlpool_shmid;
@@ -1390,8 +1374,6 @@ repl_inst_bkup_done2:
 			rptr->backup_hdr->shmid = INVALID_SHMID;
 			rptr->backup_hdr->gt_sem_ctime.ctime = 0;
 			rptr->backup_hdr->gt_shm_ctime.ctime = 0;
-			rptr->backup_hdr->ftok_counter_halted = FALSE;
-			rptr->backup_hdr->access_counter_halted = FALSE;
 			if (jnl_options[jnl_off] || bkdbjnl_off_specified)
 				rptr->backup_hdr->jnl_state = jnl_closed;
 			if (jnl_options[jnl_disable] || bkdbjnl_disable_specified)

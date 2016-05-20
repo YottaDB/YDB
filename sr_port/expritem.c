@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -619,19 +619,18 @@ int expritem(oprtype *a)
 		}
 		if (saw_se && (OLD_SE != TREF(side_effect_handling)))
 		{
-			assert(0 < TREF(expr_depth));
 			assert(TREF(expr_depth) <= TREF(side_effect_depth));
 			(TREF(side_effect_base))[TREF(expr_depth)] = TRUE;
 		}
 		functrip = t1 = a->oprval.tref;
 		if (parse_warn || !(TREF(side_effect_base))[TREF(expr_depth)] || (NO_REF == functrip->operand[1].oprclass))
 			return TRUE;	/* 1 argument gets a pass */
-		assert(0 < TREF(expr_depth));
 		switch (functrip->opcode)
 		{
 			case OC_EXFUN:		/* relies on protection from actuallist */
 			case OC_EXTEXFUN:	/* relies on protection from actuallist */
 			case OC_FNFGNCAL:	/* relies on protection from actuallist */
+			case OC_EXFUNRET:	/* arguments are addresses/locations rather than values */
 			case OC_FNGET:		/* $get() gets a pass because protects itself */
 			case OC_FNINCR:		/* $increment() gets a pass because its ordering needs no protection */
 			case OC_FNNEXT:		/* only has 1 arg, but uses 2 for lvn interface */
@@ -640,6 +639,7 @@ int expritem(oprtype *a)
 			case OC_INDINCR:	/* $increment() gets a pass because its ordering needs no protection */
 				return TRUE;
 		}	/* default falls through */
+		assert(0 < TREF(expr_depth));
 		/* This block protects lvn evaluations in earlier arguments from changes caused by side effects in later
 		 * arguments by capturing the prechange value in a temporary; coerce or preexisting temporary might already
 		 * do the job and indirect local evaluations may already have shifted to occur earlier. This algorithm is similar

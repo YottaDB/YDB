@@ -44,10 +44,10 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { "RUN", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "SPACE", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NON_NEG, 	VAL_NUM, 0},
 { "WARNINGS", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
-{ 0 }
+{ "" }
 };
 
 GBLDEF CLI_ENTRY mumps_cmd_ary[] = {
 { "MUMPS", 0, mumps_qual, mumps_parm, 0, 0, 0, VAL_DISALLOWED, 1, 0, VAL_LIST, 0},
-{ 0 }
+{ "" }
 };

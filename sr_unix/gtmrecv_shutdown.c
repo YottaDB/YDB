@@ -65,7 +65,7 @@ error_def(ERR_TEXT);
 int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 {
 	uint4           savepid;
-	boolean_t       ftok_counter_halted, shut_upd_too = FALSE, was_crit;
+	boolean_t       shut_upd_too = FALSE, was_crit;
 	int             status, save_errno;
 	unix_db_info	*udi;
 
@@ -182,7 +182,6 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	/* gtmrecv_ipc_cleanup will not be successful unless receiver server has completely exited.
 	 * It relies on RECV_SERV_COUNT_SEM value.
 	 */
-	ftok_counter_halted = jnlpool.repl_inst_filehdr->ftok_counter_halted;	/* Note down before repl_inst_filehdr is NULLed */
 	if (FALSE == gtmrecv_ipc_cleanup(auto_shutdown, &exit_status))
 	{	/* Release all semaphores */
 		if (!auto_shutdown)
@@ -200,11 +199,13 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		*/
 		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
 			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-		repl_inst_recvpool_reset(CLEAR_FTOK_HALTED_FALSE);
+		repl_inst_recvpool_reset();
 		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
-	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
+	assert(NULL != jnlpool.jnlpool_ctl);
+	if (!ftok_sem_release(recvpool.recvpool_dummy_reg,
+					!jnlpool.jnlpool_ctl->ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	return (exit_status);
 }

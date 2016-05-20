@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2015 Fidelity National Information 	#
+# Copyright (c) 2009-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -672,18 +672,14 @@ if [ "$doutf8" -ne 0 ]; then
 	chgrp $bingroup $gtmdist/utf8/*.txt
 fi
 
-gtm_dist=$gtmdist
-export gtm_dist
-
 if [ -f $gtm_dist/libgtmutil$ext ] ; then
-    gtmroutines=$gtm_dist/libgtmutil$ext
+    gtmroutines="$gtm_dist/libgtmutil$ext $gtmdist"
 else
-    gtmroutines=$gtmdist
+    gtmroutines="$gtmdist"
 fi
 export gtmroutines
 
-other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMDEFINEDTYPESTODB.o GTMHLPLD.o GTMTHREADGBLASM.o LOAD.o"
-other_object_files="$other_object_files LOADOP.o LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
+other_object_files=""
 csh_script_files=""
 
 # make database files read only
@@ -816,7 +812,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid $other_object_files $csh_script_files lowerc_cp\
 		*.hlp core *.h *.m *help.dat *help.gld COPYING README.txt
-	\rm -rf GETPASS.o plugin PINENTRY.o GTMHELP.o custom_errors_sample.txt
+	\rm -rf GETPASS.o plugin GTMHELP.o custom_errors_sample.txt
 	if [ -d utf8 ]; then
 		\rm -rf utf8
 	fi

@@ -167,20 +167,40 @@ if ( $?gtm_version_change == "1" ) then
             		setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         	endif
 		if ( "x86_64" == $mach_type ) then
-			# Add uninitialized variable checking on 64bit platforms (GCC on our 32bits platforms don't support it
-			# correctly). Do not enable on SUSE or 4.4.7 on 64-bit because both platforms either cannot disable
-			# maybe-unitialized or require -O to be defined to disable maybe-unitialized.
-			cc --version |& grep -q -E '4.4.7|4.7.2|4.6.3|SUSE'
-			if (0 != $status) then
-				setenv  gt_cc_options_common    "$gt_cc_options_common -Wuninitialized "
+			# Add flags for warnings that we want and don't want.
+			set desired_warnings = ( -Wall )
+			# The following warnings would be desirable, but together can result in megabytes of warning messages. We
+			# should look into how hard they would be to clean up. It is possible that some header changes could
+			# reduce a large number of these.
+			#set desired_warnings = ( $desired_warnings -Wconversion -Wsign-compare )
+			#
+			# We should also look into how hard these would be to restore. Some of the warnings come from generated
+			# code and macro use, making them harder to deal with.
+			set undesired_warnings = ( -Wunused-result -Wparentheses -Wunused-value -Wunused-variable )
+			set undesired_warnings = ( $undesired_warnings -Wmaybe-uninitialized -Wchar-subscripts )
+			set undesired_warnings = ( $undesired_warnings -Wunused-but-set-variable )
+			if ( { (cc --version |& grep -q -E '4.4.7|4.7.2|4.6.3|SUSE') } ) then
+				set undesired_warnings = ( $undesired_warnings -Wuninitialized )
 			endif
-			# Disable unused-result or maybe-uninitialized warnings if supported by the compiler as we don't care about
-			# them. Blindly adding disable flags causes errors. Note: Compilers that don't support --help=warnings will
-			# not output anything useful.
-
-			set  disableflags = `cc --help=warnings | & awk '{if ($1~/maybe-uninitialized/) \
-					print "-Wno-maybe-uninitialized "; if ($1~/unused-result/) print "-Wno-unused-result ";}'`
-			setenv  gt_cc_options_common    "$gt_cc_options_common $disableflags"
+			# If our compiler happens not to support --help=warnings, the following will produce junk, but it is
+			# unlikely that the junk will match the warning options of interest, so it shouldn't be a problem.
+			set -f supported_warnings = `cc --help=warnings | & awk '$1 ~ /^-/ {print $1}'`
+			foreach w ($desired_warnings)
+				# Add the warning to a copy of the supported list, discarding duplicates.
+				set -f tmp_warnings = ($supported_warnings $w)
+				if ("$supported_warnings" == "$tmp_warnings") then
+					# Adding the desired warning didn't change the list, so it is supported.
+					setenv gt_cc_options_common "$gt_cc_options_common $w"
+				endif
+			end
+			foreach w ($undesired_warnings)
+				# Add the warning to a copy of the supported list, discarding duplicates.
+				set -f tmp_warnings = ($supported_warnings $w)
+				if ("$supported_warnings" == "$tmp_warnings") then
+					# Adding the desired warning didn't change the list, so it is supported.
+					setenv gt_cc_options_common "$gt_cc_options_common -Wno-${w:s/-W//}"
+				endif
+			end
 		endif
 	endif
 

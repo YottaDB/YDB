@@ -39,6 +39,8 @@
 
 GBLREF gd_region		*db_init_region;
 
+error_def(ERR_VERMISMATCH);
+
 CONDITION_HANDLER(dbinit_ch)
 {
 	START_CH(TRUE);
@@ -52,7 +54,7 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
 	int			rc, lcl_new_dbinit_ipc;
-	boolean_t		ftok_counter_halted = FALSE, access_counter_halted = FALSE;
+	boolean_t		ftok_counter_halted, access_counter_halted;
 
 	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in db_init().Because
 	 * we don't have access to file header, we can not know if counters are disabled so we go by our best guess, not disabled,
@@ -81,27 +83,32 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			free(csa->jnl);
 			csa->jnl = NULL;
 		}
-		if (NULL != csa->hdr)
+		/* If shared memory is not available or if this is a VERMISMATCH error situation (where we do not know the exact
+		 * position of csa->nl->ftok_counter_halted or if it even exists in the other version), we have to be pessimistic
+		 * and assume the counters are halted. This avoids prematurely removing the semaphores.
+		 */
+		if ((NULL != csa->nl) && ((int)ERR_VERMISMATCH != SIGNAL))
 		{
-			ftok_counter_halted = csa->hdr->ftok_counter_halted;
-			access_counter_halted = csa->hdr->access_counter_halted;
-		}
-		if (csa->nl)
-		{
+			ftok_counter_halted = csa->nl->ftok_counter_halted;
+			access_counter_halted = csa->nl->access_counter_halted;
 			shmdt((caddr_t)csa->nl);
 			csa->nl = (node_local_ptr_t)NULL;
+		} else
+		{
+			ftok_counter_halted = TRUE;
+			access_counter_halted = TRUE;
 		}
-		if (udi->new_shm && (INVALID_SHMID != udi->shmid))
+		if (udi->shm_created && (INVALID_SHMID != udi->shmid))
 		{
 			shm_rmid(udi->shmid);
 			udi->shmid = INVALID_SHMID;
-			udi->new_shm = FALSE;
+			udi->shm_created = FALSE;
 		}
-		if (udi->new_sem && (INVALID_SEMID != udi->semid))
+		if (udi->sem_created && (INVALID_SEMID != udi->semid))
 		{
 			sem_rmid(udi->semid);
 			udi->semid = INVALID_SEMID;
-			udi->new_sem = FALSE;
+			udi->sem_created = FALSE;
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
 		}

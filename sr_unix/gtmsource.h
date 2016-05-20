@@ -185,10 +185,11 @@ typedef struct
 	boolean_t		instfreeze_environ_inited;
 	unsigned char		merrors_array[MERRORS_ARRAY_SZ];
 	boolean_t		outofsync_core_generated;
+	boolean_t		ftok_counter_halted;
 	/* Note: while adding fields to this structure, keep in mind that it needs to be 16-byte aligned so add filler bytes
 	 * as necessary
 	 */
-	char			filler_16bytealign[12];
+	char			filler_16bytealign[8];
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)

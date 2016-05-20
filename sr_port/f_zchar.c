@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,6 @@ int f_zchar(oprtype *a, opctype op)
 		v.str.len = INTCAST(c - v.str.addr);
 		stringpool.free = (unsigned char *)c;
 		CLEAR_MVAL_BITS(&v);
-		s2n(&v);
 		*a = put_lit(&v);
 		return TRUE;
 	}

@@ -146,6 +146,10 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 			free(ptr);
 			ptr = next;
 		}
+		break;
+	default:
+		assert(FALSE && stage);
+		break;					/* NOTREACHED */
 	}
 	/* Release FTOK lock on the replication instance file if holding it */
 	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);

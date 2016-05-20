@@ -642,7 +642,7 @@ LITDEF	char	*jnl_file_state_lit[JNL_FILE_STATES] =
 };
 /* Change the initialization if struct_jrec_tcom in jnl.h changes */
 GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0, 0},
-					0, 0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+					{0}, 0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 GBLDEF	jnl_gbls_t		jgbl;
 GBLDEF	short 		crash_count;
 GBLDEF	trans_num	start_tn;

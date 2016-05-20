@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -68,6 +68,7 @@ eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $gtm_dist_plugin/gtmcrypt'
 
 cp -pf $gtm_tools/{$helpers}.sh $gtm_dist_plugin/gtmcrypt
 cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin/gtmcrypt
+rm -f $gtm_dist/{PINENTRY,pinentry}.[om]
 cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile
 chmod +x $gtm_dist_plugin/gtmcrypt/*.sh
 #
@@ -77,10 +78,10 @@ if ("HP-UX" == "$HOSTOS") then
 else
 	set make = "make"
 endif
-# On tuatara, atlhxit1 and atlhxit2 Libgcrypt version is too low to support FIPS mode. Add necessary flags to
+# On atlhxit1 and atlhxit2 Libgcrypt version is too low to support FIPS mode. Add necessary flags to
 # Makefile to tell the plugin to build without FIPS support.
 set host=$HOST:r:r:r
-if ($host =~ {tuatara,atlhxit1,atlhxit2}) then
+if ($host =~ {atlhxit1,atlhxit2}) then
 	set fips_flag = "gcrypt_nofips=1"
 else
 	set fips_flag = ""
@@ -108,13 +109,17 @@ else
 		set algorithm = $algorithms[$rand]
 	endif
 endif
+
+source $gtm_tools/set_library_path.csh
+source $gtm_tools/check_unicode_support.csh
 # Build and install all encryption libraries and executables.
-$make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib $fips_flag
+env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib $fips_flag
 if ($status) then
 	@ buildaux_gtmcrypt_status++
 	echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"	\
 				>> $gtm_log/error.${gtm_exe:t}.log
 endif
+
 # Remove temporary files.
 $make clean
 if ($status) then

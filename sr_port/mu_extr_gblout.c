@@ -15,6 +15,7 @@
 #ifdef UNIX
 #include <errno.h>
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
 #include "gtmio.h"
 #elif defined(VMS)
 #include <rms.h>
@@ -41,6 +42,7 @@
 #include "min_max.h"
 #include "gtmcrypt.h"
 #include "gvcst_protos.h"
+#include "wbox_test_init.h"
 
 #define INTEG_ERROR_RETURN(CSA)											\
 {														\
@@ -87,6 +89,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 	gd_region			*reg, *reg_top;
 	gd_segment			*seg;
 	int				gtmcrypt_errno, got_encrypted_block;
+	int				wb_counter = 1;
 
 	max_zwr_len = private_blksz = 0;
 	private_blk = zwr_buffer = key_buffer = NULL;
@@ -301,7 +304,25 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 					PUSH_MV_STENT(MVST_MVAL);
 					val_span = &mv_chain->mv_st_cont.mvs_mval;
 				}
-				gvcst_get(val_span);
+#				ifdef DEBUG
+				if (gtm_white_box_test_case_enabled &&
+					(WBTEST_MUEXTRACT_GVCST_RETURN_FALSE == gtm_white_box_test_case_number))
+				{	/* white box case to simulate concurrent change, Sleeping for 10 seconds
+					 * to kill the second variable.
+					 */
+					if (2 == wb_counter)
+					{
+						LONG_SLEEP(10);
+					}
+					wb_counter++;
+				}
+#				endif
+				if (!gvcst_get(val_span))
+				{
+					val_span->mvtype = 0; /* so stp_gcol can free up any space */
+					st->recknt--;
+					continue;
+				}
 				cp1 = (unsigned char *)val_span->str.addr;
 				data_len = val_span->str.len;
 				found_dummy = TRUE;

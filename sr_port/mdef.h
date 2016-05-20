@@ -263,7 +263,7 @@ typedef UINTPTR_T uintszofptr_t;
 #if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
 #define NON_RISC_ONLY(x)	x
 #define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__hppa) || defined(__alpha)
+#elif defined(__sparc) || defined(_AIX) || defined(__alpha)
 #define RISC_ONLY(x)	x
 #define NON_RISC_ONLY(x)
 #endif
@@ -523,23 +523,23 @@ mval *underr_strict(mval *start, ...);
 # ifdef UNICODE_SUPPORTED
 #  ifdef GTM64
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+	{TYPE, SIGN, EXPONENT, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  else
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+	{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
+	{TYPE, SIGN, EXPONENT, 0xff, {MANT_LOW, MANT_HIGH}, {LENGTH, ADDRESS}}
 # endif	/* UNICODE */
 #else	/* end BIGENDIAN -- start LITTLEENDIAN */
 # ifdef UNICODE_SUPPORTED
 #  ifdef GTM64
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+	{TYPE, EXPONENT, SIGN, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  else
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+	{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
@@ -700,21 +700,14 @@ void m_usleep(int useconds);
 #	define UNIX_ONLY_COMMA(X)
 #endif
 
-/* HP-UX on PA-RISC and z/OS are not able to have dynamic file extensions while running in MM access mode
- * HP-UX:
- * All HP-UX before v3 (PA-RISC and 11i v1 and v2) have distinct memory map buffers and file system buffers with no simple
- * way to map between them.  To get around this problem the "Unified File Cache" was implemented in v3 for both Itanium
- * and PA-RISC which solves things.  The only way around the limitation in v1 and v2 would be to strategically place calls
- * to "msync" throughout the code to keep the memory maps and file cache buffers in sync.  This is too onerous a price
- * to pay.
- * z/OS:
+/* z/OS is not able to have dynamic file extensions while running in MM access mode
  * If multiple processes are accessing the same mapped file, and one process needs to extend/remap the file,
  * all the other processes must also unmap the file.
  *
  * This same comment is in the test framework in set_gtm_machtype.csh.  If this comment is updated, also update the other.
  */
 #ifdef UNIX
-#	if !defined(__hppa) && !defined(__MVS__)
+#	if !defined(__MVS__)
 #	define MM_FILE_EXT_OK
 #	else
 #	undef MM_FILE_EXT_OK
@@ -819,10 +812,6 @@ typedef struct
 							   for VMS) */
 		} parts;
 	} u;
-#if defined __hppa
-	volatile int4	hp_latch_space[4];		/* Used for HP load_and_clear locking instructions per
-							   HP whitepaper on spinlocks */
-#endif
 } global_latch_t;
 #define latch_image_count latch_word
 
@@ -836,9 +825,7 @@ typedef struct compswap_time_field_struct
 	 * size of global_latch_t's largest size (on HPUX).
 	 */
 global_latch_t	time_latch;
-#ifndef __hppa
 int4		hp_latch_space[4];	/* padding only on non-hpux systems */
-#endif
 } compswap_time_field;
 /* takes value of time() but needs to be 4 byte so can use compswap on it. Not using time_t, as that is an indeterminate size on
  * various platforms. Value is time (in seconds) in a compare/swap updated field so only one process performs a given task in a
@@ -1730,7 +1717,6 @@ typedef enum
 #define GTMCRYPT_HASH_LEN		64
 #define GTMCRYPT_RESERVED_HASH_LEN	80
 #define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2
-#define GTMCRYPT_RESERVED_ENCR_SPACE	256
 
 #define GTMCRYPT_PLUGIN_DIR_NAME	"plugin"
 #define GTMCRYPT_UTIL_LIBNAME		"libgtmcryptutil.so"
@@ -1758,7 +1744,7 @@ typedef enum
 #define	GTM_TRUNCATE_ONLY(X)		X
 
 /* Currently triggers are supported only on UNIX */
-#if defined(UNIX) && !defined(__hppa)	/* triggers not supported on HPUX-HPPA */
+#if defined(UNIX)
 #	define	GTM_TRIGGER
 #	define	GTMTRIG_ONLY(X)			X
 #	define	NON_GTMTRIG_ONLY(X)

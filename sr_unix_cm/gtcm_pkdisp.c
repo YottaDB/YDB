@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,13 +38,8 @@ static char rcsid[] = "$Header:$";
 
 GBLREF char	*omi_oprlist[];
 
-/* This executable does not have any command tables so initialize command array to NULL. The reason why cmd_ary is needed is
- * because EXIT (invoked by this module) in turn pulls in "gtm_image_exit" which in turn does asserts that in turn pull in
- * a lot of the database runtime logic which in turn (due to triggers) pulls in the compiler as well
- * (op_zcompile etc. require cmd_ary). And the reason this is needed in pro too is because pro gtm_malloc_src.h defines
- * the function "gtm_malloc_dbg" which needs "cmd_ary".
- */
-GBLDEF	CLI_ENTRY	*cmd_ary = NULL;
+#undef EXIT
+#define	EXIT	exit	/* Use system "exit" (not gtm_image_exit) directly since this is a standalone module */
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
@@ -61,9 +56,7 @@ int main(int argc, char_ptr_t argv[])
 	omi_li		nx;
 	omi_si		hlen;
 	omi_req_hdr	rh;
-	DCL_THREADGBL_ACCESS;
 
-	GTM_THREADGBL_INIT;
 	bunches = 0;
 	if (argc == 3)
 	{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,7 +131,11 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	DEBUG_ONLY(blktn = ((blk_hdr_ptr_t)base_addr)->tn);
 	assert(!IS_MCODE_RUNNING || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
 	       || (cse->mode == gds_t_acquired) || (blktn UNIX_ONLY(<) VMS_ONLY(<=) ctn));
-	assert((ctn < cs_addrs->ti->early_tn) || write_after_image);
+	/* With memory instruction reordering (currently possible only on AIX with the POWER architecture) it is possible
+	 * the early_tn we read in the assert below gets executed BEFORE the curr_tn read that happens a few lines above.
+	 * That could then fail this assert (GTM-8523). Account for that with the AIX_ONLY condition below.
+	 */
+	assert((ctn < cs_addrs->ti->early_tn) || write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);

@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,21 +38,7 @@
 #				  and sed programs, installation scripts, etc.) used in
 #				  building or maintaining GT.M
 #
-#		gtm_{inc,pct,src,tools}_list - directory pathname or list of incremental
-#				  directory pathnames
-#
-#			If this is a full release, each of these lists will contain only
-#			one entry.
-#
-#			If this is an incremental release, each list will consist of
-#			several directory pathnames:
-#				the first will be the directory corresponding to this
-#					version,
-#				the second will be the directory corresponding to the
-#					version on which this incremental version is based,
-#				the third will be the directory corresponding to the
-#					version on which the second version was based,
-#				etc.
+#		gtmroutines	- pathname for GT.M to lookup M sources and object files
 #
 #		gt_as_option_I	- assembler option(s) specifying the location(s) of the
 #				  assembly language header files (usually *.si)
@@ -62,70 +49,55 @@
 ###########################################################################################
 #
 
+# Define useful env vars
+setenv gtm_inc	"$gtm_vrt/inc"
+setenv gtm_pct	"$gtm_vrt/pct"
+setenv gtm_src	"$gtm_vrt/src"
+setenv gtm_tools	"$gtm_vrt/tools"
 
-setenv gtm_inc_list	"$gtm_vrt/inc"
-setenv gtm_pct_list	"$gtm_vrt/pct"
-setenv gtm_src_list	"$gtm_vrt/src"
-setenv gtm_tools_list	"$gtm_vrt/tools"
-
-# These shell variables are no longer used (they're now environment variables).  However, some older
-# versions of gtmsrc.csh define them as shell variables and when both a shell variables and an
-# environment variable of the same name exist, the shell variable value supersedes that of the
-# environment variable.  Therefore, until all V3.1 versions are removed from the system, we need the
-# following "unset" commands (remove after upgrading past V3.1.).
-unset gtm_inc_list
-unset gtm_pct_list
-unset gtm_src_list
-unset gtm_tools_list
-
-if ( $?gtmsrc_last_exe == "1" ) then
-	# Change path and gtmroutines to reflect new gtm_exe.
-	set	path =			`echo $path        | sed -e "s|$gtmsrc_last_exe|$gtm_exe|"`
-
-	# (Note: the use of an intermediate gtmroutines shell variable is necessary for csh; tcsh doesn't require it.)
-	set	gtmsrc_gtmroutines =	`echo "$gtmroutines" | sed -e "s|$gtmsrc_last_exe|$gtm_exe|"`
-	setenv	gtmroutines		"$gtmsrc_gtmroutines"
+if !($?gtmroutines) then
+	setenv gtmroutines ""
+endif
+# Check for utf8 mode two ways, 1) by gtm_chset and 2) by active routines
+set utf = ""
+if ($?gtm_chset) then
+	if ("UTF-8" == "$gtm_chset") set utf="/utf8"
+else if ("utf8" == "$gtm_exe:t") then
+	set utf="/utf8"
+endif
+# Rebuild gtmroutines while trying to preserve the old value.
+set rtns = ($gtmroutines:x)
+if (0 < $#rtns) then
+	@ rtncnt = $#rtns
+	# Strip off "$gtm_exe/plugin/o($gtm_exe/plugin/r)" if present; assumption, it's at the end
+	if ("$rtns[$rtncnt]" =~ "*/plugin/o*(*/plugin/r)") @ rtncnt--
+	# Strip off "$gtm_exe"; assumption, it's next to last or the last
+	if ("${rtns[$rtncnt]:s;/utf8;;}" == "${gtmsrc_last_exe:s;/utf8;;}") @ rtncnt--
+	setenv gtmroutines "$rtns[-$rtncnt]"
+	unset rtncnt
+else
+	setenv gtmroutines "."
+endif
+if (-d $gtm_exe/plugin/o && -d $gtm_exe/plugin/r) then
+	setenv gtmroutines "$gtmroutines $gtm_exe$utf $gtm_exe/plugin/o$utf($gtm_exe/plugin/r)"
+else
+	setenv gtmroutines "$gtmroutines $gtm_exe$utf"
 endif
 setenv gtmsrc_last_exe	$gtm_exe
-
-#	Copy to shell variables to make indexed selection possible.
-
-set gtmsrc_inc_list   = ($gtm_inc_list)
-set gtmsrc_pct_list   = ($gtm_pct_list)
-set gtmsrc_src_list   = ($gtm_src_list)
-set gtmsrc_tools_list = ($gtm_tools_list)
-
-#	Set environment variables for this release only (doesn't include any of the
-#	releases on which this is based -- even if this is an incremental release).
-setenv gtm_inc		$gtmsrc_inc_list[1]
-setenv gtm_pct		$gtmsrc_pct_list[1]
-setenv gtm_src		$gtmsrc_src_list[1]
-setenv gtm_tools	$gtmsrc_tools_list[1]
-
-unsetenv gt_as_option_I
-unsetenv gt_cc_option_I
+unset rtns
+unset utf8
 
 setenv	gtm_version_change	`date`
 source $gtm_tools/gtm_env.csh
 unsetenv gtm_version_change
 
-if (! $?gt_as_option_I) then
-	setenv	gt_as_option_I	""
+if !($?gt_as_option_I) then
+	setenv	gt_as_option_I	"-I$gtm_inc"
+else
+	setenv	gt_as_option_I	"$gt_as_option_I -I$gtm_inc"
 endif
-foreach i ($gtm_inc_list)
-	setenv	gt_as_option_I	"$gt_as_option_I -I$i"
-end
-
-if (! $?gt_cc_option_I) then
-	setenv	gt_cc_option_I	""
+if !($?gt_cc_option_I) then
+	setenv	gt_cc_option_I	"-I$gtm_inc"
+else
+	setenv	gt_cc_option_I	"$gt_cc_option_I -I$gtm_inc"
 endif
-foreach i ($gtm_inc_list)
-	setenv	gt_cc_option_I	"$gt_cc_option_I -I$i"
-end
-
-#	Clean up local shell variables.
-unset gtmsrc_gtmroutines
-unset gtmsrc_inc_list
-unset gtmsrc_pct_list
-unset gtmsrc_src_list
-unset gtmsrc_tools_list

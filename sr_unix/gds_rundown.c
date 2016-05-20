@@ -340,9 +340,9 @@ int4 gds_rundown(void)
 	 * But there could be other processes still having the database open so we cannot safely reset the halted fields.
 	 */
 	if (have_standalone_access && !jgbl.onlnrlbk)
-		csd->ftok_counter_halted = csd->access_counter_halted = FALSE;
-	ftok_counter_halted = csd->ftok_counter_halted;
-	access_counter_halted = csd->access_counter_halted;
+		cnl->ftok_counter_halted = cnl->access_counter_halted = FALSE;
+	ftok_counter_halted = cnl->ftok_counter_halted;
+	access_counter_halted = cnl->access_counter_halted;
 	/* If we bypassed any of the semaphores, activate safe mode.
 	 * Also, if the replication instance is frozen and this db has replication turned on (which means
 	 * no flushes of dirty buffers to this db can happen while the instance is frozen) activate safe mode.
@@ -699,8 +699,8 @@ int4 gds_rundown(void)
 			if (0 != shm_rmid(udi->shmid))
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
-			/* Note that we no longer have a new shared memory. Currently only used/usable for standalone rollback. */
-			udi->new_shm = FALSE;
+			/* Note that this process deleted shared memory. Currently only used by rollback. */
+			udi->shm_deleted = TRUE;
 			/* mupip recover/rollback don't release the semaphore here, but do it later in db_ipcs_reset (invoked from
 			 * mur_close_files())
 			 */
@@ -709,7 +709,7 @@ int4 gds_rundown(void)
 				if (0 != sem_rmid(udi->semid))
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
-				udi->new_sem = FALSE;			/* Note that we no longer have a new semaphore */
+				udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 			}

@@ -395,7 +395,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				n = (NULL != gname) ? gname->act : 0;
 			} else
 				n = 0;
-			gvkey = &save_currkey[0];
+			gvkey = (gv_key *)save_currkey;
 			key = gvn2gds(arg1, gvkey, n);
 			assert(key > &gvkey->base[0]);
 			assert(gvkey->end == key - &gvkey->base[0] - 1);

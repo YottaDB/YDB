@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,21 +36,15 @@
 #include "gdsblkops.h"
 #include "have_crit.h"
 #include "dbcertify.h"
+#include "forced_exit_err_display.h"
 
 GBLREF	int4			exi_condition;
-GBLREF	int			forced_exit_err;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 
 LITREF	gtmImageName		gtmImageNames[];
-
-error_def(ERR_KILLBYSIG);
-error_def(ERR_KILLBYSIGUINFO);
-error_def(ERR_KILLBYSIGSINFO1);
-error_def(ERR_KILLBYSIGSINFO2);
-error_def(ERR_KILLBYSIGSINFO3);
 
 void dbcertify_deferred_signal_handler(void)
 {
@@ -66,42 +60,7 @@ void dbcertify_deferred_signal_handler(void)
 	 * This routine will output those delayed messages from the appropriate structures to both the
 	 * user and the system console.
 	 */
-	/* note can't use switch here because ERR_xxx are not defined as constants */
-	if (ERR_KILLBYSIG == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
-			GTMIMAGENAMETXT(image_type), process_id, signal_info.signal);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLBYSIG, 4,
-			GTMIMAGENAMETXT(image_type), process_id, signal_info.signal);
-	} else if (ERR_KILLBYSIGUINFO == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type), process_id,
-			signal_info.signal, signal_info.send_pid, signal_info.send_uid);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type), process_id,
-						signal_info.signal, signal_info.send_pid, signal_info.send_uid);
-	} else if (ERR_KILLBYSIGSINFO1 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.int_iadr, signal_info.bad_vadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.int_iadr, signal_info.bad_vadr);
-	} else if (ERR_KILLBYSIGSINFO2 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.int_iadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.int_iadr);
-	} else if (ERR_KILLBYSIGSINFO3 == forced_exit_err)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-			 process_id, signal_info.signal, signal_info.bad_vadr);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
-			   process_id, signal_info.signal, signal_info.bad_vadr);
-	} else
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
-	}
+	forced_exit_err_display();
 	/* Drive the exit handler to terminate */
 	EXIT(-exi_condition);
 }

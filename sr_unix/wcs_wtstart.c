@@ -363,7 +363,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 									   should always be > 0 */
 				if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
 				{	/* Need to downgrade/reformat this block back to a previous format. */
-					assert(0 == reformat_buffer_in_use);
+					assert((0 == reformat_buffer_in_use) || process_exiting);
 					DEBUG_ONLY(reformat_buffer_in_use++;)
 					DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
 								 csr->blk));
@@ -481,7 +481,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				if ((blk_hdr_ptr_t)reformat_buffer == bp)
 				{
 					DEBUG_ONLY(reformat_buffer_in_use--;)
-					assert(0 == reformat_buffer_in_use);
+					assert((0 == reformat_buffer_in_use) || process_exiting);
 				}
 			}
 			/* Trigger I/O error if white box test case is turned on */

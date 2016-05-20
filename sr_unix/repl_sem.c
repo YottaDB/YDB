@@ -103,7 +103,7 @@ int grab_sem(int set_index, int sem_num)
 {
 	int rc;
 
-	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);	/* holds_sem[][] relies on this as it uses NUM_SRC_SEMS in the array definition */
+	assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS); /* holds_sem[][] relies on this as it uses NUM_SRC_SEMS for array bounds */
 	assert(!holds_sem[set_index][sem_num]);
 	ASSERT_SET_INDEX;
 	sop[0].sem_op  = 0; /* Wait for 0 */

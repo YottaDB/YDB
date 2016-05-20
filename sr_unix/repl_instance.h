@@ -123,7 +123,7 @@ typedef struct repl_inst_hdr_struct
 	boolean_t	file_corrupt;		/* Set to TRUE by online rollback at start up. Set to FALSE when online rollback
 						 * completes successfully.
 						 */
-	boolean_t	ftok_counter_halted;	/* Whether the ftok counter semaphore overflowed the 32Ki limit */
+	boolean_t	filler_ftok_counter_halted;/* Used only in V6.3-000. Kept as a filler to be safe */
 	boolean_t	qdbrundown;		/* TRUE if -QDBRUNDOWN was specified at time of instance file creation.
 						 * FALSE otherwise.
 						 */
@@ -208,17 +208,14 @@ typedef enum {
 	issue_gtm_putmsg
 } instname_act;
 
-#define	CLEAR_FTOK_HALTED_FALSE	FALSE
-#define	CLEAR_FTOK_HALTED_TRUE	TRUE
-
 boolean_t	repl_inst_get_name(char *, unsigned int *, unsigned int, instname_act error_action);
 void		repl_inst_create(void);
 void		repl_inst_edit(void);
 void		repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
 void		repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
 void		repl_inst_sync(char *fn);
-void		repl_inst_jnlpool_reset(boolean_t clear_ftok_halted);
-void		repl_inst_recvpool_reset(boolean_t clear_ftok_halted);
+void		repl_inst_jnlpool_reset(void);
+void		repl_inst_recvpool_reset(void);
 void		repl_inst_ftok_sem_lock(void);
 void		repl_inst_ftok_sem_release(void);
 int4		repl_inst_histinfo_get(int4 index, repl_histinfo *histinfo);

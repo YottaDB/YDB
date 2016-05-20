@@ -317,17 +317,21 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	{
 		if ((is_set_kill_zkill_ztworm_lgtrig_ztrig && !IS_TP(rectype)) || (JRT_TCOM == rectype))
 		{
-			/* Do forward journaling, detecting operations with duplicate transaction numbers.
-			 * While doing journaling on a database, a process may be killed immediately after
-			 * updating (or partially updating) the journal file, but before the database gets
-			 * updated.  Since the transaction was never fully committed, the database
-			 * transaction number has not been updated, and the last journal record does not
-			 * reflect the actual state of the database.  The next process to update the
-			 * database writes a journal record with the same transaction number as the
-			 * previous record.  While processing the journal file, we must recognize this and
-			 * issue a DUPTN warning so the user knows this was encountered during the recovery.
-			 * Note: DUPTN is possible with -NOTNCHECK (if two identical jnl files with just one tn
-			 * is presented to forward recovery like the v54003/C9K08003315 subtest does) so ignore that.
+			/* Do forward journaling, detecting operations with duplicate transaction numbers.  While doing
+			 * journaling on a database, a process may be killed immediately after updating (or partially
+			 * updating) the journal file, but before the database gets updated.  Since the transaction was
+			 * never fully committed, the database transaction number has not been updated, and the last
+			 * journal record does not reflect the actual state of the database. One would think the next
+			 * process to update the database will write a journal record with the same transaction number as
+			 * the previous record. But before writing the journal record, it would do a "grab_crit" which
+			 * will notice the previous crit holder having been killed and will salvage crit and as part of
+			 * that would have set wc_blocked and invoked "wcs_recover" which would have written an INCTN
+			 * record to bump the curr_tn. Therefore it is not possible for two logical records corresponding
+			 * to different transactions (non-tp or tp) to have the same rec_tn value. Therefore an ERR_DUPTN
+			 * is not possible in normal usage.  But just in case, let us recognize this and issue a DUPTN
+			 * warning so the user knows this was encountered during the recovery.  Note: DUPTN is possible
+			 * with -NOTNCHECK (if two identical jnl files with just one tn is presented to forward recovery
+			 * like the v54003/C9K08003315 subtest does) so ignore that.
 			 */
 			curr_tn = rec->prefix.tn;
 			if ((rctl->last_tn == curr_tn) && !mur_options.notncheck)

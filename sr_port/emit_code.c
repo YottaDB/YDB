@@ -1220,6 +1220,9 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					ocnt_ref_seen = TRUE;
 					ocnt_ref_opr = opr;
 					break;
+				default:
+					assert(FALSE && opr->oprclass);
+					break;						/* NOTREACHED */
 			}
 			if (!inst_emitted) {
 				NON_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg))

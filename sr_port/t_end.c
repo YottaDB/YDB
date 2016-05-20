@@ -1179,59 +1179,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			|| (ERR_GVPUTFAIL == t_err) && gvdupsetnoop			/* exception case (a) */
 			|| (ERR_JRTNULLFAIL == t_err)					/* exception case (d) */
 			|| (ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills);	/* exception case (b) */
-	if (REPL_ALLOWED(csa) && (NULL != jnlpool_ctl))
-	{
-		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-		if (!repl_csa->hold_onto_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-		assert(repl_csa->now_crit);
-		jnlpool_crit_acquired = TRUE;
-#		ifdef UNIX
-		/* With jnlpool lock held, check instance freeze, and retry if set. */
-		if (jnlpool.jnlpool_ctl->freeze)
-		{
-			status = cdb_sc_instancefreeze;
-			goto failed;
-		}
-#		endif
-		if (is_replicator && (inctn_invalid_op == inctn_opcode))
-		{
-			jpl = jnlpool_ctl;
-			replication = TRUE;
-			jplctx.write = jpl->write;
-			jplctx.write_total = 0;
-			temp_jnl_seqno = jpl->jnl_seqno;
-#			ifdef UNIX
-			if (INVALID_SUPPL_STRM != strm_index)
-			{	/* Need to also update supplementary stream seqno */
-				supplementary = TRUE;
-				assert(0 <= strm_index);
-				strm_seqno = jpl->strm_seqno[strm_index];
-				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
-			} else
-				supplementary = FALSE;
-#			endif
-			INT8_ONLY(assert(jplctx.write == jpl->write_addr % jpl->jnlpool_size));
-			assert(jgbl.cumul_jnl_rec_len);
-			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
-			jplctx.write += SIZEOF(jnldata_hdr_struct);
-			jplctx.write_total += SIZEOF(jnldata_hdr_struct);
-			if (jplctx.write >= jpl->jnlpool_size)
-			{
-				assert(jplctx.write == jpl->jnlpool_size);
-				jplctx.write = 0;
-			}
-			assert(jpl->early_write_addr == jpl->write_addr);
-			jpl->early_write_addr = jpl->write_addr + tmp_cumul_jnl_rec_len;
-			/* Source server does not read in crit. It relies on early_write_addr, the transaction
-			 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
-			 * we have to force out early_write_addr to its coherency point now. If not, the source
-			 * server may read data that is overwritten (or stale). This is true only on
-			 * architectures and OSes that allow unordered memory access
-			 */
-			SHM_WRITE_MEMORY_BARRIER;
-		}
-	}
 	assert(cw_set_depth < CDB_CW_SET_SIZE);
 	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, dbtn);
 	CHECK_TN(csa, csd, dbtn);	/* can issue rts_error TNTOOLARGE */
@@ -1253,14 +1200,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * (if it decides to switch to a new journal file)
 		 */
 		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		if (replication)
-		{	/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below macro
-			 * invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets
-			 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen
-			 * with a potentially lower value than the final adjusted time written in the jnl record.
-			 */
-			ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl);
-		}
 		/* Note that jnl_ensure_open can call cre_jnl_file which
 		 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend can call
 		 * jnl_write_epoch_rec which in turn assumes jgbl.gbl_jrec_time is set.
@@ -1338,7 +1277,67 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						DB_LEN_STR(gv_cur_region));
 		}
 	}
+	/* At this point, we are done with validation and so we need to assert that donot_commit is set to FALSE */
 	assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
+	if (REPL_ALLOWED(csa) && (NULL != jnlpool_ctl))
+	{
+		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		if (!repl_csa->hold_onto_crit)
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+		assert(repl_csa->now_crit);
+		jnlpool_crit_acquired = TRUE;
+#		ifdef UNIX
+		/* With jnlpool lock held, check instance freeze, and retry if set. */
+		if (jnlpool.jnlpool_ctl->freeze)
+		{
+			status = cdb_sc_instancefreeze;
+			goto failed;
+		}
+#		endif
+		if (is_replicator && (inctn_invalid_op == inctn_opcode))
+		{
+			jpl = jnlpool_ctl;
+			replication = TRUE;
+			jplctx.write = jpl->write;
+			jplctx.write_total = 0;
+			temp_jnl_seqno = jpl->jnl_seqno;
+#			ifdef UNIX
+			if (INVALID_SUPPL_STRM != strm_index)
+			{	/* Need to also update supplementary stream seqno */
+				supplementary = TRUE;
+				assert(0 <= strm_index);
+				strm_seqno = jpl->strm_seqno[strm_index];
+				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
+			} else
+				supplementary = FALSE;
+#			endif
+			INT8_ONLY(assert(jplctx.write == jpl->write_addr % jpl->jnlpool_size));
+			assert(jgbl.cumul_jnl_rec_len);
+			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
+			jplctx.write += SIZEOF(jnldata_hdr_struct);
+			jplctx.write_total += SIZEOF(jnldata_hdr_struct);
+			if (jplctx.write >= jpl->jnlpool_size)
+			{
+				assert(jplctx.write == jpl->jnlpool_size);
+				jplctx.write = 0;
+			}
+			/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below macro
+			 * invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets
+			 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen
+			 * with a potentially lower value than the final adjusted time written in the jnl record.
+			 */
+			ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl);
+			assert(jpl->early_write_addr == jpl->write_addr);
+			jpl->early_write_addr = jpl->write_addr + tmp_cumul_jnl_rec_len;
+			/* Source server does not read in crit. It relies on early_write_addr, the transaction
+			 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
+			 * we have to force out early_write_addr to its coherency point now. If not, the source
+			 * server may read data that is overwritten (or stale). This is true only on
+			 * architectures and OSes that allow unordered memory access
+			 */
+			SHM_WRITE_MEMORY_BARRIER;
+		}
+	}
 	assert(TN_NOT_SPECIFIED > MAX_TN_V6); /* Ensure TN_NOT_SPECIFIED isn't a valid TN number */
 	blktn = (TN_NOT_SPECIFIED == ctn) ? dbtn : ctn;
 	csa->ti->early_tn = dbtn + 1;
