@@ -1,0 +1,24 @@
+Install MacPorts: https://www.macports.org
+
+```
+sudo port install cmake
+sudo port install icu
+```
+
+   $ make -j 16 gen_gtm_threadgbl_deftypes all
+   # Something about the parallelized make doesn't work right so force
+   # gen_gtm_threadgbl_deftypes to go first.
+   
+   # WARNING WARNING WARNING
+   # The build leaves the terminal in a pretty bad shape. Do the following to
+   # restore sanity
+   $ stty sane
+
+   $ gtm_dist=$PWD ./mumps -direct
+   # This is what I have so far
+	GTM>zwrite $zversion zsystem "uname -a" halt
+	$ZVERSION="GT.M V6.2-002 Darwin x86_64"
+	Darwin Tower.lan 15.3.0 Darwin Kernel Version 15.3.0: Thu Dec 10 18:40:58 PST 2015; root:xnu-3248.30.4~1/RELEASE_X86_64 x86_64
+
+
+- On Mac OS X, use one of macports/pkgsrc/gentoo prefix. I'm using macports.
