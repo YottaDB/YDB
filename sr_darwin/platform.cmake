@@ -63,8 +63,9 @@ set(libgtmshr_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id")
 if(${bits} EQUAL 32)
   set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread")
 else()
-  set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread")
+  set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lelf")
 endif()
 
 
 include_directories (/opt/local/include /Volumes/Vault/ports/include)
+link_directories (/opt/local/lib/)
