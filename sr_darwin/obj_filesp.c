@@ -32,6 +32,7 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include <libelf/libelf.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
@@ -137,7 +138,6 @@ void create_object_file(rhdtyp *rhead)
  */
 void finish_object_file(void)
 {
-#if 0
         int		i, status;
         size_t		bufSize;
         ssize_t		actualSize;
@@ -324,5 +324,4 @@ void finish_object_file(void)
         /* Free the memory malloc'ed above */
         free(string_tbl);
         free(gtm_obj_code);
-#endif
 }
