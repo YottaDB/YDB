@@ -16,6 +16,9 @@ Homebrew:
 brew install cmake
 brew install icu4c
 brew install libelf
+brew install libconfig
+brew install libgcrypt
+brew link icu4c --force
 ```
 
 Note: if you get a linking error from homebrew change the permissions on /usr/local/include and /usr/local/lib to allow your user to write to the directory:
