@@ -1,12 +1,27 @@
 Install MacPorts: https://www.macports.org
+Alternatively Install homebrew: http://brew.sh
 
 Then install cmake, icu, and libelf.
 
+MacPorts:
 ```
 sudo port install cmake
 sudo port install icu
 sudo port install libelf
 
+```
+
+Homebrew:
+```
+brew install cmake
+brew install icu4c
+brew install libelf
+```
+
+Note: if you get a linking error from homebrew change the permissions on /usr/local/include and /usr/local/lib to allow your user to write to the directory:
+```
+sudo chmod ugo+rw /usr/local/include
+sudo chmod ugo+rw /usr/local/lib
 ```
 
    $ make -j 16 gen_gtm_threadgbl_deftypes all
