@@ -387,9 +387,11 @@ void gtm_icu_init(void)
 				memcpy(&icu_final_fname[icu_final_fname_len], major_ver_ptr, major_ver_len);
 				icu_final_fname_len += major_ver_len;
 				save_fname_len = icu_final_fname_len;
+#ifndef __APPLE__
 				icu_final_fname[icu_final_fname_len++] = '_';
 				memcpy(&icu_final_fname[icu_final_fname_len], minor_ver_ptr, minor_ver_len);
 				icu_final_fname_len += minor_ver_len;
+#endif
 				icu_final_fname[icu_final_fname_len] = '\0';
 				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
 				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
