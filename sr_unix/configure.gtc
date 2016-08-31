@@ -58,6 +58,8 @@ fi
 # Native shared library extension.
 if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
 	ext=".sl"
+elif [ $arch = "darwin" ]; then
+	ext=".dylib"
 else
 	ext=".so"
 fi
@@ -67,6 +69,7 @@ if [ "hp" = $arch ] ; then ldflags="-b" ; ldcmd="ld" # HP-UX - all platforms
 elif [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
 elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
 elif [ "solaris" = $arch ] ; then ldflags="-G -64" ; ldcmd="ld" # Solaris SPARC
+elif [ "darwin" = $arch ] ; then ldflags="-dylib" ; ldcmd="ld" # Mac OS X
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
@@ -114,8 +117,13 @@ $echo ""
 
 # Native super user and group
 rootuser=root
-bingroup=bin
-defowner=bin
+if [ $arch = "darwin" ] ; then
+	bingroup=admin
+	defowner=root
+else
+	bingroup=bin
+	defowner=bin
+fi
 
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
@@ -171,7 +179,7 @@ read gtmdist
 # if gtmdist is relative then need to make it absolute
 
 if [ `$echo $gtmdist | grep -c '^/'` -eq 0 ] ; then
-    gtmdist=`pwd`/$gtmdist
+	gtmdist=`pwd`/$gtmdist
 fi
 
 # ensure that canonical paths do not exceed PATH_MAX
@@ -233,8 +241,9 @@ if [ -d "utf8" ]; then
 		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
 	fi
 # please keep in sync with sr_unix/set_library_path.csh
+	# TODO: Follow the please keep in sync
 	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu /lib64 /lib /usr/local/ssl/lib"  #BYPASSOK line length
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu /lib64 /lib /usr/local/ssl/lib /opt/local/lib"  #BYPASSOK line length
 	else
 		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu /lib32 /lib"
 	fi
@@ -267,6 +276,8 @@ if [ -d "utf8" ]; then
 		icu_ext=".a"
 	elif [ $arch = "hp" ] ; then
 		icu_ext=".sl"
+	elif [ $arch = "darwin" ] ; then
+		icu_ext=".dylib"
 	fi
 	if [ "$would_like_utf8" -eq 1 ] ; then
 		for libpath in $library_path
@@ -283,6 +294,10 @@ if [ -d "utf8" ]; then
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
 					# Extract 36 from 36.0.a
 					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
+				elif [ $arch = "darwin" ]; then
+					#libicuio.55.1.dylib -> 55.1
+					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
+					majmin=`$echo $full_icu_ver_string | cut -f 1,2 -d '.'`
 				else
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
 					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
@@ -309,6 +324,9 @@ if [ -d "utf8" ]; then
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
+				elif [ $arch = "darwin" ]; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio.$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`file $icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
 				fi
 				# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
 				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
@@ -320,7 +338,11 @@ if [ -d "utf8" ]; then
 				fi
 				# If we have everything we want, then save the libpath that contains the proper ICU library and
 				# set the gtm_icu_version
-				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
+				if [ $arch = "darwin" ] ; then
+					export gtm_icu_version=$majmin
+					save_icu_libpath="$libpath"
+					break
+				elif [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
 					save_icu_libpath="$libpath"
 					minorver=`expr $majmin % 10`
 					majorver=`expr $majmin / 10`
@@ -443,7 +465,7 @@ done
 # Install the normal binaries
 for i in $binaries
 do
-	if [ $arch = "sun" -o $arch = "linux" ]; then
+	if [ $arch = "sun" -o $arch = "linux" -o $arch = "darwin" ]; then
 		install -g $bingroup -o $owner -m 644 $i $gtmdist
 	elif [ $arch = "ibm" ]; then
 		/usr/bin/install -f $gtmdist -M 644 -O $owner -G $bingroup $i
@@ -524,7 +546,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	# Install the plugin binaries
 	for i in $gtmcryptbinaries
 	do
-		if [ $arch = "sun" -o $arch = "linux" ]; then
+		if [ $arch = "sun" -o $arch = "linux" -o $arch = "darwin" ]; then
 			install -g $bingroup -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 		elif [ $arch = "ibm" ]; then
 			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G $bingroup $plugin_gtmcrypt/$i
@@ -544,7 +566,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		#   CMake builds generate only one library - GCRYPT with AES256CFB
 		if [ -L $plugin/$i -o ! -f $plugin/$i ]; then
 			continue
-		elif [ $arch = "sun" -o $arch = "linux" ]; then
+		elif [ $arch = "sun" -o $arch = "linux" -o $arch = "darwin" ]; then
 			install -g $bingroup -o $owner -m 755 $plugin/$i $gtmdist/$plugin
 		elif [ $arch = "ibm" ]; then
 			/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $bingroup $plugin/$i
@@ -647,10 +669,11 @@ $echo "Compiling all of the MUMPS routines. This may take a moment."
 $echo ""
 
 # Ensure we are NOT in UTF-8 mode
+# TODO: After I do the Mach-O objects, we can now compile shared libs for darwin.
 gtm_chset="M"
 export gtm_chset
 (cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; \
- if [ "$is64bit_gtm" -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+ if [ "$is64bit_gtm" -eq 1 -o "linux" != $arch ] && [ "darwin" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -673,8 +696,9 @@ if [ "$doutf8" -ne 0 ]; then
 			LD_LIBRARY_PATH=$save_icu_libpath
 			export LD_LIBRARY_PATH
 		fi
+		# TODO: After I do the Mach-O objects, we can now compile shared libs for darwin.
 		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
-		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] && [ "darwin" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
 	)
 fi
 
@@ -715,9 +739,9 @@ gtm_dist=$gtmdist
 export gtm_dist
 
 if [ -f $gtm_dist/libgtmutil$ext ] ; then
-    gtmroutines=$gtm_dist/libgtmutil$ext
+	gtmroutines=$gtm_dist/libgtmutil$ext
 else
-    gtmroutines=$gtmdist
+	gtmroutines=$gtmdist
 fi
 export gtmroutines
 
@@ -772,7 +796,7 @@ chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "sun" -o $arch = "linux" ]; then
+if [ $arch = "sun" -o $arch = "linux" -o $arch = "darwin" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then
