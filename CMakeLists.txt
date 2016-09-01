@@ -371,16 +371,25 @@ add_custom_command(
 add_custom_target(gen_gtm_threadgbl_deftypes
   DEPENDS ${GTM_BINARY_DIR}/${gtmthreadgblasmhdr} ${GTM_BINARY_DIR}/${gtmthreadgblasmfile})
 
+
 foreach(exp exe shr)
   set(out gtm${exp}_symbols.export)
   set(in ${GTM_SOURCE_DIR}/sr_unix/gtm${exp}_symbols.exp)
+  if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
   add_custom_command(
     OUTPUT ${out}
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
     COMMAND tcsh -f ${GTM_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
     )
+  # Add underscores to symbols for Mac OS X
+  elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  add_custom_command(
+    OUTPUT ${out}
+    DEPENDS ${in} gen_gtm_threadgbl_deftypes
+    COMMAND sed 's/^/_/' ${in} > ${out}
+    )
+  endif()
 endforeach()
-
 add_custom_target(gen_export DEPENDS gtmexe_symbols.export gtmshr_symbols.export)
 
 foreach(lib

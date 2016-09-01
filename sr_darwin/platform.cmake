@@ -9,24 +9,13 @@
 #								#
 #################################################################
 
-if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
-  set(arch "x86")
-  set(bits 32)
-  set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
-else()
-  set(arch "x86_64")
-  set(bits 64)
-endif()
+set(arch "x86_64")
+set(bits 64)
 set(srdir "sr_darwin")
 
 # Platform directories
-list(APPEND gt_src_list sr_darwin)
-if(${bits} EQUAL 32)
-  list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
-else()
-  list(APPEND gt_src_list sr_x86_64 sr_x86_regs)
-  set(gen_xfer_desc 1)
-endif()
+list(APPEND gt_src_list sr_darwin sr_x86_64 sr_x86_regs)
+set(gen_xfer_desc 1)
 
 # Assembler
 #enable_language(ASM_NASM)
@@ -56,15 +45,11 @@ add_definitions(
   )
 
 # Linker
-set(gtm_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,gtm_zstatus -Wl,-v")
+set(gtm_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,gtm_zstatus -Wl,-v -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmexe_symbols.export\"")
+set(libgtmshr_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
+set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
-set(libgtmshr_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id")
-
-if(${bits} EQUAL 32)
-  set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread")
-else()
-  set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lelf")
-endif()
+set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lelf")
 
 
 include_directories (/opt/local/include /Volumes/Vault/ports/include)
