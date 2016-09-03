@@ -9,6 +9,9 @@
 
 int main()
 {
+    /* NB: Mach-O objects need to be built in reverse order because we need
+     * the sizes of all the stuff at the bottom to put the offsets at the top. */
+
     /* Sample __Text Data */
     unsigned char __text[] = 
     {
@@ -27,11 +30,11 @@ int main()
     struct nlist_64 strtab[2];
     memset(&strtab, 0, sizeof(strtab));
 
-    strtab[0].n_un.n_strx = 0;
-    strtab[0].n_type = N_TYPE|N_UNDF;
-    strtab[0].n_sect = NO_SECT;
-    strtab[0].n_desc = N_LSYM;
-    strtab[0].n_value = 0LL;
+    strtab[0].n_un.n_strx = 0; /* Index into str tab */
+    strtab[0].n_type = N_TYPE|N_UNDF; /* type flag */
+    strtab[0].n_sect = NO_SECT; /* Section Number */
+    strtab[0].n_desc = N_LSYM; /* Local/Global */
+    strtab[0].n_value = 0LL; /* value or stab offset */
 
     strtab[1].n_un.n_strx = 1;
     strtab[1].n_type = N_TYPE|N_SECT;
@@ -39,8 +42,36 @@ int main()
     strtab[1].n_desc = N_GSYM;
     strtab[1].n_value = 1LL;
 
+    struct section_64 secText = {0};
+    memcpy(&secText.sectname, "__text", 6);
+    memcpy(&secText.segname, "__TEXT", 6); /* segment this section goes in */
+    secText.addr = 0LL;          /* memory address of this section */
+    secText.size = sizeof(__text); /* size in bytes of this section */
+    secText.offset = sizeof(struct mach_header_64) + sizeof(struct segment_command_64) 
+        + 3 * sizeof(struct section_64) + sizeof(struct symtab_command);
+    secText.align = 16;
+    secText.reloff = 0;
+    secText.nreloc = 0;
+    secText.flags = S_REGULAR;
+
+    struct segment_command_64 segs = {0};
+    {
+    uint32_t    cmd;        /* LC_SEGMENT_64 */
+    uint32_t    cmdsize;    /* includes sizeof section_64 structs */
+    char        segname[16];    /* segment name */
+    uint64_t    vmaddr;     /* memory address of this segment */
+    uint64_t    vmsize;     /* memory size of this segment */
+    uint64_t    fileoff;    /* file offset of this segment */
+    uint64_t    filesize;   /* amount to map from the file */
+    vm_prot_t   maxprot;    /* maximum VM protection */
+    vm_prot_t   initprot;   /* initial VM protection */
+    uint32_t    nsects;     /* number of sections in segment */
+    uint32_t    flags;      /* flags */
+    };
+
+
     int errno = 0;
-    struct mach_header_64 machoHeader = {};
+    struct mach_header_64 machoHeader = {0};
 
     machoHeader.magic = MH_MAGIC_64;       /* mach magic number identifier */
     machoHeader.cputype = CPU_TYPE_X86_64;  /* cpu specifier */
