@@ -31,6 +31,8 @@
 #	define LIBGTMSHR "%s/libgtmshr.sl"
 #elif defined(__MVS__)
 #	define LIBGTMSHR "%s/libgtmshr.dll"
+#elif defined(__APPLE__)
+#	define LIBGTMSHR "%s/libgtmshr.dylib"
 #else
 #	define LIBGTMSHR "%s/libgtmshr.so"
 #endif
