@@ -13,8 +13,10 @@
 # CMake 2.8.4 introduced LINK_DEPENDS target property
 # CMake 2.8.4 introduced generator expressions in custom commands
 # CMake 2.8.5 introduced use of C compiler as the assembler
-cmake_minimum_required(VERSION 2.8.5)
+# CMake 2.8.12 Adds MacOSX RPATH
+cmake_minimum_required(VERSION 2.8.12)
 project(GTM C ASM)
+set(CMAKE_MACOSX_RPATH 1)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
