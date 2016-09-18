@@ -11,6 +11,10 @@
  * sr_unix/mu_cre_file.c - Mac OS X does not support posix_fallocate()
  * sr_unix/mutex.c - That #ifdef 0 should have probably just deleted the code since the variable
    wake_this_pid is not even defined
+ * Current cmake file links against ncurses in ports, but we need to link
+   against ncurses in the system libs so that we don't need macports on
+   a Mac when just installing GT.M. Currently, that's the only reason
+   we need MacPorts.
 
 
 
