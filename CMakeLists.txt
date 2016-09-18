@@ -434,6 +434,7 @@ add_executable(geteuid			${geteuid_SOURCES})
 add_executable(dtgbldir			${dtgbldir_SOURCES})
 target_link_libraries(geteuid		libmumps)
 add_dependencies(geteuid		gen_gtm_threadgbl_deftypes)
+add_dependencies(dtgbldir		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
