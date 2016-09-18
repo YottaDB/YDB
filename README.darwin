@@ -8,7 +8,6 @@ MacPorts:
 sudo port install cmake
 sudo port install icu
 sudo port install libelf
-
 ```
 
 Homebrew:
@@ -27,14 +26,12 @@ sudo chmod ugo+rw /usr/local/include
 sudo chmod ugo+rw /usr/local/lib
 ```
 
-   $ make -j 16 gen_gtm_threadgbl_deftypes all
-   # Something about the parallelized make doesn't work right so force
-   # gen_gtm_threadgbl_deftypes to go first.
+Now go ahead and make:
+```
+   $ make -j16
    
    # WARNING WARNING WARNING
    # The build leaves the terminal in a pretty bad shape. Do the following to
    # restore sanity
    $ stty sane
 ```
-
-- On Mac OS X, use one of macports/pkgsrc/gentoo prefix. I'm using macports.
