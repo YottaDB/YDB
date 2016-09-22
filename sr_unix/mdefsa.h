@@ -57,6 +57,7 @@
 #elif defined(__APPLE__)
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.dylib"
 #	define	ICU_LIBNAME_EXT		"dylib"
+#	define APPLE_ICU_LIB_NAME	"libicucore.dylib"
 #else
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
 #	ifdef _AIX

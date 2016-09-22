@@ -16,7 +16,6 @@
 # CMake 2.8.12 Adds MacOSX RPATH
 cmake_minimum_required(VERSION 2.8.12)
 project(GTM C ASM)
-set(CMAKE_MACOSX_RPATH 1)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
@@ -761,23 +760,28 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
+set(GTM_SET_ICU_VERSION 1 CACHE BOOL "By default search for the ICU version number")
+if(GTM_SET_ICU_VERSION)
 find_program(ICUCONFIG NAMES icu-config)
-if(ICUCONFIG)
-  execute_process(
-    COMMAND ${ICUCONFIG} --version
-    OUTPUT_VARIABLE icu_version
-    RESULT_VARIABLE icu_failed
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-  if(icu_failed)
-    message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nfailed (${icu_failed}).")
-  elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
-    set(gtm_icu_version "${CMAKE_MATCH_1}")
+  if(ICUCONFIG)
+    execute_process(
+      COMMAND ${ICUCONFIG} --version
+      OUTPUT_VARIABLE icu_version
+      RESULT_VARIABLE icu_failed
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    if(icu_failed)
+      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nfailed (${icu_failed}).")
+    elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
+      set(gtm_icu_version "${CMAKE_MATCH_1}")
+    else()
+      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
+    endif()
   else()
-    message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
+    message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
   endif()
 else()
-  message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
+  message("Not setting gtm_icu_version")
 endif()
 
 find_program(LOCALECFG NAMES locale)
