@@ -60,6 +60,7 @@ get_filename_component(_libelfParentDir "${_libelfLibDir}" PATH)
 find_path(LIBELF_INCLUDE_PATH NAMES libelf.h libelf/libelf.h HINTS "${_libelfParentDir}/include" )
 include_directories(${LIBELF_INCLUDE_PATH})
 
+set(GTM_SET_ICU_VERSION 0 CACHE BOOL "Unless you want ICU from MacPorts/other avoid setting gtm_icu_version to get Apple's undocumented ICU library")
 
 # Set some MOSX specific stuff 
 set(CMAKE_MACOSX_RPATH 1)
