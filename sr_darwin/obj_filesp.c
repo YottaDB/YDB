@@ -27,12 +27,35 @@
  *
  * The GT.M object layout (in the .text section) is described in obj_code.c
  *
+ * This is a port of the ELF format to Mach-O by Sam Habiel.
+ * Mach-O format:
+ *
+ *	+-------------------------------+
+ *	| MACH-O 64bit Header (0 to 1C)	|
+ *	+-------------------------------+
+ *	| LC_SEGMENT64 (20 to 64)       |
+ *	| -> SEC64 HEADER (__TEXT) (64 to B4) |
+ *	+-------------------------------+
+ *	| LC_SYMTAB (B8 to CC)          |
+ *	+-------------------------------+
+ *	| .text section (GTM object) (D0...)	|
+ *	+-------------------------------+
+ *	| .symtab section(sym table)	|
+ *	+-------------------------------+
+ *	| .strtab section(string table)	|
+ *	+-------------------------------+
+ 
+ *
  */
 
 #include "mdef.h"
 
+/* Mach-O stuff. See man 5 Mach-O */
+#include <mach-o/loader.h> /* mach_header_64 */
+#include <mach-o/nlist.h>  /* nlist_64 -- symbol table */
+#include <mach-o/stab.h>   /* helper for that */
+
 #include <errno.h>
-#include <libelf/libelf.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
@@ -136,6 +159,8 @@ void create_object_file(rhdtyp *rhead)
  * Read that gtm_object and wrap it up in .text section, add remaining sections to native object(ELF)
  * Update the ELF, write it out to the object file and close the object file.
  */
+
+/* WARNING: UNDER CONSTRUCTION NOW --> CONVERTING TO MACH-O LOADER */
 void finish_object_file(void)
 {
         int		i, status;
@@ -143,13 +168,16 @@ void finish_object_file(void)
         ssize_t		actualSize;
         char		*gtm_obj_code, *string_tbl;
         int		symIndex, strEntrySize;
+        /*
         Elf		*elf;
         Elf64_Ehdr	*ehdr;
         Elf64_Shdr	*shdr, *text_shdr, *symtab_shdr, *strtab_shdr;
         Elf_Scn		*text_scn, *symtab_scn, *strtab_scn;
         Elf_Data	*text_data, *symtab_data, *strtab_data;
         Elf64_Sym	symEntries[3];
-
+        */
+        
+        /* (sam): .strtab */
         buff_flush();
         bufSize = gtm_object_size;
         actualSize = 0;
@@ -166,139 +194,113 @@ void finish_object_file(void)
         symIndex += strEntrySize;
         strEntrySize = SIZEOF(GTM_RELEASE_NAME);
         memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
-	symIndex += strEntrySize;
+        symIndex += strEntrySize;
         gtm_obj_code = (char *)malloc(bufSize);
+
+        memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
+        string_tbl[symIndex + module_name.len] = '\0';
+        symIndex += module_name.len + 1;
+
         /* At this point, we have only the GTM object written onto the file.
          * We need to read it back and wrap inside the ELF object and
          * write a native ELF object file.
-	 */
+         * (sam:) .text loaded into gtm_obj_code size bufSize
+	     */
         lseek(object_file_des, 0, SEEK_SET);
         DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
         /* Reset the pointer back for writing an ELF object. */
         lseek(object_file_des, 0, SEEK_SET);
-        /* Generate ELF64 header */
-        if (EV_NONE == elf_version(EV_CURRENT))
-        {
-		FPRINTF(stderr, "Elf library out of date!\n");
-		assertpro(FALSE);
-        }
-        if (0 == (elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)))
-        {
-		FPRINTF(stderr, "elf_begin failed!\n");
-		assertpro(FALSE);
-        }
-        if (NULL == (ehdr = elf64_newehdr(elf)))
-        {
-		FPRINTF(stderr, "elf64_newehdr() failed!\n");
-		assertpro(FALSE);
-        }
-        ehdr->e_ident[EI_MAG0] = ELFMAG0;
-        ehdr->e_ident[EI_MAG1] = ELFMAG1;
-        ehdr->e_ident[EI_MAG2] = ELFMAG2;
-        ehdr->e_ident[EI_MAG3] = ELFMAG3;
-        ehdr->e_ident[EI_CLASS] = ELFCLASS64;
-        ehdr->e_ident[EI_VERSION] = EV_CURRENT;
-#	ifdef __hpux
-        ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
-        ehdr->e_ident[EI_OSABI] = ELFOSABI_HPUX;
-#	else
-        ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-        ehdr->e_ident[EI_OSABI] = ELFOSABI_LINUX;
-#	endif /* __hpux */
-        ehdr->e_ident[EI_ABIVERSION] = EV_CURRENT;
-        ehdr->e_machine = EM_X86_64;
-        ehdr->e_type = ET_REL;
-        ehdr->e_version = EV_CURRENT;
-        ehdr->e_shoff = SIZEOF(Elf64_Ehdr);
-        ehdr->e_flags = ELF64_LINKER_FLAG;
-        if (NULL == (text_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for text section!\n");
-                assertpro(FALSE);
-        }
-        if (NULL == (text_data = elf_newdata(text_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for text section!\n");
-                assertpro(FALSE);
-        }
-        text_data->d_align = SECTION_ALIGN_BOUNDARY;
-        text_data->d_off  = 0LL;
-        text_data->d_buf  = gtm_obj_code;
-        text_data->d_type = ELF_T_REL;
-        text_data->d_size = gtm_object_size;
-        text_data->d_version = EV_CURRENT;
-        if (NULL == (text_shdr = elf64_getshdr(text_scn)))
-        {
-                FPRINTF(stderr, "elf64_getshdr() failed for text section\n");
-                assertpro(FALSE);
-        }
-        text_shdr->sh_name = STR_SEC_TEXT_OFFSET;
-        text_shdr->sh_type = SHT_PROGBITS;
-        text_shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
-        text_shdr->sh_entsize = gtm_object_size;
-        memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
-        string_tbl[symIndex + module_name.len] = '\0';
-        if (NULL == (strtab_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for strtab section\n");
-                assertpro(FALSE);
-        }
-        if (NULL == (strtab_data = elf_newdata(strtab_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for strtab section!\n");
-                assertpro(FALSE);
-        }
+
+        /* Creating .symbtab section */
+        struct nlist_64 symtab[2];
+        i = 0;
+        /* NULL symbol */
+        symtab[i].n_un.n_strx = 0; /* Index into str tab */
+        symtab[i].n_type = N_TYPE|N_UNDF; /* type flag ELF: ELF64_ST_INFO(STB_LOCAL, STT_NOTYPE);*/
+        symtab[i].n_sect = NO_SECT; /* Section Number */
+        symtab[i].n_desc = N_LSYM; /* Local/Global */
+        symtab[i].n_value = 0LL; /* value or stab offset */
+        i++;
+        /* Module symbol */
+        symtab[i].n_un.n_strx = 1; /* Index into str tab */
+        symtab[i].n_type = N_TYPE|N_SECT; /* ELF64_ST_INFO(STB_GLOBAL, STT_FUNC); No func in Mach-O */
+        symtab[i].n_sect = 1; /* string table */
+        symtab[i].n_desc = N_GSYM; /* Global */
+        symtab[i].n_value = 0LL;
+
+        /* Generate the top segement (LC_SEGMENT_64) */
+        struct segment_command_64 topSeg;
+        memset(&topSeg,0,sizeof(topSeg));
+
+        topSeg.cmd = LC_SEGMENT_64;
+        topSeg.nsects = 1;
+        topSeg.cmdsize = sizeof(struct segment_command_64) +
+                         sizeof(struct section_64) * topSeg.nsects;
+        /* topSeg.segname -- don't set -- supposed to be empty according to Apple in header file */
+        topSeg.vmaddr = 0;
+        topSeg.vmsize = gtm_object_size;
+        topSeg.fileoff = sizeof(struct mach_header_64) +
+                         sizeof(struct segment_command_64) +
+                         sizeof(struct section_64) * topSeg.nsects +
+                         sizeof(struct symtab_command) ; /* Where __text starts */
+        topSeg.filesize = topSeg.vmsize;
+        topSeg.maxprot = VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE;
+        topSeg.initprot = topSeg.maxprot;
+        topSeg.flags = 0;
+
+
+        /* Section 64 Header (__TEXT) */
+        struct section_64 secText;
+        memset(&secText,0,sizeof(secText));
+        memcpy(&secText.sectname, "__text", 6);
+        memcpy(&secText.segname, "__TEXT", 6); /* segment this section goes in */
+        secText.addr = 0LL;          /* memory address of this section */
+        secText.size = gtm_object_size; /* size in bytes of this section */
+        secText.offset = sizeof(struct mach_header_64) 
+            + sizeof(struct segment_command_64) 
+            + topSeg.nsects * sizeof(struct section_64)
+            + sizeof(struct symtab_command);
+        secText.align = 4; /* 16 bit */
+        secText.reloff = 0;
+        secText.nreloc = 0;
+        secText.flags = S_REGULAR;
+
+        /* symtab command */
+        struct symtab_command symtabCommand;
+        memset(&symtabCommand,0,sizeof(symtabCommand));
+        symtabCommand.cmd = LC_SYMTAB;
+        symtabCommand.cmdsize = sizeof(struct symtab_command);
+        symtabCommand.symoff = sizeof(struct mach_header_64) + 
+            sizeof(struct segment_command_64) + 
+            topSeg.nsects * sizeof(struct section_64) + 
+            sizeof(struct symtab_command) +
+            secText.size;
+        symtabCommand.nsyms = 2; /* number of symbol table entries */
+        symtabCommand.stroff = symtabCommand.symoff + sizeof(symtab);
+        symtabCommand.strsize = symIndex; /* string table size in bytes */
+
+
+        /* Generate Mach-O 64bit header */
+        struct mach_header_64 machoHeader;
+        memset(&machoHeader, 0, sizeof(machoHeader));
+
+        machoHeader.magic = MH_MAGIC_64;       /* mach magic number identifier */
+        machoHeader.cputype = CPU_TYPE_X86_64;  /* cpu specifier */
+        machoHeader.cpusubtype = CPU_SUBTYPE_X86_ALL;   /* machine specifier */
+        machoHeader.filetype = MH_OBJECT;   /* type of file */
+        machoHeader.ncmds = 2;  /* number of load commands */
+        machoHeader.sizeofcmds = sizeof(struct segment_command_64) + 
+            sizeof(struct section_64) * topSeg.nsects + 
+            sizeof(struct symtab_command); /* the size of all the load commands */
+        machoHeader.flags = 0;      /* flags */
+        machoHeader.reserved = 0;   /* reserved */
+
+        /*****/
+        /* (sam): Get rid of this later. Keep now; it may have good info.
         strtab_data->d_align = NATIVE_WSIZE;
         strtab_data->d_buf = string_tbl;
         strtab_data->d_off = 0LL;
         strtab_data->d_size = SPACE_STRING_ALLOC_LEN;
-        strtab_data->d_type = ELF_T_BYTE;
-        strtab_data->d_version = EV_CURRENT;
-        if (NULL == (strtab_shdr = elf64_getshdr(strtab_scn)))
-        {
-                FPRINTF(stderr, "elf_getshdr() failed for strtab section!\n");
-                assertpro(FALSE);
-        }
-        strtab_shdr->sh_name = STR_SEC_STRTAB_OFFSET;
-        strtab_shdr->sh_type = SHT_STRTAB;
-        strtab_shdr->sh_entsize = 0;
-        ehdr->e_shstrndx = elf_ndxscn(strtab_scn);
-        /* Creating .symbtab section */
-        i = 0;
-        /* NULL symbol */
-        symEntries[i].st_name = 0;
-        symEntries[i].st_info = ELF64_ST_INFO(STB_LOCAL, STT_NOTYPE);
-        symEntries[i].st_other = STV_DEFAULT;
-        symEntries[i].st_shndx = 0;
-        symEntries[i].st_size = 0;
-        symEntries[i].st_value = 0;
-        i++;
-        /* Module symbol */
-        symEntries[i].st_name = symIndex;
-        symEntries[i].st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
-        symEntries[i].st_other = STV_DEFAULT;
-        symEntries[i].st_shndx = SEC_TEXT_INDX;
-        symEntries[i].st_size = gtm_object_size;
-        symEntries[i].st_value = 0;
-        i++;
-        /* symbol for .text section */
-        symEntries[i].st_name = STR_SEC_TEXT_OFFSET;
-        symEntries[i].st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
-        symEntries[i].st_other = STV_DEFAULT;
-        symEntries[i].st_shndx = SEC_TEXT_INDX; /* index of the .text */
-        symEntries[i].st_size = 0;
-        symEntries[i].st_value = 0;
-        i++;
-        if (NULL == (symtab_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for symtab section!\n");
-                assertpro(FALSE);
-        }
-        if (NULL == (symtab_data = elf_newdata(symtab_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for symtab section!\n");
-                assertpro(FALSE);
-        }
         symtab_data->d_align = NATIVE_WSIZE;
         symtab_data->d_off  = 0LL;
         symtab_data->d_buf  = symEntries;
@@ -321,6 +323,15 @@ void finish_object_file(void)
                 assertpro(FALSE);
         }
         elf_end(elf);
+        */
+        DOWRITE(object_file_des, &machoHeader, sizeof(machoHeader));
+        DOWRITE(object_file_des, &topSeg, sizeof(topSeg));
+        DOWRITE(object_file_des, &secText, sizeof(secText));
+        DOWRITE(object_file_des, &symtabCommand, sizeof(symtabCommand));
+        DOWRITE(object_file_des, gtm_obj_code, bufSize);
+        DOWRITE(object_file_des, &symtab, sizeof(symtab));
+        DOWRITE(object_file_des, string_tbl, symIndex);
+
         /* Free the memory malloc'ed above */
         free(string_tbl);
         free(gtm_obj_code);
