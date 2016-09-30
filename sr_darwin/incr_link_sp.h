@@ -14,7 +14,12 @@
 
 #include <rtnhdr.h>
 
+#ifdef __APPLE__
+#include <mach-o/loader.h>
+#define NATIVE_HDR_LEN (SIZEOF(struct mach_header_64) + SIZEOF(struct segment_command_64) + SIZEOF(struct section_64) + SIZEOF(struct symtab_command))
+#else
 #define NATIVE_HDR_LEN	64
+#endif
 
 #define COFFHDRLEN         (SIZEOF(int4) * 8)      /* Size of old masscomp-coff header before routine hdr */
 
