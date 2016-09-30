@@ -271,7 +271,11 @@ void gtm_icu_init(void)
 		assert(SIZEOF(icu_libname) > icu_libname_len);
 		libname = icu_libname;
 	} else
+#if defined(__APPLE__)
+		libname = APPLE_ICU_LIB_NAME; /* Use Apple's undocumented private ICU implementation with unrenamed symbols */
+#else
 		libname = ICU_LIBNAME;	/* go with default name */
+#endif
 #	ifdef _AIX
 	/* AIX has a unique packaging convention in that shared objects are conventionally
 	 * archived into a static (.a) library. To resolve the shared library name at runtime

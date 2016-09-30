@@ -3,6 +3,7 @@
  * Make custom commands to massage GAS assembler files into something LLVM would use
  * Assembler macros for sigsetjmp and label jump g_msf.si.
  * Mach-O object files
+ * Shared autolink routine libraries don't work b/c of mprotect issue on shared memory.
  * Import V6.3-000A sources
  * get clock time for Mac
  * Some defines overwrote MVS defines
