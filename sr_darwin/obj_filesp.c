@@ -178,6 +178,7 @@ void finish_object_file(void)
         */
         
         /* (sam): .strtab */
+        /* (sam): Code not touched except change symIndex and add moduleOffset variables at the end */
         buff_flush();
         bufSize = gtm_object_size;
         actualSize = 0;
@@ -199,6 +200,7 @@ void finish_object_file(void)
 
         memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
         string_tbl[symIndex + module_name.len] = '\0';
+        int moduleOffset = symIndex;
         symIndex += module_name.len + 1;
 
         /* At this point, we have only the GTM object written onto the file.
@@ -212,7 +214,8 @@ void finish_object_file(void)
         lseek(object_file_des, 0, SEEK_SET);
 
         /* Creating .symbtab section */
-        struct nlist_64 symtab[2];
+        int SYMTAB_SYMBOLS_NUMBER = 3;
+        struct nlist_64 symtab[SYMTAB_SYMBOLS_NUMBER];
         i = 0;
         /* NULL symbol */
         symtab[i].n_un.n_strx = 0; /* Index into str tab */
@@ -222,10 +225,17 @@ void finish_object_file(void)
         symtab[i].n_value = 0LL; /* value or stab offset */
         i++;
         /* Module symbol */
-        symtab[i].n_un.n_strx = 1; /* Index into str tab */
+        symtab[i].n_un.n_strx = moduleOffset; /* Index into str tab */
         symtab[i].n_type = N_TYPE|N_SECT; /* ELF64_ST_INFO(STB_GLOBAL, STT_FUNC); No func in Mach-O */
         symtab[i].n_sect = 1; /* string table */
         symtab[i].n_desc = N_GSYM; /* Global */
+        symtab[i].n_value = 0LL;
+        i++;
+        /* .text symbol */
+        symtab[i].n_un.n_strx = STR_SEC_TEXT_OFFSET; /* Index into str tab */
+        symtab[i].n_type = N_TYPE|N_SECT; /* ELF64_ST_INFO(STB_GLOBAL, STT_FUNC); No func in Mach-O */
+        symtab[i].n_sect = 1; /* string table */
+        symtab[i].n_desc = N_LSYM; /* Global */
         symtab[i].n_value = 0LL;
 
         /* Generate the top segement (LC_SEGMENT_64) */
@@ -238,7 +248,7 @@ void finish_object_file(void)
                          sizeof(struct section_64) * topSeg.nsects;
         /* topSeg.segname -- don't set -- supposed to be empty according to Apple in header file */
         topSeg.vmaddr = 0;
-        topSeg.vmsize = gtm_object_size;
+        topSeg.vmsize = actualSize;
         topSeg.fileoff = sizeof(struct mach_header_64) +
                          sizeof(struct segment_command_64) +
                          sizeof(struct section_64) * topSeg.nsects +
@@ -255,7 +265,7 @@ void finish_object_file(void)
         memcpy(&secText.sectname, "__text", 6);
         memcpy(&secText.segname, "__TEXT", 6); /* segment this section goes in */
         secText.addr = 0LL;          /* memory address of this section */
-        secText.size = gtm_object_size; /* size in bytes of this section */
+        secText.size = actualSize; /* size in bytes of this section */
         secText.offset = sizeof(struct mach_header_64) 
             + sizeof(struct segment_command_64) 
             + topSeg.nsects * sizeof(struct section_64)
@@ -263,7 +273,7 @@ void finish_object_file(void)
         secText.align = 4; /* 16 bit */
         secText.reloff = 0;
         secText.nreloc = 0;
-        secText.flags = S_REGULAR;
+        secText.flags = S_REGULAR | S_ATTR_SOME_INSTRUCTIONS;
 
         /* symtab command */
         struct symtab_command symtabCommand;
@@ -275,7 +285,7 @@ void finish_object_file(void)
             topSeg.nsects * sizeof(struct section_64) + 
             sizeof(struct symtab_command) +
             secText.size;
-        symtabCommand.nsyms = 2; /* number of symbol table entries */
+        symtabCommand.nsyms = SYMTAB_SYMBOLS_NUMBER; /* number of symbol table entries */
         symtabCommand.stroff = symtabCommand.symoff + sizeof(symtab);
         symtabCommand.strsize = symIndex; /* string table size in bytes */
 
