@@ -65,10 +65,17 @@ TODO: There is no such thing as type "FUNC" that I can see.
         sizeof(struct segment_command_64) + 
         1 * sizeof(struct section_64) + 
         sizeof(struct symtab_command) +
+        sizeof(struct dysymtab_command) +
         sizeof(__text);
     symtabCommand.nsyms = 2; /* number of symbol table entries */
     symtabCommand.stroff = symtabCommand.symoff + sizeof(symtab);
     symtabCommand.strsize = sizeof(__strtab); /* string table size in bytes */
+
+    /* LC_DYSIMTAB */
+    struct dysymtab_command dysymtabCommand;
+    memset(&dysymtabCommand,0,sizeof(dysymtabCommand));
+    dysymtabCommand.cmd = LC_DYSYMTAB;
+    dysymtabCommand.cmdsize = sizeof(dysymtabCommand);
 
     /* Section 64 Header (__TEXT) */
     struct section_64 secText;
@@ -79,11 +86,12 @@ TODO: There is no such thing as type "FUNC" that I can see.
     secText.size = sizeof(__text); /* size in bytes of this section */
     secText.offset = sizeof(struct mach_header_64) 
         + sizeof(struct segment_command_64) 
-        + 1 * sizeof(struct section_64) + sizeof(struct symtab_command);
+        + 1 * sizeof(struct section_64) + sizeof(struct symtab_command)
+        + sizeof(struct dysymtab_command);
     secText.align = 4;
     secText.reloff = 0;
     secText.nreloc = 0;
-    secText.flags = S_REGULAR;
+    secText.flags = S_REGULAR | S_ATTR_PURE_INSTRUCTIONS | S_ATTR_SOME_INSTRUCTIONS;
 
     /* LC_SEGMENT64 */
     struct segment_command_64 topSeg;
@@ -99,7 +107,8 @@ TODO: There is no such thing as type "FUNC" that I can see.
     topSeg.fileoff = sizeof(struct mach_header_64) +
                      sizeof(struct segment_command_64) +
                      sizeof(struct section_64) * topSeg.nsects +
-                     sizeof(struct symtab_command) ; /* Where text starts */
+                     sizeof(struct symtab_command) +
+                     sizeof(struct dysymtab_command); /* Where text starts */
     topSeg.filesize = topSeg.vmsize;
     topSeg.maxprot = VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE;
     topSeg.initprot = topSeg.maxprot;
@@ -113,10 +122,12 @@ TODO: There is no such thing as type "FUNC" that I can see.
     machoHeader.cputype = CPU_TYPE_X86_64;  /* cpu specifier */
     machoHeader.cpusubtype = CPU_SUBTYPE_X86_ALL;   /* machine specifier */
     machoHeader.filetype = MH_OBJECT;   /* type of file */
-    machoHeader.ncmds = 2;  /* number of load commands */
+    machoHeader.ncmds = 3;  /* number of load commands */
     machoHeader.sizeofcmds = sizeof(struct segment_command_64) + 
         sizeof(struct section_64) * topSeg.nsects + 
-        sizeof(struct symtab_command); /* the size of all the load commands */
+        sizeof(struct symtab_command) +
+        sizeof(struct dysymtab_command); /* the size of all the load commands */
+        
     machoHeader.flags = 0;      /* flags */
     machoHeader.reserved = 0;   /* reserved */
 
@@ -132,6 +143,7 @@ TODO: There is no such thing as type "FUNC" that I can see.
     fwrite(&topSeg, sizeof(topSeg), 1, f);   /* LC_SEGMENT_64 */
     fwrite(&secText, sizeof(secText), 1, f); /* Text Header */
     fwrite(&symtabCommand, sizeof(symtabCommand), 1, f); /* LC_SYMTAB */
+    fwrite(&dysymtabCommand, sizeof(dysymtabCommand), 1, f); /* LC_DYSYMTAB */
     fwrite(&__text, sizeof(__text), 1, f); /* Code */
     fwrite(&symtab, sizeof(symtab), 1, f); /* Symbol Table */
     fwrite(&__strtab, sizeof(__strtab), 1, f); /* String List */
