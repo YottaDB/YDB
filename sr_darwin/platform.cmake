@@ -64,6 +64,6 @@ set(CMAKE_MACOSX_RPATH 1)
 set(gtm_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,gtm_zstatus -Wl,-v -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmexe_symbols.export\"")
 set(libgtmshr_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
 set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
-#set(libgtmsec_link "-Wl,-root_safe -Wl,-setuid_safe")
+set(libgtmsec_link "-Wl,-root_safe -Wl,-setuid_safe")
 set(libmumpslibs "-lm -ldl -lc -lpthread ${CURSES_NCURSES_LIBRARY}")
 

@@ -443,6 +443,7 @@ target_link_libraries(gtmsecshr_real libmumps libstub)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/gtmsecshrdir
+  LINK_FLAGS "${libgtmsec_link}"
   )
 add_dependencies(gtmsecshr_real		gen_gtm_threadgbl_deftypes)
 
