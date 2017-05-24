@@ -1488,4 +1488,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* STATSDBERR */
 	   0,	/* STATSDBINUSE */
 	   0,	/* STATSDBFNERR */
+	   0,	/* JNLSWITCHRETRY */
+	   0,	/* JNLSWITCHFAIL */
+	   0,	/* CLISTRTOOLONG */
 	};

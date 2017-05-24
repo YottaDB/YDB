@@ -302,37 +302,44 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 #  define MEM_UNMAP_SYSCALL "munmap()"
 # endif
 
-#define	GVKEY_INIT(GVKEY, KEYSIZE)						\
-MBSTART {									\
-	GBLREF gv_key	*gv_altkey;						\
-	GBLREF gv_key	*gv_currkey;						\
-	gv_key		*new_KEY, *old_KEY;					\
-	int4		keySZ;							\
-										\
-	old_KEY = GVKEY;							\
-	keySZ = KEYSIZE;							\
-	/* KEYSIZE should have been the output of a DBKEYSIZE command so	\
-	 * should be a multiple of 4. Assert that.				\
-	 */									\
-	assert(ROUND_UP2(keySZ, 4) == keySZ);					\
-	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);			\
-	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)				\
-		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));		\
-	if (NULL != old_KEY)							\
-	{									\
-		assert(FALSE);	/* don't call GVKEY_INIT twice for same key */	\
-		assert(KEYSIZE >= old_KEY->top);				\
-		assert(old_KEY->top > old_KEY->end);				\
-		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) + old_KEY->end);	\
-		free(old_KEY);							\
-	} else									\
-	{									\
-		new_KEY->base[0] = '\0';					\
-		new_KEY->end = 0;						\
-		new_KEY->prev = 0;						\
-	}									\
-	new_KEY->top = keySZ;							\
-	GVKEY = new_KEY;							\
+#define	GVKEY_INIT(GVKEY, KEYSIZE)							\
+MBSTART {										\
+	GBLREF gv_key	*gv_altkey;							\
+	GBLREF gv_key	*gv_currkey;							\
+	gv_key		*new_KEY, *old_KEY;						\
+	int4		keySZ;								\
+	DEBUG_ONLY(DCL_THREADGBL_ACCESS);						\
+											\
+	DEBUG_ONLY(SETUP_THREADGBL_ACCESS);						\
+	old_KEY = GVKEY;								\
+	keySZ = KEYSIZE;								\
+	/* KEYSIZE should have been the output of a DBKEYSIZE command so		\
+	 * should be a multiple of 4. Assert that.					\
+	 */										\
+	assert(ROUND_UP2(keySZ, 4) == keySZ);						\
+	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);				\
+	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)					\
+		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));			\
+	if (NULL != old_KEY)								\
+	{										\
+		/* Don't call GVKEY_INIT twice for same key. The only exception		\
+		 * is if we are called from COPY_PREV_KEY_TO_GVT_CLUE in a		\
+		 * restartable situation but TREF(donot_commit) should have		\
+		 * been set to a special value then so check that.			\
+		 */									\
+		assert(TREF(donot_commit) | DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);	\
+		assert(KEYSIZE >= old_KEY->top);					\
+		assert(old_KEY->top > old_KEY->end);					\
+		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) + old_KEY->end);		\
+		free(old_KEY);								\
+	} else										\
+	{										\
+		new_KEY->base[0] = '\0';						\
+		new_KEY->end = 0;							\
+		new_KEY->prev = 0;							\
+	}										\
+	new_KEY->top = keySZ;								\
+	GVKEY = new_KEY;								\
 } MBEND
 
 #define	GVKEY_FREE_IF_NEEDED(GVKEY)	\
@@ -569,6 +576,26 @@ MBSTART {											\
 	}													\
 }
 
+/* The below macro is modeled pretty much like OPEN_BASEREG_IF_STATSREG except that this asserts that the
+ * other macro is not needed. And that whatever that macro sets up is already set up that way.
+ */
+#ifdef DEBUG
+#define	ASSERT_BASEREG_OPEN_IF_STATSREG(MAP)				\
+{									\
+	gd_region	*baseDBreg, *statsDBreg;			\
+									\
+	statsDBreg = MAP->reg.addr;					\
+	if (IS_STATSDB_REGNAME(statsDBreg))				\
+	{								\
+		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);		\
+		assert(baseDBreg->open);				\
+		assert(statsDBreg->open);				\
+	}								\
+}
+#else
+#define	ASSERT_BASEREG_OPEN_IF_STATSREG(MAP)
+#endif
+
 /* Calculate the # of subscripts in "KEY" and stores that in "NSUBS" */
 #define	GET_NSUBS_IN_GVKEY(PTR, LEN, NSUBS)							\
 MBSTART {											\
@@ -603,6 +630,7 @@ MBSTART {													\
 	if (WAS_OPEN)												\
 	{													\
 		REG->was_open = TRUE;										\
+		TREF(was_open_reg_seen) = TRUE;									\
 		assert(DBKEYSIZE(REG->max_key_size) <= gv_keysize);						\
 	} else													\
 		GVKEYSIZE_INIT_IF_NEEDED; /* sets up "gv_keysize", "gv_currkey" and "gv_altkey" in sync */	\
@@ -1662,20 +1690,20 @@ enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] *
  * the restart will anyway be detected before commit. In this cases, this variable will take on non-zero values.
  * The commit logic will assert that this variable is indeed zero after validation but before proceeding with commit.
  */
-#define	DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH		(1 << 0) /* Restartable situation encountered in tp_hist */
-#define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL		(1 << 1) /* Restartable situation encountered in gvcst_delete_blk */
-#define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR		(1 << 2) /* Restartable situation encountered in jnl_get_checksum.h */
-#define	DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS		(1 << 3) /* Restartable situation encountered in gvcst_kill */
-#define	DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN		(1 << 4) /* Restartable situation encountered in gvcst_blk_build */
+#define	DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH		(1 << 0) /* Restartable situation seen in tp_hist */
+#define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL		(1 << 1) /* Restartable situation seen in gvcst_delete_blk */
+#define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR		(1 << 2) /* Restartable situation seen in jnl_get_checksum.h */
+#define	DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS		(1 << 3) /* Restartable situation seen in gvcst_kill */
+#define	DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN		(1 << 4) /* Restartable situation seen in gvcst_blk_build */
 #define	DONOTCOMMIT_T_QREAD_BAD_PVT_BUILD		(1 << 5) /* Restartable situation due to bad private build in t_qread */
-#define	DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC	(1 << 6) /* Restartable situation encountered in gvcst_search */
-#define	DONOTCOMMIT_GVCST_SEARCH_BLKTARGET_MISMATCH	(1 << 7) /* Restartable situation encountered in gvcst_search */
-#define DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD		(1 << 8) /* Restartable situation encountered in reallocate_bitmap */
-#define DONOTCOMMIT_T_WRITE_CSE_DONE			(1 << 9) /* Restartable situation encountered in t_write */
-#define DONOTCOMMIT_T_WRITE_CSE_MODE			(1 << 10) /* Restartable situation encountered in t_write */
-#define DONOTCOMMIT_TRIGGER_SELECT_XECUTE		(1 << 11) /* Restartable situation encountered in trigger_select */
-#define DONOTCOMMIT_JNL_FORMAT				(1 << 12) /* Restartable situation encountered in jnl_format */
-#define DONOTCOMMIT_GVCST_PUT_SPLIT_TO_RIGHT		(1 << 13) /* Restartable situation encountered in gvcst_put */
+#define	DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC	(1 << 6) /* Restartable situation seen in gvcst_search */
+#define	DONOTCOMMIT_GVCST_SEARCH_BLKTARGET_MISMATCH	(1 << 7) /* Restartable situation seen in gvcst_search */
+#define DONOTCOMMIT_GVCST_PUT_SPLIT_TO_RIGHT		(1 << 8) /* Restartable situation seen in gvcst_put */
+#define DONOTCOMMIT_T_WRITE_CSE_DONE			(1 << 9) /* Restartable situation seen in t_write */
+#define DONOTCOMMIT_T_WRITE_CSE_MODE			(1 << 10) /* Restartable situation seen in t_write */
+#define DONOTCOMMIT_TRIGGER_SELECT_XECUTE		(1 << 11) /* Restartable situation seen in trigger_select */
+#define DONOTCOMMIT_JNL_FORMAT				(1 << 12) /* Restartable situation seen in jnl_format */
+#define DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE		(1 << 13) /* Restartable situation seen in COPY_PREV_KEY_TO_GVT_CLUE */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1875,7 +1903,7 @@ typedef struct sgmnt_data_struct
 						 */
 	volatile boolean_t filler_wc_blocked;	/* Now moved to node_local */
 	boolean_t	mumps_can_bypass;	/* Allow mumps processes to bypass flushing, access control, and ftok semaphore
-						 * in gds_rundown(). This was done to improve shutdown performance.
+						 * in "gds_rundown". This was done to improve shutdown performance.
 						 */
 	boolean_t	epoch_taper;		/* If TRUE, GT.M tries to reduce dirty buffers as epoch approaches */
 	uint4		epoch_taper_time_pct;	/* in the last pct we start tapering for time */
@@ -2400,7 +2428,7 @@ typedef struct	gd_region_struct
 						 */
 	bool			freeze_on_fail;
 	bool			mumps_can_bypass; /* Allow mumps processes to bypass flushing, access control, and ftok semaphore
-						   * in gds_rundown(). This was done to improve shutdown performance.
+						   * in "gds_rundown". This was done to improve shutdown performance.
 						   */
 	unsigned char		jnl_file_len;
 	unsigned char		jnl_file_name[JNL_NAME_SIZE];
@@ -2571,6 +2599,10 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	needs_post_freeze_online_clean;	/* Perform cleanup of online freeze */
 	boolean_t	needs_post_freeze_flushsync;	/* Perform post-freeze flush/sync */
 	block_id	tp_hint;		/* last tp (allocation) hint for this process in this region */
+	boolean_t	statsDB_setup_completed;	/* TRUE if ^%YGS node has been added to this statsDB file.
+							 * Is a copy of reg->statsDB_setup_completed but is present in "csa"
+							 * too to handle was_open regions.
+							 */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3278,8 +3310,13 @@ MBSTART {												\
 		if (NULL == GVT->prev_key)								\
 			GVKEY_INIT(GVT->prev_key, GVT->clue.top);					\
 		if (gv_altkey->end >= GVT->prev_key->top)						\
-		{											\
-			assert(FALSE);	/* this means we have GVSUBOFLOW integ error */			\
+		{	/* Note that this is possible in case of concurrency issues (i.e. we are in	\
+			 * a restartable situation (see comment at bottom of gvcst_expand_key.c which	\
+			 * talks about a well-formed key. Since we cannot easily signal a restart here,	\
+			 * we reallocate to ensure the COPY_KEY does not cause a buffer overflow and	\
+			 * the caller will eventually do the restart.					\
+			 */										\
+			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE;)	\
 			GVKEY_INIT(GVT->prev_key, DBKEYSIZE(gv_altkey->end));				\
 		}											\
 		COPY_KEY(GVT->prev_key, gv_altkey);							\

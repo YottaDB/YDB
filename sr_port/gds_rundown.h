@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,8 +13,10 @@
 #ifndef GDS_RUNDOWN_INCLUDED
 #define GDS_RUNDOWN_INCLUDED
 
-#ifdef UNIX
-int4 gds_rundown(void);
+#define	CLEANUP_UDI_FALSE	FALSE
+#define	CLEANUP_UDI_TRUE	TRUE
+
+int4 gds_rundown(boolean_t cleanup_udi);
 
 #define CAN_BYPASS(SEMVAL, CSD, INST_IS_FROZEN)										\
 	(INST_IS_FROZEN || FROZEN_CHILLED(CSD)										\
@@ -46,10 +48,6 @@ int4 gds_rundown(void);
 #	define PROC_FACTOR	2
 #else
 #	define PROC_FACTOR	20
-#endif
-
-#else
-void gds_rundown(void);
 #endif
 
 #endif /* GDS_RUNDOWN_INCLUDED */

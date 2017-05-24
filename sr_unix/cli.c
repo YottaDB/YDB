@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,10 @@
 #include "util.h"
 #include "cli_parse.h"
 #include "min_max.h"
+#include "gtmimagename.h"
+#include "gtmmsg.h"
+
+error_def(ERR_CLISTRTOOLONG);
 
 /*
  * --------------------------------------------------
@@ -271,7 +276,14 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 	}
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = 0;)	/* for use inside cli_get_value -> get_parm_entry ... */
 	copylen = strlen(buf);
-	copylen = MIN(copylen, maxdstlen);
+	if (maxdstlen < copylen)
+	{
+		if (!IS_GTM_IMAGE)
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CLISTRTOOLONG, 3, entry, copylen, maxdstlen);
+		else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CLISTRTOOLONG, 3, entry, copylen, maxdstlen);
+		return FALSE;
+	}
 	memset(dst, 0, maxdstlen);
 	memcpy(dst, buf, copylen);
 	*max_len = (unsigned short) copylen;

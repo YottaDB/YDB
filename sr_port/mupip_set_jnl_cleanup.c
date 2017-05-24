@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ void mupip_set_jnl_cleanup(void)
 {
 	mu_set_rlist		*rptr;
 	file_control		*fc;
-	int4			rundown_status = EXIT_NRM;		/* if gds_rundown went smoothly */
+	int4			rundown_status = EXIT_NRM;		/* if "gds_rundown" went smoothly */
 
 	for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
 	{
@@ -73,7 +73,7 @@ void mupip_set_jnl_cleanup(void)
  			tp_change_reg();
 			assert(NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd);
 			if (NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd)
-				rundown_status |= gds_rundown();
+				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE);
 			/* Note: We did not allocate, so we do not deallocate rptr->sd */
 			rptr->sd = NULL;
 		}

@@ -223,6 +223,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 				tmplen += SPRINTF(ptr, "%d", rctl - &mur_ctl[0]);
 			file_info->fn_len = tmplen;
 		}
+		rename_fn_len = ARRAYSIZE(rename_fn);
 		if (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn, &rename_fn_len, &status))
 			return status;
 		op_pars.mvtype = MV_STR;

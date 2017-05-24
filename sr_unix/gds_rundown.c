@@ -46,9 +46,7 @@
 #include "send_msg.h"
 #include "change_reg.h"
 #include "compswap.h"
-#ifdef UNIX
 #include "mutex.h"
-#endif
 #include "gds_rundown.h"
 #include "gvusr.h"
 #include "do_semop.h"
@@ -80,6 +78,11 @@
 #include "aio_shim.h"
 #include "gvcst_protos.h"
 #include "targ_alloc.h"
+#include "gdskill.h"		/* needed for tp.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -125,7 +128,7 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
 
-int4 gds_rundown(void)
+int4 gds_rundown(boolean_t cleanup_udi)
 {
 	boolean_t		canceled_dbsync_timer, do_jnlwait, ok_to_write_pfin, wrote_pfin;
 	boolean_t		have_standalone_access, ipc_deleted, err_caught, aiocancel_timedout;
@@ -134,6 +137,7 @@ int4 gds_rundown(void)
 	boolean_t		db_needs_flushing;
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg, *statsDBreg;
+	gd_segment		*seg;
 	int			save_errno, status, rc;
 	int4			semval, ftok_semval, sopcnt, ftok_sopcnt;
 	short			crash_count;
@@ -160,6 +164,7 @@ int4 gds_rundown(void)
 	gd_region		*baseDBreg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
+	sgm_info		*si;
 
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
@@ -172,7 +177,8 @@ int4 gds_rundown(void)
 	 *	macro.  This would also avoid the assert problem
 	 *	and should be done eventually.
 	 */
-	if (dba_cm == reg->dyn.addr->acc_meth)
+	seg = reg->dyn.addr;
+	if (dba_cm == seg->acc_meth)
 		return EXIT_NRM;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -189,32 +195,43 @@ int4 gds_rundown(void)
 	 */
 	is_statsDB = IS_STATSDB_REG(reg);
 	if (!is_statsDB)
-	{
-		if (!(RDBF_NOSTATS & reg->reservedDBFlags))
+	{	/* Note that even if the baseDB has RDBF_NOSTATS set, we could have opened the statsDB region
+		 * (for example, if statsDB has read-only permissions, we would have opened it and found it is
+		 * read-only when we tried to add the ^%YGS node and would have disabled stats in the baseDB
+		 * all the while leaving the statsDB open. So we need to check if it is open and if so run it down
+		 * without checking the RDBF_NOSTATS bit in the baseDB.
+		 */
+		BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+		if (statsDBreg->open)
 		{
-			BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
-			if (statsDBreg->open)
-			{
-				gv_cur_region = statsDBreg;	/* Switch "gv_cur_region" to do rundown of statsDB */
-				tp_change_reg();
-				gds_rundown();	/* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
-				gv_cur_region = reg;	/* Restore "gv_cur_region" back to continue rundown of baseDB */
-				tp_change_reg();
-				/* Now that statsdb has been rundown, reset basedb stats back to private memory in case it was
-				 * pointing to statsdb shared/mapped memory. Note that the following reset of the stats
-				 * pointer back to the internal stats buffer located is sgmnt_data is normally taken care
-				 * of by the statsdb unlink processing in gvcst_remove_statsDB_linkage() but we keep this
-				 * reset here also to be sure it gets done in case of a statsDB rundown issue.
-				 */
-				csa->gvstats_rec_p = &csa->gvstats_rec;
-			}
+			gv_cur_region = statsDBreg;	/* Switch "gv_cur_region" to do rundown of statsDB */
+			tp_change_reg();
+			gds_rundown(cleanup_udi); /* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
+			gv_cur_region = reg;	/* Restore "gv_cur_region" back to continue rundown of baseDB */
+			tp_change_reg();
+			/* Now that statsdb has been rundown, reset basedb stats back to private memory in case it was
+			 * pointing to statsdb shared/mapped memory. Note that the following reset of the stats
+			 * pointer back to the internal stats buffer located is sgmnt_data is normally taken care
+			 * of by the statsdb unlink processing in gvcst_remove_statsDB_linkage() but we keep this
+			 * reset here also to be sure it gets done in case of a statsDB rundown issue.
+			 */
+			csa->gvstats_rec_p = &csa->gvstats_rec;
 		}
-	} else
+	}
+	csa->regcnt--;
+	if (csa->regcnt)
+	{	/* There is at least one more region pointing to the same db file as this region.
+		 * Defer rundown of this "csa" until the last region corresponding to this csa is called for rundown.
+		 */
+		reg->open = FALSE;
+		return EXIT_NRM;
+	}
+	if (is_statsDB)
 	{	/* This is a statsdb. Fix reg->read_only & csa->read_write based on csa->orig_read_write.
 		 * This is so it reflects real permissions this process has on the statsdb.
 		 */
 		reg->read_only = !csa->orig_read_write;
-		csa->read_write = csa->orig_read_write;			/* Maintain read_only/read_write in parallel */
+		csa->read_write = csa->orig_read_write;		/* Maintain read_only/read_write in parallel */
 	}
 	/* If the process has standalone access, it has udi->grabbed_access_sem set to TRUE at this point. Note that down in a local
 	 * variable as the udi->grabbed_access_sem is set to TRUE even for non-standalone access below and hence we can't rely on
@@ -240,9 +257,10 @@ int4 gds_rundown(void)
 	assert(!csa->hold_onto_crit || (csa->now_crit && jgbl.onlnrlbk));
 	/* If we are online rollback, we should already be holding crit and should release it only at the end of this module. This
 	 * is usually done by noting down csa->now_crit in a local variable (was_crit) and using it whenever we are about to
-	 * grab_crit. But, there are instances (like mupip_set_journal.c) where we grab_crit but invoke gds_rundown without any
-	 * preceeding rel_crit. Such code relies on the fact that gds_rundown does rel_crit unconditionally (to get locks to a known
-	 * state). So, augment csa->now_crit with jgbl.onlnrlbk to track if we can rel_crit unconditionally or not in gds_rundown.
+	 * grab_crit. But, there are instances (like mupip_set_journal.c) where we grab_crit but invoke "gds_rundown" without any
+	 * preceeding rel_crit. Such code relies on the fact that "gds_rundown" does rel_crit unconditionally (to get locks to a
+	 * known state). So, augment csa->now_crit with jgbl.onlnrlbk to track if we can rel_crit unconditionally or not in
+	 * "gds_rundown".
 	 */
 	was_crit = (csa->now_crit && jgbl.onlnrlbk);
 	/* Cancel any pending flush timer for this region by this process */
@@ -257,8 +275,8 @@ int4 gds_rundown(void)
 		rel_crit(reg);		/* get locks to known state */
 		mutex_cleanup(reg);
 	}
-	/* The only process that can invoke gds_rundown while holding access control semaphore is RECOVER/ROLLBACK. All the others
-	 * (like MUPIP SET -FILE/MUPIP EXTEND would have invoked db_ipcs_reset() before invoking gds_rundown (from
+	/* The only process that can invoke "gds_rundown" while holding access control semaphore is RECOVER/ROLLBACK. All the
+	* others (like MUPIP SET -FILE/MUPIP EXTEND would have invoked db_ipcs_reset() before invoking "gds_rundown" (from
 	 * mupip_exit_handler). The only exception is when these processes encounter a terminate signal and they reach
 	 * mupip_exit_handler while holding access control semaphore. Assert accordingly.
 	 */
@@ -386,7 +404,7 @@ int4 gds_rundown(void)
 	safe_mode = !ok_to_write_pfin || ftok_counter_halted || access_counter_halted || FROZEN_CHILLED(csd);
 	/* At this point we are guaranteed no one else is doing a db_init/rundown as we hold the access control semaphore */
 	assert(csa->ref_cnt);	/* decrement private ref_cnt before shared ref_cnt decrement. */
-	csa->ref_cnt--;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
+	csa->ref_cnt--;
 	assert(!csa->ref_cnt);
 	/* Note that the below value is normally incremented/decremented under control of the init/rundown semaphore in
 	 * "db_init" and "gds_rundown" but if QDBRUNDOWN is turned ON it could be manipulated without the semaphore in
@@ -455,8 +473,8 @@ int4 gds_rundown(void)
 		 */
 		if (csa->wbuf_dqd && !is_mm)
 		{	/* If we had an orphaned block and were interrupted, mupip_exit_handler will invoke secshr_db_clnup which
-			 * will clear this field and so we should never come to gds_rundown with a non-zero wbuf_dqd. The only
-			 * exception is if we are recover/rollback in which case gds_rundown (from mur_close_files) is invoked
+			 * will clear this field and so we should never come to "gds_rundown" with a non-zero wbuf_dqd. The only
+			 * exception is if we are recover/rollback in which case "gds_rundown" (from mur_close_files) is invoked
 			 * BEFORE secshr_db_clnup in mur_close_files.
 			 * Note: It is NOT possible for online rollback to reach here with wbuf_dqd being non-zero. This is because
 			 * the moment we apply the first PBLK, we stop all interrupts and hence can never be interrupted in
@@ -475,14 +493,8 @@ int4 gds_rundown(void)
 			if (!was_crit)
 				rel_crit(reg);
 		}
-		jpc = csa->jnl;
-		if (JNL_ENABLED(csd))
-		{
-			jbp = jpc->jnl_buff;
-			if (IS_GTCM_GNP_SERVER_IMAGE)
-				originator_prc_vec = NULL;
-		} else
-			jbp = NULL;
+		if (JNL_ENABLED(csd) && IS_GTCM_GNP_SERVER_IMAGE)
+			originator_prc_vec = NULL;
 		/* If we are the last writing user, then everything must be flushed */
 		if (we_are_last_writer)
 		{	/* Time to flush out all of our buffers */
@@ -525,7 +537,7 @@ int4 gds_rundown(void)
 			assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
 		} else if (((csa->canceled_flush_timer && (0 > cnl->wcs_timers)) || canceled_dbsync_timer)
 				&& !inst_is_frozen)
-		{	/* If we canceled a pending dbsync timer in gds_rundown OR canceled a db flush timer in gds_rundown
+		{	/* If we canceled a pending dbsync timer in "gds_rundown" OR canceled a db flush timer in "gds_rundown"
 			 * or sometime in the past (e.g. because we found a JNL_FILE_SWITCHED situation in wcs_stale etc.)
 			 * AND there are no other active pending flush timers, it is possible we have unflushed buffers in
 			 * the db/jnl so call wcs_flu to flush EPOCH to disk in a timely fashion.
@@ -542,6 +554,8 @@ int4 gds_rundown(void)
 		/* Do rundown journal processing after buffer flushes since they require jnl to be open */
 		if (JNL_ENABLED(csd))
 		{
+			jpc = csa->jnl;
+			jbp = jpc->jnl_buff;
 			if (jbp->fsync_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
@@ -686,9 +700,9 @@ int4 gds_rundown(void)
 		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.gt_sem_ctime = 0;
 		db_ipcs.gt_shm_ctime = 0;
-		db_ipcs.fn_len = reg->dyn.addr->fname_len;
-		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
-		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
+		db_ipcs.fn_len = seg->fname_len;
+		memcpy(db_ipcs.fn, seg->fname, seg->fname_len);
+		db_ipcs.fn[seg->fname_len] = 0;
  		/* request gtmsecshr to flush. read_only cannot flush itself */
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 		if (!csa->read_only_fs)
@@ -713,7 +727,7 @@ int4 gds_rundown(void)
 		 * be rundown. This is necessary, however, because we need to cancel all in-progress IOs before the below
 		 * CLOSEFILE_RESET().
 		 *
-		 * IOs canceled for subsequent regions will be reissued when we go to gds_rundown() next and the
+		 * IOs canceled for subsequent regions will be reissued when we go to "gds_rundown" next and the
 		 * wcs_flu()/wcs_wtstart()/aio_shim_write() happens, which will reopen the kernel context and multiplexing thread
 		 * as necessary.
 		 */
@@ -781,6 +795,7 @@ int4 gds_rundown(void)
 	GTM_WHITE_BOX_TEST(WBTEST_HOLD_SEM_BYPASS, cnl->wbox_test_seq_num, 0);
 	status = SHMDT((caddr_t)cnl);
 	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
+	csa->hdr = NULL;	/* dereferencing hdr after detach also is not right so set it to NULL */
 	/* Note that although csa->nl is NULL, we use CSA_ARG(csa) below (not CSA_ARG(NULL)) to be consistent with similar
 	 * usages before csa->nl became NULL. The "is_anticipatory_freeze_needed" function (which is in turn called by the
 	 * CHECK_IF_FREEZE_ON_ERROR_NEEDED macro) does a check of csa->nl before dereferencing shared memory contents so
@@ -791,24 +806,7 @@ int4 gds_rundown(void)
 			     LEN_AND_LIT("Error during shmdt"), errno);
 	REMOVE_CSA_FROM_CSADDRSLIST(csa);	/* remove "csa" from list of open regions (cs_addrs_list) */
 	reg->open = FALSE;
-	if (is_statsDB && !process_exiting)
-	{	/* This is a statsDB, clear a few other pertinent flags in case it gets re-opened */
-		reg->statsDB_setup_started = FALSE;
-		reg->statsDB_setup_completed = FALSE;
-		csa->hdr = NULL;
-		csa->db_addrs[0] = NULL;
-		csa->lock_addrs[0] = NULL;
-		/* Locate all the gv_targets that map to the region we are abandoning and clear their clues */
-		for (currgvt = gv_target_list; currgvt; currgvt = currgvt->next_gvnh)
-		{
-			if (csa != currgvt->gd_csa)
-				continue;
-			currgvt->clue.end = 0;
-			if (currgvt != csa->dir_tree)
-				/* Only clear root for non-directory gv_target */
-				currgvt->root = 0;
-		}
-	}
+	assert(!is_statsDB || process_exiting || IS_GTCM_GNP_SERVER_IMAGE);
 	/* If file is still not in good shape, die here and now before we get rid of our storage */
 	assertpro(0 == csa->wbuf_dqd);
 	ipc_deleted = FALSE;
@@ -915,5 +913,58 @@ int4 gds_rundown(void)
 		}
 	}
 	REVERT;
+	/* Now that "gds_rundown" is done, free up the memory associated with the region as long as the caller is okay with it */
+	if (cleanup_udi)
+	{
+		if (NULL != csa->dir_tree)
+			FREE_CSA_DIR_TREE(csa);
+		if (csa->sgm_info_ptr)
+		{
+			si = csa->sgm_info_ptr;
+			/* It is possible we got interrupted before initializing all fields of "si"
+			 * completely so account for NULL values while freeing/releasing those fields.
+			 */
+			assert((si->tp_csa == csa) || (NULL == si->tp_csa));
+			if (si->jnl_tail)
+			{
+				PROBE_FREEUP_BUDDY_LIST(si->format_buff_list);
+				PROBE_FREEUP_BUDDY_LIST(si->jnl_list);
+			}
+			PROBE_FREEUP_BUDDY_LIST(si->recompute_list);
+			PROBE_FREEUP_BUDDY_LIST(si->new_buff_list);
+			PROBE_FREEUP_BUDDY_LIST(si->tlvl_info_list);
+			PROBE_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
+			PROBE_FREEUP_BUDDY_LIST(si->cw_set_list);
+			if (NULL != si->blks_in_use)
+			{
+				free_hashtab_int4(si->blks_in_use);
+				free(si->blks_in_use);
+				si->blks_in_use = NULL;
+			}
+			if (si->cr_array_size)
+			{
+				assert(NULL != si->cr_array);
+				if (NULL != si->cr_array)
+					free(si->cr_array);
+			}
+			if (NULL != si->first_tp_hist)
+				free(si->first_tp_hist);
+			free(si);
+		}
+		if (csa->jnl)
+		{
+			assert(&FILE_INFO(csa->jnl->region)->s_addrs == csa);
+			if (csa->jnl->jnllsb)
+			{
+				assert(FALSE);
+				free(csa->jnl->jnllsb);
+			}
+			free(csa->jnl);
+		}
+		assert(seg->file_cntl->file_info);
+		free(seg->file_cntl->file_info);
+		free(seg->file_cntl);
+		seg->file_cntl = NULL;
+	}
 	return EXIT_NRM;
 }

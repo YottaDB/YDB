@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,8 +71,7 @@
 #define UPDHELPER_EARLY_EPOCH 5
 #define THRESHOLD_FOR_PAUSE 10
 
-GBLDEF	jnlpool_addrs		jnlpool;
-
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	void			(*call_on_signal)();
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;

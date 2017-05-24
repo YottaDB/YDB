@@ -147,6 +147,7 @@ error_def(ERR_FILEPARSE);
 error_def(ERR_FREEZECTRL);
 error_def(ERR_JNLCREATE);
 error_def(ERR_JNLDISABLE);
+error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLFNF);
 error_def(ERR_JNLNOCREATE);
 error_def(ERR_JNLPOOLSETUP);
@@ -1168,7 +1169,7 @@ repl_inst_bkup_done2:
 							!keep_prev_link || !JNL_ENABLED(cs_data)) ? TRUE : FALSE;
 						if (JNL_ENABLED(cs_data) && (0 != cs_addrs->nl->jnl_file.u.inode))
 						{	/* Note: following will again call wcs_flu() */
-							if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_BACKUP)))
+							if (SS_NORMAL != (status = set_jnl_file_close()))
 							{
 								util_out_print("!/Journal file !AD not closed:",
 									TRUE, jnl_info.jnl_len, jnl_info.jnl);
@@ -1195,6 +1196,7 @@ repl_inst_bkup_done2:
 								error_mupip = TRUE;
 								continue;
 							}
+							jnl_set_cur_prior(gv_cur_region, cs_addrs, cs_data);
 							jnl_info.no_rename = (FILE_NOT_FOUND == jnl_fstat);
 						}
 						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR | WCSFLU_MSYNC_DB);

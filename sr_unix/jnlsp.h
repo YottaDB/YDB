@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,6 +65,6 @@ typedef unix_file_info		fi_type;
 #define DEF_DB_EXT_NAME			"dat"
 #define DEF_JNL_EXT_NAME		".mjl"
 
-uint4 jnl_file_open(gd_region *reg, bool init, void *dummy);
+uint4 jnl_file_open(gd_region *reg, boolean_t init);
 
 #endif /* JNLSP_H_INCLUDED */

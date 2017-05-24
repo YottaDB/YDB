@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -408,8 +408,11 @@ MBSTART {													\
 					CONTINUE;							\
 				}
 
-/* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones. */
-#define UNWINDABLE(unw_ch)	((&t_ch != unw_ch->ch) && (&dbinit_ch != unw_ch->ch))
+/* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones.
+ * Use function pointer (t_ch_fnptr global variable) instead of &tch (and likewise for dbinit_ch) as it will otherwise bloat
+ * executables that don't need to pull in t_ch/dbinit_ch (e.g. ftok/gtcm_shmclean/dbcertify).
+ */
+#define UNWINDABLE(unw_ch)	((t_ch_fnptr != unw_ch->ch) && (dbinit_ch_fnptr != unw_ch->ch))
 /* Note, since we are not initially changing the assembler ESTABLISH version to also include deferring/enabling of interrupts,
  * we cannot leave the interrupt block in effect during the longjmp(). But once that support is in place, we can do away with
  * re-enabling interrupts and let the longjmp() return from setjmp() take care of it.
@@ -419,6 +422,8 @@ MBSTART {													\
 					GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;				\
 					GBLREF	volatile boolean_t	in_wcs_recover;						\
 					GBLREF	uint4			dollar_tlevel;						\
+					GBLREF	ch_ret_type		(*t_ch_fnptr)();      /* Function pointer to t_ch */	\
+					GBLREF	ch_ret_type		(*dbinit_ch_fnptr)();/* Function pointer to dbinit_ch */\
 																\
 					intrpt_state_t			prev_intrpt_state;					\
 																\
@@ -536,7 +541,7 @@ error_def(ERR_OUTOFSPACE);
 #define DUMPABLE                ((SEVERITY == SEVERE) && IS_GTM_ERROR(SIGNAL)						\
 					&& (SIGNAL != (int)ERR_OUTOFSPACE)						\
 					DEBUG_ONLY(&& (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)		\
-							? (!process_exiting || (SIGNAL != (int)ERR_MEMORY)) : TRUE)))
+							? (SIGNAL != (int)ERR_MEMORY) : TRUE)))
 
 unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc);
 

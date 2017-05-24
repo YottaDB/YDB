@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,11 +86,10 @@
 #include "gtmimagename.h"
 #include "mprof.h"
 #include "gt_timers_add_safe_hndlrs.h"
-#include "jnl_file_close_timer.h"
 #include "continue_handler.h"
-#include "fake_enospc.h"
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
+#include "common_startup_init.h"
 #ifdef UNICODE_SUPPORTED
 #include "utfcgr.h"
 #endif
@@ -131,9 +130,6 @@ GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch *
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
-GBLREF void			(*jnl_file_close_timer_ptr)(void);
-GBLREF void			(*fake_enospc_ptr)(void);
-GBLREF void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **timedout);
 
 OS_PAGE_SIZE_DECLARE
 
@@ -159,11 +155,9 @@ void gtm_startup(struct startup_vector *svec)
 	IA64_ONLY(init_xfer_table());
 	get_page_size();
 	cache_table_relobjs = &cache_table_rebuild;
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	ht_rhash_ch = &hashtab_rehash_ch;
 	jbxm_dump_ch = &jobexam_dump_ch;
-	jnl_file_close_timer_ptr = &jnl_file_close_timer;
-	fake_enospc_ptr = &fake_enospc;
-	simple_timeout_timer_ptr = &simple_timeout_timer;
 	stpgc_ch = &stp_gcol_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;

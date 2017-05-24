@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#if defined(VMS)
-#include <climsgdef.h>
-#include <math.h> /* needed for handling of epoch_interval (EPOCH_SECOND2SECOND macro uses ceil) */
-#endif
 
 #include "gtm_string.h"		/* for memcpy() */
 
@@ -74,7 +70,6 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_info->before_images = TRUE;
 	} else if (CLI_NEGATED == cli_status1)
 	{
-		VMS_ONLY(assert(CLI_PRESENT != jnl_options->cli_replic_on);)
 		jnl_options->image_type_specified = TRUE;
 		jnl_info->before_images = FALSE;
 	} else
@@ -169,19 +164,24 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		}
 	}
-	temp_jnl_fn_len = jnl_info->jnl_len = MAX_FN_LEN + 1;
-	if (jnl_options->filename_specified = cli_get_str("FILENAME", (char *)jnl_info->jnl, &temp_jnl_fn_len))
-		jnl_info->jnl_len = temp_jnl_fn_len;
-	else
+	if (jnl_options->filename_specified = (CLI_PRESENT == cli_present("FILENAME")))
+	{
+		temp_jnl_fn_len = jnl_info->jnl_len = ARRAYSIZE(jnl_info->jnl) - 1;	/* leave 1 byte for null terminator */
+		jnl_info->jnl[temp_jnl_fn_len] = '\0';	/* null terminate string in case "cli_get_str" returns file name that fills
+							 * up all allocated bytes (i.e. temp_jnl_fn_len bytes long).
+							 */
+		if (cli_get_str("FILENAME", (char *)jnl_info->jnl, &temp_jnl_fn_len))
+			jnl_info->jnl_len = temp_jnl_fn_len;
+		else
+			return FALSE;
+	} else
 		jnl_info->jnl_len = 0;
-	if ((CLI_PRESENT == (cli_status1 = cli_present(UNIX_ONLY("SYNC_IO") VMS_ONLY("CACHE")))) || (CLI_NEGATED ==  cli_status1))
+	if ((CLI_PRESENT == (cli_status1 = cli_present("SYNC_IO"))) || (CLI_NEGATED ==  cli_status1))
 	{
 		jnl_options->sync_io_specified = TRUE;
-		jnl_options->sync_io = (UNIX_ONLY(CLI_PRESENT) VMS_ONLY(CLI_NEGATED) == cli_status1) ? TRUE: FALSE;
-	}
-	else
+		jnl_options->sync_io = (CLI_PRESENT == cli_status1) ? TRUE: FALSE;
+	} else
 		jnl_options->sync_io_specified = FALSE;
-	UNIX_ONLY(
 	if (jnl_options->yield_limit_specified = (CLI_PRESENT == cli_present("YIELD_LIMIT")))
 	{
 		if (!cli_get_int("YIELD_LIMIT", &jnl_options->yield_limit))
@@ -197,6 +197,5 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		}
 	}
-	)
 	return TRUE;
 }

@@ -271,7 +271,7 @@ enum cdb_sc	op_tcommit(void)
 				csd = cs_data;
 				cnl = csa->nl;
 				is_mm = (dba_mm == csa->hdr->acc_meth);
-				csa->tp_hint = cnl->tp_hint;
+				csa->tp_hint = 0;	/* will be set to non-zero later if we invoke "bm_getfree" */
 				si->cr_array_index = 0;
 #				ifdef DEBUG
 				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
@@ -357,6 +357,13 @@ enum cdb_sc	op_tcommit(void)
 							TRAVERSE_TO_LATEST_CSE(first_cse);
 							old_db_addrs[0] = csa->db_addrs[0];
 							old_db_addrs[1] = csa->db_addrs[1];
+							if (0 == csa->tp_hint)
+							{	/* We are about to do a "bm_getfree" call for this database
+								 * for the first time in this TP transaction. Copy over the
+								 * allocation hint from shared memory.
+								 */
+								csa->tp_hint = cnl->tp_hint;
+							}
 							/* cse->blk could be a real block or a chain; we can't use a chain but
 							 * the following statement is unconditional because, in general, the region
 							 * hint works at least as well as the block, which is what we use in non-TP

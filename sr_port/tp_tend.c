@@ -1437,6 +1437,15 @@ boolean_t	tp_tend()
 		ctn = csd->trans_hist.curr_tn;
 		ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, ctn);
 		csd->trans_hist.early_tn = ctn + 1;
+		/* If this process had used "cnl->tp_hint" and done some block allocations in "bm_getfree", now that
+		 * all history validation is complete and this transaction is going to commit, take this opportunity
+		 * to update the shared memory hint to reflect this process' allocations in this TP transaction.
+		 */
+		if (csa->tp_hint)
+		{
+			cnl = csa->nl;
+			cnl->tp_hint = csa->tp_hint;	/* update the region hint to reflect any (successful) allocations */
+		}
 		com_csum = 0;
 		/* Write non-logical records (PBLK) if applicable */
 		if (JNL_ENABLED(csa))
@@ -1883,10 +1892,10 @@ boolean_t	tp_tend()
 			tp_cr_array = si->cr_array;
 			ASSERT_CR_ARRAY_IS_UNPINNED(si->tp_csd, tp_cr_array, si->cr_array_index);
 			si->cr_array_index = 0;
-			csa = cs_addrs;
-			cnl = csa->nl;
 			if (!is_mm)
 			{	/* In BG, now that two-phase commit is done, decrement counter */
+				csa = cs_addrs;
+				cnl = csa->nl;
 				DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
 				/* Phase 2 commits are completed for the current region. See if we had done a snapshot
 				 * init (csa->snapshot_in_prog == TRUE). If so, try releasing the resources obtained
@@ -1898,7 +1907,6 @@ boolean_t	tp_tend()
 					SS_RELEASE_IF_NEEDED(csa, cnl);
 				}
 			}
-			cnl->tp_hint = csa->tp_hint;	/* update the region hint to reflect any (successful) allocations */
 		}
 		assert(!si->cr_array_index);
 		si->tp_csa->t_commit_crit = FALSE;
@@ -2273,6 +2281,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	is_mm = (dba_mm == csd->acc_meth);
 	/* This optimization should only be used if blocks are being allocated (not if freed) in this bitmap. */
 	assert(0 <= bml_cse->reference_cnt);
+	bml = bml_cse->blk;
 	if (!is_mm && bml_cse->cr->in_tend)
 	{	/* Possible if this cache-record no longer contains the bitmap block we think it does. In this case restart.
 		 * Since we hold crit at this point, the block that currently resides should not be a bitmap block since
@@ -2284,7 +2293,6 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	assert(is_mm || (FALSE == bml_cse->cr->in_tend));
 	assert(is_mm || (FALSE == bml_cse->cr->data_invalid));
 	offset = 0;
-	bml = bml_cse->blk;
 	total_blks = is_mm ? csa->total_blks : csa->ti->total_blks;
 	map_size = (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml) ? total_blks - bml : BLKS_PER_LMAP;
 	assert(bml >= 0 && bml < total_blks);
@@ -2300,20 +2308,27 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		assert(gds_t_acquired == cse->mode);
 		assert(GDSVCURR == cse->ondsk_blkver);
 		assert(*b_ptr == (cse->blk - bml));
-		/* If bm_find_blk is passed a hint (first arg) it assumes it is less than map_size and gives invalid results (for
-		 * values >= map_size). Instead of changing bm_find_blk we do the check here and assert that "hint" < "map_size" in
-		 * bm_find_blk.
-		 */
 		do
 		{
-			assert(offset <= map_size);
-			if ((offset >= map_size) || (NO_FREE_SPACE == (free_bit = bm_find_blk(offset,	/* WARNING assignment */
-					(sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used))))
+			/* If "bm_find_blk" is passed a hint (first arg) it assumes it is less than map_size and gives invalid
+			 * results (for values >= map_size). Instead of changing "bm_find_blk" we do the check here and assert
+			 * that "hint" < "map_size" in "bm_find_blk".
+			 */
+			if (offset >= map_size)
+				return cdb_sc_bmlmod;
+			free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used);
+			if (NO_FREE_SPACE == free_bit)
 				return cdb_sc_bmlmod;
 			cse->blk = bml + free_bit;
 			if (cse->blk >= total_blks)
 				return cdb_sc_lostbmlcr;
-			/* re-point before-images into cse->old_block if necessary; if not available: restart */
+			/* Re-point before-images into cse->old_block if necessary; if not available: restart.
+			 * Set cse->blk_prior_state before invoking BEFORE_IMAGE_NEEDED macro (as it needs this field set).
+			 */
+			if (blk_used)
+				BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state);
+			else
+				BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
 			BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, cse->blk, before_image_needed);
 			if (!before_image_needed)
 			{
@@ -2325,9 +2340,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				assert(CR_NOTVALID != (sm_long_t)cr);
 				if ((NULL == cr) || (CR_NOTVALID == (sm_long_t)cr) || (0 <= cr->read_in_progress))
 				{	/* if this before image is not at hand don't wait for it in crit */
-					if (free_bit == offset)			/* see if we have been through the bitmap; if so, */
-						return cdb_sc_lostbmlcr;	/* restart - we hold crit so it won't change */
-					offset = free_bit;			/* otherwise, try further in this bitmap */
+					offset = free_bit + 1;		/* try further in this bitmap */
 					continue;
 				}
 				/* if we had not read a before-image previously (because cse->blk was not a reused block previously)
@@ -2341,6 +2354,11 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				{	/* Bitmap reallocation resulted in a situation where checksums etc. must be recomputed */
 					cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 					old_block = (blk_hdr_ptr_t)cse->old_block;
+					/* Note: cse->cr needs to be set BEFORE the JNL_GET_CHECKSUM_ACQUIRED macro call
+					 * as the macro relies on this.
+					 */
+					cse->cr = cr;
+					cse->cycle = cr->cycle;
 					if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
 					{
 						if (old_block->tn < jbp->epoch_tn)
@@ -2350,20 +2368,14 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 							bsiz = old_block->bsiz;
 							if (bsiz > csd->blk_size)
 							{	/* if this before image is not valid don't wait for it in crit */
-								if (free_bit == offset)			/* if exhausted this map */
-									return cdb_sc_lostbmlcr;	/* restart (see above) */
-								offset = free_bit;
+								offset = free_bit + 1;		/* try further in this bitmap */
 								continue;
 							}
 							JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_block, bsiz);
 						} else
 							cse->blk_checksum = 0;
 					}
-					cse->cr = cr;
-					cse->cycle = cr->cycle;
 				}
-				blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state)
-					 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
 			} else
 			{	/* in MM, although mm_update does not use cse->old_block, tp_tend uses it to write before-images.
 				 * therefore, fix it to point to the reallocated block's buffer address

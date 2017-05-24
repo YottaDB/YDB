@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,25 +51,26 @@ GBLREF  jnl_process_vector      *prc_vec;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
+error_def(ERR_CRYPTJNLMISMATCH);
 error_def(ERR_FILEIDMATCH);
-error_def(ERR_JNLOPNERR);
-error_def(ERR_JNLRDERR);
 error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLOPNERR);
+error_def(ERR_JNLPREVRECOV);
+error_def(ERR_JNLRDERR);
 error_def(ERR_JNLRECTYPE);
+error_def(ERR_JNLSWITCHRETRY);
 error_def(ERR_JNLTRANSGTR);
 error_def(ERR_JNLTRANSLSS);
-error_def(ERR_JNLWRERR);
 error_def(ERR_JNLVSIZE);
+error_def(ERR_JNLWRERR);
 error_def(ERR_PREMATEOF);
-error_def(ERR_JNLPREVRECOV);
-error_def(ERR_CRYPTJNLMISMATCH);
 
 #define RETURN_AND_SET_JPC(ERR, ERR2, BUF)	\
-{						\
+MBSTART {					\
 	jpc->status = ERR2;			\
 	jpc->err_str = BUF;			\
 	return ERR;				\
-}
+} MBEND
 
 /* note: returns 0 on success */
 uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
@@ -247,6 +248,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	jb->next_epoch_time = (uint4)(MID_TIME(prc_vec->jpv_time) + jb->epoch_interval);
 	jb->max_jrec_len = header->max_jrec_len;
 	memcpy(&header->who_opened, prc_vec, SIZEOF(jnl_process_vector));
+	if (header->is_not_latest_jnl)
+	{	/* Magic message to indicate that we should try a switch without cutting links. */
+		RETURN_AND_SET_JPC(ERR_JNLSWITCHRETRY, 0, buff);
+	}
 	header->crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */
 	JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)

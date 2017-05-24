@@ -145,7 +145,7 @@ boolean_t	gvcst_spr_order(void)
 		 * Note down the smallest key found across the scanned regions until we find a key that belongs to the
 		 * same map (in the gld) as the currently scanned "map". At which point, the region-spanning order is done.
 		 */
-		OPEN_BASEREG_IF_STATSREG(map);
+		ASSERT_BASEREG_OPEN_IF_STATSREG(map);	/* "gv_srch_map_linear" call above should have ensured that */
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != first_map) || (tn_array[reg_index] != gd_targ_tn));

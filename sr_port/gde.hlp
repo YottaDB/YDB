@@ -132,59 +132,55 @@
 
    A Global Directory looks like this:
 
-                         *** TEMPLATES ***
+                                   *** TEMPLATES ***
                                                                              Std      Inst
-                                                Def     Rec   Key Null       Null     Freeze   Qdb      Epoch
-    Region                                     Coll    Size  Size Subs       Coll Jnl on Error Rndwn    Taper
-    -----------------------------------------------------------------------------------------------------------
-    <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED ENABLED
-                     Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
-    ------------------------------------------------------------------------------------------
-    <default>        <based on DB file-spec>   Y       2312       2048       2048      8386560
+                                                Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK
+    Region                                     Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit
+    ----------------------------------------------------------------------------------------------------------------------
+   <default>                                     0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
     Segment          Active              Acc Typ Block      Alloc Exten Options
     ------------------------------------------------------------------------------
-    <default>          *                 BG  DYN  4096       5000 10000 GLOB =1000
-                                                                        LOCK = 40
+   <default>         *                 BG  DYN  4096        100   100 GLOB =1024
+                                                                        LOCK =  40
                                                                         RES  =   0
                                                                         ENCR = OFF
                                                                         MSLT =1024
-    <default>                            MM  DYN  4096       5000 10000 DEFER
-                                                                        LOCK = 40
+                                                                        DALL = YES
+                                                                        AIO  = OFF
+    <default>                            MM  DYN  4096        100   100 DEFER
+                                                                        LOCK =  40
                                                                         MSLT =1024
+                                                                        DALL = YES
             *** NAMES ***
     Global                             Region
     ------------------------------------------------------------------------------
     *                                  DEFAULT
                                    *** REGIONS ***
-                                                                                                   Std      Inst
-                                    Dynamic                          Def      Rec   Key Null       Null     Freeze   Qdb      Epoch
-    Region                          Segment                         Coll     Size  Size Subs       Coll Jnl on Error Rndwn    Taper
-    ---------------------------------------------------------------------------------------------------------------------------------
-    DEFAULT                         DEFAULT                            0     4080   255 NEVER      Y    Y   DISABLED DISABLED ENABLED
-                             *** JOURNALING INFORMATION ***
-    Region                          Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
-    --------------------------------------------------------------------------------------------------------
-    DEFAULT                         $gtmdir/$gtmver/g/gtm.mjl
-                                                              Y      2312       2048       2048      8386560
+                                                                                                  Std      Inst
+                                    Dynamic                          Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK
+    Region                          Segment                         Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit
+    -------------------------------------------------------------------------------------------------------------------------------------------
+    DEFAULT                         DEFAULT                            0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
                                    *** SEGMENTS ***
     Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten Options
     -------------------------------------------------------------------------------------------
-    DEFAULT                         $gtmdir/$gtmver/g/gtm.dat
-                                                        BG  DYN  4096       5000 10000 GLOB=1000
+    DEFAULT                         mumps.dat           BG  DYN  4096        100   100 GLOB=1024
                                                                                        LOCK=  40
                                                                                        RES =   0
-                                                                                       ENCR=OFF
+                                                                                       ENCR= OFF
                                                                                        MSLT=1024
+                                                                                       DALL= YES
+                                                                                       AIO = OFF
                                      *** MAP ***
       -  -  -  -  -  -  -  -  -  - Names -  -  - -  -  -  -  -  -  -
     From                            Up to                            Region / Segment / File(def ext: .dat)
     --------------------------------------------------------------------------------------------------------------------------
     %                               ...                              REG = DEFAULT
                                                                      SEG = DEFAULT
-                                                                     FILE = $gtmdir/$gtmver/g/gtm.dat
+                                                                     FILE = mumps.dat
     LOCAL LOCKS                                                      REG = DEFAULT
                                                                      SEG = DEFAULT
-                                                                     FILE = $gtmdir/$gtmver/g/gtm.dat
+                                                                     FILE = mumps.dat
 
    There are five primary sections in a Global Directory:
 
@@ -259,27 +255,34 @@
    qualifiers, see "GDE Command Summary".
 
    Abbreviation           Full Form
-   Acc                    ACCESS_METHOD
-   Alloc                  ALLOCATION
-   AutoSwitch             AUTOSWITCHLIMIT
-   Block                  BLOCK_SIZE
-   Buff                   BUFFER_SIZE
-   Def Coll               COLLATION_DEFAULT
-   Exten                  EXTENSION_COUNT
-   File                   FILE_NAME
-   GLOB                   GLOBAL_BUFFER_COUNT
-   Inst Freeze On Error   INST_FREEZE_ON_ERROR
-   JNL                    JOURNAL
-   KeySize                KEY_SIZE
-   LOCK                   LOCK_SPACE
-   MSLT                   MUTEX_SLOTS
-   Null Subs              NULL_SUBSCRIPTS
-   Qdb Rndwn              QDBRUNDOWN
-   Std Null Coll          STDNULLCOLL
-   Rec Size               RECORD_SIZE
-   RES                    RESERVED_BYTES
-   Region                 REGION
-   Typ                    DYNAMIC_SEGMENT
+   --------------------------------------------------
+   Acc                    -ACCESS_METHOD
+   AIO                    -[NO]ASYNCIO
+   Alloc                  -ALLOCATION
+   AutoDB                 -[NO]AUTODB
+   AutoSwitch             -AUTOSWITCHLIMIT
+   Block                  -BLOCK_SIZE
+   Buff                   -BUFFER_SIZE
+   Dall                   -[NO]DEFER_ALLOCATE
+   Def Coll               -COLLATION_DEFAULT
+   Epoch Taper            -[NO]EPOCHTAPER
+   Exten                  -EXTENSION_COUNT
+   File                   -FILE_NAME
+   GLOB                   -GLOBAL_BUFFER_COUNT
+   Inst Freeze On Error   -[NO]INST_FREEZE_ON_ERROR
+   JNL                    -[NO]JOURNAL
+   Key Size               -KEY_SIZE
+   LOCK                   -LOCK_SPACE
+   LOCK Crit              -[NO]LOCK_CRIT
+   MSLT                   -MUTEX_SLOTS
+   Null Subs              -[HO]NULL_SUBSCRIPTS
+   Qdb Rndwn              -[NO]QDBRUNDOWN
+   Std Null Coll          -[NO]STDNULLCOLL
+   Rec Size               -RECORD_SIZE
+   RES                    -RESERVED_BYTES
+   Region                 -REGION
+   Stats                  -[NO[STATS
+   Typ                    -DYNAMIC_SEGMENT
 
 2 Customizing_a_Global_Directory
    Customizing a Global Directory
@@ -306,7 +309,7 @@
     Region            Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
     ------------------------------------------------------------------------------------------
     DEFAULT           $gtmdir/$gtmver/g/gtm.mjl
-                                                Y      2312       2048       2048      8386560
+                                                Y      2308       2048       2048      8386560
 
 1 Using_GDE
    Using GDE
@@ -1176,6 +1179,18 @@
    The following -REGION qualifiers can be used with the ADD, CHANGE, or
    TEMPLATE commands.
 
+   -[NO]AU[TODB]
+
+   Specifies whether GT.M should implicitly create a database file for the
+   region if none exists when a process attempts to access it. Because it
+   carries lower operational risk and provides better operational control,
+   the common practice is to create database files with MUPIP CREATE.
+   However, AUTODB may simplify operations when you have scratch or temporary
+   databases which are best deleted and recreated as a part of standard
+   operation procedures.
+
+   The default is NOAUTODB.
+
    -C[OLLATION_DEFAULT]=number
 
    Specifies the number of the collation sequence definition to be used as
@@ -1290,7 +1305,7 @@
 
    Example:
 
-   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2312,EXTENSION=2048)
+   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2308,EXTENSION=2048)
 
    Summary
 
@@ -1316,7 +1331,19 @@
 
    For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
 
-   By default, GDE uses a KEY_SIZE of 64 bytes.
+   By default, GDE uses a KEY_SIZE of 64 bytes
+
+   -[NO]L[OCK_CRIT]
+
+   Specifies whether GT.M should share the resource management between a
+   database and its corresponding LOCKs or use separate and different
+   resource management for the two. Because, in the current implementation,
+   FIS has not identified any reason to share resource management between
+   LOCKs and database actions, we have no recommendations other than to
+   choose what seems to work better for your application.
+
+   By default, GDE uses NOLOCK_CRIT-Sep(arate) resource management for LOCKs
+   and database actions.
 
    -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
 
@@ -1387,7 +1414,17 @@
 
    By default, GDE uses a RECORD_SIZE of 256 bytes.
 
-   -[NO]STDNULLCOLL
+   -[NO][STA[TS]
+
+   Specifies whether GT.M should permit processes to share their database
+   access statistics for other processes to monitor. There may be operational
+   or security reasons to prohibit sharing of statistics. For example, GT.M
+   does not share statistics on database files that exist solely to support
+   GT.M features.
+
+   By default, GDE uses STATS.
+
+   -[NO]STD[NULLCOLL]
 
    Determines whether GT.M null subscripts collate in conformance to the M
    standard.
@@ -1410,6 +1447,8 @@
  |-----------------------------------------------------------------------------|
  |                 QUALIFIER                  | DEFAULT  | MINIMUM |  MAXIMUM  |
  |--------------------------------------------+----------+---------+-----------|
+ |-[NO]AU[TODB]                               |Disabled  |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
  |-C[OLLATION_DEFAULT]=number (integer)       |0         |0        |255        |
  |--------------------------------------------+----------+---------+-----------|
  |-D[YNAMIC_SEGMENT] =segment-name (char)     |-         |1        |16         |
@@ -1422,14 +1461,20 @@
  |--------------------------------------------+----------+---------+-----------|
  |-K[EY_SIZE]=size in bytes (integer)         |64        |3        |1,019      |
  |--------------------------------------------+----------+---------+-----------|
+ |                                            |Disabled  |         |           |
+ |-[NO]L[OCK_CRIT]                            |(not      |-        |-          |
+ |                                            |shared)   |         |           |
+ |--------------------------------------------+----------+---------+-----------|
  |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER     |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]Q[DBRNWDWN]                            |Disabled  |-        |-          |
  |--------------------------------------------+----------+---------+-----------|
  |-R[ECORD_SIZE]=size in bytes (integer)      |256       |7        |1,048,576  |
  |                                            |          |         |(1 MiB)    |
  |--------------------------------------------+----------+---------+-----------|
- |-[NO]Q[DBRUNDOWN]                           |DISABLED  |-        |-          |
+ |-[NO]STA[TS]                                |ENABLED   |-        |-          |
  |--------------------------------------------+----------+---------+-----------|
- |-[NO]STDNULLCOLL                            |N         |-        |-          |
+ |-[NO]STD[NULLCOLL]                          |No        |-        |-          |
  +-----------------------------------------------------------------------------+
 
 2 Segment_Qualifiers
@@ -1460,10 +1505,10 @@
        is a greater reliance on the OS/file system for database performance.
 
           * MM supports NOBEFORE_IMAGE journaling only. GT.M issues an error
-            if you use MM with BEFORE_IMAGE Journaling. MM also supports
-            MUPIP JOURNAL -RECOVER -FORWARD. MM does not support MUPIP
-            JOURNAL -RECOVER -BACKWARD and only supports MUPIP JOURNAL
-            -ROLLBACK to generate lost and broken transaction files.
+            if you use MM with BEFORE_IMAGE Journaling. MM supports MUPIP
+            JOURNAL -RECOVER -FORWARD and MUPIP JOURNAL -ROLLBACK -FORWARD.
+            With MM, MUPIP JOURNAL -RECOVER -BACKWARD only generates lost and
+            broken transaction files but cannot recover the database.
           * Depending on your file system, MM may be an option when you need
             performance advantage in situations where the above restrictions
             are acceptable.
@@ -1497,6 +1542,92 @@
        large projects large enough to hold the anticipated contents of the
        file for a length of time consistent with your UNIX file
        reorganization schedule.
+
+   --[NO]AS[YNCIO]
+
+   Determines whether an access method BG database file uses asynchronous I/O
+   rather than using synchronous I/O through the file system cache.
+
+   The performance characteristics of asynchronous IO are likely to be quite
+   different from the traditional sequential IO. Although asynchronous IO in
+   theory should be more efficient than synchronous IO by eliminating the
+   need for the UNIX file buffer cache and eliminating certain filesystem
+   locks, in practice asynchronous IO is likely to emerge from the starting
+   gate under-performing synchronous IO because of the years that synchronous
+   IO has been the common IO model operating systems and filesystems have had
+   used by applications. So, you should anticipate extensive benchmarking and
+   tuning for your application to achieve the best performance it can with
+   asynchronous IO. Some notes and observations that we have to share:
+
+     o As asynchronous IO dispenses with the UNIX file buffer cache, GT.M
+       global buffers are the sole caching mechanism. To make asynchronous IO
+       perform well, you will likely need to increase the number of global
+       buffers considerably. With GT.M's limit of 2GiB per shared memory
+       segment, a database segment with 4KiB blocks has a limit of almost two
+       million global buffers.
+     o A large number of global buffers potentially implies a large number of
+       dirty global buffers to be flushed at an epoch. You should investigate
+       the impact on application response time of GT.M epoch tapering vs.
+       turning off epoch tapering and using a separate stand-alone process
+       that executes a line of code such as: for set x="" for set
+       x=$view("gvnext",x) quit:""=x view "dbflush":x,"dbsync":x,"epoch":x
+       hang n where n is a number that causes each region to be flushed at an
+       appropriate interval. If you choose this option, remember to turn off
+       epoch tapering, and to set the epoch interval in the file header to be
+       large enough to prevent application processes from performing epochs,
+       and consider scripted timely switching of journal files by other than
+       application processes (switching journal files involves an epoch).
+     o On AIX, consider mounting file systems with the CIO mount option. The
+       CIO mount option drops support for the file buffer cache (unused by
+       asynchronous IO), and also eliminates a lock that is a potential
+       bottleneck to GT.M performance on the AIX jfs2 filesystem.
+     o For Linux x86_64, the gtm_aio_nr_events environment variable controls
+       the number of structures a process has per global directory to manage
+       asynchronous writes, and therefore determines the number of concurrent
+       writes a process can manage across all regions within a global
+       directory. If not specified, the value controlled by gtm_aio_nr_events
+       defaults to 128. If a process encounters a situation where it needs to
+       perform an asynchronous write, but has no available slots with which
+       to manage an additional one, it either falls back to synchronous
+       writing if the write is blocking other actions, and otherwise defers
+       the write until a slot becomes available as other writes complete.
+       Linux allocates the structures on a system-wide basis with the setting
+       of /proc/sys/fs/aio-max-nr. Therefore you should configure this
+       parameter to account for the needs (as determined by gtm_aio_nr_events
+       or the default) of all processes using asynchronous I/O. When
+       processes use multiple global directories with asynchronous I/O, their
+       need for the system resources increases accordingly. For example, if
+       an environment runs 10,000 processes each of which open two global
+       directories and /proc/sys/fs/aio-max-nr is set to a value of 200,000
+       then gtm_aio_nr_events needs to be set to a value <= 200,000 / (10,000
+       * 2) = 10. Conversely if gtm_aio_nr_events is set to a value of 20,
+       then aio-max-nr needs to be bumped up to (10,000 * 2 * 20) = 400,000.
+       GT.M captures the number of errors encountered when attempting to
+       write database blocks for a region, and, barring problems with the
+       storage subsystem, hitting an asynchronous write limit would
+       constitute primary (probably only) contribution to that value, which
+       you can access with the following:
+
+       $$^%PEEKBYNAME("sgmnt_data.wcs_wterror_invoked_cntr",<region>)
+
+     o Limited experience with solid-state storage (SSDs) on Linux in the
+       GT.M development environment suggests a considerable difference in
+       asynchronous IO performance on the same underlying hardware, with f2fs
+       performing better than xfs, which in turn performed better than ext4.
+
+   In GT.M development, we have not benchmarked asynchronous IO on the types
+   of storage commonly used for enterprise scale applications (as workloads
+   vary widely, we do not routinely benchmark workloads in development).
+   Please consider the above observations in this light.
+
+   By default GDE uses NOASYNCIO. On segments with an access method of MM,
+   GT.M ignores this setting.
+
+   -[NO]ENcryption
+
+   Specifies whether or not the database file for a segment is flagged for
+   encryption. Note that MUPIP CREATE acquires an encryption key for this
+   file and puts a cryptographic hash of the key in the database file header.
 
    -BL[OCK_SIZE]=size
 
@@ -1737,9 +1868,15 @@
    |-----------------------------+-----------+-------+----------------------|
    | -AL[LOCATION]=size (blocks) | 100       | 10    | 1,040,187,392(992Mi) |
    |-----------------------------+-----------+-------+----------------------|
+   | -[NO]AS[YNCIO]              | FALSE     | -     | -                    |
+   |-----------------------------+-----------+-------+----------------------|
    | -BL[OCK_SIZE]=size (bytes)  | 1,024     | 512   | 65,024               |
    |-----------------------------+-----------+-------+----------------------|
-   | -[NO]EN[CRYPTION]           | 0         |       |                      |
+   | -[NO]DEFER_ALLOCATE         | TRUE      | -     | -                    |
+   |-----------------------------+-----------+-------+----------------------|
+   | -[NO]ENCRYPTION             | FALSE     | -     | -                    |
+   |-----------------------------+-----------+-------+----------------------|
+   | -[NO]EPOCHTAPER             | TRUE      | -     | -                    |
    |-----------------------------+-----------+-------+----------------------|
    | -EX[TENSION_COUNT]=size     | 100       | 0     | 65,535               |
    | (blocks)                    |           |       |                      |
@@ -1937,11 +2074,21 @@
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-AL[LOCATION]=size(blocks)                  |100    |10     |1,040,187,392(992Mi)  |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]AS[YNCIO]                              |FALSE  |-      |-                     |-    |-    |X    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]AU[TODB]                               |FALSE  |-      |-                     |-    |X    |-    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-BL[OCK_SIZE]=size(bytes)                   |1024   |512    |65024                 |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-C[OLLATION_DEFAULT]=id-number (integer)    |0      |0      |255                   |-    |X    |-    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]DEFER_ALLOCATE                         |TRUE   |-      |-                     |-    |-    |X    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-D[YNAMIC_SEGMENT]=segment-name (chars)     |*      |1A     |16A/N                 |-    |X    |-    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]ENCRYPTION                             |FALSE  |-      |-                     |-    |-    |X    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]EPOCHTAPER                             |TRUE   |-      |-                     |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-EX[TENSION_COUNT]=size (blks)              |100    |0      |65535                 |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
@@ -1951,6 +2098,8 @@
    |                                            |***    |       |                      |     |     |     |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-K[EY_SIZE]=size (bytes)                    |64     |3      |1,019                 |-    |X    |-    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-[NO]L[OCK_CRIT]                            |FALSE  |-      |-                     |-    |X    |-    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-L[OCK_SPACE]=size (pages)                  |40     |10     |65,536                |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
@@ -1977,7 +2126,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2016
+   Copyright 2017
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -1999,7 +2148,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-000 of the
+   This help file is a concise representation of revision V6.3-001 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

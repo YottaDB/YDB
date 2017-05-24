@@ -52,16 +52,55 @@ error_def(ERR_GVIS);
 gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 {
 	gd_binding		*map;
-	ht_ent_mname		*tabent;
+	ht_ent_mname		*tabent, *tabent1;
 	gd_region		*reg;
 	gvnh_reg_t		*gvnh_reg;
-	int			keylen;
+	int			keylen, count;
 	char			format_key[MAX_MIDENT_LEN + 1];	/* max key length + 1 byte for '^' */
 	gv_namehead		*tmp_gvt;
 	sgmnt_addrs		*csa;
+	hash_table_mname	*tab_ptr;
 
 	assert(MAX_MIDENT_LEN >= gvname->var_name.len);
-	if (NULL != (tabent = lookup_hashtab_mname((hash_table_mname *)addr->tab_ptr, gvname)))
+	tab_ptr = addr->tab_ptr;
+	if (NULL == (tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname)))
+	{
+		count = tab_ptr->count;	/* Note down current # of valid entries in hash table */
+		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len, SKIP_BASEDB_OPEN_FALSE);
+		reg = map->reg.addr;
+		if (!reg->open)
+			gv_init_reg(reg);
+		if (IS_STATSDB_REG(reg))
+		{	/* In case of a statsDB, it is possible that "gv_srch_map" or "gv_init_reg" calls above end up doing
+			 * a "op_gvname/gv_bind_name" if they in turn invoke "gvcst_init_statsDB". In that case, the hash table
+			 * could have been updated since we did the "lookup_hashtab_mname" call above. So redo the lookup.
+			 */
+			tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+		} else
+		{	/* If not a statsDB, then the above calls to "gv_srch_map" or "gv_init_reg" should not have changed
+			 * the hashtable status of "gvname". There is an exception in that if gvname is "%YGS" (STATSDB_GBLNAME),
+			 * then it is possible that the open of the statsDB failed (e.g. gtm_statsdir env var too long etc.) in
+			 * which case the gvname would have been dynamically remapped to the baseDB. Assert that.
+			 * Since we want to avoid a memcmp against STATSDB_GBLNAME, we check if the hashtable count has changed
+			 * since we noted it down at function entry and if so redo the lookup hashtab in pro. Since only additions
+			 * happen in this particular hashtable, it is enough to check for "count < tab_ptr->count".
+			 */
+#			ifdef DEBUG
+			tabent1 = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+			assert((tabent1 == tabent)
+				|| ((gvname->var_name.len == STATSDB_GBLNAME_LEN)
+					&& (0 == memcmp(gvname->var_name.addr, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN))
+					&& (count < tab_ptr->count)));
+#			endif
+			if (count < tab_ptr->count)
+				tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+		}
+	}
+	if (NULL == tabent)
+	{
+		tmp_gvt = targ_alloc(reg->max_key_size, gvname, reg);
+		GVNH_REG_INIT(addr, tab_ptr, map, tmp_gvt, reg, gvnh_reg, tabent);
+	} else
 	{
 		gvnh_reg = (gvnh_reg_t *)tabent->value;
 		assert(NULL != gvnh_reg);
@@ -72,14 +111,6 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 			assert((0 == gvnh_reg->gvt->clue.end) || IS_STATSDB_REG(reg)); /* A statsDB open writes to itself */
 		}
 		tmp_gvt = gvnh_reg->gvt;
-	} else
-	{
-		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len, SKIP_BASEDB_OPEN_FALSE);
-		reg = map->reg.addr;
-		if (!reg->open)
-			gv_init_reg(reg);
-		tmp_gvt = targ_alloc(reg->max_key_size, gvname, reg);
-		GVNH_REG_INIT(addr, addr->tab_ptr, map, tmp_gvt, reg, gvnh_reg, tabent);
 	}
 	if (((keylen = gvname->var_name.len) + 2) > reg->max_key_size)	/* caution: embedded assignment of "keylen" */
 	{

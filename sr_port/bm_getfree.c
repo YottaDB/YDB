@@ -91,7 +91,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
-	for (lcnt = local_maps; lcnt ; lcnt--)	/* loop control counts down for slight efficiency; it's not used in locating bit */
+	for (lcnt = local_maps + 1; lcnt ; lcnt--) /* loop control counts down for slight efficiency */
 	{
 		bml = bmm_find_free(hint / BLKS_PER_LMAP, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if ((NO_FREE_SPACE == bml) || (bml >= hint_cycled))
@@ -118,7 +118,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			 * free blocks while doing an extend and the fact that it is very easy to make the change to do
 			 * a full-pass, the full-pass solution is currently being implemented
 			 */
-			lcnt = local_maps;	/* allow it one extra pass to ensure that it can take advantage of the entension */
+			lcnt = local_maps + 2;	/* allow it one extra pass to ensure that it can take advantage of the entension */
 			n_decrements++;	/* used only for debugging purposes */
 			continue;
 		}

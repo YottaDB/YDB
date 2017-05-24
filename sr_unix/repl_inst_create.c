@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ void repl_inst_create(void)
 	unsigned int		inst_fn_len;
 	unsigned short		inst_name_len;
 	int 			rename_fn_len;
-	char			rename_fn[MAX_FN_LEN];
+	char			rename_fn[MAX_FN_LEN + 1];
 	char			inst_fn[MAX_FN_LEN + 1], inst_name[MAX_FN_LEN + 1];
 	char			machine_name[MAX_MCNAMELEN], buff_unaligned[REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + 8];
 	char			*buff_8byte_aligned;
@@ -137,6 +137,7 @@ void repl_inst_create(void)
 			assert(FALSE);
 		}
 		JNL_SHORT_TIME(now);
+		rename_fn_len = ARRAYSIZE(rename_fn);
 		if (SS_NORMAL != (status = prepare_unique_name((char *)inst_fn, inst_fn_len, "", "",
 				rename_fn, &rename_fn_len, now, &status2)))
 		{

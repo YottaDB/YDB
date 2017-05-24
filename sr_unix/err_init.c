@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <setjmp.h>
 #include <errno.h>
+#include "gtm_string.h"
+
 #include "unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
@@ -27,10 +29,11 @@
 #include "eintr_wrappers.h"
 
 #define	COREDUMPFILTERFN	"/proc/%i/coredump_filter"
-#define FILTERPARMSIZE		(8 + 1)
-#define FILTERENABLEBITS	0x00000073			/* Represents bits 0, 1, 4, 5, 6 */
+#define FILTERPARMSIZE		(7 + 2 + 1)			/* 7 bytes for number, 2 bytes for 0x, and 1 null terminator */
+#define FILTERENABLEBITS	0x0000073			/* Bits 0, 1, 4, 5, 6 - 32-bit can only handle 10 bytes total */
 
 GBLREF enum gtmImageTypes	image_type;
+GBLDEF char                    **gtmenvp;
 
 error_def(ERR_SYSCALL);
 
@@ -40,6 +43,14 @@ error_def(ERR_SYSCALL);
  */
 void err_init(void (*x)())
 {
+#	ifdef __linux__
+	int		rc;
+	unsigned int	filterbits;
+	char		procfn[SIZEOF(COREDUMPFILTERFN) + MAX_DIGITS_IN_INT];	/* File name of file to update */
+	char		filter[FILTERPARMSIZE], *filterend;			/* Value read in & written out */
+	char		*rcc, *bytes_buf;
+	FILE		*filterstrm;						/* filter stream file block */
+#	endif
 	chnd = (condition_handler *)malloc((CONDSTK_INITIAL_INCR + CONDSTK_RESERVE) * SIZEOF(condition_handler));
 	chnd[0].ch_active = FALSE;
 	chnd[0].save_active_ch = NULL;
@@ -57,71 +68,78 @@ void err_init(void (*x)())
 	 * kernel supports the ELF loader or not. To date, all Linux flavors GT.M supports use ELF so we regard this as largely
 	 * mandatory though in the future it may happen that GT.M works yet runs with something other than ELF. In that case,
 	 * we'd need to change the below to avoid the operator log messages every time GT.M initializes.
+	 *
+	 * Note use simple basic methods since this early in initialization not everything is necessarily setup to
+	 * be able to properly use the *print*() wrapper functions.
+	 *
 	 */
+	bytes_buf = GETENV("gtm_coredump_filter");
+	if ((NULL == bytes_buf) || (0 != strncmp("-1", bytes_buf, 3)))
 	{
-		int 		rc;
-		unsigned int	filterbits;
-		char		procfn[SIZEOF(COREDUMPFILTERFN) + MAX_DIGITS_IN_INT];	/* File name of file to update */
-		char		filter[FILTERPARMSIZE], *filterend;			/* Value read in & written out */
-		char		*rcc;
-		FILE		*filterstrm;						/* filter stream file block */
 
-		/* Note use simple basic methods since this early in initialization not everything is necessarily setup to
-		 * be able to properly use the *print*() wrapper functions.
-		 */
 		rc = snprintf(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
 		if (0 > rc)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sprintf()"), CALLFROM, rc);
 			return;
 		}
-		Fopen(filterstrm, procfn, "r");
-		if (NULL == filterstrm)
+		if (NULL == bytes_buf)
 		{
-			rc = errno;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fopen()"), CALLFROM, rc);
-			return;
-		}
-		rcc = fgets(filter, SIZEOF(filter), filterstrm);
-		if (NULL == rcc)
-		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fgets()"), CALLFROM, rc);
-			return;
-		}
-		FCLOSE(filterstrm, rc);
-		if (0 > rc)
-		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fclose()"), CALLFROM, rc);
-			return;
-		}
-		filterend = filter + SIZEOF(filter);
-		filterbits = (unsigned int)strtol(filter, &filterend, 16);
-		if (FILTERENABLEBITS != (filterbits & FILTERENABLEBITS))
-		{	/* At least one flag was missing - reset them */
-			filterbits = filterbits | FILTERENABLEBITS;
-			Fopen(filterstrm, procfn, "w");
+			/* If $gtm_coredump_filter is not defined, set the filter to provide a full dump  including huge pages */
+			Fopen(filterstrm, procfn, "r");
 			if (NULL == filterstrm)
 			{
 				rc = errno;
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fopen()"),
-					     CALLFROM, rc);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("fopen()"), CALLFROM, rc);
 				return;
 			}
-			rc = fprintf(filterstrm, "0x%08x", filterbits);
-			if (0 > rc)
+			rcc = fgets(filter, SIZEOF(filter), filterstrm);
+			if (NULL == rcc)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fprintf"),
-					     CALLFROM, rc);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("fgets()"), CALLFROM, rc);
 				return;
 			}
 			FCLOSE(filterstrm, rc);
 			if (0 > rc)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fclose()"),
-					     CALLFROM, rc);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("fclose()"), CALLFROM, rc);
 				return;
 			}
+			filterend = filter + SIZEOF(filter);
+			filterbits = (unsigned int)strtol(filter, &filterend, 16);
+			if (FILTERENABLEBITS != (filterbits & FILTERENABLEBITS))
+			{	/* At least one flag was missing - reset them */
+				filterbits = filterbits | FILTERENABLEBITS;
+			}
+			snprintf(filter, FILTERPARMSIZE, "0x%07x", filterbits);
+			bytes_buf = filter;
 		}
+		Fopen(filterstrm, procfn, "w");
+		if (NULL == filterstrm)
+		{
+			rc = errno;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fopen()"),
+				     CALLFROM, rc);
+			return;
+		}
+		rc = fprintf(filterstrm, "%s", bytes_buf);
+		if (0 > rc)
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fprintf"),
+				     CALLFROM, rc);
+			return;
+		}
+		FCLOSE(filterstrm, rc);
+		if (0 > rc)
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fclose()"),
+				     CALLFROM, rc);
+			return;
+		}
+
 	}
 #	endif
 }

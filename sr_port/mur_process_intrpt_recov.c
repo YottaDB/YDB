@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,17 +13,8 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#if defined(UNIX)
 #include "gtm_unistd.h"
 #include "eintr_wrappers.h"
-#elif defined(VMS)
-#include <rms.h>
-#include <iodef.h>
-#include <psldef.h>
-#include <ssdef.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
 
 #include "gdsroot.h"
 #include "gtm_rename.h"
@@ -66,7 +57,7 @@ uint4 mur_process_intrpt_recov()
 	jnl_ctl_list			*jctl, *last_jctl;
 	reg_ctl_list			*rctl, *rctl_top;
 	int				rename_fn_len, save_name_len, idx;
-	char				prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1], save_name[MAX_FN_LEN + 1];
+	char				prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1];
 	jnl_create_info			jnl_info;
 	uint4				status, status2;
 	uint4				max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
@@ -207,7 +198,6 @@ uint4 mur_process_intrpt_recov()
 		assert(!FROZEN_CHILLED(csd));
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
 		assert(cs_addrs->ti->curr_tn == jctl->turn_around_tn);
-#		ifdef UNIX
 		if (jgbl.onlnrlbk)
 		{
 			if (dba_bg == cs_addrs->hdr->acc_meth)
@@ -238,12 +228,6 @@ uint4 mur_process_intrpt_recov()
 		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
 			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
 		}
-#		else
-		if (dba_bg == csd->acc_meth)
-		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
-			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
-		}
-#		endif
 		csd->turn_around_point = FALSE;
 		assert(OLDEST_HIST_TN(cs_addrs) == (cs_addrs->ti->curr_tn - 1));
 		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
@@ -272,6 +256,7 @@ uint4 mur_process_intrpt_recov()
 			;
 		assert(rctl->csd->jnl_file_len == jctl->jnl_fn_len); 			       /* latest gener file name */
 		assert(0 == memcmp(rctl->csd->jnl_file_name, jctl->jnl_fn, jctl->jnl_fn_len)); /* should match db header */
+		rename_fn_len = ARRAYSIZE(rename_fn);
 		if (SS_NORMAL != (status = prepare_unique_name((char *)jctl->jnl_fn, jctl->jnl_fn_len, "", "",
 								rename_fn, &rename_fn_len, now, &status2)))
 			return status;
@@ -378,7 +363,6 @@ uint4 mur_process_intrpt_recov()
 			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 			return jnl_info.status;
 		}
-#		ifdef UNIX
 		if (jgbl.onlnrlbk)
 		{
 			cs_addrs = rctl->csa;
@@ -388,7 +372,6 @@ uint4 mur_process_intrpt_recov()
 			jpc->jnl_buff->cycle++; /* so that, all other processes knows to switch to newer journal file */
 			jpc->cycle--; /* decrement cycle so "jnl_ensure_open" knows to reopen the journal */
 		}
-#		endif
 		if (NULL != rctl->jctl_alt_head) /* remove the journal files created by last interrupted recover process */
 		{
 			mur_rem_jctls(rctl);

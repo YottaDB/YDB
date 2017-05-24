@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,6 +65,7 @@ void gtcm_open_cmerrlog(void)
 	if (rval == SS_NORMAL || rval == SS_NOLOGNAM)
 	{
 		lfn_path[lfn2.len] = 0;
+		new_len = ARRAYSIZE(new_lfn_path);
 		rename_file_if_exists(lfn_path, lfn2.len, new_lfn_path, &new_len, &ustatus);
 #ifdef __MVS__
 		if (-1 == gtm_zos_create_tagged_file(lfn_path, TAG_EBCDIC))

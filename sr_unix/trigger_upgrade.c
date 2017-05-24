@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,8 @@ error_def(ERR_TRIGUPBADLABEL);
 
 #define LITERAL_TRIGJNLREC	"; ^#t physical upgrade from #LABEL 2,3 to #LABEL 4 (no logical change)"
 #define	LITERAL_TRIGJNLREC_LEN	STR_LIT_LEN(LITERAL_TRIGJNLREC)
-LITDEF mval literal_trigjnlrec	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGJNLREC_LEN, (char *)LITERAL_TRIGJNLREC, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_trigjnlrec	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGJNLREC_LEN,
+							(char *)LITERAL_TRIGJNLREC, 0, 0);
 
 LITREF	mval		literal_batch;
 LITREF	mval		literal_curlabel;
@@ -559,7 +560,7 @@ void	trigger_upgrade(gd_region *reg)
 		/* Switch to new journal file and cut previous link if we did ^#t upgrade on a journaled region */
 		if (do_upgrade && JNL_WRITE_LOGICAL_RECS(csa))
 		{
-			sts = set_jnl_file_close(0);
+			sts = set_jnl_file_close();
 			assert(SS_NORMAL == sts);	/* because we should have done jnl_ensure_open already
 							 * in which case set_jnl_file_close has no way of erroring out.
 							 */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,6 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 	int		status;
 	jnl_tm_t	now;
 
-	memcpy(rename_fn, org_fn, org_fn_len + 1); /* Ensure it to be NULL terminated */
-	*rename_fn_len = org_fn_len;
 	orgfile.addr = org_fn;
 	orgfile.len = org_fn_len;
 	if (FILE_NOT_FOUND == (status = gtm_file_stat(&orgfile, NULL, NULL, FALSE, ustatus)))

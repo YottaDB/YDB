@@ -350,13 +350,9 @@ error_def(ERR_STPEXPFAIL);
 			if (HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav))					\
 			{											\
 				x = &zav->zwr_var;								\
-				/* Regular varnames are already accounted for in other ways so			\
-				 * we need to avoid putting this mstr into the process array twice.		\
-				 * The only var names we need worry about are $ZWRTACxxx so make		\
-				 * simple check for var names starting with '$'.				\
-				 */										\
-				if (x->len && ('$' == x->addr[0]))						\
-					MSTR_STPG_ADD(x);							\
+				/* Protect MSTRs we are using to process the zwrite */				\
+				assert(x->len); /* if it is valid it should have a non-zero length */		\
+				MSTR_STPG_ADD(x);								\
 			}											\
 		}												\
 	}													\

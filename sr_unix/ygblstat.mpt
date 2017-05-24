@@ -50,7 +50,6 @@ help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [
 	; Note: this program uses external calls, which must be installed.
 
 	; Main Program
-	; set x=$get(^x)	; workaround till bug in code under development is fixed
 	if $stack do PROMPTGO quit      ; if invoked from another program, prompt for inputs, do work, and exit
 	use $principal:(ctrap=$char(3):nocenable:exception="halt")	   ; terminate on Ctrl-C if invoked from shell
 	set $etrap="set $etrap=""use $principal write $zstatus,! zhalt 1"""

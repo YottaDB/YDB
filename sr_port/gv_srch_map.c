@@ -102,6 +102,14 @@ gd_binding *gv_srch_map_linear(gd_binding *start_map, char *key, int key_len)
 	)
 	for ( ; ; map++)
 	{
+		/* Currently, the only callers of this function are gvcst_spr_* functions (e.g. "gvcst_spr_data" etc.).
+		 * And most of them (except gvcst_spr_query/gvcst_start_queryget) start an implicit TP transaction right
+		 * after this call. And since statsDB init is deferred once in TP, it is preferable to do the init before
+		 * the TP begins. So we include the OPEN_BASEREG_IF_STATSREG macro call here instead of in each of the
+		 * caller. This can be moved back to the individual callers if new callers of this function happen which
+		 * don't need this macro.
+		 */
+		OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 		assert(map < &addr->maps[addr->n_maps]);
 		res = memcmp(key, &map->gvkey.addr[0], key_len);
 		if (0 < res)
@@ -137,6 +145,13 @@ gd_binding *gv_srch_map_linear_backward(gd_binding *start_map, char *key, int ke
 	)
 	for ( ; ; map--)
 	{
+		/* Currently, the only caller of this function is "gvcst_spr_zprevious". And it starts an implicit TP transaction
+		 * right after this call. And since statsDB init is deferred once in TP, it is preferable to do the init before
+		 * the TP begins. So we include the OPEN_BASEREG_IF_STATSREG macro call here instead of in each of the
+		 * caller. This can be moved back to the individual callers if new callers of this function happen which
+		 * don't need this macro.
+		 */
+		OPEN_BASEREG_IF_STATSREG(map);	/* can modify map->reg.addr if statsDBReg */
 		assert(map >= addr->maps);
 		res = memcmp(key, &map->gvkey.addr[0], key_len);
 		if (0 < res)

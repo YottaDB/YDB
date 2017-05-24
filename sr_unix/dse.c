@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,7 @@ int main(int argc, char *argv[])
 	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
 	TREF(skip_file_corrupt_check) = TRUE;	/* do not let csd->file_corrupt flag cause errors in dse */
 	op_open_ptr = op_open;
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);

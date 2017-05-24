@@ -87,7 +87,6 @@ THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindo
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
-THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
 THREADGBLDEF(gbuff_limit,			mval)				/* holds a GTM_POOLLIMIT value for REORG or DBG */
 THREADGBLDEF(gd_targ_tn,			trans_num)			/* number that is incremented for every gvcst_spr*
@@ -457,8 +456,10 @@ THREADGBLDEF(crit_reg_count,			int4)		/* A count of the number of regions/jnlpoo
 								 * has crit
 								 */
 THREADGBLDEF(ok_to_see_statsdb_regs,		boolean_t)	/* FALSE implies statsdb regions are hidden at "gd_load" time */
+THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one region with reg->was_open = TRUE */
 /* Debug values */
 #ifdef DEBUG
+THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to count time
 										 * process was continued. */
 THREADGBLDEF(gtm_test_fake_enospc,		boolean_t)			/*  DEBUG-only option to enable/disable anticipatory

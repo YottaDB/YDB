@@ -114,7 +114,7 @@
 2 Copyright
    Copyright
 
-   Copyright 1987 - 2003, 2013 - 2016
+   Copyright 1987 - 2003, 2013 - 2017
 
    Fidelity Information Services, Inc. All rights reserved.
 
@@ -911,7 +911,7 @@
    |------------------------+-----------------------------------------------|
    |                        | The $ZPIECE() function returns a sequence of  |
    |                        | bytes delimited by a specified byte sequence  |
-   | $ZPiece()              | made up of one or more bytes. In M, $ZPIECE() |
+   | $ZPIece()              | made up of one or more bytes. In M, $ZPIECE() |
    |                        | typically returns a logical field from a      |
    |                        | logical record.                               |
    |------------------------+-----------------------------------------------|
@@ -2454,6 +2454,11 @@
    # binary operator for modulo, that is, causes M to produce the remainder
    from integer division of the first argument by the second.
 
+   Because of the practice of using it to intentionally induce an error, GT.M
+   does not produce a DIVZERO error at compile time, only at run time, for
+   divide or integer divide by a literal expression that evaluates to zero
+   (0).
+
    Remember that precedence is left to right for all arithmetic operators.
 
    Example:
@@ -2857,7 +2862,10 @@
    commands except commands that themselves have a conditional aspect accept
    a command postconditional. Among the M standard commands, ELSE, FOR, and
    IF do not accept command postconditionals. All the GT.M command extensions
-   accept command postconditionals.
+   accept command postconditionals. When a postconditional evaluates to a
+   literal FALSE (0), GT.M discards the command and its arguments at compile
+   time, which means it does not perform any validity checking on the
+   arguments.
 
 4 Argument_Postconditionals
    Argument Postconditionals
@@ -3116,7 +3124,7 @@
 
    Example:
 
-   GTM>SET from="B",to="^A(15),x=""
+   GTM>SET from="B",to="^A(15)",x=""
    GTM>FOR SET x=$O(@from@(x)) Q:x="" S @to@(x)=@from@(x)
 
    This example uses name indirection to copy the level contents of a local
@@ -3579,6 +3587,40 @@
     SET ^ID(NEXT)=RECORD,^XID(ZIP,NEXT)=""
     TCOMMIT
 
+     * pvtmods - Is always less than or equal to blkmods. This means it can
+       be 1 only if "blkmods" is also 1. If it is 1, it means that process P1
+       was planning to UPDATE (not just READ) the block number (indicated as
+       "blk: ..." in the TPRESTART message) as part of its TP transaction.
+     * blkmods - Is either 1 or 0. 1 implies the transaction restarted
+       because this process (P1) is attempting to READ/UPDATE a block that
+       has concurrently been updated by another process (P2) since P1 access
+       the block as part of its TP transaction. This means the "code: ..."
+       output in the TPRESTART message will have L as the last letter. 0
+       implies the restart occurred because of a different reason. The "code:
+       ..." then has something other than "L" as the last letter. Note that
+       each letter in "code: ..." corresponds to the failure code in each
+       try/retry in the order of occurrence.
+     * blklvl - Is the level in the GDS structure of the block ("blk: ..."
+       field in the TPRESTART message) that caused the TP restart.
+     * type - A value of 0,1,2,4 shows the restart occurred in the TP
+       transaction BEFORE executing TCOMMIT; whether it is a 0 or 1 or 2 or 4
+       should not matter to the user. These values would typically be used
+       for debugging by Fidelity. A value of 3 shows the restart occurred at
+       TCOMMIT time.
+     * readset - The number of GDS blocks that accessed as part of this TP
+       transaction in the region containing the global ("glbl: ..." in the
+       TPRESTART message).
+     * writeset - Out of the readset number, the number of GDS blocks this
+       process was attempted to UPDATE as part of this TP transaction in the
+       region containing the global ("glbl: ..." in the TPRESTART message).
+     * local_tn - This is a never-decreasing counter (starting at 1 at
+       process startup) incremented for every new TP transaction, TP restart,
+       and TP rollback. Two TPRESTART messages by the same process should
+       never have the same value of local_tn. The difference between the
+       local_tn values of two messages from the same process indicates the
+       number of TP transactions done by that process in the time interval
+       between the two messages.
+
 1 Commands
    Commands
 
@@ -3925,7 +3967,10 @@
    the line. When IF has an argument, it updates $TEST with the truth value
    of its evaluated argument. GT.M executes the remainder of a line after an
    IF statement when $TEST is 1 (TRUE). When $TEST is 0 (FALSE), GT.M does
-   not execute the rest of the line.
+   not execute the rest of the line. When the IF argument evaluates to a
+   literal FALSE (0), GT.M discards the command and its arguments at compile
+   time, which means it does not perform any validity checking on the
+   remainder of the line.
 
    The format of the IF command is:
 
@@ -3940,9 +3985,12 @@
    An IF with more than one argument behaves as if those arguments were
    logically "ANDed." However, execution of the line ceases with the
    evaluation of the first false argument. For IF argument expressions
-   containing the "AND" operator (&), execution still ceases with the
-   evaluation of the first false argument. Any global references within the
-   expression act in sequence to maintain the naked reference.
+   containing the "AND" operator (&), by default, execution still ceases with
+   the evaluation of the first false argument, however any global references
+   within the expression act in sequence to maintain the naked reference. The
+   "FULL_BOOLEAN" and "SIDE_EFFECTS" compiler settings modify this behavior
+   if you desire GT.M to provide side effects it would otherwise bypass due
+   to short-circiuting of Boolean expressions.
 
 3 Examples
    Examples
@@ -5217,6 +5265,29 @@
    Resets all the process-private global access statistics to 0. This is
    particularly useful for long running processes which would periodically
    like to restart the counting without requiring a shut down and restart.
+
+4 [NO]STATSHARE
+   [NO]STATSHARE
+
+   Opt in or out of sharing process statistics for monitoring by other
+   processes.
+
+   GT.M provides a fast and efficient mechanism for processes to share their
+   database access statistics for other processes to monitor. Processes opt
+   in or out with the VIEW "[NO]STATSHARE" command, defaulting to VIEW
+   "NOSTATSHARE". At process startup, a value of 1, or any case-independent
+   string or leading substrings of "TRUE" or "YES" in the environment
+   variable gtm_statshare provides an initial setting of VIEW "STATSHARE".
+   When a process changes whether it is opting in or out, there is no change
+   to the output of a ZSHOW "G" within that process. GT.M does not permit
+   this form of the VIEW command within a TP transaction. Monitoring the
+   statistics of other processes does not require opting-in.
+
+   Processes opted-in place their statistics as binary data in database files
+   located in the directory specified by the gtm_statsdir environment
+   variable. All processes that share statistics MUST use the same value for
+   $gtm_statsdir. The ^%YGBLSTAT utility program gathers and reports
+   statistics.
 
 4 STP_GCOL
    STP_GCOL
@@ -6651,6 +6722,29 @@
    DEX : # of times a process extends the database file
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
    ZTR : # of ZTRIGGER command operations
+   DFL : # of Database FLushes
+   DFS : # of Database FSyncs
+   JFL : # of Journal FLushes
+   JFS : # of Journal FSyncs
+   JBB : # of Bytes written to Journal Buffer
+   JFB : # of Bytes written to Journal File
+   JFW : # of Journal File Writes
+   JRL : # of Logical Journal Records
+   JRP : # of Pblk Journal Records
+   JRE : # of Regular Epoch Journal Records
+   JRI : # of Idle epoch Journal Records
+   JRO : # of Other Journal Records
+   JEX : # of Journal file EXtensions
+   DEX : # of Database file EXtensions
+   CAT : # of crit acquired total successes
+   CFE : # of attempts in CFT caused by epochs
+   CFS : sum of squares grab crit failed
+   CFT : # of grab crit failures
+   CQS : sum of squares grab crit queued sleeps
+   CQT : # of grab crit queued sleeps
+   CYS : sum of squares grab crit yields
+   CYT : # of grab crit yields
+   BTD : # of Block Transitions to Dirty
 
    When $PRINCIPAL input and output are different devices, ZSHOW "D" shows
    them as separate items identified as 0 for input and 0-out for output.
@@ -6705,14 +6799,16 @@
 
    GLD:*,REG:*,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:9,DWT:15,
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
-   TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
+   TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,
+   JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
    GLD:/home/gtmuser1/.fis-gtm/V5.4-002B_x86/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
    TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
    GLD:/tmp/tst/test.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,
    CTN:411,DRD:9,DWT:15,NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,
-   TBW:2,TBR:6,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
+   TBW:2,TBR:6,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,
+   JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
 
    Example:
 
@@ -6727,10 +6823,12 @@
    TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
    GLD:/tmp/x1.gld,REG:REG1,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,
    DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
-   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
+   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
    GLD:/tmp/x1.gld,REG:REG2,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,
    DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
-   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
+   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
 
    Example:
 
@@ -6740,13 +6838,16 @@
 
    zgbl("G",0)="GLD:*,REG:*,SET:0,KIL:0,GET:0,DTA:0,ORD:0,
    ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
-   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0"
+   TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0"
    zgbl("G",1)="GLD:/tmp/x1.gld,REG:REG1,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,
    LKS:0,LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,
-   NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0"
+   NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,
+   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0"
    zgbl("G",2)="GLD:/tmp/x1.gld,REG:REG2,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,
    LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,
-   NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0"
+   NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,
+   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0"
 
    Example:
 
@@ -8492,135 +8593,270 @@
    GT.M permits modification of the factors accessible with $VIEW(), the VIEW
    command generally provides the means for effecting the change.
 
-   +----------------------------------------------------------------------------------------------------------------------------------------------------+
-   |                                                             $VIEW() Argument Keywords                                                              |
-   |----------------------------------------------------------------------------------------------------------------------------------------------------|
-   |      ARG 1      |    ARG 2     |                                                   RETURN VALUE                                                    |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"BADCHAR"        |none          |In UTF-8 mode processes, enables or disable the generation of an error when character-oriented functions encounter |
-   |                 |              |malformed byte sequences (illegal characters). The default is 1.                                                   |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"BREAKMSG"       |none          |Value of the break message mask; GT.M defaults this to 31.                                                         |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"FREEBLOCKS"     |region        |Number of free database blocks in a given region.                                                                  |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Process-id of a process that has frozen the database associated with the region specified (using DSE or MUPIP).    |
-   |"FREEZE"         |region        |                                                                                                                   |
-   |                 |              |If the region is currently not frozen, returns zero.                                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Returns a string describing the current compiler setting. The default is "GT.M Boolean short-circuit".             |
-   |"FULL_BOOLEAN"   |none          |$VIEW("FULL_BOOLEAN") reports "Standard Boolean evaluation side effects" when it is not explicitly set, but that   |
-   |                 |              |mode of operation is required by the setting of gtm_side_effects, and "Standard Boolean side-effect warning" when  |
-   |                 |              |warnings have been specified.                                                                                      |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Truth Value indicating whether Database block certification is currently enabled or disabled.                      |
-   |"GDSCERT"        |none          |                                                                                                                   |
-   |                 |              |To enable or disable Database block certification, use the VIEW "GDSCERT" command.                                 |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"GVACCESS_METHOD"|region        |Access method of the region.                                                                                       |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"GVFILE"         |region        |Name of the database associated with the region.                                                                   |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"GVFIRST"        |none          |Name of the first database region in the current global directory; functionally equivalent to $VIEW("GVNEXT","").  |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"GVNEXT"         |region        |Name of the next database region after the given one in alphabetical order (or M collation sequence); "" for region|
-   |                 |              |starts with the first region. A return value of "" means that the global directory defines no additional regions.  |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |When                                                                                                               |
-   |                 |              |                                                                                                                   |
-   |"GVSTAT"         |region        |read-only processes are the active in a database, they cannot update the database including the file header where  |
-   |                 |              |GVSTATS are stored. Therefore their counts are only stored in associated shared memory and must be flushed to the  |
-   |                 |              |file header by a process with write access, which might be a MUPIP RUNDOWN.                                        |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Number of indirection cache hits since GT.M process startup.                                                       |
-   |"ICHITS"         |none          |                                                                                                                   |
-   |                 |              |Indirection cache is a pool of compiled expressions that GT.M maintains for indirection and XECUTE.                |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"ICMISS"         |none          |Number of indirection cache misses since GT.M process startup.                                                     |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |can return the following values:                                                                                   |
-   |                 |              |                                                                                                                   |
-   |"JNLACTIVE"      |region        |  o -1 (internal error)                                                                                            |
-   |                 |              |  o 0 journaling is disabled                                                                                       |
-   |                 |              |  o 1 journaling is enabled but closed (OFF)                                                                       |
-   |                 |              |  o 2 journaling is enabled and open (ON)                                                                          |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"JNLFILE"        |region        |Journal file name associated with the region.                                                                      |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"JNLTRANSACTION" |none          |Index showing how many ZTSTART transaction fences have been opened (and not closed).                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"LABELS"         |none          |Truth value showing whether label case sensitivity is ON (1 for "LOWER") or OFF (0 for "UPPER"); GT.M defaults to  |
-   |                 |              |1.                                                                                                                 |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"LINK"           |none          |Returns the current relink recursive setting of ZLINK.                                                             |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |local variable|returns the number of references by alias containers to the array associated with an unsubscripted local variable  |
-   |"LV_CREF"        |name (lvn)    |name specified as a second expr (for example a quoted string); it returns a zero for a variable without any        |
-   |                 |              |associated alias container.                                                                                        |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"LV_GCOL"        |none          |returns the number of data-spaces recovered during a local variable data-space garbage collection it triggers; such|
-   |                 |              |collections normally happen automatically at appropriate times.                                                    |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"LV_REF"         |local variable|returns the total number of references to the data-space associated with an unsubscripted local variable name      |
-   |                 |name (lvn)    |specified as a second expr (for example a quoted string).                                                          |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"LVNULLSUBS"     |none          |Truth value showing whether null subscripts are permitted in local arrays (1 for "LVNULLSUBS") or not (0 for       |
-   |                 |              |"NOLVNULLSUBS"); GT.M defaults to 1.                                                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |The current isolation-status of the specified global variable which must have a leading "^" in its specification.  |
-   |                 |              |                                                                                                                   |
-   |                 |              |This function returns 1 if GT.M has been instructed to not enforce the ACID property of Isolation (that is,        |
-   |"NOISOLATION"    |global        |"NOISOLATION" has been specified) and 0 otherwise.                                                                 |
-   |                 |              |                                                                                                                   |
-   |                 |              |By default, GT.M ensures Isolation, that is, a $VIEW command will return 0. The isolation-status of a global       |
-   |                 |              |variable can be turned on and off by the VIEW "NOISOLATION" command.                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"PATCODE"        |none          |Name of the active patcode table; GT.M defaults this to "M".                                                       |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"POOLLIMIT"      |region        |The current limit on global buffers for the region .                                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"PROBECRIT"      |region        |Acquires and releases a critical section for the region (the "probe"), returning a string with the following       |
-   |                 |              |fields:                                                                                                            |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Name of the region(s) holding the specified gvn.                                                                   |
-   |                 |              |                                                                                                                   |
-   |                 |              |If gvn spans more than one region, this function returns region name in an order where the first region is the     |
-   |                 |              |region to which the unsubscripted global variable name maps; and other regions are in the order in which they would|
-   |"REGION"         |gvn           |be encountered by traversing the subscripts of gvn in order (with duplicates removed).                             |
-   |                 |              |                                                                                                                   |
-   |                 |              |gvn is a subscripted or unsubscripted global variable name in the same form as that generated by $NAME(). You can  |
-   |                 |              |use $NAME() inside $VIEW() to ensure that subscripts are in a correct form, for example,                           |
-   |                 |              |$VIEW("REGION",$NAME(^abcd(1,2E4))) instead of $VIEW("REGION","^abcd(1,20000)").                                   |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"RTNCHECKSUM"    |routine name  |Source code check-sum for the most recently ZLINK'd version of the specified routine name (these check-sums use a  |
-   |                 |              |128 bit hash based on the MurmurHash3 algorithm).                                                                  |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"RTNNEXT"        |routine name  |Name of the next routine in the image after the given one; "" (empty string) for routinename starts with the first |
-   |                 |              |routine in ASCII collating sequence and a return value of the empty string indicates the end of the list.          |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Number of bytes in the currently allocated as process working storage. GT.M manages this space as what is commonly |
-   |"SPSIZE"         |none          |called a heap, and uses the term stringpool to refer to it. The GT.M garbage collector reclaims unused space from  |
-   |                 |              |the stringpool from time to time, and GT.M automatically expands the stringpool as needed by the application       |
-   |                 |              |program.                                                                                                           |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"STKSIZ"         |none          |Returns the GT.M stack size in bytes.                                                                              |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"TOTALBLOCKS"    |region        |Total number of database blocks in a given region.                                                                 |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |NULL          |Transaction ID specified in the particular level (when the transaction level is specified). The first level TSTART |
-   |                 |              |is returned if the level is not specified as second argument.                                                      |
-   |                 |or            |                                                                                                                   |
-   |"TRANSACTIONID"  |              |   **Note**                                                                                                      |
-   |                 |transaction   |                                                                                                                   |
-   |                 |level         |A NULL string is returned if the specified level (explicitly or implicitly) is greater than the current value of   |
-   |                 |              |$TLEVEL.                                                                                                           |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"UNDEF"          |none          |Truth value showing whether undefined variables should be treated as having a null value (1 for "UNDEF"; 0 for     |
-   |                 |              |"NOUNDEF"); GT.M defaults to 0.                                                                                    |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"ZDATE_FORM"     |none          |Integer value showing whether four digit year code is active for $ZDATE(); GT.M defaults to 0 (for "YY" format).   |
-   |                 |              |Use the environment variable gtm_zdate_form to set the initial value of this factor.                               |
-   +----------------------------------------------------------------------------------------------------------------------------------------------------+
+   +------------------------------------------------------------------------+
+   |                       $VIEW() Argument Keywords                        |
+   |------------------------------------------------------------------------|
+   |       ARG 1       |    ARG 2     |            RETURN VALUE             |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | In UTF-8 mode processes, enables or |
+   |                   |              | disable the generation of an error  |
+   | "BADCHAR"         | none         | when character-oriented functions   |
+   |                   |              | encounter malformed byte sequences  |
+   |                   |              | (illegal characters). The default   |
+   |                   |              | is 1.                               |
+   |-------------------+--------------+-------------------------------------|
+   | "BREAKMSG"        | none         | Value of the break message mask;    |
+   |                   |              | GT.M defaults this to 31.           |
+   |-------------------+--------------+-------------------------------------|
+   | "FREEBLOCKS"      | region       | Number of free database blocks in a |
+   |                   |              | given region.                       |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Process-id of a process that has    |
+   |                   |              | frozen the database associated with |
+   |                   |              | the region specified (using DSE or  |
+   | "FREEZE"          | region       | MUPIP).                             |
+   |                   |              |                                     |
+   |                   |              | If the region is currently not      |
+   |                   |              | frozen, returns zero.               |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Returns a string describing the     |
+   |                   |              | current compiler setting. The       |
+   |                   |              | default is "GT.M Boolean            |
+   |                   |              | short-circuit".                     |
+   |                   |              | $VIEW("FULL_BOOLEAN") reports       |
+   | "FULL_BOOLEAN"    | none         | "Standard Boolean evaluation side   |
+   |                   |              | effects" when it is not explicitly  |
+   |                   |              | set, but that mode of operation is  |
+   |                   |              | required by the setting of          |
+   |                   |              | gtm_side_effects, and "Standard     |
+   |                   |              | Boolean side-effect warning" when   |
+   |                   |              | warnings have been specified.       |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Truth Value indicating whether      |
+   |                   |              | Database block certification is     |
+   |                   |              | currently enabled or disabled.      |
+   | "GDSCERT"         | none         |                                     |
+   |                   |              | To enable or disable Database block |
+   |                   |              | certification, use the VIEW         |
+   |                   |              | "GDSCERT" command.                  |
+   |-------------------+--------------+-------------------------------------|
+   | "GVACCESS_METHOD" | region       | Access method of the region.        |
+   |-------------------+--------------+-------------------------------------|
+   | "GVFILE"          | region       | Name of the database associated     |
+   |                   |              | with the region.                    |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Name of the first database region   |
+   | "GVFIRST"         | none         | in the current global directory;    |
+   |                   |              | functionally equivalent to          |
+   |                   |              | $VIEW("GVNEXT","").                 |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Name of the next database region    |
+   |                   |              | after the given one in alphabetical |
+   |                   |              | order (or M collation sequence); "" |
+   | "GVNEXT"          | region       | for region starts with the first    |
+   |                   |              | region. A return value of "" means  |
+   |                   |              | that the global directory defines   |
+   |                   |              | no additional regions.              |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | When                                |
+   |                   |              |                                     |
+   |                   |              | read-only processes are the active  |
+   |                   |              | in a database, they cannot update   |
+   |                   |              | the database including the file     |
+   | "GVSTAT"          | region       | header where GVSTATS are stored.    |
+   |                   |              | Therefore their counts are only     |
+   |                   |              | stored in associated shared memory  |
+   |                   |              | and must be flushed to the file     |
+   |                   |              | header by a process with write      |
+   |                   |              | access, which might be a MUPIP      |
+   |                   |              | RUNDOWN.                            |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Number of indirection cache hits    |
+   |                   |              | since GT.M process startup.         |
+   |                   |              |                                     |
+   | "ICHITS"          | none         | Indirection cache is a pool of      |
+   |                   |              | compiled expressions that GT.M      |
+   |                   |              | maintains for indirection and       |
+   |                   |              | XECUTE.                             |
+   |-------------------+--------------+-------------------------------------|
+   | "ICMISS"          | none         | Number of indirection cache misses  |
+   |                   |              | since GT.M process startup.         |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | can return the following values:    |
+   |                   |              |                                     |
+   |                   |              |   o -1 (internal error)             |
+   | "JNLACTIVE"       | region       |   o 0 journaling is disabled        |
+   |                   |              |   o 1 journaling is enabled but     |
+   |                   |              |     closed (OFF)                    |
+   |                   |              |   o 2 journaling is enabled and     |
+   |                   |              |     open (ON)                       |
+   |-------------------+--------------+-------------------------------------|
+   | "JNLFILE"         | region       | Journal file name associated with   |
+   |                   |              | the region.                         |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Index showing how many ZTSTART      |
+   | "JNLTRANSACTION"  | none         | transaction fences have been opened |
+   |                   |              | (and not closed).                   |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Truth value showing whether label   |
+   | "LABELS"          | none         | case sensitivity is ON (1 for       |
+   |                   |              | "LOWER") or OFF (0 for "UPPER");    |
+   |                   |              | GT.M defaults to 1.                 |
+   |-------------------+--------------+-------------------------------------|
+   | "LINK"            | none         | Returns the current relink          |
+   |                   |              | recursive setting of ZLINK.         |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | returns the number of references by |
+   |                   |              | alias containers to the array       |
+   |                   | local        | associated with an unsubscripted    |
+   | "LV_CREF"         | variable     | local variable name specified as a  |
+   |                   | name (lvn)   | second expr (for example a quoted   |
+   |                   |              | string); it returns a zero for a    |
+   |                   |              | variable without any associated     |
+   |                   |              | alias container.                    |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | returns the number of data-spaces   |
+   |                   |              | recovered during a local variable   |
+   | "LV_GCOL"         | none         | data-space garbage collection it    |
+   |                   |              | triggers; such collections normally |
+   |                   |              | happen automatically at appropriate |
+   |                   |              | times.                              |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | returns the total number of         |
+   |                   | local        | references to the data-space        |
+   | "LV_REF"          | variable     | associated with an unsubscripted    |
+   |                   | name (lvn)   | local variable name specified as a  |
+   |                   |              | second expr (for example a quoted   |
+   |                   |              | string).                            |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Truth value showing whether null    |
+   |                   |              | subscripts are permitted in local   |
+   | "LVNULLSUBS"      | none         | arrays (1 for "LVNULLSUBS") or not  |
+   |                   |              | (0 for "NOLVNULLSUBS"); GT.M        |
+   |                   |              | defaults to 1.                      |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | The current isolation-status of the |
+   |                   |              | specified global variable which     |
+   |                   |              | must have a leading "^" in its      |
+   |                   |              | specification.                      |
+   |                   |              |                                     |
+   |                   |              | This function returns 1 if GT.M has |
+   |                   |              | been instructed to not enforce the  |
+   |                   |              | ACID property of Isolation (that    |
+   | "NOISOLATION"     | global       | is, "NOISOLATION" has been          |
+   |                   |              | specified) and 0 otherwise.         |
+   |                   |              |                                     |
+   |                   |              | By default, GT.M ensures Isolation, |
+   |                   |              | that is, a $VIEW command will       |
+   |                   |              | return 0. The isolation-status of a |
+   |                   |              | global variable can be turned on    |
+   |                   |              | and off by the VIEW "NOISOLATION"   |
+   |                   |              | command.                            |
+   |-------------------+--------------+-------------------------------------|
+   | "PATCODE"         | none         | Name of the active patcode table;   |
+   |                   |              | GT.M defaults this to "M".          |
+   |-------------------+--------------+-------------------------------------|
+   | "POOLLIMIT"       | region       | The current limit on global buffers |
+   |                   |              | for the region .                    |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Acquires and releases a critical    |
+   | "PROBECRIT"       | region       | section for the region (the         |
+   |                   |              | "probe"), returning a string with   |
+   |                   |              | the following fields:               |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Name of the region(s) holding the   |
+   |                   |              | specified gvn.                      |
+   |                   |              |                                     |
+   |                   |              | If gvn spans more than one region,  |
+   |                   |              | this function returns region name   |
+   |                   |              | in an order where the first region  |
+   |                   |              | is the region to which the          |
+   |                   |              | unsubscripted global variable name  |
+   |                   |              | maps; and other regions are in the  |
+   |                   |              | order in which they would be        |
+   |                   |              | encountered by traversing the       |
+   | "REGION"          | gvn          | subscripts of gvn in order (with    |
+   |                   |              | duplicates removed).                |
+   |                   |              |                                     |
+   |                   |              | gvn is a subscripted or             |
+   |                   |              | unsubscripted global variable name  |
+   |                   |              | in the same form as that generated  |
+   |                   |              | by $NAME(). You can use $NAME()     |
+   |                   |              | inside $VIEW() to ensure that       |
+   |                   |              | subscripts are in a correct form,   |
+   |                   |              | for example,                        |
+   |                   |              | $VIEW("REGION",$NAME(^abcd(1,2E4))) |
+   |                   |              | instead of                          |
+   |                   |              | $VIEW("REGION","^abcd(1,20000)").   |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Source code check-sum for the most  |
+   |                   |              | recently ZLINK'd version of the     |
+   | "RTNCHECKSUM"     | routine name | specified routine name (these       |
+   |                   |              | check-sums use a 128 bit hash based |
+   |                   |              | on the MurmurHash3 algorithm).      |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Name of the next routine in the     |
+   |                   |              | image after the given one; ""       |
+   |                   |              | (empty string) for routinename      |
+   | "RTNNEXT"         | routine name | starts with the first routine in    |
+   |                   |              | ASCII collating sequence and a      |
+   |                   |              | return value of the empty string    |
+   |                   |              | indicates the end of the list.      |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Returns a string with three comma   |
+   |                   |              | separated values: Number of bytes   |
+   |                   |              | currently allocated as process      |
+   |                   |              | working storage: GT.M manages this  |
+   |                   |              | space as what is commonly called a  |
+   |                   |              | heap, and uses the term stringpool  |
+   |                   |              | to refer to it. The GT.M garbage    |
+   |                   |              | collector reclaims unused space     |
+   |                   |              | from the stringpool from time to    |
+   | "SPSIZE"          | none         | time, and GT.M automatically        |
+   |                   |              | expands the stringpool as needed by |
+   |                   |              | the application program; Number of  |
+   |                   |              | bytes currently used by the         |
+   |                   |              | process; Number of bytes reserved:  |
+   |                   |              | The reserved space is used to       |
+   |                   |              | reduce the active memory usage, for |
+   |                   |              | example, when a process uses a      |
+   |                   |              | large amount of memory then         |
+   |                   |              | subsequently uses a significantly   |
+   |                   |              | reduced amount.                     |
+   |-------------------+--------------+-------------------------------------|
+   | "STKSIZ"          | none         | Returns the GT.M stack size in      |
+   |                   |              | bytes.                              |
+   |-------------------+--------------+-------------------------------------|
+   | "TOTALBLOCKS"     | region       | Total number of database blocks in  |
+   |                   |              | a given region.                     |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Transaction ID specified in the     |
+   |                   |              | particular level (when the          |
+   |                   |              | transaction level is specified).    |
+   |                   | NULL         | The first level TSTART is returned  |
+   |                   |              | if the level is not specified as    |
+   |                   | or           | second argument.                    |
+   | "TRANSACTIONID"   |              |                                     |
+   |                   | transaction  |   **Note**                        |
+   |                   | level        |                                     |
+   |                   |              | A NULL string is returned if the    |
+   |                   |              | specified level (explicitly or      |
+   |                   |              | implicitly) is greater than the     |
+   |                   |              | current value of $TLEVEL.           |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Truth value showing whether         |
+   |                   |              | undefined variables should be       |
+   | "UNDEF"           | none         | treated as having a null value (1   |
+   |                   |              | for "UNDEF"; 0 for "NOUNDEF"); GT.M |
+   |                   |              | defaults to 0.                      |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Integer value showing whether four  |
+   |                   |              | digit year code is active for       |
+   | "ZDATE_FORM"      | none         | $ZDATE(); GT.M defaults to 0 (for   |
+   |                   |              | "YY" format). Use the environment   |
+   |                   |              | variable gtm_zdate_form to set the  |
+   |                   |              | initial value of this factor.       |
+   +------------------------------------------------------------------------+
 
    **Important**
 
@@ -8661,9 +8897,11 @@
    Example:
 
    GTM>write $view("GVSTAT","DEFAULT")
-   SET:203,KIL:12,GET:203,DTA:2,ORD:23,ZPR:21,QRY:0,LKS:0,LKF:0,CTN:44,DRD:103,DWT:
-   59,NTW:24,NTR:55,NBW:27,NBR:138,NR0:0,NR1:0,NR2:0,NR3:0,TTW:17,TTR:5,TRB:0,TBW:3
-   2,TBR:80,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:7
+   SET:203,KIL:12,GET:203,DTA:2,ORD:23,ZPR:21,QRY:0,LKS:0,LKF:0,CTN:44,DRD:103,DWT:59,
+   NTW:24,NTR:55,NBW:27,NBR:138,NR0:0,NR1:0,NR2:0,NR3:0,TTW:17,TTR:5,TRB:0,TBW:32,
+   TBR:80,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:7,DFL:9,
+   DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,
+   CAT:35,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:13
    GTM>
 
    Example:
@@ -8769,6 +9007,64 @@
    i=5
    $ZWRTAC=""
    $
+
+2 $ZAscii()
+   $ZAscii()
+
+   Returns the numeric byte value (0 through 255) of a given sequence of
+   octets (8-bit bytes).
+
+   The format for the $ASCII function is:
+
+   $ZA[SCII](expr[,intexpr])
+
+3 Examples
+   Examples
+
+   Example:
+
+   GTM>for i=0:1:4 write !,$zascii("*",i)
+
+   -1
+   228
+   184
+   187
+   -1
+   GTM>
+
+   This UTF-8 mode example displays the result of $ZASCII() specifying a byte
+   position before, first, second and third positions, and after the sequence
+   of octets (8-bit bytes) represented by *. In the above example, 228, 184,
+   and 187 represents the numeric byte value of the three-byte in the
+   sequence of octets (8-bit bytes) represented by *.
+
+2 $ZATRansform
+   $ZATRansform
+
+   Returns the transformed representation of the first argument expr in a
+   normalized form using the alternative transform specified by the second
+   argument intexpr; the return can be used as an operand to the follows (])
+   or sorts-after (]]) operator such that, if both operands are in the
+   normalized form, the result is independent of alternative collation. The
+   format for the $ZATRANSFORM() function is:
+
+   $ZTRANSFORM(expr,intexpr[,{0|1}][,{0|1}])
+
+   Please see the section on $ZCOLLATE() for a similar alternative.
+
+3 Examples
+   Examples
+
+   Example:
+
+   GTM>write $ztransform("John Smythe",1)]$zatransform("Jane Smith",2)
+   0
+   GTM>
+
+   This example uses $ZATRANSFORM() and two (here unspecified) collation
+   definitions to compare the ordering of two (literal) expressions as GT.M
+   would collate them if there was a way to collate them together. The result
+   indicates that the first would collate before the second.
 
 2 $ZBIT_Functions
    $ZBIT Functions
@@ -9082,36 +9378,6 @@
    invalid bits that exist at the end of the character string. In this case
    there are zero invalid bits.
 
-2 $ZAscii()
-   $ZAscii()
-
-   Returns the numeric byte value (0 through 255) of a given sequence of
-   octets (8-bit bytes).
-
-   The format for the $ASCII function is:
-
-   $ZA[SCII](expr[,intexpr])
-
-3 Examples
-   Examples
-
-   Example:
-
-   GTM>for i=0:1:4 write !,$zascii("*",i)
-
-   -1
-   228
-   184
-   187
-   -1
-   GTM>
-
-   This UTF-8 mode example displays the result of $ZASCII() specifying a byte
-   position before, first, second and third positions, and after the sequence
-   of octets (8-bit bytes) represented by *. In the above example, 228, 184,
-   and 187 represents the numeric byte value of the three-byte in the
-   sequence of octets (8-bit bytes) represented by *.
-
 2 $ZCHar()
    $ZCHar()
 
@@ -9133,6 +9399,43 @@
 
    This example WRITEs the byte sequence represented by * and signals the
    terminal bell.
+
+2 $ZCOllate()
+   $ZCOllate()
+
+   Returns the transformed representation of the first argument glvn in a
+   normalized form using the alternative transform specified by the second
+   argument intexpr; the return can be used as an operand to the follows (])
+   or sorts-after (]]) operator such that, if both operands are in the
+   normalized form, the result is independent of alternative collation.
+
+   The format for the $ZCOLLATE() function is:
+
+   $ZCO[llate](glvn,intexpr[,{0|1}])
+
+   Note that because the forward transform is to the GDS global storage
+   format, the reverse transform always shows a global form. This is not
+   material when the result is used for most comparisons, but for some uses
+   the applcation might need to remove the leading up-arrow (^).
+
+   Please see the section on $ZATRANSFORM() for a similar alternative.
+
+3 Example_of_$ZCOllate()
+   Example of $ZCOllate()
+
+   Example:
+
+   GTM>write $zwrite($zcollate("A(""foo"")",0))
+   "A"_$C(0,255)_"foo"_$C(0,0)
+   GTM>write $zcollate($zcollate("A(""foo"")",0),0,1)
+   ^A("foo")
+   GTM>
+
+   The first WRITE in this example shows the readable form or the value
+   produced by the $ZCOLLATE() revealing the details of how GT.M internally
+   represents this key using default (M) collation. The second WRITE shows
+   how the combination of the transform and reverse transform restores the
+   value to the original representation.
 
 2 $ZCOnvert()
    $ZCOnvert()
@@ -9770,15 +10073,15 @@
    This example illustrates the output produced for each of the possible
    values for the second argument.
 
-2 $ZPiece()
-   $ZPiece()
+2 $ZPIece()
+   $ZPIece()
 
    Return a sequence of bytes delimited by a specified byte sequence made up
    of one or more bytes.
 
    The format for the $ZPIECE function is:
 
-   $ZP[IECE](expr1,expr2[,intexpr1[,intexpr2]])
+   $ZPI[ECE](expr1,expr2[,intexpr1[,intexpr2]])
 
 3 Examples
    Examples
@@ -9812,7 +10115,7 @@
 
    Example:
 
-   For p=1:1:$ZLength(x,"/") Write ?p-1*10,$ZPiece(x,"/",p)
+   For p=1:1:$ZLength(x,"/") Write ?p-1*10,$ZPIece(x,"/",p)
 
    This loop uses $ZLENGTH() and $ZPIECE() to display all the pieces of x in
    columnar format.
@@ -10481,11 +10784,11 @@
 
    $ZWRITE(expr[,intexpr])
 
-     o The first expression specifies the string to convert to or from the
+     o The first argument specifies the string to convert to or from the
        ZWRITE format.
-     o The second integer expression specifies the direction of conversion.
-       When intexpr is not specified or evaluates to zero, $zwrite() converts
-       the first argument to the ZWRITE format. When intexpr evaluates to a
+     o The second argument specifies the direction of conversion. When
+       intexpr is not specified or evaluates to zero, $zwrite() converts the
+       first argument to the ZWRITE format. When intexpr evaluates to a
        non-zero value, $ZWRITE() treats the first argument as being in ZWRITE
        format and attempts to convert it to a string with embedded
        non-graphic characters; if it is not in ZWRITE format, it returns an
@@ -10823,9 +11126,9 @@
    $Reference
 
    $R[EFERENCE] contains the last global reference. Until the first global
-   reference is made by an M program, $REFERENCE contains the empty string
-   (""). This way it is useful in determining if the usage of a naked
-   reference is valid.
+   reference is made by an M program or after a global reference with an
+   invalid key, $REFERENCE contains the empty string (""). This way it is
+   useful in determining if the usage of a naked reference is valid.
 
    A typical way of using this is:
 
@@ -11118,9 +11421,11 @@
    character set used by a GT.M process by the value of $ZCHSET. $ZCHSET can
    have only two values --"M", or "UTF-8".
 
-   GT.M only supports Unicode on certain platforms. On platforms where it is
-   not supported, the intrinsic variable $ZCHSET is always "M" ignoring the
-   value of the environment variable gtm_chset even if it is defined.
+   **Warning**
+
+   GT.M performs operations on literals at compile time and the character set
+   may have an impact on such operations. Therefore, always compile with the
+   same character set as that used at runtime.
 
    Example:
 
@@ -11447,7 +11752,7 @@
    piece is an offset in seconds to UTC. For any valid UTC time offset, the
    fourth piece is a number between -43200 (for UTC-12:00) and +50400 (for
    UTC+14:00). The value of the fourth piece remains constant all through the
-   year expect for those places that observe daylight saving time. To obtain
+   year except for those places that observe daylight saving time. To obtain
    the $HOROLOG representation of UTC, add the fourth piece to the second
    piece of $ZHOROLOG and proceed as follows:
 
@@ -11881,6 +12186,12 @@
    GT.M populates $ZPATNUMERIC at process initialization from the environment
    variable gtm_patnumeric and does not allow the process to change the
    value.
+
+   **Warning**
+
+   GT.M performs operations on literals at compile time and the pattern codes
+   settings may have an impact on such operations. Therefore, always compile
+   with the same pattern code settings as those used at runtime.
 
    For characters in Unicode, GT.M assigns patcodes based on the default
    classification of the Unicode character set by the ICU library with three
@@ -12514,9 +12825,11 @@
    ZSTEP command. $ZSTEP provides the ZSTEP action only when the ZSTEP
    command does not specify an action.
 
-   $ZSTEP initially contains the string "B" to enter direct mode. $ZSTEP is a
-   read-write Intrinsic Special Variable, (i.e., it can appear on the left
-   side of the equal sign (=) in the argument to the SET command).
+   $ZSTEP initially contains the the value of the $gtm_zstep environment
+   variable or string "B" if $gtm_zstep is not defined; note that the default
+   "B" causes the process to enter direct mode. $ZSTEP is a read-write
+   Intrinsic Special Variable, (that is, it can appear on the left side of
+   the equal sign (=) in the argument to the SET command).
 
    Example:
 
@@ -12753,6 +13066,11 @@
        continuity even if vendor branding changes, for example, "RS6000".
 
    M routines cannot modify $ZVERSION.
+
+   **Warning**
+
+   GT.M treats $ZVERSION as a literal at compile time. Therefore, always
+   compile with the same version as that used at runtime.
 
    Example:
 
@@ -13164,7 +13482,17 @@
    | CTRAP=expr            | U       | Controls vectoring on trapped <CTRL> |
    |                       |         | characters.                          |
    |-----------------------+---------+--------------------------------------|
+   | [NO]EDITING           | U       | Controls the editing mode for        |
+   |                       |         | $PRINCIPAL.                          |
+   |-----------------------+---------+--------------------------------------|
+   |                       |         | Control whether an "Erase" character |
+   | [NO]EMPTERM           | U       | on an empty input line should        |
+   |                       |         | terminate a READ or READ # command.  |
+   |-----------------------+---------+--------------------------------------|
    | [NO]ESCAPE            | U       | Controls escape sequence processing. |
+   |-----------------------+---------+--------------------------------------|
+   | [NO]INSERT            | U       | Controls insert or overstrike on     |
+   |                       |         | input.                               |
    |-----------------------+---------+--------------------------------------|
    |                       |         | Controls interpretation by the       |
    | [NO]PASTHRU           | U       | operating system of special control  |
@@ -13266,8 +13594,8 @@
    (LF), U+0000D (CR), U+000D followed by U+000A (CRLF), U+0085 (NEL), U+000C
    (FF), U+2028 (LS) and U+2029 (PS).
 
-3 READ_/_WRITE_Operations
-   READ / WRITE Operations
+3 READ/WRITE_Operations
+   READ/WRITE Operations
 
    The following table describes all READ and WRITE operations for STREAM,
    VARIABLE, and FIXED format sequential files having automatic record
@@ -13363,6 +13691,10 @@
        <LF> characters
      o In M mode, the last setting of RECORDSIZE or WIDTH for the device
        determines WIDTH
+     o In M Mode, a WRITE to a sequential device after setting $X to a value
+       greater than the device WIDTH or a reducing WIDTH to less than the
+       current $X acts as if the first character caused $X to exceed the
+       WIDTH induces an immediate WRAP, if WRAP is enabled
      o In UTF-8 mode, RECORDSIZE is in bytes and WIDTH is in characters and
        the smaller acts as the WIDTH limit in the table.
      o In UTF-8 mode, FIXED mode writes <SP> to the RECORDSIZE when the next
@@ -14035,7 +14367,7 @@
      for  read x quit:$zeof  use $principal write x,! use p1
      close p1
      quit
-     cont1
+   cont1
      if $zeof quit
      if a=0 set a=i/2
      set z=$za
@@ -14049,16 +14381,184 @@
      . for j=1:1:a  read x use $principal write j,"-",x,! use p1
      quit
 
-   This demonstrates WRITEs to a PIPE device with blocking. The WRITE loop
-   has no READ to force the input pipe to fill up which blocks the cat
-   output, causing cat to stop reading its input, letting the pipe acting as
-   input on the PIPE device to fill up and creating the blocked condition.
+   This demonstrates how to deal with write blocking of a PIPE device. The
+   loop doing the WRITE does not READ from the PIPE. Eventually causing the
+   output of cat to block on its output and stop reading input from the pipe.
    When the process takes the $ZTRAP to cont1 it tests $DEVICE to determine
    if the trap is caused by the full pipe. If so, it uses the for loop to
    read half the number of lines output by the main loop. It decrements i and
    returns to the original WRITE loop to retry the failed line and continue
    with the WRITEs to the pipe. Depending upon the configuration of the
    environment, it may trap several times before processing all lines.
+
+   Example:
+
+   sh> mumps -run pipexample induceEAGAIN
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample" STDERR="piperr"
+   $ZSTATUS="11,pipexample+9^pipexample,%SYSTEM-E-ENO11, Resource temporarily unavailable"
+
+   sh> mumps -run retry^pipexample induceEAGAIN
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample 0" STDERR="piperr"
+   ...Failed to perform non-blocked writes... Retrying write # 54
+   ...Failed to perform non-blocked writes... Retrying write # 63
+   ...Failed to perform non-blocked writes... Retrying write # 69
+   ...Failed to perform non-blocked writes... Retrying write # 78
+       Writes completed
+
+
+   This example demonstrates handling WRITE errors, like ENO11 or EAGAIN,
+   that do not terminate the PIPE device. The PIPE device does non-blocking
+   writes. If a process tries to WRITE to a full PIPE and the WRITE would
+   block, the device implicitly tries to complete the operation up to a
+   default of 10 times. GT.M sleeps 100 micro seconds between each retry.
+   When dealing with programs that can take a while to process input, it's a
+   good idea to either schedule a delay between WRITEs or come up with a
+   mechanism to back off the WRITEs when the buffer fills up.
+
+   sh> mumps -run pipexample induceEPIPE
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample" STDERR="piperr"
+       stdout:My PID is 12808
+       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
+   $ZSTATUS="32,pipexample+9^pipexample,%SYSTEM-E-ENO32, Broken pipe"
+
+   sh> mumps -run retry^pipexample induceEPIPE
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 0" STDERR="piperr"
+   ...Caught on try 0, write 49... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
+       stdout:My PID is 16252
+       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
+   Try 1   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 1" STDERR="piperr"
+   ...Caught on try 1, write 697... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
+       stdout:My PID is 16403
+       stdout:$ZSTATUS="150373210,induceEPIPE+5^pipexample,%GTM-E-DIVZERO, Attempt to divide by zero"
+   Try 2   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 2" STDERR="piperr"
+       Writes completed
+
+
+   This example demonstrates how to create a separate STDERR pipe device from
+   which to read the STDERR output of the program(s) inside the pipe. Reading
+   the STDERR is important when dealing with failures from Unix programs. It
+   is possible to read the errors without creating a STDERR pipe device,
+   however the error messages are commingled with the output of the programs
+   inside the pipe which could make diagnosis of the underlying problem
+   harder. Notice that GT.M writes fatal errors, GTM-F types, to STDERR, but
+   all others go to STDOUT.
+
+   Additionally, this example demonstrates handling errors that terminate the
+   PIPE device. In this example, the PIPE device is terminated when a program
+   inside the pipe terminates before reading all of the driving MUMPS
+   program's output causing an EPIPE or ENO32, a broken pipe. In such a
+   situation the MUMPS program must capture the error that caused the
+   termination and respond accordingly. The program may need to call out to
+   other programs to determine the status of a service it is using or to
+   alert the operator of an error with an external program or service. To
+   operate successfully, the program must recreate the pipe and retry the
+   operation.
+
+   Example:
+
+   ; Example program that starts another program in a pipe and traps the errors. The called
+   ; programs intentionally induce errors
+   pipexample
+     set $etrap="do readfrompipe(.pipe,.piperr) use $p zwrite $zstatus zhalt 99"
+     set pipe="pipe"
+     set piperr="piperr"
+     set writesize=1024
+     set cmd=$piece($zcmdline," ") set:'$length(cmd) cmd="induceEPIPE"
+     open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample":stderr=piperr)::"pipe"
+     zshow "D":devicelist write "The active device is ",devicelist("D",2),!
+     use pipe
+     for i=1:1:1024 write $tr($justify(i,writesize)," ","X"),!
+     close pipe
+     quit
+   ; Same as above, but without defining the PIPE's standard error
+   nostderr
+     set $etrap="do readfrompipe(.pipe) use $p zshow ""*"" zhalt 99"
+     set pipe="pipe"
+     set writesize=1024
+     set cmd=$piece($zcmdline," ",2) set:'$length(cmd) cmd="induceEAGAIN"
+     open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample")::"pipe"
+     zshow "D":devicelist write "The active device is ",devicelist("D",2),!
+     write !,!
+     use pipe
+     for i=1:1:1024 write $tr($justify(i,writesize)," ","X"),!
+     close pipe
+     quit
+   ; This routine intentionally delays reading from the pipe to induce an EAGAIN
+   induceEAGAIN
+     set $etrap="use $p zwrite $zstatus zhalt 99"
+     set hangtime=+$zcmdline set:'hangtime hangtime=5 set add=1
+     for i=1:1:1024 read x(i) quit:$zeof  do
+     . set delay(i)=1/(add+$random(hangtime))
+     . hang delay(i)
+     . set:i=30 add=10
+     halt
+   ; This routine intentionally induces an EPIPE by immediately sending a SIGTERM to itself causing
+   ; a FORCEDHALT error which goes to STDERR. Subsequently, a random DIVZERO error occurs, but this
+   ; error goes to STDOUT since it is not a fatal error
+   induceEPIPE
+     set $etrap="use $p zwrite $zstatus zhalt 99"
+     set divzero=150373210 ; DIVZERO goes to stdout
+     write "My PID is ",$job,!
+     zsystem:'$zcmdline "kill -15 "_$job  ; FORCEDHALT error goes to stderr
+     for i=1:1 read x(i) quit:$zeof  zmessage:'$random(1000) divzero
+     halt
+   ; Read the contents of the pipe on failure. Messages from the programs inside the pipe aid
+   ; in undestanding the underlying problem(s)
+   readfrompipe(pipe,piperr)
+     new i
+     new $etrap
+     set $etrap="set x=$zjobexam() zhalt 88"
+     use pipe
+     for i=1:1  read pipe(i):0 quit:'$test!$zeof
+     zkill pipe(i)
+     do:$data(piperr)
+     . use piperr
+     . for i=1:1  read piperr(i):0 quit:'$test!$zeof
+     . zkill piperr(i)
+     close pipe
+     use $p
+     for i=1:1  quit:'$data(pipe(i))  write ?4,"stdout:",pipe(i),!
+     for i=1:1  quit:'$data(piperr(i))  write ?4,"stderr:",piperr(i),!
+     quit
+   ; Example of trapping an error and retrying the operation as necessary. Error conditions
+   ; used are EPIPE, aka "Broken pipe" or ENO32, and EAGAIN, aka ENO11.
+   retry
+     set $etrap="use $p zshow ""*"" zhalt 99"
+     set pipe="pipe"
+     set piperr="piperr"
+     set writesize=1024
+     set cmd=$piece($zcmdline," ") set:'$length(cmd) cmd="induceEPIPE"
+     for try=0:1  do  quit:$get(readcomplete,0)
+     . new $etrap set $etrap="goto retryEPIPE"
+     . open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample "_try:stderr=piperr)::"pipe"
+     . zshow "D":devicelist write "Try ",try,$char(9),devicelist("D",2),!
+     . use pipe
+     . for i=1:1:1024 do
+     . . new $etrap set $etrap="goto retryEAGAIN^pipexample"
+     . . write $tr($justify(i,writesize)," ","X"),!
+     . set readcomplete=1
+     close pipe
+     use $p
+     write ?4,"Writes completed",!
+     quit
+   retryEPIPE
+     quit:$zstatus'["ENO32"
+     use $p
+     write "...Caught on try ",try,", write ",i,"... ",$zstatus,!
+     set $ecode=""
+     do readfrompipe(.pipe,.piperr)
+     quit
+   retryEAGAIN
+     quit:$zstatus'["ENO11"
+     use $p
+     write "...Failed to perform non-blocked writes... Retrying write # ",$increment(i,-1),!
+     set $ecode=""
+     hang 1+$random(5)
+     use pipe
+     quit
+
+   This example demonstrates how to handle PIPE device errors, whether with
+   the device itself or from programs inside the PIPE device.
 
 3 PIPE_Deviceparameter_Summary
    PIPE Deviceparameter Summary
@@ -14098,7 +14598,7 @@
    |                |   | which the created process writes any standard     |
    | STDERR=string  | o | error output. The GT.M process can USE, READ, and |
    |                |   | CLOSE it, but cannot WRITE to it. When the GT.M   |
-   |                |   | process CLOSEs the PIPE device the PIPE device    |
+   |                |   | process CLOSEs the PIPE device, the PIPE device   |
    |                |   | CLOSEs STDERR, if still OPEN.                     |
    |----------------+---+---------------------------------------------------|
    | WRITEONLY      | o | Specifies that the GT.M process may only WRITE to |
@@ -14154,7 +14654,7 @@
    From an application perspective, the transport layers used by a socket
    device are stream-oriented, with no provisions for implicit application
    messages. Therefore, the following are two common protocols used to
-   segment application messages..
+   segment application messages.
 
     1. One method is to use a, typically small, fixed length message
        containing the length of the next, variable length, message. In GT.M a
@@ -14175,8 +14675,8 @@
        application message. The protocol breaks if a message ever includes a
        delimiter as part of its content.
 
-   The SOCKET device provides a facility for recognizing delimiters to simply
-   parsing messages.
+   The SOCKET device provides a facility for recognizing delimiters to
+   simplify parsing messages.
 
 3 Socket_Read_Operation
    Socket Read Operation
@@ -14329,7 +14829,7 @@
 
    WRITE ! inserts the character(s) of the first I/O delimiter (if any) to
    the sending buffer. If "ZFF=expr" has been specified, WRITE # inserts the
-   characters of expr . Otherwise WRITE # has no effect. WRITE ! and WRITE #
+   characters of expr. Otherwise WRITE # has no effect. WRITE ! and WRITE #
    always maintain $X and $Y in a fashion that emulates a terminal cursor
    position except when the device is OPENed with a UTF CHSET because the
    units for $X and $Y for terminals are in display columns while for sockets
@@ -14346,7 +14846,7 @@
 
    /W[AIT][(timeout)]
 
-   where timeout is anumeric expression that specifies how long in seconds a
+   where timeout is a numeric expression that specifies how long in seconds a
    server waits for a connection or data to become available on one of the
    sockets in the current Socket Device.
 
@@ -14364,7 +14864,7 @@
      o If a numeric targetpid is specified, GT.M matches the value against
        the process id ($JOB) of the process receiving the sockets. GT.M uses
        a system service to perform this check on platforms that support it -
-       currently: Linux, and AIX. If the pids do not match, GT.M issues a
+       currently: Linux and AIX. If the pids do not match, GT.M issues a
        PEERPIDMISMATCH error and does not transfer the sockets.
      o If a numeric timeout is specified, GT.M sets $TEST to 1 if the
        transfer completes within the specified time, and otherwise sets $TEST
@@ -14421,38 +14921,55 @@
    socket connection itself, the socket handle, and buffered socket data (if
    any).
 
-   WRITE /TLS(option[,[timeout][,tlsid]])
+   WRITE /TLS(option[,[timeout][,tlsid[,cfg-file-options]])
 
-   SOCKET devices support encrypt connections with TLS using an encryption
+   SOCKET devices support encrypted connections with TLS using an encryption
    plugin. GT.M ships with a reference implementation of the plugin which
    uses OpenSSL; the reference implementation also supports TLS for GT.M
    replication streams. OpenSSL options are controlled by a configuration
    file. The WRITE /TLS command activates this feature for connected sockets.
 
-     o option is "server" or "client" indicating which TLS role to assume.
-       The server role requires a certificate specified in the configuration
-       file section with the label matching tlsid. The client role may
-       require a certificate depending on the OpenSSL options. If the
-       argument specifies a timeout, GT.M sets $TEST to 1 if the command
-       successfully completed or to 0 if it timed out. $DEVICE provides
-       status information in case of an error. ZSHOW "D" includes "TLS" in
-       the second line of the output for an encrypted socket.
-     o Note that SOCKET device actions may produce the following errors:
-       TLSDLLOPEN, TLSINIT, TLSCONVSOCK, TLSHANDSHAKE, TLSCONNINFO,
-       TLSIOERROR, and TLSRENEGOTIATE.
+     o option is "server", "client", or "renegotiate". "server" or "client"
+       indicates which TLS role to assume. The server role requires a
+       certificate specified in the configuration file section with the label
+       matching tlsid. The client role may require a certificate depending on
+       the OpenSSL options. If a timeout is specified for options "client" or
+       "server", GT.M sets $TEST to 1 if the command successfully completed
+       or to 0 if it timed out. $DEVICE provides status information in case
+       of an error. ZSHOW "D" includes "TLS" in the second line of the output
+       for an encrypted socket.
+     o "renegotiate" applies only to a server socket. It allows applications
+       to request a TLS renegotiation. Renegotiation requires the suspension
+       of application communication and the application must read all pending
+       data before initiating a renegotiation. This means that in the
+       communication protocol used, both parties must be at a known state
+       when renegotiating keys. For example, in GT.M replication, one party
+       sends a renegotiation request and waits for an acknowledgement before
+       initiating the renegotiation.
+     o tlsid refers to the name of a section in the configuration file
+       specified by the gtmcrypt_config environment variable. If tlsid is not
+       specified with the "renegotiate" option and cfg-file-options are
+       specified, GT.M creates a virtual section by appending "-RENEGOTIATE"
+       to the tlsid used to enable TLS on the socket. If no section named
+       tlsid is present in the configuration file, GT.M creates a virtual
+       section with that name for the life of the process.
+     o cfg-file-options specifies configuration file options. Note
+       cfg-file-options override those options if they are already specified
+       in the configuration file except ssl-options and verify-level which
+       are merged.
+     o Supported cfg-file-options for the "renegotiate" command are
+       (case-sensitive): verify-depth, verify-level, verify-mode,
+       session-id-hex, and CAfile. WRITE /TLS ignores all other configuration
+       file options whether given on the command or in the configuration
+       file. For more information on the supported configuration options,
+       refer to the Creating a Configuration File section of the
+       Administration and Operations Guide.
 
-   When placing the private key for a certificate at the beginning of the
-   certificate file, you may omit the "key" item from the configuration file.
-   The format of the combined file is:
+   **Note**
 
-   -----BEGIN RSA PRIVATE KEY-----
-    [encoded key]
-    -----END RSA PRIVATE KEY-----
-    [empty line]
-    -----BEGIN CERTIFICATE-----
-    [encoded certificate]
-    -----END CERTIFICATE-----
-    [empty line]
+   Note that SOCKET device actions may produce the following errors:
+   TLSDLLOPEN, TLSINIT, TLSCONVSOCK, TLSHANDSHAKE, TLSCONNINFO, TLSIOERROR,
+   and TLSRENEGOTIATE.
 
    GT.M buffers WRITEs to TLS enabled sockets until a subsequent USE :FLUSH,
    WRITE !, WRITE #, or an internal 400 millisecond timer expires.
@@ -14472,10 +14989,10 @@
 
    Each socket may have one or more sockets waiting for either an incoming
    connection or data available to READ (observable through $ZKEY). $ZKEY
-   contains semi-colon (";") separated list of entries detailing any waiting
+   contains semi- colon (";") separated list of entries detailing any waiting
    sockets for a current SOCKET device.
 
-   For more information on $KEY and $ZKEY, refer to Chapter 8: "ISV".
+   For more information on $KEY and $ZKEY, refer to "ISV".
 
 3 Socket_Deviceparameter_Summary
    Socket Deviceparameter Summary
@@ -14529,14 +15046,14 @@
    +------------------------------------------------------------------------+
 
    +------------------------------------------------------------------------+
-   |            Socket Establishment/Disconnect Deviceparameters            |
+   |                        Buffer Deviceparameters                         |
    |------------------------------------------------------------------------|
    | DEVICEPARAMETER  | COMMAND |                  COMMENT                  |
    |------------------+---------+-------------------------------------------|
-   | ZBFSIZE =intexpr | O       | Allocates a buffer used by GT.M when      |
+   | ZBFSIZE =intexpr | O/U     | Allocates a buffer used by GT.M when      |
    |                  |         | reading from a socket.                    |
    |------------------+---------+-------------------------------------------|
-   | ZIBFSIZE=intexpr | O       | Sets the buffer size used by the network  |
+   | ZIBFSIZE=intexpr | O/U     | Sets the buffer size used by the network  |
    |                  |         | software (setsockopt SO_RCVBUF).          |
    +------------------------------------------------------------------------+
 
@@ -14606,10 +15123,9 @@
    $gtm_dist/mumps -r start^server
 
    When start^server begins, the $PRINCIPAL device is the current device
-   connected a socket and $KEY contains
-   "ESTABLISHED|socket_handle|remote_ip_address". In most cases, a USE
-   command near the beginning of the routine sets various device parameters
-   such as delimiters.
+   connected a socket and $KEY contains "ESTABLISHED|socket_handle|
+   remote_ip_address". In most cases, a USE command near the beginning of the
+   routine sets various device parameters such as delimiters.
 
    The ZSHOW "D" command reports available information on both the local and
    remote sides of a TCP socket including local and remove addresses and
@@ -15075,11 +15591,13 @@
 5 ICHSET
    ICHSET
 
-   ICHSET=expr Applies to: All devices
+   ICHSET=expr
 
-   Establishes the character encoding of the input device being OPENed in the
-   UTF-8 mode. The value of the expression can be M, UTF-8, UTF-16, UTF-16LE,
-   or UTF-16BE. In M mode, ICHSET has no effect.
+   Applies to: All devices
+
+   Establishes the character encoding of an input device being OPENed and
+   USEed in the UTF-8 mode. The value of the expression can be M, UTF-8,
+   UTF-16, UTF-16LE, or UTF-16BE. In M mode, ICHSET has no effect.
 
    If ICHSET is not specified, GT.M assumes UTF-8 as the default character
    set for input from the device.
@@ -15090,9 +15608,9 @@
 
    **Note**
 
-   ICHSET is a deviceparameter of the OPEN command and not the USE command.
-   Since GT.M implicitly OPENs $PRINCIPAL before any application code is
-   executed, ICHSET does not apply to $Principal.
+   ICHSET is a deviceparameter of both the OPEN and USE commands. As ICHSET
+   can change the character set of an already OPENed device, it can help deal
+   with binary data intermixed with character data.
 
 5 INDEPENDENT
    INDEPENDENT
@@ -15368,8 +15886,8 @@
 
    OCHSET=expr Applies to: All devices
 
-   Establishes the character encoding of the output device being OPENed in
-   the UTF-8 mode. The value of the expression can be M, UTF-8, UTF-16,
+   Establishes the character encoding of the output device OPENed and USEed
+   in the UTF-8 mode. The value of the expression can be M, UTF-8, UTF-16,
    UTF-16LE, or UTF-16BE. In M mode, OCHSET has no effect.
 
    If *CHSET is not specified, GT.M assumes UTF-8 as the default character
@@ -15381,9 +15899,9 @@
 
    **Note**
 
-   OCHSET is a deviceparameter of the OPEN command not the USE command. Since
-   GT.M implicitly OPENs $PRINCIPAL before any application code is executed,
-   OCHSET does not apply to $Principal.
+   OCHSET is a deviceparameter of both the OPEN and USE commands. As OCHSET
+   can change the character set of an already OPENed device, it can help deal
+   with binary data intermixed with character data.
 
    Example:
 
@@ -16034,7 +16552,7 @@
    |----------------------+-----+----+------+------+------+-----|
    | [NO]EMPT[ERM]        | X   |    |      |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
-   | EXCEPTION=expr       | X   | X  | X    |      | X    | X   |
+   | EXCEPTION=expr       | X   | X  | X    | X    | X    | X   |
    |----------------------+-----+----+------+------+------+-----|
    | FIFO                 |     |    | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
@@ -16044,15 +16562,17 @@
    |----------------------+-----+----+------+------+------+-----|
    | GROUP=expr           |     | X  | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
-   | KEY                  |     | X  | X    | X    |      |     |
+   | ICHSET=encoding      | X   | X  | X    | X    | X    | X   |
    |----------------------+-----+----+------+------+------+-----|
    | IKEY                 |     | X  | X    | X    |      |     |
-   |----------------------+-----+----+------+------+------+-----|
-   | ICHSET=encoding      | X   | X  | X    | X    | X    | X   |
    |----------------------+-----+----+------+------+------+-----|
    | INDEPENDENT          |     |    |      | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | IOERROR=expr         |     |    |      |      |      | X   |
+   |----------------------+-----+----+------+------+------+-----|
+   | KEY                  |     | X  | X    | X    |      |     |
+   |----------------------+-----+----+------+------+------+-----|
+   | LISTEN=expr          |     |    |      |      |      | X   |
    |----------------------+-----+----+------+------+------+-----|
    | [NO]NEWVERSION       |     | X  | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
@@ -16086,9 +16606,9 @@
    |----------------------+-----+----+------+------+------+-----|
    | WORLD=expr           |     | X  | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
-   | [NO]WRITEONLY        |     |    |      | X    |      |     |
-   |----------------------+-----+----+------+------+------+-----|
    | [NO]WRAP             | X   | X  | X    | X    | X    | X   |
+   |----------------------+-----+----+------+------+------+-----|
+   | [NO]WRITEONLY        |     | X  | X    | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | ZBFSIZE              |     |    |      |      |      | X   |
    |----------------------+-----+----+------+------+------+-----|
@@ -16097,8 +16617,6 @@
    | Z[NO]FF              |     |    |      |      |      | X   |
    |----------------------+-----+----+------+------+------+-----|
    | ZIBFSIZE             |     |    |      |      |      | X   |
-   |----------------------+-----+----+------+------+------+-----|
-   | LISTEN=expr          |     |    |      |      |      | X   |
    +------------------------------------------------------------+
 
 3 Use
@@ -16137,11 +16655,11 @@
 
    **Note**
 
-   A socket does not carry I[O]CHSET with it while being moved. Such a socket
-   uses the I[O]CHSET of the device it is ATTACHed to. If there is input
-   still buffered, this may cause unintentional consequences in the
-   application if I[O]CHSET changes. GT.M does not detect (or report) a
-   change in I[O]CHSET due to DETACH/ATTACH.
+   A socket does not carry [I|O]CHSET with it while being moved. Such a
+   socket uses the [I|O]CHSET of the device it is ATTACHed to. If there is
+   input still buffered, this may cause unintentional consequences in the
+   application if [I|O]CHSET changes. GT.M does not detect (or report) a
+   change in [I|O]CHSET due to DETACH/ATTACH.
 
 5 CANONICAL
    CANONICAL
@@ -16308,11 +16826,11 @@
    **Note**
 
    A socket can move from one device to another using DETACH/ATTACH. A socket
-   does not carry I[O]CHSET with it while being moved. Such a socket uses the
-   I[O]CHSET of the device it is ATTACHed to. If there is input still
+   does not carry [I|O]CHSET with it while being moved. Such a socket uses
+   the [I|O]CHSET of the device it is ATTACHed to. If there is input still
    buffered, this may cause unintentional consequences in the application if
-   I[O]CHSET changes. GT.M does not detect (or report) a change in I[O]CHSET
-   due to DETACH/ATTACH.
+   [I|O]CHSET changes. GT.M does not detect (or report) a change in
+   [I|O]CHSET due to DETACH/ATTACH.
 
    Example:
 
@@ -16621,6 +17139,22 @@
    Performs a SEEK on input when $PRINCIPAL identifies a device that supports
    SEEK. Use this deviceparameter with $PRINCIPAL when redirected from a
    file.
+
+5 INSERT
+   INSERT
+
+   [NO]INSERT Applies to: TRM
+
+   Enables or disables insert mode for the $PRINCIPAL device. If INSERT mode
+   is enabled, GT.M inserts input characters at the logical position in the
+   input stream designated by the virtual cursor as defined by $X and $Y, for
+   example in the middle of the line/record. If INSERT mode is disabled,
+   input characters overwrite the existing characters in the input stream at
+   the logical position designated by the virtual cursor. You can toggle the
+   insert mode within a direct mode line or if EDITING is enabled for a
+   single READ argument's input using the terminal's INSERT key. The INSERT
+   mode is reset to the default or what was last specified with USE at the
+   beginning of each direct mode line or READ argument.
 
 5 IOERROR
    IOERROR
@@ -17111,8 +17645,8 @@
 
    Note that LOCAL sockets ignore the ZIBFSIZE deviceparameter.
 
-4 Summary
-   Summary
+4 _Summary
+    Summary
 
    +-----------------------------------------------------------+
    |                   USE Deviceparameters                    |
@@ -17137,6 +17671,8 @@
    |---------------------+-----+----+------+------+------+-----|
    | [NO]CENABLE         | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
+   | [I|O]CHSET          | X   | X  | X    | X    | X    | X   |
+   |---------------------+-----+----+------+------+------+-----|
    | CLEARSCREEN         | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | CONNECT             |     |    |      |      |      | X   |
@@ -17151,39 +17687,37 @@
    |---------------------+-----+----+------+------+------+-----|
    | DOWNSCROLL          | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | [NO]EBCDIC          |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | [NO]ECHO            | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | [NO]EMPT[ERM]       | X   |    |      |      |      |     |
+   | [NO]EMPTERM         | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | ERASELINE           | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | ERASETAPE           |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | [NO]ESCAPE          | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | EXCEPTION=expr      | X   | X  | X    |      | X    | X   |
+   | EXCEPTION=expr      | X   | X  | X    | X    | X    | X   |
    |---------------------+-----+----+------+------+------+-----|
    | [NO]FILTER[=expr]   | X   |    |      |      | X    | X   |
    |---------------------+-----+----+------+------+------+-----|
-   | FLUSH               | X   |    |      |      |      |     |
+   | FLUSH               | X   |    |      |      |      | X   |
    |---------------------+-----+----+------+------+------+-----|
    | [NO]FOLLOW          |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | [NO]HOSTSYNC        | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | KEY                 |     | X  | X    | X    |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | IKEY                |     | X  | X    | X    |      |     |
-   |---------------------+-----+----+------+------+------+-----|
-   | IOERROR             |     |    |      |      |      | X   |
    |---------------------+-----+----+------+------+------+-----|
    | INREWIND            |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | INSEEK              |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | [Z]LENGTH=expr      | X   | X  | X    |      | X    | X   |
+   | IOERROR             |     |    |      |      |      | X   |
+   |---------------------+-----+----+------+------+------+-----|
+   | KEY                 |     | X  | X    | X    |      |     |
+   |---------------------+-----+----+------+------+------+-----|
+   | [Z]LENGTH=expr      | X   | X  | X    | X    | X    | X   |
+   |---------------------+-----+----+------+------+------+-----|
+   | LISTEN              |     |    |      |      |      | X   |
    |---------------------+-----+----+------+------+------+-----|
    | OKEY                |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
@@ -17193,19 +17727,11 @@
    |---------------------+-----+----+------+------+------+-----|
    | [NO]PASTHRU         | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | [NO]RCHK            |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
-   | [NO]RETRY           |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | REWIND              |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | SEEK=strexpr        |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | SKIPFILE=intexpr    |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | SOCKET              |     |    |      |      |      | X   |
-   |---------------------+-----+----+------+------+------+-----|
-   | SPACE=intexpr       |     |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | TERMINATOR[=expr]   | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
@@ -17215,15 +17741,9 @@
    |---------------------+-----+----+------+------+------+-----|
    | UPSCROLL            | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | [NO]WCHK            |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
    | [Z]WIDTH=intexpr    | X   | X  | X    | X    | X    | X   |
    |---------------------+-----+----+------+------+------+-----|
    | [NO]WRAP            | X   | X  | X    | X    | X    | X   |
-   |---------------------+-----+----+------+------+------+-----|
-   | WRITELB=expr        |     |    |      |      |      |     |
-   |---------------------+-----+----+------+------+------+-----|
-   | WRITETM             |     |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | X=intexpr           | X   |    |      |      | X    |     |
    |---------------------+-----+----+------+------+------+-----|
@@ -17235,9 +17755,7 @@
    |---------------------+-----+----+------+------+------+-----|
    | Z[NO]FF             |     |    |      |      |      | X   |
    |---------------------+-----+----+------+------+------+-----|
-   | ZIBUFSIZE           |     |    |      |      |      | X   |
-   |---------------------+-----+----+------+------+------+-----|
-   | LISTEN              |     |    |      |      |      | X   |
+   | ZIBFSIZE            |     |    |      |      |      | X   |
    +-----------------------------------------------------------+
 
 3 Close
@@ -17296,31 +17814,27 @@
    |                                               |
    | SOC: Valid for Socket devices                 |
    |-----------------------------------------------|
-   | DELETE                |     | X  | X    |     |
+   | DELETE                |     | X  | X    | X   |
    |-----------------------+-----+----+------+-----|
    | DESTROY               |     | X  | X    | X   |
    |-----------------------+-----+----+------+-----|
-   | ERASETAPE=expr        |     |    |      |     |
+   | EXCEPTION             | X   | X  | X    | X   |
    |-----------------------+-----+----+------+-----|
-   | EXCEPTION=expr        | X   | X  | X    | X   |
+   | GROUP                 |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | GROUP=expr            |     | X  |      |     |
+   | OWNER                 |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | OWNER=expr            |     | X  |      |     |
+   | RENAME                |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | RENAME=expr           |     | X  |      |     |
-   |-----------------------+-----+----+------+-----|
-   | REWIND                |     |    |      |     |
+   | REWIND                |     | X  |      |     |
    |-----------------------+-----+----+------+-----|
    | SOCKET                |     |    |      | X   |
    |-----------------------+-----+----+------+-----|
-   | SPACE                 |     |    |      |     |
+   | SYSTEM                |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | SYSTEM=expr           |     | X  |      |     |
+   | UIC                   |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | UIC=group name        |     | X  |      |     |
-   |-----------------------+-----+----+------+-----|
-   | WORLD=expr            |     | X  |      |     |
+   | WORLD                 |     | X  | X    |     |
    +-----------------------------------------------+
 
    **Note**
@@ -17712,13 +18226,10 @@
 
    entryref: return-value routine-name (parameter, parameter, ... )
 
-   where entryref is an M entryref,
+   where entryref is an M entryref, return-value is gtm_long_t, gtm_status_t,
+   or void, and parameters are in the format:
 
-   return-value is gtm_long_t, gtm_status_t, or void.
-
-   and
-
-   parameters are in the format: direction:type [num]
+   direction:type [num]
 
    where [num] indicates a pre-allocation value explained later in this
    chapter.
@@ -19834,6 +20345,15 @@
    where tablename is the name of the patcode table within the file pointed
    to by gtm_pattern_file.
 
+   **Warning**
+
+   GT.M performs operations on literals at compile time and the pattern codes
+   settings may have an impact on such operations. Therefore, it is safest to
+   either always compile with the same pattern code settings as those used at
+   runtime. If changes to pattern codes are required at run time, "hide" any
+   patterns used on literal expressions from the compiler (which are
+   uncommon) using XECUTE commands or indirection.
+
    Within an active process, the patcode table is established using the M
    VIEW command and the %PATCODE utility. Before invoking the %PATCODE
    utility, you may use VIEW to load pattern definition files for GT.M. The
@@ -20772,6 +21292,11 @@
    loaded from a region different from the specified region, or the
    region-disambiguator identifies a region which holds a trigger that is not
    mapped by $ZGBLDIR, these features treat the trigger as not found.
+
+   ZPRINT or $TEXT() of trigger code may be out-of-date if the process
+   previously loaded the code, but a $ZTRIGGER() or MUPIP TRIGGER has since
+   changed the code. In other words, execution of a trigger (not $TEXT())
+   ensures that trigger code returned with $TEXT() is current.
 
 Appendix A. M Coding Standards - Do's and Don'ts
 

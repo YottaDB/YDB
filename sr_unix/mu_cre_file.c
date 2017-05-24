@@ -359,7 +359,6 @@ unsigned char mu_cre_file(void)
 	{
 		STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);
 		assert(baseDBreg->open);
-		assert(!baseDBreg->was_open);
 		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 		STAT_FILE((char *)baseDBcsa->nl->fname, &stat_buf, retcode);
 		if (0 > retcode)

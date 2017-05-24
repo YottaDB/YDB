@@ -1400,6 +1400,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		return FALSE;
 	}
 	csa->nl = cnl = NULL;
+	csa->hdr = NULL;
 	/* Remove the shared memory only if it is a GT.M created one. */
 	if (is_gtm_shm)
 	{

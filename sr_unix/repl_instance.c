@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1322,13 +1322,13 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;  reg < reg_top;  reg++)
 	{	/* Rundown all databases that we opened as we dont need them anymore. This is not done in the previous
 		 * loop as it has to wait until the ftok semaphore of the instance file has been released as otherwise
-		 * an assert in gds_rundown will fail as it tries to get the ftok semaphore of the database while holding
+		 * an assert in "gds_rundown" will fail as it tries to get the ftok semaphore of the database while holding
 		 * another ftok semaphore already.
 		 */
 		assert(reg->open);
 		TP_CHANGE_REG(reg);
 		assert(!cs_addrs->now_crit);
-		UNIX_ONLY(ret |=) gds_rundown();
+		ret |= gds_rundown(CLEANUP_UDI_TRUE);
 	}
 	assert(!repl_csa->now_crit);
 	return ret;

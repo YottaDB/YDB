@@ -586,7 +586,10 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		}
 		/* NOTE: update process and receiver each ignore any setting specific to the other (REPLIC_CHANGE_UPD_LOGINTERVAL,
 		 * REPLIC_CHANGE_LOGINTERVAL) */
-		upd_proc_local->changelog = gtmrecv_local->changelog; /* Pass changelog request to the update process */
+		if (REPLIC_CHANGE_LOGINTERVAL == gtmrecv_local->changelog)
+			upd_proc_local->changelog = 0;
+		else
+			upd_proc_local->changelog = gtmrecv_local->changelog; /* Pass changelog request to the update process */
 		gtmrecv_local->changelog = 0;
 	}
 	if (0 == *pending_data_len && !gtmrecv_logstats && gtmrecv_local->statslog)

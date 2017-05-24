@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,16 +18,12 @@
 #define RENAME_NOT_REQD 1
 #define RENAME_FAILED 2
 
-#ifdef UNIX
-# define JNLSWITCH_TM_FMT 	"_%Y%j%H%M%S"   	/* yearjuliandayhoursminutesseconds */
-#else
-# define JNLSWITCH_TM_FMT	"|!Y4|!H04!M0!S0|"	/* 'julian' day is added by append_time_stamp() explicitly */
-#endif
+#define JNLSWITCH_TM_FMT 	"_%Y%j%H%M%S"   /* yearjuliandayhoursminutesseconds */
+#define JNLSWITCH_TM_FMT_LEN 	14   		/* SIZE of string produced by STRFTIME(JNLSWITCH_TM_FNT) */
 
 int 	rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *rename_fn_len, uint4 *ustatus);
 uint4 	gtm_rename(char *org_fn, int org_fn_len, char *rename_fn, int rename_len, uint4 *ustatus);
 uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suffix, char *rename_fn, int *rename_fn_len,
 				jnl_tm_t now, uint4 *ustatus);
-uint4 	append_time_stamp(char *fn, int *fn_len, jnl_tm_t now);
 
 #endif

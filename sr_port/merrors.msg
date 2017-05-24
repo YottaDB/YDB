@@ -1655,6 +1655,9 @@ INVSTATSDB	<Database file !AD associated with statistics database region !AD is 
 STATSDBERR	<Error in/at !AD attempting to use a statistics database: !AD>/error/fao=4!/ansi=0
 STATSDBINUSE	<Statistics database !AD is in use with database !AD so cannot also be used with database !AD>/error/fao=6!/ansi=0
 STATSDBFNERR	<This database has no accessible statistics database due to the following error: !AD>/error/fao=2!/ansi=0
+JNLSWITCHRETRY	<Retrying previously abandoned switch of journal file !AD for database !AD>/info/fao=4!/ansi=0
+JNLSWITCHFAIL	<Failed to switch journal file !AD for database file !AD>/error/fao=4!/ansi=0
+CLISTRTOOLONG	<!AZ specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=3!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

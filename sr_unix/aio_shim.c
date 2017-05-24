@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -164,6 +164,7 @@ MBSTART {										\
 STATICFNDCL void *io_getevents_multiplexer(void *arg);
 STATICFNDCL int io_getevents_internal(aio_context_t ctx);
 STATICFNDCL void clean_wip_queue(unix_db_info *udi);
+STATICFNDCL void aio_gld_clean_wip_queue(gd_addr *input_gd, gd_addr *match_gd);
 STATICFNDCL int	aio_shim_setup(aio_context_t *ctx);
 STATICFNDCL int aio_shim_thread_init(gd_addr *gd);
 
@@ -460,10 +461,11 @@ void aio_shim_destroy(gd_addr *gd)
 	struct gd_info 	*gdi;
 	int		ret;
 	char 		*eventfd_str = "GTMROCKS";
-	gd_region 	*r_local, *r_top;
-	unix_db_info	*udi;
 	mstr		*gldname;
+	gd_addr		*addr_ptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	gdi = gd->thread_gdi;
 	if (NULL == gdi)
 	{	/* A write didn't happen. */
@@ -485,28 +487,49 @@ void aio_shim_destroy(gd_addr *gd)
 	assert(0 == ret);
 	if (-1 == ret)
 		ISSUE_SYSCALL_RTS_ERROR_WITH_GD(gd, "aio_shim_destroy::io_destroy", errno);
-	/* Iterate over all the regions in the global directory and clean their WIP queues */
-	for (r_local = gd->regions, r_top = r_local + gd->n_regions; r_local < r_top; r_local++)
+	/* If there was at least one region with reg->was_open = TRUE, then it is possible regions in other glds
+	 * (different from "gd" have a "udi" with "udi->owning_gd" == "gd". So we would need to look at all regions
+	 * across all glds opened by this process. If no was_open region was ever seen by this process, then it is
+	 * enough to look at regions in just the current gld ("gd").
+	 */
+	if (TREF(was_open_reg_seen))
 	{
-		if (r_local->open && !r_local->was_open && r_local->dyn.addr->asyncio
-				&& dba_cm != r_local->dyn.addr->acc_meth)
+		/* Iterate over all the regions in the global directory and clean their WIP queues */
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+			aio_gld_clean_wip_queue(addr_ptr, gd);
+	} else
+		aio_gld_clean_wip_queue(gd, gd);
+	/* By this point, we must have no more outstanding IOs */
+	assert(0 == gdi->num_ios);
+	/* Delete the thread_gdi to leave us in a state consistent with no thread existing. */
+	gtm_free(gdi);
+	gd->thread_gdi = NULL;
+}
+
+void	aio_gld_clean_wip_queue(gd_addr *input_gd, gd_addr *match_gd)
+{
+	unix_db_info	*udi;
+	gd_region 	*reg, *r_top;
+	struct gd_info 	*gdi;
+
+	gdi = match_gd->thread_gdi;
+	assert(NULL != gdi);
+	for (reg = input_gd->regions, r_top = reg + input_gd->n_regions; reg < r_top; reg++)
+	{
+		assert(input_gd == reg->owning_gd);
+		if (reg->open && reg->dyn.addr->asyncio && (dba_cm != reg->dyn.addr->acc_meth))
 		{
-			udi = FILE_INFO(r_local);
-			/* We don't call clean_wip_queue() if we don't have any outstanding IOs
-			 * in the region.
-			 * This reduces wip queue header lock contention if lots of processes
-			 * exit at the same time.
+			udi = FILE_INFO(reg);
+			/* We don't call clean_wip_queue() if we don't have any outstanding IOs in the region.
+			 * This reduces wip queue header lock contention if lots of processes exit at the same time.
+			 * Note that in case multiple regions map to same db file, it is possible udi->owning_gd
+			 * points to a gld different from "match_gd". In that case, skip the wip queue clean as we are
+			 * interested only in cleaning up aio writes issued from "match_gd".
 			 */
-			assert(udi->owning_gd == r_local->owning_gd);
-			if (0 < udi->owning_gd->thread_gdi->num_ios)
+			if ((udi->owning_gd == match_gd) && (0 < gdi->num_ios))
 				clean_wip_queue(udi);
 		}
 	}
-	/* By this point, we must have no more outstanding IOs */
-	assert(0 == gd->thread_gdi->num_ios);
-	/* Delete the thread_gdi to leave us in a state consistent with no thread existing. */
-	gtm_free(gd->thread_gdi);
-	gd->thread_gdi = NULL;
 }
 
 /* Lazily loads the multiplexing thread and submits an IO. */

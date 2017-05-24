@@ -475,6 +475,7 @@ int mur_merge_sort_extfmt(void)
 						/* Argument journal -extract=-stdout ? */
 						if (!mur_options.extr_fn_is_stdout[recstat])
 						{
+							rename_fn_len = ARRAYSIZE(rename_fn);
 							if (RENAME_FAILED == rename_file_if_exists(fn_out, extr_fn_len,
 											rename_fn, &rename_fn_len, &status))
 							{

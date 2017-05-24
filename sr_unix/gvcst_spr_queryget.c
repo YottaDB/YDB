@@ -51,7 +51,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	boolean_t	spr_tpwrapped;
 	boolean_t	est_first_pass;
 	int		reg_index;
-	gd_binding	*start_map, *end_map, *map, *prev_end_map;
+	gd_binding	*start_map, *end_map, *map, *prev_end_map, *stop_map;
 	gd_region	*reg, *gd_reg_start;
 	gd_addr		*addr;
 	gv_namehead	*start_map_gvt;
@@ -69,10 +69,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	SETUP_THREADGBL_ACCESS;
 	start_map = TREF(gd_targ_map);	/* set up by op_gvname/op_gvnaked/op_gvextnam done just before invoking op_gvqueryget */
 	start_map_gvt = gv_target;	/* save gv_target corresponding to start_map so we can restore at end */
-	/* Now that we know the keyrange maps to more than one region, go through each of them and do the $queryget
-	 * Since multiple regions are potentially involved, need a TP fence.
-	 */
-	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
+	/* Do any initialization that is independent of retries BEFORE the op_tstart */
 	PUSH_MV_STENT(MVST_MVAL);	/* Need to protect value returned by gvcst_queryget from stpgcol */
 	/* "val" protection might not be necessary specifically for the non-spanning-node gvcst_queryget version.
 	 * And most likely not needed for the spanning-node gvcst_queryget version. But it is not easy to be sure and
@@ -87,6 +84,17 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	gvnh_reg = TREF(gd_targ_gvnh_reg);
 	assert(NULL != gvnh_reg);
 	assert(NULL != gvnh_reg->gvspan);
+	/* Now that we know the keyrange maps to more than one region, go through each of them and do the $queryget
+	 * Since multiple regions are potentially involved, need a TP fence. But before that, open any statsDBs pointed
+	 * to by map entries from "start_map" to "stop_map" (as their open will be deferred once we go into TP). Not
+	 * opening them before the TP can produce incomplete results from the $query operation.
+	 */
+	assert(0 < gvnh_reg->gvspan->end_map_index);
+	assert(gvnh_reg->gvspan->end_map_index < addr->n_maps);
+	stop_map = &addr->maps[gvnh_reg->gvspan->end_map_index];
+	for (map = start_map; map <= stop_map; map++)
+		OPEN_BASEREG_IF_STATSREG(map);
+	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	if (!dollar_tlevel)
 	{
 		spr_tpwrapped = TRUE;
@@ -103,9 +111,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	cumul_key_len = 0;
 	DEBUG_ONLY(cumul_key[cumul_key_len] = KEY_DELIMITER;)
 	INCREMENT_GD_TARG_TN(gd_targ_tn); /* takes a copy of incremented "TREF(gd_targ_tn)" into local variable "gd_targ_tn" */
-	assert(0 < gvnh_reg->gvspan->end_map_index);
-	assert(gvnh_reg->gvspan->end_map_index < addr->n_maps);
-	end_map = &addr->maps[gvnh_reg->gvspan->end_map_index];
+	end_map = stop_map;
 	/* Verify that initializations that happened before op_tstart are still unchanged */
 	assert(addr == TREF(gd_targ_addr));
 	assert(tn_array == TREF(gd_targ_reg_array));
@@ -115,7 +121,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 		 * Note down the smallest key found across the scanned regions until we find a key that belongs to the
 		 * same map (in the gld) as the currently scanned "map". At which point, the region-spanning queryget is done.
 		 */
-		OPEN_BASEREG_IF_STATSREG(map);
+		ASSERT_BASEREG_OPEN_IF_STATSREG(map);	/* "OPEN_BASEREG_IF_STATSREG" call above should have ensured that */
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != start_map) || (tn_array[reg_index] != gd_targ_tn));

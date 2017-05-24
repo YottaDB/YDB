@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,16 +12,10 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#  include <descrip.h>
-#  include <rms.h>
-#  include <ssdef.h>
-#elif defined(UNIX)
-#  include "gtm_unistd.h"
-#  include <errno.h>
-#  include "parse_file.h"
-#  include "gtm_stdlib.h"
-#endif
+#include "gtm_unistd.h"
+#include <errno.h>
+#include "parse_file.h"
+#include "gtm_stdlib.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -54,11 +48,7 @@ error_def(ERR_SYSCALL);
 #define GTCM_ENVVAR_PFX "GTCM_"
 #define GTCM_ENVVAR_PFXLEN (SIZEOF(GTCM_ENVVAR_PFX) - 1)
 
-#ifdef VMS
-void gvcmy_open(gd_region *reg, struct NAM *nb)
-#else
 void gvcmy_open(gd_region *reg, parse_blk *pb)
-#endif
 {
 	struct CLB	*clb_ptr;
 	link_info	*li;
@@ -71,25 +61,13 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	mstr		task1, task2;
 	unsigned char	buff[256], lbuff[MAX_HOST_NAME_LEN + GTCM_ENVVAR_PFXLEN];
 	short		temp_short;
-	VMS_ONLY($DESCRIPTOR(task, "GTCMSVR");)
-	UNIX_ONLY(MSTR_DEF(task, 0, NULL);)
+	MSTR_DEF(task, 0, NULL);
+	DCL_THREADGBL_ACCESS;		/* needed by TREF usage inside SET_REGION_OPEN_TRUE macro */
 
+	SETUP_THREADGBL_ACCESS;		/* needed by TREF usage inside SET_REGION_OPEN_TRUE macro */
 	ESTABLISH(gvcmy_open_ch);
 	if (reg->is_spanned)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REMOTEDBNOSPGBL, 2, REG_LEN_STR(reg));
-#ifdef VMS
-	if (!nb->nam$b_node)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
-	top = nb->nam$l_esa + nb->nam$b_esl;
-	fn = nb->nam$l_node + nb->nam$b_node;
-	node.dsc$b_dtype = task.dsc$b_dtype = 14;
-	node.dsc$b_class = task.dsc$b_class = 1;
-	node.dsc$w_length = nb->nam$b_node - 2;
-	node.dsc$a_pointer = nb->nam$l_node;
-	task1.addr = "GTCMSVRNAM";
-	task1.len = SIZEOF("GTCMSVRNAM") - 1;
-	status = TRANS_LOG_NAME(&task1, &task2, (char *)buff, SIZEOF(buff), dont_sendmsg_on_log2long);
-#elif defined(UNIX)
 	if (!pb->b_node)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
 	fn = (unsigned char *)pb->l_dir;
@@ -119,29 +97,18 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 			status = SS_LOG2LONG;
 	} else
 		status = SS_NOLOGNAM;
-#else
-#  error "Undefined platform"
-#endif
 	if (SS_NOLOGNAM != status)
 	{
 		if (SS_NORMAL != status)
 		{
-#			ifdef UNIX
 			if (SS_LOG2LONG == status)
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
 			else
-#			endif
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
-		VMS_ONLY(
-			task.dsc$a_pointer = buff;
-			task.dsc$w_length = task2.len;
-			);
-		UNIX_ONLY(
-			task.addr = (char *)task2.addr;
-			task.len = task2.len;
-			);
+		task.addr = (char *)task2.addr;
+		task.len = task2.len;
 	}
 	clb_ptr = cmu_getclb(&node, &task);
 	if (!clb_ptr)		/* If link not open */

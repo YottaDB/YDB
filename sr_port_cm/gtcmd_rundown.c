@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	jnl_buffer_ptr_t	jbp;
 	int			refcnt;
 	boolean_t		was_crit;
-	int4			rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
+	int4			rundown_status = EXIT_NRM;			/* if "gds_rundown" went smoothly */
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
@@ -96,11 +96,13 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		 */
 		assert(0 <= refcnt);
 		if (0 == refcnt)
-		{	/* free up only as little as needed to facilitate structure reuse when the region is opened again */
+		{	/* Free up only as little as needed to facilitate structure reuse when the region is opened again.
+			 * Hence the CLEANUP_UDI_FALSE use below.
+			 */
 			assert(region->head.fl == region->head.bl);
 			if (JNL_ALLOWED(cs_data))
 				jpc->pini_addr = 0;
-			UNIX_ONLY(rundown_status |=) gds_rundown();
+			rundown_status |= gds_rundown(CLEANUP_UDI_FALSE);
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);

@@ -1,6 +1,6 @@
 /****************************************************************
  *
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 {
 	int 		reg_total;
 	reg_ctl_list	*rctl, *rctl_top;
+	jnl_ctl_list	*jctl;
 	jnl_tm_t	reg_tp_resolve_time;
 	boolean_t	all_reg_before_image;
 
@@ -83,18 +84,26 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
 	{
+		jctl = rctl->jctl;
 		/* Assumption : It is guaranteed to see an EPOCH in every
-		 * "rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY" seconds. */
-		assert(max_lvrec_time >= rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY);
+		 * "jctl->jfh->epoch_interval + MAX_EPOCH_DELAY" seconds.
+		 */
+		assert(max_lvrec_time >= jctl->jfh->epoch_interval + MAX_EPOCH_DELAY);
 		/* Calculate this region's TP resolve time based on the maximum of the last valid record across regions. If the
-		 * region is properly closed (typically this means that the journal file's crash field is FALSE. But, with online
+		 * region is properly closed (typically this means that the journal file's crash field is FALSE). But, with online
 		 * rollback, crash field being TRUE, does not mean the journal file is crashed (as long as the shared memory for
 		 * that region existed when the region was opened). So, use jctl->properly_closed to determine whether the journal
 		 * file for the region is really crashed. If it is properly closed, the region's TP resolve time is the
 		 * max_lvrec_time. If not, we need to go back by an epoch interval in addition to the MAX_EPOCH_DELAY.
+		 * There is one exception to this rule and that is if the latest generation journal file of a region is properly
+		 * closed but was once a previous generation journal file (possible for example if the user moves mumps.mjl out
+		 * of the way and renames mumps.mjl_<timestamp> back as mumps.mjl). In that case, we want to treat the
+		 * tp_resolve_time for this region as the last valid record timestamp in this journal file.
 		 */
-		if (!rctl->jctl->properly_closed)
-			reg_tp_resolve_time = max_lvrec_time - rctl->jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
+		if (!jctl->properly_closed)
+			reg_tp_resolve_time = max_lvrec_time - jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
+		else if (jctl->jfh->is_not_latest_jnl)
+			reg_tp_resolve_time = rctl->lvrec_time;
 		else
 			reg_tp_resolve_time = max_lvrec_time;
 		if (rctl->lvrec_time > reg_tp_resolve_time)

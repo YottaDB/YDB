@@ -72,21 +72,14 @@ error_def(ERR_JNLENDIANLITTLE);
 						 */
 #define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in GDSJNL24/GDSJNL25 that can be input to replication filter */
 
-#ifdef UNIX
-#  define JNL_ALLOC_DEF		2048
-#  define JNL_ALLOC_MIN		2048
-#elif defined(VMS)
-#  define JNL_ALLOC_DEF		100
-#  define JNL_ALLOC_MIN		10
-#endif
+#define JNL_ALLOC_DEF		2048
+#define JNL_ALLOC_MIN		2048
 
-#ifdef UNIX
 /* The journal buffer size (specified in pages of size DISK_BLOCK_SIZE) should be large enough for one largest record,
  * which is equivalent to the largest possible value (of size MAX_STRLEN) and largest possible key (of size MAX_KEY_SZ),
  * plus the overhead of storing the journal records.
  */
-#  define JNL_BUFFER_MIN	((MAX_LOGI_JNL_REC_SIZE + ROUND_UP(2 * MAX_IO_BLOCK_SIZE, DISK_BLOCK_SIZE)) / DISK_BLOCK_SIZE + 1)
-#endif
+#define JNL_BUFFER_MIN		((MAX_LOGI_JNL_REC_SIZE + ROUND_UP(2 * MAX_IO_BLOCK_SIZE, DISK_BLOCK_SIZE)) / DISK_BLOCK_SIZE + 1)
 #define JNL_BUFFER_MAX		32768	/* # of 512-byte blocks = 16Mb journal buffer size */
 
 /*	JNL_EXTEND_DEF	allocation size / 10
@@ -95,13 +88,8 @@ error_def(ERR_JNLENDIANLITTLE);
 */
 
 #define JNL_EXTEND_MIN		0
-#ifdef UNIX
-#  define JNL_EXTEND_DEF	2048
-#  define JNL_EXTEND_MAX	1073741823
-#else
-#  define JNL_EXTEND_DEF	100
-#  define JNL_EXTEND_MAX	65535
-#endif
+#define JNL_EXTEND_DEF		2048
+#define JNL_EXTEND_MAX		1073741823
 #define JNL_MIN_WRITE		32768
 #define JNL_MAX_WRITE		65536
 /* FE was changed to EB because, the bit pattern there seems to vary more than the one for "FE".
@@ -111,11 +99,7 @@ error_def(ERR_JNLENDIANLITTLE);
 /* In Unix, with sync_io, we do journal writes to disk at filesystem block size boundaries.
  * In VMS, the writes are at 512-byte boundaries only.
  */
-#ifdef UNIX
-#  define JNL_WRT_START_MODULUS(jb)	jb->fs_block_size
-#elif defined(VMS)
-#  define JNL_WRT_START_MODULUS(jb)	512
-#endif
+#define JNL_WRT_START_MODULUS(jb)	jb->fs_block_size
 #define JNL_WRT_START_MASK(jb)	~(JNL_WRT_START_MODULUS(jb) - 1)	/* mask defining where the next physical write needs to
 									 * happen as follows from the size of JNL_WRT_START_MODULUS
 									 */
@@ -123,21 +107,12 @@ error_def(ERR_JNLENDIANLITTLE);
 #define	JNL_WRT_END_MODULUS	8
 #define JNL_WRT_END_MASK	((uint4)~(JNL_WRT_END_MODULUS - 1))
 
-#ifdef UNIX
-#  define JNL_MIN_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
-#  define JNL_DEF_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
-#else
-#  define JNL_MIN_ALIGNSIZE	(1 <<  5)	/*      32 disk blocks effectively   16K alignsize */
-#  define JNL_DEF_ALIGNSIZE	(1 <<  7)	/*     128 disk blocks effectively   64K alignsize */
-#endif
+#define JNL_MIN_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
+#define JNL_DEF_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
 #define	JNL_MAX_ALIGNSIZE	(1 << 22)	/* 4194304 disk blocks effectively    2G alignsize */
 #define JNL_REC_START_BNDRY	8
-#ifdef UNIX
 /* maximum logical journal record size */
-#  define MAX_LOGI_JNL_REC_SIZE		(ROUND_UP(MAX_STRLEN, DISK_BLOCK_SIZE) + ROUND_UP(MAX_KEY_SZ, DISK_BLOCK_SIZE))
-#else
-#  define MAX_LOGI_JNL_REC_SIZE		(MAX_DB_BLK_SIZE)			  /* maximum logical journal record size */
-#endif
+#define MAX_LOGI_JNL_REC_SIZE		(ROUND_UP(MAX_STRLEN, DISK_BLOCK_SIZE) + ROUND_UP(MAX_KEY_SZ, DISK_BLOCK_SIZE))
 /* one more disk-block for PBLK record header/footer */
 #define MAX_JNL_REC_SIZE		(MAX_LOGI_JNL_REC_SIZE + DISK_BLOCK_SIZE)
 /* Very large records require spanning nodes, which only happen in TP. */
@@ -170,15 +145,9 @@ error_def(ERR_JNLENDIANLITTLE);
 #define MAX_YIELD_LIMIT		2048
 #define DEFAULT_YIELD_LIMIT	8
 
-#ifdef UNIX
 /* Have a minimum jnl-file-auto-switch-limit of 4 align boundaries (currently each align boundary is 2M) */
 #define	JNL_AUTOSWITCHLIMIT_MIN	(4 * JNL_MIN_ALIGNSIZE)
 #define	JNL_AUTOSWITCHLIMIT_DEF	8386560	/* Instead of 8388607 it is adjusted for default allocation = extension = 2048 */
-#else
-/* Have a minimum jnl-file-auto-switch-limit of 128 align boundaries (currently each align boundary is 16K) */
-#define	JNL_AUTOSWITCHLIMIT_MIN	(128 * JNL_MIN_ALIGNSIZE)
-#define	JNL_AUTOSWITCHLIMIT_DEF	8388600	/* Instead of 8388607 it is adjusted for default allocation = extension = 100 */
-#endif
 
 /* options (4-bytes unsigned integer) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
 #define	WCSFLU_NONE		 0
@@ -653,7 +622,7 @@ typedef struct
 						This offset was supposed to have EOF_RECORD before recover switched journal.
 						A non-zero value means this journal was recovered and had the turn around point. */
 	off_jnl_t		virtual_size;	/* Allocation + n * Extension (in blocks). jnl_file_extend updates it */
-	boolean_t		crash;		/* crashed before jnl_file_close() completed */
+	boolean_t		crash;		/* crashed before "jnl_file_close" completed */
 	boolean_t		recover_interrupted;	/* true when recover creates the journal file; false after success. */
 	off_jnl_t		turn_around_offset;	/* At turn around point journal record's (EPOCH) offset */
 	jnl_tm_t		turn_around_time;	/* At turn around point journal record's timestamp */
@@ -664,11 +633,7 @@ typedef struct
  	uint4			autoswitchlimit;/* Limit in disk blocks (max 4GBytes) when jnl should be auto switched */
 	uint4			jnl_alq;	/* initial allocation (in blocks) */
 	uint4			jnl_deq;	/* extension (in blocks) */
-#ifdef VMS
-	boolean_t		update_disabled;/* If the secondary side has database update disabled. For rollback. */
-#else
 	boolean_t		filler_update_disabled;	/* obsoleted as part of multi-site replication changes */
-#endif
 	int4			max_jrec_len;	/* Maximum length in bytes of a journal record.
 						 * Although computed from the database block size, we need this
 						 * stored as well in case database is not available */
@@ -693,8 +658,11 @@ typedef struct
 	seq_num			strm_start_seqno[MAX_SUPPL_STRMS];
 	seq_num			strm_end_seqno[MAX_SUPPL_STRMS];
 	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
+	boolean_t		is_not_latest_jnl;	/* Set to TRUE if this jnl becomes a previous generation jnl file
+							 * at some point in time (relied upon by mur_tp_resolve_time).
+							 */
 	/* filler remaining */
-	char			filler[436];
+	char			filler[432];
 } jnl_file_header;
 
 typedef struct
@@ -1114,17 +1082,6 @@ typedef struct mu_set_reglist
 	boolean_t		before_images;
 } mu_set_rlist;
 
-/* The enum codes below correspond to code-paths that can call set_jnl_file_close() in VMS */
-typedef enum
-{
-        SET_JNL_FILE_CLOSE_BACKUP = 1,	/* just for safety a non-zero value to start with */
-	SET_JNL_FILE_CLOSE_SETJNL,
-	SET_JNL_FILE_CLOSE_EXTEND,
-	SET_JNL_FILE_CLOSE_RUNDOWN,
-	SET_JNL_FILE_CLOSE_REORG_ENCRYPT,
-        SET_JNL_FILE_CLOSE_INVALID_OP
-} set_jnl_file_close_opcode_t;
-
 typedef	void	(*pini_addr_reset_fnptr)(sgmnt_addrs *csa);
 
 typedef struct
@@ -1201,12 +1158,7 @@ typedef struct
 
 /* pass address of jnl_buffer to get address of expanded jnl file name */
 #define JNL_GDID_PVT(CSA)        ((CSA)->jnl->fileid)
-
-#ifdef UNIX
 #define JNL_GDID_PTR(CSA)	((gd_id_ptr_t)(&((CSA)->nl->jnl_file.u)))
-#else
-#define JNL_GDID_PTR(CSA)	((gd_id_ptr_t)(&((CSA)->nl->jnl_file.jnl_file_id)))
-#endif
 
 /* Note that since "cycle" (in jpc and jb below) can rollover the 4G limit back to 0, it should
  * only be used to do "!=" checks and never to do ordered checks like "<", ">", "<=" or ">=".
@@ -1240,7 +1192,6 @@ typedef struct
  * reach mur_close_files, we should no longer be in an active transaction and so we don't need to make any adjustments.
  * VMS does not support supplementary instances so the below macro does not apply there at all.
  */
-#ifdef UNIX
 #define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)							\
 {													\
 	int			strm_num;								\
@@ -1266,9 +1217,6 @@ typedef struct
 		}											\
 	}												\
 }
-#else
-#define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)
-#endif
 
 /* Given a journal record, GET_TN returns the tn field
  */
@@ -1304,11 +1252,7 @@ typedef struct
  * are identical in VMS where it is currently 2K.
  */
 #define	REAL_JNL_HDR_LEN	SIZEOF(jnl_file_header)
-#ifdef UNIX
-#  define	JNL_HDR_LEN	64 * 1024
-#elif defined(VMS)
-#  define	JNL_HDR_LEN	REAL_JNL_HDR_LEN
-#endif
+#define	JNL_HDR_LEN		64 * 1024
 #define	JNL_FILE_FIRST_RECORD	JNL_HDR_LEN
 
 /* Minimum possible journal file size */
@@ -1332,7 +1276,6 @@ typedef struct
 /* the following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow */
 #define	DISK_BLOCKS_SUM(freeaddr, jrec_size)	DIVIDE_ROUND_UP((((gtm_uint64_t)(freeaddr)) + (jrec_size)), DISK_BLOCK_SIZE)
 
-#if defined(UNIX)
 /* For future portability JNLBUFF_ALLOC is defined in jnl.h instead of jnlsp.h */
 #define JPC_ALLOC(csa)								\
 {										\
@@ -1349,26 +1292,6 @@ typedef struct
 		csa->nl->jnl_file.u.inode = 0;		\
 		csa->nl->jnl_file.u.device = 0;		\
 }
-#elif defined(VMS)
-#define JPC_ALLOC(csa)								\
-{										\
-	vms_lock_sb	*tmp_jnllsb;						\
-	if (NULL == csa->jnl)							\
-	{									\
-		csa->jnl = (jnl_private_control *)malloc(SIZEOF(*csa->jnl));	\
-		memset(csa->jnl, 0, SIZEOF(*csa->jnl));				\
-		csa->jnl->jnllsb = malloc(SIZEOF(vms_lock_sb));			\
-	} else									\
-	{									\
-		tmp_jnllsb = csa->jnl->jnllsb;					\
-		memset(csa->jnl, 0, SIZEOF(*csa->jnl));				\
-		csa->jnl->jnllsb = tmp_jnllsb;					\
-	}									\
-	memset(csa->jnl->jnllsb, 0, SIZEOF(vms_lock_sb));			\
-}
-#define	ASSERT_JNLFILEID_NOT_NULL(csa) assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)));
-#define NULLIFY_JNL_FILE_ID(csa) memset(&csa->nl->jnl_file.jnl_file_id, 0, SIZEOF(gds_file_id))
-#endif
 #define JNL_INIT(csa, reg, csd)													\
 {																\
 	csa->jnl_state = csd->jnl_state;											\
@@ -1395,7 +1318,7 @@ typedef struct
 	 */													\
 	lcl_channel = CHANNEL;											\
 	CHANNEL = NOJNL;											\
-	F_CLOSE(lcl_channel, RC);	/* resets "lcl_channel" to FD_INVALID */				\
+	CLOSEFILE_RESET(lcl_channel, RC);	/* resets "lcl_channel" to FD_INVALID */			\
 	assert(SS_NORMAL == RC);										\
 }
 
@@ -1410,16 +1333,9 @@ typedef struct
  * MAX_STRLEN for the actual database record. But that only takes care of the value part of the record.
  * The key can still be MAX_KEY_SZ long. So take that into account as well.
  */
-#ifdef UNIX
 #  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2((FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE)			\
 						+ MAX_KEY_SZ + MAX_STRLEN						\
 						+ SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)
-#else
-#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2(FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE			\
-						+ ((CSD)->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr))			\
-						+ SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)	\
-		/* fixed size part of update record + MAX possible (key + data) len + keylen-len + datalen-len */
-#endif
 
 #define	JNL_MAX_PBLK_RECLEN(CSD)	(uint4)ROUND_UP2(MIN_PBLK_RECLEN + (CSD)->blk_size, JNL_REC_START_BNDRY)
 
@@ -1526,12 +1442,8 @@ typedef struct
 	DEST = jnl_buffer_adj_value;									\
 }
 
-#ifdef UNIX
 # define CURRENT_JNL_IO_WRITER(JB)	JB->io_in_prog_latch.u.parts.latch_pid
 # define CURRENT_JNL_FSYNC_WRITER(JB)	JB->fsync_in_prog_latch.u.parts.latch_pid
-#else
-# define CURRENT_JNL_IO_WRITER(JB)	JB->now_writer
-#endif
 
 /* This macro is invoked by callers just before grabbing crit to check if a db fsync is needed and if so do it.
  * Note that we can do the db fsync only if we already have the journal file open. If we do not, we will end
@@ -1614,18 +1526,11 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 
 jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, uint4 nodeflags);
 
-#ifdef VMS
-void	finish_active_jnl_qio(void);
-void	jnl_start_ast(jnl_private_control *jpc);
-uint4	jnl_permit_ast(jnl_private_control *jpc);
-void	jnl_qio_end(jnl_private_control *jpc);
-#endif
-
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
-uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode);
+uint4	set_jnl_file_close(void);
 uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str);
 uint4	jnl_file_open_switch(gd_region *reg, uint4 sts);
-void	jnl_file_close(gd_region *reg, bool clean, bool dummy);
+void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch);
 
 /* Consider putting followings in a mupip only header file  : Layek 2/18/2003 */
 boolean_t  mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info *jnl_info);
@@ -1639,5 +1544,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
 char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bufsiz);
 char	*jnl2ext(char *jnl_buff, char *ext_buff);
+void	jnl_set_cur_prior(gd_region *reg, sgmnt_addrs *csa, sgmnt_data *csd);
+void	jnl_set_fd_prior(int jnl_fd, sgmnt_addrs* csa, sgmnt_data* csd, jnl_file_header *jfh);
 
 #endif /* JNL_H_INCLUDED */

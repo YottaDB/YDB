@@ -92,6 +92,12 @@
    on the circumstances it encounters and the qualifiers with which it is
    invoked.
 
+   **Note**
+
+   MUPIP commands that need standalone access issue a MUUSERLBK error on a
+   crashed replication-enabled database and MUUSERECOV error in case of a
+   non-replicated-but-journaled database.
+
 2 Syntax
    Syntax
 
@@ -459,7 +465,8 @@
    **Note**
 
    The replication instance file should always be backed up with the database
-   file.
+   file. The source server for the instance must be started at least once
+   before backing up the replication instance file.
 
    The format of the REPLINSTANCE qualifier is:
 
@@ -673,24 +680,7 @@
    The MUPIP DOWNGRADE command changes the file header format to V4 or V5.
    The format of the MUPIP DOWNGRADE command is:
 
-   D[OWNGRADE] -V[ERSION]={V4|V5} file-name
-
-   For V4:
-
-     o It reduces the size from 8 bytes to 4 bytes for fields like current
-       transaction (CTN), maximum tn (MTN) and others that contain
-       transaction numbers.
-     o It removes the results of any prior DBCERTIFY run on the database.
-     o You cannot downgrade a V5 database which has standard null collation.
-       In such a case, perform a MUPIP EXTRACT -FORMAT=ZWR operation on the
-       V5 database and then perform a MUPIP LOAD operation on a V4 database.
-
-3 VERSION
-   VERSION
-
-   Specifies file header format. For more information on the downgrade
-   criteria for your database, refer to the release notes document of your
-   current GT.M version.
+   D[OWNGRADE] -V[ERSION]={V4|V5|V63000A} file-name
 
    **Note**
 
@@ -701,6 +691,30 @@
    rolling upgrade scheme using replication and / or take a backup prior to
    upgrading the database.
 
+3 VERSION
+   VERSION
+
+   V4 and V5 specifies file header format. For more information on the
+   downgrade criteria for your database, refer to the release notes document
+   of your current GT.M version.
+
+   V4:
+
+     o It reduces the size from 8 bytes to 4 bytes for fields like current
+       transaction (CTN), maximum tn (MTN) and others that contain
+       transaction numbers.
+     o It removes the results of any prior DBCERTIFY run on the database.
+     o You cannot downgrade a V5 database which has standard null collation.
+       In such a case, perform a MUPIP EXTRACT -FORMAT=ZWR operation on the
+       V5 database and then perform a MUPIP LOAD operation on a V4 database.
+
+   V63000A:
+
+   V63000A downgrades to any release older than V6.3-001. All releases up to
+   V6.3-000A have an empty 512-bytes block logically after the last usable
+   database block. VERSION=V63000A changes this terminating block from having
+   the current size of a database block to 512-bytes.
+
 3 Examples
    Examples
 
@@ -709,6 +723,62 @@
    $ mupip downgrade mumps.dat
 
    This command changes the file-header of mumps.dat to V4 format.
+
+2 DUMPFHEAD
+   DUMPFHEAD
+
+   The MUPIP DUMPFHEAD command displays information about one or more
+   database files. The format of the MUPIP DUMPFHEAD command is:
+
+   DU[MPFHEAD]  {-FI[LE] file-name |-REG[ION] region-list}
+
+3 FILE
+   FILE
+
+   Specifies the name of the database file for the MUPIP DUMPFHEAD operation.
+   -FILE does not require a Global Directory. The format of the FILE
+   qualifier is:
+
+   -FI[LE] database-file-name
+
+     o The database file name must include the absolute or relative path.
+     o The -FILE qualifier is incompatible with the -REGION qualifier.
+
+3 REGION
+   REGION
+
+   Specifies that the INTEG parameter identifies one or more regions rather
+   than a database file. The format of the REGION qualifier is:
+
+   -R[EGION] region-list
+
+     o The region-list identifies the target of DUMPFHEAD. region-list may
+       specify more than one region of the current global directory in a
+       list. Regions are case-insensitive, separated by a comma, and
+       wildcards can be used to specify them. Any region-name may include the
+       wildcard characters * and ? (remember to escape them to protect them
+       from inappropriate expansion by the shell). Any region name expansion
+       occurs in M (ASCII) collation order.
+     o The region-list argument may specify more than one region of the
+       current Global Directory in a list separated with commas. DUMPFHEAD
+       -REGION requires the environment variable gtmgbldir to specify a valid
+       Global Directory.
+     o The -REGION qualifier is incompatible with the -FILE qualifier.
+
+3 Examples
+   Examples
+
+   Example:
+
+   $ mupip dumpfhead -file mumps.dat
+
+   This command lists information about the database file mumps.dat in the
+   current working directory.
+
+   $ mupip dumpfhead -region "*"
+
+   This command lists information about all the database files mapped by the
+   global directory specified by $gtmgbldir.
 
 2 ENDIANCVT
    ENDIANCVT
@@ -1115,7 +1185,7 @@
 
    The format of the MUPIP FREEZE command is:
 
-   F[REEZE] {-OF[F] [-OV[ERRIDE]]|-ON [-R[ECORD]]} region-list
+   F[REEZE] {-OF[F] [-OV[ERRIDE]]|-ON [[-ONL[INE] [-[NO]AUTORELEASE]] | [-NOONL[INE]] [-R[ECORD]]]} region-list
 
      o The region-list identifies the target of the FREEZE. region-list may
        specify more than one region of the current global directory in a
@@ -1124,10 +1194,11 @@
        wildcard characters * and % (remember to escape them to protect them
        from inappropriate expansion by the shell). Any region name expansion
        occurs in M (ASCII) collation order.
-     o MUPIP FREEZE waits for one minute so that concurrent KILL or MUPIP
-       REORG operations can complete. If the KILL or MUPIP REORG commands do
-       not complete within one minute, MUPIP FREEZE terminates operations and
-       unfreezes any regions it had previously marked as frozen.
+     o MUPIP FREEZE waits for up to one minute so that concurrent KILL or
+       MUPIP REORG operations can complete. If the KILL or MUPIP REORG
+       commands do not complete within one minute, MUPIP FREEZE unfreezes any
+       regions it had previously marked as frozen and terminates with an
+       error.
      o To ensure that a copy or reorganized version of a database file
        contains a consistent set of records, concurrent MUPIP utilities, such
        as BACKUP (without the ONLINE qualifier) and EXTRACT, include
@@ -1136,11 +1207,19 @@
        qualifier with BACKUP.
      o A MUPIP FREEZE can be removed only by the user who sets the FREEZE or
        by using -OVERRIDE.
-     o After MUPIP FREEZE -ON, processes that are attempting updates "hang"
-       until the FREEZE is removed by the MUPIP FREEZE -OFF command or DSE.
-       Make sure that procedures for using MUPIP FREEZE, whether manual or
-       automated, include provisions for removing the FREEZE in all
-       appropriate cases, including when errors disrupt the normal flow.
+     o A MUPIP FREEZE -ON can specify either -NOONLINE, the default, or
+       -ONLINE, and if -ONLINE, can specify either -AUTORELEASE, the default,
+       or -NOAUTORELEASE.
+     o A FREEZE specifying -ONLINE attempts to minimize the impact of the
+       FREEZE on concurrently updating processes.
+     o A FREEZE specifying -ONLINE -AUTORELEASE allows updates to continue
+       immediately when GT.M needs to update the database file.
+     o After MUPIP FREEZE -ON -NOONLINE, processes that are attempting
+       updates "hang" until the FREEZE is removed by the MUPIP FREEZE -OFF
+       command or DSE. Make sure that procedures for using MUPIP FREEZE,
+       whether manual or automated, include provisions for removing the
+       FREEZE in all appropriate cases, including when errors disrupt the
+       normal flow.
      o A -RECOVER/-ROLLBACK for a database reverts to a prior database update
        state. Therefore, a -RECOVER/-ROLLBACK immediately after a MUPIP
        FREEZE -ON removes the freeze. However, -RECOVER/-ROLLBACK does not
@@ -1155,8 +1234,10 @@
 
    The optional qualifiers are:
 
+   -[NO]A[UTORELEASE] - only valid with -ONLINE
+   -ON[LINE] - only valid with -ON
    -OV[ERRIDE]
-   -R[ECORD]
+   -R[ECORD] - only valid with -ON
 
 3 OFf
    OFf
@@ -1167,6 +1248,10 @@
 
    OF[F]
 
+     o A FREEZE -OFF which turns off a FREEZE -ONLINE -AUTORELEASE produces a
+       OFRZNOTHELD warning to indicate that the freeze was automatically
+       released and therefore did not protect whatever concurrent actions it
+       was intended to guard.
      o When used with -OVERRIDE, -OFF stops a freeze operation set by a
        process with a different userid.
      o Incompatible with: -ON, -RECORD
@@ -1181,6 +1266,75 @@
 
    Incompatible with: -OFF, -OVERRIDE
 
+3 [NO]A[UTORELEASE
+   [NO]A[UTORELEASE
+
+   Controls the behavior of a FREEZE specified with -ONLINE when GT.M must
+   write to a database file. The format of the AUTORELEASE qualifier is:
+
+   -[NO]A[UTORELEASE]
+
+     o -AUTORELEASE, the default, causes GT.M to release the freeze if it
+       needs to update the file before a FREEZE -OFF.
+     o -NOAUTORELEASE causes GT.M to hold off actions that need to update the
+       database file until someone issues a MUPIP FREEZE -OFF.
+     o -The actions that require GT.M to write to the database file are:
+
+          o Insufficient global buffers to hold updates - GT.M must flush
+            buffers to make space to do any additional updates
+          o Insufficient space in the database to hold updates - GT.M must
+            extend the file
+          o The journal file reaches its maximum size or someone issues a
+            MUPIP SET -JOURNAL command - GT.M must create a new journal file
+          o An epoch comes due - GT.M must create a checkpoint
+          o Someone issues a MUPIP BACKUP command - GT.M must record state
+            information to mark the beginning of the backup
+
+     o When an -AUTORELEASE abandons a FREEZE, any actions that depend on the
+       stability of the database file on secondary storage, such as a
+       database copy, lose that protection and are not reliable, so they
+       likely need to be repeated at a time when an -AUTORELEASE is less
+       likely or when -NOONLINE is more appropriate.
+     o An -AUTORELEASE action produces an OFRZAUTOREL message in the operator
+       log.
+     o An -AUTORELEASE action requires a FREEZE -OFF to reestablish a normal
+       database state.
+     o Incompatible with: -OFF, -NOONLINE
+
+3 ONLine
+   ONLine
+
+   Controls the potential impact of a FREEZE on concurrently updating
+   processes. The format of the ONLINE qualifier is:
+
+   -[NO]ONL[INE]
+
+     o ON -NOONLINE, the default, causes the freeze to last until OFF, and
+       makes management of the FREEZE straightforward.
+     o ON -ONLINE, causes GT.M to attempt to minimize the impact of the
+       FREEZE on concurrently updating processesby taking a number of
+       actions, as appropriate:
+
+          o Switching journal files to provide maximum space
+          o Performing an epoch to provide maximum time to the next epoch
+          o Flushing the global buffers to make all available to hold updates
+          o Incompatible with: -AUTORELEASE, -OFF
+
+     o After performing these preparations, -ONLINE allows updating processes
+       to make updates to global buffers but defer flushing them to the
+       database file.
+     o -ONLINE cannot apply to MM databases, so a FREEZE -ONLINE skips any MM
+       regions it encounters.
+     o Refer to -AUTORELEASE above for additional information.
+     o Incompatible with: -OFF
+
+   **Note**
+
+   If a database is nearly full, and you about to use MUPIP FREEZE -ON
+   -ONLINE, you may want to use MUPIP EXTEND first as a database file
+   extension will either AUTORELEASE or "harden" the -ONLINE freeze
+   effectively into a -NOONLINE freeze.
+
 3 OVerride
    OVerride
 
@@ -1192,7 +1346,7 @@
 
      o OVERRIDE should not be necessary (and may even be dangerous) in most
        schemes.
-     o Incompatible with: -ON, -RECORD
+     o Incompatible with: -AUTORELEASE, -ON, -ONLINE -RECORD
 
 3 Record
    Record
@@ -1661,13 +1815,30 @@
    subscripts with a colon (:). -SUBSCRIPT cannot detect incorrectly marked
    busy errors. The format of the SUBSCRIPT qualifier is:
 
-   -S[UBSCRIPT]=subscript
+   -SU[BSCRIPT]=subscript
 
    Specify SUBSCRIPT only if the path to the keys in the subscript is not
    damaged. If the path is questionable or known to be damaged, use DSE to
    find the block(s) and INTEG -BLOCK.
 
    Incompatible with: -BLOCK, -TN_RESET
+
+3 Stats
+   Stats
+
+   Specifies INTEG to check any active statistics database associated with
+   the region(s) specified for the command. The format of the STATS qualifier
+   is:
+
+   -[NO]ST[ATS]
+
+   Specify STATS only if you have reason to understand that statistics
+   reporting is failing with database errors or reporting incorrect results.
+   Because -FILE requires standalone access and statistic databases are
+   automatically created and removed it is incompatible with -STATS. The
+   default is NOSTATS.
+
+   Incompatible with: -BLOCK, -FILE, -TN_RESET
 
 3 TN_reset
    TN_reset
@@ -2188,7 +2359,7 @@
     -S[ELECT]=global-name-list
     -T[RUNCATE][=percentage]
     -UP[GRADE]
-    -REG[ION]=region-list
+    -REG[ION] region-list
    ]
 
    **Note**
@@ -2319,6 +2490,15 @@
    instances, FIS recommends running this operation on replicating secondary
    instances, rather than on originating primary instances.
 
+   **Note**
+
+   MUPIP REORG -ENCRYPT does not enable switching between encryption
+   algorithms. To migrate databases from Blowfish CFB to AES CFB requires
+   that the data be extracted and loaded into newly created database files.
+   To minimize the time your application is unavailable, you can deploy your
+   application in a Logical Multi-Site (LMS) configuration, and migrate using
+   a rolling upgrade technique.
+
 3 Exclude
    Exclude
 
@@ -2433,7 +2613,7 @@
 
    The format of the REGION qualifier is:
 
-   -R[EGION]=region-list
+   -R[EGION] region-list
 
    region-list may specify more than one region of the current global
    directory in a list. Regions are case-insensitive, separated by a comma,
@@ -2676,6 +2856,9 @@
    A successful MUPIP RUNDOWN of a database region removes any current MUPIP
    FREEZE.
 
+   RUNDOWN -FILE can be directed to a statistics database file and works even
+   if the corresponding actual database file does not exist.
+
    To ensure database integrity, all system shutdown algorithms should
    include scripts that stop at GT.M processes and perform RUNDOWN on all
    database files.
@@ -2689,7 +2872,9 @@
 
    If the RUNDOWN command does not specify either -File or -Region, it checks
    all the IPC resources (shared memory) on the system and if they are
-   associated with a GT.M database, attempts to rundown that file.
+   associated with a GT.M database, attempts to rundown that file. MUPIP
+   RUNDOWN with no argument removes any statistics database file resources
+   associated with actual database file resources it can remove.
 
 3 File
    File
@@ -2761,7 +2946,8 @@
    The format of the SET command is:
 
    SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list|-REP[LICATION]={ON|OFF}}
-    -A[CCESS_METHOD]={BG|MM}
+    -AC[CESS_METHOD]={BG|MM}
+    -[NO]AS[YNCIO]
     -[NO]DE[FER_TIME][=seconds]
     -[NO]DEFER_ALLOCATE
     -E[XTENSION_COUNT]=integer(no of blocks)
@@ -2772,6 +2958,7 @@
     -K[EY_SIZE]=bytes
     -L[OCK_SPACE]=integer
     -M[UTEX_SLOTS]=integer
+    -[NO]LCK_SHARES_DB_CRIT
     -PA[RTIAL_RECOV_BYPASS]
     -[NO]Q[DBRUNDOWN]
     -REC[ORD_SIZE]=bytes
@@ -2780,7 +2967,8 @@
     -RES[ERVED_BYTES]=integer]
     -SLEE[P_SPIN_COUNT]=integer
     -SPIN[_SLEEP_LIMIT]=nanoseconds
-    -S[TANDALONENOT]
+    -STAN[DALONENOT]
+    -[NO]STAT[S]
     -V[ERSION]={V4|V6}
     -W[AIT_DISK]=integer
 
@@ -2842,14 +3030,25 @@
 
    Incompatible with: -FILE, -JNLFILE and -REGION
 
-3 Access_method
-   Access_method
+3 ACcess_method
+   ACcess_method
 
    Specifies the access method (GT.M buffering strategy) for storing and
    retrieving data from the global database file. The format of the
    ACCESS_METHOD qualifier is:
 
-   -A[CCESS_METHOD]=code
+   -AC[CESS_METHOD]=code
+
+3 ASyncIO
+   ASyncIO
+
+   Specifies whether to use asynchronous I/O for an access method BG
+   database, rather than using synchronous I/O through the file system cache.
+   ASYNCIO is incompatible with the MM access method and an attempt to
+   combine the two with MUPIP SET produces a ASYNCIONOMM error. The format of
+   the ASYNCIO qualifier is:
+
+   -[NO]AS[YNCIO]
 
 3 Defer_time
    Defer_time
@@ -3003,6 +3202,17 @@
 
    -M[UTEX_SLOTS]=integer
 
+3 Lck_shares_db_crit
+   Lck_shares_db_crit
+
+   Specifies whether LOCK actions share the same resource and management as
+   the database or use a separate resource and management. The format of the
+   LCK_SHARES_DB_CRIT qualifier is:
+
+    -[NO]LC[K_SHARES_DB_CRIT]
+
+   The default is Sep(arate)/FALSE.
+
 3 Qdbrundown
    Qdbrundown
 
@@ -3114,6 +3324,15 @@
        leaving the default values unchanged in production environments, until
        and unless, you have data from testing and benchmarking that
        demonstrates a benefit from a change.
+
+3 STATs
+   STATs
+
+   Specifies specifies whether GT.M should permit statistics sharing for this
+   region. This characteristic permits operational exclusion of statistics
+   sharing for a region. The format of the STATS qualifier is:
+
+   -[NO]STAT[S]
 
 3 Version
    Version
@@ -3239,6 +3458,12 @@
 
      o If -HEURISTIC is not specified, MUPIP SIZE uses the
        ARSAMPLE,SAMPLE=1000 estimation technique.
+
+   The 2 sigma column for the two sampling techniques shows the dispersion of
+   the samples (in blocks) and the probability (rounded to a whole
+   percentage) that the actual value falls farther away from the reported
+   value by more than two sigma. With the scan method the "sample" is
+   "complete," so any inaccuracy comes from concurrent updates.
 
    **Important**
 
@@ -3956,7 +4181,7 @@
    current journal-buffer-size as part of an online switch of the journal
    files.
 
-   The default value is 2312 blocks. The minimum BUFFER_SIZE is 2307 blocks.
+   The default value is 2308 blocks. The minimum BUFFER_SIZE is 2307 blocks.
    The maximum BUFFER_SIZE is 32K blocks which means that the maximum buffer
    you can set for your journal file output is 16MB.
 
@@ -5926,7 +6151,7 @@
 
    Command Syntax:
 
-   mupip replicate -instance_create -name=<instance name> [-noreplace] [-supplementary]
+   mupip replicate -instance_create -name=<instance name> [-noreplace] [-supplementary] [-noqdbrundown]
 
    Qualifiers:
 
@@ -5959,6 +6184,40 @@
    Specifies that the replication instance file is suitable for use in a
    supplementary instance.
 
+   -noqdbrundown
+
+   Permits more than 32,767 udpating processes to concurrently the
+   replication instance file and database file(s). The default
+   (-noqdbrundown) permits up to 32,767 concurrent updating processes to
+   access a database file or a replication instance file.
+
+   This permission is effected by the QDBRUNDOWN flags in database file
+   headers and in replication instance files. When an open database file or
+   replication instance file with QDBRUNDOWN set is first concurrently
+   accessed by more than 32,767 processes, GT.M:
+
+    1. logs a NOMORESEMCNT message in the system log, and
+    2. stops counting the number of attached processes. This means that GT.M
+       cannot recognize when the number of attached processes reaches zero
+       (0) in order to release the corresponding shared resources, and
+       therefore requires explicit manual clean up of resources for an
+       orderly shutdown.
+
+   Except in application configurations that require it, FIS recommends not
+   setting QDBRUNDOWN. Not setting QDBRUNDOWN allows GT.M to clean up
+   resources, instead of putting the burden on the operational procedures.
+   Where GT.M cannot perform an orderly shutdown, an explicit, clean shutdown
+   must be performed as follows:
+
+    1. Replicated instances require a mupip journal -rollback -backward "*"
+       executed after the mupip replicate -source -shutdown command (remember
+       that even instances receiving a replication stream have one or more
+       Source Servers).
+    2. Database files that are journaled but not part of a replication
+       instance require a mupip journal -recover -backward command.
+    3. For database files that are not journaled (and hence not replicated),
+       perform a mupip rundown, or if appropriate, delete and recreate them.
+
    Example:
 
    $ export gtm_repl_instance=mutisite.repl
@@ -5978,6 +6237,7 @@
     -edit[instance] {<instance-file>|-source -jnlpool}
     {-show [-detail]|-change [-offset=] [-size=] [-value=]}
     [-name=<new-name>]
+    [-[no]qdbrundown]
 
    -editinstance
 
@@ -6047,6 +6307,12 @@
    The SHOW qualifier serves two purposes. When used with -editinstance, it
    displays the content of the replication instance file. When used with
    -jnlpool, it displays the content of the journal pool.
+
+   -[no]qdbrundown
+
+   Controls the setting of the "HDR Quick database rundown is active" field
+   in a replication instance file. For more information about this setting,
+   refer to "Create instance".
 
    Example:
 
@@ -6137,13 +6403,13 @@
    -buffsize=<Journal Pool size in bytes>
 
    Specifies the size of the Journal Pool. The server rounds the size up or
-   down to suit its needs. Any size less than 1 MB is rounded up to 1 MB. If
-   you do not specify a qualifier, the size defaults to the GT.M default
-   value of 64 MB. Remember that you cannot exceed the system-provided
+   down to suit its needs. Any size less than 1 MiB is rounded up to 1 MiB.
+   If you do not specify a qualifier, the size defaults to the GT.M default
+   value of 64 MiB. Remember that you cannot exceed the system-provided
    maximum shared memory. For systems with high update rates, specify a
    larger buffer size to avoid the overflows and file I/O that occur when the
    Source Server reads journal records from journal files. The maximum value
-   is 4GiB - 1.
+   is 4294967288(4GiB-8).
 
    -filter=<filter command>
 
@@ -6428,12 +6694,13 @@
    must provide the compression library. The GT.M interface for compression
    libraries accepts the zlib compression libraries without any need for
    adaptation. These libraries are included in many UNIX distributions and
-   are downloadable from the zlib home page. If you prefer to use other
-   compression libraries, you need to configure or adapt them to provide the
-   same API provided by zlib. Simple instructions for compiling zlib on a
-   number of platforms follow. Although GT.M uses zlib, zlib is not FIS
-   software and FIS does not support zlib. These instructions are merely
-   provided as a convenience to you.
+   are downloadable from the zlib home page. GT.M supports the use of the IBM
+   provided zlib library for AIX. If you prefer to use other compression
+   libraries, you need to configure or adapt them to provide the same API
+   provided by zlib. Simple instructions for compiling zlib on a number of
+   platforms follow. Although GT.M uses zlib, zlib is not FIS software and
+   FIS does not support zlib. These instructions are merely provided as a
+   convenience to you.
 
    If a package for zlib is available with your operating system, FIS
    suggests that you use it rather than building your own.
@@ -6539,7 +6806,9 @@
 
    Command syntax:
 
-   mupip replicate -source -shutdown [-timeout=<timeout in seconds>]
+   mupip replicate -source -shutdown
+    [-timeout=<timeout in seconds>]
+    [-zerobacklog]
 
    Qualifiers:
 
@@ -6553,6 +6822,11 @@
    signaling the Source Server to shut down. If you do not specify -timeout,
    the default timeout period is 120 seconds. If you specify -timeout=0 ,
    shutdown occurs immediately.
+
+   -zerobacklog
+
+   Shuts down the Source Server either when the backlog goes to zero or the
+   timeout expires, whichever occurs first.
 
 2 Activate_Passive_Source_Server
    Activate Passive Source Server
@@ -7448,146 +7722,159 @@
    Summary
 
    +------------------------------------------------------------------------------+
-   |   COMMAND   |    OBJECTS     |                MAIN QUALIFIER                 |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-BK[UPDBJNL]=DISABLE | OFF                     |
-   |             |                |-B[YTESTREAM] -NET[TIMEOUT]=seconds            |
-   |             |                |-C[OMPREHENSIVE]                               |
-   |             |                |-DA[TABASE] -REPLA[CE]                         |
-   |             |                |-DBG                                           |
-   |             |                |-I[NCREMENTAL]                                 |
-   |             |region-name     |-[NO]J[OURNAL][=journal-options-list]          |
-   |B[ACKUP]     |                |                                               |
-   |             |file-name       |-NETTIMEOUT                                    |
-   |             |                |-[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]  |
-   |             |                |-O[NLINE]                                      |
-   |             |                |-RECORD                                        |
-   |             |                |-REPLI[NSTANCE]=OFF | ON                       |
-   |             |                |-S[INCE]={DATABASE|BYTESTREAM|RECORD}          |
-   |             |                |-T[RANSACTION=hexa;transaction_number]         |
-   |-------------+----------------+-----------------------------------------------|
-   |CR[EATE]     |-               |-R[EGION]=region-name                          |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-OUTDB=<outdb-file>                            |
-   |EN[DIANCVT]  |file-name       |                                               |
-   |             |                |-OV[ERRIDE]                                    |
-   |-------------+----------------+-----------------------------------------------|
-   |EXI[T]       |-               |-                                              |
-   |-------------+----------------+-----------------------------------------------|
-   |EXTE[ND]     |region-name     |-B[LOCKS]=blocks                               |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                    |
-   |             |                |-FR[EEZE]                                      |
-   |             |                |-LA[BEL]=text                                  |
-   |EXTR[ACT]    |-               |-[NO]L[OG]                                     |
-   |             |                |-S[ELECT]=global-name-list                     |
-   |             |                |-O[CHSET]=character-set                        |
-   |             |                |-R[EGION=region-list                           |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-DBG                                           |
-   |             |                |-OF[F]                                         |
-   |F[REEZE]     |region-list     |                                               |
-   |             |                |-OV[ERRIDE]                                    |
-   |             |                |-ON[-R[ECORD]]                                 |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-D[B]                                          |
-   |FT[OK]       |File-name       |-J[NLPOOL]                                     |
-   |             |                |-R[ECVPOOL]                                    |
-   |-------------+----------------+-----------------------------------------------|
-   |H[ELP]       |command-option  |-                                              |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-A[DJACENCY]=integer]                          |
-   |             |                |-BL[OCK]=hexa;block-number]                    |
-   |             |                |-BR[IEF]                                       |
-   |             |                |-FA[ST]                                        |
-   |             |                |-FI[LE]                                        |
-   |             |                |-FU[LL]                                        |
-   |             |File-name or    |                                               |
-   |I[NTEG]      |region-list     |-NO]K[EYRANGES                                 |
-   |             |                |-[NO][MAP]=integer                             |
-   |             |                |-[NO]MAXK[EYSIZE]=integer                      |
-   |             |                |-R[EGION]                                      |
-   |             |                |-S[UBSCRIPT]=subscript                         |
-   |             |                |-TN[_RESET]                                    |
-   |             |                |-[NO]TR[ANSACTION][=integer]                   |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-EX[TRACT][=file-specification|-stdout]        |
-   |             |                |-REC[OVER] | -RO[LLBACK]                       |
-   |J[OURNAL]    |file-name       |-SH[OW][=show-option-list]                     |
-   |             |                |-[NO]V[ERIFY]                                  |
-   |             |                |-BA[CKWARD] | -FO[RWARD]                       |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-BE[GIN]=integer                               |
-   |             |                |-BLOCK_DENSITY                                 |
-   |             |                |-E[ND]=integer                                 |
-   |L[OAD]       |file-name       |-FI[LLFACTOR]=integer                          |
-   |             |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                    |
-   |             |                |-S[TDIN]                                       |
-   |             |                |-O[NERROR]                                     |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-DOWNGRADE                                     |
-   |             |                |-E[XCLUDE]=global-name-list                    |
-   |             |                |-FI[LL_FACTOR]=integer                         |
-   |             |                |-I[NDEX_FILL_FACTOR]=integer                   |
-   |             |                |-REG[ION]                                      |
-   |             |                |-RES[UME]                                      |
-   |REO[RG]      |                |-SA[FEJNL]                                     |
-   |             |                |-S[ELECT]=global-name-list                     |
-   |             |                |-STA[RTBLK]=hexa                               |
-   |             |                |-STO[PBLK]=hexa                                |
-   |             |                |-T[RUNCATE][=percentage]                       |
-   |             |                |-UP[GRADE]                                     |
-   |             |                |-USER_DEFINED_REORG=reorg_list                 |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-E[DITINSTANCE]                                |
-   |             |                |-I[NSTANCE_CREATE]                             |
-   |             |                |-R[ECEIVER                                     |
-   |REP[LICATE]  |file-name       |                                               |
-   |             |                |-S[OURCE]                                      |
-   |             |                |-UPDA[TEPROC]                                  |
-   |             |                |-UPDH[ELPER]                                   |
-   |-------------+----------------+-----------------------------------------------|
-   |RE[STORE]    |file-name or    |-[NO]E[XTEND]                                  |
-   |             |file-list       |                                               |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-F[ILE]                                        |
-   |             |file-name or    |-R[EGION]                                      |
-   |RU[NDOWN]    |region-name     |                                               |
-   |             |                |-RELINKCTL [dir]                               |
-   |             |                |-OVERRIDE                                      |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-A[CCESS_METHOD=BG|MM]                         |
-   |             |                |-B[YPASS]                                      |
-   |             |                |-DB[FILENAME]=database_file                    |
-   |             |                |-DE[FER_TIME]=seconds                          |
-   |             |                |-E[XTENSION_COUNT]=integer(no of blocks)       |
-   |             |                |-FILE                                          |
-   |             |                |-F[LUSH_TIME]= integer                         |
-   |             |                |-G[LOBAL_BUFFERS]=integer                      |
-   |             |                |-JN[LFILE]                                     |
-   |             |file-name or    |-JO[URNAL]=journal-option-list                 |
-   |SE[T]        |region-name     |                                               |
-   |             |                |-L[OCK_SPACE]=integer                          |
-   |             |                |-PA[RTIAL_RECOV_BYPASS]                        |
-   |             |                |-PR[EVJNLFILE]=jnl_file_name                   |
-   |             |                |-RE[GION]                                      |
-   |             |                |-REPLI[CATION]=ON|OFF                          |
-   |             |                |-REPL_[STATE]=ON|OFF                           |
-   |             |                |-RES[ERVED_BYTES]=integer                      |
-   |             |                |-S[TANDALONENOT]                               |
-   |             |                |-V[ERSION]=V4|V5                               |
-   |             |                |-W[AIT_DISK]=integer                           |
-   |-------------+----------------+-----------------------------------------------|
-   |             |                |-TRIG[GERFILE]=<trigger_definitions_file>      |
-   |             |                |-NOPR[OMPT]                                    |
-   |TRIGGER      |-               |                                               |
-   |             |                |-SELE[CT][=name-list|*][<select-output-file>]  |
-   |             |                |-UPGRADE                                       |
-   |-------------+----------------+-----------------------------------------------|
-   |ST[OP]       |process-id      |process-id                                     |
-   |-------------+----------------+-----------------------------------------------|
-   |UP[GRADE]    |-               |-                                              |
+   |  COMMAND  |   OBJECTS    |                  MAIN QUALIFIER                   |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-BK[UPDBJNL]=DISABLE | OFF                         |
+   |           |              |-B[YTESTREAM] -NET[TIMEOUT]=seconds                |
+   |           |              |-C[OMPREHENSIVE]                                   |
+   |           |              |-DA[TABASE] -REPLA[CE]                             |
+   |           |              |-DBG                                               |
+   |           |              |-I[NCREMENTAL]                                     |
+   |           |region-name   |-[NO]J[OURNAL][=journal-options-list]              |
+   |B[ACKUP]   |              |                                                   |
+   |           |file-name     |-NETTIMEOUT                                        |
+   |           |              |-[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]      |
+   |           |              |-O[NLINE]                                          |
+   |           |              |-RECORD                                            |
+   |           |              |-REPLI[NSTANCE]=OFF | ON                           |
+   |           |              |-S[INCE]={DATABASE|BYTESTREAM|RECORD}              |
+   |           |              |-T[RANSACTION=hexa;transaction_number]             |
+   |-----------+--------------+---------------------------------------------------|
+   |CR[EATE]   |-             |-R[EGION]=region-name                              |
+   |-----------+--------------+---------------------------------------------------|
+   |DO[WNGRADE]|file-name     |-V[ERION]={V4|V5}                                  |
+   |-----------+--------------+---------------------------------------------------|
+   |DU[MPFHEAD]|file-name or  |-                                                  |
+   |           |region-list   |                                                   |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-OUTDB=<outdb-file>                                |
+   |EN[DIANCVT]|file-name     |                                                   |
+   |           |              |-OV[ERRIDE]                                        |
+   |-----------+--------------+---------------------------------------------------|
+   |EXI[T]     |-             |-                                                  |
+   |-----------+--------------+---------------------------------------------------|
+   |EXTE[ND]   |region-name   |-B[LOCKS]=blocks                                   |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-FO[RMAT]=GO|B[INARY]|Z[WR]                        |
+   |           |              |-FR[EEZE]                                          |
+   |           |              |-LA[BEL]=text                                      |
+   |EXTR[ACT]  |-             |-[NO]L[OG]                                         |
+   |           |              |-S[ELECT]=global-name-list                         |
+   |           |              |-O[CHSET]=character-set                            |
+   |           |              |-R[EGION=region-list                               |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-DBG                                               |
+   |F[REEZE]   |region-list   |-OF[F] [-OV[ERRIDE]]                               |
+   |           |              |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]]            |
+   |           |              |[-R[ECORD]]]                                       |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-D[B]                                              |
+   |FT[OK]     |File-name     |-J[NLPOOL]                                         |
+   |           |              |-R[ECVPOOL]                                        |
+   |-----------+--------------+---------------------------------------------------|
+   |H[ELP]     |command-option|-                                                  |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-A[DJACENCY]=integer]                              |
+   |           |              |-BL[OCK]=hexa;block-number]                        |
+   |           |              |-BR[IEF]                                           |
+   |           |              |-FA[ST]                                            |
+   |           |              |-FI[LE]                                            |
+   |           |              |-FU[LL]                                            |
+   |           |File-name or  |-NO]K[EYRANGES                                     |
+   |I[NTEG]    |region-list   |                                                   |
+   |           |              |-[NO][MAP]=integer                                 |
+   |           |              |-[NO]MAXK[EYSIZE]=integer                          |
+   |           |              |-R[EGION]                                          |
+   |           |              |-[NO]ST[ATS]                                       |
+   |           |              |-SU[BSCRIPT]=subscript                             |
+   |           |              |-TN[_RESET]                                        |
+   |           |              |-[NO]TR[ANSACTION][=integer]                       |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-EX[TRACT][=file-specification|-stdout]            |
+   |           |              |-REC[OVER] | -RO[LLBACK]                           |
+   |J[OURNAL]  |file-name     |-SH[OW][=show-option-list]                         |
+   |           |              |-[NO]V[ERIFY]                                      |
+   |           |              |-BA[CKWARD] | -FO[RWARD]                           |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-BE[GIN]=integer                                   |
+   |           |              |-BLOCK_DENSITY                                     |
+   |           |              |-E[ND]=integer                                     |
+   |L[OAD]     |file-name     |-FI[LLFACTOR]=integer                              |
+   |           |              |-FO[RMAT]=GO|B[INARY]|Z[WR]                        |
+   |           |              |-S[TDIN]                                           |
+   |           |              |-O[NERROR]                                         |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-ENCR[YPT]=key                                     |
+   |           |              |-E[XCLUDE]=global-name-list                        |
+   |           |              |-FI[LL_FACTOR]=integer                             |
+   |           |              |-I[NDEX_FILL_FACTOR]=integer                       |
+   |           |              |-REG[ION]                                          |
+   |REO[RG]    |              |                                                   |
+   |           |              |-R[ESUME]                                          |
+   |           |              |-S[ELECT]=global-name-list                         |
+   |           |              |-T[RUNCATE][=percentage]                           |
+   |           |              |-UP[GRADE]                                         |
+   |           |              |-REG[ION] region-list                              |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-E[DITINSTANCE]                                    |
+   |           |              |-I[NSTANCE_CREATE]                                 |
+   |           |              |-R[ECEIVER                                         |
+   |REP[LICATE]|file-name     |                                                   |
+   |           |              |-S[OURCE]                                          |
+   |           |              |-UPDA[TEPROC]                                      |
+   |           |              |-UPDH[ELPER]                                       |
+   |-----------+--------------+---------------------------------------------------|
+   |RE[STORE]  |file-name or  |-[NO]E[XTEND]                                      |
+   |           |file-list     |                                                   |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-F[ILE]                                            |
+   |           |file-name or  |-R[EGION]                                          |
+   |RU[NDOWN]  |region-name   |                                                   |
+   |           |              |-RELINKCTL [dir]                                   |
+   |           |              |-OVERRIDE                                          |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |SE[T] {-FI[LE] file-name|-JN[LFILE]                |
+   |           |              |journal-file-name|-REG[ION]                        |
+   |           |              |region-list|-REP[LICATION]={ON|OFF}}               |
+   |           |              |-AC[CESS_METHOD]={BG|MM}                           |
+   |           |              |-[NO]AS[YNCIO]                                     |
+   |           |              |-[NO]DE[FER_TIME][=seconds]                        |
+   |           |              |-[NO]DEFER_ALLOCATE                                |
+   |           |              |-E[XTENSION_COUNT]=integer(no of blocks)           |
+   |           |              |-F[LUSH_TIME]=integer                              |
+   |           |              |-G[LOBAL_BUFFERS]=integer                          |
+   |           |              |-[NO]INST[_FREEZE_ON_ERROR]                        |
+   |           |              |-JN[LFILE]journal-file-name                        |
+   |           |              |-K[EY_SIZE]=bytes                                  |
+   |           |              |-L[OCK_SPACE]=integer                              |
+   |           |file-name or  |                                                   |
+   |SE[T]      |region-name   |-M[UTEX_SLOTS]=integer                             |
+   |           |              |-[NO]LCK_SHARES_DB_CRIT                            |
+   |           |              |-PA[RTIAL_RECOV_BYPASS]                            |
+   |           |              |-[NO]Q[DBRUNDOWN]                                  |
+   |           |              |-REC[ORD_SIZE]=bytes                               |
+   |           |              |-REG[ION] region-list                              |
+   |           |              |-REP[LICATION]={ON|OFF}                            |
+   |           |              |-RES[ERVED_BYTES]=integer]                         |
+   |           |              |-SLEE[P_SPIN_COUNT]=integer                        |
+   |           |              |-SPIN[_SLEEP_LIMIT]=nanoseconds                    |
+   |           |              |-STAN[DALONENOT]                                   |
+   |           |              |-[NO]STAT[S]                                       |
+   |           |              |-V[ERSION]={V4|V6}                                 |
+   |           |              |-W[AIT_DISK]=integer                               |
+   |-----------+--------------+---------------------------------------------------|
+   |           |              |-TRIG[GERFILE]=<trigger_definitions_file>          |
+   |           |              |-NOPR[OMPT]                                        |
+   |TRIGGER    |-             |                                                   |
+   |           |              |-SELE[CT][=name-list|*][<select-output-file>]      |
+   |           |              |-UPGRADE                                           |
+   |-----------+--------------+---------------------------------------------------|
+   |ST[OP]     |process-id    |process-id                                         |
+   |-----------+--------------+---------------------------------------------------|
+   |UP[GRADE]  |file-name     |-                                                  |
    +------------------------------------------------------------------------------+
+
+   The following table summarizes the qualifiers.
 
    +------------------------------------------------------------------------------------------------------------+
    |            Main Qualifier            |      MUPIP Command       |            Options/Qualifiers            |
@@ -7595,14 +7882,28 @@
    |                                      |                          |-CHANGE                                   |
    |                                      |                          |-DETAIL                                   |
    |                                      |                          |-OFFSET=hexa                              |
-   |-EDITINSTANCE                         |REPLICATE                 |                                          |
-   |                                      |                          |-VALUE=hexa                               |
+   |-EDITINSTANCE                         |REPLICATE                 |-VALUE=hexa                               |
    |                                      |                          |-SIZE=hexa                                |
    |                                      |                          |-VALUE=hexa                               |
+   |                                      |                          |-[NO]QDBRUNDOWN                           |
    |--------------------------------------+--------------------------+------------------------------------------|
    |                                      |                          |ALWAYS                                    |
    |-FENCES=<fence-options-list>          |JOURNAL-RECOVER-ROLLBACK  |NONE                                      |
    |                                      |                          |PROCESS                                   |
+   |--------------------------------------+--------------------------+------------------------------------------|
+   |                                      |                          |-OVERRIDE                                 |
+   |-OFF                                  |FREEZE                    |                                          |
+   |                                      |                          |-RECORD                                   |
+   |--------------------------------------+--------------------------+------------------------------------------|
+   |                                      |                          |-[NO]ONLINE                               |
+   |-ON                                   |FREEZE                    |                                          |
+   |                                      |                          |-[NO]AUTORELEASE                          |
+   |--------------------------------------+--------------------------+------------------------------------------|
+   |                                      |                          |-NAME                                     |
+   |                                      |                          |-NOREPLACE                                |
+   |-INSTANCE_CREATE                      |REPLICATE                 |                                          |
+   |                                      |                          |-SUPPLEMENTARY                            |
+   |                                      |                          |-[NO]QDBRUNDOWN                           |
    |--------------------------------------+--------------------------+------------------------------------------|
    |                                      |                          |ALIGNSIZE=integer                         |
    |                                      |                          |ALLOCATION=integer                        |
@@ -7630,17 +7931,23 @@
    |                                      |                          |-CMPLVL=integer                           |
    |                                      |                          |-FILTER=filter_name                       |
    |                                      |                          |-he[lpers]=[m[,n]]                        |
+   |                                      |                          |-INITIALIZE                               |
+   |                                      |                          |-CMPLVL=n                                 |
    |                                      |                          |-LISTENPORT=integer                       |
    |                                      |                          |-LOG=logfile                              |
-   |-RECEIVER                             |REPLICATE                 |-LOG_INTERVAL=integer                     |
+   |                                      |                          |-LOG_INTERVAL=integer                     |
+   |-RECEIVER                             |REPLICATE                 |-NORESYNC                                 |
+   |                                      |                          |-RESUME=strm_num                          |
+   |                                      |                          |-REUSE=instname                           |
    |                                      |                          |-SHOWBACKLOG                              |
    |                                      |                          |-SHUTDOWN                                 |
    |                                      |                          |-START                                    |
    |                                      |                          |-STATSLOG=[ON|OFF]                        |
    |                                      |                          |-STOPSOURCEFILTER                         |
    |                                      |                          |TIMEOUT=seconds                           |
+   |                                      |                          |TLSID=label                               |
    |                                      |                          |-UPDATEONLY                               |
-   |                                      |                          |-UPDATERESYNC                             |
+   |                                      |                          |-UPDATERESYNC=/path/to/bkup-orig-inst     |
    |--------------------------------------+--------------------------+------------------------------------------|
    |                                      |                          |-AFTER=time                               |
    |                                      |                          |-APPLY_AFTER_IMAGE                        |
@@ -7725,14 +8032,18 @@
    |                                      |                          |-DEACTIVATE                               |
    |                                      |                          |-DETAIL                                   |
    |                                      |                          |-FILTER=filter_name                       |
+   |                                      |                          |-FREEZE=on|off                            |
+   |                                      |                          |-[NO]COMMENT=string                       |
    |                                      |                          |-INSTSECONDARY=secondary_instance name    |
+   |                                      |                          |-NOJNLFILEONLY                            |
    |                                      |                          |-JNLPOOL-LOG=log_file                     |
    |                                      |                          |-LOG_INTERVAL=integer                     |
-   |-SO[URCE]                             |REPLICATE                 |                                          |
    |                                      |                          |-LOSTTNCOMPLETE                           |
-   |                                      |                          |-NEEDRESTART                              |
+   |-SO[URCE]                             |REPLICATE                 |-NEEDRESTART                              |
    |                                      |                          |-PASSIVE                                  |
+   |                                      |                          |-[NO]PLAINTEXTFALLBACK                    |
    |                                      |                          |-PROPAGATEPRIMARY                         |
+   |                                      |                          |-RENEGOTIATE_INTERVAL=minutes             |
    |                                      |                          |-ROOTPRIMARY                              |
    |                                      |                          |-SECONDARY=secondary_instance_name        |
    |                                      |                          |-SHOWBACKLOG                              |
@@ -7741,12 +8052,20 @@
    |                                      |                          |-STATSLOG                                 |
    |                                      |                          |-STOPSOURCEFILTER                         |
    |                                      |                          |-TIMEOUT=seconds                          |
+   |                                      |                          |-TLSID=label                              |
+   |                                      |                          |-UPDOK                                    |
+   |                                      |                          |-UPDNOTOK                                 |
+   |                                      |                          |-ZEROBACKLOG                              |
+   |--------------------------------------+--------------------------+------------------------------------------|
+   |                                      |DOWNGRADE                 |                                          |
+   |-VERSION={V4|V5}                      |                          |file-name                                 |
+   |                                      |UPGRADE                   |                                          |
    +------------------------------------------------------------------------------------------------------------+
 
 1 Copyright
    Copyright
 
-   Copyright 2016
+   Copyright 2017
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -7768,7 +8087,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-000 of the
+   This help file is a concise representation of revision V6.3-001 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

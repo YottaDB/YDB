@@ -420,6 +420,9 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
 		|| (jgbl.mur_rollback && !jgbl.mur_options_forward) || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	/* Requests for the ftok lock on a db should always comes before requests for crit on the same db.
+	 * This is needed to avoid deadlocks. So we should never hold crit on this db while requesting the ftok lock. Assert that.
+	 */
 	assert(!csa->now_crit);
 	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.  The only
 	 * exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we came to rundown code

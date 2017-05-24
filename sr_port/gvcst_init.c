@@ -87,6 +87,7 @@ GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			dollar_trestart;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
@@ -291,15 +292,18 @@ void gvcst_init(gd_region *reg)
 				DBGRDB((stderr, "gvcst_init: reg->open return\n"));
 				return;
 			}
-			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible
-			 * if TREF(statshare_opted_in) is FALSE. In that case, this call to "gvcst_init" is coming through
-			 * a direct reference to the statsDB (e.g. ZWR ^%YGS). But if the TREF is TRUE, then the statsDB
-			 * should have been opened as part of the baseDB "gvcst_init" done above. Since it did not, that
-			 * means some sort of error occurred that has sent messages to the user console or syslog so return
-			 * right away to the caller which would silently adjust gld map entries so they do not point to this
-			 * statsDB anymore (NOSTATS should already be set in the baseDB in this case, assert that).
+			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible if
+			 *	a) TREF(statshare_opted_in) is FALSE. In that case, this call to "gvcst_init" is coming through
+			 *		a direct reference to the statsDB (e.g. ZWR ^%YGS). OR
+			 *	b) baseDBreg->was_open is TRUE. In that case, the statsDB open would have been short-circuited
+			 *		in "gvcst_init".
+			 *	c) Neither (a) nor (b). This means an open of the statsDB was attempted as part of the baseDB
+			 *		"gvcst_init" done above. Since it did not, that means some sort of error occurred that
+			 *		has sent messages to the user console or syslog so return right away to the caller which
+			 *		would silently adjust gld map entries so they do not point to this statsDB anymore
+			 *		(NOSTATS should already be set in the baseDB in this case, assert that).
 			 */
-			if (TREF(statshare_opted_in))
+			if (TREF(statshare_opted_in) && !baseDBreg->was_open)
 			{
 				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
 				return;
@@ -384,6 +388,26 @@ void gvcst_init(gd_region *reg)
 			 * have the same timer-id added twice due to the nested call).
 			 */
 			DBGRDB((stderr, "gvcst_init: !baseDBnl->statsdb_created\n"));
+			if (IS_TP_AND_FINAL_RETRY && baseDBcsa->now_crit)
+			{	/* If this is a TP transaction and in the final retry, we are about to request the ftok
+				 * sem lock on baseDBreg while already holding crit on baseDBReg. That is an out-of-order
+				 * request which can lead to crit/ftok deadlocks so release crit before requesting it.
+				 * This code is similar to the TPNOTACID_CHECK macro with the below exceptions.
+				 *	a) We do not want to issue the TPNOTACID syslog message since there is no ACID
+				 *		violation here AND
+				 *	b) We have to check for baseDBcsa->now_crit in addition to IS_TP_AND_FINAL_RETRY
+				 *		as it is possible this call comes from "tp_restart -> gv_init_reg -> gvcst_init"
+				 *		AND t_tries is still 3 but we do not hold crit on any region at that point
+				 *		(i.e. "tp_crit_all_regions" call is not yet done) and in that case we should
+				 *		not decrement t_tries (TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK call below)
+				 *		as it would result in we later starting the final retry with t_tries = 2 but
+				 *		holding crit on all regions which is an out-of-design situation.
+				 */
+				TP_REL_CRIT_ALL_REG;
+				assert(!baseDBcsa->now_crit);
+				assert(!mupip_jnl_recover);
+				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
+			}
 			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 			if (!ftok_sem_lock(baseDBreg, FALSE))
 			{
@@ -700,8 +724,7 @@ void gvcst_init(gd_region *reg)
 			csa->regcnt++;	/* Increment # of regions that point to this csa */
 			return;
 		}
-		/* Assert that two base regions pointing to the same basedb can never have different statsdbs */
-		assert(!is_statsDB || !baseDBreg->was_open);
+		/* Note that if we are opening a statsDB, it is possible baseDBreg->was_open is TRUE at this point. */
 		reg->was_open = FALSE;
 		/* We shouldn't have crit on any region unless we are in TP and in the final retry or we are in mupip_set_journal
 		 * trying to switch journals across all regions. WBTEST_HOLD_CRIT_ENABLED is an exception because it exercises a

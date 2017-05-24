@@ -86,8 +86,9 @@ void gv_rundown(void)
 	{
 		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 		{
-			if (r_local->open && !r_local->was_open && dba_cm != r_local->dyn.addr->acc_meth)
-			{	/* Rundown has already occurred for GT.CM client regions through gvcmy_rundown() above.
+			if (r_local->open && (dba_cm != r_local->dyn.addr->acc_meth))
+			{
+				/* Rundown has already occurred for GT.CM client regions through gvcmy_rundown() above.
 			 	 * Hence the (dba_cm != ...) check in the if above. Note that for GT.CM client regions,
 				 * region->open is TRUE although cs_addrs is NULL.
 			 	 */
@@ -107,62 +108,7 @@ void gv_rundown(void)
 #				endif
 				gv_cur_region = r_local;
 			        tp_change_reg();
-				rundown_status |= gds_rundown();
-				/* Now that gds_rundown is done, free up the memory associated with the region.
-				 * Ideally the following memory freeing code should go to gds_rundown, but
-				 * GT.CM calls gds_rundown() and we want to reuse memory for GT.CM.
-				 */
-				if (NULL != cs_addrs)
-				{
-					if (NULL != cs_addrs->dir_tree)
-						FREE_CSA_DIR_TREE(cs_addrs);
-					if (cs_addrs->sgm_info_ptr)
-					{
-						si = cs_addrs->sgm_info_ptr;
-						/* It is possible we got interrupted before initializing all fields of "si"
-						 * completely so account for NULL values while freeing/releasing those fields.
-						 */
-						assert((si->tp_csa == cs_addrs) || (NULL == si->tp_csa));
-						if (si->jnl_tail)
-						{
-							PROBE_FREEUP_BUDDY_LIST(si->format_buff_list);
-							PROBE_FREEUP_BUDDY_LIST(si->jnl_list);
-						}
-						PROBE_FREEUP_BUDDY_LIST(si->recompute_list);
-						PROBE_FREEUP_BUDDY_LIST(si->new_buff_list);
-						PROBE_FREEUP_BUDDY_LIST(si->tlvl_info_list);
-						PROBE_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
-						PROBE_FREEUP_BUDDY_LIST(si->cw_set_list);
-						if (NULL != si->blks_in_use)
-						{
-							free_hashtab_int4(si->blks_in_use);
-							free(si->blks_in_use);
-							si->blks_in_use = NULL;
-						}
-						if (si->cr_array_size)
-						{
-							assert(NULL != si->cr_array);
-							if (NULL != si->cr_array)
-								free(si->cr_array);
-						}
-						if (NULL != si->first_tp_hist)
-							free(si->first_tp_hist);
-						free(si);
-					}
-					if (cs_addrs->jnl)
-					{
-						assert(&FILE_INFO(cs_addrs->jnl->region)->s_addrs == cs_addrs);
-						if (cs_addrs->jnl->jnllsb)
-						{
-							assert(FALSE);
-							free(cs_addrs->jnl->jnllsb);
-						}
-						free(cs_addrs->jnl);
-					}
-				}
-				assert(gv_cur_region->dyn.addr->file_cntl->file_info);
-				free(gv_cur_region->dyn.addr->file_cntl->file_info);
-				free(gv_cur_region->dyn.addr->file_cntl);
+				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE);
 			}
 			r_local->open = r_local->was_open = FALSE;
 		}

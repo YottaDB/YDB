@@ -1490,6 +1490,9 @@ LITDEF	err_msg merrors[] = {
 	{ "STATSDBERR", "Error in/at !AD attempting to use a statistics database: !AD", 4 },
 	{ "STATSDBINUSE", "Statistics database !AD is in use with database !AD so cannot also be used with database !AD", 6 },
 	{ "STATSDBFNERR", "This database has no accessible statistics database due to the following error: !AD", 2 },
+	{ "JNLSWITCHRETRY", "Retrying previously abandoned switch of journal file !AD for database !AD", 4 },
+	{ "JNLSWITCHFAIL", "Failed to switch journal file !AD for database file !AD", 4 },
+	{ "CLISTRTOOLONG", "!AZ specified is !UL bytes long which is greater than the allowed maximum of !UL bytes", 3 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2969,9 +2972,12 @@ LITDEF	int ERR_INVSTATSDB = 150384146;
 LITDEF	int ERR_STATSDBERR = 150384154;
 LITDEF	int ERR_STATSDBINUSE = 150384162;
 LITDEF	int ERR_STATSDBFNERR = 150384170;
+LITDEF	int ERR_JNLSWITCHRETRY = 150384179;
+LITDEF	int ERR_JNLSWITCHFAIL = 150384186;
+LITDEF	int ERR_CLISTRTOOLONG = 150384194;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1477};
+	1480};

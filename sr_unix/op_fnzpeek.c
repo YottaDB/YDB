@@ -496,7 +496,6 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			 */
 			assert(arglen);
 			pass = (ISLOWER_ASCII(argptr[0]) ? PASS1 : PASS2);
-			r_ptr = NULL;
 			for ( ; ; )
 			{
 				if (PASS1 != pass)
@@ -508,22 +507,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				if ((arglen == TREF(zpeek_regname_len)) && (0 == memcmp(argptr, TADR(zpeek_regname), arglen)))
 				{	/* Fast path - no lookup necessary */
 					r_ptr = TREF(zpeek_reg_ptr);
-					if (!r_ptr->open)
-					{	/* Region was open when we cached it as part of the previous $zpeek but it
-						 * is no longer open. Only possibility is a VIEW "NOSTATSHARE" was done in
-						 * between and that this is a statsdb region. Assert accordingly.
-						 */
-						assert(IS_STATSDB_REGNAME(r_ptr));
-						assert(PASS1 == pass);
-						TREF(zpeek_regname_len) = 0;
-						r_ptr =  NULL;
-						pass = PASS1;
-						continue;
-					}
 					break;
 				}
-				if (NULL != r_ptr)
-					break;
 				/* Region now defined - make sure it is open */
 				if (!gd_header)		/* If gd_header is NULL, open gbldir */
 					gvinit();
@@ -552,14 +537,22 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					pass = PASS2;
 					continue;
 				}
-				if (!r_ptr->open)
-					gv_init_reg(r_ptr);
-				/* r_ptr now points to (open) region */
-				assert(r_ptr->open);	/* Make sure truly open */
 				/* Cache new region access for followup references */
 				memcpy(TADR(zpeek_regname), argptr, arglen);
 				TREF(zpeek_regname_len) = arglen;
 				TREF(zpeek_reg_ptr) = r_ptr;
+				break;
+			}
+			/* PO_GDRREG opcode examines only the region's fields so does not need the region to be open.
+			 * All the rest need it to be open. If there are any errors in the open (e.g. statsdb specified
+			 * and gtm_statsdir env var is too long etc.) then handle it by issuing an error.
+			 */
+			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
+			{
+				gv_init_reg(r_ptr);
+				if (!r_ptr->open)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+						      RTS_ERROR_LITERAL("mnemonic argument (region name could not be opened)"));
 			}
 			break;
 		case PO_GLFREPL:		/* These types have an array index argument */

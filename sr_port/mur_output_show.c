@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -163,6 +163,8 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
 	util_out_print(" Maximum Journal Record Length    !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_jrec_len));
 	util_out_print(" Turn Around Point Offset               !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->turn_around_offset));
+	util_out_print(" Last EOF Written                            !AD", TRUE, 5, (hdr->last_eof_written ? " TRUE" : "FALSE"));
+	util_out_print(" Was a Previous Generation Journal File      !AD", TRUE, 5, (hdr->is_not_latest_jnl ? " TRUE" : "FALSE"));
 	if (hdr->turn_around_time)
 		time_len = format_time(hdr->turn_around_time, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
 	else
@@ -173,8 +175,7 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Turn Around Point Time       !20AD", TRUE, time_len, time_str);
 	util_out_print(" Start Region Sequence Number !20@UQ [0x!16@XQ]", TRUE, &hdr->start_seqno, &hdr->start_seqno);
 	util_out_print(" End Region Sequence Number   !20@UQ [0x!16@XQ]", TRUE, &hdr->end_seqno, &hdr->end_seqno);
-	/* Dump stream seqnos for upto 16 streams if any are non-zero.
-	 */
+	/* Dump stream seqnos for upto 16 streams if any are non-zero */
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 	{	/* Dump stream seqnos. Dont dump them unconditionally as they will swamp the output.
 		 * We usually expect 1 or 2 streams to have non-zero values so dump it only if non-zero.

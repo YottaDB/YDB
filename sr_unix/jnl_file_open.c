@@ -65,7 +65,7 @@ error_def(ERR_JNLMOVED);
 error_def(ERR_JNLOPNERR);
 error_def(ERR_JNLRDERR);
 
-uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument for compatibility with VMS version */
+uint4 jnl_file_open(gd_region *reg, boolean_t init)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -98,14 +98,14 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		assert(256 == JNL_NAME_SIZE);
 		nameptr[csd->jnl_file_len] = 0;
 		cre_jnl_file_intrpt_rename(csa);
-		/* although jnl_file_close() would have reset jnl_file.u.inode and device to 0 and incremented cycle, it
+		/* although "jnl_file_close" would have reset jnl_file.u.inode and device to 0 and incremented cycle, it
 		 * might have got shot in the middle of executing those instructions. we redo it here just to be safe.
 		 */
 		csa->nl->jnl_file.u.inode = 0;
 		csa->nl->jnl_file.u.device = 0;
 		jb->cycle++;
 		/* Source Server only reads journal files so must never try to create and switch to a new journal file. */
-		switch_and_retry = (!is_src_server) ? TRUE : FALSE;
+		switch_and_retry = (!is_src_server);
 		for (;;)
 		{
 			/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
@@ -142,11 +142,11 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 				} else
 					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size, buff);
 			}
-			DEBUG_ONLY(
-				/* Will fail if Source Server would need to switch journal files. */
-				assert((gtm_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED ==
-					gtm_white_box_test_case_number)) || (0 == sts) || switch_and_retry);
-			)
+#			ifdef DEBUG
+			/* Will fail if Source Server would need to switch journal files. */
+			assert((gtm_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED == gtm_white_box_test_case_number))
+					|| (0 == sts) || (!is_src_server));
+#			endif
 			if ((0 != sts) && switch_and_retry)
 			{	/* Switch to a new journal file and retry, but only once */
 				sts = jnl_file_open_switch(reg, sts);

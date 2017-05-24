@@ -112,7 +112,7 @@ mint	gvcst_spr_data(void)
 	assert(gvnh_reg == TREF(gd_targ_gvnh_reg));
 	for ( ; map <= end_map; map++)
 	{
-		OPEN_BASEREG_IF_STATSREG(map);
+		ASSERT_BASEREG_OPEN_IF_STATSREG(map);	/* "gv_srch_map_linear" call above should have ensured that */
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != start_map) || (tn_array[reg_index] != gd_targ_tn));

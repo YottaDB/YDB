@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ error_def(ERR_JNLWRERR);
 error_def(ERR_PREMATEOF);
 error_def(ERR_TEXT);
 
-void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
+void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 {
 	jnl_file_header		*header;
 	unsigned char		hdr_base[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
@@ -172,15 +172,14 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 				assert(header->eov_tn >= header->bov_tn);
 				header->end_seqno = eof_record.jnl_seqno;
 			}
-#			ifdef UNIX
 			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 				header->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 			if (jgbl.forw_phase_recovery)
 			{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
 				MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(csd, header->strm_end_seqno);
 			}
-#			endif
 			header->last_eof_written = jb->last_eof_written;
+			header->is_not_latest_jnl = in_jnl_switch;
 			header->crash = FALSE;
 			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel,
 				0, header, read_write_size, jpc->status, jpc->status2);

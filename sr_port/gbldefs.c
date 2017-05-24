@@ -861,6 +861,10 @@ GBLDEF	void		(*cache_table_relobjs)(void);   /* Function pointer to call cache_t
 GBLDEF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLDEF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 GBLDEF	ch_ret_type	(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
+#ifdef DEBUG
+GBLDEF	ch_ret_type	(*t_ch_fnptr)();		/* Function pointer to t_ch */
+GBLDEF	ch_ret_type	(*dbinit_ch_fnptr)();		/* Function pointer to dbinit_ch */
+#endif
 GBLDEF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
 GBLDEF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
 GBLDEF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */

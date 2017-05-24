@@ -55,6 +55,7 @@
 #include "util.h"
 #include "wcs_flu.h"
 #include "gtm_sem.h"
+#include "gtm_file_stat.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
 #endif
@@ -117,16 +118,16 @@ error_def(ERR_RLBKSTRMSEQ);
 
 boolean_t mur_close_files(void)
 {
-	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN + 1];
+	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN + STR_LIT_LEN(PREFIX_ROLLED_BAK) + 1];
 	int			head_jnl_fn_len, wrn_count = 0, rename_fn_len;
 	reg_ctl_list		*rctl, *rctl_top;
 	jnl_ctl_list		jctl_temp, *jctl, *prev_jctl, *end_jctl;
 	gd_region		*reg;
 	sgmnt_addrs		*csa;
 	sgmnt_data		*csd, csd_temp;
-	uint4			ustatus;
+	uint4			ustatus, ustatus2;
 	int4			status;
-	int4			rundown_status = EXIT_NRM;		/* if gds_rundown went smoothly */
+	int4			rundown_status = EXIT_NRM;		/* if "gds_rundown" went smoothly */
 	int			idx, finish_err_code, save_errno;
 	const char		*fini_str = NULL;
 	const char		*termntd_str;
@@ -146,7 +147,9 @@ boolean_t mur_close_files(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	uint4			jnl_status;
-	DEBUG_ONLY(int		semval;)
+#	ifdef DEBUG
+	int		semval;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -157,11 +160,11 @@ boolean_t mur_close_files(void)
 	}
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
 	SET_PROCESS_EXITING_TRUE;	/* In case the database is encrypted, this value is used to avoid using
-					 * mur_ctl->csd in mur_fopen as it would be invalid due to the gds_rundown() done below.
+					 * mur_ctl->csd in mur_fopen as it would be invalid due to the "gds_rundown" done below.
 					 */
 	csd = &csd_temp;
 	assert(murgbl.losttn_seqno == murgbl.save_losttn_seqno);
-	/* If journaling, gds_rundown will need to write PINI/PFIN records. The timestamp of that journal record will
+	/* If journaling, "gds_rundown" will need to write PINI/PFIN records. The timestamp of that journal record will
 	 * need to be adjusted to the current system time to reflect that it is recovery itself writing that record
 	 * instead of simulating GT.M activity. Reset jgbl.dont_reset_gbl_jrec_time to allow for adjustments to gbl_jrec_time.
 	 */
@@ -212,7 +215,7 @@ boolean_t mur_close_files(void)
 		 * "mupfndfil" path (e.g. journal file names were explicitly specified for a journal extract command) so it
 		 * would not have done gvcst_init in that case. But we would have set rctl->csa to a non-NULL value in order
 		 * to be able to switch amongst regions in mur_forward. So we should check for gd->open below to know for
-		 * sure if a gvcst_init was done which in turn requires a gds_rundown to be done.
+		 * sure if a gvcst_init was done which in turn requires a "gds_rundown" to be done.
 		 */
 		if (reg->open)
 		{ 	/* gvcst_init was called */
@@ -223,7 +226,7 @@ boolean_t mur_close_files(void)
 			 * signal (say MUPIP STOP) that causes exit handling processing which invokes this function.
 			 * In this case, cs_addrs would still be set to a non-NULL value so use that instead of rctl->csa.
 			 */
-			assert((NULL != rctl->csa) && (rctl->csa == cs_addrs) || (NULL == rctl->csa) && !murgbl.clean_exit);
+			assert(((NULL != rctl->csa) && (rctl->csa == cs_addrs)) || ((NULL == rctl->csa) && !murgbl.clean_exit));
 			csa = cs_addrs;
 			csd = mur_options.forward ? &csd_temp : csa->hdr;
 			assert(NULL != csa);
@@ -239,8 +242,11 @@ boolean_t mur_close_files(void)
 			assert((!(mur_options.update ^ csa->nl->donotflush_dbjnl)) || !murgbl.clean_exit);
 			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != csa->nl))
 				csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
+			/* Note: udi/csa is used a little later after the "gds_rundown" call (e.g. by "jnl_set_cur_prior")
+			 * so pass CLEANUP_UDI_FALSE as the parameter.
+			 */
 			if (mur_options.forward)
-				rundown_status = gds_rundown();
+				rundown_status = gds_rundown(CLEANUP_UDI_FALSE);
 			if (EXIT_NRM != rundown_status)
 			{
 				wrn_count++;
@@ -286,14 +292,14 @@ boolean_t mur_close_files(void)
 					assert(mur_options.update);
 					/* For MUPIP JOURNAL -RECOVER -FORWARD or MUPIP JOURNAL -ROLLBACK -FORWARD, we are
 					 * done "gds_rundown" at this point and so have a clean database state at this point.
-					 * For RECOVER/ROLLBACK -BACKWARD, even though we haven't done the gds_rundown yet,
+					 * For RECOVER/ROLLBACK -BACKWARD, even though we haven't done the "gds_rundown" yet,
 					 * we still hold the standalone access and so no new process can attach to the database.
 					 * For the -ONLINE version of RECOVER/ROLLBACK -BACKWARD, we haven't released the access
 					 * control lock as well as the critical section lock, so no new processes can attach to
 					 * the database and no existing process can continue from their hung state(waiting for
 					 * crit). So, in all cases, it should be okay to safely set csd->file_corrupt to FALSE.
 					 * The only issue is if we get crashed AFTER setting csd->file_corrupt to FALSE, but
-					 * before doing the gds_rundown in which case, all the processes starting up will see
+					 * before doing the "gds_rundown" in which case, all the processes starting up will see
 					 * it just like any other system crash warranting a ROLLBACK/RECOVER.
 					 */
 					csd->file_corrupt = FALSE;
@@ -347,6 +353,11 @@ boolean_t mur_close_files(void)
 								}
 							}
 						}
+						/* If we just did forward recovery, and the current journal is available,
+						 * then we are leaving journaling disabled, so mark the journal as switched.
+						 */
+						if (mur_options.forward && (jnl_open == csd->intrpt_recov_jnl_state))
+							jnl_set_cur_prior(reg, csa, csd);
 						/* Reset save_strm_reg_seqno[]. Do it even for -recover (not just for -rollback)
 						 * so a successful -recover after an interrupted -rollback clears these fields.
 						 * Take this opportunity to reset intrpt_recov_resync_strm_seqno[] as well.
@@ -480,6 +491,7 @@ boolean_t mur_close_files(void)
 				assert(jctl->turn_around_offset);
 				jctl->jfh->turn_around_offset = 0;
 				jctl->jfh->turn_around_time = 0;
+				jctl->jfh->is_not_latest_jnl = TRUE;
 				jctl->jfh->crash = FALSE;
 				jctl->jfh->end_of_data = jctl->turn_around_offset;
 				jctl->jfh->eov_timestamp = jctl->turn_around_time;
@@ -522,18 +534,25 @@ boolean_t mur_close_files(void)
 					JNL_DO_FILE_WRITE(NULL, NULL, end_jctl->channel, 0, end_jctl->jfh, REAL_JNL_HDR_LEN,
 						end_jctl->status, end_jctl->status2);
 					WARN_STATUS(end_jctl);
-					/* Rename journals whose entire contents have been undone with
-					 * the rolled_bak prefix. user can decide to delete these */
+					/* Rename journals whose entire contents have been undone with the rolled_bak prefix.
+					 * User can decide to delete these.
+					 */
 					rename_fn = fn;
-					prepare_unique_name((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
-						PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, 0, &ustatus);
-					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-						/* wait for instance freeze before journal file renames */
+					rename_fn_len = ARRAYSIZE(fn);
+					ustatus = prepare_unique_name((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
+								PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, 0, &ustatus2);
+					/* We have allocated enough space in rename_fn/fn array to store PREFIX_ROLLED_BAK
+					 * prefix. So no way the above "prepare_unique_name" call can fail. Hence the assert.
+					 */
+					assert(SS_NORMAL == ustatus);
+					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze
+										 * before journal file renames.
+										 */
 					if (SS_NORMAL == gtm_rename((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
-									rename_fn, rename_fn_len, &ustatus))
+											rename_fn, rename_fn_len, &ustatus2))
 					{
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, end_jctl->jnl_fn_len,
-							end_jctl->jnl_fn, rename_fn_len, rename_fn);
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4,
+							end_jctl->jnl_fn_len, end_jctl->jnl_fn, rename_fn_len, rename_fn);
 					} else
 					{
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4,
@@ -735,7 +754,7 @@ boolean_t mur_close_files(void)
 		udi = (NULL != reg->dyn.addr->file_cntl) ? FILE_INFO(reg) : NULL;
 		if (reg->open)
 		{
-			assert(!mur_options.forward); /* for forward recovery, gds_rundown should have been done before */
+			assert(!mur_options.forward); /* for forward recovery, "gds_rundown" should have been done before */
 			gv_cur_region = reg;
 			TP_CHANGE_REG(reg);
 			assert(!jgbl.onlnrlbk || (cs_addrs->now_crit && cs_addrs->hold_onto_crit) || !murgbl.clean_exit);
@@ -743,10 +762,10 @@ boolean_t mur_close_files(void)
 			if (jgbl.onlnrlbk)
 			{	/* This is an online rollback. If "gtm_mupjnl_parallel" is not 1, multiple child processes were
 				 * started to operate on different regions in the forward phase. Any updates they made would not
-				 * have been flushed since the children did not go through gds_rundown. If multiple child processes
-				 * were not started, it is possible some GT.M processes (which were active before the online
-				 * rollback started) have taken over the flush timers so the rollback process could not get any
-				 * timer slots. In either case, it is better to flush the jnl records to disk right away as the
+				 * have been flushed since the children did not go through "gds_rundown". If multiple child
+				 * processes were not started, it is possible some GT.M processes (which were active before the
+				 * online rollback started) have taken over the flush timers so the rollback process could not get
+				 * any timer slots. In either case, it is better to flush the jnl records to disk right away as the
 				 * source server could be waiting for these and the sooner it gets them, the better. In the
 				 * multiple-child processes case, not doing the flush here can actually cause the source server to
 				 * timeout with a SEQNUMSEARCHTIMEOUT error (if no GT.M processes have any flush timers active and
@@ -755,7 +774,10 @@ boolean_t mur_close_files(void)
 				assert(!FROZEN_CHILLED(cs_data));
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			}
-			rundown_status = gds_rundown(); /* does the final rel_crit */
+			/* Note: udi/csa is used a little later after the "gds_rundown" call to determine if "db_ipcs_reset"
+			 * can be called so pass CLEANUP_UDI_FALSE as the parameter.
+			 */
+			rundown_status = gds_rundown(CLEANUP_UDI_FALSE); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
 				wrn_count++;
 			assert((EXIT_NRM != rundown_status) || !rctl->standalone
@@ -767,7 +789,7 @@ boolean_t mur_close_files(void)
 		 */
 		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
 		if (rctl->standalone && (EXIT_NRM == rundown_status))
-			/* Avoid db_ipcs_reset if gds_rundown did not remove shared memory */
+			/* Avoid db_ipcs_reset if "gds_rundown" did not remove shared memory */
 			if ((NULL != udi) && udi->shm_deleted && !db_ipcs_reset(reg))
 				wrn_count++;
 		rctl->standalone = FALSE;

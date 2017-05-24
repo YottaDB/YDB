@@ -83,14 +83,17 @@ void mupip_cvtgbl(void)
 	fn_len = SIZEOF(fn);
 	if (cli_present("STDIN"))
 	{
+		/* Check if both file name and -STDIN specified. */
+		if (cli_get_str("FILE", fn, &fn_len))
+		{
+			util_out_print("STDIN and FILE (!AD) cannot be specified at the same time", TRUE, fn_len, fn);
+			mupip_exit(ERR_MUPCLIERR);
+		}
 		/* User wants to load from standard input */
 		assert(SIZEOF(fn) > sys_input.len);
 		memcpy(fn, sys_input.addr, sys_input.len);
 		fn_len = sys_input.len;
 		assert(-1 != fcntl(fileno(stdin), F_GETFD));
-		/* Check if both file name and -STDIN specified. */
-		if (cli_get_str("FILE", fn, &fn_len))
-			mupip_exit(ERR_MUPCLIERR);
 	} else if (!cli_get_str("FILE", fn, &fn_len))  /* User wants to read from a file. */
 		mupip_exit(ERR_MUPCLIERR); /* Neither -STDIN nor file name specified. */
 	file_input_init(fn, fn_len, IOP_EOL);

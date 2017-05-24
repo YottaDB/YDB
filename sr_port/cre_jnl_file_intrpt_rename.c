@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,20 +42,24 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 	mstr 		filestr;
 	int		status1, status2, ext_new_jnl_fn_len;
 	uint4		status, ustatus;
-	unsigned char	ext_new_jnl_fn[MAX_FN_LEN];
+	unsigned char	ext_new_jnl_fn[MAX_FN_LEN + STR_LIT_LEN(EXT_NEW) + 1];
 
 	assert(csa);
-	UNIX_ONLY(assert(csa->hdr));		/* csa->hdr may not be set, e.g. on VMS for MUPIP SET /JOURNAL */
+	assert(csa->hdr);
 	/* We need either crit or standalone to ensure that there are no concurrent switch attempts. */
-	UNIX_ONLY(assert(csa->now_crit || (gv_cur_region && FILE_INFO(gv_cur_region)->grabbed_access_sem)));
+	assert(csa->now_crit || (gv_cur_region && FILE_INFO(gv_cur_region)->grabbed_access_sem));
 	if (!csa->hdr)
 		return;
 	fn = csa->hdr->jnl_file_name;
 	fn_len = csa->hdr->jnl_file_len;
 	filestr.addr = (char *)fn;
 	filestr.len = fn_len;
-	prepare_unique_name((char *)fn, fn_len, "", EXT_NEW, (char *)ext_new_jnl_fn, &ext_new_jnl_fn_len, 0, &ustatus);
-	assert(SS_NORMAL == ustatus);
+	ext_new_jnl_fn_len = ARRAYSIZE(ext_new_jnl_fn);
+	status = prepare_unique_name((char *)fn, fn_len, "", EXT_NEW, (char *)ext_new_jnl_fn, &ext_new_jnl_fn_len, 0, &ustatus);
+	/* We have allocated enough space in ext_new_jnl_fn array to store EXT_NEW suffix.
+	 * So no way the above "prepare_unique_name" call can fail. Hence the below assert.
+	 */
+	assert(SS_NORMAL == status);
 	status1 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status1)
 	{
@@ -83,18 +88,11 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 			if (SYSCALL_ERROR(status))
 			{
 				if (IS_GTM_IMAGE)
-				{
-					VMS_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_RENAMEFAIL, 4, filestr.len,
-								filestr.addr, fn_len, fn, status, ustatus));
-					UNIX_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
-								filestr.addr, fn_len, fn, status));
-				} else
-				{
-					VMS_ONLY(gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_RENAMEFAIL, 4, filestr.len,
-									filestr.addr, fn_len, fn, status, ustatus));
-					UNIX_ONLY(gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
-									filestr.addr, fn_len, fn, status));
-				}
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
+								filestr.addr, fn_len, fn, status);
+				else
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
+									filestr.addr, fn_len, fn, status);
 			} else
 			{
 				if (IS_GTM_IMAGE)
@@ -113,18 +111,11 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 			if (SYSCALL_ERROR(status))
 			{
 				if (IS_GTM_IMAGE)
-				{
-					VMS_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FILEDELFAIL, 2, filestr.len,
-							filestr.addr, status, ustatus));
-					UNIX_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
-							filestr.addr, status));
-				} else
-				{
-					VMS_ONLY(gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FILEDELFAIL, 2, filestr.len,
-								filestr.addr, status, ustatus));
-					UNIX_ONLY(gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
-								filestr.addr, status));
-				}
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
+							filestr.addr, status);
+				else
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
+								filestr.addr, status);
 			} else
 			{
 				if (IS_GTM_IMAGE)

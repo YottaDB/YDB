@@ -100,6 +100,7 @@ int main (int argc, char **argv)
 	licensed = TRUE;
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	mu_get_term_characterstics();
 	gtm_chk_dist(argv[0]);
 	cli_lex_setup(argc,argv);

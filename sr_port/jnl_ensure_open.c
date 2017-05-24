@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -68,7 +68,7 @@ uint4   jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa)
 		if (IS_GTCM_GNP_SERVER_IMAGE)
 			gtcm_jnl_switched(reg); /* Reset pini_addr of all clients that had any older journal file open */
 		first_open_of_jnl = (0 == csa->nl->jnl_file.u.inode);
-		jnl_status = jnl_file_open(reg, first_open_of_jnl, NULL);
+		jnl_status = jnl_file_open(reg, first_open_of_jnl);
 	}
 #	ifdef DEBUG
 	else

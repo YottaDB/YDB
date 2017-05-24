@@ -119,8 +119,9 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 	if (is_replicator || mu_reorg_process)
 	{
 		++crit_deadlock_check_cycle;
-		repl_csa = ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-			? &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs : NULL;
+		repl_csa = (NULL != jnlpool.jnlpool_dummy_reg) ? &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs : NULL;
+		assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open
+			 || (repl_csa->critical != criticalPtr));
 		if (!dollar_tlevel)
 		{
 			if ((NULL != repl_csa) && (repl_csa->critical == criticalPtr))

@@ -1216,8 +1216,8 @@
 
      o With -ALL specified, DSE includes all region of the current global
        directory for cache recovery.
-     o Attempt DSE -RECOVER only if a DSE CACHE -VERIFY commands reports the
-       cache is "NOT clean".
+     o Attempt DSE CACHE -RECOVER only if a DSE CACHE -VERIFY commands
+       reports the cache is "NOT clean".
 
    -SH[OW]
 
@@ -1551,11 +1551,11 @@
    File            /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
    Region          DEFAULT
    Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
-     Access method                          BG  Global Buffers                1024
+     Access method                          MM  Global Buffers                1024
      Reserved Bytes                          0  Block size (in bytes)         1024
      Maximum record size                   256  Starting VBN                   513
-     Maximum key size                       64  Total blocks            0x000000C9
-     Null subscripts                     NEVER  Free blocks             0x00000056
+     Maximum key size                       64  Total blocks            0x00000065
+     Null subscripts                     NEVER  Free blocks             0x0000005E
      Standard Null Collation             FALSE  Free space              0x00000000
      Last Record Backup     0x0000000000000001  Extension Count                100
      Last Database Backup   0x0000000000000001  Number of local maps             1
@@ -1563,18 +1563,14 @@
      In critical section            0x00000000  Timers pending                   0
      Cache freeze id                0x00000000  Flush timer            00:00:01:00
      Freeze match                   0x00000000  Flush trigger                  960
-     Current transaction    0x0000000000002712  No. of writes/flush              7
+     Freeze online                       FALSE  Freeze online autorelease    FALSE
+     Current transaction    0x0000000000000006  No. of writes/flush              7
      Maximum TN             0xFFFFFFFF83FFFFFF  Certified for Upgrade to        V6
      Maximum TN Warn        0xFFFFFFFD93FFFFFF  Desired DB Format               V6
      Master Bitmap Size                    496  Blocks to Upgrade       0x00000000
      Create in progress                  FALSE  Modified cache blocks            0
      Reference count                         1  Wait Disk                        0
-     Journal State               [inactive] ON  Journal Before imaging        TRUE
-     Journal Allocation                   2048  Journal Extension             2048
-     Journal Buffer Size                  2312  Journal Alignsize             4096
-     Journal AutoSwitchLimit           8386560  Journal Epoch Interval          30
-     Journal Yield Limit                     8  Journal Sync IO              FALSE
-     Journal File: /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.mjl
+     Journal State                    DISABLED
      Mutex Hard Spin Count                 128  Mutex Sleep Spin Count         128
      Mutex Queue Slots                    1024  KILLs in progress                0
      Replication State                     OFF  Region Seqno    0x0000000000000001
@@ -1582,6 +1578,10 @@
      Endian Format                      LITTLE  Commit Wait Spin Count          16
      Database file encrypted             FALSE  Inst Freeze on Error         FALSE
      Spanning Node Absent                 TRUE  Maximum Key Size Assured      TRUE
+     Defer allocation                     TRUE  Spin sleep time mask    0x00000000
+     Async IO                              OFF  WIP queue cache blocks           0
+     DB is auto-created                  FALSE  DB shares gvstats             TRUE
+     LOCK shares DB critical section     FALSE
 
    Note that the certain fileheader elements appear depending on the current
    state of database. For example, if Journaling is not enabled in the
@@ -2941,7 +2941,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2016
+   Copyright 2017
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2963,7 +2963,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-000 of the
+   This help file is a concise representation of revision V6.3-001 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.
