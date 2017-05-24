@@ -248,7 +248,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			/* replication is allowed and has not gone into the WAS_ON state so journaling is expected to be ON*/
 			assert(JNL_ENABLED(csd));
 			did_jnl_ensure_open = TRUE;
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(reg, csa);
 			if (0 != jnl_status)
 			{
 				if (!was_crit)
@@ -342,7 +342,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		F_COPY_GDID(tmp_ctl->repl_buff->fc->id, JNL_GDID_PVT(csa));
 		/* reset jpc->channel (would have been updated by jnl_ensure_open) as that corresponds to an
 		 * actively updated journal file and is only for GT.M and never for source server which only
-		 * READS from journal files. Source server anyways has a copy of the fd in tmp_ctl->repl_buff->fc->fd.
+		 * READS from journal files for the most part (it can do a jnl_flush rarely (in case GT.M failed
+		 * to do one) using GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE macro). Source server anyways has a copy of
+		 * the fd in tmp_ctl->repl_buff->fc->fd.
 		 */
 		jpc->channel = NOJNL;
 	} else
@@ -497,16 +499,15 @@ int gtmsource_ctl_close(void)
 
 int gtmsource_set_lookback(void)
 {
-	/* Scan all the region ctl's and set lookback to TRUE if ctl has to be
-	 * repositioned for a transaction read from the past */
-
+	/* Scan all the region ctl's and set lookback to TRUE if ctl has to be repositioned for a transaction read from the past.
+	 * In all other cases, reset it to FALSE.
+	 */
 	repl_ctl_element	*ctl;
 
 	for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
 	{
-		if ((JNL_FILE_OPEN == ctl->file_state ||
-		     JNL_FILE_CLOSED == ctl->file_state) &&
-		    QWLE(jnlpool.gtmsource_local->read_jnl_seqno, ctl->seqno))
+		if (((JNL_FILE_OPEN == ctl->file_state) || (JNL_FILE_CLOSED == ctl->file_state))
+				&& QWLE(jnlpool.gtmsource_local->read_jnl_seqno, ctl->seqno))
 			ctl->lookback = TRUE;
 		else
 			ctl->lookback = FALSE;

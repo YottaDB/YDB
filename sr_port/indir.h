@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,7 +9,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 /* The third column represents the opcodes for functions to be used by op_indfun().
  * The one parameter version of $name can probably be folded into op_indfun, but at a later time.
  * Note: ***	Please add new entries to end of list so as not to cause execution problems for

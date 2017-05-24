@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -65,7 +66,8 @@ GDEMSGIN
 	s gdeerr("INVGBLDIR")=150503851
 	s gdeerr("WRITEERROR")=150503859
 	s gdeerr("NONASCII")=150503866
-	s gdeerr("CRYPTNOMM")=150503874
+	s gdeerr("GDECRYPTNOMM")=150503874
+	s gdeerr("GDEASYNCIONOMM")=150504106
 	s gdeerr("JNLALLOCGROW")=150503883
 	s gdeerr("KEYFORBLK")=150503891
 	s gdeerr("STRMISSQUOTE")=150503898
@@ -94,4 +96,5 @@ GDEMSGIN
 	s gdeerr("GBLNAMCOLLRANGE")=150504082
 	s gdeerr("STDNULLCOLLREQ")=150504091
 	s gdeerr("GBLNAMCOLLVER")=150504098
+	s gdeerr("NOPERCENTY")=150504114
 	q

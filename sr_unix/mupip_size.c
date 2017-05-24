@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,8 +99,8 @@ void mupip_size(void)
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
 		restrict_reg = TRUE;
-		gvinit();				/* initialize gd_header (needed by the following call to mu_getlst) */
-		mu_getlst("REGION", SIZEOF(tp_region));	/* get the parameter corresponding to REGION qualifier */
+		gvinit();							/* init gd_header (needed to call mu_getlst) */
+		mu_getlst("REGION", SIZEOF(tp_region));
 	}
 	mupip_size_check_error();
 	/* SELECT qualifier */

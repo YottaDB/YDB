@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,9 +87,9 @@ const int parm_space_needed[] =
 	SIZEOF(gtm_long_t *) + SIZEOF(gtm_long_t),
 	SIZEOF(gtm_float_t *) + SIZEOF(gtm_float_t),
 	SIZEOF(gtm_double_t *) + SIZEOF(gtm_double_t),
-	SIZEOF(gtm_string_t *) + SIZEOF(gtm_string_t),
-	SIZEOF(gtm_string_t *) + SIZEOF(gtm_string_t),
-	SIZEOF(gtm_string_t *) + SIZEOF(gtm_string_t)
+	SIZEOF(gtm_string_t),  /* gtm_string_t contains a (gtm_long_t) and (gtm_char_t *) */
+	SIZEOF(gtm_string_t),
+	SIZEOF(gtm_string_t)
 };
 
 error_def(ERR_CIDIRECTIVE);

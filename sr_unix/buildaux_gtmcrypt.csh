@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -78,14 +78,6 @@ if ("HP-UX" == "$HOSTOS") then
 else
 	set make = "make"
 endif
-# On atlhxit1 and atlhxit2 Libgcrypt version is too low to support FIPS mode. Add necessary flags to
-# Makefile to tell the plugin to build without FIPS support.
-set host=$HOST:r:r:r
-if ($host =~ {atlhxit1,atlhxit2}) then
-	set fips_flag = "gcrypt_nofips=1"
-else
-	set fips_flag = ""
-endif
 if ($gtm_verno =~ V[4-8]*) then
 	# For production builds don't do any randomizations.
 	set algorithm = "AES256CFB"
@@ -102,18 +94,16 @@ else
 		# Force AES as long as the plugin is linked against libgcrypt
 		set algorithm = "AES256CFB"
 	else
-		# OpenSSL, V9* build. Go ahead and randomize the algorithm. Increase the probability of AES256CFB,
-		# the industry standard and the one we officially support.
-		set algorithms = ("AES256CFB" "AES256CFB" "BLOWFISHCFB")
-		set rand = `echo $#algorithms | awk '{srand() ; print 1+int(rand()*$1)}'`
-		set algorithm = $algorithms[$rand]
+		# OpenSSL, V9* build. AES256CFB is the only one we we officially support.
+		set algorithm = "AES256CFB"
 	endif
 endif
 
 source $gtm_tools/set_library_path.csh
 source $gtm_tools/check_unicode_support.csh
+if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
 # Build and install all encryption libraries and executables.
-env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib $fips_flag
+env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib
 if ($status) then
 	@ buildaux_gtmcrypt_status++
 	echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"	\
@@ -127,6 +117,9 @@ if ($status) then
 	echo "buildaux-E-libgtmcrypt, failed to clean libgtmcrypt and/or helper scripts"	\
 				>> $gtm_log/error.${gtm_exe:t}.log
 endif
+# Remove pinentry routine for GTM-8668
+rm -f $gtm_dist_plugin/gtmcrypt/pinentry.m
+
 
 popd >&! /dev/null
 exit $buildaux_gtmcrypt_status

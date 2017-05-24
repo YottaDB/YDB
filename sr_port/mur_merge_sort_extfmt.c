@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -264,6 +264,7 @@ int mur_merge_sort_extfmt(void)
 {
 	FILE			*fp, *fp_out, **fp_array;
 	boolean_t		extr_file_created, single_reg, skip_sort;
+	boolean_t		is_dummy_gbldir;
 	char			*buff, extr_fn[MAX_FN_LEN + 1], *fn, *fn_out;
 	char			rename_fn[MAX_FN_LEN + 1];
 	int			rename_fn_len, fn_len;
@@ -319,12 +320,16 @@ int mur_merge_sort_extfmt(void)
 				fn_len = mur_shm_hdr->extr_fn_len[recstat];
 				fn_len++;	/* for the '_' */
 				reg = rctl->gd;
-				if (reg->rname_len)
+				is_dummy_gbldir = reg->owning_gd->is_dummy_gbldir;
+				if (!is_dummy_gbldir)
+				{
+					assert(reg->rname_len);
 					fn_len += reg->rname_len;
-				else
+				} else
 				{	/* maximum # of regions is limited by MULTI_PROC_MAX_PROCS (since that is the limit
 					 * that "gtm_multi_proc" can handle. Use the byte-length of MULTI_PROC_MAX_PROCS-1.
 					 */
+					assert(!memcmp(reg->rname, "DEFAULT", reg->rname_len));
 					assert(1000 == MULTI_PROC_MAX_PROCS);
 					fn_len += 3;	/* 999 is maximum valid value and has 3 decimal digits */
 				}
@@ -339,7 +344,7 @@ int mur_merge_sort_extfmt(void)
 				tmplen = file_info->fn_len;
 				ptr = &file_info->fn[tmplen];
 				*ptr++ = '_'; tmplen++;
-				if (reg->rname_len)
+				if (!is_dummy_gbldir)
 				{
 					memcpy(ptr, reg->rname, reg->rname_len);
 					tmplen += reg->rname_len;

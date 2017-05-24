@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
+error_def(ERR_ASYNCIONOV4);
 error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_CRYPTNOV4);
 error_def(ERR_DBDSRDFMTCHNG);
@@ -75,20 +76,25 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRYPTNOV4, 2, DB_LEN_STR(reg));
 		return ERR_CRYPTNOV4;
 	}
-	GTM_SNAPSHOT_ONLY(
-		/* We don't allow databases to be downgraded when snapshots are in progress */
-		if (SNAPSHOTS_IN_PROG(csa->nl) && (GDSV4 == new_db_format))
-		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SNAPSHOTNOV4,
-				3, csa->nl->num_snapshots_in_effect, DB_LEN_STR(reg));
-			return ERR_SNAPSHOTNOV4;
-		}
-	)
+	/* We do not allow databases in ASYNCIO mode if the block format is V4 */
+	if (csd->asyncio && (GDSV4 == new_db_format))
+	{
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_ASYNCIONOV4, 6, DB_LEN_STR(reg),
+			LEN_AND_LIT("ASYNCIO enabled"), LEN_AND_LIT("downgrade to V4"));
+		return ERR_ASYNCIONOV4;
+	}
+	/* We don't allow databases to be downgraded when snapshots are in progress */
+	if (SNAPSHOTS_IN_PROG(csa->nl) && (GDSV4 == new_db_format))
+	{
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SNAPSHOTNOV4,
+			3, csa->nl->num_snapshots_in_effect, DB_LEN_STR(reg));
+		return ERR_SNAPSHOTNOV4;
+	}
 	was_crit = csa->now_crit;
 	if (FALSE == was_crit)
 		grab_crit(reg);
 	/* if MM and desired_db_format is not V5, gvcst_init would have issued MMNODYNDWNGRD error. assert that. */
-	assert(dba_bg == csd->acc_meth || (dba_mm == csd->acc_meth) && (GDSV6 == csd->desired_db_format));
+	assert((dba_bg == csd->acc_meth) || ((dba_mm == csd->acc_meth) && (GDSV6 == csd->desired_db_format)));
 	if (csd->desired_db_format == new_db_format)
 	{	/* no change in db_format. fix max_tn_warn if necessary and return right away. */
 		status = ERR_MUNOACTION;
@@ -146,7 +152,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		 * (if it decides to switch to a new journal file)
 		 */
 		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		jnl_status = jnl_ensure_open();
+		jnl_status = jnl_ensure_open(reg, csa);
 		if (0 == jnl_status)
 		{
 			save_inctn_opcode = inctn_opcode;

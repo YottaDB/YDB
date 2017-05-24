@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015-2016 Fidelity National Information		;
+; Copyright (c) 2015-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -35,12 +35,12 @@
 %PEEKBYNAME(field,regindex,format)
 	if '$quit write "GTM-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
 	new anindexval,aregname,digits,etrap,first,ishexnum,land,length,mnemonicandreg,offset,pattern,rest,type,typeindex
+	new dim,ret,idx,off
 	set etrap=$etrap
 	new $etrap	; Do not modify caller's error trap
 	set $ecode="",$etrap="quit"	; Defer error handling to the caller without doing anything
 	set land=$zlevel-1
 	set anindexval="an index value",aregname="a region name"
-	set field=$zconvert($get(field),"L")
 	set first=$piece(field,".",1)
 	set rest=$piece(field,".",2,$length(field,"."))
 	do:""=rest error("NOFIELD")
@@ -73,25 +73,43 @@
 	.	set $zgbldir=$ztrnlnm("gtm_dist")_"/gtmhelp.gld"
 	.	set typeindex=$get(^gtmtypfldindx(first,rest))
 	.	do:0=+typeindex error("INVALID",first,rest)
+	.	set type=^gtmtypes(first,typeindex,"type")
+	.	; determine if struct or union
+	.	do:0'=$data(^gtmtypes(type)) error("UNSUPTYPE",type)
 	.	set offset=^gtmtypes(first,typeindex,"off")
 	.	set length=^gtmtypes(first,typeindex,"len")
-	.	set type=^gtmtypes(first,typeindex,"type")
+	.	set dim=$get(^gtmtypes(first,typeindex,"dim"),1)
 	if $get(format)="" do
-	.	if (type="unsigned-char")&(1=length) set format="U"
-	.	else  if (type="char")&(1=length) set format="I"
-	.	else  if type["char" set format="C"
-	.	else  if (type["addr")!(type["ptr")!(type="void") set format="X"
-	.	else  if (type["uint")!(type["unsigned") set format="U"
-	.	else  set format="I"
+	.	; note that even with the check above for structs, anonymous
+	.	; structs and unions "types" can still appear here
+	.	set format=$get(format)
+	.	set:(""=format)&(1=length) format=$select((type="unsigned-char"):"U",(type="char"):"I",1:"")
+	.	set:""=format format=$select(type["char":"C",1:"")
+	.	set:""=format format=$select(type["addr":"X",type["ptr":"X",type["void":"X",1:"")
+	.	set:""=format format=$select(type["uint64":"X",type["int64":"X",type["long":"X",1:"")
+	.	set:""=format format=$select(type["uint":"U",type["unsigned":"U",1:"")
+	.	set:""=format format=$select(type["int":"I",1:"")
+	.	; miscellaneous whitelist of non-standard types
+	.	set:""=format format=$select("boolean_t"=type:"I","time_t"=type:"I","size_t"=type:"U",1:"")
+	.	do:""=format error("UNSUPTYPE",type)
 	set $etrap=etrap
-	quit $zpeek(mnemonicandreg,offset,length,format)
+	; determine if this is an array
+	if (1=dim)!("C"=format) do
+	.	set ret=$zpeek(mnemonicandreg,offset,length,format)
+	else  do
+	.	set length=length/dim
+	.	set ret=$zpeek(mnemonicandreg,offset,length,format)
+	.	for idx=1:1:dim-1 do
+	.	.	set off=offset+(length*idx)
+	.	.	set ret=ret_","_$zpeek(mnemonicandreg,off,length,format)
+	quit ret
 
 ; Raises an error with given arguments
 error(err,first,args)
 	new i,x
 	set str=$text(@("ERRPBN"_err)),x="x="_$piece(str,";",3),@x,str=$piece(str,";",2)_","
 	if ("PARMREQ"=err)!("INVALID"=err) set args=""""_first_""":"""_args_""""
-	else  if ("NOPARM"=err)!("UNSUPSTRUCT"=err) set args=""""_first_""""
+	else  if ("NOPARM"=err)!("UNSUPSTRUCT"=err)!("UNSUPTYPE"=err) set args=""""_first_""""
 	else  set args=""""""
 	set $etrap="if $zstatus[""UNKNOWN"" set $zstatus=""%GTM-E-""_str_x zgoto land"	; in case of older versions
 	xecute "zmessage "_$translate(str,",",":")_args	; XECUTE because indirection exploded in older versions
@@ -124,6 +142,7 @@ ERRPBNNOPARM		;150383754;"First parameter "_first_" does not support a second pa
 ERRPBNUNSUPSTRUCT	;150383762;"$ZPEEK() does not support structure "_first
 ERRPBNINVALID		;150383770;first_" does not have a field named "_args
 ERRPBNNOFIELD		;150383778;"%ZPEEKBYNAME() requires a field.item in its first parameter"
+ERRPBNUNSUPTYPE		;150383882;"$ZPEEK() does not support type "_first
 struct	;  listed below, in alphabetical order, structures currently supported by ^%PEEKBYNAME
 	;gd_region
 	;gtmrecv_local_struct

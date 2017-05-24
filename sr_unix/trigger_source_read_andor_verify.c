@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,10 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
 #ifdef GTM_TRIGGER
+#include "gtmio.h"
 #include "error.h"
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
@@ -25,6 +28,7 @@
 #include "trigger_fill_xecute_buffer.h"
 #include "trigger_gbl_fill_xecute_buffer.h"
 #include "trigger_read_andor_locate.h"
+#include "gtm_trigger_trc.h"
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
 #include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME) */
@@ -54,6 +58,7 @@
 #include "change_reg.h"			/* for "change_reg" prototype */
 #include "gvnh_spanreg.h"
 #include "min_max.h"
+#include "io.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -321,7 +326,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	DBGTRIGR((stderr, "trigger_source_raov: Entered\n"));
 	/* Before we try to save anything, see if there is something to save and initialize stuff if not */
-	SAVE_TRIGGER_REGION_INFO(save_currkey);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	if (NULL != *rtn_vec)
 		rtn_vector = *rtn_vec;
 	else if (find_rtn_tabent(&rttabent, trigname))
@@ -385,7 +390,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		if (runtime_disambiguator_specified
 			|| (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg)))
 		{
-			RESTORE_TRIGGER_REGION_INFO(save_currkey);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 			ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 			return TRIG_FAILURE_RC;
 		}
@@ -413,7 +418,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 				gv_init_reg(reg);
 			if (&FILE_INFO(reg)->s_addrs != csa)
 			{
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -425,13 +430,11 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
 			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 			{
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
 		}
-		DBGTRIGR((stderr, "trigger_source_raov: existing trigger routine has %d bytes of source\n",
-			  ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len));
 		assert(csd == cs_data);
 		tp_set_sgm();
 		/* Ensure that we don't use stale triggers if we are in the third retry OR an explicit transaction */
@@ -442,11 +445,11 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			needs_reload = (db_trigger_cycle_mismatch || ztrig_cycle_mismatch);
 			DBGTRIGR((stderr, "trigger_source_raov: ztrig_cycle_mismatch=%d\tdb_trigger_cycle_mismatch=%d\treload?%d\n",
 				  ztrig_cycle_mismatch, db_trigger_cycle_mismatch, needs_reload));
-			if (needs_reload && (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg)) &&
-					(0 == trigdsc->xecute_str.str.len && NULL == rtn_vector->source_code))
+			if (needs_reload && (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg))
+					&& (NULL == rtn_vector->source_code))
 			{
 				/* A reload failed (deleted or ^#t busted) and there is nothing cached, issue an error */
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -459,12 +462,12 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		if (NULL != trigdsc->rtn_desc.rt_adr)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: trigger already compiled, all done\n"));
-			RESTORE_TRIGGER_REGION_INFO(save_currkey);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 			*rtn_vec = rtn_vector;
 			return 0;
 		}
 		/* Else load the trigger source as needed */
-		if ((0 == trigdsc->xecute_str.str.len) && (NULL == rtn_vector->source_code))
+		if (NULL == rtn_vector->source_code)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: get the source\n"));
 			SET_GVTARGET_TO_HASHT_GBL(csa);
@@ -490,21 +493,12 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		}
 		assert(trigdsc->rtn_desc.rt_adr);
 		assert(trigdsc->rtn_desc.rt_adr == CURRENT_RHEAD_ADR(trigdsc->rtn_desc.rt_adr));
-		/* After the compile is no longer needed so release it */
-		if (0 < trigdsc->xecute_str.str.len)
-		{
-			DBGTRIGR((stderr, "trigger_source_raov: free the source\n"));
-			free(trigdsc->xecute_str.str.addr);
-			trigdsc->xecute_str.str.addr = NULL;
-			trigdsc->xecute_str.str.len = 0;
-		}
 		rtn_vector = trigdsc->rtn_desc.rt_adr;
 	} else
 	{
-		assert(((NULL != trigdsc->xecute_str.str.addr) && (0 < trigdsc->xecute_str.str.len))
-		       || (rtn_vector && NULL !=rtn_vector->source_code));
+		assert(rtn_vector && (NULL !=rtn_vector->source_code));
 	}
-	RESTORE_TRIGGER_REGION_INFO(save_currkey);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	assert(rtn_vector);
 	assert(trigdsc == rtn_vector->trigr_handle);
 	*rtn_vec = rtn_vector;
@@ -592,6 +586,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	gvt->db_trigger_cycle = cycle_start;
 	gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle;
 	gvt->trig_local_tn = local_tn;		/* Mark this trigger as being referenced in this transaction */
+	DBGTRIGR((stderr, "trigger_source_raov_trigload: CSA->db_dztrigger_cycle=%d\n", csa->db_dztrigger_cycle));
 	DBGTRIGR((stderr, "trigger_source_raov_trigload: gvt->db_trigger_cycle updated to %d\n", gvt->db_trigger_cycle));
 	SET_GVTARGET_TO_HASHT_GBL(csa);
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;

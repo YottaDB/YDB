@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,6 @@
 #	define	GTM_MALLOC_NO_RENT_ONLY(X)	X
 #endif
 
-NOPIO_ONLY(GBLREF boolean_t	*lseekIoInProgress_flags;)	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -64,10 +64,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	boolean_t		dbsync_defer_timer;
 	gd_region               *reg, *save_region;
 	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
-	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
 	DEBUG_ONLY(boolean_t	save_ok_to_call_wcs_recover;)
 	boolean_t		is_mm;
 	DCL_THREADGBL_ACCESS;
@@ -96,9 +96,13 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	jpc = csa->jnl;
+	DEBUG_ONLY(jbp = NULL;)
+	if (NULL != jpc)
+		jbp = jpc->jnl_buff;	/* Note: Use "jbp" below ONLY if "jpc" is non-NULL */
 	BG_TRACE_PRO_ANY(csa, n_dbsync_timers);
 	assert(csa == cs_addrs);
-	assert(!JNL_ALLOWED(csd) || NULL != jpc);
+	assert(!JNL_ALLOWED(csd) || (NULL != jpc));
+	assert((NULL == jpc) || (NULL != jbp));
 	/* Note that even if the active queue was emptied when this routine was called, due to
 	 * concurrent update activity, cnl->wcs_active_lvl can be non-zero when we reach here. We
 	 * defer syncing in this case to the next time the active queue becomes empty ( or when we
@@ -111,13 +115,12 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	dbsync_defer_timer = FALSE;
 	if (!cnl->wcs_active_lvl && !csa->in_wtstart)
 	{	/* Similar to wcs_stale, defer expensive IO flushing if any of the following is true.
-		 *   1) We are in the midst of lseek/read/write IO. This could reset an lseek.
-		 *   2) We are aquiring/releasing crit in any region (Strictly speaking it is enough
-		 *		to check this in the current region, but doesn't harm us much).
+		 *   1) We are aquiring/releasing crit in any region (Strictly speaking it is enough
+		 *	to check this in the current region, but doesn't harm us much).
 		 *	Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
 		 *	might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
 		 *	if we are in the "mutex_deadlock_check" as otherwise it presents reentrancy issues.
-		 *   3) We have crit in the current region OR are in the middle of commit for this region (even though
+		 *   2) We have crit on any region/jnlpool OR are in the middle of commit for this region (even though
 		 *	we dont hold crit) OR are in wcs_wtstart (potentially holding write interlock and keeping another
 		 *	process in crit waiting) OR we need to wait to obtain crit. At least one reason why we should not wait
 		 *	to obtain crit is because the timeout mechanism for the critical section is currently (as of 2004 May)
@@ -125,45 +128,26 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 *	it is a SIGALRM handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
 		 *   	Were this to happen, we could end up waiting for crit, not being able to interrupt the wait
 		 *   	with a timeout resulting in a hang until crit became available.
-		 *   4) We are in a "fast lock".
-		 *   5) We are in gtm_malloc. Don't want to recurse on malloc.
+		 *   3) We are in a "fast lock".
+		 *   4) We are in gtm_malloc. Don't want to recurse on malloc.
 		 * Other deadlock causing conditions that need to be taken care of
 		 *   1) We already have either the fsync_in_prog or the io_in_prog lock.
 		 *   2) We are currently doing a db_fsync on some region.
+		 * Note that wcs_clean_dbsync is always called in interrupt code and so we do not want to risk running a
+		 * "wcs_recover" inside the call to "grab_crit_immediate" hence the OK_FOR_WCS_RECOVER_FALSE usage below.
 		 */
 		dbsync_defer_timer = TRUE;
-		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-		DEBUG_ONLY(
-			/* We invoke grab_crit_immediate below which can potentially do cache-recoveries if cnl->wc_blocked is set.
-			 * But wcs_recover has an assert that we never invoke it in the final retry. This is to avoid
-			 * restarts in the final retry. But wcs_clean_dbsync invokes grab_crit_immediate only if we dont already
-			 * hold crit and that means we have already finished commit on this particular region (e.g. if
-			 * commit is complete on all regions and crit is released on all of them but before we reset t_tries
-			 * to 0 in t_end/tp_tend) so it is okay to invoke wcs_recover in that case. Signal that to wcs_recover
-			 * by setting ok_to_call_wcs_recover to TRUE. Need to save and restore the global as it could be
-			 * TRUE or FALSE depending on where wcs_clean_dbsync interrupted mainline code.
-			 */
-			assert(CDB_STAGNATE >= t_tries || WBTEST_ENABLED(WBTEST_ANTIFREEZE_GVDATAFAIL));
-			if (CDB_STAGNATE <= t_tries)
-			{
-				save_ok_to_call_wcs_recover = TREF(ok_to_call_wcs_recover);
-				TREF(ok_to_call_wcs_recover) = TRUE;
-			}
-		)
-		if (!mupip_jnl_recover NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
+		if (!mupip_jnl_recover
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& (0 == crit_count) && !in_mutex_deadlock_check
 			&& (0 == fast_lock_count)
-			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
-			&& (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
-			&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
-			&& !T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
-			&& (FALSE != grab_crit_immediate(reg)))
-		{	/* Note that grab_crit_immediate invokes wcs_recover in case cnl->wc_blocked is non-zero.  This means we
-			 * could be doing cache recovery even though we are in interrupt code.  If this is found undesirable, the
-			 * logic in grab_crit_immediate that invokes wcs_recover has to be re-examined.
-			 */
-			/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
+			&& (!jnl_qio_in_prog) && (!db_fsync_in_prog)
+			&& (!jpc || (LOCK_AVAILABLE == jbp->fsync_in_prog_latch.u.parts.latch_pid))
+			&& (0 == TREF(crit_reg_count))
+			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
+			&& !T_IN_COMMIT_OR_WRITE(csa)
+			&& (FALSE != grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_FALSE)))
+		{ 	/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
 			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open
 			 * when the dbsync timer was started in wcs_wtstart. This is because mainline (non-interrupt) code
@@ -203,13 +187,13 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 				 * but this is a very rare situation that is considered okay to write the epoch in that case
 				 * as it keeps the if check simple for the most frequent path.
 				 */
-				if ((NULL != jpc) && JNL_HAS_EPOCH(jpc->jnl_buff)
+				if ((NULL != jpc)
 					? (((NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
-							&& (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn))
+							&& (jbp->epoch_tn < csa->ti->curr_tn))
 					: (cnl->last_wcsflu_tn < csa->ti->curr_tn))
 				{
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC
-							| WCSFLU_SPEEDUP_NOBEFORE);
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_CLEAN_DBSYNC
+											| WCSFLU_SPEEDUP_NOBEFORE);
 					BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
 					/* If MM, file could have been remapped by wcs_flu above.
 					 * If so, cs_data needs to be reset.
@@ -221,11 +205,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			dbsync_defer_timer = FALSE;
 			assert(!csa->hold_onto_crit); /* this ensures we can safely do unconditional rel_crit */
 			rel_crit(reg);
+			DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp); /* Do equivalent of WCSFLU_SYNC_EPOCH out of crit */
 		}
-		DEBUG_ONLY(
-			if (CDB_STAGNATE <= t_tries)
-				TREF(ok_to_call_wcs_recover) = save_ok_to_call_wcs_recover;
-		)
 	}
 	if (dbsync_defer_timer)
 	{

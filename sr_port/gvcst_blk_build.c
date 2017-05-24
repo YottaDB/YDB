@@ -124,13 +124,13 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 *	d) For acquired blocks, it is possible that some process had read in the uninitialized block from disk
 	 *		outside of crit (due to concurrency issues). Therefore the buffer could contain garbage. So we cannot
 	 *		rely on the buffer contents to determine the block's transaction number.
-	 *	e) For VMS, if a twin is created, we explicitly set its buffer tn to be equal to ctn in phase1.
+	 *	e) If a twin is created, we explicitly set its buffer tn to be equal to ctn in phase1.
 	 *		But since we are not passed the "cr" in this routine, it is not easily possible to check that.
-	 *		Hence in case of VMS, we relax the check so buffertn == ctn is allowed.
+	 *		Hence in case of twinning, we relax the check so buffertn == ctn is allowed.
 	 */
 	DEBUG_ONLY(blktn = ((blk_hdr_ptr_t)base_addr)->tn);
 	assert(!IS_MCODE_RUNNING || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
-	       || (cse->mode == gds_t_acquired) || (blktn UNIX_ONLY(<) VMS_ONLY(<=) ctn));
+	       || (cse->mode == gds_t_acquired) || ((!cs_data->asyncio && (blktn < ctn)) || (cs_data->asyncio && (blktn <= ctn))));
 	/* With memory instruction reordering (currently possible only on AIX with the POWER architecture) it is possible
 	 * the early_tn we read in the assert below gets executed BEFORE the curr_tn read that happens a few lines above.
 	 * That could then fail this assert (GTM-8523). Account for that with the AIX_ONLY condition below.

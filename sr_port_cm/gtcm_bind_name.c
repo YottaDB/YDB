@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +54,7 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 		gv_target = gvnh_reg->gvt;
 	} else
 	{
-		assert((dba_bg == REG_ACC_METH(rh->reg)) || (dba_mm == REG_ACC_METH(rh->reg)));
+		assert(IS_REG_BG_OR_MM(rh->reg));
 		gv_target = targ_alloc(cs_data->max_key_size, &gvent, rh->reg);
 		GVNH_REG_INIT(NULL, rh->reg_hash, NULL, gv_target, rh->reg, gvnh_reg, tabent);
 	}

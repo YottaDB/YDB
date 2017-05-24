@@ -151,7 +151,7 @@ typedef struct gtm_keystore_unres_key_link_struct
 	struct gtm_keystore_unres_key_link_struct	*next;				/* Pointer to next element. */
 } gtm_keystore_unres_key_link_t;
 
-STATICFNDEF int			keystore_refresh();
+STATICFNDEF int			keystore_refresh(void);
 STATICFNDEF int 		read_files_section(config_t *cfgp);
 STATICFNDEF int 		read_database_section(config_t *cfgp);
 STATICFNDEF int			gtm_keystore_cleanup_node(gtm_keystore_t *);

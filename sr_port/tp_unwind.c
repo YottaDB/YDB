@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -302,6 +302,13 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			mlk_pvtblk_delete(prior);
 	}
 	DBGRFCT((stderr, "tp_unwind: Processing complete\n"));
+	/* Reset tprestart_state here instead of (or in addition to) the regular places it is modified because this routine
+	 * is used both in normal TP unwind scenarios as well as in error conditions and is part of running down the process
+	 * in the exit handler. Added due to the need for a statsDB to kill a record from its DB as part of it being rundown
+	 * and the first need to NOT be in the middle of a TP transaction when that happens.
+	 */
+	if ((0 == newlevel) && (NULL == tp_pointer))
+		tprestart_state = TPRESTART_STATE_NORMAL;
 	dollar_tlevel = newlevel;
 	ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);/* drive any MUPIP STOP/signals deferred while in this function */
 }

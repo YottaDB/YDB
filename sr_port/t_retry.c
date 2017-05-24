@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -296,6 +296,9 @@ void t_retry(enum cdb_sc failure)
 			 * (f) cdb_sc_instancefreeze : Instance freeze detected while crit held.
 			 * (g) cdb_sc_gvtrootmod2 : Similar to (e).
 			 * (h) cdb_sc_reorg_encrypt : Concurrent update of encryption settings due to MUPIP REORG -ENCRYPT.
+			 * (i) cdb_sc_gvtrootnonzero : It is possible that a GVT gets created just before we get crit in the
+			 *	final retry inside "gvcst_put2". In that case a cdb_sc_gvtrootnonzero restart is possible while in
+			 *	the final retry.
 			 */
 			assert(cdb_sc_optrestart != failure);
 			if (IS_FINAL_RETRY_CODE(failure))
@@ -402,7 +405,7 @@ void t_retry(enum cdb_sc failure)
 			csd = cs_data;
 			if (CDB_STAGNATE == t_tries)
 			{
-				if (csd->freeze && update_trans)
+				if (FROZEN_HARD(csd) && update_trans)
 				{	/* Final retry on an update transaction and region is frozen.
 					 * Wait for it to be unfrozen and only then grab crit.
 					 */
@@ -423,6 +426,7 @@ void t_retry(enum cdb_sc failure)
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
 				if (cdb_sc_gbloflow == failure)
 				{
+					gv_currkey->end = 0;
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				}
@@ -517,7 +521,8 @@ void t_retry(enum cdb_sc failure)
 				}
 #				endif
 				break;
-			case cdb_sc_gvtrootmod:	/* failure signaled by gvcst_kill */
+			case cdb_sc_gvtrootmod:		/* failure signaled by gvcst_kill */
+			case cdb_sc_gvtrootnonzero:	/* failure signaled by gvcst_put */
 				/* If "gvcst_redo_root_search" has not yet been invoked in t_retry, do that now */
 				assert(NULL != gv_target);
 				if (!redo_root_search_done && (NULL != gv_target) && (DIR_ROOT != gv_target->root))

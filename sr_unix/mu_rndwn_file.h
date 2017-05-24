@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,5 +74,6 @@ typedef struct shm_parms_struct
 	free(parm);							\
 }
 
-boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone);
+STATICFNDCL boolean_t	mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *statsdb_exists, boolean_t standalone);
+boolean_t		mu_rndwn_file(gd_region *reg, boolean_t standalone);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2016 Fidelity National Information	*
+ * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,30 +19,42 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab_int4.h"	/* needed for cws_insert.h */
-#include "cws_insert.h"		/* for CWS_RESET macro */
-#include "gdsblkops.h"		/* for CHECK_AND_RESET_UPDATE_ARRAY macro */
-#include "t_abort.h"		/* for prototype of t_abort() */
+#include "t_abort.h"		/* for prototype of "t_abort" */
 #include "process_reorg_encrypt_restart.h"
+#include "op.h"			/* for OP_TROLLBACK */
 
-GBLREF	unsigned char	cw_set_depth;
-GBLREF	unsigned int	t_tries;
-GBLREF	uint4		update_trans;
-GBLREF sgmnt_addrs	*reorg_encrypt_restart_csa;
+GBLREF	sgmnt_addrs	*reorg_encrypt_restart_csa;
+GBLREF	uint4		dollar_tlevel;
+GBLREF	int		process_exiting;
 
 void t_abort(gd_region *reg, sgmnt_addrs *csa)
 {
+#	ifdef DEBUG
+	uint4		save_dollar_tlevel;
+#	endif
+
+	assert(!dollar_tlevel);
+	assert(IS_REG_BG_OR_MM(reg));	/* caller should have ensured this */
 	assert(&FILE_INFO(reg)->s_addrs == csa);
-	CWS_RESET;
-	/* reset update_array_ptr to update_array; do not use CHECK_AND_RESET_UPDATE_ARRAY since cw_set_depth can be non-zero */
-	RESET_UPDATE_ARRAY;
-	/* "secshr_db_clnup/t_commit_cleanup" assume an active non-TP transaction if cw_set_depth is non-zero or if
-	 * update_trans has the UPDTRNS_TCOMMIT_STARTED_MASK bit set. Now that the transaction is aborted, reset these fields.
-	 */
-	cw_set_depth = 0;
-	update_trans = 0;
-	t_tries = 0;
+	if (process_exiting)
+	{	/* If we are in the phase2 of an M-KILL (where "dollar_tlevel" is temporarily reset to 0), reset the global
+		 * variable "bml_save_dollar_tlevel" and restore "dollar_tlevel" now that we are going to go into exit handling
+		 * and unwind from that "gvcst_expand_free_subtree" context altogether.
+		 */
+		DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel;)
+		RESET_BML_SAVE_DOLLAR_TLEVEL;
+		if (dollar_tlevel)
+		{	/* If "dollar_tlevel" was 0 at function entry and became 1 now, it means we were in phase2 of
+			 * an M-kill when we got a kill -15 and started exit handling and came here from "secshr_db_clnup".
+			 * Exit handling code relies on "dollar_tlevel" being 0 (e.g. "gvcst_remove_statsDB_linkage_all").
+			 * So rollback the TP.
+			 */
+			assert(!save_dollar_tlevel);
+			OP_TROLLBACK(0);
+			assert(!dollar_tlevel);
+		}
+	}
+	t_abort_cleanup();
 	/* Do not release crit in case of
 	 * 	a) MUPIP RECOVER ONLINE  OR
 	 * 	b) DSE where a CRIT SEIZE had been done on this region previously

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -317,7 +317,7 @@ void lvzwr_out(lv_val *lvp)
 			if (!LV_IS_BASE_VAR(dst_lv))
 			{
 				LV_SBS_DEPTH(dst_lv, FALSE, sbs_depth);
-				if (MAX_LVSUBSCRIPTS < (sbs_depth + nsubs))
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + nsubs))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 			}
 			param_list.arg[0] = dst_lv;	/* this is already protected from stp_gcol by op_merge so no need to

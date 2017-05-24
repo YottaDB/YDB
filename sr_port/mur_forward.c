@@ -57,7 +57,6 @@
 #include "wcs_timer_start.h"
 #include "gds_rundown.h"
 #include "wcs_clean_dbsync.h"
-#include "heartbeat_timer.h"
 #include "gtmcrypt.h"
 #ifdef DEBUG
 #include "is_proc_alive.h"
@@ -80,14 +79,14 @@ GBLREF	int			mur_forw_mp_hash_buckets;	/* # of buckets in "mur_shm_hdr->hash_buc
 GBLREF	mur_shm_hdr_t		*mur_shm_hdr;	/* Pointer to mur_forward-specific header in shared memory */
 GBLREF	boolean_t		mur_forward_multi_proc_done;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		heartbeat_started;
-GBLREF	uint4			heartbeat_counter;
 
 error_def(ERR_BLKCNTEDITFAIL);
 error_def(ERR_FILENOTCREATE);
 error_def(ERR_FORCEDHALT);
 error_def(ERR_JNLREADEOF);
 error_def(ERR_SYSCALL);
+
+#define STUCK_TIME	(16 * MILLISECS_IN_SEC)
 
 static	void	(* const extraction_routine[])() =
 {
@@ -186,7 +185,7 @@ int	mur_forward_multi_proc_init(reg_ctl_list *rctl)
 int	mur_forward_multi_proc(reg_ctl_list *rctl)
 {
 	boolean_t		multi_proc, this_reg_stuck, release_latch, ok_to_play;
-	boolean_t		cancelled_dbsync_timer, cancelled_timer;
+	boolean_t		cancelled_dbsync_timer;
 	reg_ctl_list		*rctl_top, *prev_rctl;
 	jnl_ctl_list		*jctl;
 	gd_region		*reg;
@@ -199,6 +198,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 	char			errstr[256];
 	int			i, rctl_index, save_errno, num_procs_stuck, num_reg_stuck;
 	uint4			status, regcnt_stuck, num_partners, start_hrtbt_cntr;
+	boolean_t		stuck;
 	forw_multi_struct	*forw_multi;
 	shm_forw_multi_t	*sfm;
 	multi_struct 		*multi;
@@ -235,12 +235,11 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 			for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 			{
 				assert(rctl->csa->hold_onto_crit);	/* would have been set in parent process */
-				rctl->csa->hold_onto_crit = FALSE;	/* reset since we dont own this region */
+				rctl->csa->hold_onto_crit = FALSE;	/* reset since we don't own this region */
 				assert(rctl->csa->now_crit);		/* would have been set in parent process */
-				rctl->csa->now_crit = FALSE;		/* reset since we dont own this region */
+				rctl->csa->now_crit = FALSE;		/* reset since we don't own this region */
 			}
 		}
-		START_HEARTBEAT_IF_NEEDED; /* heartbeat timer needed later (in case not already started by "gtm_multi_proc") */
 	}
 	first_shm_rctl = NULL;
 	/* Phase1 of forward recovery starts */
@@ -334,11 +333,23 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 		{
 			reg = rctl->gd;
 			gv_cur_region = reg;
-			tp_change_reg();	/* note : sets cs_addrs to non-NULL value even if gv_cur_region->open is FALSE
-						 * (cs_data could still be NULL). */
-			rctl->csa = cs_addrs;
-			cs_addrs->miscptr = (void *)rctl;
-			rctl->csd = cs_data;
+			tp_change_reg();	/* Note : sets cs_addrs to non-NULL value even if gv_cur_region->open is FALSE
+						 * (cs_data could still be NULL).
+						 */
+			if (NULL == rctl->csa)
+			{
+				assert(!rctl->db_present);
+				assert(!rctl->gd->open);
+				rctl->csa = cs_addrs;
+				rctl->csa->miscptr = rctl;
+			} else
+			{
+				assert(rctl->csa == cs_addrs);
+				assert((reg_ctl_list *)rctl->csa->miscptr == rctl);	/* set in "mur_open_files" and maybe
+											 * updated in "mur_sort_files".
+											 */
+			}
+			assert(rctl->csd == cs_data);
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
 			assert(!reg->open || (NULL != cs_addrs->dir_tree));
 			gv_target = cs_addrs->dir_tree;
@@ -446,12 +457,13 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 				 * multi-region TP transaction. If so, wait in a sleep loop. If not, we can proceed.
 				 */
 				rctl = rctl_start;
-				start_hrtbt_cntr = heartbeat_counter;
+				TIMEOUT_INIT(stuck, STUCK_TIME);
 				do
 				{
 					if (IS_FORCED_MULTI_PROC_EXIT(mp_hdr))
 					{	/* We are at a logical point. So exit if signaled by parent */
 						status = ERR_FORCEDHALT;
+						TIMEOUT_DONE(stuck);
 						goto finish;
 					}
 					forw_multi = rctl->forw_multi;
@@ -468,6 +480,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 					{	/* We are no longer stuck in this region */
 						assert(!forw_multi->no_longer_stuck);
 						forw_multi->no_longer_stuck = TRUE;
+						TIMEOUT_DONE(stuck);
 						break;
 					}
 					rctl = rctl->next_rctl;	/* Move on to the next available region */
@@ -476,10 +489,10 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 					{	/* We went through all regions once and are still stuck.
 						 * Sleep until at leat TWO heartbeats have elapsed after which check for deadlock.
 						 * Do this only in the child process that owns the FIRST region in the region list.
-						 * This way we dont have contention for the GRAB_MULTI_PROC_LATCH from
+						 * This way we don't have contention for the GRAB_MULTI_PROC_LATCH from
 						 * all children at more or less the same time.
 						 */
-						if ((rctl == mur_ctl) && (heartbeat_counter > (start_hrtbt_cntr + 2)))
+						if ((rctl == mur_ctl) && stuck)
 						{	/* Check if all processes are stuck for a while. If so assertpro */
 							GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 							assert(release_latch);
@@ -498,7 +511,8 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 							REL_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 							/* If everyone is stuck at this point, it is an out-of-design situation */
 							assertpro(num_reg_stuck < murgbl.reg_total);
-							start_hrtbt_cntr = heartbeat_counter;
+							TIMEOUT_DONE(stuck);
+							TIMEOUT_INIT(stuck, STUCK_TIME);
 						} else
 						{	/* Sleep and recheck if any region we are stuck in got resolved.
 							 * To minimize time spent sleeping, we just yield our timeslice.
@@ -725,7 +739,7 @@ finish:
 			 * clear up csa->nl->wcs_timers. (normally done by gds_rundown).
 			 */
 			if (NULL != rctl->csa)	/* rctl->csa can be NULL in case of "mupip journal -extract" etc. */
-				CANCEL_DB_TIMERS(rctl->gd, rctl->csa, cancelled_timer, cancelled_dbsync_timer);
+				CANCEL_DB_TIMERS(rctl->gd, rctl->csa, cancelled_dbsync_timer);
 			reccnt = 0;
 			for (size_ptr = &rctl->jnlext_multi_list_size[0], recstat = 0;
 								recstat < TOT_EXTR_TYPES;
@@ -746,7 +760,7 @@ finish:
 			assert(INVALID_SHMID == shm_rctl->jnlext_shmid);
 			shm_size = reccnt * SIZEOF(jnlext_multi_t);
 			/* If we are quitting because of an abnormal status OR a forced signal to terminate
-			 * OR if the parent is dead (kill -9) dont bother creating shmid to communicate back with parent.
+			 * OR if the parent is dead (kill -9) don't bother creating shmid to communicate back with parent.
 			 */
 			if (mp_hdr->parent_pid != getppid())
 			{
@@ -875,7 +889,7 @@ void mur_shm_forw_token_add(forw_multi_struct *forw_multi, reg_ctl_list *rctl, b
 		 * This is because murgbl.losttn_seqno marks the boundary between GOOD_TN and LOST_TN. And BROKEN_TN is known
 		 * in backward processing phase itself.
 		 * In case of SHOW or VERIFY (except EXTRACT), there is no need to do this processing since we are
-		 * interested only in GOOD_TN or BROKEN_TN, not LOST_TN. So dont maintain shm_forw_multi in that case too.
+		 * interested only in GOOD_TN or BROKEN_TN, not LOST_TN. So don't maintain shm_forw_multi in that case too.
 		 */
 		return;
 	}
@@ -951,7 +965,7 @@ void mur_shm_forw_token_add(forw_multi_struct *forw_multi, reg_ctl_list *rctl, b
 	assert(NULL == shm_rctl->shm_forw_multi);
 	shm_rctl->shm_forw_multi = sfm;
 	/* Adjust shm value of "recstat" based on individual region's perspective. Note that if shm value is LOST_TN
-	 * and individual region's value is GOOD_TN, then LOST_TN should prevail. Note that we dont hold a lock when doing
+	 * and individual region's value is GOOD_TN, then LOST_TN should prevail. Note that we don't hold a lock when doing
 	 * this update to sfm->recstat (a shared memory location). This is because if any update happens to sfm->recstat,
 	 * it will be for a GOOD_TN -> LOST_TN transition and it is okay if multiple processes do this overwrite at the same time.
 	 */

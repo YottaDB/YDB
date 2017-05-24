@@ -46,6 +46,7 @@ void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 	reg->jnl_deq = csd->jnl_deq;
 	reg->jnl_buffer_size = csd->jnl_buffer_size;
 	reg->jnl_before_image = csd->jnl_before_image;
+	assert(!IS_AIO_DBGLDMISMATCH(reg->dyn.addr, csd));	/* Or else "gvcst_init" should have reopened the file */
 	bt_init(csa);
 	/* Initialization of prc_vec is done even for no journaling. gtcm uses this always. Others might need it too. */
 	if (NULL == prc_vec)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -242,7 +242,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #LABEL */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
@@ -259,7 +259,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCYCLE, LITERAL_HASHCYCLE_LEN);
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #CYCLE */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
@@ -281,7 +281,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			out_rec_ptr = out_rec;
 			if (!gvcst_get(&trigger_value))
 			{	/* There has to be a #NAME */
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
@@ -470,7 +470,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			ptr += trigvn_len;
 			if ((mv_trigger_val.str.len == trigvn_len) || ('\0' != *ptr))
 			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
@@ -481,7 +481,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
 			if (1 > indx)
 			{	/* We expect a valid index */
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
@@ -534,8 +534,10 @@ STATICFNDEF void dump_all_triggers(void)
 	save_gvtarget = gv_target;
 	for (reg_index = 0, reg = gd_header->regions; reg_index < gd_header->n_regions; reg_index++, reg++)
 	{
+		if (IS_STATSDB_REGNAME(reg))
+			continue;
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
-		if (NULL == cs_addrs)	/* not MM or BG access method, which means GT.CM */
+		if (NULL == cs_addrs)	/* not BG or MM access method */
 			continue;
 		/* gv_target now points to ^#t in region "reg" */
 		if (0 != gv_target->root)
@@ -762,7 +764,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	else
 	{
 		len = select_list_len;
-		sel_ptr = strtok_r(save_select_list, ",", &strtok_ptr);
+		sel_ptr = STRTOK_R(save_select_list, ",", &strtok_ptr);
 		do
 		{
 			trig_name = ('^' != *sel_ptr);
@@ -786,12 +788,12 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 				/* Skip only if the previous global is the same as the current */
 				if ((prev_len == gbl_len) && (0 == memcmp(prev_ptr, ptr1, gbl_len)))
 					continue;
-				SAVE_TRIGGER_REGION_INFO(save_currkey);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				prev_ptr = ptr1;
 				prev_len = gbl_len;
-				start_map = gv_srch_map(gd_header, ptr1, gbl_len);
+				start_map = gv_srch_map(gd_header, ptr1, gbl_len, SKIP_BASEDB_OPEN_FALSE);
 				ptr1[gbl_len - 1]++;
-				end_map = gv_srch_map(gd_header, ptr1, gbl_len);
+				end_map = gv_srch_map(gd_header, ptr1, gbl_len, SKIP_BASEDB_OPEN_FALSE);
 				ptr1[gbl_len - 1]--;
 				gvname.var_name.addr = ptr1;
 				gvname.var_name.len = gbl_len;
@@ -805,11 +807,14 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 						gvname.var_name.len++;
 					for (map = start_map; map <= end_map; map++)
 					{
+						OPEN_BASEREG_IF_STATSREG(map);
 						reg = map->reg.addr;
 						GET_REG_INDEX(gd_header, reg_start, reg, reg_index);	/* sets "reg_index" */
 						assert(reg_array_size > reg_index);
 						if (!reg_done[reg_index])
 						{	/* this region first encountered now */
+							if (IS_STATSDB_REGNAME(reg))
+								continue;
 							GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 							if (NULL == cs_addrs)	/* not BG or MM access method */
 								continue;
@@ -848,9 +853,11 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 					len1--;	/* drop the trailing # sign */
 				gvname.var_name.addr = sel_ptr;
 				gvname.var_name.len = len1;
-				SAVE_TRIGGER_REGION_INFO(save_currkey);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 				{
+					if (IS_STATSDB_REGNAME(reg))
+						continue;
 					GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 					if (NULL == cs_addrs)	/* not BG or MM access method */
 						continue;
@@ -860,8 +867,8 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 					write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len, trig_name);
 				}
 			}
-			RESTORE_TRIGGER_REGION_INFO(save_currkey);
-		} while (NULL != (sel_ptr = strtok_r(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+		} while (NULL != (sel_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
 	}
 	return select_status;
 }

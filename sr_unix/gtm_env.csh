@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -113,7 +114,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
 	setenv	gt_ld_options_gtmshr	""
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-	setenv gt_ld_ci_u_option	"-Wl,-u,gtm_ci"
+	setenv gt_ld_ci_u_option	"-Wl,-u,gtm_ci -Wl,-u,gtm_is_main_thread"
 
 	setenv gt_ld_extra_libs		""		# platform specific GT.M libraries
 

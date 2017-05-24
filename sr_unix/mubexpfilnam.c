@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +38,7 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 	file.addr = tmp_mstr_addr;
 	if (list != mu_repl_inst_reg_list)
 	{	/* Database region */
-		if (!mupfndfil(list->reg, &file))
+		if (!mupfndfil(list->reg, &file, LOG_ERROR_TRUE))
 		{
 			util_out_print("Backup not finished because of the above error.", TRUE);
 			error_mupip = TRUE;
@@ -46,7 +47,7 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 	} else
 	{	/* Replication instance region */
 		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error))
-			GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+			assertpro(FALSE);	/* rts_error should have been issued by repl_inst_get_name */
 	}
 	for (c1 = file.addr + file.len; (*c1 != '/') && (c1 != file.addr); c1--)
 		;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,29 +27,23 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 	unsigned char			ch, *gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t			is_string;
 	mstr				opstr;
-	DEBUG_ONLY(unsigned char	*gvkey_top_ptr;)
+	unsigned char			*gvkey_top_ptr;
 
 	assert(12 < max_size);
 	out_top = out_char_ptr + max_size - 2;	/* - 2, as could add comma left-paren or TWO double quotes between checks */
 	gvkey_char_ptr = key->base;
-	DEBUG_ONLY(gvkey_top_ptr = gvkey_char_ptr + key->end;)
+	gvkey_top_ptr = gvkey_char_ptr + key->end;
 	/* Ensure input key is well-formed (i.e. double null terminated) */
 	assert(KEY_DELIMITER == *(gvkey_top_ptr - 1));
 	assert(KEY_DELIMITER == *gvkey_top_ptr);
-	/* The following assert (in the for loop) assumes that a global name will be able to fit in completely into any key.
-	 * But that is not true. For exmaple I can have a maxkeysize of 10 and try to set a global variable name of length 20.
-	 * That will have issues below. Until C9J10-003204 is fixed to handle long global names and small maxkeysizes, we
-	 * let the below code stay as it is (asserts only) to avoid overheads (of if checks for whether end is reached) in pro.
-	 * When that is fixed, it is possible, we see the key terminate before even the global name is finished. In that case,
-	 * we should return without '(' or ')' in the formatted buffer. The caller will know this is a case of too long global name.
-	 */
-	for (*out_char_ptr++ = '^'; (*out_char_ptr = *gvkey_char_ptr++); out_char_ptr++)
-		assert(gvkey_char_ptr <= gvkey_top_ptr);
+	for (*out_char_ptr++ = '^'; (*out_char_ptr = *gvkey_char_ptr++) && (gvkey_char_ptr <= gvkey_top_ptr); out_char_ptr++)
+		;
+	/* The following asserts (in the for loop) assume that a global name will be able to fit in completely into any key. */
 	assert(gvkey_char_ptr <= gvkey_top_ptr);
 	if (0 == *gvkey_char_ptr)		/* no subscipts */
 		return (out_char_ptr);
 	*out_char_ptr++ = '(';
-	for ( ; ; )
+	for ( ; gvkey_char_ptr <= gvkey_top_ptr; )
 	{
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
 		if (0x01 == *gvkey_char_ptr)	/* this must be a null string which was adjusted by op_gvorder */
@@ -110,15 +105,24 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 			assert(FALSE);
 			return (NULL);
 		}
-		for ( ; *gvkey_char_ptr++; )
-			assert(gvkey_char_ptr <= gvkey_top_ptr);
-		assert(gvkey_char_ptr <= gvkey_top_ptr);
+		/* Advance until next null separator */
+		for ( ; *gvkey_char_ptr++ && (gvkey_char_ptr <= gvkey_top_ptr); )
+			;
+		if (gvkey_char_ptr > gvkey_top_ptr)
+		{
+			assert(FALSE);
+			return (NULL);
+		}
 		if (*gvkey_char_ptr)
 			*out_char_ptr++ = ',';
 		else
 			break;
 	}
+	if((out_char_ptr >= out_top) || (gvkey_char_ptr > gvkey_top_ptr))
+	{
+		assert(FALSE);
+		return (NULL);
+	}
 	*out_char_ptr++ = ')';
-	assert(gvkey_char_ptr <= gvkey_top_ptr);
 	return (out_char_ptr);
 }

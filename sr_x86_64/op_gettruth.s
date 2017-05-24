@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -39,7 +39,7 @@ doit:
 	# Copy/return literal_zero or literal_one mval to caller
 	#
 	movq	REG64_RET1, REG64_ARG0
-	movl	$mval_byte_len, REG32_ARG3
+	movl	$mval_qword_len, REG32_ARG3
 	REP
-	movsb
+	movsq
 	ret

@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2016 Fidelity National Information		#
+# Copyright (c) 2009-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -16,25 +16,12 @@
 # Path to the correct echo program
 # depending on the list of locales configured, locale -a might be considered a binary output.
 # grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
-if [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	echo=/usr/5bin/echo
-	# Solaris 11 does not have /usr/5bin/echo
-	if [ ! -f $echo ]; then
-		echo=/usr/bin/echo
-	fi
-	binaryopt=""
-elif [ $arch = "linux" ]; then
+if [ $arch = "linux" ]; then
 	echo="/bin/echo -e"
 	binaryopt="-a"
 else
 	echo=/bin/echo
 	binaryopt=""
-fi
-
-# add path to strip for solaris
-if [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	PATH="$PATH:/usr/ccs/bin"
-	export PATH
 fi
 
 # Options to ps
@@ -61,17 +48,11 @@ if [ -d utf8 ]; then
 fi
 
 # Native shared library extension.
-if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
-	ext=".sl"
-else
-	ext=".so"
-fi
+ext=".so"
 
 # Flags to build shared libraries of M routines
-if [ "hp" = $arch ] ; then ldflags="-b" ; ldcmd="ld" # HP-UX - all platforms
-elif [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
+if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
 elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
-elif [ "solaris" = $arch ] ; then ldflags="-G -64" ; ldcmd="ld" # Solaris SPARC
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
@@ -188,28 +169,18 @@ $echo ""
 if [ -d $gtmdist ]; then
 	$echo "Directory $gtmdist exists. If you proceed with this installation then"
 	$echo "some files will be over-written. Is it ok to proceed? (y or n) \c"
-	read resp
-	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		chmod 0755 $gtmdist
-		chown $owner $gtmdist
-		chgrp $bingroup $gtmdist
-	else
-		exit
-	fi
-
 else
 	$echo "Directory $gtmdist does not exist. Do you wish to create it as part of"
 	$echo "this installation? (y or n) \c"
-
-	read resp
-	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
-		chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-		chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-		chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-	else
-		exit
-	fi
+fi
+read resp
+if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
+	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+else
+	exit
 fi
 
 if [ ! -w $gtmdist ]; then
@@ -223,25 +194,20 @@ $echo ""
 $echo "Installing GT.M...."
 $echo ""
 
+is64bit_gtm=`file mumps | grep -c 64`
 
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
 # keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
-
 if [ -d "utf8" ]; then
 	unset gtm_icu_version
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu and crypto libs)
-	if [ "$arch" = "hp" ] ; then
-		is64bit_gtm=`file mumps | grep "IA64" | wc -l`
-	else
-		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
-	fi
-# please keep in sync with sr_unix/set_library_path.csh
+	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
 	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu /lib64 /lib /usr/local/ssl/lib"  #BYPASSOK line length
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu"
 	else
-		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu /lib32 /lib"
+		library_path="                 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
 	fi
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
@@ -270,8 +236,6 @@ if [ -d "utf8" ]; then
 	icu_ext=".so"
 	if [ $arch = "ibm" ] ; then
 		icu_ext=".a"
-	elif [ $arch = "hp" ] ; then
-		icu_ext=".sl"
 	fi
 	if [ "$would_like_utf8" -eq 1 ] ; then
 		for libpath in $library_path
@@ -305,12 +269,9 @@ if [ -d "utf8" ]; then
 			fi
 			if [ $icu_lib_found -eq 1 ] ; then
 				# Figure out the object mode(64 bit or 32 bit)  of ICU libraries on the target machine
-				if [ $arch = "linux" -o $arch = "sun"  -o  $arch = "solaris" ] ; then
+				if [ $arch = "linux" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
 					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
-				elif [ $arch = "hp" ] ; then
-					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
-					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "IA64" | wc -l`
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
@@ -417,9 +378,11 @@ if [ -f $file ]; then
 	fi
 fi
 # Install the .cshrc and .profile files
-cp -p gdedefaults gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
+cp -p gdedefaults gtmgblstat.xc gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
 chmod 0444 $gtmdist/gdedefaults
 chown $owner $gtmdist/gdedefaults
+chmod 0444 $gtmdist/gtmgblstat.xc
+chown $owner $gtmdist/gtmgblstat.xc
 chmod 0755 $gtmdist/gtmprofile
 chown $owner $gtmdist/gtmprofile
 chmod 0755 $gtmdist/gtmprofile_preV54000
@@ -448,7 +411,7 @@ done
 # Install the normal binaries
 for i in $binaries
 do
-	if [ $arch = "sun" -o $arch = "linux" ]; then
+	if [ $arch = "linux" ]; then
 		install -g $bingroup -o $owner -m 644 $i $gtmdist
 	elif [ $arch = "ibm" ]; then
 		/usr/bin/install -f $gtmdist -M 644 -O $owner -G $bingroup $i
@@ -625,7 +588,7 @@ if [ "$doutf8" -ne 0 ]; then
 	(
 		# Ensure we ARE in UTF-8 mode
 		utflocale=`locale -a | grep $binaryopt -iE 'en_us\.utf.?8$' | head -n1`
-		if [ $utflocale = "" ]; then
+		if [ "$utflocale" = "" ]; then
 			# If no locale defined, try C.UTF-8
 			utflocale="C.UTF-8"
 		fi
@@ -729,7 +692,7 @@ chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "sun" -o $arch = "linux" ]; then
+if [ $arch = "linux" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then

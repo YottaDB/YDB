@@ -8618,24 +8618,6 @@
    |"UNDEF"          |none          |Truth value showing whether undefined variables should be treated as having a null value (1 for "UNDEF"; 0 for     |
    |                 |              |"NOUNDEF"); GT.M defaults to 0.                                                                                    |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Displays the database representation of gvn where gvn is a global name or a global name with subscript(s). The     |
-   |                 |              |option collnum specifies the alternate collation sequence number. If collnum is not specified, GT.M assumes the    |
-   |                 |              |default ASCII collation(collnum=0). For example:                                                                   |
-   |"YGVN2GDS"       |gvn[,collnum])|                                                                                                                   |
-   |                 |              |GTM>set x=$VIEW("YGVN2GDS","^A(1,""abcd"")") zwrite x for i=1:1:$zlength(x) write $zascii($zextract(x,i))," "      |
-   |                 |              |x="A"_$C(0)_" "_$C(17,0,255)_"abcd"_$C(0,0)                                                                        |
-   |                 |              |65 0 191 17 0 255 97 98 99 100 0 0                                                                                 |
-   |                 |              |GTM>                                                                                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Displays the global name or a global name with subscript(s) of a database representation gds. The option collnum   |
-   |                 |              |specifies the collnum specifies the alternate collation sequence number. If collnum is not specified, GT.M assumes |
-   |                 |              |the default ASCII collation(collnum=0). This function is the inverse of the $VIEW("YGVN2GDS",<gvn>[,collnum])      |
-   |"YGDS2GVN"       |gds[,collnum])|function. For example:                                                                                             |
-   |                 |              |                                                                                                                   |
-   |                 |              |GTM>set y=$VIEW("YGDS2GVN",x) zwrite y                                                                             |
-   |                 |              |y="^A(1,""abcd"")"                                                                                                 |
-   |                 |              |GTM>                                                                                                               |
-   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |"ZDATE_FORM"     |none          |Integer value showing whether four digit year code is active for $ZDATE(); GT.M defaults to 0 (for "YY" format).   |
    |                 |              |Use the environment variable gtm_zdate_form to set the initial value of this factor.                               |
    +----------------------------------------------------------------------------------------------------------------------------------------------------+

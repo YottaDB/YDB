@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,8 @@
 #include "gtmmsg.h"
 #include "gtcm_find_region.h"
 #include "lke_cleartree.h"
+#include "interlock.h"
+#include "rel_quant.h"
 
 #define RESET		2
 
@@ -44,7 +47,7 @@ GBLREF	short			crash_count;
 char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 {
 	gd_region		*cur_region;
-	sgmnt_addrs		*cs_adr;
+	sgmnt_addrs		*csa;
 	mlk_ctldata_ptr_t	lke_ctl;
 	mstr			dnode;
 	show_reply		srep;
@@ -52,24 +55,19 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 	boolean_t		was_crit;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, creq->rnum)->reghead->reg;
-	if (dba_bg == cur_region->dyn.addr->acc_meth || dba_mm == cur_region->dyn.addr->acc_meth)
+	if (IS_REG_BG_OR_MM(cur_region))
 	{
-		cs_adr = &FILE_INFO(cur_region)->s_addrs;
-		lke_ctl = (mlk_ctldata_ptr_t)cs_adr->lock_addrs[0];
+		csa = &FILE_INFO(cur_region)->s_addrs;
+		lke_ctl = (mlk_ctldata_ptr_t)csa->lock_addrs[0];
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = creq->nodelength;
 		dnode.addr = creq->node;
-		if (cs_adr->critical != NULL)
-			crash_count = cs_adr->critical->crashcnt;
-		was_crit = cs_adr->now_crit;
-		if (!was_crit)
-			grab_crit(cur_region);
+		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
 		if (lke_ctl->blkroot != 0)
 			/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
 			lke_cleartree(cur_region, lnk, lke_ctl, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
 				      creq->interactive, creq->pid, dnode, FALSE);
-		if (!was_crit)
-			rel_crit(cur_region);
+		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
 	}
 	srep.code = CMMS_U_LKEDELETE;
 	lnk->cbl = SIZEOF(srep.code);

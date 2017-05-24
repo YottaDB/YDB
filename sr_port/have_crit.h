@@ -76,6 +76,7 @@ typedef enum
 	INTRPT_IN_MKSTEMP,		/* Deferring interrupts while in mkstemp */
 	INTRPT_IN_CRYPT_RECONFIG,	/* Deferring interrupts during reconfiguration of the encryption state. */
 	INTRPT_IN_UNLINK_AND_CLEAR,	/* Deferring interrupts around unlink and clearing the filename being unlinked */
+	INTRPT_IN_GETC,			/* Deferring interrupts around GETC() call */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

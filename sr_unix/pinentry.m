@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2015 Fidelity National Information 	;
+; Copyright (c) 2010-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -42,12 +42,14 @@ pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd i
 	; can execute the default pinentry program. If $gtm_pinentry_log is defined, the routine will dump all
 	; status. Note that the locals are all killed prior to dumping status
 error	kill
-	set pinlog=$ztrnlnm("gtm_pinentry_log")
 	new $etrap set $etrap="zhalt +$zstatus"
+	set errmsg="%GTM-E-PINENTRYERR, Custom pinentry program failure. "_$zstatus
+	if $zsyslog(errmsg)
+	set pinlog=$ztrnlnm("gtm_pinentry_log")
 	if $zlength(pinlog) do
 	. open pinlog:(append:chset="M")
 	. use pinlog
-	. write !,"PINENTRY-F-FAILED ",$zdate($horolog,"YYYY/MM/DD 24:60:SS"),!
+	. write !,$zdate($horolog,"YYYY/MM/DD 24:60:SS"),errmsg,!
 	. zwrite $zversion,$ecode,$job,$zchset,$zdirectory,$zroutines,$zstatus
 	. write "Stack trace:",! zshow "S"
 	. write "Loaded external calls:",! zshow "C"

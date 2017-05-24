@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -151,8 +151,7 @@ void op_merge(void)
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
-		nontp_and_bgormm = ((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)))
-				&& !dollar_tlevel;
+		nontp_and_bgormm = (!dollar_tlevel && IS_REG_BG_OR_MM(gv_cur_region));
 		if (NULL == TREF(gv_mergekey2))
 		{	/* We need to initialize gvn2 (right hand side). */
 			GVKEY_INIT(TREF(gv_mergekey2), DBKEYSIZE(MAX_KEY_SZ));
@@ -251,7 +250,7 @@ void op_merge(void)
 				assert (0 < delta2);
 				GET_NSUBS_IN_GVKEY(mkey->str.addr + org_glvn2_keysz - 2, delta2, nsubs); /* sets "nsubs" */
 				/* Check if the target node in ^gvn1 exceeds max # of subscripts */
-				if (MAX_GVSUBSCRIPTS <= (gvn1subs + gvn2subs + nsubs))
+				if (MAX_GVSUBSCRIPTS <= (gvn1subs + nsubs))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 				/* Save the new source key for next iteration. Do not use gvname_env_save since that relies
 				 * on gv_currkey holding the key to be saved which is not the case here. Also gvname_env_save
@@ -265,7 +264,9 @@ void op_merge(void)
 				{
 					if (NULL != gvnh_reg2)
 					{	/* ^gvn2 spans multiple regions. Find region where the current key was obtained */
-						map = gv_srch_map(gbl2_gd_addr, (char *)&gv_currkey->base[0], gv_currkey->end - 1);
+						map = gv_srch_map(gbl2_gd_addr,
+									(char *)&gv_currkey->base[0], gv_currkey->end - 1,
+									SKIP_BASEDB_OPEN_FALSE);
 						reg2 = map->reg.addr;
 					}
 				}
@@ -423,7 +424,7 @@ void op_merge(void)
 				do
 				{
 					LV_SBS_DEPTH(dst_lv, is_base_var, sbs_depth);
-					if (MAX_LVSUBSCRIPTS <= sbs_depth)
+					if ((MAX_LVSUBSCRIPTS - 1) <= sbs_depth)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 					opstr.addr = (char *)buff;
 					opstr.len = MAX_ZWR_KEY_SZ;

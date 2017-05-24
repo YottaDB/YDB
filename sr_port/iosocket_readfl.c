@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -328,9 +328,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	ret = TRUE;
 	has_delimiter = (0 < socketptr->n_delimiter);
 	do_delim_conv = FALSE;
-	if (has_delimiter && IS_UTF16_CHSET(iod->ichset))
-	{
-		if (socketptr->delimiter[0].addr == socketptr->idelimiter[0].addr)
+	if (has_delimiter && gtm_utf8_mode)
+	{	/* CHSET can be switched b/w M/UTF-8/UTF-16* in UTF-8 mode. Convert the delimitor accordingly *
+		 * 1. delimiter[] == idelimiter[] (i.e. it's not been converted) && IS_UTF16_CHSET
+		 * 2. delimiter[] != idelimiter (i.e. it's been converted to UTF-16) && CHSET is NOT UTF-16
+		 */
+		if (((socketptr->delimiter[0].addr == socketptr->idelimiter[0].addr) && IS_UTF16_CHSET(ichset))
+			|| ((socketptr->delimiter[0].addr != socketptr->idelimiter[0].addr) && !IS_UTF16_CHSET(ichset)))
 			do_delim_conv = TRUE;
 	}
 	need_get_chset = FALSE;		/* if we change ichset, make sure converter available */
@@ -553,6 +557,16 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			bytes_read += (int)status;
 			UNIX_ONLY(if (iod == io_std_device.out)
 					  prin_in_dev_failure = FALSE);
+			/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done, there's no way to
+			 * read the BOM bytes & to determine the variant. So default to UTF-16BE, if not already determined.
+			 */
+			if (!socketptr->first_read &&
+				((CHSET_UTF16 == ichset) && (!IS_UTF16_CHSET(dsocketptr->ichset_utf16_variant))))
+			{
+				DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
+				iod->ichset = ichset = dsocketptr->ichset_utf16_variant = CHSET_UTF16BE;
+				need_get_chset = TRUE;
+			}
 			if (socketptr->first_read && (CHSET_M != ichset))	/* May have a BOM to defuse */
 			{
 				if (CHSET_UTF8 != ichset)
@@ -576,6 +590,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							} else
 							{
 								iod->ichset = ichset = CHSET_UTF16BE;
+								dsocketptr->ichset_utf16_variant = CHSET_UTF16BE;
 								need_get_chset = TRUE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw way BOM */
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM detected\n"));
@@ -593,6 +608,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							} else
 							{
                                                                 iod->ichset = ichset = CHSET_UTF16LE;
+								dsocketptr->ichset_utf16_variant = CHSET_UTF16LE;
 								need_get_chset = TRUE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw away BOM */
                                                                 DBGSOCK2((stdout, "socrfl: UTF16LE BOM detected\n"));
@@ -605,6 +621,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							{
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
 								iod->ichset = ichset = CHSET_UTF16BE;
+								dsocketptr->ichset_utf16_variant = CHSET_UTF16BE;
 								need_get_chset = TRUE;
 							}
 						}
@@ -615,7 +632,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						if (CHSET_UTF16 == ichset)
 						{
 							DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
-							iod->ichset = ichset = CHSET_UTF16BE;
+							iod->ichset = ichset = dsocketptr->ichset_utf16_variant = CHSET_UTF16BE;
 							need_get_chset = TRUE;
 						}
 					}
@@ -637,7 +654,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 			if (do_delim_conv)
 			{
-				iosocket_delim_conv(socketptr, ichset);
+				iosocket_idelim_conv(socketptr, ichset);
 				do_delim_conv = FALSE;
 			}
 			if (bytes_read && has_delimiter)
@@ -653,12 +670,16 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					{
 						terminator = TRUE;
 						match_delim = ii;
-						memcpy(iod->dollar.zb, socketptr->idelimiter[ii].addr,
-						       MIN(socketptr->idelimiter[ii].len, ESC_LEN - 1));
-						iod->dollar.zb[MIN(socketptr->idelimiter[ii].len, ESC_LEN - 1)] = '\0';
-						memcpy(iod->dollar.key, socketptr->idelimiter[ii].addr,
-						       MIN(socketptr->idelimiter[ii].len, DD_BUFLEN - 1));
-						iod->dollar.key[MIN(socketptr->idelimiter[ii].len, DD_BUFLEN - 1)] = '\0';
+						/* since idelimiter contains the converted value for UTF-16, $ZB and $KEY will have
+						 * a UTF-16 value instead of UTF-8 which is the chset used for strings.
+						 * Hence use delimiter instead of idelimiter.
+						 */
+						memcpy(iod->dollar.zb, socketptr->delimiter[ii].addr,
+						       MIN(socketptr->delimiter[ii].len, ESC_LEN - 1));
+						iod->dollar.zb[MIN(socketptr->delimiter[ii].len, ESC_LEN - 1)] = '\0';
+						memcpy(iod->dollar.key, socketptr->delimiter[ii].addr,
+						       MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1));
+						iod->dollar.key[MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1)] = '\0';
 						break;
 					}
 				}

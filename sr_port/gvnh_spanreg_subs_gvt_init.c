@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -25,6 +29,7 @@
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "process_gvt_pending_list.h"	/* for "is_gvt_in_pending_list" prototype used in ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN */
 #include "gtmimagename.h"
+#include "io.h"
 
 GBLREF	gd_region			*gv_cur_region;
 
@@ -45,9 +50,9 @@ void gvnh_spanreg_subs_gvt_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, viewparm *p
 	gv_namehead		*gvt, *name_gvt;
 	gvnh_spanreg_t		*gvspan;
 	int			min_reg_index, reg_index;
-	DEBUG_ONLY(
-		gd_binding	*gd_map_top;
-	)
+#	ifdef DEBUG
+	gd_binding		*gd_map_top;
+#	endif
 
 	assert(NULL != gvnh_reg->gvt);
 	gvspan = gvnh_reg->gvspan;
@@ -60,6 +65,11 @@ void gvnh_spanreg_subs_gvt_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, viewparm *p
 	gd_reg_start = &addr->regions[0];
 	min_reg_index = gvspan->min_reg_index;
 	name_gvt = gvnh_reg->gvt;
+#	ifdef DEBUG
+	/* ^%Y* should never be invoked here (callers would have issued ERR_PCTYRESERVED error in that case). Assert accordingly. */
+	assert((RESERVED_NAMESPACE_LEN > name_gvt->gvname.var_name.len)
+		|| (0 != MEMCMP_LIT(name_gvt->gvname.var_name.addr, RESERVED_NAMESPACE)));
+#	endif
 	save_reg = gv_cur_region;
 	for ( ; map < map_top; map++)
 	{

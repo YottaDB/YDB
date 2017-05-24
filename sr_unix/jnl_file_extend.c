@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,8 +74,10 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	gtm_uint64_t		avail_blocks;
 	uint4			aligned_tot_jrec_size, count;
 	uint4			jnl_fs_block_size, read_write_size;
+	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
 	case dba_mm:
@@ -83,7 +85,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		csa = &FILE_INFO(jpc->region)->s_addrs;
 		break;
 	default:
-		assertpro((dba_mm == jpc->region->dyn.addr->acc_meth) || (dba_bg == jpc->region->dyn.addr->acc_meth));
+		assertpro(IS_REG_BG_OR_MM(jpc->region));
 	}
 	csd = csa->hdr;
 	assert(csa == cs_addrs && csd == cs_data);
@@ -133,7 +135,6 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					 * we will freeze the instance and wait for space to become available and keep
 					 * retrying the writes. Therefore, we make the NOSPACEEXT a warning in this case.
 					 */
-					SETUP_THREADGBL_ACCESS;
 					if (!INST_FREEZE_ON_NOSPC_ENABLED(csa))
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
@@ -164,7 +165,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			jnl_info.prev_jnl = &prev_jnl_fn[0];
 			set_jnl_info(gv_cur_region, &jnl_info);
 			assert(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && !(JNL_FILE_SWITCHED(jpc)));
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(gv_cur_region, csa);
 			if (0 != jnl_status)
 			{
 				if (SS_NORMAL != jpc->status)
@@ -236,7 +237,14 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
-				fc->op_buff = (sm_uc_ptr_t)csd;
+				udi = FC2UDI(fc);
+				if (!udi->fd_opened_with_o_direct)
+					fc->op_buff = (sm_uc_ptr_t)csd;
+				else
+				{
+					memcpy((TREF(dio_buff)).aligned, csd, SGMNT_HDR_LEN);
+					fc->op_buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+				}
 				fc->op_len = SGMNT_HDR_LEN;
 				fc->op_pos = 1;
 				status = dbfilop(fc);
@@ -244,7 +252,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				assert(JNL_ENABLED(csa));
 				/* call jnl_ensure_open instead of jnl_file_open to make sure jpc->pini_addr is set to 0 */
-				jnl_status = jnl_ensure_open();	/* sets jpc->status */
+				jnl_status = jnl_ensure_open(gv_cur_region, csa);	/* sets jpc->status */
 				if (0 != jnl_status)
 				{
 					if (jpc->status)

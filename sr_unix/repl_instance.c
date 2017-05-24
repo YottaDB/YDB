@@ -738,12 +738,21 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 				assert(prev_histinfo_num > last_strm_histinfo->prev_histinfo_num);
 				prev_histinfo_num = last_strm_histinfo->prev_histinfo_num;
 			}
-			if (start_seqno_equal && (strm_histinfo_num == (histinfo_num - 1)))
+			if (start_seqno_equal && (strm_histinfo_num == (histinfo_num - 1))
+				&& (histinfo->history_type == last_strm_histinfo->history_type))
 			{	/* Starting seqno of the last histinfo in the instance file matches the input histinfo.
 				 * This means there are no journal records corresponding to the input stream in the journal
 				 * files after the last histinfo (which happens to be same as the input stream) was written
 				 * in the instance file. Overwrite the last histinfo with the new histinfo information before
 				 * writing new journal records.
+				 * Note: The check for history_type above is to take into account a supplementary
+				 * instance where a HISTINFO_TYPE_UPDRESYNC type history record is first written when A->P
+				 * connect for the first time and later a HISTINFO_TYPE_NORMAL record is written when A->P
+				 * connect for the second time. If there were no intervening updates on P from the disconnect
+				 * to the reconnect, we do not want to overwrite the HISTINFO_TYPE_UPDRESYNC type record
+				 * as that will confuse Q in a A->P->Q configuration when Q receives updates from A (GTM-8657).
+				 * If the history types do not match, treat the two history records as different and avoid
+				 * overwriting even if the start_seqno matches.
 				 */
 				histinfo_num--;
 			}

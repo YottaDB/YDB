@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,9 @@
 #include "util.h"
 #include "print_target.h"
 #include "gtmmsg.h"
+#include "collseq.h"
+#include "gdsblk.h"
+#include "format_targ_key.h"
 
 GBLREF block_id		mu_int_path[];
 GBLREF int		mu_int_plen;
@@ -30,7 +34,12 @@ GBLREF boolean_t	mu_int_err_ranges;
 GBLREF boolean_t	master_dir;
 GBLREF global_list	*trees;
 GBLREF span_node_integ	*sndata;
-
+GBLREF boolean_t	null_coll_type_err;
+GBLREF boolean_t	null_coll_type;
+GBLREF unsigned int	rec_num;
+GBLREF block_id		blk_id;
+GBLREF boolean_t	nct_err_type;
+GBLREF int		rec_len;
 #define MAX_UTIL_LEN 40
 #define BLOCK_WINDOW 8
 #define LEVEL_WINDOW 3
@@ -59,10 +68,13 @@ void	mu_int_err(
 		int has_top,
 	      	unsigned int level)
 {
-	int		i, util_len;
+	int		i, util_len, fmtd_key_len;
 	unsigned char	util_buff[MAX_UTIL_LEN];
 	unsigned char 	span_key[MAX_KEY_SZ + 1];
-
+	unsigned char	temp_bot;
+	unsigned char	key_buffer[MAX_KEY_SZ];
+	unsigned char	*temp;
+	gv_key		*tmp_gvkey = NULL;
 	if (!mu_int_errknt)
 		util_out_print("!/Block:Offset Level", TRUE);
 	mu_int_errknt++;
@@ -84,6 +96,27 @@ void	mu_int_err(
 	if (sndata->sn_type)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) err, 3, LEN_AND_STR((char*)util_buff),
 				(SPAN_NODE == sndata->sn_type) ? (sndata->span_prev_blk + 2) : (sndata->span_blk_cnt));
+	else if (null_coll_type_err)
+	{
+		if (null_coll_type)
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 6, rec_num, blk_id,
+					LEN_AND_STR(GTM_NULL_TEXT), LEN_AND_STR(STD_NULL_TEXT));
+		else
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 6, rec_num, blk_id,
+					LEN_AND_STR(STD_NULL_TEXT), LEN_AND_STR(GTM_NULL_TEXT));
+	} else if (nct_err_type)
+	{
+		assert(NULL == tmp_gvkey);
+		GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));
+		memcpy(tmp_gvkey->base, bot, rec_len);
+		tmp_gvkey->end = rec_len - 1;
+		temp = (unsigned char*)format_targ_key(key_buffer,
+				MAX_ZWR_KEY_SZ, tmp_gvkey, TRUE);
+		fmtd_key_len = (int)(temp - key_buffer);
+		key_buffer[fmtd_key_len] = '\0';
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, LEN_AND_STR(key_buffer));
+		GVKEY_FREE_IF_NEEDED(tmp_gvkey);
+	}
 	else
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
 	if (do_path)
@@ -137,8 +170,10 @@ void	mu_int_err(
 			util_out_print("^", FALSE);
 			/* in the case bot is the leftmost key of the gvtree, it needs a second null to be a properly terminated
 			 * real key for print_target. since it is a simple set, we unconditionally do it for every key */
+			temp_bot = bot[has_bot];
 			bot[has_bot] = 0;
 			print_target(bot);
+			bot[has_bot] = temp_bot;
 		} else
 		{
 			assert(master_dir);	/* for a global variable tree, we better have a non-zero begin key */

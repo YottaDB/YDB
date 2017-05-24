@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +44,7 @@ GBLREF	jnl_gbls_t	jgbl;
 #endif
 
 error_def(ERR_DBPRIVERR);
+error_def(ERR_PCTYRESERVED);
 
 void kill_var(void);
 
@@ -53,6 +55,13 @@ void op_gvkill(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* If specified var name is global ^%Y*, the name is illegal to use in a SET or KILL command, only GETs are allowed.
+	 * The only exception is if we are removing a ^%YGS record from the statsdb (caller "gvcst_remove_statsDB_linkage"
+	 * but in that case we would have reg->read_only set to FALSE for a statsdb region name. Account for that.
+	 */
+	if (((RESERVED_NAMESPACE_LEN <= gv_currkey->end) && (0 == MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE)))
+			&& (!IS_STATSDB_REGNAME(gv_cur_region) || gv_cur_region->read_only))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
 	if (gv_cur_region->read_only)
 	{
 		assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
@@ -60,7 +69,7 @@ void op_gvkill(void)
 	}
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-	if (REG_ACC_METH(gv_cur_region) == dba_bg || REG_ACC_METH(gv_cur_region) == dba_mm)
+	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
 		gvnh_reg = TREF(gd_targ_gvnh_reg);
 		if (NULL == gvnh_reg)

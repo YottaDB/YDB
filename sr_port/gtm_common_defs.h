@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,10 +107,11 @@
 #define ROUND_UP(VALUE, MODULUS)		(DIVIDE_ROUND_UP(VALUE, MODULUS) * (MODULUS))
 #define ROUND_DOWN(VALUE, MODULUS)		(DIVIDE_ROUND_DOWN(VALUE, MODULUS) * (MODULUS))
 
-/* Macros to enable block macros to be used in any context taking a single statement.
- * See MALLOC_* macros below for examples of use.
- * Note that if the macro block does a break or continue and expects it to transfer control
- * to the calling context, these cannot be used.
+/* Macros to enable block macros to be used in any context taking a single statement. See MALLOC_* macros below for examples of use.
+ * Note that if the macro block does a "break" or "continue" and expects it to transfer control to the calling context
+ * (i.e. OUTSIDE the macro block because a for/while/switch exists outside the macro block), these macros should not be used.
+ * This means that a "break" or "continue" inside a for/while/switch statement in the macro block which transfers control to
+ * within the macro block is not an issue.
  */
 #define MBSTART		do
 #define MBEND		while (FALSE)
@@ -150,5 +152,8 @@ MBSTART {					\
 	memset(lcl_ptr, 0, SIZ);		\
 	DST = lcl_ptr;				\
 } MBEND
+
+/* Shared between GT.M and external plugins */
+#define EXT_NEW 		"_%YGTM"
 
 #endif /* GTM_COMMON_DEFS_H */

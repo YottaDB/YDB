@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2015 Fidelity National Information	*
+ * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,12 +60,12 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 		if (BUF_OWNER_STUCK < lcnt)
 		{	/* sick of waiting */
 			/* Since cr->r_epid can be changing concurrently, take a local copy before using it below,
-			 * particularly before calling is_proc_alive as we dont want to call it with a 0 r_epid.
+			 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 			 */
 			r_epid = cr->r_epid;
 			if (0 != r_epid)
 			{
-				if (FALSE == is_proc_alive(r_epid, cr->image_count))
+				if (FALSE == is_proc_alive(r_epid, 0))
 				{	/* process gone; release its lock */
 					cr->r_epid = 0;
 					RELEASE_BUFF_READ_LOCK(cr);

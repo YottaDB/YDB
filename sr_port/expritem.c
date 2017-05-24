@@ -11,6 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
@@ -23,6 +24,7 @@
 #include "namelook.h"
 #include "fullbool.h"
 #include "show_source_line.h"
+#include "op.h"
 
 GBLREF	bool		devctlexp;
 GBLREF	boolean_t	run_time;
@@ -40,16 +42,12 @@ LITREF	toktabtype	tokentable[];
 LITREF	mval		literal_null;
 LITREF	octabstruct	oc_tab[];
 
-#ifndef UNICODE_SUPPORTED
-#define f_char f_zchar
-#endif
-
 /* note that svn_index array provides indexes into this array for each letter of the
  * alphabet so changes here should be reflected there.
  */
 LITDEF nametabent svn_names[] =
 {
-         { 1, "D" }, { 6, "DEVICE" }
+	 { 1, "D" }, { 6, "DEVICE" }
 	,{ 2, "EC" }, { 5, "ECODE" }
 	,{ 2, "ES" }, { 6, "ESTACK" }
 	,{ 2, "ET" }, { 5, "ETRAP" }
@@ -246,6 +244,7 @@ LITDEF nametabent fun_names[] =
 	,{1, "V*"}
 	,{2, "ZA"}, {6, "ZASCII"}
 	,{3, "ZAH"}, {8, "ZAHANDLE"}
+	,{4, "ZATR"}, {8, "ZATRANSF*"}
 	,{7, "ZBITAND"}
 	,{8, "ZBITCOUN*"}
 	,{8, "ZBITFIND"}
@@ -259,6 +258,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "ZC"}, {5, "ZCALL"}
 	,{3, "ZCH"}, {5, "ZCHAR"}
 	,{3, "ZCO"}, {8, "ZCONVERT"}
+	,{4, "ZCOL"}, {8, "ZCOLLATE"}
 	,{2, "ZD"}
 	,{5, "ZDATA"}
 	,{5, "ZDATE"}
@@ -300,14 +300,14 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 118	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 122	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
 LITDEF fun_data_type fun_data[] =
 {
 	 { OC_FNASCII, ALL_SYS }, { OC_FNASCII, ALL_SYS }
-        ,{ OC_FNCHAR, ALL_SYS }, { OC_FNCHAR, ALL_SYS }
+	,{ OC_FNCHAR, ALL_SYS }, { OC_FNCHAR, ALL_SYS }
 	,{ OC_FNDATA, ALL_SYS }, { OC_FNDATA, ALL_SYS }
 	,{ OC_FNEXTRACT, ALL_SYS }, { OC_FNEXTRACT, ALL_SYS }
 	,{ OC_FNFIND, ALL_SYS }, { OC_FNFIND, ALL_SYS }
@@ -326,13 +326,14 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNQUERY, ALL_SYS }, { OC_FNQUERY, ALL_SYS }
 	,{ OC_FNRANDOM, ALL_SYS }, { OC_FNRANDOM, ALL_SYS }
 	,{ OC_FNREVERSE, ALL_SYS }, { OC_FNREVERSE, ALL_SYS }
-	,{ OC_PASSTHRU, ALL_SYS }, { OC_PASSTHRU, ALL_SYS }
+	,{ OC_PASSTHRU, ALL_SYS }, { OC_PASSTHRU, ALL_SYS }	/* f_select creates a STOTEMP and STOs anchored by a PASSTHRU */
 	,{ OC_FNSTACK1, ALL_SYS }, { OC_FNSTACK1, ALL_SYS }
 	,{ OC_FNTEXT, ALL_SYS }, { OC_FNTEXT, ALL_SYS }
 	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
 	,{ OC_FNVIEW, ALL_SYS }
 	,{ OC_FNZASCII, ALL_SYS }, { OC_FNZASCII, ALL_SYS }
 	,{ OC_FNZAHANDLE, ALL_SYS }, { OC_FNZAHANDLE, ALL_SYS }
+	,{ OC_FNZATRANSFORM, ALL_SYS }, { OC_FNZATRANSFORM, ALL_SYS }
 	,{ OC_FNZBITAND, ALL_SYS }
 	,{ OC_FNZBITCOUN, ALL_SYS }
 	,{ OC_FNZBITFIND, ALL_SYS }
@@ -346,6 +347,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
 	,{ OC_FNZCHAR, ALL_SYS }, { OC_FNZCHAR, ALL_SYS }
 	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
+	,{ OC_FNZCOLLATE, UNIX_OS }, { OC_FNZCOLLATE, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }
 	,{ OC_FNZDATA, ALL_SYS }
 	,{ OC_FNZDATE, ALL_SYS }
@@ -412,6 +414,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_view,
 	f_ascii, f_ascii,
 	f_zahandle, f_zahandle,
+	f_zatransform, f_zatransform,
 	f_two_mval,
 	f_one_mval,
 	f_fnzbitfind,
@@ -425,6 +428,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_zcall, f_zcall,
 	f_zchar, f_zchar,
 	f_zconvert, f_zconvert,
+	f_zcollate, f_zcollate,
 	f_zdate,
 	f_data,				/* $ZDATA reuses parser for $DATA since only runtime execution differs */
 	f_zdate,
@@ -462,10 +466,12 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 };
 
 int expritem(oprtype *a)
+/* process an expression item into the operand at *a */
 {
 	boolean_t	parse_warn, saw_local, saw_se, se_warn;
-	oprtype 	*j, *k, x1;
 	int		i, index, sv_opcode;
+	mval		v;
+	oprtype		*j, *k, x1;
 	tbp		argbp, *funcbp, *tripbp;
 	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
 	unsigned char	type;
@@ -541,6 +547,34 @@ int expritem(oprtype *a)
 			if (TK_LPAREN == TREF(director_token))
 			{
 				index = namelook(fun_index, fun_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+				if (!gtm_utf8_mode)
+				{	/** When possible, update opcodes rather than mess with xfer table */
+					switch (fun_data[index].opcode)
+					{
+					case OC_FNASCII:
+						index = namelook(fun_index, fun_names, "zascii", 6);
+						break;
+					case OC_FNCHAR:
+						index = namelook(fun_index, fun_names, "zchar", 5);
+						break;
+					case OC_FNEXTRACT:
+						index = namelook(fun_index, fun_names, "zextract", 8);
+						break;
+					case OC_FNFIND:
+						index = namelook(fun_index, fun_names, "zfind", 5);
+						break;
+					case OC_FNLENGTH:
+						index = namelook(fun_index, fun_names, "zlength", 7);
+						break;
+					case OC_FNPIECE:
+						index = namelook(fun_index, fun_names, "zpiece", 6);
+						break;
+					case OC_FNTRANSLATE:
+						index = namelook(fun_index, fun_names, "ztranslate", 10);
+						break;
+					default: break;
+					}
+				}
 				if (index < 0)
 				{
 					STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
@@ -572,8 +606,7 @@ int expritem(oprtype *a)
 				} else
 				{
 					*a = put_lit((mval *)&literal_null);
-					/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL
-					   is reached */
+					/* Parse remaining arguments until reaching the corresponding RIGHT-PAREN/SPACE/EOL */
 					if (!parse_until_rparen_or_space())
 						return FALSE;
 				}
@@ -602,15 +635,29 @@ int expritem(oprtype *a)
 				{
 					sv_opcode = svn_data[index].opcode;
 					assert(SV_NUM_SV > sv_opcode);
-					if (SV_TEST == sv_opcode)
-						*a = put_tref(newtriple(OC_GETTRUTH));
-					else
+					switch (sv_opcode)
 					{
-						if (sv_opcode == SV_X || sv_opcode == SV_Y)
-							devctlexp = TRUE;
-						ref = newtriple(OC_SVGET);
-						ref->operand[0] = put_ilit(sv_opcode);
-						*a = put_tref(ref);
+						case SV_TEST:
+							*a = put_tref(newtriple(OC_GETTRUTH));
+							break;
+						case SV_ZVERSION:	/* making these literals at compile time assumes code is */
+						case SV_ZCHSET:		/* generated for/in the environment where it runs, which */
+							op_svget(sv_opcode, &v);	/* relies on appropriate code management */
+							assert(MVTYPE_IS_NUMERIC(v.mvtype) && MVTYPE_IS_STRING(v.mvtype));
+							ENSURE_STP_FREE_SPACE(v.str.len);
+							memcpy((char *)stringpool.free, v.str.addr, v.str.len);
+							v.str.addr = (char *)stringpool.free;
+							stringpool.free += v.str.len;
+							*a = put_lit(&v);
+							break;
+						case SV_X:
+						case SV_Y:
+							devctlexp = TRUE;		/* WARNING fallthrough */
+						default:
+							ref = newtriple(OC_SVGET);
+							ref->operand[0] = put_ilit(sv_opcode);
+							*a = put_tref(ref);
+							break;
 					}
 				} else
 					*a = put_lit((mval *)&literal_null);
@@ -680,7 +727,7 @@ int expritem(oprtype *a)
 				t2 = (oc_tab[t3->opcode].octype & OCT_COERCE) ? t3->operand[0].oprval.tref : t3;
 				if ((OC_VAR == t2->opcode) || (OC_GETINDX == t2->opcode))
 				{	/* it's an lvn */
-					if ((t3 != t2) || ((ARRAYTOP(argtrip->operand) - 1) == (&(argtrip->operand[i]))))
+					if ((t3 != t2) || ((ARRAYTOP(argtrip->operand) - 1) == j))
 						continue;		/* but if it's the last or there's a coerce */
 					saw_local = TRUE;		/* left operand may need protection */
 				}

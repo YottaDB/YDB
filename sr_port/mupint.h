@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,9 @@
 #define	MUINTKEY_FALSE		0 /* -subscript was NOT specified as part of mupip integ */
 #define	MUINTKEY_TRUE		1 /* -subscript was specified as part of mupip integ */
 #define	MUINTKEY_NULLSUBS	2 /* -subscript was specified as part of mupip integ AND there was at least one null subscript */
+
+#define	RETURN_AFTER_DB_OPEN_FALSE	FALSE
+#define	RETURN_AFTER_DB_OPEN_TRUE	TRUE
 
 #define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
 
@@ -44,17 +48,6 @@ typedef	struct global_list_struct
 	char				key[MAX_MIDENT_LEN + 1];	/* max key length plus one for printf terminator */
 	int4				keysize;			/* length of the key */
 } global_list;
-#ifdef BIGENDIAN
-typedef struct
-{	unsigned int	two : 4;
-	unsigned int	one : 4;
-} sub_num;
-#else
-typedef struct
-{	unsigned int	one : 4;
-	unsigned int	two : 4;
-} sub_num;
-#endif
 
 enum sn_type
 {
@@ -81,9 +74,9 @@ boolean_t mu_int_blk(block_id blk, char level, boolean_t is_root, unsigned char 
 	int bot_len, unsigned char *top_key, int top_len, boolean_t eb_ok);
 boolean_t mu_int_fhead(void);
 boolean_t mu_int_init(void);
-void mu_int_reg(gd_region *reg, boolean_t *return_value);
+void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open);
 int mu_int_getkey(unsigned char *key_buff, int keylen);
-uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver);
+uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff);
 void mu_int_err(int err, boolean_t do_path, boolean_t do_range, unsigned char *bot, int has_bot,
 	unsigned char *top, int has_top, unsigned int level);
 void mu_int_maps(void);

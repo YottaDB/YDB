@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,15 +42,36 @@
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 error_def(ERR_REPLLOGOPN);
+error_def(ERR_CHANGELOGINTERVAL);
 
 int gtmrecv_changelog(void)
 {
-	uint4	changelog_desired = 0, changelog_accepted = 0;
+	uint4	changelog_accepted = 0;
 	int     log_fd = 0; /*used to indicate whether the new specified log file is writable*/
 	int     close_status = 0; /*used to indicate if log file is successfully closed*/
 	char*   err_code;
-	int     save_errno;
+	int     save_errno = 0;
+	int	retry_count = 5;
 
+	if (0 != recvpool.gtmrecv_local->changelog)
+	{
+		while (0 != retry_count--)
+		{
+			LONG_SLEEP(5);
+			if (!recvpool.gtmrecv_local->changelog)
+				break;
+		}
+	}
+	if (0 != recvpool.upd_proc_local->changelog)
+	{
+		retry_count = 5;
+		while (0 != retry_count--)
+		{
+			LONG_SLEEP(5);
+			if (!recvpool.upd_proc_local->changelog)
+				break;
+		}
+	}
 	/* Grab the recvpool jnlpool option write lock */
 	if (0 > grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
 	{
@@ -65,7 +86,6 @@ int gtmrecv_changelog(void)
 	}
 	if ('\0' != gtmrecv_options.log_file[0]) /* trigger change in log file (for both receiver and update process) */
 	{
-		changelog_desired |= REPLIC_CHANGE_LOGFILE;
 		if (0 != strcmp(recvpool.gtmrecv_local->log_file, gtmrecv_options.log_file))
 		{
 #ifdef UNIX
@@ -76,10 +96,16 @@ int gtmrecv_changelog(void)
 			{
 				save_errno = ERRNO;
 				err_code = STRERROR(save_errno);
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
-						   LEN_AND_STR(gtmrecv_options.log_file),
-						   LEN_AND_STR(err_code),
-						   LEN_AND_STR(NULL_DEVICE));
+				if ('\0' != recvpool.gtmrecv_local->log_file[0])
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+						LEN_AND_STR(gtmrecv_options.log_file),
+						LEN_AND_STR(err_code),
+						LEN_AND_STR(recvpool.gtmrecv_local->log_file));
+				else
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+						LEN_AND_STR(gtmrecv_options.log_file),
+						LEN_AND_STR(err_code),
+						LEN_AND_STR(NULL_DEVICE));
 			} else {
 				CLOSEFILE_IF_OPEN(log_fd, close_status);
 				assert(close_status==0);
@@ -98,19 +124,20 @@ int gtmrecv_changelog(void)
 	}
 	if (0 != gtmrecv_options.rcvr_log_interval) /* trigger change in receiver log interval */
 	{
-		changelog_desired |= REPLIC_CHANGE_LOGINTERVAL;
 		if (gtmrecv_options.rcvr_log_interval != recvpool.gtmrecv_local->log_interval)
 		{
 			changelog_accepted |= REPLIC_CHANGE_LOGINTERVAL;
 			recvpool.gtmrecv_local->log_interval = gtmrecv_options.rcvr_log_interval;
-			util_out_print("Change initiated with receiver log interval !UL", TRUE, gtmrecv_options.rcvr_log_interval);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_CHANGELOGINTERVAL, 5,
+					   LEN_AND_LIT("Receiver"),
+					   LEN_AND_STR(recvpool.gtmrecv_local->log_file),
+					   gtmrecv_options.rcvr_log_interval);
 		} else
 			util_out_print("Receiver log interval is already !UL. Not initiating change in log interval", TRUE,
 					gtmrecv_options.rcvr_log_interval);
 	}
 	if (0 != gtmrecv_options.upd_log_interval) /* trigger change in update process log interval */
 	{
-		changelog_desired |= REPLIC_CHANGE_UPD_LOGINTERVAL;
 		if (gtmrecv_options.upd_log_interval != recvpool.upd_proc_local->log_interval)
 		{
 			changelog_accepted |= REPLIC_CHANGE_UPD_LOGINTERVAL;
@@ -126,5 +153,5 @@ int gtmrecv_changelog(void)
 	else
 		util_out_print("No change to log file or log interval", TRUE);
 	rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-	return ((0 != changelog_accepted && changelog_accepted == changelog_desired) ? NORMAL_SHUTDOWN : ABNORMAL_SHUTDOWN);
+	return (0 != save_errno) ? ABNORMAL_SHUTDOWN : NORMAL_SHUTDOWN;
 }

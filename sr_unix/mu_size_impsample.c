@@ -150,7 +150,7 @@ int4 mu_size_impsample(glist *gl_ptr, int4 M, int4 seed)
 			CLEAR_VECTOR(a);
 			if (cdb_sc_normal != (status = mu_size_rand_traverse(r, a)))			/* WARNING: assignment */
 			{
-				assert((CDB_STAGNATE > t_tries) || IS_FINAL_RETRY_CODE(status));
+				assert(UPDATE_CAN_RETRY(t_tries, status));
 				t_retry(status);
 				continue;
 			}
@@ -229,7 +229,7 @@ STATICFNDEF void accum_stats_impsmpl(stat_t *stat, double *r, double *a)
 STATICFNDEF void finalize_stats_impsmpl(stat_t *stat)
 {
 	double		ess; /* effective sample size */
-	unsigned int	k, l;
+	int		k, l;
 
 	for (l = 1; MAX_BT_DEPTH >= l; l++)
 		if (stat->W[l] > 0)
@@ -245,9 +245,17 @@ STATICFNDEF void finalize_stats_impsmpl(stat_t *stat)
 			stat->S[l] /= (ess + 1);
 		}
 	stat->W[0] = stat->n;				/* for arithmetic below */
-	for (l = MAX_BT_DEPTH; (0 <= l) && (stat->mu[l] < EPS); l--)
+	/* Note: stat->mu[0] should remain zero since we don't maintain it. Also stat->mu[1] should be > EPS.
+	 * So "l" is guaranteed to be at least 1 at the end of the for loop. Assert that.
+	 * In "pro" we be safe and add the "(0 < l)" check in the for loop below to prevent "l" from becoming negative.
+	 */
+	assert(0 == stat->mu[0]);
+	assert(EPS > 0);
+	assert(EPS < 1);
+	assert(1 <= stat->mu[1]);
+	for (l = MAX_BT_DEPTH; (0 < l) && (stat->mu[l] < EPS); l--)
 		;
-	assert(0 <= l);				/* stat->mu[0] should remain zero */
+	assert(0 < l);
 	stat->AT = stat->blkerr[l] = stat->error = stat->R = 0;
 	stat->B = stat->blktot[l] = 1;
 	for (k = l - 1 ; 0 < l; k--, l--)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,10 +158,10 @@ void dbcertify_certify_phase(void)
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
-#ifdef __MVS__
+#	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(psa->outfd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
-#endif
+#	endif
 	dbc_read_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));		/* Read phase 1 output file header */
 	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, SIZEOF(psa->ofhdr.p1hdr_tag)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
@@ -196,13 +196,9 @@ void dbcertify_certify_phase(void)
 	len = STRLEN((char_ptr_t)psa->ofhdr.dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = len;
-
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-
 	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
 	fc = psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
-	fc->file_type = psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;	/* Always treat as BG mode */
 
 	/* Initialize for db processing - open and read in file-header, get "real" filename for comparison */
 	dbc_init_db(psa);
@@ -500,7 +496,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		blk_index = dbc_read_dbblk(psa, blk_ptr, tmp_blk_type);
 		/* Note that we cannot do a "tmp_blk_levl--" here but instead should get the child block level from the block
 		 * header. This is because it is possible the block we started out with is no longer marked BUSY in the bitmap
-		 * (because of updates after the "dbcertify scan" but before the "dbcertify certify"). Since we dont check
+		 * (because of updates after the "dbcertify scan" but before the "dbcertify certify"). Since we don't check
 		 * a block's bitmap status first (to avoid performance overhead of reading bitmap for every block that is
 		 * processed by certify), we need to add robustness within dbcertify to handle that.
 		 */

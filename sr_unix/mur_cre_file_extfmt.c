@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,6 +74,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	mval			op_val, op_pars;
 	boolean_t		is_stdout;	/* Output will go STDOUT?. Matters only for single-region in this function */
 	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch, key_reset;
+	boolean_t		is_dummy_gbldir;
 	reg_ctl_list		*rctl;
 	gd_region		*reg;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;
@@ -185,12 +186,22 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 			/* Calculate if appending region name will not overflow allocation. If so error out */
 			tmplen = file_info->fn_len;
 			tmplen++;	/* for the '_' */
-			if (reg->rname_len)
+			/* If this region corresponds to a gld created by "gd_load" then it is a real gld and use that
+			 * "region-name". Else it is a dummy gld created by "mu_gv_cur_reg_init" in which case use a
+			 * number (of the rctl in the rctl array) to differentiate multiple journal files. Thankfully
+			 * "mu_gv_cur_reg_init" uses "create_dummy_gbldir" which sets gd->link = NULL whereas "gd_load"
+			 * sets it to a non-NULL value. So use that as the distinguishing characteristic.
+			 */
+			is_dummy_gbldir = reg->owning_gd->is_dummy_gbldir;
+			if (!is_dummy_gbldir)
+			{
+				assert(reg->rname_len);
 				tmplen += reg->rname_len;
-			else
+			} else
 			{	/* maximum # of regions is limited by MULTI_PROC_MAX_PROCS (since that is the limit
 				 * that "gtm_multi_proc" can handle. Use the byte-length of MULTI_PROC_MAX_PROCS-1.
 				 */
+				assert(!memcmp(reg->rname, "DEFAULT", reg->rname_len));
 				assert(1000 == MULTI_PROC_MAX_PROCS);
 				tmplen += 3;	/* 999 is maximum valid value and has 3 decimal digits */
 			}
@@ -204,7 +215,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 			tmplen = file_info->fn_len;
 			ptr = &file_info->fn[tmplen];
 			*ptr++ = '_'; tmplen++;
-			if (reg->rname_len)
+			if (!is_dummy_gbldir)
 			{
 				memcpy(ptr, reg->rname, reg->rname_len);
 				tmplen += reg->rname_len;

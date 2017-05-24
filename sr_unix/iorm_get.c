@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,7 +321,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	assert(CHSET_UTF16 != chset);
 	PIPE_DEBUG(PRINTF("iorm_get_fol: bom_buf_cnt: %d bom_buf_off: %d\n",rm_ptr->bom_buf_cnt,rm_ptr->bom_buf_off );
 		   DEBUGPIPEFLUSH;);
-	if (0 <= status && rm_ptr->bom_buf_cnt > rm_ptr->bom_buf_off)
+	if ((0 <= status) && (rm_ptr->bom_buf_cnt > rm_ptr->bom_buf_off))
 	{
 		PIPE_DEBUG(PRINTF("move bom: status: %d\n", status); DEBUGPIPEFLUSH;);
 		from_bom = MIN((rm_ptr->bom_buf_cnt - rm_ptr->bom_buf_off), bytes2read);
@@ -333,7 +333,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		rm_ptr->file_pos += from_bom;
 		status = 0;
 	}
-	if (0 <= status && 0 < bytes2read)
+	if ((0 <= status) && (0 < bytes2read))
 	{
 		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
 		if (timed)
@@ -556,10 +556,11 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 				    out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
 				    timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 			/* Decrypt the read bytes even if they turned out to not contain a BOM. */
-			if (rm_ptr->input_encrypted && ((status > 0) || ((status < 0) && (*tot_bytes_read > 0))))
+			if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 			{
-				READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt],
-					status > 0 ? status : *tot_bytes_read, NULL);
+				if (rm_ptr->input_encrypted)
+					READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt],
+						status > 0 ? status : *tot_bytes_read, NULL);
 				rm_ptr->read_occurred = TRUE;
 			}
 			PIPE_DEBUG(PRINTF("iorm_get_bom UTF8 DOREADRLTO2: status: %d\n", status); DEBUGPIPEFLUSH;);
@@ -582,10 +583,11 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 				    out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
 				    timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 			/* Decrypt the read bytes even if they turned out to not contain a BOM. */
-			if (rm_ptr->input_encrypted && ((status > 0) || ((status < 0) && (*tot_bytes_read > 0))))
+			if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 			{
-				READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt],
-					status > 0 ? status : *tot_bytes_read, NULL);
+				if (rm_ptr->input_encrypted)
+					READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt],
+						status > 0 ? status : *tot_bytes_read, NULL);
 				rm_ptr->read_occurred = TRUE;
 			}
 		}
@@ -733,10 +735,11 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		PIPE_DEBUG(PRINTF("pipeget: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
 		DOREADRLTO2(fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, blocked_in, ispipe,
 			    flags, status, tot_bytes_read, timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
-		if (rm_ptr->input_encrypted && ((0 < status) || ((status < 0) && (*tot_bytes_read > 0))))
+		if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 		{	/* Decrypt. */
-			READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, rm_ptr->inbuf_pos,
-				status > 0 ? status : *tot_bytes_read, NULL);
+			if (rm_ptr->input_encrypted)
+				READ_ENCRYPTED_DATA(rm_ptr, io_ptr->trans_name, rm_ptr->inbuf_pos,
+					status > 0 ? status : *tot_bytes_read, NULL);
 			rm_ptr->read_occurred = TRUE;
 		}
 	}

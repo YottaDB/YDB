@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,11 @@
 #ifndef GTMIO_Included
 #define GTMIO_Included
 
+/* Depends on aio_shim.h if using the POSIX or linux ASYNC IO #defines. This is due to aio_shim.h
+ * requiring some header files with no include guards, and so we don't want to pull it in multiple
+ * times by accident.
+ */
+
 #ifndef GTMIO_MINIMAL		/* Avoid pulling in includes that make gtm_icu.c uncompilable */
 # include <sys/types.h>
 # include "gtm_stat.h"
@@ -50,10 +55,12 @@
 # include "eintr_wrappers.h"
 # include "min_max.h"
 # include "wbox_test_init.h"
+# include "get_fs_block_size.h"
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__)
 #include <sys/vfs.h>
+#include "is_fstype_nfs.h"
 #endif
 
 error_def(ERR_PREMATEOF);
@@ -73,7 +80,7 @@ error_def(ERR_PREMATEOF);
 #define WAIT_FOR_BLOCK_TIME	100 /* msec */
 
 #define IOCTL(FDESC, REQUEST, ARG, RC)			\
-{							\
+MBSTART {						\
 	do						\
 	{						\
 		RC = ioctl(FDESC, REQUEST, ARG);	\
@@ -82,23 +89,23 @@ error_def(ERR_PREMATEOF);
 		RC = 0;					\
 	else						\
 		RC = errno;				\
-}
+} MBEND
 
 #define OPENFILE(FNAME, FFLAGS, FDESC)			\
-{							\
+MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN(FNAME, FFLAGS);		\
 	} while(-1 == FDESC && EINTR == errno);		\
-}
+} MBEND
 
 #define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC)		\
-{							\
+MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN3(FNAME, FFLAGS, FMODE);	\
 	} while(-1 == FDESC && EINTR == errno);		\
-}
+} MBEND
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
 
@@ -106,7 +113,7 @@ error_def(ERR_PREMATEOF);
  * This is used for system calls, e.g, pipe, that do not support O_CLOEXEC.
  */
 #define SETFDCLOEXECALWAYS(FDESC) 					\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	if (-1 != FDESC) 						\
 	{ 								\
@@ -115,20 +122,20 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags) 						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	} 								\
-}
+} MBEND
 
 /* Versions of the OPEN* macros that cause the file descriptor to be closed before an EXEC. */
 
 /* If the platform really supports O_CLOEXEC use it in the OPEN */
 #if defined(O_CLOEXEC) && !defined(_AIX) && !defined(__sparc)
 #define OPEN_CLOEXEC(FNAME, FFLAGS, FDESC)	\
-{						\
+MBSTART {					\
 	FDESC = OPEN(FNAME, FFLAGS | O_CLOEXEC);\
-}
+} MBEND
 #define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)  	\
-{							\
+MBSTART {						\
 	FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);\
-}
+} MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
 #define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)	OPENFILE_SYNC(FNAME, FFLAGS | O_CLOEXEC, FDESC);
 #define OPENFILE3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)	OPENFILE3(FNAME, FFLAGS | O_CLOEXEC, FMODE, FDESC);
@@ -143,7 +150,7 @@ error_def(ERR_PREMATEOF);
 #else
 /* If the platform does not support O_CLOEXEC, use fcntl with FD_CLOEXEC */
 #define OPEN_CLOEXEC(FNAME, FFLAGS, FDESC)				\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	FDESC = OPEN(FNAME, FFLAGS);					\
 	if (-1 != FDESC)						\
@@ -153,9 +160,9 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags)						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	}								\
-}
+} MBEND
 #define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)			\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	FDESC = OPEN3(FNAME, FFLAGS, FMODE);				\
 	if (-1 != FDESC)						\
@@ -165,9 +172,9 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags)						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	}								\
-}
+} MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)				\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	OPENFILE(FNAME, FFLAGS, FDESC);					\
 	if (-1 != FDESC)						\
@@ -177,10 +184,10 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags)						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	}								\
-}
+} MBEND
 
 #define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)			\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	OPENFILE_SYNC(FNAME, FFLAGS, FDESC);				\
 	if (-1 != FDESC)						\
@@ -190,10 +197,10 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags)						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	}								\
-}
+} MBEND
 
 #define OPENFILE3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)			\
-{									\
+MBSTART {								\
 	int flags, fcntl_res;						\
 	OPENFILE3(FNAME, FFLAGS, FMODE, FDESC);				\
 	if (-1 != FDESC)						\
@@ -203,160 +210,95 @@ error_def(ERR_PREMATEOF);
 	    if (-1 != flags)						\
 		FCNTL3(FDESC, F_SETFD, (flags | FD_CLOEXEC), fcntl_res);\
 	}								\
-}
+} MBEND
 #define SETOCLOEXEC(FFLAGS) (FFLAGS)
 #define SETSOCKCLOEXEC(FFLAGS) (FFLAGS)
 #define SETFDCLOEXEC(FDESC)		\
-{					\
+MBSTART {				\
 	SETFDCLOEXECALWAYS(FDESC);	\
-}
+} MBEND
 #endif
+
+#define OPENFILE_DB(FNAME, FFLAGS, UDI, SEG)									\
+MBSTART {													\
+	DCL_THREADGBL_ACCESS;											\
+														\
+	SETUP_THREADGBL_ACCESS;											\
+	if (!IS_AIO_ON_SEG(SEG))										\
+	{													\
+		OPENFILE_CLOEXEC(FNAME, FFLAGS, UDI->fd);							\
+		UDI->fd_opened_with_o_direct = FALSE;								\
+	} else													\
+	{													\
+		OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, UDI->fd);							\
+		if (FD_INVALID != udi->fd)									\
+		{												\
+			UDI->fd_opened_with_o_direct = TRUE;							\
+			/* Get filesystem block size and use that to align future reads/writes */		\
+			UDI->db_fs_block_size = get_fs_block_size(UDI->fd);					\
+			/* Until we read the db file header, we do not know the blocksize so allocate space	\
+			 * initially to read the db file header. Later we can expand this to fit a GDS block	\
+			 * in case that turns out to be bigger than the file header. The global variable	\
+			 * "dio_buff" is filled in with the aligned/unaligned buffer details.			\
+			 */											\
+			DIO_BUFF_EXPAND_IF_NEEDED(UDI, SGMNT_HDR_LEN, &(TREF(dio_buff)));			\
+		}												\
+	}													\
+} MBEND
 
 #define FSTYPE_ADVFS	"advfs"
 #define FSTYPE_UFS	"ufs"
 
-#if defined(_AIX)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
-/* Note: putting the DIRECTIO_FLAG definition before the #if and then redefining it below for the two exceptions
- * causes a warning on sparc - "macro redefined: DIRECTIO_FLAG" so it is repeated in each part of the big #define
- */
-#define DIRECTIO_FLAG	O_DIRECT
-#elif defined(__osf__)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
-{															\
-	struct statvfs	statvfs_buf;											\
-	int		macro_errno;											\
-	boolean_t	dio_success = TRUE;										\
-	if (-1 == statvfs(FNAME, &statvfs_buf))										\
-	{														\
-		macro_errno = errno;											\
-		util_out_print("Error finding FS type for file, !AD :!AD", OPER,					\
-				LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
-		dio_success = FALSE;											\
-	} else if (strcmp(FSTYPE_ADVFS, statvfs_buf.f_basetype))							\
-			dio_success = FALSE;										\
-	if (dio_success)												\
-	{														\
-		OPENFILE(FNAME, FFLAGS | O_DIRECTIO | O_DSYNC, FDESC);							\
-	} else														\
-	{														\
-		OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);								\
-	}														\
-}
-#define DIRECTIO_FLAG	O_DIRECTIO
-#elif defined(__sparc)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
-{															\
-	struct statvfs	statvfs_buf;											\
-	int		macro_errno;											\
-	boolean_t	dio_success = TRUE;										\
-	if (-1 == statvfs(FNAME, &statvfs_buf))										\
-	{														\
-		macro_errno = errno;											\
-		util_out_print("Error finding FS type for file, !AD. !AD", OPER,					\
-				LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
-		dio_success = FALSE;											\
-	} else if (strcmp(FSTYPE_UFS, statvfs_buf.f_basetype))								\
-			dio_success = FALSE;										\
-	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);									\
-	if (dio_success && (FD_INVALID != FDESC))									\
-	{														\
-		if (-1 == directio(FDESC, DIRECTIO_ON))									\
-		{													\
-			macro_errno = errno;										\
-			util_out_print("Failed to set DIRECT IO option for !AD, reverting to normal IO. !AD ",		\
-					OPER, LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));			\
-		}													\
-	}														\
-}
-#define DIRECTIO_FLAG	0
-#elif defined(__MVS__)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
-#define DIRECTIO_FLAG	0
-#elif defined(__linux__) || defined(__CYGWIN__)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
-#define DIRECTIO_FLAG	O_DIRECT
-#elif defined(__hpux)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
-#define DIRECTIO_FLAG	O_DIRECT
+#if defined(__MVS__)
+#	define	O_DIRECT_FLAGS				(O_SYNC)
 #else
-#error UNSUPPORTED PLATFORM
+#	define	O_DIRECT_FLAGS				(O_DIRECT | O_DSYNC)
 #endif
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT_FLAGS, FDESC);
 
 #if defined( __linux__) || defined(__CYGWIN__)
 /* A special handling was needed for linux due to its inability to lock
  * over NFS.  The only difference in code is an added check for NFS file
  * thru fstatfs
- *
- * This should ideally include <linux/nfs_fs.h> for NFS_SUPER_MAGIC.
- * However, this header file doesn't seem to be standard and gives lots of
- * compilation errors and hence defining again here.  The constant value
- * seems to be portable across all linuxes (courtesy 'statfs' man pages)
  */
-#define NFS_SUPER_MAGIC 0x6969
 #define LOCK_IS_ALLOWED(FDESC, STATUS)								\
-{												\
+MBSTART {											\
 	struct statfs buf;									\
 	STATUS = ((-1 != fstatfs(FDESC, &buf)) && (NFS_SUPER_MAGIC != buf.f_type)) ? 0 : -2;	\
-}
+} MBEND
 #else
 #define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
 #endif
 #define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)	OPENFILE(FNAME, FFLAG, FDESC)
 #define CLOSE_OBJECT_FILE(FDESC, RC)		CLOSEFILE_RESET(FDESC, RC)
 #define CLOSEFILE(FDESC, RC)					\
-{								\
+MBSTART {							\
 	do							\
 	{							\
 		RC = close(FDESC);				\
 	} while(-1 == RC && EINTR == errno);			\
 	if (-1 == RC)	/* Had legitimate error - return it */	\
 		RC = errno;					\
-}
+} MBEND
 
 #define	CLOSEFILE_RESET(FDESC, RC)	\
-{					\
-	CLOSEFILE(FDESC, RC)		\
+MBSTART {				\
+	CLOSEFILE(FDESC, RC);		\
 	FDESC = FD_INVALID;		\
-}
+} MBEND
 
 /* Close file only if we have it open. Use FCNTL to check if we have it open */
 #define CLOSEFILE_IF_OPEN(FDESC, RC)							\
-{											\
+MBSTART {										\
 	int	flags;									\
 											\
 	FCNTL2(FDESC, F_GETFL, flags);							\
 	if ((-1 != flags) || (EBADF != errno))						\
 		CLOSEFILE(FDESC, RC);	/* file is a valid descriptor. Close it */	\
-}
-
-#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || \
-	defined(__CYGWIN__) || defined(__MVS__)
-/* These platforms are known to support pread/pwrite.
- * !!!!!!!!!!!!!! Note !!!!!!!!!!!!!!
- * pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would,
- * so they are NOT a drop-in replacement !!
- */
-
-#define NOPIO_ONLY(X)
-
-#define GET_LSEEK_FLAG(FDESC, VAL)
-
-/* If definitions are flying around for pread/pread64, don't override them. Otherwise on HPUX
-   we need to run the 64bit versions of these calls because the POSIX version linkage to the
-   64 bit variation is broken. SE 07/2005.
-*/
-#if (defined(__hpux) && !defined(__ia64))
-# if !defined(pread) && !defined(pread64)
-#  define pread pread64
-#  define pwrite pwrite64
-# else
-#  error "** Interference with pread/pwrite defines - HPUX may have fixed their problem **"
-# endif
-#endif
+} MBEND
 
 #define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)						\
-{												\
+MBSTART {											\
 	ssize_t			gtmioStatus;							\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
@@ -384,13 +326,19 @@ error_def(ERR_PREMATEOF);
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
-}
+} MBEND
+
+#define	DB_LSEEKREAD(UDI, FD, OFFSET, BUFF, SIZE, STATUS)		\
+MBSTART {								\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);		\
+	LSEEKREAD(FD, OFFSET, BUFF, SIZE, STATUS);			\
+} MBEND
 
 /* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
  * bytes ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
  */
 #define LSEEKREAD_AVAILABLE(FDESC, FPTR, FBUFF, FBUFF_LEN, ACTUAL_READLEN, RC)			\
-{												\
+MBSTART {											\
 	ssize_t			gtmioStatus;							\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
@@ -420,10 +368,42 @@ error_def(ERR_PREMATEOF);
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
-}
+} MBEND
+
+#define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)			\
+MBSTART {											\
+	memset(&CR->aiocb, 0, SIZEOF(struct aiocb));						\
+	CR->aiocb.aio_nbytes = (size_t) FBUFF_LEN;						\
+	CR->aiocb.aio_offset = (off_t) FPTR;							\
+	LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC);					\
+} MBEND
+
+#define LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC)					\
+MBSTART {											\
+	GBLREF 	boolean_t	async_restart_got_eagain;					\
+	ssize_t			gtmioStatus;							\
+												\
+	CR->aiocb.aio_buf = IF_LIBAIO((unsigned long)) FBUFF;					\
+	CR->aiocb.aio_fildes = FDESC;								\
+	assert(0 < CR->aiocb.aio_nbytes);							\
+	assert(0 < CR->aiocb.aio_offset);							\
+	AIO_SHIM_WRITE(CSA->region, &(CR->aiocb), gtmioStatus);					\
+	if (0 == gtmioStatus)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+	{											\
+		assert(FALSE);									\
+		RC = -1;		/* Something kept us from initiating the write */	\
+	}											\
+	assert((-1 < gtmioStatus) IF_LIBAIO(|| (EAGAIN == RC)));				\
+	if (EAGAIN == RC)									\
+		BG_TRACE_PRO_ANY(CSA, async_restart_eagain);					\
+} MBEND
 
 #define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)						\
-{												\
+MBSTART {											\
 	ssize_t			gtmioStatus;							\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
@@ -451,162 +431,10 @@ error_def(ERR_PREMATEOF);
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-}
-
-#else /* real lseek and read/write - still need to protect against interrupts inbetween calls */
-/* Using lseek/read/write path instead of faster pread/pwrite path */
-
-#ifndef __MVS__
-#warning "Using lseek/read/write path instead of faster pread/pwrite path"
-#endif
-
-#define NOPIO_ONLY(X) X
-
-/* Note array is not initialized but first IO to a given file descriptor will initialize that element */
-#define GET_LSEEK_FLAGS_ARRAY									\
-{												\
-	GBLREF	boolean_t	*lseekIoInProgress_flags;					\
-	int4	sc_open_max;									\
-	if ((boolean_t *)0 == lseekIoInProgress_flags)						\
-	{											\
-		SYSCONF(_SC_OPEN_MAX, sc_open_max);						\
-		lseekIoInProgress_flags = (boolean_t *)malloc(sc_open_max * SIZEOF(boolean_t));	\
-	}											\
-}
-
-#define GET_LSEEK_FLAG(FDESC, VAL)				\
-{								\
-	GBLREF	boolean_t	*lseekIoInProgress_flags;	\
-	GET_LSEEK_FLAGS_ARRAY;					\
-	VAL = lseekIoInProgress_flags[(FDESC)];			\
-}
-
-#define SET_LSEEK_FLAG(FDESC, VAL)				\
-{								\
-	GBLREF	boolean_t	*lseekIoInProgress_flags;	\
-	GET_LSEEK_FLAGS_ARRAY;					\
-	lseekIoInProgress_flags[(FDESC)] = VAL;			\
-}
-
-#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)					\
-{											\
-	GBLREF boolean_t	*lseekIoInProgress_flags;				\
-	ssize_t			gtmioStatus;						\
-	size_t			gtmioBuffLen;						\
-	off_t			gtmioPtr;						\
-	sm_uc_ptr_t		gtmioBuff;						\
-	SET_LSEEK_FLAG(FDESC, TRUE);							\
-	gtmioBuffLen = FBUFF_LEN;							\
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF);						\
-	gtmioPtr = (off_t)(FPTR);							\
-	for (;;)									\
-	{										\
-		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))	\
-		{									\
-			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))	\
-			{								\
-				gtmioBuffLen -= gtmioStatus;				\
-				if (0 == gtmioBuffLen || 0 == gtmioStatus)		\
-					break;						\
-				gtmioBuff += gtmioStatus;				\
-				gtmioPtr += gtmioStatus;				\
-				continue;						\
-			}								\
-		}									\
-		if (EINTR != errno)							\
-			break;								\
-	}										\
-	if (0 == gtmioBuffLen)								\
-		RC = 0;									\
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */		\
-		RC = errno;								\
-	else										\
-		RC = -1;		/* Something kept us from reading what we wanted */	\
-	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
-}
-
-/* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
- * bytes ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
- */
-#define LSEEKREAD_AVAILABLE(FDESC, FPTR, FBUFF, FBUFF_LEN, ACTUAL_READLEN, RC)			\
-{												\
-	GBLREF boolean_t	*lseekIoInProgress_flags;					\
-	ssize_t			gtmioStatus;							\
-	size_t			gtmioBuffLen;							\
-	off_t			gtmioPtr;							\
-	sm_uc_ptr_t		gtmioBuff;							\
-												\
-	SET_LSEEK_FLAG(FDESC, TRUE);								\
-	gtmioBuffLen = FBUFF_LEN;								\
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
-	gtmioPtr = (off_t)(FPTR);								\
-	for (;;)										\
-	{											\
-		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))		\
-		{										\
-			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))		\
-			{									\
-				gtmioBuffLen -= gtmioStatus;					\
-				if (0 == gtmioBuffLen || 0 == gtmioStatus)			\
-					break;							\
-				gtmioBuff += gtmioStatus;					\
-				gtmioPtr += gtmioStatus;					\
-				continue;							\
-			}									\
-		}										\
-		if (EINTR != errno)								\
-			break;									\
-	}											\
-	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
-	if (0 == gtmioBuffLen)									\
-		RC = 0;										\
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
-		RC = errno;									\
-	else											\
-		RC = -1;		/* Something kept us from reading what we wanted */	\
-	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
-}
-
-#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) 						\
-{												\
-	GBLREF boolean_t	*lseekIoInProgress_flags;					\
-	ssize_t			gtmioStatus;							\
-	size_t			gtmioBuffLen;							\
-	off_t			gtmioPtr;							\
-	sm_uc_ptr_t		gtmioBuff;							\
-	SET_LSEEK_FLAG(FDESC, TRUE);								\
-	gtmioBuffLen = FBUFF_LEN;								\
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
-	gtmioPtr = (off_t)(FPTR);								\
-	for (;;)										\
-	{											\
-		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))		\
-		{										\
-			if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))	\
-			{									\
-				gtmioBuffLen -= gtmioStatus;					\
-				if (0 == gtmioBuffLen)						\
-					break;							\
-				gtmioBuff += gtmioStatus;					\
-				gtmioPtr += gtmioStatus;					\
-				continue;							\
-			}									\
-		}										\
-		if (EINTR != errno)								\
-			break;									\
-	}											\
-	if (0 == gtmioBuffLen)									\
-		RC = 0;										\
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
-		RC = errno;									\
-	else											\
-		RC = -1;		/* Something kept us from writing what we wanted */	\
-	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
-}
-#endif /* if old lseekread/writes */
+} MBEND
 
 #define DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC)							\
-{												\
+MBSTART {											\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
 	sm_uc_ptr_t	gtmioBuff;								\
@@ -630,10 +458,10 @@ error_def(ERR_PREMATEOF);
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
-}
+} MBEND
 
 #define DOREADRL(FDESC, FBUFF, FBUFF_LEN, RLEN)							\
-{												\
+MBSTART {											\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
 	sm_uc_ptr_t	gtmioBuff;								\
@@ -655,11 +483,11 @@ error_def(ERR_PREMATEOF);
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
 	else						/* Had legitimate error - return it */	\
 		RLEN = -1;									\
-}
+} MBEND
 
 #define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN,				\
-		    TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
-{														\
+			TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
+MBSTART {													\
 	ssize_t		gtmioStatus;										\
 	int		skip_read = FALSE;									\
 	int		tfcntl_res;										\
@@ -712,7 +540,8 @@ error_def(ERR_PREMATEOF);
 			}											\
 		}												\
 		/* if we didn't read 1 character or it's an error don't read anymore now */			\
-		if (TRUE == skip_read) break;									\
+		if (skip_read)											\
+			break;											\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))					\
 		{												\
 			gtmioBuffLen -= gtmioStatus;								\
@@ -739,10 +568,10 @@ error_def(ERR_PREMATEOF);
 		*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen);						\
 		RLEN = -1;											\
 	}													\
-}
+} MBEND
 
 #define DOWRITE(FDESC, FBUFF, FBUFF_LEN)						\
-{											\
+MBSTART {										\
 	ssize_t		gtmioStatus;							\
 	size_t		gtmioBuffLen;							\
 	sm_uc_ptr_t	gtmioBuff;							\
@@ -757,17 +586,16 @@ error_def(ERR_PREMATEOF);
 			if (0 == gtmioBuffLen)						\
 				break;							\
 			gtmioBuff += gtmioStatus;					\
-		}									\
-		else if (EINTR != errno)						\
-		  break;								\
+		} else if (EINTR != errno)						\
+			break;								\
 	}										\
 	/* assertpro(FALSE)? */								\
-}
+} MBEND
 
 #define DOWRITERC_RM(RM, FBUFF, FBUFF_LEN, RC)									\
-{														\
+MBSTART {													\
 	if (0 == RM->fsblock_buffer_size)									\
-		DOWRITERC(RM->fildes, FBUFF, FBUFF_LEN, RC)							\
+		DOWRITERC(RM->fildes, FBUFF, FBUFF_LEN, RC);							\
 	else													\
 	{													\
 		GBLREF	int	gtm_non_blocked_write_retries;							\
@@ -806,10 +634,10 @@ error_def(ERR_PREMATEOF);
 		else												\
 			RC = errno;		/* Something kept us from writing what we wanted */		\
 	}													\
-}
+} MBEND
 
 #define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
-{												\
+MBSTART {											\
 	GBLREF	int	gtm_non_blocked_write_retries;						\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
@@ -842,10 +670,10 @@ error_def(ERR_PREMATEOF);
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-}
+} MBEND
 
 #define DOLLAR_DEVICE_SET(DEVPTR,STATUS)							\
-{												\
+MBSTART {											\
 	len = SIZEOF(ONE_COMMA) - 1;								\
 	memcpy(DEVPTR->dollar.device, ONE_COMMA, len);					\
 	errptr = (char *)STRERROR(STATUS);							\
@@ -853,10 +681,10 @@ error_def(ERR_PREMATEOF);
 	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar.device) - SIZEOF(ONE_COMMA));	\
 	memcpy(&DEVPTR->dollar.device[len], errptr, errlen);				\
 	DEVPTR->dollar.device[len + errlen] = '\0';					\
-}
+} MBEND
 
 #define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)						\
-{											\
+MBSTART {										\
 	int	len;									\
 	int	errlen;									\
 	char	*errptr;								\
@@ -867,12 +695,12 @@ error_def(ERR_PREMATEOF);
 		memcpy(DEVPTR->dollar.device, ONE_COMMA_UNAVAILABLE, len);		\
 	} else										\
 		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
-}
+} MBEND
 
 #define DOWRITERL_RM(RM, FBUFF, FBUFF_LEN, RLEN)								\
-{														\
+MBSTART {													\
 	if (0 == RM->fsblock_buffer_size)									\
-		DOWRITERL(RM->fildes, FBUFF, FBUFF_LEN, RLEN)							\
+		DOWRITERL(RM->fildes, FBUFF, FBUFF_LEN, RLEN);							\
 	else													\
 	{													\
 		ssize_t		gtmioStatus;									\
@@ -912,10 +740,10 @@ error_def(ERR_PREMATEOF);
 		else						/* Had legitimate error - return it */		\
 			RLEN = -1;										\
 	}													\
-}
+} MBEND
 
 #define DOWRITERL(FDESC, FBUFF, FBUFF_LEN, RLEN)						\
-{												\
+MBSTART {											\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
 	sm_uc_ptr_t	gtmioBuff;								\
@@ -948,31 +776,31 @@ error_def(ERR_PREMATEOF);
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
 	else						/* Had legitimate error - return it */	\
 		RLEN = -1;									\
-}
+} MBEND
 
 #define DO_FILE_READ(CHANNEL, OFFSET, READBUFF, LEN, STATUS1, STATUS2)		\
-{										\
+MBSTART {									\
 	STATUS2 = SS_NORMAL;							\
 	LSEEKREAD(CHANNEL, OFFSET, READBUFF, LEN, STATUS1);			\
 	if (-1 == STATUS1)							\
 		STATUS1 = ERR_PREMATEOF;					\
-}
+} MBEND
 
-#define DB_DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
-{										\
-	STATUS2 = SS_NORMAL;							\
-	DB_LSEEKWRITE(NULL, NULL, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);	\
-	if (-1 == STATUS1)							\
-		STATUS1 = ERR_PREMATEOF;					\
-}
+#define DB_DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)				\
+MBSTART {												\
+	STATUS2 = SS_NORMAL;										\
+	DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);	\
+	if (-1 == STATUS1)										\
+		STATUS1 = ERR_PREMATEOF;								\
+} MBEND
 
 #define JNL_DO_FILE_WRITE(CSA, JNL_FN, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
-{												\
+MBSTART {											\
 	STATUS2 = SS_NORMAL;									\
 	JNL_LSEEKWRITE(CSA, JNL_FN, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);			\
 	if (-1 == STATUS1)									\
 		STATUS1 = ERR_PREMATEOF;							\
-}
+} MBEND
 
 typedef struct
 {
@@ -985,7 +813,7 @@ typedef struct
  * applied to all Unix platforms, even though all except z/OS seem to work with monster writes.
  */
 #define WRITEPIPE(FDESC, PIPESZ, FBUFF, FBUFF_LEN, RC)						\
-{												\
+MBSTART {											\
 	GBLREF	int	gtm_non_blocked_write_retries;						\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
@@ -1020,46 +848,49 @@ typedef struct
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-}
+} MBEND
 
 #define FFLUSH(STREAM)							\
-{									\
+MBSTART {								\
 	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_FFLUSH, prev_intrpt_state);		\
 	fflush(STREAM);							\
 	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH, prev_intrpt_state);		\
-}
+} MBEND
 
 /* Macros to deal with calls which are not async-signal-safe */
 
 #define GETC(STREAM, RC)							\
-{										\
+MBSTART {									\
 	GBLREF boolean_t	multi_thread_in_use;				\
 	char			*rname;						\
+	intrpt_state_t		prev_intrpt_state;				\
 	/* Use the right system call based on threads are in use or not */	\
+	DEFER_INTERRUPTS(INTRPT_IN_GETC, prev_intrpt_state);			\
 	if (!INSIDE_THREADED_CODE(rname))					\
 		RC = getc_unlocked(STREAM);					\
 	else									\
 		RC = getc(STREAM);						\
-}
+	ENABLE_INTERRUPTS(INTRPT_IN_GETC, prev_intrpt_state);			\
+} MBEND
 
 #define CLEARERR(STREAM)						\
-{									\
+MBSTART {								\
 	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
 	clearerr(STREAM);						\
 	ENABLE_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);	\
-}
+} MBEND
 
 #define FEOF(STREAM, RC)						\
-{									\
+MBSTART {								\
 	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
 	RC = feof(STREAM);						\
 	ENABLE_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);	\
-}
+} MBEND
 
 #endif

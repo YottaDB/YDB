@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,33 +114,5 @@ int dse_ksrch(block_id srch,
 	if (((blk_hdr_ptr_t) bp)->levl && *pp > 0 && *pp < cs_addrs->ti->total_blks && (*pp % cs_addrs->hdr->bplmap)
 	    && dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len))
 		return TRUE;
-	return FALSE;
-}
-
-int dse_key_srch(block_id srch, block_id_ptr_t key_path, int4 *off, char *targ_key, int targ_len)
-{
-	int	status;
-
-	status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
-	if (status)
-		return status;
-	else if(!patch_find_root_search)
-	{	/* We are not searching for the global name in the directory tree and search for the regular-key
-		 * has failed. So, adjust to the input key with special subscript to indicate it as a spanning node key.
-		 * call dse_ksrch() again.
-		 */
-		targ_len -= 1;		/* back off 1 to overlay terminator */
-		SPAN_INITSUBS((span_subs *)(targ_key + targ_len), 0);
-		targ_len += SPAN_SUBS_LEN;
-		targ_key[targ_len++] = KEY_DELIMITER;
-		targ_key[targ_len++] = KEY_DELIMITER;
-		patch_path_count = 1; 	/*This indicates the length of the path of node in gvtree*/
-		patch_find_root_search = FALSE;
-		status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
-		/* Undo updates to "targ_key" */
-		targ_len -= (SPAN_SUBS_LEN + 2);
-		targ_key[targ_len] = KEY_DELIMITER;
-		return status;
-	}
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,6 +63,7 @@
 #include "tp.h"
 #include "gtmcrypt.h"
 #include "is_proc_alive.h"
+#include "gtm_reservedDB.h"
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF	bool			mu_ctrlc_occurred;

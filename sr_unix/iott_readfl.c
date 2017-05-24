@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -614,8 +614,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							{
 								for (i = 0; i < delchar_width; i++)
 								{
-									DOWRITERC(tt_ptr->fildes, eraser,
-										SIZEOF(eraser), status)
+									DOWRITERC(tt_ptr->fildes, eraser, SIZEOF(eraser), status);
 									if (0 != status)
 										break;
 								}

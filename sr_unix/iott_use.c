@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "stringpool.h"
 #include "send_msg.h"
 #include "namelook.h"
+#include "gtm_conv.h"
 #include "error.h"
 #include "gtm_tputs.h"
 #include "gtm_tparm.h"
@@ -72,7 +73,7 @@ error_def(ERR_ZINTRECURSEIO);
 
 void iott_use(io_desc *iod, mval *pp)
 {
-	boolean_t		flush_input;
+	boolean_t		flush_input, terminator_specified = FALSE;
 	char			dc1, *ttab;
 	d_tt_struct		*temp_ptr, *tt_ptr;
 	int			p_offset, fil_type, save_errno, status;
@@ -81,6 +82,8 @@ void iott_use(io_desc *iod, mval *pp)
 	io_termmask		mask_term;
 	struct sigaction	act;
 	struct termios		t;
+	mstr			chset_mstr;
+	gtm_chset_t		temp_chset, old_ochset, old_ichset;
 	uint4			mask_in;
 	unsigned char		ch, len;
 	boolean_t		ch_set;
@@ -114,6 +117,8 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		mask_in = temp_ptr->term_ctrl;
 		mask_term = temp_ptr->mask_term;
+		old_ochset = iod->ochset;
+		old_ichset = iod->ichset;
 		while (*(pp->str.addr + p_offset) != iop_eol)
 		{
 			switch (ch = *(pp->str.addr + p_offset++))
@@ -301,6 +306,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_terminator:
 					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), SIZEOF(io_termmask));
+					terminator_specified = TRUE;
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					if (mask_term.mask[0] == NUL &&
 						mask_term.mask[1] == NUL &&
@@ -310,17 +316,10 @@ void iott_use(io_desc *iod, mval *pp)
 						mask_term.mask[5] == NUL &&
 						mask_term.mask[6] == NUL &&
 						mask_term.mask[7] == NUL)
-					{
 						temp_ptr->default_mask_term = TRUE;
-						if (CHSET_UTF8 == d_in->ichset)
-						{
-							mask_term.mask[0] = TERM_MSK_UTF8_0;
-							mask_term.mask[4] = TERM_MSK_UTF8_4;
-						} else
-							mask_term.mask[0] = TERM_MSK;
-					} else
+					else
 						temp_ptr->default_mask_term = FALSE;
-						break;
+					break;
 				case iop_noterminator:
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					temp_ptr->default_mask_term = FALSE;
@@ -403,6 +402,14 @@ void iott_use(io_desc *iod, mval *pp)
 							ICONV_OPEN_CD(iod->input_conv_cd,
 								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
 #						endif
+						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+						SET_ENCODING(temp_chset, &chset_mstr);
+						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+							break;	/* ignore UTF chsets if not utf8_mode. */
+						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+								 chset_mstr.len, chset_mstr.addr);
+						iod->ichset = temp_chset;
 						break;
 					}
 				case iop_opchset:
@@ -417,6 +424,26 @@ void iott_use(io_desc *iod, mval *pp)
 							ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
 								(char *)(pp->str.addr + p_offset + 1));
 #						endif
+						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+						SET_ENCODING(temp_chset, &chset_mstr);
+						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+							break;	/* ignore UTF chsets if not utf8_mode. */
+						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+								 chset_mstr.len, chset_mstr.addr);
+						iod->ochset = temp_chset;
+						break;
+					}
+				case iop_chset:
+					{
+						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+						SET_ENCODING(temp_chset, &chset_mstr);
+						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+							break;	/* ignore UTF chsets if not utf8_mode. */
+						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+								 chset_mstr.len, chset_mstr.addr);
+						iod->ichset = iod->ochset = temp_chset;
 						break;
 					}
 			}
@@ -427,8 +454,24 @@ void iott_use(io_desc *iod, mval *pp)
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
-		temp_ptr->term_ctrl = mask_in;
-		memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
+		if (tt == d_in->type)
+		{
+			temp_ptr->term_ctrl = mask_in;
+			/* reset the mask to default if chset was changed without specifying new terminators or Default */
+			if ((!terminator_specified && (old_ichset != iod->ichset)) ||
+				(terminator_specified && temp_ptr->default_mask_term))
+			{
+				memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+				if (CHSET_M != iod->ichset)
+				{
+					mask_term.mask[0] = TERM_MSK_UTF8_0;
+					mask_term.mask[4] = TERM_MSK_UTF8_4;
+				} else
+					mask_term.mask[0] = TERM_MSK;
+				temp_ptr->default_mask_term = TRUE;
+			}
+			memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
+		}
 		if (flush_input)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);

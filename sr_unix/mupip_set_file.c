@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,8 @@
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
 #include "gtmcrypt.h"
 #include "anticipatory_freeze.h"
+#include "get_fs_block_size.h"
+#include "interlock.h"
 
 GBLREF	bool			in_backup;
 GBLREF	bool			region;
@@ -70,8 +72,10 @@ GBLREF	tp_region		*grlist;
 
 LITREF char			*gtm_dbversion_table[];
 
-ZOS_ONLY(error_def(ERR_BADTAG);)
+error_def(ERR_ASYNCIONOV4);
+error_def(ERR_ASYNCIONOMM);
 error_def(ERR_CRYPTNOMM);
+error_def(ERR_DBBLKSIZEALIGN);
 error_def(ERR_DBFILOPERR);
 error_def(ERR_DBPREMATEOF);
 error_def(ERR_DBRDERR);
@@ -83,6 +87,7 @@ error_def(ERR_MUPIPSET2SML);
 error_def(ERR_MUREENCRYPTV4NOALLOW);
 error_def(ERR_NODFRALLOCSUPP);
 error_def(ERR_NOUSERDB);
+error_def(ERR_OFRZACTIVE);
 error_def(ERR_SETQUALPROB);
 error_def(ERR_TEXT);
 error_def(ERR_WCERRNOTCHG);
@@ -101,24 +106,24 @@ MBSTART {									\
 
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
-	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE;
+	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE, acc_meth_changing;
 	char			acc_spec[MAX_ACC_METH_LEN], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN];
 	enum db_acc_method	access, access_new;
 	enum db_ver		desired_dbver;
 	gd_region		*temp_cur_region;
-	int			defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
+	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
 				encryption_complete_status, epoch_taper_status, extn_count_status,
-				fd, fn_len, glbl_buff_status, inst_freeze_on_error_status, key_size_status,
+				fd, fn_len, glbl_buff_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
 				lock_space_status, mutex_space_status, qdbrundown_status, rec_size_status, reg_exit_stat, rc,
-				rsrvd_bytes_status, sleep_cnt_status, save_errno, status, status1;
+				rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status, status1;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_key_size, new_lock_space,
 				new_mutex_space, new_rec_size, new_sleep_cnt, new_spin_sleep, reserved_bytes, spin_sleep_status;
-	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
-	unix_db_info		*udi;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
+	gd_segment		*seg;
+	uint4			fsb_size, reservedDBFlags;
 	ZOS_ONLY(int 		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -150,6 +155,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	} else
 		access = n_dba;		/* really want to keep current method,
 					    which has not yet been read */
+	if (asyncio_status = cli_present("ASYNCIO"))
+		need_standalone = TRUE;
 	defer_allocate_status = cli_present("DEFER_ALLOCATE");
 	if (encryptable_status = cli_present("ENCRYPTABLE"))
 		need_standalone = TRUE;
@@ -219,6 +226,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		}
 		need_standalone = TRUE;
 	}
+	if (locksharesdbcrit = cli_present("LCK_SHARES_DB_CRIT"))
+		need_standalone = TRUE;
 	if (lock_space_status = cli_present("LOCK_SPACE"))
 	{
 		if (cli_get_int("LOCK_SPACE", &new_lock_space))
@@ -331,6 +340,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			exit_stat |= EXIT_ERR;
 		}
 	}
+	if (stats_status = cli_present("STATS"))
+		need_standalone = TRUE;
 	if (cli_present("VERSION"))
 	{
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
@@ -383,7 +394,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				exit_stat |= EXIT_WRN;
 				continue;
 			}
-			if (!mupfndfil(rptr->reg, NULL))
+			if (!mupfndfil(rptr->reg, NULL, LOG_ERROR_TRUE))
 				continue;
 			fn = (char *)rptr->reg->dyn.addr->fname;
 			fn_len = rptr->reg->dyn.addr->fname_len;
@@ -395,45 +406,64 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		mu_gv_cur_reg_init();
 		memcpy(gv_cur_region->dyn.addr->fname, fn, fn_len);
 		gv_cur_region->dyn.addr->fname_len = fn_len;
+		acc_meth_changing = FALSE;
 		if (need_standalone)
 		{	/* Following part needs standalone access */
 			got_standalone = STANDALONE(gv_cur_region);
 			if (FALSE == got_standalone)
 			{
 				exit_stat |= EXIT_WRN;
+				mu_gv_cur_reg_free();
 				continue;
 			}
 			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
-			if (FD_INVALID == (fd = OPEN(fn, O_RDWR)))
+			if (FD_INVALID == (fd = OPEN(fn, O_RDWR)))	/* udi not available so OPENFILE_DB not used */
 			{
 				save_errno = errno;
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
 				continue;
 			}
-#ifdef __MVS__
+#			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
-#endif
+#			endif
 			LSEEKREAD(fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
 			if (0 != status)
 			{
 				save_errno = errno;
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 				if (-1 != status)
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 				else
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
 				continue;
 			}
 			if ((n_dba != access) && (pvt_csd->acc_meth != access))	/* n_dba is a proxy for no change */
 			{
-				if ((dba_mm == access) && USES_ENCRYPTION(pvt_csd->is_encrypted))
+				acc_meth_changing = TRUE;
+				if (dba_mm == access)
 				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
-					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
-					continue;
+					if (USES_ENCRYPTION(pvt_csd->is_encrypted))
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2,
+											DB_LEN_STR(gv_cur_region));
+						DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
+						continue;
+					}
+					if (pvt_csd->asyncio && (CLI_NEGATED != asyncio_status))
+					{	/* ASYNCIO=ON */
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOMM, 6,
+							DB_LEN_STR(gv_cur_region), LEN_AND_LIT(" has ASYNCIO enabled;"),
+							LEN_AND_LIT("enable MM"));
+					} else if (!pvt_csd->asyncio && (CLI_PRESENT == asyncio_status))
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOMM, 6,
+							DB_LEN_STR(gv_cur_region), LEN_AND_LIT(";"),
+							LEN_AND_LIT("enable MM and ASYNCIO at the same time"));
+						reg_exit_stat |= EXIT_WRN;
+					}
 				}
 				if (dba_mm == access)
 					pvt_csd->defer_time = 1;			/* defer defaults to 1 */
@@ -549,12 +579,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				}
 				pvt_csd->max_key_size = new_key_size;
 			}
+			if (locksharesdbcrit)
+				pvt_csd->lock_crit_with_db = CLI_PRESENT == locksharesdbcrit;
 			if (lock_space_status)
 				pvt_csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
 			if (mutex_space_status)
 				NUM_CRIT_ENTRY(pvt_csd) = new_mutex_space;
 			if (qdbrundown_status)
-				pvt_csd->mumps_can_bypass = CLI_PRESENT == qdbrundown_status;
+				pvt_csd->mumps_can_bypass = (CLI_PRESENT == qdbrundown_status);
 			if (rec_size_status)
 			{
 				if (pvt_csd->max_rec_size > new_rec_size)
@@ -575,6 +607,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				}
 				pvt_csd->reserved_bytes = reserved_bytes;
 			}
+			if (stats_status)
+			{
+				reservedDBFlags = pvt_csd->reservedDBFlags & ~RDBF_NOSTATS;
+				if (CLI_NEGATED == stats_status)
+					reservedDBFlags |= RDBF_NOSTATS;
+				pvt_csd->reservedDBFlags = reservedDBFlags;
+			}
 			if (EXIT_NRM != reg_exit_stat)
 			{
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, reg_exit_stat);
@@ -584,6 +623,19 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else /* if (!need_standalone) */
 		{
 			got_standalone = FALSE;
+			if (region)
+			{	/* We have a region from a gld file. Find out asyncio setting from there. And copy that
+				 * over to the dummy region we created. This is to avoid DBGLDMISMATCH errors inside "gvcst_init".
+				 */
+				COPY_AIO_SETTINGS(gv_cur_region->dyn.addr, rptr->reg->dyn.addr); /* copies from rptr->reg->dyn.addr
+												  * to gv_cur_region->dyn.addr
+												  */
+			} else
+			{	/* We do not have a region from a gld file. All we have is the name of the db file.
+				 * "db_init" (invoked by "gvcst_init") takes care of initializing the "asyncio" field
+				 * as appropriate.
+				 */
+			}
 			gvcst_init(gv_cur_region);
 			change_reg();	/* sets cs_addrs and cs_data */
 			if (gv_cur_region->read_only)
@@ -597,6 +649,19 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			csd = cs_data;
 			assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
 			grab_crit(gv_cur_region);
+			if (FROZEN_CHILLED(cs_data))
+			{
+				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+				if (FROZEN_CHILLED(cs_data))
+				{
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,
+								DB_LEN_STR(gv_cur_region));
+					exit_stat |= EXIT_WRN;
+					exit_stat |= gds_rundown();
+					mu_gv_cur_reg_free();
+					continue;
+				}
+			}
 		}
 		access_new = (n_dba == access ? csd->acc_meth : access);
 		if (GDSVLAST != desired_dbver)
@@ -630,8 +695,35 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				reg_exit_stat |= EXIT_WRN;
 			}
 		}
+		if (asyncio_status && (CLI_PRESENT == asyncio_status))
+		{
+			if (!csd->fully_upgraded)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOV4, 6, DB_LEN_STR(gv_cur_region),
+					LEN_AND_LIT("V4 format"), LEN_AND_LIT("enable ASYNCIO"));
+				reg_exit_stat |= EXIT_WRN;
+			}
+			if (!acc_meth_changing && (dba_bg != access_new))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOMM, 6, DB_LEN_STR(gv_cur_region),
+					LEN_AND_LIT(" has MM access method;"), LEN_AND_LIT("enable ASYNCIO"));
+				reg_exit_stat |= EXIT_WRN;
+			}
+			seg = gv_cur_region->dyn.addr;
+			/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
+			fsb_size = get_fs_block_size(got_standalone ? fd : FILE_INFO(gv_cur_region)->fd);
+			if (0 != (csd->blk_size % fsb_size))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBBLKSIZEALIGN, 4,
+							DB_LEN_STR(gv_cur_region), csd->blk_size, fsb_size);
+				reg_exit_stat |= EXIT_WRN;
+			}
+		}
 		if (EXIT_NRM == reg_exit_stat)
 		{
+			if (n_dba != access)
+				util_out_print("Database file !AD now has !AD access method", TRUE,
+					       fn_len, fn, 2, ((dba_bg == csd->acc_meth) ? "BG" : "MM"));
 			if (defer_allocate_status)
 			{
 #				if defined(__sun) || defined(__hpux)
@@ -646,7 +738,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (disk_wait_status)
 				csd->wait_disk_space = new_disk_wait;
 			if (epoch_taper_status)
-				csd->epoch_taper = CLI_PRESENT == epoch_taper_status;
+				csd->epoch_taper = (CLI_PRESENT == epoch_taper_status);
+			if (asyncio_status)
+				csd->asyncio = (CLI_PRESENT == asyncio_status);
 			if (extn_count_status)
 				csd->extension_size = (uint4)new_extn_count;
 			change_fhead_timer("FLUSH_TIME", csd->flush_time,
@@ -661,6 +755,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (spin_sleep_status)
 				SPIN_SLEEP_MASK(csd) = new_spin_sleep;
 			/* --------------------- report results ------------------------- */
+			if (asyncio_status)
+			{
+				if (csd->asyncio)
+					util_out_print("Database file !AD now has asyncio !AD", TRUE,
+						       fn_len, fn, LEN_AND_LIT("enabled"));
+				else
+					util_out_print("Database file !AD now has asyncio !AD", TRUE,
+						       fn_len, fn, LEN_AND_LIT("disabled"));
+			}
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
 					TRUE, fn_len, fn, csd->wait_disk_space);
@@ -686,7 +789,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					TRUE, fn_len, fn, SPIN_SLEEP_MASK(csd));
 			if (got_standalone)
 			{
-				DB_LSEEKWRITE(NULL, NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
+				DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
 				if (0 != status)
 				{
 					save_errno = errno;
@@ -694,7 +797,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("write : !AZ", TRUE, errptr);
 					util_out_print("Error writing header of file", TRUE);
 					util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 				}
 				if (defer_status && (dba_mm == pvt_csd->acc_meth))
 					util_out_print("Database file !AD now has defer_time set to !SL",
@@ -709,6 +812,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD now has encryptable flag set to !AD", TRUE,
 							fn_len, fn, 5,
 							(TO_BE_ENCRYPTED(pvt_csd->is_encrypted) ? " TRUE" : "FALSE"));
+				if (locksharesdbcrit)
+					util_out_print("Database file !AD now has LOCK sharing crit with DB !AD", TRUE,
+							fn_len, fn, 5, (pvt_csd->lock_crit_with_db ? " TRUE" : "FALSE"));
 				if (lock_space_status)
 					util_out_print("Database file !AD now has lock space !UL pages",
 							TRUE, fn_len, fn, pvt_csd->lock_space_size/OS_PAGELET_SIZE);
@@ -724,6 +830,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				if (rsrvd_bytes_status)
 					util_out_print("Database file !AD now has !UL reserved bytes",
 							TRUE, fn_len, fn, pvt_csd->reserved_bytes);
+				if (stats_status)
+					util_out_print("Database file !AD now has sharing of gvstats set to !AD", TRUE,
+						       fn_len, fn, 5, (CLI_PRESENT == stats_status) ? " TRUE" : "FALSE");
 			} else
 				wcs_flu(WCSFLU_FLUSH_HDR);
 		} else
@@ -735,9 +844,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{
 			rel_crit(gv_cur_region);
-			exit_stat |=gds_rundown();
-			mu_gv_cur_reg_free();
+			exit_stat |= gds_rundown();
 		}
+		mu_gv_cur_reg_free();
 	}
 	free(pvt_csd);
 	assert(!(exit_stat & EXIT_INF));

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,16 +43,17 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 
+error_def (ERR_DBOPNERR);
+
 cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 {
-	cm_region_head  *ptr,*last;
+	cm_region_head  *last, *ptr;
 	struct stat	stat_buf;
 	unsigned char	*fname, buff[256];
 	unsigned short	len;
 	uint4		status, retlen;
-	unsigned char	node[MAX_HOST_NAME_LEN];
+	unsigned char	ch, node[MAX_HOST_NAME_LEN], *tmp_ptr;
 	sgmnt_addrs	*csa;
-	error_def (ERR_DBOPNERR);
 
 	ptr = 0;
 	fname = cnx->clb_ptr->mbf;
@@ -62,7 +64,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	memcpy(buff, fname, len);
 	STAT_FILE((char *)buff, &stat_buf, status);
 	if ((uint4)-1 == status)
-		rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
 	last = reglist;
 	for (ptr = reglist ; ptr ; ptr = ptr->next)
 	{
@@ -99,10 +101,21 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		set_gdid_from_stat(&FILE_INFO(ptr->reg)->fileid, &stat_buf);
 		ptr->reg_hash = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 		if (-1 != gethostname((char *)node, SIZEOF(node)))
-		{
-			retlen = USTRLEN((char *)node);
+		{	/* In case the nodename is in lower-case, convert it to upper-case. This is because
+			 * region-names that start with a lower-case have special meaning in GT.M. See IS_STATSDB_REGNAME.
+			 */
+		 	tmp_ptr = node;
+			do
+			{
+				ch = *tmp_ptr;
+				if ('\0' == ch)
+					break;
+				*tmp_ptr++ = TOUPPER(ch);
+			} while (TRUE);
+			retlen = tmp_ptr - node;
 			retlen = MIN(retlen, MAX_RN_LEN - 1);
 			memcpy(ptr->reg->rname, node, retlen);
+
 		} else
 			retlen = 0;
 		ptr->reg->rname[retlen] = ':';

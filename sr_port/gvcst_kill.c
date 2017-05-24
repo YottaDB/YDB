@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,10 +18,7 @@
 #include "gtm_stdio.h"
 #include "gtm_inet.h"	/* Required for gtmsource.h */
 
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
-
+#include "gtmio.h"
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -44,13 +41,12 @@
 #include "interlock.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
-#ifdef GTM_TRIGGER
-# include "gv_trigger.h"
-# include "gtm_trigger.h"
-# include "gv_trigger_protos.h"
-# include "mv_stent.h"
-# include "stringpool.h"
-#endif
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#include "gv_trigger_protos.h"
+#include "mv_stent.h"
+#include "stringpool.h"
+#include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
 
@@ -111,7 +107,7 @@ GBLREF	uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE ma
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
-UNIX_ONLY(GBLREF	boolean_t 		span_nodes_disallowed;)
+GBLREF	boolean_t 		span_nodes_disallowed;
 
 error_def(ERR_TPRETRY);
 error_def(ERR_GVKILLFAIL);
@@ -155,9 +151,15 @@ void	gvcst_kill(boolean_t do_subtree)
 		if (!spanstat)
 			return;
 	}
-	VMS_ONLY(assert(FALSE));
-#	ifdef UNIX
 	RTS_ERROR_IF_SN_DISALLOWED;
+#	ifdef DEBUG
+	/* ^%Y* should never be killed (op_gvkill/op_gvzwithdraw would have issued a ERR_PCTYRESERVED error in that case).
+	 * The only exception is if we are removing a ^%YGS record from the statsdb (caller "gvcst_remove_statsDB_linkage"
+	 * but in that case we would have reg->read_only set to FALSE for a statsdb region name. Account for that.
+	 */
+	assert((RESERVED_NAMESPACE_LEN > gv_currkey->end) || (0 != MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE))
+		|| (IS_STATSDB_REGNAME(gv_cur_region) && !gv_cur_region->read_only));
+#	endif
 	oldend = gv_currkey->end;
 	/* Almost certainly have a spanning node to zkill. So start a TP transaction to deal with it. */
 	if (!dollar_tlevel)
@@ -188,7 +190,6 @@ void	gvcst_kill(boolean_t do_subtree)
 		REVERT; /* remove our condition handler */
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
-#	endif
 }
 
 void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks)
@@ -457,7 +458,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 research:
 		if (gvt_root)
 		{
-#if defined(DEBUG) && defined(UNIX)
+			#if defined(DEBUG)
 			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVKILLFAIL == gtm_white_box_test_case_number))
 			{
 				cdb_status = cdb_sc_blknumerr;
@@ -466,7 +467,7 @@ research:
 				 */
 				GOTO_RETRY(cdb_status, SKIP_ASSERT_TRUE);
 			}
-#endif
+			#endif
 			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
 				GOTO_RETRY(cdb_status, SKIP_ASSERT_FALSE);
 			assert(gv_altkey->top == gv_currkey->top);
@@ -482,7 +483,6 @@ research:
 				base[++end] = KEY_DELIMITER;
 			} else
 			{
-#				ifdef UNIX
 				target_key_size = gv_currkey->end + 1;
 				bh = &gv_target->hist.h[0];
 				key_exists = (target_key_size == bh->curr_rec.match);
@@ -525,7 +525,6 @@ research:
 						}
 					}
 				}
-#				endif
 				if (killing_chunks)
 				{	/* Second call of gvcst_kill2 within TP transaction in gvcst_kill
 					 * Kill all hidden subscripts...

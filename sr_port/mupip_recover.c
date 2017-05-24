@@ -90,6 +90,7 @@ error_def(ERR_MUPJNLINTERRUPT);
 error_def(ERR_REPEATERROR);
 error_def(ERR_REPLINSTDBMATCH);
 error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_RESYNCSEQLOW);
 error_def(ERR_RLBKJNSEQ);
 error_def(ERR_RLBKLOSTTNONLY);
 error_def(ERR_RSYNCSTRMSUPPLONLY);
@@ -184,6 +185,7 @@ void	mupip_recover(void)
 	JNL_PUT_MSG_PROGRESS("Initial processing started");
 	mur_init();
 	mur_get_options();
+	DEBUG_ONLY(jgbl.in_mupjnl = TRUE;)
 	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	jgbl.mur_update = mur_options.update;
 	mur_open_files_status = mur_open_files();
@@ -219,7 +221,7 @@ void	mupip_recover(void)
 		{
 			/* These journal files were created by recover so they should be BEFORE_IMAGE */
 			assertpro(jctl->jfh->before_images);
-			assertpro(!mur_options.rollback_losttnonly);	/* dont know how one can end up with NOBEFORE_IMAGE jnl
+			assertpro(!mur_options.rollback_losttnonly);	/* don't know how one can end up with NOBEFORE_IMAGE jnl
 									 * files in intrpt recovery */
 			rctl->jfh_recov_interrupted = TRUE;
 			intrrupted_recov_processing = murgbl.intrpt_recovery = TRUE;
@@ -247,10 +249,8 @@ void	mupip_recover(void)
 		}
 	} else
 		TREF(jnl_extract_nocol) = 0;
-	if (mur_options.rollback && !mur_options.forward)
-	{	/* For backward rollback, determine "max_reg_seqno".
-		 * Note: For all other cases "max_reg_seqno" is uninitialized so should be later used only if backward rollback.
-		 */
+	if (mur_options.rollback)
+	{	/* In case of rollback, determine "max_reg_seqno" */
 		max_reg_seqno = 0;
 		for (regno = 0; regno < reg_total; regno++)
 		{
@@ -357,6 +357,7 @@ void	mupip_recover(void)
 	}
 	if (mur_options.fetchresync_port)
 	{
+		assert(mur_options.rollback);	/* because "max_reg_seqno" (used below) is uninitialized otherwise */
 		JNL_PUT_MSG_PROGRESS("FETCHRESYNC processing started");
 		if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno, max_reg_seqno))
 			mupip_exit(ERR_MUNOACTION);
@@ -386,10 +387,10 @@ void	mupip_recover(void)
 			 * invocations which might have hidden some part of the history records in the instance file.
 			 * So before doing the rollback, make sure the input resync_seqno has a corresponding history
 			 * record. If not, issue a REPLINSTNOHIST error just like a -fetchresync rollback would have done.
-			 * For stream 0, no such hiding of history records is possible so we dont have confusion between
+			 * For stream 0, no such hiding of history records is possible so we don't have confusion between
 			 * the instance file and journal file contents (no possibility of two journal records at different
 			 * points in time having the exact same strm_seqno) so we skip this check in that case. Besides,
-			 * "repl_inst_histinfo_find_seqno" processes strm_index=0 differently and we dont want that behavior.
+			 * "repl_inst_histinfo_find_seqno" processes strm_index=0 differently and we don't want that behavior.
 			 */
 			assert(murgbl.resync_seqno);
 			status = repl_inst_histinfo_find_seqno(murgbl.resync_seqno + 1, murgbl.resync_strm_index, &local_histinfo);
@@ -408,6 +409,14 @@ void	mupip_recover(void)
 	/* Do some adjustments if -resync or -fetchresync was specified and resync_strm_index is non-zero */
 	if (murgbl.resync_seqno)
 	{
+		assert(mur_options.rollback);
+		assert(!mur_options.forward || (INVALID_SUPPL_STRM == murgbl.resync_strm_index));
+		if (mur_options.forward && (murgbl.resync_seqno < max_reg_seqno))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESYNCSEQLOW, 4,
+				&murgbl.resync_seqno, &murgbl.resync_seqno, &max_reg_seqno, &max_reg_seqno);
+			mupip_exit(ERR_MUNOACTION);
+		}
 		/* In case the current instance is supplementary and the remote source is also supplementary, and a
 		 * resync seqno has been agreed upon, this is the unified seqno and not the stream-specific seqno
 		 * even though "murgbl.resync_strm_index" is actually 0 in this case. In this case, do not set
@@ -426,7 +435,8 @@ void	mupip_recover(void)
 		}
 	}
 	/* PHASE 2: Create list of broken transactions for both forward and backward recovery
-	 *          In addition apply PBLK for backward recover with noverify */
+	 *          In addition apply PBLK for backward recover with noverify.
+	 */
 	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.rollback_losttnonly && !mur_options.verify);
 	murgbl.mur_state = MUR_STATE_BACKWARD;
 	murgbl.ok_to_update_db = apply_pblk;	/* Allow db to be updated by the PBLKs if we chose to apply them */
@@ -444,12 +454,11 @@ void	mupip_recover(void)
 					min_broken_time, min_broken_time);
 		min_broken_seqno = losttn_seqno = MAXUINT8;
 	} else
-	{	/* In case of -ROLLBACK -BACKWARD, mur_back_process returns with "losttn_seqno" set to a pre-resolve-seqno.
-		 * This is the earliest seqno that is possibly lost in the journal files in case of a system crash.
-		 * In case of -ROLLBACK -FORWARD, it is possible this did not get set, in case of -VERIFY.
-		 * In that case though, it will get initialized in "mur_process_seqno_table". So assert accordingly.
+	{	/* In case of -ROLLBACK -BACKWARD or -ROLLBACK -FORWARD, mur_back_process returns with "losttn_seqno" set
+		 * to a pre-resolve-seqno. This is the earliest seqno that is possibly lost in the journal files in case
+		 * of a system crash. So assert accordingly.
 		 */
-		assert((0 != losttn_seqno) || mur_options.forward);
+		assert(0 != losttn_seqno);
 	}
        	/* Multi_region TP/ZTP resolution */
 	if (!mur_options.forward)

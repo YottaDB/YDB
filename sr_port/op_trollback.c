@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,7 @@
 #include "tp_unwind.h"
 #include "op.h"
 #include "jobinterrupt_process.h"
+#include "gvcst_protos.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -73,7 +75,9 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	sgmnt_addrs	*csa;
 	tp_region	*tr;
 	int		tl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (implicit_trollback)
 	{
 		/* Unlike the call to "op_trollback" from generated code, this invocation of "op_trollback" is from C runtime code.
@@ -101,7 +105,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as
 		 * updated blocks). This is typically needed for a restart.
 		 */
-		tp_clean_up(TRUE);
+		tp_clean_up(TP_ROLLBACK);
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
 			curreg = tr->reg;
@@ -151,6 +155,11 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		dollar_trestart = 0;
 		if (!reg_reset)
 			RESTORE_GV_CUR_REGION;
+		/* Transaction is complete as the outer transaction has been rolled back. Check now to see if any statsDB
+		 * region initializations were deferred and drive them now if they were.
+		 */
+		if (NULL != TREF(statsDB_init_defer_anchor))
+			gvcst_deferred_init_statsDB();
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 	} else
 	{

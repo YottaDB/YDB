@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2015 Fidelity National Information 	*
+ * Copyright (c) 2002-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 
 boolean_t cli_disallow_mupip_backup(void);
 boolean_t cli_disallow_mupip_crypt(void);
+boolean_t cli_disallow_mupip_dumpfhead(void);
 boolean_t cli_disallow_mupip_extract(void);
 boolean_t cli_disallow_mupip_freeze(void);
 boolean_t cli_disallow_mupip_integ(void);

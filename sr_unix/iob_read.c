@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,26 +31,25 @@
 #include "error.h"
 #include "iob.h"
 #include "gtmio.h"
-void iob_flush(BFILE *bf);
+#include "gtmmsg.h"
+
+GBLREF	uint4		restore_read_errno;
+
+error_def(ERR_IOEOF);
 
 void iob_read(BFILE *bf, char *buf, int nbytes)
 {
 	int4	nread, nreread;
 	int	rc;
 
-	error_def(ERR_IOEOF);
-
 	if (bf->write_mode)
 	{
 		iob_flush(bf);
 		bf->write_mode = FALSE;
 	}
-
-#ifdef DEBUG_IOB
-	PRINTF("iob_read:\tiob_read(%x, %x, %d), bf->remaining = %d\n",
-	       bf, buf, nbytes, bf->remaining);
-#endif
-
+#	ifdef DEBUG_IOB
+	PRINTF("iob_read:\tiob_read(%x, %x, %d), bf->remaining = %d\n", bf, buf, nbytes, bf->remaining);
+#	endif
 	while (nbytes > bf->remaining)
 	{
 		/* copy bytes remaining in buffer */
@@ -59,47 +59,23 @@ void iob_read(BFILE *bf, char *buf, int nbytes)
 
 		/* refill */
 		DOREADRL(bf->fd, bf->buf, bf->bufsiz, nread);
-#ifdef DEBUG_IOB
-		PRINTF("iob_read:\t\tread(%d, %x, %d) = %d\n", bf->fd, bf->buf,
-		       bf->bufsiz, nread);
-#endif
+#		ifdef DEBUG_IOB
+		PRINTF("iob_read:\t\tread(%d, %x, %d) = %d\n", bf->fd, bf->buf, bf->bufsiz, nread);
+#		endif
 		bf->bptr = bf->buf;
 		bf->remaining = nread;
-
-		if (nread == -1)
+		/* In case of error, set global variable "restore_read_errno" and return to caller ("mupip_restore")
+		 * for it to do cleanup before exiting.
+		 */
+		if ((-1 == nread) || (0 == nread) || (nread % bf->blksiz))
 		{
-			rts_error(VARLSTCNT(1) errno);
+			restore_read_errno = ((-1 == nread) ? errno : ERR_IOEOF);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) restore_read_errno);
+			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			return;
 		}
-		else if (nread == 0 || nread % bf->blksiz)
-		{
-			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
-			rts_error(VARLSTCNT(1) ERR_IOEOF);
-
-			/* if we continued from here, assume that this is a magnetic
-			   tape and we have loaded the next volume. Re-open and
-			   finish the read operation.
-			   */
-			while (FD_INVALID == (bf->fd = OPEN3(bf->path,bf->oflag,bf->mode)))
-				rts_error(VARLSTCNT(1) errno);
-
-			DOREADRL(bf->fd, bf->buf + nread, bf->bufsiz - nread, nreread);
-#ifdef DEBUG_IOB
-			PRINTF("iob_read:\t\tread(%d, %x, %d) = %d\n", bf->fd, bf->buf,
-			       bf->bufsiz, nread);
-#endif
-			if (nreread < bf->bufsiz - nread)
-			{
-				rts_error(VARLSTCNT(1) errno);
-				return;
-			}
-			bf->remaining = nread;
-		}
 	}
-
 	memcpy(buf, bf->bptr, nbytes);
 	bf->bptr += nbytes;
 	bf->remaining -= nbytes;
 }
-
-

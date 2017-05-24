@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,8 @@
 #include "mvalconv.h"
 #include "op.h"
 #include "is_canonic_name.h"
+#include "stringpool.h"
+#include "zshow.h"
 
 error_def(ERR_FNNAMENEG);
 error_def(ERR_NOCANONICNAME);
@@ -33,7 +36,7 @@ void op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
 	MV_FORCE_STR(prechomp);
 	depth = MV_FORCE_INT(depthval);
 	if (depth < 0)
-		rts_error(VARLSTCNT(1) ERR_FNNAMENEG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FNNAMENEG);
 	subscripts = depth + 1;
 	*finaldst = *prechomp;
 	if (subscripts > MAX_LVSUBSCRIPTS)
@@ -41,7 +44,7 @@ void op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
 	if (!is_canonic_name(prechomp, &subscripts, &start, &dummy))
 	{	/* op_indfnname should have passed us a valid name */
 		assert(FALSE);
-		rts_error(VARLSTCNT(4) ERR_NOCANONICNAME, 2, prechomp->str.len, prechomp->str.addr);
+		NOCANONICNAME_ERROR(prechomp);
 	}
 	if (start)
 	{	/* indeed have subscripts to remove */

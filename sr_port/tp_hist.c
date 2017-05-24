@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,24 +85,25 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
 enum cdb_sc tp_hist(srch_hist *hist1)
 {
-	int 		hist_index;
-	srch_hist	*hist;
-	off_chain	chain;
-	srch_blk_status	*t1, *t2;
-	block_id	blk;
-	srch_blk_status	*local_hash_entry;
-	enum cdb_sc	status = cdb_sc_normal;
-	boolean_t	is_mm, store_history, was_crit;
-	sgm_info	*si;
-	ht_ent_int4	*tabent, *lookup_tabent;
-	cw_set_element	*cse;
-	cache_rec_ptr_t	cr;
-	sgmnt_addrs	*csa;
+	int			hist_index;
+	srch_hist		*hist;
+	off_chain		chain;
+	srch_blk_status		*t1, *t2;
+	block_id		blk;
+	srch_blk_status		*local_hash_entry;
+	enum cdb_sc		status = cdb_sc_normal;
+	boolean_t		is_mm, store_history, was_crit;
+	sgm_info		*si;
+	ht_ent_int4		*tabent, *lookup_tabent;
+	cw_set_element		*cse;
+	cache_rec_ptr_t		cr;
+	sgmnt_addrs		*csa;
+	node_local_ptr_t	cnl;
 #	ifdef DEBUG
-	boolean_t	wc_blocked;
-	boolean_t	ready2signal_gvundef_lcl;
+	boolean_t		wc_blocked;
+	boolean_t		ready2signal_gvundef_lcl;
 #	endif
-	gv_namehead	*gvt;	/* store local copy of global "gv_target" for faster access */
+	gv_namehead		*gvt;	/* store local copy of global "gv_target" for faster access */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -116,6 +118,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));
 	si = sgm_info_ptr;
 	csa = si->tp_csa;
+	cnl = csa->nl;
 	gvt = gv_target;
 	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
 	assert(hist1 != &gvt->hist);
@@ -186,10 +189,10 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				/* Assert that cr->in_tend is never equal to our process_id since at this point we should
 				 * never have locked a buffer for phase2 commit. The only exception is if the previous
 				 * transaction by this process had a commit-time error and secshr_db_clnup finished the
-				 * transaction and had set csa->nl->wc_blocked to TRUE. It is possible in that case no process
+				 * transaction and had set cnl->wc_blocked to TRUE. It is possible in that case no process
 				 * has yet done a cache-recovery by the time we come to tp_hist as part of the next transaction
 				 * in which case cr->in_tend could still be pointing to our process_id. Note that
-				 * csa->nl->wc_blocked could be changing concurrently so need to note it down in a local
+				 * cnl->wc_blocked could be changing concurrently so need to note it down in a local
 				 * variable BEFORE checking the value of cr->in_tend.
 				 */
 				DEBUG_ONLY(wc_blocked = cs_addrs->nl->wc_blocked;)
@@ -219,7 +222,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						status = cdb_sc_blkmod;
 						BREAK_IN_PRO__CONTINUE_IN_DBG;
 					} else
-					{	/* In case of VMS, it is possible we (gvcst_search) could have been looking at
+					{	/* In case of twinning, it is possible we (gvcst_search) could have been looking at
 						 * a newly formed twin buffer while setting the first_rec portion of the clue.
 						 * It is possible that the twin buffer was obtained by a db_csh_getn and that
 						 * it does not yet contain the records of the block we were interested in. This
@@ -232,14 +235,14 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						 * "recompute_upd_array" function) so a similar reset of the first_rec needs to
 						 * happen there too.
 						 *
-						 * In Unix, there is no twinning so we dont have that issue. But it is possible
-						 * that if gvcst_search is reading from a buffer that is being modified
-						 * concurrently, it could pick up the first half of first_rec from the pre-update
-						 * copy of the block and the second half of first_rec from the post-update copy of
-						 * the block. Depending on the actual byte sequences, it is possible that this
-						 * mixed first_rec is LESSER than the correct value. This could therefore cause
-						 * DBKEYORD integ errors in case this is used for the next transaction. It is
-						 * therefore necessary to invalidate the first_rec in this case (C9J07-003162).
+						 * Even if there is no twinning, it is possible that if gvcst_search is reading
+						 * from a buffer that is being modified concurrently, it could pick up the first
+						 * half of first_rec from the pre-update copy of the block and the second half of
+						 * first_rec from the post-update copy of the block. Depending on the actual byte
+						 * sequences, it is possible that this mixed first_rec is LESSER than the correct
+						 * value. This could therefore cause DBKEYORD integ errors in case this is used
+						 * for the next transaction. It is therefore necessary to invalidate the first_rec
+						 * in this case (C9J07-003162).
 						 */
 						if (gvt->clue.end)
 							GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
@@ -287,8 +290,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				if ((t1 != t2) && t1->cr)
 				{
 					assert(((sm_long_t)GDS_REL2ABS(t1->cr->buffaddr) == (sm_long_t)t1->buffaddr)
-						UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)
-							  || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
+						|| (0 != cnl->onln_rlbk_pid) || MISMATCH_ROOT_CYCLES(csa, cnl));
 					if (t1->cycle != t1->cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -300,8 +302,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				if (cr)
 				{
 					assert(((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t2->buffaddr)
-						UNIX_ONLY( || (0 != csa->nl->onln_rlbk_pid)
-							   || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
+						|| (0 != cnl->onln_rlbk_pid) || MISMATCH_ROOT_CYCLES(csa, cnl));
 					if (t2->cycle != cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -432,8 +433,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
 			{
 				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
-				assert((t2->tn <= t1->tn) UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)
-								    || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
+				assert((t2->tn <= t1->tn) || (0 != cnl->onln_rlbk_pid) || MISMATCH_ROOT_CYCLES(csa, cnl));
 				/* Take this time to also check that gv_targets match between t1 and t2.
 				 * If they dont, the restart should be detected in tp_tend.
 				 * Set the flag donot_commit to catch the case this does not restart.
@@ -444,8 +444,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		}
 #		endif
 	}
-#	ifdef UNIX
-	if (MISMATCH_ROOT_CYCLES(csa, csa->nl))
+	if (MISMATCH_ROOT_CYCLES(csa, cnl))
 	{	/* We want to sync the online rollback cycles ONLY under crit. So, grab_crit and sync the
 		 * cycles. While grab_crit_immediate would have been a better choice, the reason we don't use
 		 * grab_crit_immediate here is because if we don't sync cycles because we don't hold crit but
@@ -460,10 +459,10 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		if (!was_crit)
 			grab_crit(gv_cur_region);
 		status = cdb_sc_gvtrootmod2;
-		if (MISMATCH_ONLN_RLBK_CYCLES(csa, csa->nl))
+		if (MISMATCH_ONLN_RLBK_CYCLES(csa, cnl))
 		{
 			assert(!mupip_jnl_recover);
-			status = ONLN_RLBK_STATUS(csa, csa->nl);
+			status = ONLN_RLBK_STATUS(csa, cnl);
 			SYNC_ONLN_RLBK_CYCLES;
 			SYNC_ROOT_CYCLES(NULL);
 		} else
@@ -471,7 +470,11 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 	}
-#	endif
+	if (si->start_tn <= cnl->last_wcs_recover_tn)
+	{
+		status = cdb_sc_wcs_recover;
+		assert(CDB_STAGNATE > t_tries);
+	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 	ADD_TO_GVT_TP_LIST(gvt, RESET_FIRST_TP_SRCH_STATUS_FALSE);	/* updates gvt->read_local_tn & adds gvt to gvt_tp_list

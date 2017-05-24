@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,9 @@
 #include "eintr_wrappers.h"
 #include "db_snapshot.h"
 
+error_def(ERR_SSFILOPERR);
+error_def(ERR_SSPREMATEOF);
+
 static void ss_print_blk_details(block_id, blk_hdr_ptr_t);
 
 static void ss_print_fil_hdr(snapshot_filhdr_ptr_t);
@@ -47,20 +51,18 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	block_id		blkno;
 	unsigned int		*bitmap_buffer = NULL;
 
-	error_def(ERR_SSPREMATEOF);
-	error_def(ERR_SSFILOPERR);
 	OPENFILE(filename, O_RDONLY, shdw_fd);
 	if (FD_INVALID == shdw_fd)
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), flen, filename, status);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), flen, filename, status);
 	}
 	LSEEKREAD(shdw_fd, 0, ((sm_uc_ptr_t)&ss_filhdr), SNAPSHOT_HDR_SIZE, status);
 	if (0 != status)
 	{
 		if (-1 != status)
 		{
-			gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
 			return;
 		} else
 		{
@@ -82,7 +84,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	{
 		if (-1 != status)
 		{
-			gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
 			return;
 		} else
 		{
@@ -105,17 +107,19 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 		bit = blkno % BLKS_PER_WORD;
 		if (num & (1 << bit))
 		{
-			blk_offset = ((DISK_BLOCK_SIZE * (off_t)(shadow_vbn - 1)) + ((off_t)(blkno) * db_blk_size));
+			blk_offset = (BLK_ZERO_OFF(shadow_vbn) + (off_t)blkno * db_blk_size);
 			LSEEKREAD(shdw_fd, blk_offset, bp, db_blk_size, status);
 			if (0 != status)
 			{
 				if (-1 != status)
 				{
-					gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"),
+													flen, filename, status);
 					return;
 				} else
 				{
-					gtm_putmsg(VARLSTCNT(7) ERR_SSPREMATEOF, 5, blkno, db_blk_size, blk_offset, flen, filename);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, blkno,
+											db_blk_size, blk_offset, flen, filename);
 					return;
 				}
 			}

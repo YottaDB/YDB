@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,10 +33,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gt_timer.h"
-#ifdef UNIX
 #include "mutex.h"
-#endif
-#include "op.h"
 #include "fgncalsp.h"
 #include "zcall_package.h"
 #include "gtm_exit_handler.h"
@@ -47,11 +44,13 @@
 #include "secshr_db_clnup.h"
 #include "gtmcrypt.h"
 #include "relinkctl.h"
+#include "gvcst_protos.h"
+#include "op.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		need_core;			/* Core file should be created */
-GBLREF	boolean_t		created_core;			/* core file was created */
+GBLREF	boolean_t		created_core;			/* Core file was created */
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		exit_handler_active;
@@ -60,8 +59,9 @@ GBLREF 	boolean_t		is_tracing_on;
 
 enum rundown_state
 {
-	rundown_state_mprof,
 	rundown_state_lock,
+	rundown_state_mprof,
+	rundown_state_statsdb,
 	rundown_state_db,
 	rundown_state_io,
 	rundown_state_last
@@ -112,12 +112,10 @@ GBLREF	int			process_exiting;
 	SET_PROCESS_EXITING_TRUE;									\
 	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */	\
 	/* Note we call secshr_db_clnup() with the flag NORMAL_TERMINATION even in an error condition	\
-	 * here because we know at this point that we aren't in the middle of a transaction but crit	\
-	 * may be held in one or more regions and/or other odds/ends to cleanup.			\
+	 * here because we know at this point that we aren't in the middle of a transaction commit but	\
+	 * crit	may be held in one or more regions and/or other odds/ends to cleanup.			\
 	 */												\
 	secshr_db_clnup(NORMAL_TERMINATION);								\
-	if (dollar_tlevel)										\
-		OP_TROLLBACK(0);									\
 	zcall_halt();											\
 	op_lkinit();											\
 	op_unlock();											\
@@ -169,11 +167,13 @@ void gtm_exit_handler(void)
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;
-	attempting = rundown_state_mprof;
+	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
-	RUNDOWN_STEP(rundown_state_mprof, rundown_state_lock, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
-	RUNDOWN_STEP(rundown_state_lock, rundown_state_db, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
+	RUNDOWN_STEP(rundown_state_lock, rundown_state_mprof, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
+	RUNDOWN_STEP(rundown_state_mprof, rundown_state_statsdb, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
+	/* The condition handler used in the gvcst_remove_statsDB_linkage_all() path takes care of sending errors */
+	RUNDOWN_STEP(rundown_state_statsdb, rundown_state_db, 0, gvcst_remove_statsDB_linkage_all());
 	RUNDOWN_STEP(rundown_state_db, rundown_state_io, ERR_GVRUNDOWN, gv_rundown());
 	/* We pass 0 (not ERR_IORUNDOWN) below to avoid displaying any error if io_rundown fails. One reason we have
 	 * seen an external filter M program fail is with a "SYSTEM-E-ENO32, Broken pipe" error if the source or receiver

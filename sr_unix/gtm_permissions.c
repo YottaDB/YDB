@@ -27,16 +27,39 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 
-GBLREF  char		gtm_dist[GTM_PATH_MAX];
-GBLREF  boolean_t	gtm_dist_ok_to_use;
+GBLREF		char		gtm_dist[GTM_PATH_MAX];
+GBLREF		boolean_t	gtm_dist_ok_to_use;
+STATICDEF	gid_t		*gid_list = NULL;
+STATICDEF	int		gid_list_len = 0;
 
-#if defined(__hpux) && defined(__hppa)
-#	define LIBGTMSHR "%s/libgtmshr.sl"
-#elif defined(__MVS__)
+#if defined(__MVS__)
 #	define LIBGTMSHR "%s/libgtmshr.dll"
 #else
 #	define LIBGTMSHR "%s/libgtmshr.so"
 #endif
+
+/* Get the process's group list and stash the information to avoid repeated calls */
+#define GETGROUPS								\
+MBSTART {									\
+	int	tmp_gid_list_len;						\
+	if (NULL == gid_list)							\
+	{	/* Obtain the supplementary gid list */				\
+		tmp_gid_list_len = getgroups(0, NULL);				\
+		assert(0 <= tmp_gid_list_len);					\
+		if (0 < tmp_gid_list_len)					\
+		{								\
+			gid_list = malloc(tmp_gid_list_len * SIZEOF(gid_t));	\
+			gid_list_len = getgroups(tmp_gid_list_len, gid_list);	\
+			assert(gid_list_len == tmp_gid_list_len);		\
+			if (gid_list_len != tmp_gid_list_len)			\
+			{							\
+				gid_list_len = 0;				\
+				free(gid_list);					\
+				gid_list = NULL;				\
+			}							\
+		}								\
+	}									\
+} MBEND
 
 /* Return the group id of the distribution based on libgtmshr.xx[x]. If there is some
  * problem accessing that file then return INVALID_GID which signals no change to group.  Otherwise,
@@ -73,14 +96,32 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 /* Return TRUE if the "uid" parameter is a member of the "gid" group parameter.
  * Return FALSE if it is not.
  */
-int gtm_member_group_id(uid_t uid, gid_t gid)
+boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 {
 	struct group	*grp;
 	struct passwd	*pwd;
+	int		i;
 
-	/* Check effective group if current effective uid */
-	if ((GETEUID() == uid) && (GETEGID() == gid))
-		return(TRUE);
+#	ifdef DEBUG
+	if (WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+	{
+		GETGROUPS;
+		return FALSE;
+	}
+#	endif
+	/* Effective user is uid ?*/
+	if (GETEUID() == uid)
+	{	/* Effective group is gid? */
+		if (GETEGID() == gid)
+			return(TRUE);
+		GETGROUPS;
+		/* Search through the supplementary gid list for a match */
+		for (i = 0; i < gid_list_len; i++)
+			if (gid == gid_list[i])
+				return (TRUE);
+		/* EUID == uid but gid is not in any groups associated with the process */
+		return FALSE;
+	}
 	/* Get "uid" details */
 	pwd = getpwuid(uid);
 	if (NULL == pwd)
@@ -108,7 +149,8 @@ int gtm_member_group_id(uid_t uid, gid_t gid)
  *	c) *user_id to the user id to be used.
  *		If the user is root, *user_id may be set to a target uid if needed. Otherwise, it will be set to INVALID_UID.
  */
-void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type)
+boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm,
+			  enum perm_target_types target_type, struct perm_diag_data *pdd)
 {
 	uid_t		this_uid, file_uid;
 	gid_t		this_gid, file_gid;
@@ -121,7 +163,9 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 	int		gtm_group_restricted;
 	int		file_owner_perms, file_group_perms, file_other_perms;
 	int		new_owner_perms, new_group_perms, new_other_perms;
-	mode_t		st_mode;
+	char		*strnow, *strtop;
+	int		i, len;
+	mode_t		st_mode, dir_mode = 0;
 
 	/* get this_uid/gid */
 	this_uid = GETEUID();
@@ -131,8 +175,8 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 	/* set variables for permission logic */
 	this_uid_is_file_owner = (this_uid == file_uid);
 	this_uid_is_root = (0 == this_uid);
-	this_uid_in_file_group = gtm_member_group_id(this_uid, file_gid);
-	owner_in_file_group = gtm_member_group_id(file_uid, file_gid);
+	this_uid_in_file_group = gtm_member_group_id(this_uid, file_gid, pdd);
+	owner_in_file_group = gtm_member_group_id(file_uid, file_gid, pdd);
 	*user_id = INVALID_UID;		/* set default uid */
 	*group_id = INVALID_GID;	/* set default gid */
 	assert((PERM_FILE & target_type) || (PERM_IPC & target_type));	/* code below relies on this */
@@ -179,7 +223,6 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 			*perm = new_owner_perms | new_group_perms;
 		}
 		*group_id = file_gid;			/* use file group */
-		assert(this_uid_in_file_group || this_uid_is_root);
 	} else
 	{	/* File is other accessible OR accessible to user and group but not other */
 		file_other_perms = (0006 & st_mode);
@@ -196,7 +239,8 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 		}
 		/* Find restricted group, if any */
 		gtm_dist_gid = gtm_get_group_id(&dist_stat_buff);
-		gtm_group_restricted = ((INVALID_GID != gtm_dist_gid) && !(dist_stat_buff.st_mode & 01)); /* not other executable */
+		dir_mode = dist_stat_buff.st_mode;
+		gtm_group_restricted = ((INVALID_GID != gtm_dist_gid) && !(dir_mode & 01)); /* not other executable */
 		if ((this_uid_is_file_owner && this_uid_in_file_group) || this_uid_is_root)
 		{
 			if (this_uid_is_root)		/* otherwise, use default uid */
@@ -212,7 +256,8 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 			new_group_perms = (new_group_perms | (new_other_perms << 3));
 			if (gtm_group_restricted)
 			{
-				assert(gtm_member_group_id(this_uid, gtm_dist_gid));
+				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
 				*group_id = gtm_dist_gid;	/* use restricted group */
 				*perm = new_owner_perms | new_group_perms;
 			} else
@@ -234,7 +279,7 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 		} else
 		{	/* This uid has access via file group OR file other membership */
 			/* Use default uid in all cases below */
-			if (this_uid_in_file_group && owner_in_file_group)
+			if ((this_uid_in_file_group && owner_in_file_group) || this_uid_is_root)
 			{
 				*group_id = file_gid;		/* use file group */
 				assert(file_group_perms);
@@ -242,9 +287,11 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 				*perm = new_owner_perms | new_group_perms | new_other_perms;
 			} else if (gtm_group_restricted)
 			{
-				assert(gtm_member_group_id(this_uid, gtm_dist_gid));
+				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
 				*group_id = gtm_dist_gid;	/* use restricted group */
 				new_group_perms = (new_group_perms | (new_other_perms << 3));
+				/* "owner" gets group permissions if in group, otherwise "other" permissions */
 				new_owner_perms = this_uid_in_file_group ? (new_group_perms << 3) : (new_other_perms << 6);
 				*perm = new_owner_perms | new_group_perms;
 			} else
@@ -259,7 +306,7 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 					new_owner_perms = new_group_perms << 3;
 				} else
 				{
-					/* Use default group */
+					/* Use default group; Use 'other' permissions for owner */
 					new_owner_perms = (new_other_perms << 6);
 					new_group_perms = (new_group_perms | (new_other_perms << 3));
 					new_other_perms = new_group_perms >> 3;
@@ -271,5 +318,33 @@ void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *p
 	if (target_type & PERM_EXEC)
 		*perm |= ((*perm & 0444) >> 2);	/* Grab the read bits, shift them to the exec bit position, and add them back in. */
 	assert(*perm);
-	return;
+	if (!(this_uid_is_root) && (!(*perm & 0600)
+				|| (!(this_uid_is_file_owner) && !(this_uid_in_file_group) && !(0006 & st_mode))))
+	{	/* Either permissions don't include owner or could not ascertain group membership */
+		pdd->this_uid = this_uid;
+		pdd->this_gid = this_gid;
+		pdd->file_uid = file_uid;	/* get owning file uid */
+		pdd->file_gid = file_gid;	/* get owning file gid */
+		pdd->lib_gid  = gtm_dist_gid;
+		SNPRINTF(pdd->file_perm, SIZEOF(pdd->file_perm), "%04o", st_mode & 07777);
+		SNPRINTF(pdd->lib_perm, SIZEOF(pdd->lib_perm), "%04o", dir_mode  & 07777);
+		if (gid_list_len > 0)
+		{
+			strtop = pdd->print_gid_list + MAX_PRINT_GID_LEN;
+			strnow = pdd->print_gid_list;
+			for (i = 0; (strnow < strtop) && (i < gid_list_len); i++)
+				if (this_gid != gid_list[i]) /* Avoid printing the primary GID */
+					strnow += SNPRINTF(strnow, (strtop - strnow), ",%d", (int) gid_list[i]);
+			if (strnow >= strtop)
+			{	/* It's too long, terminate with an ellipsis*/
+				strnow = pdd->print_gid_list + MAX_PRINT_GID_LEN - GID_ELLIPSIS_LEN;
+				SNPRINTF(strnow, GID_ELLIPSIS_LEN, GID_ELLIPSIS);
+			}
+			pdd->print_gid_list_len = strlen(pdd->print_gid_list);
+			assert(pdd->print_gid_list_len < MAX_PRINT_GID_LEN);
+		} else
+			pdd->print_gid_list_len = 0;
+		return FALSE;
+	}
+	return TRUE;
 }

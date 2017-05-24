@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,16 +11,21 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <errno.h>
-#include <signal.h>
 
+#include <errno.h>
 #ifdef __MVS__
 #include <sys/resource.h>
 #endif
 
+#include "gtm_signal.h"
+
 #include "is_proc_alive.h"
-/*
- * ----------------------------------------------
+
+#ifdef DEBUG
+GBLREF	uint4			process_id;
+#endif
+
+/* ----------------------------------------------
  * Check if process is still alive
  *
  * Arguments:
@@ -50,12 +55,10 @@ bool is_proc_alive(int4 pid, int4 imagecnt)
 #	endif
 	if (status)
 	{
-		assert(status == -1 && (errno == EPERM || errno == ESRCH));
-		if (errno == ESRCH)
-			ret = FALSE;
-		else
-			ret = TRUE;
+		assert((-1 == status) && ((EPERM == errno) || (ESRCH == errno)));
+		ret = (ESRCH != errno);
 	} else
 		ret = TRUE;
+	assert(ret || (process_id != pid));
 	return ret;
 }

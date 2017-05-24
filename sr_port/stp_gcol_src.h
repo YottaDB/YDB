@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -369,7 +369,7 @@ error_def(ERR_STPEXPFAIL);
 #else
 #define DBGSTPGCOL(x)
 #endif
-static void expand_stp(unsigned int new_size)	/* BYPASSOK */
+static void expand_stp(size_t new_size)	/* BYPASSOK */
 {
 	if (retry_if_expansion_fails)
 		ESTABLISH(stp_gcol_ch);
@@ -428,7 +428,7 @@ void stp_vfy_mval(void)
 	}
 }
 
-boolean_t is_stp_space_available(int space_needed)
+boolean_t is_stp_space_available(ssize_t space_needed)
 {
 	/* Asserts added here are tested every time any module in the codebase does stringpool space checks */
 	assert(!stringpool_unusable);
@@ -456,15 +456,16 @@ void mv_parse_tree_collect(mvar *node)
 void stp_move(char *stp_move_from, char *stp_move_to)
 #else
 /* garbage collect and create enough space for space_asked bytes */
-void stp_gcol(int space_asked)	/* BYPASSOK */
+void stp_gcol(size_t space_asked)	/* BYPASSOK */
 #endif
 {
 #	ifdef STP_MOVE
 	int			space_asked = 0, stp_move_count = 0;
 #	endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
-	int			index, space_needed, fixup_cnt, tmplen, totspace;
-	long			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
+	int			index, fixup_cnt;
+	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
+	ssize_t			totspace, space_needed, tmplen, tmplen2;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
@@ -480,7 +481,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	int			*low_reclaim_passes;
 	int			*incr_factor;
 	int			killcnt;
-	long			stp_incr;
+	ssize_t			stp_incr;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
 	ht_ent_addr		*tabent_addr, *topent_addr;
@@ -544,7 +545,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 #	endif	/* !STP_MOVE */
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-	assert(stringpool.top - stringpool.free < space_asked || space_asked == 0);
+	assert(stringpool.invokestpgcollevel <= stringpool.top);
         assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
 	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
 #	ifdef STP_MOVE
@@ -683,8 +684,13 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			LVZWRITE_BLOCK_GC(lvzwrblk);
 		}
 		ZWRHTAB_GC(zwrhtab);
-		for (l = io_root_log_name; 0 != l; l = l->next)
+		for (l = io_root_log_name; NULL != l; l = l->next)
 		{
+			if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+			{
+				assert(FALSE);
+				continue;       /* skip it on pro */
+			}
 			if ((IO_ESC != l->dollar_io[0]) && (l->iod->trans_name == l))
 			{
 				MSTR_STPG_ADD(&l->iod->error_handler);
@@ -925,8 +931,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			assert(0 < tmplen);
 			if (tmpaddr + tmplen > straddr) /* if it is not a proper substring of previous one */
 			{
-				int tmplen2;
-				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (int)(tmpaddr + tmplen - straddr));
+				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (ssize_t)(tmpaddr + tmplen - straddr));
 				assert(0 < tmplen2);
 				totspace += tmplen2;
 				if (mstr_native_align)
@@ -945,7 +950,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	assert(mstr_native_align || space_after_compact >= space_before_compact);
 #	endif
 	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
-	space_needed -= (int)space_after_compact;
+	space_needed -= (ssize_t)space_after_compact;
 	DBGSTPGCOL((stderr, "space_needed=%i\n", space_needed));
 	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
 	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact) /* BYPASSOK */
@@ -995,7 +1000,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			expansion_failed = FALSE;	/* will be set to TRUE by condition handler if can't get memory */
 			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
 			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
-			expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
+			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
 #			ifdef DEBUG
 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
 			 * ok_to_UNWIND_in_exit_handling would have been set to avoid an assert in UNWIND macro. Now that
@@ -1093,6 +1098,12 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	}
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
+	stringpool.invokestpgcollevel = (STP_SPACE_USED_MULTIPLIER * (space_asked + stringpool.free - stringpool.base))
+		+ stringpool.base;
+	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
+		|| (stringpool.invokestpgcollevel > stringpool.top))
+		? stringpool.top : stringpool.invokestpgcollevel;
+	assert(stringpool.invokestpgcollevel <= stringpool.top);
 #	ifndef STP_MOVE
 	assert(stringpool.top - stringpool.free >= space_asked);
 #	endif

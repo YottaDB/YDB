@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +30,9 @@
 #include "gtm_trigger_trc.h"
 #endif
 
-GBLDEF	sgm_info	*sgm_info_ptr;
-GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
-GBLDEF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
-
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
+GBLREF  tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	short			crash_count;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	gd_region		*gv_cur_region;
@@ -58,10 +58,13 @@ void tp_set_sgm(void)
 	{
 		si->next_sgm_info = first_sgm_info;
 		first_sgm_info = si;
-		si->start_tn = csa->ti->curr_tn;
 		if (csa->critical)
 			si->crash_count = csa->critical->crashcnt;
 		insert_region(gv_cur_region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+		/* Note down "si->start_tn" AFTER the "insert_region" call in case it does a "grab_crit_immediate/wcs_recover"
+		 * call and bumps csa->ti->curr_tn. Otherwise we would end up with a cdb_sc_wcs_recover failure code.
+		 */
+		si->start_tn = csa->ti->curr_tn;
 		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle
 		 * to avoid unnecessary cdb_sc_triggermod type of restarts.
 		 */

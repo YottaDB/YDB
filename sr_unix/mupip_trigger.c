@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,9 +37,7 @@
 #include "trigger_upgrade_protos.h"
 
 GBLREF	gd_addr		*gd_header;
-#ifdef DEBUG
 GBLREF	boolean_t	is_replicator;
-#endif
 
 error_def(ERR_INVSTRLEN);
 error_def(ERR_MUNOACTION);
@@ -57,11 +55,9 @@ void mupip_trigger(void)
 	boolean_t	noprompt, trigger_error;
 	gd_region	*reg, *reg_top;
 	sgmnt_addrs	*csa;
-#	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	endif
 	if (CLI_PRESENT == cli_present("TRIGGERFILE"))
 	{
 		noprompt = (CLI_PRESENT == cli_present("NOPROMPT"));
@@ -76,6 +72,8 @@ void mupip_trigger(void)
 			util_out_print("Missing input file name", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
 		}
+		is_replicator = TRUE;
+		TREF(ok_to_see_statsdb_regs) = TRUE;
 		gvinit();
 		mu_trig_trgfile(trigger_file_name, (uint4)trigger_file_len, noprompt);
 	}
@@ -111,9 +109,11 @@ void mupip_trigger(void)
 		DEBUG_ONLY(TREF(in_trigger_upgrade) = TRUE;)
 		for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 		{
+			if (IS_STATSDB_REGNAME(reg))
+				continue;
 			GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 			csa = cs_addrs;
-			if (NULL == csa)	/* not BG or MM access method */
+			if (NULL == csa)	/* not BG or MM access method OR a statsdb region */
 				continue;
 			if (!csa->hdr->hasht_upgrade_needed)
 			{

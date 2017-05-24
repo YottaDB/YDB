@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	status = cmj_setupfd(new_fd);
 	if (CMI_ERROR(status))
-		CLOSEFILE_RESET(new_fd, rc)	/* resets "new_fd" to FD_INVALID */
+		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 	else
 	{
 		status = cmj_set_async(new_fd);

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2016 Fidelity National Information		#
+# Copyright (c) 2011-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -195,7 +195,7 @@ chmod 444 $readme_txt
 # be copied as a part of open source distribution (down the script)
 set open_source = 0
 set GNU_COPYING_license = "${gtm_com}/COPYING"
-if (("$osname" == "linux" && ( "$arch" == "i586" || "x8664" == "$arch" )) || ("$osname" == "osf1" && "$arch" == "alpha")) then
+if ("$osname" == "linux" && ( "$arch" == "i586" || "x8664" == "$arch" )) then
 	set open_source = 1
 	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
 	chmod 444 $GNU_COPYING_license
@@ -206,7 +206,7 @@ set dist = "$gtm_ver/dist"
 set tmp_dist = "$gtm_ver/tmp_dist"
 set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
-set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om]'
+set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om]' #BYPASSOKLENGTH
 set notdistributed = '_*.o GDE*.m *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass plugin/r plugin/o'
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
 
@@ -235,8 +235,9 @@ foreach image ($imagetype)
 	echo "Copying files from ${gtm_ver}/${image}"
 	set cpflags="-r"
 	if ("aix" == $osname) set cpflags="-rh"
-	if ("solaris" == $osname) set cpflags="-rH"
 	cp ${cpflags} ${gtm_ver}/${image}/* . || exit 8
+	# Put pinentry into the plugin directory so that it ends up in the final package
+	cp ${gtm_pct}/pinentry.m ./plugin/gtmcrypt/
 	echo ""
 	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
 	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
@@ -334,11 +335,7 @@ foreach image ($imagetype)
 	find . -exec chown 40535:40535 {} \;
 	echo ""
 	echo "Creating $dist_file"
-	if (("hpux" == ${osname})) then
-		$package $dist_file . >& /dev/null
-	else
-		$package $dist_file . || exit 10
-	endif
+	$package $dist_file . || exit 10
 	echo ""
 	echo "Gzipping $dist_file"
 	gzip $dist_file || exit 11
@@ -391,7 +388,6 @@ if ($testinstall) then
 		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
 		# We answer "y" to this question
 		# If libgtmutil.so is not created(on i586) this question is not asked
-		if ("$osname" != "osf1") then
 			if ("$osname" == "linux" && "$arch" == "i586") then
 				sh ./configure << CONFIGURE_EOF
 
@@ -419,18 +415,6 @@ n
 CONFIGURE_EOF
 
 			endif
-		else
-			sh ./configure << CONFIGURE_EOF
-
-
-n
-${install}/defgroup/${image}
-y
-n
-y
-n
-CONFIGURE_EOF
-		endif
 
 		# We need for root to be a member of the restricted group so that it can run tests. root is a
 		# member of the gtmsec NIS group.
@@ -441,7 +425,6 @@ CONFIGURE_EOF
 		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
 		# We answer "y" to this question
 		# If libgtmutil.so is not created(on i586) this question is not asked
-		if("$osname" != "osf1") then
 			if ("$osname" == "linux" && "$arch" == "i586") then
 	 			sh ./configure << CONFIGURE_EOF
 
@@ -468,18 +451,6 @@ y
 y
 CONFIGURE_EOF
 			endif
-		else
-			sh ./configure << CONFIGURE_EOF
-
-$rootgroup
-y
-${install}/${image}
-y
-n
-y
-y
-CONFIGURE_EOF
-		endif
 
 		# exit if the installation of the image failed
 		if ($status) then
@@ -499,7 +470,7 @@ CONFIGURE_EOF
 			# create the build.dir.  Only have to do it once
 			cd $gtm_ver || exit 14
 			# insert "pro:" for non Linux/Solaris
-			if ((${osname} != linux) && (${osname} != solaris)) echo pro: > ${tmp_dist}/build.dir
+			if (${osname} != linux) echo pro: > ${tmp_dist}/build.dir
 			ls -lR pro >> ${tmp_dist}/build.dir
 			if (aix == ${osname}) then
 				# insert a newline before "pro/gtmsecshrdir:" on AIX
@@ -518,7 +489,7 @@ CONFIGURE_EOF
 				# create the install.dir from both installations
 				cd ${install}/$defgroup
 				# insert "pro:" for non Linux/Solaris
-				if ((${osname} != linux) && (${osname} != solaris)) echo pro: > ${tmp_dist}/$defgroup/install.dir
+				if (${osname} != linux) echo pro: > ${tmp_dist}/$defgroup/install.dir
 				ls -lR pro >> ${tmp_dist}/$defgroup/install.dir
 				if (aix == ${osname}) then
 					# insert a newline before "pro/gtmsecshrdir:" on AIX
@@ -532,14 +503,6 @@ CONFIGURE_EOF
 				set deldir=$gtm_tools/bdeldir.txt
 				if (("linux" == ${osname}) && ("i586" == ${arch})) then
 					set adddir=$gtm_tools/linuxi686_badd.txt
-				else if (("hpux" == ${osname}) && ("parisc" == ${arch})) then
-					set adddir=$gtm_tools/hpuxparisc_badd.txt
-					set deldir=$gtm_tools/hpuxparisc_bdeldir.txt
-				else if (("hpux" == ${osname}) && ("ia64" == ${arch})) then
-					set adddir=$gtm_tools/hpuxia64_badd.txt
-				else if (("osf1" == ${osname}) && ("alpha" == ${arch})) then
-					set adddir=$gtm_tools/osf1alpha_badd.txt
-					set deldir=$gtm_tools/hpuxparisc_bdeldir.txt
 				endif
 				$comp $adddir $deldir ${osname}
 				set teststat = $status

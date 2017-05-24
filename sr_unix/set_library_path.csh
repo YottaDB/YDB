@@ -34,15 +34,15 @@ else
 #			/lib64		64bit
 # Redhat/SuSE way:	/lib		32bit
 #			/lib64		64bit
-	if ( ! $?gtm_inc ) then
-		echo "ERROR : gtm_inc not defined!"
+	if !($?gtm_inc) then
+		echo "GTM-E-ERROR : gtm_inc not defined!"
 		exit
 	endif
 
-# please keep in sync with sr_unix/gtm_test_install.csh
+	# Please keep in sync with sr_unix/gtm_test_install.csh && sr_unix/configure.gtc
 	if (( -e $gtm_inc/s390.h ) || ( -e $gtm_inc/x86_64.h )) then
-		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/lib"
+		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/usr/lib/x86_64-linux-gnu"
 	else
-		setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib:/usr/lib/i386-linux-gnu:/usr/lib32"
+		setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib32:/usr/lib:/usr/lib/i386-linux-gnu"
         endif
 endif

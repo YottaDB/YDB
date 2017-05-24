@@ -59,7 +59,6 @@
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "fork_init.h"
-#include "heartbeat_timer.h"
 #include "gtmio.h"
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
@@ -407,7 +406,6 @@ int gtmrecv(void)
 	 */
 	assert(mutex_per_process_init_pid && mutex_per_process_init_pid != process_id);
 	mutex_per_process_init();
-	START_HEARTBEAT_IF_NEEDED;
 	/* Take a copy of the fact whether an -UPDATERESYNC was specified or not. Note this down in shared memory.
 	 * We will clear the shared memory copy as soon as the first history record gets written to the instance file
 	 * after the first time this receiver connects to a source. Future connects of this same receiver with the same

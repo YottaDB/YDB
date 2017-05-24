@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@ void op_gvdata(mval *v)
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 	acc_meth = REG_ACC_METH(gv_cur_region);
-	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
+	if (IS_ACC_METH_BG_OR_MM(acc_meth))
 	{
 		gvnh_reg = TREF(gd_targ_gvnh_reg);
 		if (NULL == gvnh_reg)

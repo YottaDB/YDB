@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,28 +34,26 @@
 #include "have_crit.h"
 #include "min_max.h"
 #include "tp_frame.h"
-#ifdef GTM_TRIGGER
 #include <rtnhdr.h>
+#include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 #include "util.h"		/* for TP_ZTRIGBUFF_PRINT macro */
-#endif
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	ua_list			*curr_ua, *first_ua;
 GBLREF	uint4			dollar_trestart;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	trans_num		local_tn;
 GBLREF	global_tlvl_info	*global_tlvl_info_head;
 GBLREF	buddy_list		*global_tlvl_info_list;
-GBLREF	block_id		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target_list, *gvt_tp_list;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
 GBLREF	int			process_exiting;
-GBLREF	block_id		tp_allocation_clue;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	tp_frame		*tp_pointer;
@@ -70,7 +68,7 @@ GBLREF	unsigned int		t_tries;
 error_def(ERR_MEMORY);
 error_def(ERR_VMSMEMORY);
 
-void	tp_clean_up(boolean_t rollback_flag)
+void	tp_clean_up(tp_cleanup_state clnup_state)
 {
 	gv_namehead	*gvnh, *blk_target;
 	sgm_info	*si, *next_si;
@@ -97,7 +95,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 #	ifdef DEBUG
-	if (rollback_flag)
+	if (TP_COMMIT != clnup_state)
 		TREF(donot_commit) = FALSE;
 	assert(!TREF(donot_commit));
 #	endif
@@ -106,6 +104,17 @@ void	tp_clean_up(boolean_t rollback_flag)
 		update_trans = 0;
 	} else
 		assert(!update_trans);
+	/* Reset trigger state now. Trigger cycles, dollar_ztrigger_invoked and gvt_triggers_read_this_tn are reset only in
+	 * TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED. Trigger cycles and dollar_ztrigger_invoked are different from other TP level
+	 * artifacts in that they are maintained through an incremental rollback and restarts so that future trigger operations in
+	 * the current transaction recognize the invalid trigger cycles and reload triggers as necessary. Trigger cycles and
+	 * dollar_ztrigger_invoked are only reset upon a commit or a complete rollback.
+	 * Unlike other cleanup, trigger reset is not made conditional upon the existence of first_sgm_info because it is possible
+	 * for the Update Process to restart and immediately issue a complete rollback while handling an ONLINE ROLLBACK.
+	 * Please see the comment for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED to understand how trigger cycles and friends are
+	 * handled across commit, rollback and restarts.
+	 */
+	TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(clnup_state);
 	if (NULL != first_sgm_info)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
 		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
@@ -156,7 +165,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			}
 		}
 		RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are in TP and will fail the check there */
-		if (rollback_flag) 		/* Rollback invalidates clues in all targets used by this transaction */
+		if (TP_COMMIT != clnup_state) 		/* Rollback invalidates clues in all targets used by this transaction */
 		{
 			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)
 			{
@@ -172,7 +181,6 @@ void	tp_clean_up(boolean_t rollback_flag)
 				/* Cleanup any block-split info (of created block #) in gvtarget histories */
 				TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);
 			}
-			GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, FALSE));
 #			ifdef DEBUG
 			if (!process_exiting)
 			{	/* Ensure that we did not miss out on resetting clue for any gvtarget.
@@ -191,18 +199,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			}
 #			endif
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */
-			tp_allocation_clue = gtm_tp_allocation_clue;	/* Reset clue to what it was at beginning of transaction */
-		} else
-		{
-			GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, TRUE));
-			gtm_tp_allocation_clue = tp_allocation_clue;	/* Update tp allocation clue for next transaction to skip
-									 * past values used in this transaction now that this one
-									 * is successfully committed.
-									 */
 		}
-		GTMTRIG_ONLY(assert(!TREF(gvt_triggers_read_this_tn));)
-		/* Assert that for all regions, we have csa->db_dztrigger_cycle = 0 or 1 (based on commit/restart/rollback) */
-		GTMTRIG_ONLY(TP_ASSERT_ZTRIGGER_CYCLE_RESET;)
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
 			TP_TEND_CHANGE_REG(si);
@@ -227,7 +224,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				 * inctn_tp_upd_no_logical_rec) was written. So reset cs_addrs->next_fenced unconditionally.
 				 */
 				cs_addrs->next_fenced = NULL;
-				if (FALSE == rollback_flag)
+				if (TP_COMMIT == clnup_state)
 				{	/* Non-rollback case (op_tcommit) validates clues in the targets we are updating */
 					sgm_info_ptr = si;	/* for tp_get_cw to work */
 					is_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth);
@@ -348,7 +345,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
 				si->cw_set_depth = 0;
 				si->update_trans = 0;
-			} else if (rollback_flag)
+			} else if (TP_COMMIT != clnup_state)
 				REINITIALIZE_LIST(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
 #			ifdef DEBUG
 			/* Verify that all fields that were reset in the if code above are already at the reset value.
@@ -387,18 +384,11 @@ void	tp_clean_up(boolean_t rollback_flag)
 		{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
 			 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
 			 * Also use this opportunity to check that non-zero clues for BG contain non-null cr in histories.
-			 * In addition, check that the list of multi-level block numbers (involved in the most recent split
-			 * operations) stored in the gv_target are valid block #s.
 			 */
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 			{
 				chain1 = *(off_chain *)&gvnh->root;
 				assert(!chain1.flag);
-				for (level = 0; level < ARRAYSIZE(gvnh->last_split_blk_num); level++)
-				{
-					chain1 = *(off_chain *)&gvnh->last_split_blk_num[level];
-					assert(!chain1.flag);
-				}
 				/* If there was a gvnh->write_local_tn, we could assert that if ever that field was updated
 				 * in this transaction, then gvnh->root better be non-zero. Otherwise gvnh could have been
 				 * used only for reads in this TP and in that case it is ok for the root to be 0.
@@ -407,7 +397,6 @@ void	tp_clean_up(boolean_t rollback_flag)
 				{	/* check that gv_target->root falls within total blocks range */
 					csa = gvnh->gd_csa;
 					assert(NULL != csa);
-					NON_GTM_TRUNCATE_ONLY(assert(gvnh->root < csa->ti->total_blks));
 					assert(!IS_BITMAP_BLK(gvnh->root));
 				}
 				if (gvnh->clue.end)
@@ -428,12 +417,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 #		endif
 		jgbl.cumul_jnl_rec_len = 0;
 		jgbl.tp_ztp_jnl_upd_num = 0;
-		GTMTRIG_ONLY(
-			/* reset jgbl.prev_ztworm_ptr as we are now ready to start a new transaction
-			 * and thus need to write new ztwormhole records if needed
-			 */
-			jgbl.prev_ztworm_ptr = NULL;
-		)
+		/* reset jgbl.prev_ztworm_ptr as we are now ready to start a new transaction
+		 * and thus need to write new ztwormhole records if needed
+		 */
+		jgbl.prev_ztworm_ptr = NULL;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
 		REINITIALIZE_LIST(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
@@ -451,18 +438,16 @@ void	tp_clean_up(boolean_t rollback_flag)
 	/* Now that this transaction try is done (need to start a fresh try in case of a restart; in case of commit the entire
 	 * transaction is done) ensure first_tp_si_by_ftok is NULL at end of tp_clean_up as this field is relied upon by
 	 * secshr_db_clnup and t_commit_cleanup to determine if we have an ongoing transaction. In case of a successfully
-	 * committing transaction (rollback_flag == FALSE), this should be guaranteed already. So we might need to do the reset
-	 * only in case rollback_flag == TRUE but since that is an if condition which involves a pipeline break we avoid it by
+	 * committing transaction (clnup_state == TP_COMMIT), this should be guaranteed already. So we might need to do the reset
+	 * only in case clnup_state != TP_COMMIT but since that is an if condition which involves a pipeline break we avoid it by
 	 * doing the set to NULL unconditionally.
 	 */
-	assert(rollback_flag || (NULL == first_tp_si_by_ftok));
+	assert(TP_COMMIT != (clnup_state) || (NULL == first_tp_si_by_ftok));
 	first_tp_si_by_ftok = NULL;
 	ENABLE_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP, prev_intrpt_state);	/* Allow MUPIP STOP/signals from now on */
-#	ifdef GTM_TRIGGER
-	if (!rollback_flag)
+	if (TP_COMMIT == clnup_state)
 	{
 		TP_ZTRIGBUFF_PRINT; /* TP is committed so print $ZTRIGGER/MUPIP-TRIGGER activity output in this tn */
 	} else
 		TREF(ztrigbuffLen) = 0;
-#	endif
 }

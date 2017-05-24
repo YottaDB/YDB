@@ -129,7 +129,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 						UNLINK(ptr->backup_tempfile);
 					}
 				} else	/* defreeze the databases */
-					region_freeze(ptr->reg, FALSE, FALSE, FALSE);
+					region_freeze(ptr->reg, FALSE, FALSE, FALSE, FALSE, FALSE);
 			}
 			ptr = ptr->fPtr;
 		}

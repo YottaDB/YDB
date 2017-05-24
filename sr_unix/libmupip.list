@@ -56,7 +56,6 @@ jnlext_write
 jnlpool_hasnt_overflowed
 mu_all_version_standalone
 mu_clsce
-mu_cre_file
 mu_cre_structs
 mu_decrypt
 mu_dwngrd_header
@@ -111,8 +110,6 @@ mubexpfilnam
 mubfilcpy
 mubgetfil
 mubinccpy
-mucblkini
-mucregini
 mup_bak_sys
 mupip_backup
 mupip_cmd_disallow

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,9 +13,10 @@
 #include "mdef.h"
 
 #include <stddef.h>		/* for offsetof macro */
-
 #include "gtm_string.h"
 #include "gtm_time.h"
+#include "gtm_fcntl.h"
+#include "gtm_stdio.h"
 
 #include "cdb_sc.h"
 #include "gdsroot.h"
@@ -58,21 +59,25 @@
 #include "gvt_hashtab.h"
 #include "gtmmsg.h"
 #include "op.h"
-#include "set_gbuff_limit.h"	/* Needed for set_gbuff_limit() */
-#ifdef UNIX
-#include "heartbeat_timer.h"
+#include "set_gbuff_limit.h"
+#include "gtm_reservedDB.h"
 #include "anticipatory_freeze.h"
 #include "wbox_test_init.h"
-
-#define MAX_DBINIT_RETRY	4
-#endif
+#include "ftok_sems.h"
+#include "util.h"
+#include "getzposition.h"
+#include "gtmio.h"
+#include "io.h"
 
 #ifdef	GTM_FD_TRACE
 #include "gtm_dbjnl_dupfd_check.h"
 #endif
 
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	gd_region		*gv_cur_region, *db_init_region;
+GBLREF	boolean_t		created_core, dont_want_core;
+GBLREF  gd_region               *gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		gtcm_connection;
 GBLREF	bool			licensed;
@@ -97,25 +102,49 @@ GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
 GBLREF	jnl_gbls_t		jgbl;
-#ifdef UNIX
 GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs		jnlpool;
-#endif
-#ifdef DEBUG
 GBLREF	uint4			process_id;
-#endif
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
+LITREF mval			literal_statsDB_gblname;
+
+#define MAX_DBINIT_RETRY	3
+#define MAX_DBFILOPN_RETRY_CNT	4
+
+/* In code below to (re)create a statsDB file, we are doing a number of operations under lock. Rather than deal with
+ * getting out of the lock before the error, handle the possible errors after we are out from under the lock. These
+ * values are the possible errors we need may need to raise.
+ */
+typedef enum {
+	STATSDB_NOERR = 0,
+	STATSDB_NOTEEXIST,
+	STATSDB_OPNERR,
+	STATSDB_READERR,
+	STATSDB_NOTSTATSDB,
+	STATSDB_NOTOURS,
+	STATSDB_UNLINKERR,
+	STATSDB_RECREATEERR,
+	STATSDB_CLOSEERR
+} statsdb_recreate_errors;
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBCREINCOMP);
 error_def(ERR_DBFLCORRP);
+error_def(ERR_DBGLDMISMATCH);
 error_def(ERR_DBNOTGDS);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBROLLEDBACK);
 error_def(ERR_DBVERPERFWARN1);
 error_def(ERR_DBVERPERFWARN2);
+error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
+error_def(ERR_INVSTATSDB);
 error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_REGOPENFAIL);
+error_def(ERR_STATSDBERR);
+error_def(ERR_STATSDBFNERR);
+error_def(ERR_STATSDBINUSE);
 
 static readonly mval literal_poollimit =
 	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("POOLLIMIT") - 1), "POOLLIMIT", 0, 0);
@@ -126,16 +155,15 @@ void	assert_jrec_member_offsets(void)
 	assert(JNL_HDR_LEN % DISK_BLOCK_SIZE == 0);
 	/* We currently assume that the journal file header size is aligned relative to the filesystem block size.
 	 * which is currently assumed to be a 2-power (e.g. 512 bytes, 1K, 2K, 4K etc.) but never more than 64K
-	 * (MAX_IO_BLOCK_SIZE). Given this, we keep the journal file header size at 64K for Unix and 512-byte aligned
-	 * for VMS. This way any process updating the file header will hold crit and do aligned writes. Any process
+	 * (MAX_IO_BLOCK_SIZE). Given this, we keep the journal file header size at 64K for Unix.
+	 * This way any process updating the file header will hold crit and do aligned writes. Any process
 	 * writing the journal file data (journal records) on disk will hold the qio lock and can safely do so without
 	 * ever touching the journal file header area. If ever MAX_IO_BLOCK_SIZE changes (say because some filesystem
 	 * block size changes to 128K) such that JNL_HDR_LEN is no longer aligned to that, we want to know hence this assert.
 	 */
 	assert(JNL_HDR_LEN % MAX_IO_BLOCK_SIZE == 0);
 	assert(REAL_JNL_HDR_LEN == SIZEOF(jnl_file_header));
-	UNIX_ONLY(assert(REAL_JNL_HDR_LEN <= JNL_HDR_LEN);)
-	VMS_ONLY(assert(REAL_JNL_HDR_LEN == JNL_HDR_LEN);)
+	assert(REAL_JNL_HDR_LEN <= JNL_HDR_LEN);
 	assert(JNL_HDR_LEN == JNL_FILE_FIRST_RECORD);
 	assert(DISK_BLOCK_SIZE >= PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN);
 	assert((JNL_ALLOC_MIN * DISK_BLOCK_SIZE) > JNL_HDR_LEN);
@@ -204,153 +232,375 @@ void	assert_jrec_member_offsets(void)
 	assert(SIZEOF(token_split_t) == SIZEOF(token_build));   /* Required for TOKEN_SET macro */
 }
 
-void gvcst_init(gd_region *greg)
+void gvcst_init(gd_region *reg)
 {
-	sgmnt_addrs		*csa, *prevcsa, *regcsa;
+	gd_segment		*seg;
+	sgmnt_addrs		*baseDBcsa, *csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd;
-#	ifdef VMS
-	char			cs_data_buff[ROUND_UP(SGMNT_HDR_LEN, DISK_BLOCK_SIZE)];
-	sgmnt_data_ptr_t	temp_cs_data;
-#	endif
+	sgmnt_data		statsDBcsd;
 	uint4			segment_update_array_size;
-	int4			bsize;
-	boolean_t		realloc_alt_buff;
+	int4			bsize, padsize;
+	boolean_t		is_statsDB, realloc_alt_buff, retry_dbinit;
 	file_control		*fc;
-	gd_region		*prev_reg, *reg_top;
+	gd_region		*prev_reg, *reg_top, *baseDBreg, *statsDBreg;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
 #	endif
-	int			max_fid_index;
+	int			db_init_ret, loopcnt, max_fid_index, fd, rc, save_errno, errrsn_text_len;
 	mstr			log_nam, trans_log_nam;
-	mval			reg_nam_mval = DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF(MAX_RN_LEN), 0, 0, 0);
-	char			trans_buff[MAX_FN_LEN + 1];
-	unique_file_id		*greg_fid, *reg_fid;
+	char			trans_buff[MAX_FN_LEN + 1], statsdb_path[MAX_FN_LEN + 1], *errrsn_text;
+	unique_file_id		*reg_fid, *tmp_reg_fid;
 	tp_region		*tr;
 	ua_list			*tmp_ua;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_warn_uint4;
 	unsigned int            minus1 = (unsigned)-1;
-	enum db_acc_method	greg_acc_meth;
+	enum db_acc_method	reg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	intrpt_state_t		save_intrpt_ok_state;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	int4			db_init_retry;
 	intrpt_state_t		prev_intrpt_state;
+	srch_blk_status		*bh;
+	mstr			*gld_str;
+	node_local_ptr_t	baseDBnl;
+	unsigned char		cstatus;
+	statsdb_recreate_errors	statsdb_rcerr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	UNSUPPORTED_PLATFORM_CHECK;
+	/* If this is a statsDB, then open its baseDB first (if not already open). Most of the times the baseDB would be open.
+	 * In rare cases like direct use of ^%YGS global, it is possible baseDB is not open.
+	 */
+	assert(!reg->open);
+	is_statsDB = IS_STATSDB_REG(reg);
+	if (is_statsDB)
+	{
+		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+		if (!baseDBreg->open)
+		{
+			DBGRDB((stderr, "gvcst_init: !baseDBreg->open (NOT open)\n"));
+			gvcst_init(baseDBreg);
+			assert(baseDBreg->open);
+			if (reg->open)	/* statsDB was opened as part of opening baseDB. No need to do anything more here */
+			{
+				DBGRDB((stderr, "gvcst_init: reg->open return\n"));
+				return;
+			}
+			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible
+			 * if TREF(statshare_opted_in) is FALSE. In that case, this call to "gvcst_init" is coming through
+			 * a direct reference to the statsDB (e.g. ZWR ^%YGS). But if the TREF is TRUE, then the statsDB
+			 * should have been opened as part of the baseDB "gvcst_init" done above. Since it did not, that
+			 * means some sort of error occurred that has sent messages to the user console or syslog so return
+			 * right away to the caller which would silently adjust gld map entries so they do not point to this
+			 * statsDB anymore (NOSTATS should already be set in the baseDB in this case, assert that).
+			 */
+			if (TREF(statshare_opted_in))
+			{
+				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
+				return;
+			}
+		} else if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)
+		{	/* The baseDB was already open and the statsDB was NOT open. This could be because of either the baseDB
+			 * has NOSTATS set in it or it could be that NOSTATS was set when we attempted before to open the statsDB
+			 * but failed for whatever reason (privs, noexistant directory, space, etc). In either case, return
+			 * right away (for same reason as described before the "if" block above).
+			 */
+			return;
+		}
+		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+		baseDBnl = baseDBcsa->nl;
+		if (0 == baseDBnl->statsdb_fname_len)
+		{	/* This can only be true if it was set that way in gvcst_set_statsdb_fname(). Each error case sets a
+			 * reason value in TREF(statsdb_fnerr_reason) so use that to give a useful error message.
+			 */
+			switch(TREF(statsdb_fnerr_reason))
+			{
+				case FNERR_NOSTATS:
+					errrsn_text = FNERR_NOSTATS_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_NOSTATS_TEXT) - 1;
+					break;
+				case FNERR_STATSDIR_TRNFAIL:
+					errrsn_text = FNERR_STATSDIR_TRNFAIL_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRNFAIL_TEXT) - 1;
+					break;
+				case FNERR_STATSDIR_TRN2LONG:
+					errrsn_text = FNERR_STATSDIR_TRN2LONG_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRN2LONG_TEXT) - 1;
+					break;
+				case FNERR_INV_BASEDBFN:
+					errrsn_text = FNERR_INV_BASEDBFN_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_INV_BASEDBFN_TEXT) - 1;
+					break;
+				case FNERR_FTOK_FAIL:
+					errrsn_text = FNERR_FTOK_FAIL_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_FTOK_FAIL_TEXT) - 1;
+					break;
+				case FNERR_FNAMEBUF_OVERFLOW:
+					errrsn_text = FNERR_FNAMEBUF_OVERFLOW_TEXT;
+					errrsn_text_len = SIZEOF(FNERR_FNAMEBUF_OVERFLOW_TEXT) - 1;
+					break;
+				case FNERR_NOERR:
+				default:
+					assertpro(FALSE);
+			}
+			assert(TREF(gvcst_statsDB_open_ch_active));	/* so the below error goes to syslog and not to user */
+			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
+			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR, 2,
+				      errrsn_text_len, errrsn_text);
+		}
+		COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
+		seg = reg->dyn.addr;
+		if (!seg->blk_size)
+		{	/* This is a region/segment created by "mu_gv_cur_reg_init" (which sets most of reg/seg fields to 0).
+			 * Now that we need a non-zero blk_size, do what GDE did to calculate the statsdb block-size.
+			 * But since we cannot duplicate that code here, we set this to the same value effectively but
+			 * add an assert that the two are the same in "gd_load" function.
+			 * Take this opportunity to initialize other seg/reg fields for statsdbs like what GDE would have done.
+			 */
+			seg->blk_size = STATSDB_BLK_SIZE;
+			/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
+			seg->allocation = STATSDB_ALLOCATION;
+			seg->ext_blk_count = STATSDB_EXTENSION;
+			reg->max_key_size = STATSDB_MAX_KEY_SIZE;
+			reg->max_rec_size = STATSDB_MAX_REC_SIZE;
+			/* The below is directly inherited from the base db so no macro/assert like above fields */
+			seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
+			reg->mumps_can_bypass = TRUE;
+		}
+		/* Before "dbfilopn" of a statsdb, check if it has been created. If not, create it (as it is an autodb).
+		 * Use FTOK of the base db as a lock, the same lock that is obtained when statsdb is auto deleted.
+		 */
+		if (!baseDBnl->statsdb_created)
+		{
+			/* Disable interrupts for the time we hold the ftok lock as it is otherwise possible we get a SIG-15
+			 * and go to exit handling and try a nested "ftok_sem_lock" on the same basedb and that could pose
+			 * multiple issues (e.g. ftok_sem_lock starts a timer while waiting in the "semop" call and we will
+			 * have the same timer-id added twice due to the nested call).
+			 */
+			DBGRDB((stderr, "gvcst_init: !baseDBnl->statsdb_created\n"));
+			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+			if (!ftok_sem_lock(baseDBreg, FALSE))
+			{
+				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
+			}
+			/* Now that we have the lock, check if the db is still not created. */
+			if (!baseDBnl->statsdb_created)
+			{	/* File still not created. Do it now under the ftok lock. */
+				DBGRDB((stderr, "gvcst_init: !baseDBnl->statsdb_created (under lock)\n"));
+				cstatus = gvcst_cre_autoDB(reg);
+				if (EXIT_NRM != cstatus)
+				{	/* File failed to create - if this is a case where the file exists (but was not supposed
+					 * to exist), we should remove/recreate the file. Otherwise, we have a real error -
+					 * probably a missing directory or permissions or some such. In that case, turn off stats
+					 * and unwind the failed open.
+					 */
+					statsdb_rcerr = STATSDB_NOERR;		/* Assume no error to occur */
+					save_errno = TREF(mu_cre_file_openrc);	/* Save the errno that stopped our recreate */
+					DBGRDB((stderr, "gvcst_init: Create of statsDB failed - rc = %d\n", save_errno));
+					if (EEXIST != TREF(mu_cre_file_openrc))
+						statsdb_rcerr = STATSDB_NOTEEXIST;
+					else
+					{	/* See if this statsdb file is really supposed to be linked to the baseDB we
+						 * also just opened. To do this, we need to open the statsdb temporarily, read
+						 * its fileheader and then close it to get the file-header field we want. Note
+						 * this is a very quick operation so we don't use the normal DB utilities on it.
+						 * We just want to read the file header and get out. Since we have the lock, no
+						 * other processes will have this database open unless we are illegitimately
+						 * opening it. This is an infrequent issue so the overhead is not relevant.
+						 */
+						DBGRDB((stderr, "gvcst_init: Test to see if file is 'ours'\n"));
+						memcpy(statsdb_path, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
+						statsdb_path[reg->dyn.addr->fname_len] = '\0';	/* Rebuffer fn to include null */
+						fd = OPEN(statsdb_path, O_RDONLY);
+						if (0 > fd)
+						{	/* Some sort of open error occurred */
+							statsdb_rcerr = STATSDB_OPNERR;
+							save_errno = errno;
+						} else
+						{	/* Open worked - read file header from it*/
+							LSEEKREAD(fd, 0, (char *)&statsDBcsd, SIZEOF(sgmnt_data), rc);
+							if (0 > rc)
+								/* Wasn't enough data to be a file header - not a statsDB */
+								statsdb_rcerr = STATSDB_NOTSTATSDB;
+							else if (0 < rc)
+							{	/* Unknown error while doing read */
+								statsdb_rcerr = STATSDB_READERR;
+								save_errno = rc;
+							} else  /* if (0 == rc) */
+							{	/* Read worked - check if these two files are a proper pair */
+								if ((baseDBreg->dyn.addr->fname_len != statsDBcsd.basedb_fname_len)
+								    || (0 != memcmp(baseDBreg->dyn.addr->fname,
+										    statsDBcsd.basedb_fname,
+										    statsDBcsd.basedb_fname_len)))
+								{	/* This file is in use by another database */
+									statsdb_rcerr = STATSDB_NOTOURS;
+								} else
+								{	/* This file was for us - unlink and recreate */
+									DBGRDB((stderr, "gvcst_init: File is ours - unlink and "
+										"recreate it\n"));
+#									ifdef BYPASS_UNLINK_RECREATE_STATSDB
+									baseDBnl->statsdb_created = TRUE;
+#									else
+									rc = unlink(statsdb_path);
+									if (0 > rc)
+									{	/* Unlink failed - may not have permissions */
+										statsdb_rcerr = STATSDB_UNLINKERR;
+										save_errno = errno;
+									} else
+									{	/* Unlink succeeded - recreate now */
+										cstatus = gvcst_cre_autoDB(reg);
+										if (EXIT_NRM != cstatus)
+										{	/* Recreate failed */
+											statsdb_rcerr = STATSDB_RECREATEERR;
+											save_errno = TREF(mu_cre_file_openrc);
+										} else
+											baseDBnl->statsdb_created = TRUE;
+									}
+#									endif
+								}
+							}
+							CLOSEFILE(fd, rc);
+							if (0 < rc)
+							{	/* Close failed */
+								statsdb_rcerr = STATSDB_CLOSEERR;
+								save_errno = rc;
+							}
+						}
+					}
+					if (STATSDB_NOERR != statsdb_rcerr)
+					{	/* If we could not create or recreate the file, finish our error processing here */
+						assert(TREF(gvcst_statsDB_open_ch_active));	/* so the below rts_error_csa calls
+												 * go to syslog and not to user.
+												 */
+						baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
+						baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+						if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
+						{	/* Release the lock before unwinding back */
+							assert(FALSE);
+							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+							rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2,
+								      DB_LEN_STR(baseDBreg));
+						}
+						/* For those errors that need a special error message, take care of that here
+						 * now that we've released the lock.
+						 */
+						switch(statsdb_rcerr)
+						{
+							case STATSDB_NOTEEXIST:		/* Some error occurred handled elsewhere */
+								break;
+							case STATSDB_NOTOURS:		/* This statsdb already in use elsewhere */
+								/* We are trying to attach a statsDB to our baseDB should not be
+								 * associated with that baseDB. First check if this IS a statsdb.
+								 */
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								if (IS_RDBF_STATSDB(&statsDBcsd))
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_STATSDBINUSE,
+										      6, DB_LEN_STR(reg),
+										      statsDBcsd.basedb_fname_len,
+										      statsDBcsd.basedb_fname,
+										      DB_LEN_STR(baseDBreg));
+								else
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB,
+										      4, DB_LEN_STR(reg), REG_LEN_STR(reg));
+								break;			/* For the compiler */
+							case STATSDB_OPNERR:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
+									      DB_LEN_STR(reg), save_errno);
+								break;			/* For the compiler */
+							case STATSDB_READERR:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2,
+									      DB_LEN_STR(reg), save_errno);
+								break;			/* For the compiler */
+							case STATSDB_NOTSTATSDB:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB, 4,
+									      DB_LEN_STR(reg), REG_LEN_STR(reg));
+								break;			/* For the compiler */
+							case STATSDB_UNLINKERR:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+									      LEN_AND_LIT("unlink()"), CALLFROM, save_errno);
+								break;			/* For the compiler */
+							case STATSDB_RECREATEERR:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
+									      DB_LEN_STR(reg), save_errno);
+								break;			/* For the compiler */
+							case STATSDB_CLOSEERR:
+								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+									      LEN_AND_LIT("close()"), CALLFROM, save_errno);
+								break;			/* For the compiler */
+							default:
+								assertpro(FALSE);
+						}
+						if (TREF(gvcst_statsDB_open_ch_active))
+						{	/* Unwind back to ESTABLISH_NORET where did gvcst_init() call to open this
+							 * statsDB which now won't open.
+							 */
+							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DRVLONGJMP);
+						} else
+						{	/* We are not nested so can give the appropriate error ourselves */
+							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2,
+								      DB_LEN_STR(reg), ERR_TEXT, 2,
+								      RTS_ERROR_TEXT("See preceding errors written to syserr"
+										     " and/or syslog for details"));
+						}
+					}
+				} else
+					baseDBnl->statsdb_created = TRUE;
+			}
+			if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
+			{
+				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
+			}
+			ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+		}
+	}
+#	ifdef DEBUG
+	else
+	{
+		BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+		assert(!statsDBreg->open);
+	}
+#	endif
 	assert(!jgbl.forw_phase_recovery);
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 	/* check the header design assumptions */
 	assert(SIZEOF(th_rec) == (SIZEOF(bt_rec) - SIZEOF(bt->blkque)));
 	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + SIZEOF(cr->blkque)));
-	DEBUG_ONLY(assert_jrec_member_offsets();)
+	DEBUG_ONLY(assert_jrec_member_offsets());
 	assert(MAX_DB_BLK_SIZE < (1 << NEXT_OFF_MAX_BITS));	/* Ensure a off_chain record's next_off member
 								 * can work with all possible block sizes */
-        set_num_additional_processors();
-	DEBUG_ONLY(
-		/* Note that the "block" member in the blk_ident structure in gdskill.h has 30 bits.
-		 * Currently, the maximum number of blocks is 2**30. If ever this increases, something
-		 * has to be correspondingly done to the "block" member to increase its capacity.
-		 * The following assert checks that we always have space in the "block" member
-		 * to represent a GDS block number.
-		 */
-		tmp_blk.block = minus1;
-		assert(MAXTOTALBLKS_MAX - 1 <= tmp_blk.block);
-	)
+	set_num_additional_processors();
+#	ifdef DEBUG
+	/* Note that the "block" member in the blk_ident structure in gdskill.h has 30 bits.
+	 * Currently, the maximum number of blocks is 2**30. If ever this increases, something
+	 * has to be correspondingly done to the "block" member to increase its capacity.
+	 * The following assert checks that we always have space in the "block" member
+	 * to represent a GDS block number.
+	 */
+	tmp_blk.block = minus1;
+	assert(MAXTOTALBLKS_MAX - 1 <= tmp_blk.block);
+#	endif
 	/* TH_BLOCK is currently a hardcoded constant as basing it on the offsetof macro does not work with the VMS compiler.
 	 * Therefore assert that TH_BLOCK points to the 512-byte block where the "trans_hist" member lies in the fileheader.
 	 */
 	assert(DIVIDE_ROUND_UP(offsetof(sgmnt_data, trans_hist), DISK_BLOCK_SIZE) == TH_BLOCK);
-	if ((prev_reg = dbfilopn(greg)) != greg)
-	{
-		if (NULL == prev_reg || (gd_region *)-1L == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
-			return;
-		/* Found same database already open - prev_reg contains addr of originally opened region */
-		greg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
-		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
-		greg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
-		csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
-		if (NULL == csa->gvt_hashtab)
-			gvt_hashtab_init(csa);	/* populate csa->gvt_hashtab; need to do this BEFORE PROCESS_GVT_PENDING_LIST */
-		PROCESS_GVT_PENDING_LIST(greg, csa);
-		csd = csa->hdr;
-		greg->max_rec_size = csd->max_rec_size;
-		greg->max_key_size = csd->max_key_size;
-	 	greg->null_subs = csd->null_subs;
-		greg->std_null_coll = csd->std_null_coll;
-		greg->jnl_state = csd->jnl_state;
-		greg->jnl_file_len = csd->jnl_file_len;		/* journal file name length */
-		memcpy(greg->jnl_file_name, csd->jnl_file_name, greg->jnl_file_len);	/* journal file name */
-		greg->jnl_alq = csd->jnl_alq;
-		greg->jnl_deq = csd->jnl_deq;
-		greg->jnl_buffer_size = csd->jnl_buffer_size;
-		greg->jnl_before_image = csd->jnl_before_image;
-		SET_REGION_OPEN_TRUE(greg, WAS_OPEN_TRUE);
-		assert(1 <= csa->regcnt);
-		csa->regcnt++;	/* Increment # of regions that point to this csa */
-		return;
-	}
-	GTM_FD_TRACE_ONLY(gtm_dbjnl_dupfd_check();)	/* check if any of db or jnl fds collide (D9I11-002714) */
-	greg->was_open = FALSE;
-	/* We shouldn't have crit on any region unless we are in TP and in the final retry or we are in mupip_set_journal trying to
-	 * switch journals across all regions. WBTEST_HOLD_CRIT_ENABLED is an exception because it exercises a deadlock situation so
-	 * it needs to hold multiple crits at the same time. Currently, there is no fine-granular checking for mupip_set_journal,
-	 * hence a coarse MUPIP_IMAGE check for image_type.
-	 */
-	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG))
-	       || WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED));
-	if (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG)))
-	{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
-		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
-		 * having released crit on all regions. Note that this check should be done AFTER checking if the
-		 * region has already been opened (i.e. greg->was_open = TRUE logic above) since in that case we dont
-		 * do any heavyweight processing (like db_init which involves crit/DLM locks) and so dont need to restart.
-		 */
-		insert_region(greg, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
-		t_retry(cdb_sc_needcrit);
-		assert(FALSE);	/* we should never reach here since t_retry should have unwound the M-stack and restarted the TP */
-	}
-	csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
-
-#ifdef	NOLICENSE
-	licensed = TRUE;
-#else
-	CRYPT_CHKSYSTEM;
-#endif
-	db_init_region = greg;	/* initialized for dbinit_ch */
-	csa->hdr = NULL;
-        csa->nl = NULL;
-        csa->jnl = NULL;
-	csa->gbuff_limit = 0;
-	csa->our_midnite = NULL;
-	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
-	csa->regcnt = 1;	/* At this point, only one region points to this csa */
-	csa->db_addrs[0] = csa->db_addrs[1] = NULL;
-	csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
-#	ifdef VMS
-	greg_acc_meth = REG_ACC_METH(greg);
-	assert(dba_cm != greg_acc_meth);
-	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
-	fc = greg->dyn.addr->file_cntl;
-	fc->file_type = greg_acc_meth;
-	fc->op = FC_READ;
-	fc->op_buff = (sm_uc_ptr_t)temp_cs_data;
-	fc->op_len = SIZEOF(*temp_cs_data);
-	fc->op_pos = 1;
-	dbfilop(fc);
-	DO_BADDBVER_CHK(greg, temp_cs_data);
-	DO_DB_HDR_CHECK(greg, temp_cs_data); /* Basic sanity check on the file header fields */
-	if (greg_acc_meth != temp_cs_data->acc_meth)
-	{
-		greg_acc_meth = temp_cs_data->acc_meth;
-		REG_ACC_METH(greg) = greg_acc_meth;
-	}
-#	endif
 	/* Here's the shared memory layout:
 	 *
 	 * low address
@@ -415,47 +665,145 @@ void gvcst_init(gd_region *greg)
 	assert(268 == OFFSETOF(node_local, now_running[0]));
  	assert(36 == SIZEOF(((node_local *)NULL)->now_running));
 	assert(36 == MAX_REL_NAME);
-#	ifdef UNIX
-	START_HEARTBEAT_IF_NEEDED;
-	if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE && REPL_INST_AVAILABLE)
-		jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
-	/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
-	 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to greg. This is a safe
-	 * thing to do since csa->region is anyways set in db_common_init (few lines below).
-	 */
-	csa->region = greg;
-#	endif
-	/* Protect the db_init and the code below until we set greg->open to TRUE. This is needed as otherwise,
-	 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but greg->open
-	 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
-	 * thus would be left over in the system.
-	 */
-	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
-	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS in dbinit_ch */
-	VMS_ONLY(db_init(greg, temp_cs_data));
-#	ifdef UNIX
-	db_init_retry = 0;
-	GTM_WHITE_BOX_TEST(WBTEST_HOLD_FTOK_UNTIL_BYPASS, db_init_retry, 3);
-	for (; db_init_retry < MAX_DBINIT_RETRY; db_init_retry++)
+	for (loopcnt = 0; loopcnt < MAX_DBFILOPN_RETRY_CNT; loopcnt++)
 	{
-		if (0 == db_init(greg))
+		prev_reg = dbfilopn(reg);
+		if (prev_reg != reg)
+		{	/* (gd_region *)-1 == prev_reg => cm region open attempted */
+			if (NULL == prev_reg || (gd_region *)-1L == prev_reg)
+				return;
+			/* Found same database already open - prev_reg contains addr of originally opened region */
+			reg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
+			memcpy(reg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
+			reg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
+			csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+			if (NULL == csa->gvt_hashtab)
+				gvt_hashtab_init(csa);	/* populate csa->gvt_hashtab; needed BEFORE PROCESS_GVT_PENDING_LIST */
+			PROCESS_GVT_PENDING_LIST(reg, csa);
+			csd = csa->hdr;
+			reg->max_rec_size = csd->max_rec_size;
+			reg->max_key_size = csd->max_key_size;
+			reg->null_subs = csd->null_subs;
+			reg->std_null_coll = csd->std_null_coll;
+			reg->jnl_state = csd->jnl_state;
+			reg->jnl_file_len = csd->jnl_file_len;		/* journal file name length */
+			memcpy(reg->jnl_file_name, csd->jnl_file_name, reg->jnl_file_len);	/* journal file name */
+			reg->jnl_alq = csd->jnl_alq;
+			reg->jnl_deq = csd->jnl_deq;
+			reg->jnl_buffer_size = csd->jnl_buffer_size;
+			reg->jnl_before_image = csd->jnl_before_image;
+			reg->dyn.addr->asyncio = csd->asyncio;
+			assert(csa->reservedDBFlags == csd->reservedDBFlags);	/* Should be same already */
+			SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, csd, ((node_local_ptr_t)NULL));
+			SET_REGION_OPEN_TRUE(reg, WAS_OPEN_TRUE);
+			assert(1 <= csa->regcnt);
+			csa->regcnt++;	/* Increment # of regions that point to this csa */
+			return;
+		}
+		/* Assert that two base regions pointing to the same basedb can never have different statsdbs */
+		assert(!is_statsDB || !baseDBreg->was_open);
+		reg->was_open = FALSE;
+		/* We shouldn't have crit on any region unless we are in TP and in the final retry or we are in mupip_set_journal
+		 * trying to switch journals across all regions. WBTEST_HOLD_CRIT_ENABLED is an exception because it exercises a
+		 * deadlock situation so it needs to hold multiple crits at the same time. Currently, there is no fine-granular
+		 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type.
+		 */
+		assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG))
+		       || WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED));
+		if (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG)))
+		{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in "db_init",
+			 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
+			 * having released crit on all regions.
+			 */
+			insert_region(reg, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+			t_retry(cdb_sc_needcrit);
+			assert(FALSE);	/* should never reach here since t_retry should have unwound the M-stack and restarted TP */
+		}
+		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+#		ifdef NOLICENSE
+		licensed = TRUE;
+#		else
+		CRYPT_CHKSYSTEM;
+#		endif
+		csa->hdr = NULL;
+		csa->nl = NULL;
+		csa->jnl = NULL;
+		csa->gbuff_limit = 0;
+		csa->our_midnite = NULL;
+		csa->our_lru_cache_rec_off = 0;
+		csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
+		csa->regcnt = 1;	/* At this point, only one region points to this csa */
+		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
+		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
+		if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE && REPL_INST_AVAILABLE)
+			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
+		/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
+		 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to reg. This is a safe
+		 * thing to do since csa->region is anyways set in db_common_init (few lines below).
+		 */
+		csa->region = reg;
+		/* Protect the db_init and the code below until we set reg->open to TRUE. This is needed as otherwise,
+		 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but reg->open
+		 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
+		 * thus would be left over in the system.
+		 */
+		DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+		assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS in dbinit_ch */
+		/* Do a loop of "db_init". This is to account for the fact that "db_init" can return an error in some cases.
+		 * e.g. If DSE does "db_init" first time with OK_TO_BYPASS_TRUE and somewhere in the middle of "db_init" it
+		 * notices that a concurrent mumps process has deleted the semid/shmid since it was the last process attached
+		 * to the db. In this case we retry the "db_init" a few times and the last time we retry with OK_TO_BYPASS_FALSE
+		 * even if this is DSE.
+		 */
+		db_init_retry = 0;
+		GTM_WHITE_BOX_TEST(WBTEST_HOLD_FTOK_UNTIL_BYPASS, db_init_retry, MAX_DBINIT_RETRY);
+		do
+		{
+			db_init_ret = db_init(reg, (MAX_DBINIT_RETRY == db_init_retry) ? OK_TO_BYPASS_FALSE : OK_TO_BYPASS_TRUE);
+			if (0 == db_init_ret)
+				break;
+			if (-1 == db_init_ret)
+			{
+				assert(MAX_DBINIT_RETRY > db_init_retry);
+				retry_dbinit = TRUE;
+			} else
+			{	/* Set "retry_dbinit" to FALSE that way "db_init_err_cleanup" call below takes care of
+				 * closing udi->fd opened in "dbfilopn" call early in this iteration. This avoids fd leak
+				 * since another call to "dbfilopn" in the next iteration would not know about the previous fd.
+				 */
+				retry_dbinit = FALSE;
+			}
+			db_init_err_cleanup(retry_dbinit);
+			if (!retry_dbinit)
+				break;
+		} while (MAX_DBINIT_RETRY >= ++db_init_retry);
+		assert(-1 != db_init_ret);
+		if (0 == db_init_ret)
 			break;
-		db_init_err_cleanup(MAX_DBINIT_RETRY >  (db_init_retry + 1));
+		if (ERR_DBGLDMISMATCH == db_init_ret)
+		{	/* "db_init" would have adjusted seg->asyncio to reflect the db file header's asyncio settings.
+			 * Retry but do not count this try towards the total tries as otherwise it is theoretically possible
+			 * for the db fileheader to be recreated with just the opposite asyncio setting in each try and
+			 * we might eventually error out when "loopcnt" is exhausted. Not counting this try implies we
+			 * might loop indefinitely but the chances are infinitesimally small. And since this error is never
+			 * issued, the user should never expect to see this and hence this error is not documented.
+			 */
+			loopcnt--;
+		}
 	}
-	if (MAX_DBINIT_RETRY == db_init_retry) /* We retried enough. Error out. */
+	if (db_init_ret)
 	{
-		assert(IS_LKE_IMAGE || IS_DSE_IMAGE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(greg), DB_LEN_STR(greg));
+		assert(FALSE);	/* we don't know of a practical way to get errors in each of the for-loop attempts above */
+		/* "db_init" returned with an unexpected error. Issue a generic error to note this out-of-design state */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	}
-
-#	endif
 	/* At this point, we have initialized the database, but haven't yet set reg->open to TRUE. If any rts_errors happen in
 	 * the meantime, there are no condition handlers established to handle the rts_error. More importantly, it is non-trivial
 	 * to add logic to such a condition handler to undo the effects of db_init. Also, in some cases, the rts_error can can
 	 * confuse future calls of db_init. By invoking DBG_MARK_RTS_ERROR_UNUSABLE, we can catch any rts_errors in future and
 	 * eliminate it on a case by case basis.
 	 */
-	UNIX_ONLY(DBG_MARK_RTS_ERROR_UNUSABLE);
+	DBG_MARK_RTS_ERROR_UNUSABLE;
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
@@ -466,16 +814,15 @@ void gvcst_init(gd_region *greg)
 	csa->db_trigger_cycle = csd->db_trigger_cycle;
 #	endif
 	/* set csd and fill in selected fields */
-	assert(REG_ACC_METH(greg) == csd->acc_meth); /* db_init should have made sure this assert holds good */
-	greg_acc_meth = csd->acc_meth;
+	assert(REG_ACC_METH(reg) == csd->acc_meth); /* db_init should have made sure this assert holds good */
+	reg_acc_meth = csd->acc_meth;
 	/* It is necessary that we do the pending gv_target list reallocation BEFORE db_common_init as the latter resets
-	 * greg->max_key_size to be equal to the csd->max_key_size and hence process_gvt_pending_list might wrongly conclude
-	 * that NO reallocation (since it checks greg->max_key_size with csd->max_key_size) is needed when in fact a
+	 * reg->max_key_size to be equal to the csd->max_key_size and hence process_gvt_pending_list might wrongly conclude
+	 * that NO reallocation (since it checks reg->max_key_size with csd->max_key_size) is needed when in fact a
 	 * reallocation might be necessary (if the user changed max_key_size AFTER database creation)
 	 */
-	PROCESS_GVT_PENDING_LIST(greg, csa);
-	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
-
+	PROCESS_GVT_PENDING_LIST(reg, csa);
+	db_common_init(reg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
 	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
 	   performance. Compatibility mode is a known performance drain. Actually, we can send one of two
 	   messages. If the desired_db_format is for an earlier release than the current release, we send
@@ -491,31 +838,32 @@ void gvcst_init(gd_region *greg)
 	    && COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
 	{	/* The msg is due and we have successfully updated the next time interval */
 		if (GDSVCURR != csd->desired_db_format)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(greg));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(reg));
 		else
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(greg));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(reg));
 	}
-
+	csa->lock_crit_with_db = csd->lock_crit_with_db;	/* put a copy in csa where it's cheaper for mlk* to access */
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this variable in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */
 	csa->pblk_align_jrecsize = (int4)MIN_PBLK_RECLEN + csd->blk_size + (int4)MIN_ALIGN_RECLEN;
 	segment_update_array_size = UA_SIZE(csd);
-	assert(!greg->was_open);
-	SET_REGION_OPEN_TRUE(greg, WAS_OPEN_FALSE);
+	assert(!reg->was_open);
+	SET_REGION_OPEN_TRUE(reg, WAS_OPEN_FALSE);
+	GTM_FD_TRACE_ONLY(gtm_dbjnl_dupfd_check());	/* check if any of db or jnl fds collide (D9I11-002714) */
 	if (NULL != csa->dir_tree)
 	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
 		 * calls can run down regions without the process halting out. We don't want to double malloc.
 		 */
 		csa->dir_tree->clue.end = 0;
 	}
-	SET_CSA_DIR_TREE(csa, greg->max_key_size, greg);
+	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
-	UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE);
+	DBG_MARK_RTS_ERROR_USABLE;
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state), can do mallocs which in turn
 	 * can issue a GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
-	 * UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE) call. Since these are only private memory initializations, it is safe to
+	 * DBG_MARK_RTS_ERROR_USABLE call. Since these are only private memory initializations, it is safe to
 	 * do these after reg->open is set. Any rts_errors from now on still do the needful cleanup of shared memory in
 	 * gds_rundown since reg->open is already TRUE.
 	 */
@@ -601,14 +949,14 @@ void gvcst_init(gd_region *greg)
 		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
 	if (tp_in_use || !IS_GTM_IMAGE)
-		gvcst_tp_init(greg);	/* Initialize TP structures, else postpone till TP is used (only if GTM) */
+		gvcst_tp_init(reg);	/* Initialize TP structures, else postpone till TP is used (only if GTM) */
 	if (!global_tlvl_info_list)
 	{
 		global_tlvl_info_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 		initialize_list(global_tlvl_info_list, SIZEOF(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
 	}
 	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
-	if (dba_bg == greg_acc_meth)
+	if (dba_bg == reg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
 		 * (c) if it is big enough to deal with this region. If the region does not have any non-upgraded
 		 * block (blks_to_upgrd is 0) we will not allocate the buffer at this time. Note that this opens up
@@ -628,12 +976,12 @@ void gvcst_init(gd_region *greg)
 			 * the decrement of fast_lock_count should be done AFTER decrementing reformat_buffer_in_use.
 			 */
 			assert(0 == reformat_buffer_in_use);
-			DEBUG_ONLY(reformat_buffer_in_use++;)
+			DEBUG_ONLY(reformat_buffer_in_use++);
 			if (reformat_buffer)
 				free(reformat_buffer);	/* Different blksized databases in use .. keep only largest one */
 			reformat_buffer = malloc(csd->blk_size);
 			reformat_buffer_len = csd->blk_size;
-			DEBUG_ONLY(reformat_buffer_in_use--;)
+			DEBUG_ONLY(reformat_buffer_in_use--);
 			assert(0 == reformat_buffer_in_use);
 			--fast_lock_count;
 		}
@@ -644,8 +992,26 @@ void gvcst_init(gd_region *greg)
 			(TREF(gbuff_limit)).str.addr = malloc(SIZEOF(REORG_GBUFF_LIMIT));
 			memcpy((TREF(gbuff_limit)).str.addr, REORG_GBUFF_LIMIT, SIZEOF(REORG_GBUFF_LIMIT));
 		}
+		if ((mu_reorg_process DEBUG_ONLY(|| IS_GTM_IMAGE)) && (0 != (TREF(gbuff_limit)).str.len))
+		{	/* if reorg or dbg apply env var */
+			set_gbuff_limit(&csa, &csd, &(TREF(gbuff_limit)));
+#			ifdef DEBUG
+			if ((process_id & 2) && (process_id & (csd->n_bts - 1)))		/* also randomize our_midnite */
+			{
+				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+				csa->our_midnite += (process_id & (csd->n_bts - 1));
+				assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts)
+				       > csa->our_midnite);
+				cr = csa->our_midnite - csa->gbuff_limit;
+				if (cr < csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets)
+					cr += csd->n_bts;
+				csa->our_lru_cache_rec_off = GDS_ANY_ABS2REL(csa, cr);
+			}
+			assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets) < csa->our_midnite);
+#			endif
+		}
 	}
-	if ((dba_bg == greg_acc_meth) || (dba_mm == greg_acc_meth))
+	if (IS_ACC_METH_BG_OR_MM(reg_acc_meth))
 	{
 		/* Determine fid_index of current region's file_id across sorted file_ids of all regions open until now.
 		 * All regions which have a file_id lesser than that of current region will have no change to their fid_index
@@ -658,16 +1024,15 @@ void gvcst_init(gd_region *greg)
 		 * hence they will not be sorted.
 		 */
 		prevcsa = NULL;
-		greg_fid = &(csa->nl->unique_id);
+		reg_fid = &(csa->nl->unique_id);
 		max_fid_index = 1;
 		for (regcsa = cs_addrs_list; NULL != regcsa; regcsa = regcsa->next_csa)
 		{
-			UNIX_ONLY(onln_rlbk_cycle_mismatch |= (regcsa->db_onln_rlbkd_cycle != regcsa->nl->db_onln_rlbkd_cycle));
+			onln_rlbk_cycle_mismatch |= (regcsa->db_onln_rlbkd_cycle != regcsa->nl->db_onln_rlbkd_cycle);
 			if ((NULL != prevcsa) && (regcsa->fid_index < prevcsa->fid_index))
 				continue;
-			reg_fid = &((regcsa)->nl->unique_id);
-			VMS_ONLY(if (0 < memcmp(&(greg_fid->file_id), (char *)&(reg_fid->file_id), SIZEOF(gd_id))))
-			UNIX_ONLY(if (0 < gdid_cmp(&(greg_fid->uid), &(reg_fid->uid))))
+			tmp_reg_fid = &((regcsa)->nl->unique_id);
+			if (0 < gdid_cmp(&(reg_fid->uid), &(tmp_reg_fid->uid)))
 			{
 				if ((NULL == prevcsa) || (regcsa->fid_index > prevcsa->fid_index))
 					prevcsa = regcsa;
@@ -684,14 +1049,15 @@ void gvcst_init(gd_region *greg)
 			csa->fid_index = prevcsa->fid_index + 1;
 			max_fid_index = MAX(max_fid_index, csa->fid_index);
 		}
-		UNIX_ONLY(
-			if (onln_rlbk_cycle_mismatch)
+		if (onln_rlbk_cycle_mismatch)
+		{
+			csa->root_search_cycle--;
+			if (REPL_ALLOWED(csd))
 			{
-				csa->root_search_cycle--;
 				csa->onln_rlbk_cycle--;
 				csa->db_onln_rlbkd_cycle--;
 			}
-		)
+		}
 		/* Add current csa into list of open csas */
 		csa->next_csa = cs_addrs_list;
 		cs_addrs_list = csa;
@@ -701,22 +1067,6 @@ void gvcst_init(gd_region *greg)
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 		TREF(max_fid_index) = max_fid_index;
 	}
-	if ((mu_reorg_process DEBUG_ONLY(|| IS_GTM_IMAGE)) && (0 != (TREF(gbuff_limit)).str.len) )
-	{	/* if reorg or dbg apply env var */
-		reg_nam_mval.str.len = greg->rname_len;
-		reg_nam_mval.str.addr = (char *)&greg->rname;
-		set_gbuff_limit(&csa, &csd, &(TREF(gbuff_limit)));
-#		ifdef DEBUG
-		if (process_id & 2)		/* also randomize our_midnite */
-		{
-			csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-			csa->our_midnite += (process_id & (csd->n_bts - 1));
-			assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts)
-				> csa->our_midnite);
-		}
-#		endif
-	}
-#	ifdef UNIX
 	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)
 	{
 		/* Last parameter to VALIDATE_INITIALIZED_JNLPOOL is TRUE if the process does logical updates and FALSE otherwise.
@@ -729,8 +1079,78 @@ void gvcst_init(gd_region *greg)
 		 * SCNDDBNOUPD error message here. But, eventually when this process goes to gvcst_{put,kill} or op_ztrigger,
 		 * SCNDDBNOUPD is issued.
 		 */
-		VALIDATE_INITIALIZED_JNLPOOL(csa, csa->nl, greg, GTMRELAXED, SCNDDBNOUPD_CHECK_FALSE);
+		VALIDATE_INITIALIZED_JNLPOOL(csa, csa->nl, reg, GTMRELAXED, SCNDDBNOUPD_CHECK_FALSE);
 	}
-#	endif
+	/* At this point, the database is officially open but one of two condition can exist here where we need to do more work:
+	 *   1. This was a normal database open and this process has opted-in for global shared stats so we need to also open
+	 *      the associated statsDB (IF the baseDB does not have the NOSTATS qualifier).
+	 *   2. We are opening a statsDB in which case we are guaranteed the baseDB has already been open (assert at start of
+	 *	this function). The baseDB open would have done the needed initialization for the statsDB in a lot of cases.
+	 *	But in case it did not (e.g. TREF(statshare_opted_in) is FALSE), keep the statsDB open read-only until the
+	 *	initialization happens later (when TREF(statshare_opted_in) becomes TRUE again).
+	 * Note since this database is officially opened and has gone through db_init(), the current reservedDBFlags in all of
+	 * region, sgmnt_addrs, and sgmnt_data are sync'd to the value that was in sgmnt_data (fileheader).
+	 */
+	if (!IS_DSE_IMAGE)
+	{	/* DSE does not open statsdb automatically. It does it only when asked to */
+		if (TREF(statshare_opted_in))
+		{
+			if (!is_statsDB)
+			{	/* This is a baseDB - so long as NOSTATS is *not* turned on, we should initialize the statsDB */
+				if (!(RDBF_NOSTATS & reg->reservedDBFlags))
+				{
+					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+					assert(NULL != statsDBreg);
+					if (!statsDBreg->statsDB_setup_started)
+					{       /* The associated statsDB may or may not be open but it hasn't been initialized
+						 * so take care of that now. Put a handler around it so if the open of the statsDB
+						 * file fails for whatever reason, we can ignore it and just keep going.
+						 */
+						statsDBreg->statsDB_setup_started = TRUE;
+						gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
+					}
+				}
+			}
+		} else if (is_statsDB)
+		{	/* We are opening a statsDB file but not as a statsDB (i.e. not opted-in) but we still need to set the
+			 * database to R/O mode so it is only updated by GTM's C code and never in M mode which could lead to
+			 * too-small records being added that would cause the gvstats records to move which must never happen.
+			 * For DSE, we want it to open the db R/W (in case we need some repair of the statsdb).
+			 * So skip this R/O setting for DSE.
+			 */
+			assert(!reg->was_open);
+			reg->read_only = TRUE;
+			csa->read_write = FALSE;	/* Maintain read_only/read_write in parallel */
+		}
+	}
 	return;
+}
+
+/* Simplistic handler for when errors occur during open of statsDB. The ESTABLISH_NORET is a place-holder for the
+ * setjmp/longjmp sequence used to recover quietly from errors opening* the statsDB. So if the error is the magic
+ * ERR_DRVLONGJMP, do just that (longjmp() via the UNWIND() macro). If the error is otherwise, capture the error
+ * and where it was raised and send the STATSDBERR to the syslog before we unwind back to the ESTABLISH_NORET.
+ */
+CONDITION_HANDLER(gvcst_statsDB_open_ch)
+{
+	char	buffer[OUT_BUFF_SIZE];
+	int	msglen;
+	mval	zpos;
+
+	START_CH(TRUE);
+	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
+	if (DUMPABLE)
+		NEXTCH;				/* Bubble down till handled properly in mdb_condition_handler() */
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+		CONTINUE;			/* Keep going for non-error issues */
+	if (ERR_DRVLONGJMP != arg)
+	{	/* Need to reflect the current error to the syslog - First save message that got us here */
+		msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
+		assert(OUT_BUFF_SIZE > msglen);
+		memcpy(buffer, TREF(util_outbuff_ptr), msglen);
+		getzposition(&zpos);
+		/* Send whole thing to syslog */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
+	}
+	UNWIND(NULL, NULL);			/* Return back to where ESTABLISH_NORET was done */
 }

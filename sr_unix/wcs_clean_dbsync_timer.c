@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@
 #include "timers.h"		/* for TIM_DEFER_DBSYNC #define */
 #include "have_crit.h"
 #include "wcs_clean_dbsync.h"
+#include "gtm_reservedDB.h"
 
 GBLREF	uint4			process_id;
 
@@ -39,6 +41,8 @@ void	wcs_clean_dbsync_timer(sgmnt_addrs *csa)
 	 * process P1 empties the queue and another by the wcs_flu() of process P2 (waiting on P1 to finish
 	 * its wcs_wtstart). But this is considered infrequent enough to be better than skipping writing an
 	 * epoch due to incorrect cnl->wcsflu_pid.
+	 *
+	 * Note setting timer also bypassed if this is an statsDB as no flush is ever needed/used.
 	 */
 	if (!process_exiting && (process_id != csa->nl->wcsflu_pid) && (FALSE == csa->dbsync_timer))
 		START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);

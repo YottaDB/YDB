@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +18,6 @@
  * may be some interference, most will succeed and we are only looking
  * for trends from these numbers anyway, not exact counts.
  */
-
 
 #define BG_TRACE_PRO_ANY(C, X)	{C->hdr->X##_cntr++; C->hdr->X##_tn = C->hdr->trans_hist.curr_tn ;}
 #define BG_TRACE_PRO(Q) 	BG_TRACE_PRO_ANY(cs_addrs, Q)

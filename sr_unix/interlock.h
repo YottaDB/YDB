@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@
 /* New buffer doesn't need interlocked operation.  */
 #define LOCK_NEW_BUFF_FOR_UPDATE(X)	(SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_SET))
 
+/* After this macro returns, Y points to the PRE-aswp (not POST-aswp) value of the latch */
 #define LOCK_BUFF_FOR_UPDATE(X,Y,Z)     {Y = ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_SET, Z);		\
 						 LOCK_HIST("OBTN", &(X)->interlock.latch, process_id, -1);}
 #define RELEASE_BUFF_UPDATE_LOCK(X,Y,Z) {LOCK_HIST("RLSE", &(X)->interlock.latch, process_id, -1); 		\
@@ -88,9 +89,6 @@
  */
 #define OWN_BUFF(X)			((X) == LATCH_CLEAR)
 
-#define ADD_ENT_TO_ACTIVE_QUE_CNT(X,Y)		(INCR_CNT((sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
-#define SUB_ENT_FROM_ACTIVE_QUE_CNT(X,Y)	(DECR_CNT((sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
-
 #define INCR_CNT(X,Y)			INTERLOCK_ADD(X,Y,1)
 #define DECR_CNT(X,Y)			INTERLOCK_ADD(X,Y,-1)
 
@@ -113,3 +111,28 @@
 boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs);
 void		rel_latch(sm_global_latch_ptr_t latch);
 
+#define LOCK_HARD_SPIN_TIME 		60	/* in seconds */
+/* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
+#define GRAB_LOCK_CRIT(CSA, REGION, RET_WAS_CRIT)						\
+MBSTART {											\
+	if (CSA->lock_crit_with_db)								\
+	{											\
+		if (CSA->critical)								\
+			crash_count = CSA->critical->crashcnt;					\
+		if (!(RET_WAS_CRIT = CSA->now_crit))		/* WARNING assignment */	\
+			grab_crit(REGION);							\
+	} else											\
+	{											\
+		while (!grab_latch(&CSA->nl->lock_crit, LOCK_HARD_SPIN_TIME))			\
+			rel_quant();								\
+	}											\
+} MBEND
+#define REL_LOCK_CRIT(CSA, REGION, WAS_CRIT)							\
+MBSTART {											\
+	if (CSA->lock_crit_with_db)								\
+	{											\
+		if (!WAS_CRIT)									\
+			rel_crit(REGION);							\
+	} else											\
+		rel_latch(&CSA->nl->lock_crit);							\
+} MBEND

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,8 @@
 #define GTM_REG_FRAME_POINTER   I386_REG_RBP
 /* Note that GTM_REG_COND_CODE is not assigned a separate register on x86_64.h
  * The following defination is dummy used in emit_jmp as dummy parameter
- * emit_jmp in x86_64 is not an generic function */
+ * emit_jmp in x86_64 is not an generic function.
+ */
 #define GTM_REG_COND_CODE       I386_REG_RAX
 
 #define GTM_REG_R0              I386_REG_RAX
@@ -36,11 +38,11 @@
 
 #define MOVL_RETVAL_REG		GTM_REG_R0
 #define MOVL_REG_R1		GTM_REG_R1
-#define CLRL_REG		GTM_REG_R0  /* Note this is just a dummy reg. There is no ZEROing reg in x86 */
+#define CLRL_REG		GTM_REG_R0  	/* Note this is just a dummy reg. There is no ZEROing reg in x86 */
 #define CMPL_TEMP_REG		I386_REG_RSI
 
-#define MOVC3_SRC_REG		GTM_REG_R0
-#define MOVC3_TRG_REG		GTM_REG_R1
+#define MOVC3_SRC_REG		I386_REG_RSI
+#define MOVC3_TRG_REG		I386_REG_RDI
 
 #define MACHINE_FIRST_ARG_REG	I386_REG_RDI
 #define MACHINE_REG_ARGS	6

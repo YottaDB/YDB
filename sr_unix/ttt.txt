@@ -287,6 +287,12 @@ OC_FNZASCII:	pushab	val.0
 OC_FNZAHANDLE:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzahandle
+OC_FNZATRANSFORM:	pushab  val.0
+		pushl   val.4
+		pushl   val.3
+		pushl   val.2
+		pushab  val.1
+		calls   #5,xfer.xf_fnzatransform
 OC_FNZBITAND:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
@@ -332,15 +338,20 @@ OC_FNZCALL:	irepab	val.2
 OC_FNZCHAR:	irepl	val.2
 		pushab	val.0
 		calls	val.1,xfer.xf_fnzchar
-OC_FNZCONVERT2: pushab  val.0                   ; /* destination mval */
-                pushab  val.2                   ; /* "U"/"L"/"T" */
-                pushab  val.1                   ; /* string */
-                calls   #3,xfer.xf_fnzconvert2
-OC_FNZCONVERT3: pushab  val.0                   ; /* Destination mval */
-                pushab  val.3                   ; /* target chset */
-                pushab  val.2                   ; /* src chset */
-                pushab  val.1                   ; /* string */
-                calls   #4,xfer.xf_fnzconvert3
+OC_FNZCONVERT2: pushab  val.0		   ; /* destination mval */
+		pushab  val.2		   ; /* "U"/"L"/"T" */
+		pushab  val.1		   ; /* string */
+		calls   #3,xfer.xf_fnzconvert2
+OC_FNZCONVERT3: pushab  val.0		   ; /* Destination mval */
+		pushab  val.3		   ; /* target chset */
+		pushab  val.2		   ; /* src chset */
+		pushab  val.1		   ; /* string */
+		calls   #4,xfer.xf_fnzconvert3
+OC_FNZCOLLATE:  pushab  val.0
+		pushl   val.3
+		pushl   val.2
+		pushab  val.1
+		calls   #4,xfer.xf_fnzcollate
 OC_FNZDATA:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzdata
@@ -445,11 +456,11 @@ OC_FNZSIGPROC:	pushab	val.0
 OC_FNZSOCKET:	irepab  val.2
 		pushab  val.0
 		calls   val.1,xfer.xf_fnzsocket
-OC_FNZSUBSTR:   pushab  val.0                   ; /* Destination mval */
-                pushl   val.3                   ; /* max byte length */
-                pushl   val.2                   ; /* starting character position */
-                pushab  val.1                   ; /* string */
-                calls   #4,xfer.xf_fnzsubstr
+OC_FNZSUBSTR:   pushab  val.0		   ; /* Destination mval */
+		pushl   val.3		   ; /* max byte length */
+		pushl   val.2		   ; /* starting character position */
+		pushab  val.1		   ; /* string */
+		calls   #4,xfer.xf_fnzsubstr
 OC_FNZTRANSLATE: pushab	val.0
 		pushab	val.3
 		pushab	val.2
@@ -468,9 +479,9 @@ OC_FNZTRNLNM:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#7,xfer.xf_fnztrnlnm
-OC_FNZWIDTH:    pushab  val.0                   ; /* destination mval */
-                pushab  val.1                   ; /* string */
-                calls   #2,xfer.xf_fnzwidth
+OC_FNZWIDTH:    pushab  val.0		   ; /* destination mval */
+		pushab  val.1		   ; /* string */
+		calls   #2,xfer.xf_fnzwidth
 OC_FOLLOW:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_follow

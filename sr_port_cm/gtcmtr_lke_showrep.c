@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +40,8 @@
 #include "gtcm_find_region.h"
 #include "gvcmz.h"
 #include "longcpy.h"
+#include "interlock.h"
+#include "rel_quant.h"
 
 #define RESET	2
 
@@ -49,7 +52,7 @@ GBLREF	short			crash_count;
 char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 {
 	gd_region		*cur_region;
-	sgmnt_addrs		*cs_adr;
+	sgmnt_addrs		*csa;
 	mlk_ctldata		*lke_ctl;
 	ssize_t			ls_len;
 	mstr 			dnode;
@@ -58,20 +61,15 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	boolean_t		was_crit;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
-	if (dba_bg == cur_region->dyn.addr->acc_meth || dba_mm == cur_region->dyn.addr->acc_meth)
+	if (IS_REG_BG_OR_MM(cur_region))
 	{
-		cs_adr = &FILE_INFO(cur_region)->s_addrs;
-		ls_len = cs_adr->lock_addrs[1] - cs_adr->lock_addrs[0];
+		csa = &FILE_INFO(cur_region)->s_addrs;
+		ls_len = csa->lock_addrs[1] - csa->lock_addrs[0];
 		lke_ctl = (mlk_ctldata *)malloc(ls_len);
 		/* Prevent any modification of the lock space while we make a local copy of it */
-		if (cs_adr->critical != NULL)
-			crash_count = cs_adr->critical->crashcnt;
-		was_crit = cs_adr->now_crit;
-		if (!was_crit)
-			grab_crit(cur_region);
-		longcpy((uchar_ptr_t)lke_ctl, cs_adr->lock_addrs[0], ls_len);
-		if (!was_crit)
-			rel_crit(cur_region);
+		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
+		longcpy((uchar_ptr_t)lke_ctl, csa->lock_addrs[0], ls_len);
+		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;

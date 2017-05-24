@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,8 +26,6 @@
 #include "startup.h"
 #include "cmd_qlf.h"
 #include "lv_val.h"
-#include "collseq.h"
-#include "patcode.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -87,9 +85,10 @@
 #include "cenable.h"
 #include "gtmimagename.h"
 #include "mprof.h"
-#include "heartbeat_timer.h"
 #include "gt_timers_add_safe_hndlrs.h"
+#include "jnl_file_close_timer.h"
 #include "continue_handler.h"
+#include "fake_enospc.h"
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
 #ifdef UNICODE_SUPPORTED
@@ -120,19 +119,11 @@ GBLREF spdesc			rts_stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
-GBLREF pattern         		*pattern_list;
-GBLREF pattern        		*curr_pattern;
-GBLREF pattern        		mumps_pattern;
-GBLREF uint4    		*pattern_typemask;
-GBLREF int4			exi_condition;
 GBLREF global_latch_t 		defer_latch;
 GBLREF boolean_t		is_replicator;
 GBLREF void			(*ctrlc_handler_ptr)();
 GBLREF boolean_t		mstr_native_align;
 GBLREF boolean_t		gtm_utf8_mode;
-GBLREF boolean_t		utf8_patnumeric;
-GBLREF mstr			dollar_zchset;
-GBLREF mstr			dollar_zpatnumeric;
 GBLREF casemap_t		casemaps[];
 GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
@@ -140,21 +131,23 @@ GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch *
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
-GBLREF void			(*heartbeat_timer_ptr)(void);
+GBLREF void			(*jnl_file_close_timer_ptr)(void);
+GBLREF void			(*fake_enospc_ptr)(void);
+GBLREF void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **timedout);
 
 OS_PAGE_SIZE_DECLARE
-
-error_def(ERR_COLLATIONUNDEF);
 
 #define MIN_INDIRECTION_NESTING 32
 #define MAX_INDIRECTION_NESTING 256
 
 void gtm_startup(struct startup_vector *svec)
-/* Note: various references to data copied from *svec could profitably be referenced directly */
-{
+{	/* initialize various process characteristics and states, but beware as initialization occurs in other places as well
+	 * svec is really a VMS vestige as it had a file to tailor process characteristics
+	 * while in UNIX, it's all done with environment variables
+	 * hence, various references to data copied from *svec could profitably be referenced directly
+	 */
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
-	int4		lct;
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
@@ -168,7 +161,9 @@ void gtm_startup(struct startup_vector *svec)
 	cache_table_relobjs = &cache_table_rebuild;
 	ht_rhash_ch = &hashtab_rehash_ch;
 	jbxm_dump_ch = &jobexam_dump_ch;
-	heartbeat_timer_ptr = &heartbeat_timer;
+	jnl_file_close_timer_ptr = &jnl_file_close_timer;
+	fake_enospc_ptr = &fake_enospc;
+	simple_timeout_timer_ptr = &simple_timeout_timer;
 	stpgc_ch = &stp_gcol_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
@@ -274,24 +269,7 @@ void gtm_startup(struct startup_vector *svec)
 	init_callin_functable();
 	gtm_env_xlate_init();
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-	curr_pattern = pattern_list = &mumps_pattern;
-	pattern_typemask = mumps_pattern.typemask;
-	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
-	/* Initialize local collating sequence */
-	TREF(transform) = TRUE;
-	lct = find_local_colltype();
-	if (lct != 0)
-	{
-		TREF(local_collseq) = ready_collseq(lct);
-		if (!TREF(local_collseq))
-		{
-			exi_condition = -ERR_COLLATIONUNDEF;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
-			EXIT(exi_condition);
-		}
-	} else
-		TREF(local_collseq) = 0;
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	/* Initialize zwrite subsystem. Better to do it now when we have storage to allocate than
@@ -324,19 +302,15 @@ void gtm_utf8_init(void)
 	SETUP_THREADGBL_ACCESS;
 	if (!gtm_utf8_mode)
 	{	/* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
-	  	FIX_XFER_ENTRY(xf_fnascii, op_fnzascii);
-		FIX_XFER_ENTRY(xf_fnchar, op_fnzchar);
-		FIX_XFER_ENTRY(xf_fnextract, op_fnzextract);
 		FIX_XFER_ENTRY(xf_setextract, op_setzextract);
-		FIX_XFER_ENTRY(xf_fnfind, op_fnzfind);
 		FIX_XFER_ENTRY(xf_fnj2, op_fnzj2);
-		FIX_XFER_ENTRY(xf_fnlength, op_fnzlength);
-		FIX_XFER_ENTRY(xf_fnpopulation, op_fnzpopulation);
-		FIX_XFER_ENTRY(xf_fnpiece, op_fnzpiece);
-		FIX_XFER_ENTRY(xf_fnp1, op_fnzp1);
 		FIX_XFER_ENTRY(xf_setpiece, op_setzpiece);
+		/* If optimization of this happens, we need to move this to
+		 * 	expritem.c under 'update opcodes rather than mess with xfer table' */
+		FIX_XFER_ENTRY(xf_fnpopulation, op_fnzpopulation);
 		FIX_XFER_ENTRY(xf_setp1, op_setzp1);
-		FIX_XFER_ENTRY(xf_fntranslate, op_fnztranslate);
+		/* If optimization of this happens, we need to move this to
+		 * 	expritem.c under 'update opcodes rather than mess with xfer table' */
 		FIX_XFER_ENTRY(xf_fnreverse, op_fnzreverse);
 		return;
 	} else
@@ -358,12 +332,5 @@ void gtm_utf8_init(void)
 		/* Spins to find non-(recently)-referenced cache slot before we overwrite an entry */
 		TREF(utfcgr_string_lookmax) = TREF(gtm_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
 #		endif /* UNICODE_SUPPORTED */
-	}
-	dollar_zchset.len = STR_LIT_LEN(UTF8_NAME);
-	dollar_zchset.addr = UTF8_NAME;
-	if (utf8_patnumeric)
-	{
-		dollar_zpatnumeric.len = STR_LIT_LEN(UTF8_NAME);
-		dollar_zpatnumeric.addr = UTF8_NAME;
 	}
 }

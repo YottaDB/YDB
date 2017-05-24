@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,8 @@ error_def(ERR_ZPEEKNORPLINFO);
 
 #define FMTHEXDGT(spfree, digit) *spfree++ = digit + ((digit <= 9) ? '0' : ('A' - 0x0A))
 #define ARGUMENT_MAX_LEN	MAX_MIDENT_LEN
+#define	PASS1			1
+#define	PASS2			2
 
 /* Codes for peek operation mnemonics */
 typedef enum
@@ -445,6 +447,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];
 	sgmnt_addrs		*csa;
+	int			pass;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -481,22 +484,46 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
 		switch(mnemonic_opcode)
 		{
-			case PO_CSAREG:			/* These types have a region name argument */
-			case PO_FHREG:
-			case PO_GDRREG:
-			case PO_NLREG:
-			case PO_JNLREG:
-			case PO_JBFREG:
-				/* Uppercase the region name since that is what GDE does when creating them */
-				lower_to_upper(argument_uc_buf, argptr, arglen);
-				argptr = argument_uc_buf;	/* Reset now to point to upper case version */
+		case PO_CSAREG:			/* These types have a region name argument */
+		case PO_FHREG:
+		case PO_GDRREG:
+		case PO_NLREG:
+		case PO_JNLREG:
+		case PO_JBFREG:
+			/* Uppercase the region name since that is what GDE does when creating them.
+			 * But we want the ability to do $zpeek on statsdb regions (lower-case regions)
+			 * so first check if region as is does exist. If so use that. If not, do uppercase.
+			 */
+			assert(arglen);
+			pass = (ISLOWER_ASCII(argptr[0]) ? PASS1 : PASS2);
+			r_ptr = NULL;
+			for ( ; ; )
+			{
+				if (PASS1 != pass)
+				{
+					lower_to_upper(argument_uc_buf, argptr, arglen);
+					argptr = argument_uc_buf;	/* Reset now to point to upper case version */
+				}
 				/* See if region recently used so can avoid lookup */
 				if ((arglen == TREF(zpeek_regname_len)) && (0 == memcmp(argptr, TADR(zpeek_regname), arglen)))
 				{	/* Fast path - no lookup necessary */
 					r_ptr = TREF(zpeek_reg_ptr);
-					assert(r_ptr->open && !r_ptr->was_open);	/* Make sure truly open */
+					if (!r_ptr->open)
+					{	/* Region was open when we cached it as part of the previous $zpeek but it
+						 * is no longer open. Only possibility is a VIEW "NOSTATSHARE" was done in
+						 * between and that this is a statsdb region. Assert accordingly.
+						 */
+						assert(IS_STATSDB_REGNAME(r_ptr));
+						assert(PASS1 == pass);
+						TREF(zpeek_regname_len) = 0;
+						r_ptr =  NULL;
+						pass = PASS1;
+						continue;
+					}
 					break;
 				}
+				if (NULL != r_ptr)
+					break;
 				/* Region now defined - make sure it is open */
 				if (!gd_header)		/* If gd_header is NULL, open gbldir */
 					gvinit();
@@ -504,42 +531,59 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 				{
 					if (r_ptr >= r_top)
+					{
+						if (PASS1 == pass)
+							break;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 							      RTS_ERROR_LITERAL("mnemonic argument (region name)"));
+					}
 					if ((r_ptr->rname_len == arglen) && (0 == memcmp(r_ptr->rname, argptr, arglen)))
 						break;
 				}
+				if (r_ptr == r_top)
+				{	/* Could not find lower-case region specified. Try upper-casing it.
+					 * Note that even though GDE guarantees all upper-case region names have a corresponding
+					 * lower-case region name, it is possible the user specified a region name with
+					 * a lower-case letter as the first letter and at least one upper-case letter in the
+					 * region name. In that case, it is possible we find the region in the gld only when we
+					 * convert the entire region name into upper case.
+					 */
+					assert(PASS1 == pass);
+					pass = PASS2;
+					continue;
+				}
 				if (!r_ptr->open)
 					gv_init_reg(r_ptr);
+				/* r_ptr now points to (open) region */
+				assert(r_ptr->open);	/* Make sure truly open */
 				/* Cache new region access for followup references */
 				memcpy(TADR(zpeek_regname), argptr, arglen);
 				TREF(zpeek_regname_len) = arglen;
 				TREF(zpeek_reg_ptr) = r_ptr;
-				/* r_ptr now points to (open) region */
-				assert(r_ptr->open && !r_ptr->was_open);	/* Make sure truly open */
-				break;
-			case PO_GLFREPL:		/* These types have an array index argument */
-			case PO_GSLREPL:
-				arryidx = asc2i(argptr, arglen);
-				if ((0 > arryidx) || (NUM_GTMSRC_LCL <= arryidx))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-						      RTS_ERROR_LITERAL("mnemonic argument (array index)"));
-				break;
-			case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
-				if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-						      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
-				cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */
-				prmpeekadr = (UINTPTR_T)GTM64_ONLY(asc_hex2l)NON_GTM64_ONLY(asc_hex2i)(cptr, arglen - 2);
-				if (-1 == (INTPTR_T)prmpeekadr)
-					/* Either an error occurred or the user specified the maximum address. So it's
-					 * either an error from the conversion routine or an otherwise useless value.
-					 */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-						      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
-				break;
-			default:
-				assert(FALSE);		/* Only the above types should ever have an argument */
+			}
+			break;
+		case PO_GLFREPL:		/* These types have an array index argument */
+		case PO_GSLREPL:
+			arryidx = asc2i(argptr, arglen);
+			if ((0 > arryidx) || (NUM_GTMSRC_LCL <= arryidx))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					      RTS_ERROR_LITERAL("mnemonic argument (array index)"));
+			break;
+		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
+			if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
+			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */
+			prmpeekadr = (UINTPTR_T)GTM64_ONLY(asc_hex2l)NON_GTM64_ONLY(asc_hex2i)(cptr, arglen - 2);
+			if (-1 == (INTPTR_T)prmpeekadr)
+				/* Either an error occurred or the user specified the maximum address. So it's
+				 * either an error from the conversion routine or an otherwise useless value.
+				 */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
+			break;
+		default:
+			assert(FALSE);		/* Only the above types should ever have an argument */
 		}
 	}
 	/* Figure out the address of each block to return */

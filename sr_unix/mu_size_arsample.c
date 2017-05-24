@@ -163,7 +163,7 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 			CLEAR_VECTOR(a);
 			if (cdb_sc_normal != (status = mu_size_rand_traverse(r, a)))			/* WARNING assignment */
 			{
-				assert((CDB_STAGNATE > t_tries) || IS_FINAL_RETRY_CODE(status));
+				assert(UPDATE_CAN_RETRY(t_tries, status));
 				t_retry(status);
 				continue;
 			}
@@ -247,7 +247,7 @@ STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, double *a)
 
 STATICFNDCL void finalize_stats_ar(stat_t *stat)
 {
-	unsigned int	j, k;
+	int	j, k;
 
 	for (j = 0; MAX_BT_DEPTH >= j; j++)
 		/* Variance of the mean (mean referes to avg number of records per block) is Var(R)/N where N is samples size */
@@ -257,9 +257,17 @@ STATICFNDCL void finalize_stats_ar(stat_t *stat)
 			stat->S[j] /= stat->N[j];
 		}
 	stat->N[0] = stat->n;				/* for arithmetic below */
-	for (j = MAX_BT_DEPTH; (0 <= j) && (stat->M[j] < EPS); j--)
+	/* Note: stat->M[0] should remain zero since we don't maintain it. Also stat->M[1] should be > EPS.
+	 * So "j" is guaranteed to be at least 1 at the end of the for loop. Assert that.
+	 * In "pro" we be safe and add the "(0 < j)" check in the for loop below to prevent "j" from becoming negative.
+	 */
+	assert(0 == stat->M[0]);
+	assert(EPS > 0);
+	assert(EPS < 1);
+	assert(1 <= stat->M[1]);
+	for (j = MAX_BT_DEPTH; (0 < j) && (stat->M[j] < EPS); j--)
 		;
-	assert(0 <= j);					/* stat->M[0] should remain zero since we don't maintain it */
+	assert(0 < j);
 	mu_int_adj[j] = stat->AT = stat->blkerr[j] = stat->error = 0;
 	stat->B = stat->blktot[j] = 1;
 	for (k = j - 1; j > 0; j--, k--)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "gvcst_expand_free_subtree.h"
 #include "rc_cpt_ops.h"
 #include "wcs_phase2_commit_wait.h"
+#include "min_max.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -63,20 +64,23 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
     	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
 	uint4			save_update_trans;
-	sm_uc_ptr_t		temp_buff;
+	unsigned char		temp_buff[MAX_DB_BLK_SIZE];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	unsigned short		temp_ushort;
 	trans_num		ret_tn;
 	inctn_opcode_t		save_inctn_opcode;
 	bt_rec_ptr_t		bt;
-	unsigned int		level;
+	unsigned int		bsiz, level;
+#	ifdef DEBUG
+	uint4			save_dollar_tlevel;
+#	endif
 
 	csa = cs_addrs;
 	csd = cs_data;
 	/* If ever the following assert is removed, "flush_cache" shouldn't be set to FALSE unconditionally as it is now */
 	assert(!csd->dsid);	/* see related comment in gvcst_kill before the call to this routine */
-	temp_buff = (unsigned char *)malloc(cs_data->blk_size);
+	assert(MAX_DB_BLK_SIZE >= cs_data->blk_size);
 	for (ks = ks_head; NULL != ks; ks = ks->next_kill_set)
 	{
 		for (cnt = 0; cnt < ks->used; ++cnt)
@@ -93,7 +97,6 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					 * haven't sync'ed the cycles, the next tranasction commit will detect the online rollback
 					 * and the restart logic will handle it appropriately.
 					 */
-					free(temp_buff);
 					rel_crit(gv_cur_region);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_IGNBMPMRKFREE, 4, REG_LEN_STR(gv_cur_region),
 							DB_LEN_STR(gv_cur_region));
@@ -111,7 +114,6 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					blk = ksb->block;
 				if (!(bp = (blk_hdr_ptr_t)t_qread(blk, (sm_int_ptr_t)&cycle, &cr)))
 				{	/* This should have worked because t_qread was done in crit */
-					free(temp_buff);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &rdfail_detail);
 				}
 				if (NULL != cr)
@@ -131,13 +133,13 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 						|| (CR_NOTVALID == bt->cache_index)
 						|| (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend));
 				}
-				memcpy(temp_buff, bp, bp->bsiz);
+				assert(MAX_DB_BLK_SIZE >= bp->bsiz);
+				bsiz = MIN(bp->bsiz, MAX_DB_BLK_SIZE);	/* avoid buffer overflows */
+				memcpy(temp_buff, bp, bsiz);
 				if (!was_crit)
 					rel_crit(gv_cur_region);
-				for (rp = (rec_hdr_ptr_t)(temp_buff + SIZEOF(blk_hdr)),
-					rtop = (rec_hdr_ptr_t)(temp_buff + ((blk_hdr_ptr_t)temp_buff)->bsiz);
-				     rp < rtop;
-				     rp = rp1)
+				for (rp = (rec_hdr_ptr_t)(temp_buff + SIZEOF(blk_hdr)), rtop = (rec_hdr_ptr_t)(temp_buff + bsiz);
+					rp < rtop; rp = rp1)
 				{
 					GET_USHORT(temp_ushort, &rp->rsiz);
 					rp1 = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + temp_ushort);
@@ -145,7 +147,6 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					{	/* This should have worked because a local copy was made while crit */
 						assert(FALSE);
 						kill_error = cdb_sc_rmisalign;
-						free(temp_buff);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &kill_error);
 					}
 					GET_LONG(temp_long, (block_id_ptr_t)((sm_uc_ptr_t)rp1 - SIZEOF(block_id)));
@@ -171,6 +172,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 		}
 		gvcst_kill_sort(ks);
 		assert(!bml_save_dollar_tlevel);
+		DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 		bml_save_dollar_tlevel = dollar_tlevel;
 		/* Resetting and restoring of update_trans is necessary to avoid blowing an assert in t_begin that it is 0. */
 		save_update_trans = update_trans;
@@ -180,7 +182,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 		GVCST_BMP_MARK_FREE(ks, ret_tn, inctn_invalid_op, inctn_bmp_mark_free_gtm, inctn_opcode, csa)
 		update_trans = save_update_trans;
 		dollar_tlevel = bml_save_dollar_tlevel;
+		assert(dollar_tlevel == save_dollar_tlevel);
 		bml_save_dollar_tlevel = 0;
 	}
-	free(temp_buff);
 }

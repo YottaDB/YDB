@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2015 Fidelity National Information 	#
+# Copyright (c) 2011-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -85,9 +85,9 @@ cd $gtm_dist
 
 # keep the utf8 libicu search code below in synch with configure.gtc!
 
-set is64bit_gtm = `file mumps | grep 64 | wc -l`
+set is64bit_gtm = `file mumps | grep -c 64`
 
-# please keep in sync with sr_unix/set_library_path.csh
+# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/configure.gtc
 if ( $is64bit_gtm == 1 ) then
 	set library_path = "/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib"
 else
@@ -99,8 +99,6 @@ set is64bit_icu = 0
 set icu_ext = ".so"
 if ( $arch == "ibm" ) then
 	set icu_ext = ".a"
-else if ( $arch == "hp" ) then
-	set icu_ext = ".sl"
 endif
 
 # Check the presence of gtm_icu_version
@@ -139,12 +137,9 @@ foreach libpath ($library_path)
 	endif
 	if ( $icu_lib_found ) then
 		# Figure out the object mode(64 bit or 32 bit) of ICU libraries on the target machine
-		if ( "linux" == "$arch" || "sun" == "$arch" || "solaris" == $arch ) then
+		if ( "linux" == "$arch" ) then
 			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null" | awk '{print $NF}'`
-			set is64bit_icu = `sh -c "file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l"`
-		else if ( "hp" == "$arch" ) then
-			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null" | awk '{print $NF}'`
-			set is64bit_icu = `sh -c "file $libpath/$icu_full_ver_lib 2>/dev/null | grep "IA64" | wc -l"`
+			set is64bit_icu = `sh -c "file $libpath/$icu_full_ver_lib 2>/dev/null | grep -c 64"`
 		else if ( "ibm" == "$arch" ) then
 			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null" | awk '{print $NF}'`
 			set is64bit_icu = `sh -c "nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l"`
@@ -192,88 +187,87 @@ EOF
 
 setenv gtm_dist utf8
 
-if ( -d utf8) then
-	setenv LD_LIBRARY_PATH $libpath
-	setenv LIBPATH $libpath
-	setenv gtm_chset utf-8
-	# depending on the list of locales configured, locale -a might be considered a binary output.
-	# grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
-	if ( "linux" == "$arch" ) then
-		set binaryopt = "-a"
-	else
-		set binaryopt = ""
-	endif
-	set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
-	setenv LC_ALL $utflocale
+setenv LD_LIBRARY_PATH $libpath
+setenv LIBPATH $libpath
+setenv gtm_chset utf-8
+# depending on the list of locales configured, locale -a might be considered a binary output.
+# grep needs -a option to process the output as text but -a is not supported on the non-linux servers we have.
+if ( "linux" == "$arch" ) then
+	set binaryopt = "-a"
+else
+	set binaryopt = ""
+endif
+set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
+setenv LC_ALL $utflocale
 
 gtm << EOF						>>&! gtm_test_install.out
 write \$zchset
 EOF
 
-	setenv gtm_dist $save_gtm_dist/utf8
-	setenv gtmroutines ". $save_gtm_dist/utf8"
+setenv gtm_dist $save_gtm_dist/utf8
+setenv gtmroutines ". $save_gtm_dist/utf8"
 
-	mkdir test_gtm_utf8
-	cd test_gtm_utf8
-	cp ../test_gtm/sim.m .
+mkdir test_gtm_utf8
+cd test_gtm_utf8
+cp ../test_gtm/sim.m .
 
-	# set to test directory
-	setenv gtmdir $save_gtm_dist/test_gtm_utf8
-	# make gtm set the utf locale
-	unsetenv LC_CTYPE
-	# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
-	setenv save_icu $gtm_icu_version
-	unsetenv gtm_icu_version
-	# NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
-	../gtm -r sim >& gtm.out
+# set to test directory
+setenv gtmdir $save_gtm_dist/test_gtm_utf8
+# make gtm set the utf locale
+unsetenv LC_CTYPE
+# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
+setenv save_icu $gtm_icu_version
+unsetenv gtm_icu_version
+# NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
+../gtm -r sim >& gtm.out
 
-	# get $ZCHSET
-	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
-	grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
-	# restore saved gtm_icu_version
-	setenv gtm_icu_version $save_icu
-	# test gtmsecshr with an alternate user
-	set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
-	su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOK line length
-	# if we see the 'Topic? ' prompt, all is well
-	grep -q '^Topic. $' gtmtest.out
-	if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
-	# get journal output
-	cd V*/g
+# get $ZCHSET
+echo ""						>>&! $save_gtm_dist/gtm_test_install.out
+grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
+# restore saved gtm_icu_version
+setenv gtm_icu_version $save_icu
+# test gtmsecshr with an alternate user
+set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
+su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH
+# if we see the 'Topic? ' prompt, all is well
+grep -q '^Topic. $' gtmtest.out
+if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
+# get journal output
+cd V*/g
 
-	$save_gtm_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
-	env gtmgbldir=$save_gtm_dist/test_gtm/mumps.gld $save_gtm_dist/mupip integ -reg "*"	>& integ.out
-	set mupip_status = $status
-	# output the change lines
-	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
-	echo "Global changes in the gtm.mjl file:"	>>&! $save_gtm_dist/gtm_test_install.out
-	awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_gtm_dist/gtm_test_install.out
-	if (0 != $mupip_status) then
-		echo "Error: mupip integ returned $status status instead of 0" >>&! $save_gtm_dist/gtm_test_install.out
-	else
-		echo "mupip integ returned a 0 status - as expected" >>&! $save_gtm_dist/gtm_test_install.out
-	endif
-	$gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
-	$gtm_com/IGS $gtm_dist/gtmsecshr "STOP"
-	cd $save_gtm_dist
-
+$save_gtm_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
+env gtmgbldir=$save_gtm_dist/test_gtm/mumps.gld $save_gtm_dist/mupip integ -reg "*"	>& integ.out
+set mupip_status = $status
+# output the change lines
+echo ""						>>&! $save_gtm_dist/gtm_test_install.out
+echo "Global changes in the gtm.mjl file:"	>>&! $save_gtm_dist/gtm_test_install.out
+awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_gtm_dist/gtm_test_install.out
+if (0 != $mupip_status) then
+	echo "Error: mupip integ returned $status status instead of 0" >>&! $save_gtm_dist/gtm_test_install.out
 else
-	# BEGIN - Fake the UTF-8 mode run for platforms that don't support it
-cat <<EOF						>>&! gtm_test_install.out
-
-GTM>
-UTF-8
-GTM>
-
-ZCHSET= UTF-8
-
-Global changes in the gtm.mjl file:
-^a="1"
-^b="2"
-mupip integ returned a 0 status - as expected
-EOF
-	#  END  - Fake the UTF-8 mode run for platforms that don't support it
+	echo "mupip integ returned a 0 status - as expected" >>&! $save_gtm_dist/gtm_test_install.out
 endif
+$gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
+$gtm_com/IGS $gtm_dist/gtmsecshr "STOP"
+
+echo "Build test the encryption plugin"									>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+mkdir -p $save_gtm_dist/plugin/buildcrypt
+cd $save_gtm_dist/plugin/buildcrypt
+tar xf $save_gtm_dist/plugin/gtmcrypt/source.tar
+env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL GTMXC_gpgagent=$save_gtm_dist/plugin/gpgagent.tab sh -v README >& $save_gtm_dist/encr_plugin_build_test.out #BYPASSOKLENGTH
+if ($status) echo "Encryption plugin build failure"
+grep "GTM.[WIFE]" $save_gtm_dist/encr_plugin_build_test.out
+setenv gtmroutines ". $gtm_dist/plugin/o($gtm_dist/plugin/r) $gtm_dist"
+setenv gtm_passwd "`echo gtmrocks | env gtm_dist=$gtm_dist $gtm_dist/plugin/gtmcrypt/maskpass | cut -f3 -d ' '`"
+setenv GTMXC_gpgagent $gtm_dist/plugin/gpgagent.tab
+setenv gtm_pinentry_log $gtm_dist/encr_plugin_build_test.out
+echo "Default gtmroutines"										>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $gtm_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+echo "Null gtmroutines"											>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+unsetenv gtmroutines
+echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $gtm_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+
+cd $save_gtm_dist
 
 # strip off the copyright lines
 tail -n +11 $gtm_tools/gtm_test_install.txt > gtm_test_install.txt

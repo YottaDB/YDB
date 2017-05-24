@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,21 +58,25 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "error.h"
+#include "wcs_backoff.h"
+#include "wcs_wt.h"
+#include "db_write_eof_block.h"
+#include "interlock.h"
 
 #define	GDSFILEXT_CLNUP						\
-{								\
+MBSTART {							\
 	if (!was_crit)						\
 		rel_crit(gv_cur_region);			\
-}
+} MBEND
 
 #define ISSUE_WAITDSKSPACE(TO_WAIT, WAIT_PERIOD, MECHANISM)									\
-{																\
+MBSTART {															\
 	uint4		seconds;												\
 																\
 	seconds = TO_WAIT + (CDB_STAGNATE - t_tries) * WAIT_PERIOD;								\
 	MECHANISM(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_WAITDSKSPACE, 4, process_id, seconds, DB_LEN_STR(gv_cur_region), ERR_TEXT,\
 			2, LEN_AND_LIT("Please make more disk space available or shutdown GT.M to avoid data loss"), ENOSPC);	\
-}
+} MBEND
 
 #define SUSPICIOUS_EXTEND 	(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)
 
@@ -107,8 +111,8 @@ error_def(ERR_WAITDSKSPACE);
 OS_PAGE_SIZE_DECLARE
 
 #if !defined(__sun) && !defined(__hpux)
-STATICFNDCL int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total);
-STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total)
+STATICFNDCL int extend_wait_for_fallocate(unix_db_info *udi, off_t new_size);
+STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, off_t new_size)
 {
 	int to_wait, to_msg, wait_period, save_errno;
 
@@ -121,18 +125,19 @@ STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total)
 			ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
 		hiber_start(1000);
 		to_wait--;
-		save_errno = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) + (off_t)new_total * cs_data->blk_size +
-					     DISK_BLOCK_SIZE);
+		save_errno = posix_fallocate(udi->fd, 0, new_size);
 	} while ((to_wait > 0) && (ENOSPC == save_errno));
 	return save_errno;
 }
 #endif
 
-STATICFNDCL int extend_wait_for_write(unix_db_info *udi, off_t new_eof, char *buff);
-STATICFNDEF int extend_wait_for_write(unix_db_info *udi, off_t new_eof, char *buff)
+STATICFNDCL int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new_eof);
+STATICFNDEF int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new_eof)
 {
-	int to_wait, to_msg, wait_period, save_errno;
+	int	to_wait, to_msg, wait_period, save_errno;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Attempt to write every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
 	wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
 	to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
@@ -142,7 +147,7 @@ STATICFNDEF int extend_wait_for_write(unix_db_info *udi, off_t new_eof, char *bu
 			ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
 		hiber_start(1000);
 		to_wait--;
-		LSEEKWRITE(udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+		save_errno = db_write_eof_block(udi, udi->fd, blk_size, new_eof, &(TREF(dio_buff)));
 	} while ((to_wait > 0) && (ENOSPC == save_errno));
 	return save_errno;
 }
@@ -151,12 +156,12 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 {
 	sm_uc_ptr_t		old_base[2], mmap_retaddr;
 	boolean_t		was_crit, is_mm;
-	char			buff[DISK_BLOCK_SIZE];
 	int			result, save_errno, status;
+	DEBUG_ONLY(int		first_save_errno);
 	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
 	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
-	off_t			new_eof;
+	off_t			new_eof, new_size;
 	trans_num		curr_tn;
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
@@ -166,6 +171,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	cache_rec_ptr_t         cr;
 	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!IS_DSE_IMAGE);
 	assert((cs_addrs->nl == NULL) || (process_id != cs_addrs->nl->trunc_pid)); /* mu_truncate shouldn't extend file... */
 	assert(!process_exiting);
@@ -220,7 +226,6 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			{
 				if (blocks > (uint4)avail_blocks)
 				{
-					SETUP_THREADGBL_ACCESS;
 					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs))
 						return (uint4)(NO_FREE_SPACE);
 					else
@@ -256,7 +261,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	 *	op_tcommit to invoke bm_getfree->gdsfilext, then we would have come here with a frozen region on which
 	 *	we hold crit.
 	 */
-	assert(!was_crit || !cs_data->freeze || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
+	assert(!was_crit || !FROZEN_HARD(cs_data) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
 	/*
 	 * If we are in the final retry and already hold crit, it is possible that csa->nl->wc_blocked is also set to TRUE
 	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
@@ -270,20 +275,27 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		for ( ; ; )
 		{
 			grab_crit(gv_cur_region);
-			if (!cs_data->freeze && !IS_REPL_INST_FROZEN)
+			if (FROZEN_CHILLED(cs_data))
+				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+			if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
 				break;
 			rel_crit(gv_cur_region);
-			while (cs_data->freeze || IS_REPL_INST_FROZEN)
+			while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+			{
 				hiber_start(1000);
+				if (FROZEN_CHILLED(cs_data) && CHILLED_AUTORELEASE(cs_data))
+					break;
+			}
 		}
-	} else if (cs_data->freeze && dollar_tlevel)
+	} else if (FROZEN_HARD(cs_data) && dollar_tlevel)
 	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
 		 * op_tcommit will recognize (as a cdb_sc_needcrit/cdb_sc_instancefreeze type of restart) and restart accordingly.
 		 */
 		assert(CDB_STAGNATE <= t_tries);
 		GDSFILEXT_CLNUP;
 		return (uint4)FINAL_RETRY_FREEZE_PROG;
-	}
+	} else
+		WAIT_FOR_REGION_TO_UNCHILL(cs_addrs, cs_data);
 	if (IS_REPL_INST_FROZEN && trans_in_prog)
 	{
 		assert(CDB_STAGNATE <= t_tries);
@@ -296,7 +308,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	{	/* Somebody else has already extended it, since we are in crit, this is trust-worthy. However, in case of MM,
 		 * we still need to remap the database
 		 */
-		assert((old_total > filesize) GTM_TRUNCATE_ONLY( || !is_mm));
+		assert((old_total > filesize) || !is_mm);
 		/* For BG, someone else could have truncated or extended - we have no idea */
 		GDSFILEXT_CLNUP;
 		return (SS_NORMAL);
@@ -324,7 +336,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		 * journal records (if it decides to switch to a new journal file).
 		 */
 		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		jnl_status = jnl_ensure_open();
+		jnl_status = jnl_ensure_open(gv_cur_region, cs_addrs);
 		if (jnl_status)
 		{
 			GDSFILEXT_CLNUP;
@@ -335,14 +347,14 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	if (is_mm)
 	{
 		cs_addrs->nl->mm_extender_pid = process_id;
-		status = wcs_wtstart(gv_cur_region, 0);
+		status = wcs_wtstart(gv_cur_region, 0, NULL, NULL);
 		cs_addrs->nl->mm_extender_pid = 0;
 		assertpro(SS_NORMAL == status);
 		old_base[0] = cs_addrs->db_addrs[0];
 		old_base[1] = cs_addrs->db_addrs[1];
 		cs_addrs->db_addrs[0] = NULL; /* don't rely on it until the mmap below */
 #		ifdef _AIX
-		status = shmdt(old_base[0] - BLK_ZERO_OFF(cs_data));
+		status = shmdt(old_base[0] - BLK_ZERO_OFF(cs_data->start_vbn));
 #		else
 		status = munmap((caddr_t)old_base[0], (size_t)(old_base[1] - old_base[0]));
 #		endif
@@ -356,7 +368,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		}
 	} else
 	{	/* Due to concurrency issues, it is possible some process had issued a disk read of the GDS block# corresponding
-		 * to "old_total" right after a truncate wrote a 512-byte block of zeros on disk (to signal end of the db file).
+		 * to "old_total" right after a truncate wrote a GDS-block of zeros on disk (to signal end of the db file).
 		 * If so, the global buffer containing this block needs to be invalidated now as part of the extend. If not, it is
 		 * possible the EOF block on disk is now going to be overwritten by a properly initialized bitmap block (as part
 		 * of the gdsfilext below) while the global buffer continues to have an incorrect copy of that bitmap block and
@@ -372,17 +384,19 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	}
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	new_total = old_total + new_blocks;
-	new_eof = BLK_ZERO_OFF(cs_data) + ((off_t)new_total * cs_data->blk_size);
+	new_eof = BLK_ZERO_OFF(cs_data->start_vbn) + ((off_t)new_total * cs_data->blk_size);
 #	if !defined(__sun) && !defined(__hpux)
 	if (!cs_data->defer_allocate)
 	{
-		save_errno = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) + (off_t)new_total * cs_data->blk_size +
-					     DISK_BLOCK_SIZE);
+		new_size = new_eof + cs_data->blk_size;
+		save_errno = posix_fallocate(udi->fd, 0, new_size);
+		DEBUG_ONLY(first_save_errno = save_errno);
 		if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
-			save_errno = extend_wait_for_fallocate(udi, new_total);
+			save_errno = extend_wait_for_fallocate(udi, new_size);
 		if (0 != save_errno)
 		{
 			GDSFILEXT_CLNUP;
+			assert(ENOSPC == save_errno);
 			if (ENOSPC != save_errno)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
 					     save_errno);
@@ -390,9 +404,9 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		}
 	}
 #	endif
-	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+	save_errno = db_write_eof_block(udi, udi->fd, cs_data->blk_size, new_eof, &(TREF(dio_buff)));
 	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
-		save_errno = extend_wait_for_write(udi, new_eof, buff);
+		save_errno = extend_wait_for_write(udi, cs_data->blk_size, new_eof);
 	if (0 != save_errno)
 	{
 		GDSFILEXT_CLNUP;
@@ -408,13 +422,17 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	/* Ensure the EOF and metadata get to disk BEFORE any bitmap writes. Otherwise, the file size could no longer reflect
 	 * a proper extent and subsequent invocations of gdsfilext could corrupt the database.
 	 */
-	GTM_DB_FSYNC(cs_addrs, udi->fd, status);
-	assert(0 == status);
-	if (0 != status)
+	if (!IS_STATSDB_CSA(cs_addrs))
 	{
-		GDSFILEXT_CLNUP;
-		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
-		return (uint4)(NO_FREE_SPACE);
+		GTM_DB_FSYNC(cs_addrs, udi->fd, status);
+		assert(0 == status);
+		if (0 != status)
+		{
+			GDSFILEXT_CLNUP;
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5,
+						RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
+			return (uint4)(NO_FREE_SPACE);
+		}
 	}
 	if (WBTEST_ENABLED(WBTEST_FILE_EXTEND_INTERRUPT_2))
 	{
@@ -474,13 +492,17 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		LONG_SLEEP(600);
 		assert(FALSE); /* Should be killed before that */
 	}
-	GTM_DB_FSYNC(cs_addrs, udi->fd, status);
-	assert(0 == status);
-	if (0 != status)
+	if (!IS_STATSDB_CSA(cs_addrs))
 	{
-		GDSFILEXT_CLNUP;
-		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync2()"), CALLFROM, status);
-		return (uint4)(NO_FREE_SPACE);
+		GTM_DB_FSYNC(cs_addrs, udi->fd, status);
+		assert(0 == status);
+		if (0 != status)
+		{
+			GDSFILEXT_CLNUP;
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync2()"), CALLFROM,
+				     status);
+			return (uint4)(NO_FREE_SPACE);
+		}
 	}
 	if (WBTEST_ENABLED(WBTEST_FILE_EXTEND_INTERRUPT_4))
 	{
@@ -523,12 +545,13 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	if (is_mm)
 	{
 		assert((NULL != old_base[0]) && (NULL != old_base[1]));
-		mmap_sz = new_eof - BLK_ZERO_OFF(cs_data);	/* Don't mmap the file header and master map */
+		mmap_sz = new_eof - BLK_ZERO_OFF(cs_data->start_vbn);	/* Don't mmap the file header and master map */
 		CHECK_LARGEFILE_MMAP(gv_cur_region, mmap_sz);   /* can issue rts_error MMFILETOOLARGE */
 #		ifdef _AIX
 		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)shmat(udi->fd, (void *)NULL,SHM_MAP));
 #		else
-		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(cs_data), FALSE));
+		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz,
+										BLK_ZERO_OFF(cs_data->start_vbn), FALSE));
 #		endif
 		GTM_WHITE_BOX_TEST(WBTEST_MEM_MAP_SYSCALL_FAIL, status, -1);
 		if (-1 == status)
@@ -542,7 +565,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		}
 		/* In addition to updating the internal map values, gds_map_moved sets cs_data to point to the remapped file */
 #		if defined(_AIX)
-		mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data);
+		mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data->start_vbn);
 #		endif
 		gds_map_moved(mmap_retaddr, old_base[0], old_base[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
 		cs_addrs->db_addrs[0] = mmap_retaddr;

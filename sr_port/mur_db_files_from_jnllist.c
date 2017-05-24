@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,6 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		memcpy(seg->fname, &db_fname[0], db_fname_len);
 		/* This code is lifted from the tail of "mu_gv_cur_reg_init". Any changes here need to be reflected there */
 		FILE_CNTL_INIT(seg);
-		seg->file_cntl->file_type = dba_bg;
 	}
 	while (cptr < ctop)
 	{

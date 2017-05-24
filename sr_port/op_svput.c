@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,6 +157,10 @@ void op_svput(int varnum, mval *v)
 					gvinit();
 				if (NULL != gv_target)
 					gv_target->clue.end = 0;
+				/* Reset any cached region-name for $zpeek since gbldir is changing and any same region name
+				 * in the new gbldir should point to a different gd_region structure (and not the cached one).
+				 */
+				TREF(zpeek_regname_len) = 0;
 			}
 			break;
 		case SV_ZMAXTPTIME:

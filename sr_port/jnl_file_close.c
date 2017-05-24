@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	}
 	JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
 	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, rc, EIO);
-	jpc->cycle--;	/* decrement cycle so jnl_ensure_open() knows to reopen the journal */
+	jpc->cycle--;	/* decrement cycle so "jnl_ensure_open" knows to reopen the journal */
 	jpc->pini_addr = 0;
 	if (clean && (SS_NORMAL != jpc->status || SS_NORMAL != rc))
 	{

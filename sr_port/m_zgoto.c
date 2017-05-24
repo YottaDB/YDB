@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,7 @@ int m_zgoto(void)
 	{	/* Only level parm supplied (no entry ref) - job for op_zg1 */
 		setcurtchain(oldchain);
 		obp = oldchain->exorder.bl;
-		dqadd(obp, &tmpchain, exorder);		/* this is a violation of info hiding */
+		dqadd(obp, &tmpchain, exorder);					/* this is a violation of info hiding */
 		ref0 = newtriple(OC_ZG1);
 		ref0->operand[0] = quits;
 		return TRUE;
@@ -59,7 +60,7 @@ int m_zgoto(void)
 		}
 		make_commarg(&quits, indir_zgoto);
 		obp = oldchain->exorder.bl;
-		dqadd(obp, &tmpchain, exorder);		/* this is a violation of info hiding */
+		dqadd(obp, &tmpchain, exorder);					/* this is a violation of info hiding */
 	 	return TRUE;
 	}
 	advancewindow();
@@ -83,30 +84,8 @@ int m_zgoto(void)
 		setcurtchain(oldchain);
 	}
 	if (TK_COLON == TREF(window_token))
-	{	/* post conditional expression */
-		advancewindow();
-		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr(FALSE, cr))
-			return FALSE;
-		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
-		{
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(TREF(expr_start));
-		}
-		obp = oldchain->exorder.bl;
-		dqadd(obp, &tmpchain, exorder);		 /* this is a violation of info hiding */
-		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
-		{
-			ref0 = newtriple(OC_JMP);
-			ref1 = newtriple(OC_GVRECTARG);
-			ref1->operand[0] = put_tref(TREF(expr_start));
-			*cr = put_tjmp(ref1);
-			tnxtarg(&ref0->operand[0]);
-		} else
-			tnxtarg(cr);
-		return TRUE;
-	}
+		return m_goto_postcond(oldchain, &tmpchain);			/* post conditional expression */
 	obp = oldchain->exorder.bl;
-	dqadd(obp, &tmpchain, exorder);			/* this is a violation of info hiding */
+	dqadd(obp, &tmpchain, exorder);						/* this is a violation of info hiding */
 	return TRUE;
 }

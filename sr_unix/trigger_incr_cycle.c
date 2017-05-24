@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +25,7 @@
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
 #include "mvalconv.h"			/* Needed for MV_FORCE_* */
+#include "gtm_trigger_trc.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
@@ -48,6 +50,7 @@ void trigger_incr_cycle(char *trigvn, int trigvn_len)
 		cycle_ptr = cycle_str;
 	} else
 		cycle_ptr = INITIAL_CYCLE;
+	DBGTRIGR((stderr, "trigger_incr_cycle(): %s #CYCLE=%s\n", trigvn, cycle_ptr));
 	SET_TRIGGER_GLOBAL_SUB_SUB_STR(trigvn, trigvn_len, LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE),
 		cycle_ptr, STRLEN(cycle_ptr), result);
 	assert(PUT_SUCCESS == result);

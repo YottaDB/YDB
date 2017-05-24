@@ -74,7 +74,7 @@
 
 /* Callers of this macro ensure that the maximum seqno which can be found until offset MAX_SEQNO_EOF_ADDR is MAX_SEQNO. */
 #define	CTL_SET_MAX_SEQNO(CTL, MAX_SEQNO, MAX_SEQNO_ADDR, MAX_SEQNO_EOF_ADDR, SKIP_EOF_ADDR_CHECK)		\
-{														\
+MBSTART {													\
 	assert(MAX_SEQNO_ADDR <= MAX_SEQNO_EOF_ADDR);								\
 	assert(SKIP_EOF_ADDR_CHECK || (MAX_SEQNO_EOF_ADDR <= CTL->repl_buff->fc->eof_addr));			\
 	assert(ctl->max_seqno <= MAX_SEQNO);									\
@@ -84,7 +84,36 @@
 	assert(MAX_SEQNO_EOF_ADDR >= MAX_SEQNO_ADDR);								\
 	assert(ctl->max_seqno_eof_addr <= MAX_SEQNO_EOF_ADDR);							\
 	ctl->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
-}
+} MBEND
+
+#define BUNCHING_TIME	(8 * MILLISECS_IN_SEC)
+
+#define	GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(CTL, CSA)									\
+MBSTART {														\
+	boolean_t		flush_done;										\
+	uint4			dskaddr, freeaddr, saved_jpc_cycle;							\
+	jnl_private_control	*jpc;											\
+	int			rc;											\
+															\
+	jpc = CSA->jnl;													\
+	saved_jpc_cycle = jpc->cycle; /* remember current cycle */							\
+	DO_JNL_FLUSH_IF_POSSIBLE(CTL->reg, CSA, flush_done, dskaddr, freeaddr);						\
+	if (flush_done)													\
+	{	/* Source server did a flush. Log that event for debugging purposes */					\
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_INFO : Source server did flush of journal file %s "	\
+			"state %s : seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x]\n", CTL->jnl_fn,			\
+			jnl_file_state_lit[CTL->file_state], CTL->seqno, CTL->seqno, dskaddr, freeaddr);		\
+		/* Since "flush_done" is TRUE, it means the source server has done a "jnl_ensure_open" inside the	\
+		 * DO_JNL_FLUSH_IF_POSSIBLE macro and has opened the journal file. It already has a copy of the fd in	\
+		 * ctl->repl_buff->fc->fd which it uses to read the journal file. Now that the jnl_flush (rare event)	\
+		 * is done, close the jpc->channel and continue to use the ctl's fd.					\
+		 */													\
+		assert(NOJNL != jpc->channel);										\
+		JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */					\
+		assert(NOJNL == jpc->channel);										\
+		jpc->cycle = saved_jpc_cycle; /* do not want cycle to be changed by our flushing so restore it */	\
+	}														\
+} MBEND
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -98,7 +127,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	uint4			process_id;
-GBLREF	uint4			heartbeat_counter;
 
 LITREF char *jnl_file_state_lit[];
 
@@ -503,10 +531,10 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
 		if (!ctl->eof_addr_final)
 		{
-			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, REAL_JNL_HDR_LEN, status);
+			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP2(REAL_JNL_HDR_LEN, fc->fs_block_size), status);
 			if (SS_NORMAL != status)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
-						ERR_TEXT, 2, LEN_AND_LIT("Error in reading jfh in update_eof_addr"), status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn, ERR_TEXT,
+						2, LEN_AND_LIT("Error reading journal fileheader to update EOF address"), status);
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
 			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
 		}
@@ -704,11 +732,14 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					return (SS_NORMAL);
 				}
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-				if (0 == (wait_for_jnl += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
+				wait_for_jnl += GTMSOURCE_WAIT_FOR_JNL_RECS;
+				if (0 == (wait_for_jnl % LOG_WAIT_FOR_JNL_FLUSH_PERIOD))
+					GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(ctl, csa); /* See if a "jnl_flush" might help nudge */
+				if (0 == (wait_for_jnl % LOG_WAIT_FOR_JNL_RECS_PERIOD))
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for "
 						" journal record(s) to be written to journal file %s while attempting to read "
-						"seqno %llu [0x%llx]. [dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with "
+						"seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x]. Check for problems with "
 						"journaling\n", wait_for_jnl / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
 						csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
 				}
@@ -1011,11 +1042,14 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 				return 0;
 			}
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-			if (0 == (total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
+			total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS;
+			if (0 == (total_wait_for_jnl_recs % LOG_WAIT_FOR_JNL_FLUSH_PERIOD))
+				GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(ctl, csa); /* See if a "jnl_flush" might help nudge */
+			if (0 == (total_wait_for_jnl_recs % LOG_WAIT_FOR_JNL_RECS_PERIOD))
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for journal "
 					"record(s) to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
-					"[dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with journaling\n",
+					"[dskaddr 0x%x freeaddr 0x%x]. Check for problems with journaling\n",
 					total_wait_for_jnl_recs / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
 					csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
 			}
@@ -1455,34 +1489,37 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 				return 0;
 			}
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN); /* sleep for 10 msec between each iteration */
-			if (0 == ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD))
+			total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN;
+			if (0 == (total_wait_for_jnlopen % LOG_WAIT_FOR_JNL_FLUSH_PERIOD))
+			{
+				for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
+				{
+					csa = &FILE_INFO(ctl->reg)->s_addrs;
+					GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(ctl, csa); /* See if a "jnl_flush" might help nudge */
+				}
+			}
+			if (0 == (total_wait_for_jnlopen % LOG_WAIT_FOR_JNLOPEN_PERIOD))
 			{	/* We have waited for 5000 intervals of 10 msec each, for a total of 50 seconds sleep.
-				 * Issue alert every 50 seconds. Print detail of all open journal files only in first alert.
+				 * Issue alert every 50 seconds.
 				 */
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for journal"
 					" file(s) to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check"
 					" for problems with journaling\n", total_wait_for_jnlopen / 1000,
 					read_jnl_seqno, read_jnl_seqno);
-				if (LOG_WAIT_FOR_JNLOPEN_PERIOD == total_wait_for_jnlopen)
-				{	/* Print debug info only for first alert */
-					for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
-					{
-						csa = &FILE_INFO(ctl->reg)->s_addrs;
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "DBG_INFO: Journal File: %s for"
-							" Database File: %s; State: %s. Timer PIDs(%d): (%u %u %u)\n",
-							ctl->jnl_fn, ctl->reg->dyn.addr->fname,
-							jnl_file_state_lit[ctl->file_state], csa->nl->wcs_timers + 1,
-							csa->nl->wt_pid_array[0], csa->nl->wt_pid_array[1],
-							csa->nl->wt_pid_array[2]);
-						if (JNL_FILE_OPEN == ctl->file_state)
-						{
-							repl_log(gtmsource_log_fp, TRUE, TRUE, " "
-								"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
-								"ctl->repl_rctl->read_complete = %d\n",
-								ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
-								csa->jnl->jnl_buff->freeaddr, ctl->repl_rctl->read_complete);
-						}
-					}
+				for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
+				{
+					csa = &FILE_INFO(ctl->reg)->s_addrs;
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "DBG_INFO: Journal File: %s for"
+						" Database File: %s; State: %s. Timer PIDs(%d): (%u %u %u)\n",
+						ctl->jnl_fn, ctl->reg->dyn.addr->fname,
+						jnl_file_state_lit[ctl->file_state], csa->nl->wcs_timers + 1,
+						csa->nl->wt_pid_array[0], csa->nl->wt_pid_array[1],
+						csa->nl->wt_pid_array[2]);
+					repl_log(gtmsource_log_fp, TRUE, TRUE, " "
+						"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
+						"ctl->repl_rctl->read_complete = %d\n",
+						ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+						csa->jnl->jnl_buff->freeaddr, ctl->repl_rctl->read_complete);
 				}
 			}
 		}
@@ -1878,6 +1915,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	uint4			jnlpool_size;
 	boolean_t		file2pool;
 	unsigned int		start_heartbeat;
+	boolean_t		stop_bunching;
 	gtmsource_state_t	gtmsource_state_sav;
 
 	jctl = jnlpool.jnlpool_ctl;
@@ -1909,12 +1947,15 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			REPL_DPRINT1("REPL_HISTREC message first needs to be sent before any more seqnos can be sent across\n");
 			return 0;
 		}
-		start_heartbeat = heartbeat_counter;
+		TIMEOUT_INIT(stop_bunching, BUNCHING_TIME);
 		read_addr = gtmsource_local->read_addr;
 		GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 		first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
 		if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+		{
+			TIMEOUT_DONE(stop_bunching);
 			return 0;
+		}
 		tot_tr_len = 0;
 		do
 		{
@@ -1949,7 +1990,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			 * of no-progress. In the worst case we could be unresponsive for 8 seconds (1 heartbeat period)
 			 * with this approach.
 			 */
-			read_multiple = read_multiple && (start_heartbeat == heartbeat_counter);
+			read_multiple = read_multiple && !stop_bunching;
 			if (read_multiple)
 			{	/* Ok to read multiple transactions. Limit the multiple reads until there is no more to be read
 				 * OR total read size reaches a fixed value MAX_TR_BUFFSIZE. This strikes a fine balance between
@@ -1966,7 +2007,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 					GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 					read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
 					if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
-						return 0;	/* Control message triggered state change */
+					{	/* Control message triggered state change */
+						TIMEOUT_DONE(stop_bunching);
+						return 0;
+					}
 					/* Don't use buff to assign type and len as buffer may have expanded.
 					 * Use gtmsource_msgp instead */
 					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
@@ -1979,6 +2023,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			}
 			break;
 		} while (TRUE);
+		TIMEOUT_DONE(stop_bunching);
 		assert(read_jnl_seqno <= max_read_seqno);
 		if ((gtmsource_local->next_histinfo_num < gtmsource_local->num_histinfo)
 			|| (gtmsource_local->num_histinfo == jnlpool.repl_inst_filehdr->num_histinfo))

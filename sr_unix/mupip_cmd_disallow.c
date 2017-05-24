@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2016 Fidelity National Information	*
+ * Copyright (c) 2002-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,6 +77,20 @@ boolean_t cli_disallow_mupip_freeze(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("ON") && d_c_cli_present("OFF");
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("ONLINE") && d_c_cli_present("OFF");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = !d_c_cli_present("ONLINE") && d_c_cli_present("AUTORELEASE");
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}
+
+boolean_t cli_disallow_mupip_dumpfhead(void)
+{
+	int disallow_return_value = 0;
+
+	*cli_err_str_ptr = 0;
+	disallow_return_value = d_c_cli_present("FILE") && d_c_cli_present("REGION");
+	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
 
@@ -99,6 +113,10 @@ boolean_t cli_disallow_mupip_integ(void)
 	 */
 	disallow_return_value = d_c_cli_present("ONLINE") && (d_c_cli_present("TN_RESET")
 								|| d_c_cli_present("FILE"));
+	CLI_DIS_CHECK_N_RESET;
+	/* [NO]STATS is supported only with REGION */
+	disallow_return_value = !d_c_cli_present("REGION")
+					&& (d_c_cli_present("STATS") || d_c_cli_negated("STATS"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

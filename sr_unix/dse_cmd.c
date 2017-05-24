@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -285,6 +285,7 @@ static readonly CLI_ENTRY dse_find_qual[] = {
 { "KEY",        dse_f_key,  0, 0,                    0, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR, 0       },
 { "REGION",     dse_f_reg,  0, dse_freg_parm_values, 0, 0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "SIBLINGS",   0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NON_NEG, 0,       0       },
+{ "STATS",      0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NEG,     0,       0       },
 { "" }
 };
 

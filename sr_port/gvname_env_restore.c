@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +47,7 @@ void gvname_env_restore(gvname_info *curr_gvname_info)
 	SETUP_THREADGBL_ACCESS;
 	gv_target = curr_gvname_info->s_gv_target;
 	gv_cur_region = curr_gvname_info->s_gv_cur_region;
-	DEBUG_ONLY(is_bg_or_mm = (dba_bg == REG_ACC_METH(gv_cur_region) || dba_mm == REG_ACC_METH(gv_cur_region));)
+	DEBUG_ONLY(is_bg_or_mm = IS_REG_BG_OR_MM(gv_cur_region);)
 	cs_addrs = curr_gvname_info->s_cs_addrs;
 	assert((is_bg_or_mm && cs_addrs)
 		|| (dba_cm == REG_ACC_METH(gv_cur_region)) || (dba_usr == REG_ACC_METH(gv_cur_region)));

@@ -140,7 +140,7 @@
     <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED ENABLED
                      Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
     ------------------------------------------------------------------------------------------
-    <default>        <based on DB file-spec>   Y       2308       2048       2048      8386560
+    <default>        <based on DB file-spec>   Y       2312       2048       2048      8386560
     Segment          Active              Acc Typ Block      Alloc Exten Options
     ------------------------------------------------------------------------------
     <default>          *                 BG  DYN  4096       5000 10000 GLOB =1000
@@ -165,7 +165,7 @@
     Region                          Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
     --------------------------------------------------------------------------------------------------------
     DEFAULT                         $gtmdir/$gtmver/g/gtm.mjl
-                                                              Y      2308       2048       2048      8386560
+                                                              Y      2312       2048       2048      8386560
                                    *** SEGMENTS ***
     Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten Options
     -------------------------------------------------------------------------------------------
@@ -306,7 +306,7 @@
     Region            Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
     ------------------------------------------------------------------------------------------
     DEFAULT           $gtmdir/$gtmver/g/gtm.mjl
-                                                Y      2308       2048       2048      8386560
+                                                Y      2312       2048       2048      8386560
 
 1 Using_GDE
    Using GDE
@@ -1290,7 +1290,7 @@
 
    Example:
 
-   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2308,EXTENSION=2048)
+   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2312,EXTENSION=2048)
 
    Summary
 

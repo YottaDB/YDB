@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,22 +67,18 @@ int gc_sym_init(void)
  *
  * Arguments:	handle	Encryption / decryption state object to destroy.
  *
- * Returns:	1 if the cipher handle was successfully destroyed; -1 otherwise.
+ * Returns:	N/A neither OpenSSL nor GCrypt destructors return a status.
  */
-int gc_sym_destroy_cipher_handle(crypt_key_t handle)
+void gc_sym_destroy_cipher_handle(crypt_key_t handle)
 {
-#	ifdef USE_OPENSSL
-	if (!EVP_CIPHER_CTX_cleanup(&handle))
-	{
-		GC_APPEND_OPENSSL_ERROR("Failed to destroy encryption key handle.");
-		return -1;
-	}
-#	endif
-#	ifdef USE_GCRYPT
-	if (handle)
+	if (NULL != handle)
+#ifdef USE_OPENSSL
+		EVP_CIPHER_CTX_free(handle);
+#elif defined(USE_GCRYPT)
 		gcry_cipher_close(handle);
-#	endif
-	return 0;
+#else
+	error Encryption library not defined, please use either -DUSE_OPENSSL or -DUSE_GCRYPT
+#endif
 }
 
 /*
@@ -103,11 +99,13 @@ int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt
 	int rv, plain_text_length;
 
 #	ifdef USE_OPENSSL
-	if (!reuse)
+	if (NULL == *handle)
+		*handle = EVP_CIPHER_CTX_new();
+	else if (!reuse)
 	{
-		EVP_CIPHER_CTX_init(handle);
+		EVP_CIPHER_CTX_init(*handle);
 	}
-	if (!EVP_CipherInit_ex(handle, ALGO, NULL, raw_key, iv, direction))
+	if (!EVP_CipherInit_ex(*handle, ALGO, NULL, raw_key, iv, direction))
 	{
 		GC_APPEND_OPENSSL_ERROR("Failed to initialize encryption key handle.");
 		return -1;
@@ -168,12 +166,12 @@ int gc_sym_encrypt_decrypt(crypt_key_t *key, unsigned char *in_block, int in_blo
 	}
 #	endif
 #	ifdef USE_OPENSSL
-	if (!EVP_CipherUpdate(key, out_block, &out_block_len, in_block, in_block_len))
+	if (!EVP_CipherUpdate(*key, out_block, &out_block_len, in_block, in_block_len))
 	{
 		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherUpdate' failed.")
 		return -1;
 	}
-	if (!EVP_CipherFinal_ex(key, out_block + out_block_len, &tmp_len))
+	if (!EVP_CipherFinal_ex(*key, out_block + out_block_len, &tmp_len))
 	{
 		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherFinal_ex' failed.")
 		return -1;

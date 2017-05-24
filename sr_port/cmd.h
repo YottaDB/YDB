@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@ int m_else(void);
 int m_xecute(void);
 int m_for(void);
 int m_goto(void);
+int m_goto_postcond(triple *oldchain, triple *tmpchain);
 int m_halt(void);
 int m_hang(void);
 int m_hcmd(void);

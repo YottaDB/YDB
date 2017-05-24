@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -226,5 +226,25 @@ if (!mutex_trc_dump_done) \
 #define MUTEX_TEST_PRINT5(p, q, r, s, t)
 
 #endif /* MUTEX_TEST */
+
+#define TOO_MANY_REGIONS	1025	/* An arbitrary number that is a value much higher than the
+					 * total # of database regions + jnlpools that a process is
+					 * supposed to attach to. Used only in debug to ensure
+					 * TREF(crit_reg_count) does not go too high.
+					 */
+
+#define SET_CSA_NOW_CRIT_TRUE(CSA)								\
+MBSTART {											\
+	(CSA)->now_crit = TRUE;									\
+	(TREF(crit_reg_count))++;								\
+	assert((0 < TREF(crit_reg_count)) && (TOO_MANY_REGIONS > TREF(crit_reg_count)));	\
+} MBEND
+
+#define SET_CSA_NOW_CRIT_FALSE(CSA)								\
+MBSTART {											\
+	(CSA)->now_crit = FALSE;								\
+	(TREF(crit_reg_count))--;								\
+	assert((0 <= TREF(crit_reg_count)) && (TOO_MANY_REGIONS > TREF(crit_reg_count)));	\
+} MBEND
 
 #endif /* MUTEXSP_H */

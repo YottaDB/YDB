@@ -98,8 +98,8 @@ GBLREF	char			dl_err[MAX_ERRSTR_LEN];
 #define REPL_SEND_TRACE_BUFF_SIZE 65536
 #define REPL_RECV_TRACE_BUFF_SIZE 65536
 #else
-#define REPL_SEND_TRACE_BUFF_SIZE 1048576
-#define REPL_RECV_TRACE_BUFF_SIZE 1048576
+#define REPL_SEND_TRACE_BUFF_SIZE (MAX_REPL_MSGLEN * 2) /* For symmetry with the below */
+#define REPL_RECV_TRACE_BUFF_SIZE (MAX_REPL_MSGLEN * 2) /* To debug problems in the Receiver's msgbuff (gtmrecv_msgp) management */
 #endif
 #define REPL_SEND_SIZE_TRACE_SIZE 1024
 #define REPL_RECV_SIZE_TRACE_SIZE 1024

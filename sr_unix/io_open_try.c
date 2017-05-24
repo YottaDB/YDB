@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,6 +106,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	int		errcode;
 	unsigned int	port_len;
 	char		port_buffer[NI_MAXSERV], *port_ptr;
+	io_desc		*temp_iod;
 
 	mt_ptr = NULL;
 	char_or_block_special = FALSE;
@@ -138,24 +139,24 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	{
 		if (0 == tl->iod)
 		{
-			tl->iod =  (io_desc *)malloc(SIZEOF(io_desc));
-			memset((char*)tl->iod, 0, SIZEOF(io_desc));
-			tl->iod->pair.in  = tl->iod;
-			tl->iod->pair.out = tl->iod;
-			tl->iod->trans_name = tl;
-			tl->iod->type = n_io_dev_types;
+			temp_iod =  (io_desc *)malloc(SIZEOF(io_desc));
+			memset((char*)temp_iod, 0, SIZEOF(io_desc));
+			temp_iod->pair.in  = temp_iod;
+			temp_iod->pair.out = temp_iod;
+			temp_iod->trans_name = tl;
+			temp_iod->type = n_io_dev_types;
 			p_offset = 0;
 			while(iop_eol != *(pp->str.addr + p_offset))
 			{
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_fifo == ch)
-					tl->iod->type = ff;
+					temp_iod->type = ff;
 				else  if (iop_sequential == ch)
-					tl->iod->type = rm;
+					temp_iod->type = rm;
 				p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 					     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 			}
-			if (ff == tl->iod->type)
+			if (ff == temp_iod->type)
 			{
 				/* fifo with RW permissions for owner, group, other */
 				if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0))
@@ -168,11 +169,11 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					if (EEXIST != errno)
 						filecreated = TRUE;
 					/*	create another one for fifo write	*/
-					tl->iod->pair.out = (io_desc *)malloc(SIZEOF(io_desc));
-					(tl->iod->pair.out)->pair.in = tl->iod;
-					(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
-					(tl->iod->pair.out)->trans_name = tl;
-					(tl->iod->pair.out)->type = ff;
+					temp_iod->pair.out = (io_desc *)malloc(SIZEOF(io_desc));
+					(temp_iod->pair.out)->pair.in = temp_iod;
+					(temp_iod->pair.out)->pair.out = (temp_iod->pair.out);
+					(temp_iod->pair.out)->trans_name = tl;
+					(temp_iod->pair.out)->type = ff;
 #else
 					filecreated = TRUE;
 #endif
@@ -184,6 +185,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					   In that way error handler will get the chance to handle any error */
 				}
 			}
+			tl->iod = temp_iod;
 		}
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
 		{

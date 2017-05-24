@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 {
 	size_t		str_len, delim_cnt;
 	int		len, pfx_str_len, sfx_start_offset, sfx_str_len, rep_str_len, pfx_scan_offset;
-	int		dlmlen, cpy_cache_lines, mblen;
+	int		dlmlen, cpy_cache_lines, mblen, lmsdelim;
 	unsigned char	*start_sfx, *str_addr, *end_pfx, *end_src, *start_pfx;
 	boolean_t	do_scan, delim_last_scan, valid_char;
 	mval		dummymval;	/* It's value is not used but is part of the call to op_fnp1() */
@@ -267,10 +267,18 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		str_addr += pfx_str_len;
 	}
 	/* copy delimiters */
-	while (0 < delim_cnt--)
-	{
-		memcpy(str_addr, ldelim.unibytes_val, dlmlen);
-		str_addr += dlmlen;
+	if (gtm_utf8_mode && (1 < dlmlen))
+	{	/* In this mode, delimiters can exceed 1 character so copy them this way */
+		while (0 < delim_cnt--)
+		{
+			memcpy(str_addr, ldelim.unibytes_val, dlmlen);
+			str_addr += dlmlen;
+		}
+	} else
+	{	/* If delimiters are 1 byte (M mode always and perhaps UTF8 mode), use this simpler/faster method */
+		lmsdelim = (gtm_utf8_mode) ? ldelim.unibytes_val[0] : delim;
+		memset(str_addr, lmsdelim, delim_cnt);
+		str_addr += delim_cnt;
 	}
 	/* copy expression */
 	if (0 < expr->str.len)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,9 +53,8 @@ error_def(ERR_TLSCLOSE);
 	if (0 < gtmsource_options.renegotiate_interval)										\
 	{															\
 		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;							\
-		NEXT_RENEG_HRTBT = heartbeat_counter + gtmsource_options.renegotiate_interval;					\
-		gtmsource_local->next_renegotiate_time = (uint4)time(NULL)							\
-							+ gtmsource_options.renegotiate_interval * HEARTBEAT_INTERVAL_IN_SECS;	\
+		TIMEOUT_DONE_NOCH(NEXT_RENEG_HRTBT);										\
+		TIMEOUT_INIT_NOCH(NEXT_RENEG_HRTBT, gtmsource_options.renegotiate_interval * MILLISECS_IN_SEC);			\
 	}															\
 }
 

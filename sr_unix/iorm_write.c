@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -151,6 +151,13 @@ void iorm_write_utf(mstr *v)
 	if (CHSET_UTF8 != iod->ochset)
 	{
 		outstart = nextoutptr = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
+		/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done,
+		 * there's no way to read the BOM bytes & to determine the variant. So default to UTF-16BE.
+		 */
+		if (rm_ptr->done_1st_write && ((CHSET_UTF16 == iod->ochset) && !IS_UTF16_CHSET(rm_ptr->ochset_utf16_variant)))
+		{
+			iod->ochset = rm_ptr->ochset_utf16_variant = CHSET_UTF16BE;
+		}
 		if (!rm_ptr->done_1st_write)
 		{	/* get the file size  */
 			FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);
@@ -190,6 +197,9 @@ void iorm_write_utf(mstr *v)
 				iod->ochset = CHSET_UTF16BE;
 				get_chset_desc(&chset_names[iod->ochset]);
 			}
+			if (!IS_UTF16_CHSET(rm_ptr->ochset_utf16_variant) &&
+				(IS_UTF16_CHSET(iod->ochset) && (CHSET_UTF16 != iod->ochset)))
+				rm_ptr->ochset_utf16_variant = iod->ochset;
 		}
 	} else
 		outstart = (unsigned char *)v->addr;	/* write from the UTF-8 string */

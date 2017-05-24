@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,7 +246,7 @@ error_def(ERR_SYSCALL);
 			}											\
 		} else												\
 		{	/* Recovery on this database was previously interrupted. Although we know which		\
-			 * stream seqno was specified for this round of rollback, we dont know which		\
+			 * stream seqno was specified for this round of rollback, we don't know which		\
 			 * streams were specified in previous interrupted rollbacks. So set all the		\
 			 * stream #s in the file header based on murgbl.resync_strm_seqno[] which has		\
 			 * already been computed taking into account ALL region file headers.			\
@@ -639,6 +639,7 @@ typedef struct reg_ctl_list_struct
 	struct jnlext_multi_struct *jnlext_shm_list[TOT_EXTR_TYPES];	/* valid only if "rctl->this_pid_is_owner" is FALSE */
 	int			extr_fn_len_orig[TOT_EXTR_TYPES];	/* fn_len before the region-name suffix was added */
 	boolean_t		last_jext_logical_rec[TOT_EXTR_TYPES];/* Whether corresponding last_jext_rec[] is logical record */
+	dio_buff_t		dio_buff;	/* Used for O_DIRECT IO in case this region has asyncio=TRUE */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -789,7 +790,7 @@ typedef struct jnlext_multi_struct
 						 * = 2*n+1 for *SET*,*KILL*,*LGTRIG*,*ZTRIG rectypes where this is the nth
 						 *	journaled update (across all regions) in this TP.
 						 * = 2*n for *ZTWORM* rectype. We need this 2n+1 vs 2n distinction because
-						 *	ZTWORM type of updates dont inherit a unique update_num at the time of
+						 *	ZTWORM type of updates don't inherit a unique update_num at the time of
 						 *	the TP transaction. They just inherit the update_num of the following
 						 *	*SET*,*KILL* rectype.
 						 * = 2**31-1 (max-possible-value) for TCOM record.
@@ -1207,21 +1208,23 @@ typedef struct {
 #define	RESOLVED_TRUE	TRUE
 
 /* The below macro is similar to code in gtm_pthread_init_key.c */
-#define	MUR_SET_MULTI_PROC_KEY(RCTL, PTR)			\
-{								\
-	gd_region	*reg;					\
-								\
-	assert(multi_proc_in_use);				\
-	reg = RCTL->gd;						\
-	if (reg->rname_len)					\
-	{							\
-		PTR = &reg->rname[0];				\
-		assert('\0' == PTR[reg->rname_len]);		\
-	} else							\
-	{							\
-		PTR = &reg->dyn.addr->fname[0];			\
-		assert('\0' == PTR[reg->dyn.addr->fname_len]);	\
-	}							\
+#define	MUR_SET_MULTI_PROC_KEY(RCTL, PTR)					\
+{										\
+	gd_region	*reg;							\
+										\
+	assert(multi_proc_in_use);						\
+	reg = RCTL->gd;								\
+	if (!reg->owning_gd->is_dummy_gbldir)					\
+	{									\
+		assert(reg->rname_len);						\
+		PTR = &reg->rname[0];						\
+		assert('\0' == PTR[reg->rname_len]);				\
+	} else									\
+	{									\
+		assert(!memcmp(reg->rname, "DEFAULT", reg->rname_len));		\
+		PTR = &reg->dyn.addr->fname[0];					\
+		assert('\0' == PTR[reg->dyn.addr->fname_len]);			\
+	}									\
 }
 
 #define	IN_MUR_CLOSE_FILES_FALSE	FALSE

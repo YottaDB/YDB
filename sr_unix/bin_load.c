@@ -50,6 +50,8 @@
 #include "min_max.h"
 #include "mu_interactive.h"
 
+#define LAST_NEGATIVE_SUBSCRIPT 127
+
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF bool		mu_ctrlc_occurred;
@@ -61,8 +63,13 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF int		onerror;
 GBLREF io_pair		io_curr_device;
+
+LITREF boolean_t mu_int_possub[16][16];
+LITREF boolean_t mu_int_negsub[16][16];
+LITREF boolean_t mu_int_exponent[256];
 
 error_def(ERR_CORRUPTNODE);
 error_def(ERR_GVIS);
@@ -78,6 +85,8 @@ error_def(ERR_LOADINVCHSET);
 error_def(ERR_LDSPANGLOINCMP);
 error_def(ERR_RECLOAD);
 error_def(ERR_GVFAILCORE);
+error_def(ERR_NULSUBSC);
+error_def(ERR_DBDUPNULCOL);
 
 #define	BIN_PUT		0
 #define BIN_BIND	1
@@ -179,7 +188,7 @@ error_def(ERR_GVFAILCORE);
  */
 
 gvnh_reg_t	*bin_call_db(int, INTPTR_T, INTPTR_T);
-void 		zwr_out_print(char * buff, int len);
+void		zwr_out_print(char * buff, int len);
 
 #define ZWR_BASE_STRIDE 1024
 #define UOP_BASE_STRIDE 1024
@@ -218,9 +227,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	unsigned char		*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
-	unsigned char		*end_buff;
-	unsigned short		rec_len, next_cmpc, numsubs;
-	int			len, current, last, max_key;
+	unsigned char		*end_buff, *gvn_char, *subs, mych;
+	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
+	int			len, current, last, max_key, max_rec, fmtd_key_len;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
 	uint4			max_data_len, max_subsc_len, gblsize, data_len;
 	ssize_t			subsc_len, extr_std_null_coll;
@@ -229,7 +238,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	boolean_t		need_xlation, new_gvn, utf8_extract;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
-	mval			v, tmp_mval;
+	mval			v, tmp_mval, *val;
 	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
@@ -237,15 +246,24 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gv_key			*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
 	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
 	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
+	gv_key			*save_orig_key = NULL; /* null-initialize at start, will be malloced later */
+	gv_key			*orig_gv_currkey_ptr = NULL;
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
 	gtmcrypt_key_t		*encr_key_handles;
-	boolean_t		encrypted_version, mixed_encryption;
+	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg;
+	sub_num			subtocheck;
+	sgmnt_data_ptr_t	csd;
+	boolean_t		discard_nullcoll_mismatch_record, update_nullcoll_mismatch_record;
+	unsigned char		subscript, *r_ptr;
+	unsigned int		null_subscript_cnt, k, sub_index[MAX_GVSUBSCRIPTS];
+	static unsigned char	key_buffer[MAX_ZWR_KEY_SZ];
+	unsigned char		*temp, coll_typr_char;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -402,6 +420,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	GVKEY_INIT(sn_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	assert(NULL == sn_savekey);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(sn_savekey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
+	assert(NULL == save_orig_key);	/* GVKEY_INIT macro relies on this */
+	GVKEY_INIT(save_orig_key, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	gvnh_reg = NULL;
 	for ( ; !mupip_DB_full; )
 	{
@@ -486,7 +506,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						 */
 						if ((n_index <= index) || (0 > index)
 						    || (mixed_encryption
-						        && (0 == memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
+							&& (0 == memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
 									EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))))
 						{
 							rp = (rec_hdr *)ptr;
@@ -533,12 +553,13 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				ONERROR_PROCESS;
 			}
 			max_key = gvnh_reg->gd_reg->max_key_size;
+			max_rec = gvnh_reg->gd_reg->max_rec_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
 			db_collhdr.nct = gv_target->nct;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
-		if ((0 != EVAL_CMPC(rp)) || (gvname.var_name.len > rec_len) || mupip_error_occurred)
+		if ((max_rec < rec_len) || (0 != EVAL_CMPC(rp)) || (gvname.var_name.len > rec_len) || mupip_error_occurred)
 		{
 			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 			mu_gvis();
@@ -594,6 +615,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		new_gvn = FALSE;
 		for ( ; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
 		{
+			csd = cs_data;
 			GET_USHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
@@ -644,6 +666,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							/* length of the key might change (due to nct variation),
 							 * so get a copy of the original key from the extract */
 				memcpy(dup_key_str, gv_currkey->base, gv_currkey->end + 1);
+				COPY_KEY(save_orig_key, gv_currkey);
 				gvkey_char_ptr = dup_key_str;
 				while (*gvkey_char_ptr++)
 					;
@@ -673,8 +696,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						/* transform the string to the current subsc format */
 					TREF(transform) = TRUE;
 					tmp_mval.mvtype = MV_STR;
-                                	tmp_mval.str.addr = (char *)dest_buff;
-                                	tmp_mval.str.len = INTCAST(end_buff - dest_buff);
+					tmp_mval.str.addr = (char *)dest_buff;
+					tmp_mval.str.len = INTCAST(end_buff - dest_buff);
 					tmp_gvkey->prev = 0;
 					tmp_gvkey->end = 0;
 					if (extr_collseq)
@@ -695,10 +718,93 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				continue;
 			}
+			/* Validate the global variable name */
+			gvn_char = gv_currkey->base;
+			valid_gblname = VALFIRSTCHAR(*gvn_char);
+			gvn_char++; /* need to post-increment here since above macro uses it multiple times */
+			for (; (*gvn_char && valid_gblname) ; gvn_char++)
+				valid_gblname = valid_gblname && VALKEY(*gvn_char);
+			valid_gblname = (valid_gblname && (KEY_DELIMITER == *gvn_char));
+			if (!valid_gblname)
+			{
+				mupip_error_occurred = TRUE;
+				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+				mu_gvis();
+				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
+				break;
+			}
+			/* Validate the subscripts */
+			subs = gvn_char + 1;
+			num_subscripts = 0;
+			while (mych = *subs++) /* WARNING: assignment */
+			{
+				num_subscripts++;
+				if (MAX_GVSUBSCRIPTS < num_subscripts)
+				{
+					mupip_error_occurred = TRUE;
+					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+					mu_gvis();
+					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
+					break;
+				}
+				if (mu_int_exponent[mych]) /* Is it a numeric subscript? */
+				{
+					if (mych > LAST_NEGATIVE_SUBSCRIPT) /* Is it a positive numeric subscript */
+					{
+						while (mych = *subs++) /* WARNING: assignment */
+						{
+							memcpy(&subtocheck, &mych, 1);
+							if (!mu_int_possub[subtocheck.one][subtocheck.two])
+							{
+								mupip_error_occurred = TRUE;
+								bin_call_db(ERR_COR, (INTPTR_T)rec_count,
+									(INTPTR_T)global_key_count);
+								mu_gvis();
+								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
+								break;
+							}
+						}
+					}
+					else /* It is a negative subscript */
+					{
+						while ((mych = *subs++) && (STR_SUB_PREFIX != mych)) /* WARNING: assignment */
+						{
+							memcpy(&subtocheck, &mych, 1);
+							if (!mu_int_negsub[subtocheck.one][subtocheck.two])
+							{
+								mupip_error_occurred = TRUE;
+								bin_call_db(ERR_COR, (INTPTR_T)rec_count,
+									(INTPTR_T)global_key_count);
+								mu_gvis();
+								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
+								break;
+							}
+						}
+						if (!mupip_error_occurred && ((STR_SUB_PREFIX != mych) || (*subs)))
+						{
+							mupip_error_occurred = TRUE;
+							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+							mu_gvis();
+							DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
+							break;
+						}
+					}
+				}
+				else /* It is a string subscript */
+				{
+					/* string can have arbitrary content so move to the next subscript */
+					while (mych = *subs++) /* WARNING: assignment */
+						;
+				}
+				if (mupip_error_occurred)
+					break;
+			}
+			if (mupip_error_occurred)
+				break;
 			/*
 			 * Spanning node-related variables and their usage:
 			 *
-			 * expected_sn_chunk_number: 	0  - looking for spanning nodes (regular nodes are OK, too)
+			 * expected_sn_chunk_number:	0  - looking for spanning nodes (regular nodes are OK, too)
 			 *				!0 - number of the next chunk needed (implies we are building
 			 *					a spanning node's value)
 			 *
@@ -715,9 +821,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			 *
 			 * Controlling the placing of the key,value in the database:
 			 * ok_to_put: means we are ready to place the key,value in the database, i.e., we have the full value
-			 * 		(either of the spanning node or a regular node).
+			 *		(either of the spanning node or a regular node).
 			 * putting_a_sn: we are placing a spanning node in the database, i.e, use the key from sn_gvkey and
-			 * 		the value from sn_hold_buff.
+			 *		the value from sn_hold_buff.
 			 */
 			CHECK_HIDDEN_SUBSCRIPT(gv_currkey,is_hidden_subscript);
 			if (!is_hidden_subscript && (max_subsc_len < (gv_currkey->end + 1)))
@@ -751,7 +857,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					continue;
 				}
 				if (0 == sn_chunk_number)
-				{ 	/* first spanning node chunk, get ctrl info */
+				{	/* first spanning node chunk, get ctrl info */
 					if (0 != expected_sn_chunk_number)
 					{
 						DISPLAY_INCMP_SN_MSG;
@@ -798,8 +904,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						if (expected_sn_chunk_number == numsubs)
 						{
 							if (sn_hold_buff_pos != gblsize)
-							{	/* we don't have the expected size even though 	*/
-								/* we have all the expected chunks. 		*/
+							{	/* we don't have the expected size even though	*/
+								/* we have all the expected chunks.		*/
 								DISPLAY_INCMP_SN_MSG;
 								util_out_print("!_!_Expected size : !UL actual size : !UL", TRUE,
 										gblsize, sn_hold_buff_pos);
@@ -842,6 +948,89 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				ok_to_put = TRUE;
 			if (ok_to_put)
 			{
+				if (!need_xlation)
+					COPY_KEY(save_orig_key, gv_currkey);
+				orig_gv_currkey_ptr = gv_currkey;
+				gv_currkey = save_orig_key;
+				for (r_ptr = gv_currkey->base; *r_ptr != KEY_DELIMITER; r_ptr++)
+					;
+				null_subscript_cnt = 0;
+				coll_typr_char = (gvnh_reg->gd_reg->std_null_coll) ? SUBSCRIPT_STDCOL_NULL : STR_SUB_PREFIX;
+				for (;;)
+				{
+					if (r_ptr >= (gv_currkey->base + gv_currkey->end))
+						break;
+					if (KEY_DELIMITER == *r_ptr++)
+					{
+						subscript = *r_ptr;
+						if (KEY_DELIMITER == subscript)
+							break;
+						if (SUBSCRIPT_ZERO == subscript || KEY_DELIMITER != *(r_ptr + 1))
+						{
+							r_ptr++;
+							continue;
+						}
+						sub_index[null_subscript_cnt++] = (r_ptr - gv_currkey->base);
+					}
+				}
+				if (0 < null_subscript_cnt && !csd->null_subs)
+				{
+					temp = (unsigned char *)format_targ_key(&key_buffer[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
+					fmtd_key_len = (int)(temp - key_buffer);
+					key_buffer[fmtd_key_len] = '\0';
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_NULSUBSC, 2, gvnh_reg->gd_reg->rname_len,
+						&gvnh_reg->gd_reg->rname[0], ERR_GVIS, 2, fmtd_key_len, &key_buffer[0]);
+					ok_to_put = FALSE;
+				}
+				discard_nullcoll_mismatch_record = FALSE;
+				update_nullcoll_mismatch_record = FALSE;
+				if (0 < null_subscript_cnt && gv_target->root)
+				{
+					if (!val)
+					{
+						PUSH_MV_STENT(MVST_MVAL);
+						val = &mv_chain->mv_st_cont.mvs_mval;
+					}
+					if (csd->std_null_coll ? SUBSCRIPT_STDCOL_NULL
+								: STR_SUB_PREFIX != gv_currkey->base[sub_index[0]])
+					{
+						for (k = 0; k < null_subscript_cnt; k++)
+							gv_currkey->base[sub_index[k]] = coll_typr_char;
+						if (gvcst_get(val))
+							discard_nullcoll_mismatch_record = TRUE;
+						for (k = 0; k < null_subscript_cnt; k++)
+							gv_currkey->base[sub_index[k]] = (csd->std_null_coll) ? STR_SUB_PREFIX
+										: SUBSCRIPT_STDCOL_NULL;
+					} else
+					{
+						if (gvcst_get(val))
+							update_nullcoll_mismatch_record = TRUE;
+					}
+				}
+				if (discard_nullcoll_mismatch_record || update_nullcoll_mismatch_record)
+				{
+					temp = (unsigned char *)format_targ_key(key_buffer, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
+					fmtd_key_len = (int)(temp - key_buffer);
+					key_buffer[fmtd_key_len] = '\0';
+					if (discard_nullcoll_mismatch_record)
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBDUPNULCOL, 4,
+							LEN_AND_STR(key_buffer), v.str.len, v.str.addr);
+					else
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBDUPNULCOL, 4,
+							LEN_AND_STR(key_buffer), val->str.len, val->str.addr);
+					if (discard_nullcoll_mismatch_record)
+						ok_to_put = FALSE;
+				}
+				gv_currkey = orig_gv_currkey_ptr;
+			}
+			if (ok_to_put)
+			{
+				if (gvnh_reg->gd_reg->null_subs)
+				{
+					for (k = 0; k < null_subscript_cnt; k++)
+						gv_currkey->base[sub_index[k]] = csd->std_null_coll
+							? SUBSCRIPT_STDCOL_NULL : STR_SUB_PREFIX;
+				}
 				if (putting_a_sn)
 				{
 					gv_currkey->base[gv_currkey->end - (SPAN_SUBS_LEN + 1)] = 0;
@@ -871,8 +1060,11 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					putting_a_sn = FALSE;
 				else
 				{
-					key_count++;
-					global_key_count++;
+					if (!(discard_nullcoll_mismatch_record || update_nullcoll_mismatch_record))
+					{
+						key_count++;
+						global_key_count++;
+					}
 				}
 			}
 		}
@@ -889,6 +1081,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	}
 	free(tmp_gvkey);
 	free(sn_gvkey);
+	free(save_orig_key);
 	if (NULL != sn_hold_buff)
 		free(sn_hold_buff);
 	file_input_close();

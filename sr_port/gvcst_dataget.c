@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -223,7 +224,7 @@ enum cdb_sc gvcst_dataget2(mint *dollar_data, mval *val, unsigned char *sn_ptr)
 		if ((0 > data_len) || ((sm_uc_ptr_t)rp + rsiz > b_top))
 		{
 			assert(CDB_STAGNATE > t_tries);
-			status = cdb_sc_rmisalign1;
+			status = cdb_sc_rmisalign;
 			return status;
 		} else if (DG_DATAONLY != dg2_info)
 		{

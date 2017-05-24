@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,6 @@
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
 
-GBLREF	unsigned char	*source_buffer;
 GBLREF	int		source_column;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -51,7 +50,7 @@ static readonly unsigned char apos_ok[] =
 
 void advancewindow(void)
 {
-	unsigned char	*cp1, *cp2, *cp3, *cptr;
+	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr;
 	unsigned char	*error, errtxt[(3 + 1) UNICODE_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
@@ -62,7 +61,7 @@ void advancewindow(void)
 
 	SETUP_THREADGBL_ACCESS;
 	TREF(last_source_column) = source_column;
-	source_column = (unsigned char *)TREF(lexical_ptr) - source_buffer + 1;
+	source_column = (TREF(lexical_ptr) - (TREF(source_buffer)).addr + 1);
 	TREF(window_token) = TREF(director_token);
 	TREF(window_mval) = TREF(director_mval);
 	(TREF(director_mval)).mvtype = 0; /* keeps mval from being GC'd since it is not useful until re-used */
@@ -72,31 +71,38 @@ void advancewindow(void)
 	x = *TREF(lexical_ptr);
 	switch (y = ctypetab[x])
 	{
+	case TK_CR:
+		y = ctypetab[*(++(TREF(lexical_ptr)))];
+		if (TK_EOL != y)
+		{	/* Not looking like a <CR><LF>, so it's an error */
+			y = TK_ERROR;
+			break;
+		}	/* WARNING fall through - it is a <CR><LF>*/
 	case TK_EOL:
 		TREF(director_token) = TK_EOL;
 		return;		/* if next character is terminator, avoid incrementing past it */
 	case TK_QUOTE:
-		ENSURE_STP_FREE_SPACE(TREF(max_advancewindow_line));
-		cp1 = (unsigned char *)TREF(lexical_ptr) + 1;
+		ENSURE_STP_FREE_SPACE((TREF(source_buffer)).len);
+		cptop = (unsigned char *)((TREF(source_buffer)).addr + (TREF(source_buffer)).len - 1);
 		cp2 = cp3 = stringpool.free;
-		for (;;)
+		for (cp1 = (unsigned char *)TREF(lexical_ptr) + 1; cp1 <= cptop;)
 		{
 #			ifdef UNICODE_SUPPORTED
 			if (gtm_utf8_mode)
-				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, source_buffer + TREF(max_advancewindow_line),
-								    ch);
+				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, (TREF(source_buffer)).addr
+					+ (TREF(source_buffer)).len, ch);
 #			endif
 			x = *cp1++;
 			if ((SP > x) UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
 			{
-				TREF(last_source_column) = cp1 - source_buffer;
-				if ('\0' == x)
-				{
-					TREF(director_token) = TREF(window_token) = TK_ERROR;
-					return;
-				}
+				TREF(last_source_column) = (cp1 - (unsigned char*)((TREF(source_buffer)).addr));
 				if (!run_time)
 				{
+					if ('\0' == x)
+					{
+						TREF(director_token) = TREF(window_token) = TK_ERROR;
+						return;
+					}
 					show_source_line(TRUE);
 					if (!gtm_utf8_mode)
 						charlen = 1;			/* always one character in M mode */
@@ -134,6 +140,12 @@ void advancewindow(void)
 			}
 #			endif
 			assert(cp2 <= stringpool.top);
+		}
+		if (cp1 > cptop)
+		{
+			TREF(last_source_column) = (TREF(source_buffer)).len;
+			TREF(director_token) = TREF(window_token) = TK_ERROR;
+			return;
 		}
 		TREF(lexical_ptr) = (char *)cp1;
 		TREF(director_token) = TK_STRLIT;
@@ -180,7 +192,7 @@ void advancewindow(void)
 			break;
 	case TK_DIGIT:
 		(TREF(director_mval)).str.addr = TREF(lexical_ptr);
-		(TREF(director_mval)).str.len = TREF(max_advancewindow_line);
+		(TREF(director_mval)).str.len = (TREF(source_buffer)).len;
 		(TREF(director_mval)).mvtype = MV_STR;
 		CLEAR_MVAL_BITS(TADR(director_mval));
 		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));

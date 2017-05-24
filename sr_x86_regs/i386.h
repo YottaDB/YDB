@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,16 +126,16 @@ NUM_8_BIT_REGISTERS
 
 typedef struct
 {
-	unsigned int	r_m:3;
-	unsigned int	reg_opcode:3;
-	unsigned int	mod:2;
+	unsigned char	r_m : 3;
+	unsigned char	reg_opcode : 3;
+	unsigned char	mod : 2;
 } ModR_M;
 
 typedef struct
 {
-	unsigned int	base:3;
-	unsigned int	index:3;
-	unsigned int	ss:2;
+	unsigned char	base : 3;
+	unsigned char	index : 3;
+	unsigned char	ss : 2;
 } SIB;
 
 

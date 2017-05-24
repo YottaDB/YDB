@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,10 +41,14 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 #	ifdef DEBUG
 	char			*backup_encrypt_hash_ptr, *db_encrypt_hash_ptr;
 	boolean_t		backup_uses_new_key, db_uses_new_key, backup_was_encrypted, db_was_encrypted;
-	sgmnt_data_ptr_t	backup_csd;
 #	endif
+	sgmnt_data_ptr_t	backup_csd;
 
 	csd = csa->hdr;
+	sbufh_p = csa->shmpool_buffer;
+	backup_csd = &sbufh_p->shadow_file_header;
+	if (backup_csd->trans_hist.total_blks <= blk)
+		return TRUE;	/* Block to be backed up was created AFTER the backup started. So no need to backup. */
 	is_bg = (dba_bg == csd->acc_meth);
 	assert(is_bg || (dba_mm == csd->acc_meth));
 	/* Should have EITHER backup cr (BG mode) or buffer pointer (MM mode) */
@@ -57,7 +61,6 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 		backup_blk_p = GDS_ANY_REL2ABS(csa, backup_cr->buffaddr);
 	}
 	bsiz = ((blk_hdr_ptr_t)(backup_blk_p))->bsiz;
-	sbufh_p = csa->shmpool_buffer;
 	assert(bsiz <= sbufh_p->blk_size);
 
 	/* Obtain block from shared memory pool. If we can't get the block, then backup will be effectively terminated. */
@@ -94,7 +97,6 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 	{
 #		ifdef DEBUG
 		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, backup_blk_p);
-		backup_csd = &sbufh_p->shadow_file_header;
 		backup_uses_new_key = NEEDS_NEW_KEY(backup_csd, bkp_tn);
 		db_uses_new_key = NEEDS_NEW_KEY(csd, bkp_tn);
 		backup_was_encrypted = IS_ENCRYPTED(backup_csd->is_encrypted);

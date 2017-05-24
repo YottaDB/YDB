@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,6 +114,7 @@ void	op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
 void	op_fnzconvert2(mval *str, mval *kase, mval *dst);
 void	op_fnzconvert3(mval *str, mval *from_chset, mval *to_chset, mval *dst);
 #endif
+void	op_fnzcollate(mval *src, int col, int reverse, mval *dst);
 void	op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst);
 void	op_fnzdebug(mval *cmd, mval *dst);
 void	op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
@@ -154,6 +155,7 @@ void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 void	op_fnzwidth(mval *str, mval *dst);
 #endif
 void	op_fnzwrite(boolean_t direction, mval *str, mval *dst);
+void	op_fnzatransform(mval *src, int col, int reverse, int forcenum, mval *dst);
 int	op_forchk1();
 #ifdef UNIX
 int	op_forintrrpt();
@@ -295,6 +297,7 @@ int	op_zbfetch();
 int	op_zbstart();
 void	op_zcompile(mval *v, boolean_t ignore_dollar_zcompile);
 void	op_zcont(void);
+void    op_zcollate(mval *v, int c, mval *p);
 void	op_zdealloc2(int4 timeout, UINTPTR_T auxown);
 void	op_zdeallocate(int4 timeout);
 void	op_zedit(mval *v, mval *p);

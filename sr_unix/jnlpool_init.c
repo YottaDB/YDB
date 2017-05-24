@@ -50,7 +50,6 @@
 #include "is_proc_alive.h"
 #include "repl_shutdcode.h"
 #include "send_msg.h"
-#include "heartbeat_timer.h"
 #include "lockconst.h"
 #include "anticipatory_freeze.h"
 #include "have_crit.h"
@@ -513,7 +512,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)
 		mutex_per_process_init();
-	START_HEARTBEAT_IF_NEEDED;
 	if (new_ipc)
 	{
 		jnlpool_ctl->instfreeze_environ_inited = FALSE;

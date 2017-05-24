@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,8 +64,7 @@
 #endif
 
 #ifdef MUTEX_MSEM_WAKE
-#define MUTEX_MAX_HEARTBEAT_WAIT        2 /* so that total wait for both select and msem wait will be the same */
-#define MUTEX_LCKALERT_PERIOD		4
+#define MUTEX_MAX_WAIT        		(MUTEX_CONST_TIMEOUT_VAL * MILLISECS_IN_SEC)
 #endif
 
 /* The following PROBE_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
@@ -109,7 +108,7 @@ MBSTART {															\
 		(CSA)->critical->crit_cycle++;											\
 		MUTEX_DPRINT3("%d: Write %sACQUIRED\n", (PID), (MUTEX_LOCK_WRITE == (LOCK_TYPE)) ? "" : "IMMEDIATE ");		\
 		MUTEX_TEST_SIGNAL_HERE("WRTLCK NOW CRIT\n", FALSE);								\
-		(CSA)->now_crit = TRUE;												\
+		SET_CSA_NOW_CRIT_TRUE(CSA);											\
 		MUTEX_TEST_SIGNAL_HERE("WRTLCK SUCCESS\n", FALSE);								\
 		if (-1 != (SPIN_CNT))												\
 		{														\
@@ -160,9 +159,8 @@ GBLREF int			num_additional_processors;
 GBLREF jnl_gbls_t		jgbl;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF uint4			process_id;
-GBLREF uint4			image_count, mutex_per_process_init_pid;
+GBLREF uint4			mutex_per_process_init_pid;
 #ifdef MUTEX_MSEM_WAKE
-GBLREF volatile uint4           heartbeat_counter;
 #  ifdef POSIX_MSEM
 static sem_t			*mutex_wake_msem_ptr = NULL;
 #  else
@@ -364,7 +362,8 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	enum cdb_sc		status;
 	boolean_t		wakeup_status;
 #	ifdef MUTEX_MSEM_WAKE
-	uint4                   bad_heartbeat;
+	boolean_t		msem_timedout;
+	int			save_errno;
 #	else
 	struct timeval		timeout;
 	int			timeout_threshold;
@@ -398,40 +397,39 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	do
 	{
 #		ifdef MUTEX_MSEM_WAKE
-		/* My msemaphore is already used by another process.
-		 * In other words, I was woken up, but missed my wakeup call.
-		 * I should return immediately.
-		 */
 		if (msem_slot->pid != process_id)
+		{	/* My msemaphore is already used by another process.
+		   	 * In other words, I was woken up, but missed my wakeup call.
+			 * I should return immediately.
+			 */
 			wakeup_status = TRUE;
-		else
+		} else
 		{
-			bad_heartbeat = 0;
+			TIMEOUT_INIT(msem_timedout, MUTEX_MAX_WAIT);
 			/*
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, because another condition is checked for the while loop.
 			 */
 			while (!(wakeup_status = (0 == MSEM_LOCKW(mutex_wake_msem_ptr))))
 			{
-				if (EINTR == errno)
+				save_errno = errno;
+				if (EINTR == save_errno)
 				{
-					if (bad_heartbeat)	/* to save memory reference and calc on fast path */
+					if (msem_timedout)
 					{
-						if (bad_heartbeat < heartbeat_counter)
-						{
-							MUTEX_DPRINT3("%d: msem sleep done, heartbeat_counter = %d\n",
-								     process_id, heartbeat_counter);
-							break;
-						}
-						MUTEX_DPRINT3("%d: msem sleep continue, heartbeat_counter = %d\n",
-							      process_id, heartbeat_counter);
-					} else
-						bad_heartbeat = heartbeat_counter + MUTEX_MAX_HEARTBEAT_WAIT - 1;
-					/* -1 since we were interrupted this time */
+						MUTEX_DPRINT3("%d: msem sleep done, heartbeat_counter = %d\n",
+							     process_id, heartbeat_counter);
+						break;
+					}
+					MUTEX_DPRINT3("%d: msem sleep continue, heartbeat_counter = %d\n",
+						      process_id, heartbeat_counter);
 				} else
+				{
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
-						RTS_ERROR_TEXT("Error with mutex wake msem"), errno);
+						RTS_ERROR_TEXT("Error with mutex wake msem"), save_errno);
+				}
 			}
+			TIMEOUT_DONE(msem_timedout);
 			/* wakeup_status is set to true, if I was able to lock...somebody woke me up;
 			 * wakeup_status is set to false, if I timed out and should go to recovery.
 			 */
@@ -669,7 +667,9 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 #	ifdef MUTEX_MSEM_WAKE
 	int			rc;
 #	endif
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(!csa->now_crit);
 	cnl = csa->nl;
@@ -679,7 +679,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	 * know for sure there is no other pid accessing the database shared memory.
 	 */
 	assert((MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type) || (MUTEX_LOCK_WRITE == mutex_lock_type));
-	assert((mutex_per_process_init_pid == process_id) || (0 == mutex_per_process_init_pid) && in_mu_rndwn_file);
+	assert((mutex_per_process_init_pid == process_id) || ((0 == mutex_per_process_init_pid) && in_mu_rndwn_file));
 	MUTEX_TRACE_CNTR((MUTEX_LOCK_WRITE == mutex_lock_type) ? mutex_trc_lockw : mutex_trc_lockwim);
 	optimistic_attempts = MUTEX_MAX_OPTIMISTIC_ATTEMPTS;
 	queue_sleeps = csa->probecrit_rec.p_crit_que_full = 0;
@@ -753,7 +753,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				if (process_id == in_crit_pid)
 				{	/* This is just a precaution - shouldn't ever happen and has no code to maintain gvstats */
 					assert(FALSE);
-					csa->now_crit = TRUE;
+					SET_CSA_NOW_CRIT_TRUE(csa);
 					return (cdb_sc_normal);
 				}
 				if (in_crit_pid && (in_crit_pid == cnl->in_crit) && is_proc_alive(in_crit_pid, 0))
@@ -925,15 +925,17 @@ enum cdb_sc mutex_unlockw(gd_region *reg, int crash_count)
 
 	uint4		already_clear;
 	sgmnt_addrs	*csa;
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	if (crash_count != csa->critical->crashcnt)
 		return (cdb_sc_critreset);
 	assert(csa->now_crit);
 	MUTEX_TEST_SIGNAL_HERE("WRTUNLCK NOW CRIT\n", FALSE);
-	csa->now_crit = FALSE;
 	assert(csa->critical->semaphore.u.parts.latch_pid == process_id);
 	RELEASE_SWAPLOCK(&csa->critical->semaphore);
+	SET_CSA_NOW_CRIT_FALSE(csa);
 	MUTEX_DPRINT2("%d: WRITE LOCK RELEASED\n", process_id);
 	return (mutex_wakeup(csa->critical, NULL != csa->hdr
 		? (mutex_spin_parms_ptr_t)(&csa->hdr->mutex_spin_parms)
@@ -949,7 +951,7 @@ void mutex_cleanup(gd_region *reg)
 	   the lock, go ahead and release it.
 	*/
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, image_count, LOCK_AVAILABLE, 0))
+	if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, CMPVAL2, LOCK_AVAILABLE, 0))
 	{
 		MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
 	}
@@ -981,8 +983,7 @@ void mutex_salvage(gd_region *reg)
 	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
 	{
 		mutex_salvaged = FALSE;
-		VMS_ONLY(holder_imgcnt = csa->critical->semaphore.u.parts.latch_image_count);
-		if (holder_pid == process_id VMS_ONLY(&& holder_imgcnt == image_count))
+		if (holder_pid == process_id)
 		{	/* We were trying to obtain a lock we already held -- very odd */
 			RELEASE_SWAPLOCK(&csa->critical->semaphore);
 			csa->nl->in_crit = 0;
@@ -1027,6 +1028,7 @@ void mutex_salvage(gd_region *reg)
 		assert((NULL != csa->hdr) || (csa == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));
 		if (mutex_salvaged && (NULL != csa->hdr))
 		{
+			SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
 								   * since we already checked for csa->hdr non-NULL.
 								   */

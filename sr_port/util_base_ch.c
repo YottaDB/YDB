@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +80,7 @@ CONDITION_HANDLER(util_base_ch)
 			{
 				csa = &FILE_INFO(r_local)->s_addrs;
 				if (!csa->persistent_freeze)
-					region_freeze(r_local, FALSE, FALSE, FALSE);
+					region_freeze(r_local, FALSE, FALSE, FALSE, FALSE, FALSE);
 			}
 		}
 	}

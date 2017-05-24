@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,8 @@
 #include "mlk_lock.h"
 #include "t_retry.h"
 #include "gvusr.h"
-
+#include "interlock.h"
+#include "rel_quant.h"
 
 #ifdef VMS
 GBLREF uint4	image_count;
@@ -87,16 +88,13 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	{
 		csa = &FILE_INFO(p->region)->s_addrs;
 		ctl = p->ctlptr;
-		if (csa->critical)
-			crash_count = csa->critical->crashcnt;
 		if (dollar_tlevel)
 		{
 			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
-                if (FALSE == (was_crit = csa->now_crit))
-			grab_crit(p->region);
+		GRAB_LOCK_CRIT(csa, p->region, was_crit);
 		retval = ctl->wakeups;
 		assert(retval);
 		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
@@ -178,8 +176,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
 			}
 		}
-		if (FALSE == was_crit)
-			rel_crit(p->region);
+		REL_LOCK_CRIT(csa, p->region, was_crit);
 		if (!retval)
 		{
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_success, 1);

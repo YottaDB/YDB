@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,15 +37,8 @@
  * by a late-delivered invalidate)
  */
 #define SHM_WRITE_MEMORY_BARRIER	asm("mb")
-
 #define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
-
 #define MM_WRITE_MEMORY_BARRIER
-
-#ifdef __vms
-#define SECSHR_SHM_WRITE_MEMORY_BARRIER	asm("mb")
-#define SECSHR_SHM_READ_MEMORY_BARRIER	SECSHR_SHM_WRITE_MEMORY_BARRIER
-#endif /* __vms */
 
 #elif defined(POWER) || defined(PWRPC)	/* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
 
@@ -198,14 +192,6 @@ void do_isync(void);
 #define SHM_READ_MEMORY_BARRIER
 #define MM_WRITE_MEMORY_BARRIER
 
-#endif
-
-#if !defined(SECSHR_SHM_WRITE_MEMORY_BARRIER)
-#define SECSHR_SHM_WRITE_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER	/* default definition */
-#endif
-
-#if !defined(SECSHR_SHM_READ_MEMORY_BARRIER)
-#define	SECSHR_SHM_READ_MEMORY_BARRIER		SHM_READ_MEMORY_BARRIER		/* default definition */
 #endif
 
 #endif /* MEMCOHERENCY_H_INCLUDED */

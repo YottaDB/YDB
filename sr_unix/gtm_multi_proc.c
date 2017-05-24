@@ -48,7 +48,6 @@
 #include "gtmsource.h"
 #include "init_secshr_addrs.h"
 #include "mutex.h"
-#include "heartbeat_timer.h"
 
 #ifdef DEBUG
 #include "is_proc_alive.h"
@@ -257,7 +256,6 @@ void	gtm_multi_proc_helper(void)
 	{
 		assert(mutex_per_process_init_pid != process_id);
 		mutex_per_process_init();
-		START_HEARTBEAT_IF_NEEDED;
 	}
 	/* process-level reinitialization is done */
 	mp_hdr = multi_proc_shm_hdr;

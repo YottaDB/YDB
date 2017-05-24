@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,12 +92,14 @@ void mupip_rundown(void)
 	replpool_identifier	replpool_id;
 	repl_inst_hdr		repl_instance;
 	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
 	struct shmid_ds		shm_buf;
 	union semun		semarg;
 	unsigned int		full_len;
 	char			*instfilename;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 	semid_queue_elem	*prev_elem;
+	gd_segment		*seg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -105,6 +107,10 @@ void mupip_rundown(void)
 	file = (CLI_PRESENT == cli_present("FILE"));
 	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
 	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
+	TREF(ok_to_see_statsdb_regs) = TRUE;
+	/* No need to do the following set (like is done in mupip_integ.c) since we call "mu_rndwn_file" (not "gvcst_init")
+	 *	TREF(statshare_opted_in) = FALSE;	// Do not open statsdb automatically when basedb is opened
+	 */
 	arg_present = (0 != TREF(parms_cnt));
 	if ((file == region) && (TRUE == file))
 		mupip_exit(ERR_MUQUALINCOMP);
@@ -123,10 +129,11 @@ void mupip_rundown(void)
 	} else if (file)
 	{
 		mu_gv_cur_reg_init();
-		gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
-		if (!cli_get_str("WHAT",  (char *)&gv_cur_region->dyn.addr->fname[0], &gv_cur_region->dyn.addr->fname_len))
+		seg = gv_cur_region->dyn.addr;
+		seg->fname_len = SIZEOF(seg->fname);
+		if (!cli_get_str("WHAT",  (char *)&seg->fname[0], &seg->fname_len))
 			mupip_exit(ERR_MUNODBNAME);
-		*(gv_cur_region->dyn.addr->fname + gv_cur_region->dyn.addr->fname_len) = 0;
+		seg->fname[seg->fname_len] = '\0';
 		rptr = &single;		/* a dummy value that permits one trip through the loop */
 		rptr->fPtr = NULL;
 	}
@@ -178,26 +185,21 @@ void mupip_rundown(void)
 		{
 			if (region)
 			{
-				if (!mupfndfil(rptr->reg, NULL))
+				if (!mupfndfil(rptr->reg, NULL, LOG_ERROR_TRUE))
 				{
 					exit_status = ERR_MUNOTALLSEC;
 					continue;
 				}
 				gv_cur_region = rptr->reg;
-				if (NULL == gv_cur_region->dyn.addr->file_cntl)
-				{
-					gv_cur_region->dyn.addr->acc_meth = dba_bg;
-					gv_cur_region->dyn.addr->file_cntl =
-						(file_control *)malloc(SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
-					memset(gv_cur_region->dyn.addr->file_cntl, 0, SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
-					gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-					gv_cur_region->dyn.addr->file_cntl->file_info = (GDS_INFO *)malloc(SIZEOF(GDS_INFO));
-					memset(gv_cur_region->dyn.addr->file_cntl->file_info, 0, SIZEOF(GDS_INFO));
-				}
+				seg = gv_cur_region->dyn.addr;
+				if (NULL == seg->file_cntl)
+					FILE_CNTL_INIT(seg);
 			}
-			if (TRUE == mu_rndwn_file(gv_cur_region, FALSE))
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
-			else
+			if (mu_rndwn_file(gv_cur_region, FALSE))
+			{
+				if (!IS_RDBF_STATSDB(gv_cur_region))	/* See comment in "mu_rndwn_all" for why this is needed */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+			} else
 				exit_status = ERR_MUNOTALLSEC;
 		}
 		if (do_jnlpool_detach)
@@ -327,7 +329,7 @@ void mupip_rundown(void)
 		 * We have noticed that on HPUX, a call to "fflush NULL" (done inside gtm_putmsg which is called from
 		 * the above two functions at various places) causes unread (but buffered) data from the input stream
 		 * to be cleared/consumed resulting in incomplete processing of the input list of ipcs. To avoid this
-		 * we set this global variable. That causes gtm_putmsg to skip the fflush NULL. We dont have an issue
+		 * we set this global variable. That causes gtm_putmsg to skip the fflush NULL. We don't have an issue
 		 * with out-of-order mixing of stdout and stderr streams (like is there with replication server logfiles)
 		 * and so it is okay for this global variable to be set to TRUE for the entire lifetime of the argumentless
 		 * rundown command. See <C9J02_003091_mu_rndwn_all_premature_termination_on_HPUX>.

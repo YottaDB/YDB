@@ -78,7 +78,6 @@ GBLREF	spdesc			stringpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	uchar_ptr_t		mubbuf;
 GBLREF	uint4			pipe_child;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
@@ -129,7 +128,6 @@ error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_DBCCERR);
 error_def(ERR_ERRCALL);
 error_def(ERR_IOEOF);
-error_def(ERR_PERMGENFAIL);
 
 bool	mubinccpy (backup_reg_list *list)
 {
@@ -143,7 +141,7 @@ bool	mubinccpy (backup_reg_list *list)
 	int4			size1, bsize, bm_num, hint, lmsize, rsize, timeout, outsize,
 				blks_per_buff, counter, i, write_size, read_size, match;
 	size_t			copysize;
-	off_t			copied;
+	off_t			copied, read_offset;
 	int			db_fd, exec_fd;
 	enum db_acc_method	access;
 	blk_hdr_ptr_t		bp, bptr;
@@ -163,22 +161,24 @@ bool	mubinccpy (backup_reg_list *list)
 	int			user_id;
 	int			group_id;
 	int			perm;
+	struct perm_diag_data	pdd;
 	int4			cur_mdb_ver;
+	unix_db_info		*udi;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 	DEBUG_INCBKUP_ONLY(gtm_uint64_t backup_write_offset = 0;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(list->reg == gv_cur_region);
 	assert(incremental);
-	/* Make sure inc_header  can be same size on all platforms. Some platforms pad 8 byte aligned structures
-	   that end on a 4 byte boundary and some do not. It is critical that this structure is the same size on
-	   all platforms as it is sent across TCP connections when doing TCP backup.
-	*/
+	/* Make sure inc_header can be same size on all platforms. Some platforms pad 8 byte aligned structures
+	 * that end on a 4 byte boundary and some do not. It is critical that this structure is the same size on
+	 * all platforms as it is sent across TCP connections when doing TCP backup.
+	 */
 	assert(0 == (SIZEOF(inc_header) % 8));
-
 	/* ================= Initialization and some checks ======================== */
 	header	=	list->backup_hdr;
 	file	=	&(list->backup_file);
-
 	if (list->tn >= header->trans_hist.curr_tn)
 	{
 		util_out_print("!/TRANSACTION number is greater than or equal to current transaction,", TRUE);
@@ -187,8 +187,8 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 	if (!mubtomag)
 		mubmaxblk = (64 * 1024);
-	db_fd = ((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd;
-
+	udi = FILE_INFO(gv_cur_region);
+	db_fd = udi->fd;
 	/* =================== open backup destination ============================= */
 	backup_write_errno = 0;
 	switch (list->backup_to)
@@ -202,29 +202,28 @@ bool	mubinccpy (backup_reg_list *list)
 				util_out_print("Error: Cannot create backup file !AD.", TRUE, file->len, file->addr);
 				return FALSE;
 			}
-			if (is_raw_dev(file->addr))
+			FSTAT_FILE(db_fd, &stat_buf, fstat_res);
+			if (-1 != fstat_res && !gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd))
 			{
-				ESTABLISH_RET(iob_io_error1, FALSE);
-			} else
-			{
-				FSTAT_FILE(db_fd, &stat_buf, fstat_res);
-				if (-1 != fstat_res)
-					gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
-				/* setup new group and permissions if indicated by the security rules. */
-				if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
-					|| (((INVALID_UID != user_id) || (INVALID_GID != group_id))
-						&& (-1 == fchown(backup->fd, user_id, group_id))))
-				{
-					PERROR("fchmod/fchown error: ");
-					util_out_print("ERROR: Cannot access incremental backup file !AD.",
-						       TRUE, file->len, file->addr);
-					util_out_print("WARNING: Backup file !AD is not valid.", TRUE, file->len, file->addr);
-					CLEANUP_AND_RETURN_FALSE;
-				}
-				memcpy(incbackupfile, file->addr, file->len);
-				incbackupfile[file->len] = 0;
-				ESTABLISH_RET(iob_io_error2, FALSE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("incremental backup file"),
+						file->len, file->addr, PERMGENDIAG_ARGS(pdd));
+				CLEANUP_AND_RETURN_FALSE;
 			}
+			/* setup new group and permissions if indicated by the security rules. */
+			if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
+				|| (((INVALID_UID != user_id) || (INVALID_GID != group_id))
+					&& (-1 == fchown(backup->fd, user_id, group_id))))
+			{
+				PERROR("fchmod/fchown error: ");
+				util_out_print("ERROR: Cannot access incremental backup file !AD.",
+					       TRUE, file->len, file->addr);
+				util_out_print("WARNING: Backup file !AD is not valid.", TRUE, file->len, file->addr);
+				CLEANUP_AND_RETURN_FALSE;
+			}
+			memcpy(incbackupfile, file->addr, file->len);
+			incbackupfile[file->len] = 0;
+			ESTABLISH_RET(iob_io_error2, FALSE);
 			break;
 		case backup_to_exec:
 			pipe_child = 0;
@@ -299,7 +298,6 @@ bool	mubinccpy (backup_reg_list *list)
 			DB_LEN_STR(gv_cur_region), file->len, file->addr);
 		CLEANUP_AND_RETURN_FALSE;
 	}
-
 	/* ============================ read/write appropriate blocks =============================== */
 	bsize		= header->blk_size;
 	gds_ratio	= bsize / DISK_BLOCK_SIZE;
@@ -309,21 +307,18 @@ bool	mubinccpy (backup_reg_list *list)
 	outptr		= (char_ptr_t)malloc(MAX(outsize, mubmaxblk));
 	sblkh_p		= (muinc_blk_hdr_ptr_t)outptr;
 	data_ptr	= (char_ptr_t)(sblkh_p + 1);
-	bp		= (blk_hdr_ptr_t)mubbuf;
+	/* If udi->fd_opened_with_o_direct is TRUE, we need an aligned buffer to proceed with the reads. And if it is FALSE,
+	 * we anyways have to allocate a 64Kb (BACKUP_READ_SIZE) buffer and free it. Most of this logic is already present
+	 * in the below macro so we use it even for the no-O_DIRECT case (i.e. dio_buff.aligned is used even if
+	 * udi->fd_opened_with_o_direct is FALSE).
+	 */
+	DIO_BUFF_EXPAND_IF_NEEDED_NO_UDI(BACKUP_READ_SIZE, BACKUP_READ_SIZE, &(TREF(dio_buff)));
+	bp		= (blk_hdr_ptr_t)(TREF(dio_buff)).aligned;
 	bm_blk_buff	= (uchar_ptr_t)malloc(SIZEOF(blk_hdr) + (BLKS_PER_LMAP * BML_BITS_PER_BLK / BITS_PER_UCHAR));
 	save_blks	= 0;
 	memset(sblkh_p, 0, SIZEOF(*sblkh_p));
 	sblkh_p->use.bkup.ondsk_blkver = GDSNOVER;
 
-	if (-1 == lseek(db_fd, (off_t)(header->start_vbn - 1) * DISK_BLOCK_SIZE, SEEK_SET))
-	{
-		PERROR("fseek error: ");
-		util_out_print("Error reading from database file !AD.", TRUE, DB_LEN_STR(gv_cur_region));
-		util_out_print("WARNING: backup file !AD is not valid.", TRUE, DB_LEN_STR(gv_cur_region));
-		free(outptr);
-		free(bm_blk_buff);
-		CLEANUP_AND_RETURN_FALSE;
-	}
 	DEBUG_INCBKUP_ONLY(blks_this_lmap = 0);
 	if (cs_addrs->nl->onln_rlbk_pid)
 	{
@@ -332,6 +327,7 @@ bool	mubinccpy (backup_reg_list *list)
 		free(bm_blk_buff);
 		CLEANUP_AND_RETURN_FALSE;
 	}
+	read_offset = (off_t)BLK_ZERO_OFF(header->start_vbn);
 	for (blk_num_base = 0;  blk_num_base < header->trans_hist.total_blks;  blk_num_base += blks_per_buff)
 	{
 		if (online && (0 != cs_addrs->shmpool_buffer->failed))
@@ -341,7 +337,7 @@ bool	mubinccpy (backup_reg_list *list)
 			blks_per_buff = header->trans_hist.total_blks - blk_num_base;
 			read_size = blks_per_buff * bsize;
 		}
-		DOREADRC(db_fd, bp, read_size, status);
+		DB_LSEEKREAD(udi, db_fd, read_offset, bp, read_size, status);
 		if (0 != status)
 		{
 			PERROR("read error: ");
@@ -351,6 +347,7 @@ bool	mubinccpy (backup_reg_list *list)
 			free(bm_blk_buff);
 			CLEANUP_AND_RETURN_FALSE;
 		}
+		read_offset += read_size;
 		bptr = (blk_hdr *)bp;
 		/* The blocks we back up will be whatever version they are. There is no implicit conversion in this
 		 * part of the backup/restore. Since we aren't even looking at the blocks (and indeed some of these blocks
@@ -465,10 +462,8 @@ bool	mubinccpy (backup_reg_list *list)
 			else if ((3 > blk_num) || (is_bitmap_blk && (0 != header->blks_to_upgrd) && ((trans_num)0 == blk_tn)
 						 && (blk_num >= list->last_blk_at_last_bkup)))
 				backup_this_blk = TRUE;
-#			ifdef GTM_TRUNCATE
 			else if (is_bitmap_blk && ((trans_num)0 == blk_tn))
 				backup_this_blk = TRUE;
-#			endif
 			else if ((blk_tn < list->tn))
 				backup_this_blk = FALSE;
 			else
@@ -521,7 +516,7 @@ bool	mubinccpy (backup_reg_list *list)
 		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
-			 * outside of crit, we dont want them to keep writing to the backup temporary file even after the
+			 * outside of crit, we don't want them to keep writing to the backup temporary file even after the
 			 * backup is complete and the temporary file has been deleted.
 			 */
 			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
@@ -573,13 +568,13 @@ bool	mubinccpy (backup_reg_list *list)
 		{
 			if (cs_addrs->shmpool_buffer->dskaddr < copied + copysize)
 				copysize = (size_t)(cs_addrs->shmpool_buffer->dskaddr - copied);
-			DOREADRC(list->backup_fd, mubbuf, copysize, status);
+			DOREADRC(list->backup_fd, (TREF(dio_buff)).aligned, copysize, status);
 			if (0 != status)
 			{
 				PERROR("read error : ");
 				CLEANUP_AND_RETURN_FALSE;
 			}
-			COMMON_WRITE(backup, (char *)mubbuf, copysize);
+			COMMON_WRITE(backup, (char *)(TREF(dio_buff)).aligned, copysize);
 		}
 	}
 	/* Write one last (zero-filled) block into this file that designates the end of the blocks */
@@ -744,29 +739,6 @@ void tcp_write(BFILE *bf, char *buf, int nbytes)
 		backup_write_errno = errno;
 	}
 	return;
-}
-
-CONDITION_HANDLER(iob_io_error1)
-{
-	int	dummy1, dummy2;
-	char	s[80];
-	char	*fgets_res;
-
-	START_CH(TRUE);
-	if (SIGNAL == ERR_IOEOF)
-	{
-		PRINTF("End of media reached, please mount next volume and press Enter: ");
-		FGETS(s, 79, stdin, fgets_res);
-		util_out_print(0, 2, 0);  /* clear error message */
-		if (mu_ctrly_occurred  ||  mu_ctrlc_occurred)
-		{
-			util_out_print("WARNING:  DB file backup aborted, backup file is not valid.", TRUE);
-			UNWIND(dummy1, dummy2);
-		}
-		CONTINUE;
-	}
-	PRN_ERROR;
-	UNWIND(dummy1, dummy2);
 }
 
 CONDITION_HANDLER(iob_io_error2)

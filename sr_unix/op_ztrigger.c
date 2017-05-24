@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,14 +38,13 @@
 #include "interlock.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
-#ifdef GTM_TRIGGER
-#  include "gv_trigger.h"
-#  include "gtm_trigger.h"
-#  include "gv_trigger_protos.h"
-#  include "mv_stent.h"
-#  include "stringpool.h"
-#  include "trigger.h"
-#endif
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#include "gv_trigger_protos.h"
+#include "mv_stent.h"
+#include "stringpool.h"
+#include "trigger.h"
+#include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
 #include "t_end.h"

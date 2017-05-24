@@ -47,6 +47,7 @@
 #include "repl_sp.h"
 #include "jnl_write.h"
 #include "gtmio.h"
+#include "interlock.h"
 #include "wcs_flu.h"
 #include "wcs_mm_recover.h"
 #include "wcs_timer_start.h"
@@ -63,6 +64,8 @@
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
 #include "memcoherency.h"
 #include "change_reg.h"
+#include "wcs_backoff.h"
+#include "wcs_wt.h"
 
 #define UPDHELPER_SLEEP 30
 #define UPDHELPER_EARLY_EPOCH 5
@@ -128,9 +131,10 @@ int updhelper_writer(void)
 					MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
 				}
 				wcs_timer_start(reg, TRUE);
-				if (cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0)
+				if ((cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0)
+						&& !FROZEN_CHILLED(csd))
 				{
-					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, dummy_errno);
+					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, NULL, FALSE, dummy_errno);
 					flushed = TRUE;
 				}
 				assert(NULL == reorg_encrypt_restart_csa); /* ensure above wcs_wtstart call does not set it */
@@ -143,18 +147,24 @@ int updhelper_writer(void)
 						ENSURE_JNL_OPEN(csa, reg);
 					SET_GBL_JREC_TIME;
 					assert(jgbl.gbl_jrec_time);
-					if ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH <= jgbl.gbl_jrec_time)
-						 && grab_crit_immediate(reg))
+					if (((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
+						 && !FROZEN_CHILLED(csd))
 					{
-						if (jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH <= jgbl.gbl_jrec_time)
+						DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
+						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE))
 						{
-							ENSURE_JNL_OPEN(csa, reg);
-							wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SPEEDUP_NOBEFORE
-								| WCSFLU_SYNC_EPOCH);
-							assert(NULL == reorg_encrypt_restart_csa);
+							if ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
+							{
+								ENSURE_JNL_OPEN(csa, reg);
+								wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH
+												| WCSFLU_SPEEDUP_NOBEFORE);
+								assert(NULL == reorg_encrypt_restart_csa);
+							}
+							rel_crit(reg);
+							/* Do equivalent of WCSFLU_SYNC_EPOCH now out of crit */
+							DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
 						}
-						rel_crit(reg);
-				 	}
+					}
 				 }
 			 }
 		}

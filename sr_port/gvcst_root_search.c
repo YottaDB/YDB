@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -42,6 +44,7 @@
 #ifdef UNIX
 #include "error.h"
 #endif
+#include "io.h"
 
 GBLREF	gv_key		*gv_currkey, *gv_altkey;
 GBLREF	int4		gv_keysize;
@@ -230,7 +233,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+	assert(IS_REG_BG_OR_MM(gv_cur_region));
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 	save_targ = gv_target;
 	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).

@@ -46,6 +46,7 @@
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
+#include "db_write_eof_block.h"
 
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
@@ -115,10 +116,8 @@ error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_ERRCALL);
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_TEXT);
 error_def(ERR_TMPFILENOCRE);
-ZOS_ONLY(error_def(ERR_BADTAG);)
 
 bool	mubfilcpy (backup_reg_list *list)
 {
@@ -131,7 +130,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	int4			sourcefilelen, sourcedirlen, realpathlen;
 	struct stat		stat_buf;
 	off_t			filesize, offset;
-	char 			*inbuf, *zero_blk, *ptr, *errptr, *sourcefilename, *sourcedirname;
+	char 			*inbuf, *ptr, *errptr, *sourcefilename, *sourcedirname;
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
 	int                     fstat_res;
@@ -141,7 +140,11 @@ bool	mubfilcpy (backup_reg_list *list)
 	int			user_id;
 	int			group_id;
 	int			perm;
+	struct perm_diag_data	pdd;
+	int 			ftruncate_res;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
 	header_cpy = list->backup_hdr;
@@ -232,7 +235,11 @@ bool	mubfilcpy (backup_reg_list *list)
 		util_out_print("Temporary directory !AD could not be created.", TRUE, tempfilelen, tempfilename);
 		CLEANUP_AND_RETURN_FALSE;
 	}
-	realpath(tempfilename, realpathname);
+	if (NULL == realpath(tempfilename, realpathname))
+	{
+		util_out_print("Temporary directory !AD could not be found after creation.", TRUE, tempfilelen, tempfilename);
+		CLEANUP_AND_RETURN_FALSE;
+	}
 	realpathlen = STRLEN(realpathname);
 	/* Calculate total line length for commands to execute (pushd + cp). *
  	 * If cannot fit in local variable array, malloc space *
@@ -300,7 +307,20 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	if (-1 != fstat_res)
-		gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
+		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd))
+		{
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			if (online)
+				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+			CLEANUP_AND_RETURN_FALSE;
+		}
 	/* Setup new group and permissions if indicated by the security rules. */
 	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm))
 		|| (((INVALID_UID != user_id) || (INVALID_GID != group_id)) && (-1 == fchown(backup_fd, user_id, group_id))))
@@ -312,10 +332,10 @@ bool	mubfilcpy (backup_reg_list *list)
 			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 		CLEANUP_AND_RETURN_FALSE;
 	}
-#if defined(__MVS__)
+#	if defined(__MVS__)
 	if (-1 == gtm_zos_tag_to_policy(backup_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG( tempfilename, realfiletag, TAG_BINARY, errno);
-#endif
+#	endif
 	if (online)
 	{
 		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
@@ -338,11 +358,10 @@ bool	mubfilcpy (backup_reg_list *list)
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
 		}
-		filesize = header_cpy->start_vbn * DISK_BLOCK_SIZE +
-			(off_t)header_cpy->trans_hist.total_blks * header_cpy->blk_size;
+		filesize = (off_t)BLK_ZERO_OFF(header_cpy->start_vbn)
+				+ (off_t)(header_cpy->trans_hist.total_blks + 1) * header_cpy->blk_size;
 		if (filesize != stat_buf.st_size)
 		{	/* file has been extended, so truncate it and set the end of database block */
-			int ftruncate_res;
 			FTRUNCATE(backup_fd, filesize, ftruncate_res);
 			if (-1 == ftruncate_res)
 			{
@@ -353,16 +372,14 @@ bool	mubfilcpy (backup_reg_list *list)
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 				CLEANUP_AND_RETURN_FALSE;
 			}
-			zero_blk = (char *)malloc(DISK_BLOCK_SIZE);
-			memset(zero_blk, 0, DISK_BLOCK_SIZE);
-			LSEEKWRITE(backup_fd, filesize - DISK_BLOCK_SIZE, zero_blk, DISK_BLOCK_SIZE, status);
+			status = db_write_eof_block(NULL, backup_fd, cs_data->blk_size, filesize - header_cpy->blk_size,
+													&(TREF(dio_buff)));
 			if (0 != status)
 			{
 				util_out_print("Error writing the last block in database !AD.", TRUE, file->len, file->addr);
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 				CLEANUP_AND_RETURN_FALSE;
 			}
-			free(zero_blk);
 		}
 		/* By getting crit here, we ensure that there is no process still in transaction logic that sees
 		   (nbb != BACKUP_NOT_IN_PRORESS). After rel_crit(), any process that enters transaction logic will
@@ -375,7 +392,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
-			 * outside of crit, we dont want them to keep writing to the backup temporary file even after the
+			 * outside of crit, we don't want them to keep writing to the backup temporary file even after the
 			 * backup is complete and the temporary file has been deleted.
 			 */
 			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
@@ -492,8 +509,7 @@ bool	mubfilcpy (backup_reg_list *list)
 					if (cs_addrs->do_fullblockwrites)
 						size = ROUND_UP(size, cs_addrs->fullblockwrite_len);
 					assert((uint4)cs_addrs->hdr->blk_size >= size);
-					offset = (header_cpy->start_vbn - 1) * DISK_BLOCK_SIZE
-						+ ((off_t)header_cpy->blk_size * blk_num);
+					offset = BLK_ZERO_OFF(header_cpy->start_vbn) + ((off_t)header_cpy->blk_size * blk_num);
 					LSEEKWRITE(backup_fd,
 						   offset,
 						   inbuf,

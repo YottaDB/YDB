@@ -204,6 +204,7 @@ uint4 mur_process_intrpt_recov()
 				csd->save_strm_reg_seqno[idx] = csd->strm_reg_seqno[idx];
 			csd->strm_reg_seqno[idx] = jnlrec->jrec_epoch.strm_seqno[idx];
 		}
+		assert(!FROZEN_CHILLED(csd));
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
 		assert(cs_addrs->ti->curr_tn == jctl->turn_around_tn);
 #		ifdef UNIX
@@ -385,7 +386,7 @@ uint4 mur_process_intrpt_recov()
 			jpc = cs_addrs->jnl; /* the previous loop makes sure cs_addrs->jnl->jnl_buff is valid*/
 			NULLIFY_JNL_FILE_ID(cs_addrs);
 			jpc->jnl_buff->cycle++; /* so that, all other processes knows to switch to newer journal file */
-			jpc->cycle--; /* decrement cycle so jnl_ensure_open() knows to reopen the journal */
+			jpc->cycle--; /* decrement cycle so "jnl_ensure_open" knows to reopen the journal */
 		}
 #		endif
 		if (NULL != rctl->jctl_alt_head) /* remove the journal files created by last interrupted recover process */

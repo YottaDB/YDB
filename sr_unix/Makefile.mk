@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2016 Fidelity National Information		#
+# Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -33,6 +33,9 @@ CURDIR = `pwd`
 # Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
+# Users may install GT.M without Unicode support
+HAVE_UNICODE = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
+
 # Determine machine and OS type.
 UNAMESTR = $(shell uname -a)
 MACHTYPE = $(shell uname -m)
@@ -42,6 +45,19 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 endif
 # 64 bit version of GT.M? 0 for yes!
 BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; echo $$?)
+
+# Determine if GPG 2.1+ is installed
+HAVE_GPG21   = 0
+HAVE_GPGCONF = $(shell which gpgconf 2> /dev/null)
+ifneq ($(HAVE_GPGCONF),)
+	GPGBIN     = $(shell gpgconf | grep 'gpg:' | cut -d: -f3)
+	GPGVER     = $(shell $(GPGBIN) --version | head -n1 | cut -d' ' -f3)
+	HAVE_GPG21 = $(shell expr $(GPGVER) \>= 2.1.12)
+endif
+ifeq ($(HAVE_GPG21),1)
+	USE_LOOPBACK = "-DUSE_GPGME_PINENTRY_MODE_LOOPBACK"
+endif
+
 
 # Default installation target. This allows for the build system to randomize `thirdparty' and `algo' thereby changing the default
 # gtmcrypt install link.
@@ -59,7 +75,7 @@ endif
 CC = cc
 
 # Setup common compiler flags
-CFLAGS = $(debug_flag) $(optimize) -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES -D_LARGEFILE64_SOURCE=1
+CFLAGS = $(debug_flag) $(optimize) -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES -D_LARGEFILE64_SOURCE=1 $(USE_LOOPBACK)
 
 ifneq ($(gcrypt_nofips),0)
 	gcrypt_nofips_flag = -DGCRYPT_NO_FIPS
@@ -187,17 +203,12 @@ libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcrypt
 	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
 		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
 
-openssl: libgtmcrypt_openssl_AES256CFB.so libgtmcrypt_openssl_BLOWFISHCFB.so
+openssl: libgtmcrypt_openssl_AES256CFB.so
 
 libgtmcrypt_openssl_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_AES256CFB $(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
 		$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
-
-libgtmcrypt_openssl_BLOWFISHCFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
-	@echo ; echo "Compiling $@..."
-	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_BLOWFISHCFB $(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
-	$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
 
 libgtmtls.so: $(tls_srcfiles) $(tls_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
@@ -211,11 +222,14 @@ install: all
 	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
-	(cd $(PLUGINDIR)/o && ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
-	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
-	cp -pf *.sh $(GTMCRYPTDIR)/
+	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
+endif
+ifeq ($(HAVE_UNICODE),0)
+	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
+	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

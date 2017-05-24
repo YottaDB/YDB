@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,6 @@
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "op.h"
-
 
 /*
  * -----------------------------------------------
@@ -33,5 +33,5 @@
  */
 int op_lock(int timeout)
 {
-	return (op_lock2(timeout,CM_LOCKS));
+	return (op_lock2(timeout, CM_LOCKS));
 }

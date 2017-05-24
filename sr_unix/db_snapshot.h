@@ -152,11 +152,7 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 #	define	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(CSA, PTR)
 #endif
 
-#ifdef GTM_SNAPSHOT
-#	define	SNAPSHOT_SECTION_SIZE	(ROUND_UP((MAX_SNAPSHOTS * SINGLE_SHM_SNAPSHOT_SIZE), OS_PAGE_SIZE))
-#else
-#	define	SNAPSHOT_SECTION_SIZE	0
-#endif
+#define	SNAPSHOT_SECTION_SIZE	(ROUND_UP((MAX_SNAPSHOTS * SINGLE_SHM_SNAPSHOT_SIZE), OS_PAGE_SIZE))
 #define SHMPOOL_SECTION_SIZE	(ROUND_UP((SHMPOOL_BUFFER_SIZE + SNAPSHOT_SECTION_SIZE), OS_PAGE_SIZE))
 
 boolean_t	ss_initiate(gd_region *, util_snapshot_ptr_t, snapshot_context_ptr_t *, boolean_t, char *);

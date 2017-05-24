@@ -36,8 +36,8 @@
 #include "clear_cache_array.h"
 #include "is_proc_alive.h"
 #include "do_semop.h"
-#include "anticipatory_freeze.h"	/* needed for WRITE_EOF_BLOCK -->  DB_LSEEKWRITE */
 #include "gtm_semutils.h"
+#include "db_write_eof_block.h"
 
 error_def(ERR_DBFILERR);
 error_def(ERR_MUTRUNCERROR);
@@ -51,8 +51,10 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 	off_t			old_size, cur_size, new_size;
 	int			ftrunc_status, status;
 	unix_db_info    	*udi;
-	int			semval;
+	int			blk_size, semval;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (NULL != csa->nl && csa->nl->trunc_pid && !is_proc_alive(csa->nl->trunc_pid, 0))
 		csa->nl->trunc_pid = 0;
 	if (!csd->before_trunc_total_blks)
@@ -67,22 +69,22 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 	if (NULL != csa->nl)
 		csa->nl->root_search_cycle++;
 	old_total = csd->before_trunc_total_blks;					/* Pre-truncate total_blks */
-	old_size = (off_t)SIZEOF_FILE_HDR(csd)						/* Pre-truncate file size (in bytes) */
-			+ (off_t)old_total * csd->blk_size + DISK_BLOCK_SIZE;
+	blk_size = csd->blk_size;
+	old_size = (off_t)SIZEOF_FILE_HDR(csd) + (off_t)(old_total + 1) * blk_size;	/* Pre-truncate file size (in bytes) */
 	cur_total = csa->ti->total_blks;						/* Actual total_blks right now */
 	cur_size = (off_t)gds_file_size(reg->dyn.addr->file_cntl) * DISK_BLOCK_SIZE;	/* Actual file size right now (in bytes) */
 	new_total = csd->after_trunc_total_blks;					/* Post-truncate total_blks */
-	new_size = old_size - (off_t)(old_total - new_total) * csd->blk_size;		/* Post-truncate file size (in bytes) */
+	new_size = old_size - (off_t)(old_total - new_total) * blk_size;		/* Post-truncate file size (in bytes) */
 	/* We don't expect FTRUNCATE to leave the file size in an 'in between' state, hence the assert below. */
 	assert(old_size == cur_size || new_size == cur_size);
 	if (new_total == cur_total && old_size == cur_size)
-	{ /* Crash after reducing total_blks, before successful FTRUNCATE. Complete the FTRUNCATE here. */
+	{	/* Crash after reducing total_blks, before successful FTRUNCATE. Complete the FTRUNCATE here. */
 		DBGEHND((stdout, "DBG:: recover_truncate() -- completing truncate, old_total = [%lu], cur_total = [%lu]\n",
 			old_total, new_total));
 		assert(csd->before_trunc_free_blocks >= DELTA_FREE_BLOCKS(old_total, new_total));
 		csa->ti->free_blocks = csd->before_trunc_free_blocks - DELTA_FREE_BLOCKS(old_total, new_total);
 		clear_cache_array(csa, csd, reg, new_total, old_total);
-		WRITE_EOF_BLOCK(reg, csd, new_total, status);
+		status = db_write_eof_block(udi, udi->fd, blk_size, new_size - blk_size, &(TREF(dio_buff)));
 		if (status != 0)
 		{
 			err_msg = (char *)STRERROR(errno);

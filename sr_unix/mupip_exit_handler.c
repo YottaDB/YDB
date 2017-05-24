@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,6 @@
 #include "secshr_db_clnup.h"
 #include "gtmio.h"
 #include "repl_shutdcode.h"
-#include "op.h"
 #include "io.h"
 #include "gtmsource_srv_latch.h"
 #include "gtmcrypt.h"
@@ -117,8 +116,6 @@ void mupip_exit_handler(void)
 	 * be holding crit in one or more regions and/or we could have other odds/ends to cleanup.
 	 */
 	secshr_db_clnup(NORMAL_TERMINATION);
-	if (dollar_tlevel)
-		OP_TROLLBACK(0);
 	if (is_updhelper && NULL != helper_entry) /* haven't had a chance to cleanup, must be an abnormal exit */
 	{
 		helper_entry->helper_shutdown = ABNORMAL_SHUTDOWN;

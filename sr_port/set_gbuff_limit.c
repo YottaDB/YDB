@@ -28,6 +28,7 @@ void set_gbuff_limit(sgmnt_addrs **csaptr, sgmnt_data_ptr_t *csdptr, mval *pooll
 	int4			nbuffs;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	cache_rec_ptr_t		cr;
 
 	csa = *csaptr;
 	csd = *csdptr;
@@ -39,4 +40,8 @@ void set_gbuff_limit(sgmnt_addrs **csaptr, sgmnt_data_ptr_t *csdptr, mval *pooll
 	 * but for the first release of this always pick the end of the buffer
 	 */
 	csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts;
+	cr = csa->our_midnite - csa->gbuff_limit;
+	if (cr < csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets)
+		cr += csd->n_bts;
+	csa->our_lru_cache_rec_off = GDS_ANY_ABS2REL(csa, cr);
 }

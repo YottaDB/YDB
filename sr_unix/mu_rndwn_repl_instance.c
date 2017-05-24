@@ -56,7 +56,6 @@
 #include "muprec.h"
 #include "error.h"
 #include "anticipatory_freeze.h"
-#include "heartbeat_timer.h"
 #include "mutex.h"
 #include "do_semop.h"
 
@@ -320,11 +319,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						assert(!repl_csa->now_crit);
 						assert(!repl_csa->hold_onto_crit);
 						was_crit = repl_csa->now_crit;
-						/* Since we do grab_lock, below, we need to do a per-process initialization. Also,
-						 * start heartbeat so that grab_lock can issue MUTEXLCKALERT and get C-stacks if
-						 * waiting for crit
-						 */
-						START_HEARTBEAT_IF_NEEDED;
+						/* Since we do grab_lock, below, we need to do a per-process initialization. */
 						mutex_per_process_init();
 						if (!was_crit)
 							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);

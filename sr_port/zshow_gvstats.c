@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +23,7 @@
 #include "gvstats_rec.h"
 #include "zshow.h"
 #include "dpgbldir.h"
+#include "gtm_reservedDB.h"
 
 #define	KEYWORD_TERMINATOR	","
 #define	KEYWORD_SEPARATOR	":"
@@ -85,13 +87,13 @@ void zshow_gvstats(zshow_out *output)
 	{
 		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
 		{
-			if (!reg->open || reg->was_open)
+			if (!reg->open || reg->was_open || IS_STATSDB_REG(reg))
 				continue;
 			acc_meth = reg->dyn.addr->acc_meth;
-			if ((dba_bg != acc_meth) && (dba_mm != acc_meth))
+			if (!IS_ACC_METH_BG_OR_MM(acc_meth))
 				continue;
 			csa = &FILE_INFO(reg)->s_addrs;
-#			define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	cumul_gvstats.COUNTER += csa->gvstats_rec.COUNTER;
+#			define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2) cumul_gvstats.COUNTER += csa->gvstats_rec_p->COUNTER;
 #			include "tab_gvstats_rec.h"
 #			undef TAB_GVSTATS_REC
 		}
@@ -103,15 +105,15 @@ void zshow_gvstats(zshow_out *output)
 		get_first_gdr_name(addr_ptr, &gldname);
 		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
 		{
-			if (!reg->open)
+			if (!reg->open || IS_STATSDB_REG(reg))
 				continue;
 			acc_meth = reg->dyn.addr->acc_meth;
-			if ((dba_bg != acc_meth) && (dba_mm != acc_meth))
+			if (!IS_ACC_METH_BG_OR_MM(acc_meth))
 				continue;
 			csa = &FILE_INFO(reg)->s_addrs;
 			regname.len = reg->rname_len;
 			regname.addr = (char *)&reg->rname[0];
-			zshow_gvstats_output(output, &gldname, &regname, &csa->gvstats_rec);
+			zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p);
 		}
  	}
 }

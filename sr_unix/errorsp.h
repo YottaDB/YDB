@@ -474,8 +474,10 @@ MBSTART {													\
 	ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 	DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",		\
 		 __FILE__, __LINE__, arg, SIGNAL));							\
-	if ((continue_on_success) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)			\
-		&& ((int)ERR_CTRLY != SIGNAL) && ((int)ERR_CTRLC != SIGNAL)))				\
+	if ((continue_on_success)									\
+		&& ((SUCCESS == SEVERITY)								\
+			|| ((INFO == SEVERITY) && ((int)ERR_CTRLY != SIGNAL)				\
+				&& ((int)ERR_CTRLC != SIGNAL))))					\
 	{												\
 		if (ctrlc_on || !IS_GTM_IMAGE)								\
 			PRN_ERROR;									\
@@ -600,6 +602,8 @@ CONDITION_HANDLER(gvcst_spr_queryget_ch);
 
 CONDITION_HANDLER(op_fnzpeek_ch);
 CONDITION_HANDLER(op_fnzpeek_getpool_ch);
+
+CONDITION_HANDLER(timer_cancel_ch);
 
 CONDITION_HANDLER(trigger_upgrade_ch);
 

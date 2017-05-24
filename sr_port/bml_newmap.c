@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,6 @@ void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn)
 {
 	sm_uc_ptr_t bptr;
 
-	/* --- similar logic exists in mupip_restore.c, which need to pick up any new updates here --- */
 	ptr->bver = GDSVCURR;
 	ptr->bsiz = size;
 	ptr->levl = LCL_MAP_LEVL;

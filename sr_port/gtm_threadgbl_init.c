@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,6 +108,7 @@
 #include "parm_pool.h"
 #include "util.h"		/* for util_outbuff manipulations */
 #include "nametabtyp.h"
+#include "gtm_reservedDB.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -183,6 +184,7 @@ typedef struct
 
 GBLDEF gtm_threadgbl_true_t	*gtm_threadgbl_true;
 
+GBLREF int4 			*aligned_source_buffer;
 /* This routine allocates the thread global structure and for now, since GTM is not yet threaded,
  * anchors it in a global variable. This still improves access to global variables even in this
  * paradym because the 3 step global dereference only need happen once per module.
@@ -231,5 +233,6 @@ void gtm_threadgbl_init(void)
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	TREF(util_outbuff_ptr) = TADR(util_outbuff);	/* Point util_outbuff_ptr to the beginning of util_outbuff at first. */
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
-	TREF(max_advancewindow_line) = MAX_SRCLINE;
+	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
+	(TREF(source_buffer)).len = MAX_SRCLINE;
 }

@@ -46,6 +46,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 
 LITREF	mval			literal_one;
 LITREF	mval			literal_ten;
@@ -167,7 +168,7 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 			LITERAL_HASHTRHASH, STR_LIT_LEN(LITERAL_HASHTRHASH), mv_hash, collision_indx);
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -177,7 +178,7 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		ptr2 = memchr(ptr, '\0', key_val.str.len);
 		if (NULL == ptr2)
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -247,7 +248,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			LITERAL_HASHTRHASH, STR_LIT_LEN(LITERAL_HASHTRHASH), mv_hash, collision_indx);
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -257,7 +258,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		ptr2 = memchr(ptr, '\0', key_val.str.len);
 		if (NULL == ptr2)
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -268,7 +269,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		{	/* We expect all hashes under ^#t(<gbl>,"#TRHASH",...) to correspond to <gbl> in their value.
 			 * If not this is a TRIGDEFBAD situation.
 			 */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,

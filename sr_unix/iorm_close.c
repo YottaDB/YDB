@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,6 +215,11 @@ void iorm_close(io_desc *iod, mval *pp)
 		{
 			free(rm_ptr->outbuf);
 			rm_ptr->outbuf = NULL;
+		}
+		if (rm_ptr->tmp_buffer)
+		{
+			free(rm_ptr->tmp_buffer);
+			rm_ptr->tmp_buffer = NULL;
 		}
 	}
 

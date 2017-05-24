@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,18 +44,26 @@
 #include "trigger_fill_xecute_buffer.h"
 #include "trigger_gbl_fill_xecute_buffer.h"
 #include "gtm_trigger_trc.h"
+#ifdef DEBUG
+#include "repl_msg.h"
+#include "gtmsource.h"			/* for jnlpool_addrs */
+#endif
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	int4			gtm_trigger_depth;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	gv_namehead		*gv_target;
+#ifdef DEBUG
+GBLREF	boolean_t		is_updproc;
+GBLREF	jnlpool_addrs		jnlpool;
+#endif
+GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int			tprestart_state;
-GBLREF	int4			tstart_trigger_depth;
-GBLREF	int4			gtm_trigger_depth;
 GBLREF	tp_frame		*tp_pointer;
+GBLREF	int4			tstart_trigger_depth;
 
 error_def(ERR_TPRETRY);
 
@@ -147,7 +155,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 
 	assert(0 < dollar_tlevel);
 	assert(NULL != trigdsc);
-	SAVE_TRIGGER_REGION_INFO(save_currkey);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 
 	gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */
 	index = trigdsc - gvt_trigger->gv_trig_array + 1;	/* We now know our trigger index value */
@@ -172,15 +180,16 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	/* See if we need to reload our triggers */
 	if ((csa->db_trigger_cycle != gvt->db_trigger_cycle)
 	    || (csa->db_dztrigger_cycle && (gvt->db_dztrigger_cycle != csa->db_dztrigger_cycle)))
-	{       /* The process' view of the triggers could be potentially stale. Restart to be safe.
-		 * Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
-		 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
-		 * updater on the secondary so we dont expect it to see any concurrent trigger changes
-		 * Assert accordingly.
+	{       /* The process' view of the triggers is likely stale. Restart to be safe.
+		 * Triggers can be invoked only by GT.M and Update process. We expect to see GT.M processes to
+		 * restart due to concurrent trigger changes. The Update Process should only restart if it is a
+		 * supplementary instance. Assert accordingly. Note similar asserts occur in t_end.c and
+		 * tp_tend.c.
 		 */
 		DBGTRIGR((stderr, "trigger_fill_xecute_buffer_read_trigger_source: stale trigger view\n"));
 		assert(CDB_STAGNATE > t_tries);
-		assert(IS_GTM_IMAGE);
+		assert(!is_updproc || (jnlpool.repl_inst_filehdr->is_supplementary
+					&& !jnlpool.jnlpool_ctl->upd_disabled));
 		t_retry(cdb_sc_triggermod);
 	}
 	SET_GVTARGET_TO_HASHT_GBL(csa);
@@ -189,7 +198,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	/* Restore gv_target/gv_currkey which need to be kept in sync */
-	RESTORE_TRIGGER_REGION_INFO(save_currkey);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	return;
 }
 #endif /* GTM_TRIGGER */

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -31,7 +31,7 @@ ENTRY	ci_restart
 	subl	$1, REG32_ARG3
 	leaq	8(REG64_ARG2), REG64_ARG1
 	leaq	8(REG_SP), REG64_ARG0
-	REP
+	REP						#   copy argument registers
 	movsq						# }
 L0:
 	movq	param_list(REG_IP), REG64_ACCUM

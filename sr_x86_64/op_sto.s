@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,11 +27,11 @@ ENTRY	op_sto
 	CHKSTKALIGN						# Verify stack alignment
 	mv_if_notdefined REG64_RET1, notdef
 nowdef:
-	movl	$mval_byte_len, REG32_ARG3
+	movl	$mval_qword_len, REG32_ARG3
 	movq	REG64_RET1, REG64_ARG1
 	movq	REG64_RET0, REG64_ARG0
 	REP
-	movsb
+	movsq
 	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
 done:
 	addq	$8, REG_SP					# Remove stack alignment bump

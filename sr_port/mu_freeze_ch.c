@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +25,12 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "interlock.h"
 
 GBLREF gd_region 	*gv_cur_region;
+GBLREF sgmnt_data	*cs_data;
 GBLREF tp_region 	*grlist;
+GBLREF uint4		process_id;
 
 CONDITION_HANDLER(mu_freeze_ch)
 {
@@ -35,10 +39,12 @@ CONDITION_HANDLER(mu_freeze_ch)
 	START_CH(TRUE);
 	for (rptr1 = grlist ; rptr1 != NULL; rptr1 = rptr1->fPtr)
 	{
-		gv_cur_region = rptr1->reg;
+		TP_CHANGE_REG(rptr1->reg);
 		if (!gv_cur_region->open)
 			continue;
-		region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
+		if (process_id == FILE_INFO(gv_cur_region)->s_addrs.nl->freeze_latch.u.parts.latch_pid)
+			rel_latch(&FILE_INFO(gv_cur_region)->s_addrs.nl->freeze_latch);
+		region_freeze(gv_cur_region, FALSE, FALSE, FALSE, FALSE, FALSE);
 	}
 	NEXTCH; /* should do PRN_ERROR for us */
 }

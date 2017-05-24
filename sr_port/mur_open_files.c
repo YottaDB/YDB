@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,6 @@
 #include "gtm_semutils.h"
 #include "sleep_cnt.h"
 #include "gdsbgtr.h"
-#include "heartbeat_timer.h"
 #include "gtmsource_srv_latch.h"
 #include "do_semop.h"
 #include "wcs_sleep.h"
@@ -327,7 +326,7 @@ boolean_t mur_open_files()
 				}
 			}
 		}
-		if (!mupfndfil(rctl->gd, NULL))
+		if (!mupfndfil(rctl->gd, NULL, LOG_ERROR_FALSE))
 		{
 			rctl->db_present = FALSE;
 			if (mur_options.update || star_specified)
@@ -442,7 +441,8 @@ boolean_t mur_open_files()
 				tmpcsd = tmpcsa->hdr;
 				GRAB_ACCESS_CONTROL(rl);
 				grab_crit(reg);
-				if (tmpcsd->freeze)
+				DO_CHILLED_AUTORELEASE(tmpcsa, tmpcsd);
+				if (FROZEN(tmpcsd))
 				{
 					save_rl = rl;
 					rl = rl->fPtr;	/* Increment so we release the lock we actually got */
@@ -464,7 +464,7 @@ boolean_t mur_open_files()
 				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_str,
 				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
-			while (tmpcsd->freeze)
+			while (FROZEN(tmpcsd))
 			{
 				if (MAXHARDCRITS < llcnt)
 					wcs_sleep(llcnt); /* Don't waste CPU cycles anymore */
@@ -578,7 +578,6 @@ boolean_t mur_open_files()
 									   * this shared memory until recover/rlbk cleanly exits */
 				}
 				assert(!JNL_ENABLED(csd) || 0 == csd->jnl_file_name[csd->jnl_file_len]);
-				rctl->db_ctl->file_type = rctl->gd->dyn.addr->file_cntl->file_type;
 				rctl->db_ctl->file_info = rctl->gd->dyn.addr->file_cntl->file_info;
 				rctl->recov_interrupted = csd->recov_interrupted;
 				if (mur_options.update && rctl->recov_interrupted)
@@ -649,7 +648,7 @@ boolean_t mur_open_files()
 						{	/* Replication is either OFF or WAS_ON. Journaling could be ENABLED or not.
 							 * If replication is OFF and journaling is DISABLED, there is no issue.
 							 * Any other combination (including replication being WAS_ON) is an error
-							 * as we dont have the complete set of journal records to do the rollback.
+							 * as we don't have the complete set of journal records to do the rollback.
 							 */
 							if (REPL_ALLOWED(csd) || JNL_ENABLED(csd))
 							{
@@ -683,12 +682,12 @@ boolean_t mur_open_files()
 						 * 	 below.
 						 */
 					}
-					if (csd->freeze && !jgbl.onlnrlbk)
+					if (FROZEN(csd) && !jgbl.onlnrlbk)
 					{	/* region_freeze should release freeze here. For ONLINE ROLLBACK we would have
 						 * waited for the freeze to be lifted off before
 						 */
-						reg_frz_status = region_freeze(rctl->gd, FALSE, TRUE, FALSE);
-						assert (0 == rctl->csa->hdr->freeze);
+						reg_frz_status = region_freeze(rctl->gd, FALSE, TRUE, FALSE, FALSE, FALSE);
+						assert (!FROZEN(rctl->csa->hdr));
 						assert(REG_FREEZE_SUCCESS == reg_frz_status);
 						if (REG_ALREADY_FROZEN == reg_frz_status)
 						{
@@ -713,8 +712,11 @@ boolean_t mur_open_files()
 					/* flush the changed csd to disk */
 					fc = rctl->gd->dyn.addr->file_cntl;
 					fc->op = FC_WRITE;
+					/* Note: csd points to shared memory and is already aligned
+					 * appropriately even if db was opened using O_DIRECT.
+					 */
 					fc->op_buff = (sm_uc_ptr_t)csd;
-					fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
+					fc->op_len = SGMNT_HDR_LEN;
 					fc->op_pos = 1;
 					dbfilop(fc);
 				}
@@ -839,7 +841,7 @@ boolean_t mur_open_files()
 				return FALSE;
 			}
 			cptr++;	/* skip separator */
-			if (SS_NORMAL != mur_fopen(jctl, NULL))	/* dont know rctl yet */
+			if (SS_NORMAL != mur_fopen(jctl, NULL))	/* don't know rctl yet */
 				return FALSE;	/* mur_fopen() would have done the appropriate gtm_putmsg() */
 			for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 			{
@@ -987,6 +989,8 @@ boolean_t mur_open_files()
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		jctl = rctl->jctl_head;
+		if (rctl->db_present && (mur_options.update || mur_options.extr[GOOD_TN]))
+			rctl->csa->miscptr = (void *)rctl; /* needed by gdsfilext_nojnl/jnl_put_jrt_pini/mur_pini_addr_reset */
 		if (mur_options.update)
 		{
 			csd = rctl->csd;

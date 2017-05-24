@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +28,9 @@
 #include "copy.h"
 #include "longset.h"		/* also needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
-#ifdef GTM_TRIGGER
 #include <rtnhdr.h>
+#include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
-#endif
 
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -203,7 +203,7 @@ void tp_incr_clean_up(uint4 newlevel)
 		}
 		DEBUG_ONLY(if (!si->update_trans) DBG_CHECK_SI_BUDDY_LIST_IS_REINITIALIZED(si);)
 	}
-	GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(TRUE, FALSE);)
+	TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(TP_INCR_ROLLBACK);
 	/* After an incremental rollback, it is possible that some gv_targets now have a block-split history that reflects
 	 * a created block number that is no longer relevant due to the rollback. Fix those as needed.
 	 */

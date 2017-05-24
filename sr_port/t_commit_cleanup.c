@@ -42,7 +42,7 @@
 #include "send_msg.h"
 #include "have_crit.h"
 
-GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
+GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -52,6 +52,7 @@ GBLREF	uint4			dollar_trestart;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
+GBLREF  tp_region               *tp_reg_list;	      /* List of tp_regions for this transaction */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -103,6 +104,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	cache_rec_ptr_t			cr;
 	sgm_info			*si;
 	sgmnt_addrs			*csa, *jpl_csa = NULL;
+	tp_region			*tr;
 	char				*trstr;
 	gd_region			*xactn_err_region, *jpl_reg = NULL;
 	cache_rec_ptr_t			*tp_cr_array;
@@ -203,16 +205,35 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
 											  * seqno of filehdr and jnlpool */
 				/* Do not release crit on the region until reg_seqno has been reset above. */
-				assert(!csa->hold_onto_crit UNIX_ONLY(|| jgbl.onlnrlbk));
+				assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
 				if (!csa->hold_onto_crit && release_crit)
 					rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
 			}
-			/* If final retry and released crit (in the above loop), decrement t_tries to ensure that we dont have an
-			 * out-of-design situation (with crit not being held in the final retry).
-			 */
-			if (release_crit && (CDB_STAGNATE <= t_tries))
-				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK; /* t_tries untouched for rollback and recover */
-			UNIX_ONLY(assert(!jgbl.onlnrlbk || (lcl_t_tries == t_tries)));
+			if (release_crit)
+			{	/* If final retry and released crit (in the above loop), do the following
+				 * Decrement t_tries to ensure that we dont have an out-of-design situation (with crit not being
+				 * held in the final retry).
+				 */
+				if (CDB_STAGNATE <= t_tries)
+					TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK; /* t_tries untouched for rollback and recover */
+				/* Above, we released crit on all regions in "first_sgm_info" (list of regions referenced in the
+				 * current try/retry of this TP transaction). But it is possible "tp_reg_list" (list of regions
+				 * referenced across all tries/retries of this TP transaction until now) contains a few more
+				 * regions on which we have crit . In that case we need to release crit on those regions as well.
+				 * Types of activity that could lead to this situation:
+				 *  - M locks
+				 *  - Regions from which globals are read but not updated
+				 */
+				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+				{
+					assert(tr->reg->open);
+					csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
+					assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
+					if (!csa->hold_onto_crit && csa->now_crit)
+						rel_crit(tr->reg);
+				}
+			}
+			assert(!jgbl.onlnrlbk || (lcl_t_tries == t_tries));
 			assert((lcl_t_tries == t_tries) || (t_tries == (CDB_STAGNATE - 1)));
 			/* Do not release crit on jnlpool until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
@@ -240,7 +261,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * the process wants to hold onto crit (for instance, DSE or ONLINE ROLLBACK). In that case, do the flush anyways.
 		 */
 		assert(!release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG))
-			UNIX_ONLY(|| jgbl.onlnrlbk) || (!dollar_tlevel && cs_addrs->hold_onto_crit));
+			|| jgbl.onlnrlbk || (!dollar_tlevel && cs_addrs->hold_onto_crit));
 		if (release_crit && unhandled_stale_timer_pop)
 			process_deferred_stale();
 	} else

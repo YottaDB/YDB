@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,6 +88,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	mname_entry	gvname;
 	int		max_key;
 	gvnh_reg_t	*gvnh_reg;
+	char		varstr[MAX_MIDENT_LEN + 1];
 	gd_region	*reg;
 	DCL_THREADGBL_ACCESS;
 
@@ -98,13 +100,22 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	val = val_arg;
 	count -= 2;
 	gvname.hash_code = hash_code;
-	gvname.var_name = val->str;
+	/* GV_BIND_NAME_AND_ROOT_SEARCH invokes "gv_bind_name" which does a "gv_init_reg". That could in turn invoke
+	 * "gvcst_init_statsDB" which does a "gvcst_get" and that could invoke "stp_gcol" (through the ENSURE_STP_FREE_SPACE
+	 * macro). This garbage collection could move mvals around. "val->str" would be correctly repointed since "val" is
+	 * known to "stp_gcol" but if gvname.var_name is a copy of val->str, it would not be repointed and so later usages
+	 * of "gvname" in "gv_bind_name" could point to garbage contents. Hence take a copy of the variable in the C-stack
+	 * and point to it instead of val->str.addr.
+	 */
+	gvname.var_name.len = val->str.len;
+	memcpy(varstr, val->str.addr, gvname.var_name.len);
+	gvname.var_name.addr = varstr;
+	TREF(gd_targ_addr) = gd_header;		/* needed by name-level $order/$zprevious and various other functions */
 	/* Bind the unsubscripted global name to corresponding region in the global directory map */
 	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
-	TREF(gd_targ_addr) = gd_header;		/* needed by name-level $order/$zprevious and various other functions */
 	/* gv_cur_region will not be set in case gvnh_reg->gvspan is non-NULL. So use region from gvnh_reg */
 	reg = gvnh_reg->gd_reg;
-	DEBUG_ONLY(bgormm = ((dba_bg == REG_ACC_METH(reg)) || (dba_mm == REG_ACC_METH(reg)));)
+	DEBUG_ONLY(bgormm = IS_REG_BG_OR_MM(reg);)
 	assert(bgormm || !dollar_tlevel);
 	assert(NULL != gv_target);
 	assert(gv_currkey->end);

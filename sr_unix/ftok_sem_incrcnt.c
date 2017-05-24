@@ -77,13 +77,17 @@ boolean_t ftok_sem_incrcnt(gd_region *reg, const char *file_type_str, boolean_t 
 		if (ERANGE == save_errno)
 		{	/* "repl_inst_read" and "repl_inst_write" (invoked from "repl_inst_ftok_counter_halted")
 			 * rely on the caller holding the ftok semaphore. Although we dont hold it in this case,
-			 * our caller (gtmrecv.c or gtmsource.c) have ensured there is a parent pid that is holding
-			 * the ftok and waiting for us to finish this counter increment. Therefore steal the ftok
-			 * semaphore temporarily for the assert.
+			 * if we are the source server (is_src_server) our caller (gtmsource.c) would have ensured
+			 * there is a parent pid that is holding the ftok and waiting for us to finish this counter
+			 * increment. Therefore steal the ftok semaphore temporarily for the assert.  If we are the
+			 * receiver server (is_rcvr_server) our caller (gtmrecv.c) does not ensure this so grab the
+			 * ftok in that case. Those are the only two possibilities for the caller as asserted below.
 			 */
-			assert(!udi->grabbed_ftok_sem);
 			assert(is_src_server || is_rcvr_server);
-			DEBUG_ONLY(udi->grabbed_ftok_sem = TRUE;)
+			assert(!udi->grabbed_ftok_sem);
+			DEBUG_ONLY(if (is_src_server) udi->grabbed_ftok_sem = TRUE;)
+			if (is_rcvr_server)
+				repl_inst_ftok_sem_lock();
 			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 			if (repl_instance.qdbrundown)
 			{
@@ -91,7 +95,9 @@ boolean_t ftok_sem_incrcnt(gd_region *reg, const char *file_type_str, boolean_t 
 				if (!jnlpool.jnlpool_ctl->ftok_counter_halted)
 					repl_inst_ftok_counter_halted(udi);
 			}
-			DEBUG_ONLY(udi->grabbed_ftok_sem = FALSE;)
+			if (is_rcvr_server)
+				repl_inst_ftok_sem_release();
+			DEBUG_ONLY(if (is_src_server) udi->grabbed_ftok_sem = FALSE;)
 		}
 		if (issue_error)
 		{

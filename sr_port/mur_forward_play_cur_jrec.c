@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,12 +50,15 @@
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
-GBLREF  gd_region		*gv_cur_region;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF 	mur_gbls_t		murgbl;
+GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			dollar_tlevel;
-GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+#ifdef DEBUG
+GBLREF	boolean_t		forw_recov_lgtrig_only;
+#endif
 
 error_def(ERR_DUPTN);
 error_def(ERR_FORCEDHALT);
@@ -273,6 +276,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			mv.str.addr = NULL;
 			op_tstart(IMPLICIT_TSTART, TRUE, &mv, -1);
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = 0;)
+			DEBUG_ONLY(forw_recov_lgtrig_only = TRUE;)	/* gets reset later if a non-LGTRIG record is seen */
 		}
 		tp_set_sgm();	/* needed to set "sgm_info_ptr" to correspond to "rctl" */
 	}
@@ -305,7 +309,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 				assert(gv_cur_region->open);
 			} else
 			{
-				assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+				assert(IS_REG_BG_OR_MM(gv_cur_region));
 				gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
 				GVNH_REG_INIT(gd_header, &rctl->gvntab, NULL, gv_target, gv_cur_region, gvnh_reg, tabent);
 			}

@@ -27,10 +27,8 @@
 #include "gds_blk_upgrade.h"
 #include "gtmcrypt.h"
 #include "min_max.h"
-#ifdef GTM_SNAPSHOT
 #include "shmpool.h"		/* Needed for DBG_ENSURE_PTR_WITHIN_SS_BOUNDS */
 #include "db_snapshot.h"
-#endif
 #include "mupip_exit.h"
 
 GBLREF sgmnt_data		mu_int_data;
@@ -49,7 +47,15 @@ error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_INTEGERRS);
 error_def(ERR_REGSSFAIL);
 
-uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
+/* Returns buffer containing the GDS block. "free_buff" is set to point to the start of the malloced buffer
+ * so the caller needs to use "free_buff" when doing the "free". This is necessary particularly in case of
+ * asyncio=TRUE when the file is opened with O_DIRECT and the malloced buffer is not necessarily aligned
+ * for DIO. And so we allocate with padding to get alignment. In this case the aligned buffer is returned
+ * as the GDS block but the unaligned buffer is set in "free_buff" and is the one that needs to be freed.
+ * In case asyncio=FALSE, the return value is the same as "free_buff". So in all cases, the caller is safe to
+ * do a free of "free_buff".
+ */
+uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff)
 {
 	int4			status;
 	file_control		*fc;
@@ -61,22 +67,29 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 	sgmnt_data_ptr_t	csd;
 	boolean_t 		have_blk;
 	sgmnt_addrs		*csa;
-	GTM_SNAPSHOT_ONLY(
-		boolean_t	read_failed;
-		shm_snapshot_t	*ss_shm_ptr;
-	)
+	unix_db_info		*udi;
+	boolean_t		read_failed;
+	shm_snapshot_t		*ss_shm_ptr;
 
 	have_blk = FALSE;
 	csa = cs_addrs;
-#	ifdef UNIX
 	if (region && csa->nl->onln_rlbk_pid)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		mupip_exit(ERR_INTEGERRS);
 	}
-#	endif
-	tmp_ptr = malloc(mu_int_data.blk_size);
-#	ifdef GTM_SNAPSHOT
+	fc = gv_cur_region->dyn.addr->file_cntl;
+	udi = FC2UDI(fc);
+	if (udi->fd_opened_with_o_direct)
+	{	/* We need aligned buffers */
+		tmp_ptr = (unsigned char *)malloc(ROUND_UP2(mu_int_data.blk_size, DIO_ALIGNSIZE(udi)) + OS_PAGE_SIZE);
+		*free_buff = tmp_ptr;
+		tmp_ptr = (unsigned char *)ROUND_UP2((UINTPTR_T)tmp_ptr, OS_PAGE_SIZE);
+	} else
+	{
+		tmp_ptr = malloc(mu_int_data.blk_size);
+		*free_buff = tmp_ptr;
+	}
 	if (ointeg_this_reg)
 	{
 		assert(NULL != csa->ss_ctx);
@@ -95,16 +108,13 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 			mupip_exit(ERR_INTEGERRS);
 		}
 	}
-#	endif
 	if (!have_blk)
 	{
-		fc = gv_cur_region->dyn.addr->file_cntl;
 		fc->op = FC_READ;
 		fc->op_buff = tmp_ptr;
 		fc->op_len = mu_int_data.blk_size;
 		fc->op_pos = mu_int_ovrhd + ((gtm_int64_t)mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
 		dbfilop(fc); /* No return if error */
-#		ifdef GTM_SNAPSHOT
 		if (ointeg_this_reg)
 		{
 			assert(NULL != ss_shm_ptr); /* should have been initialized above */
@@ -121,7 +131,6 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 				mupip_exit(ERR_INTEGERRS);
 			}
 		}
-#		endif
 	}
 	csd = &mu_int_data;
 	if (USES_ENCRYPTION(csd->is_encrypted))

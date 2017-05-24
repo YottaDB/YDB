@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,8 @@
 #include "i386.h"
 #include <rtnhdr.h>	/* Needed by zbreak.h */
 #include "zbreak.h"
+
+GBLREF emit_base_info_struct	emit_base_info;
 
 int inst_size = 0;
 /* inst_size is REX + OP_CODE + immed32 used to go past the instruction*/

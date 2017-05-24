@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,7 @@ void mupip_cvtgbl(void)
 	 */
 	TREF(issue_DBROLLEDBACK_anyways) = TRUE;
 	is_replicator = TRUE;
+	TREF(ok_to_see_statsdb_regs) = TRUE;
 	skip_dbtriggers = TRUE;
 	fn_len = SIZEOF(fn);
 	if (cli_present("STDIN"))
@@ -256,16 +257,15 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 		if (c == ctop)
 		{	/* did not find a terminator - read some more of 1st line */
 			ptr = c;
-			if (0 < (len = go_get(&ptr, 0, max_io_size)))		/* WARNING assignment */
-			{
+			if (0 <= (len = go_get(&ptr, 0, max_io_size)))		/* WARNING assignment */
 				*line1_len += len;
-				line2 = line1 + *line1_len;
-			} else
+			else
 			{	/* chances of this are small but we are careful not to overflow buffers */
 				mupip_error_occurred = TRUE;
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 			}
 			line2_len = 0;
+			line2 = line1 + *line1_len;
 		} else if (line2_len)
 		{	/* If line1 length is actually < 12 chars, the buffer has characters from line2 as well */
 			for (c = line2, ctop = c + line2_len; c < ctop; c++)

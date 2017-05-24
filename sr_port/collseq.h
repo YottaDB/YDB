@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +19,8 @@
 #define MIN_COLLTYPE	0
 #define XFORM	0
 #define XBACK	1
+#define	GTM_NULL_TEXT "GTM NULL COLL"
+#define STD_NULL_TEXT "STD NULL COLL"
 
 #define ALLOC_XFORM_BUFF(STR1LEN)									\
 {													\

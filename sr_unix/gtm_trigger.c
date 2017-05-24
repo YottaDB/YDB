@@ -482,6 +482,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		trigdsc->rtn_desc.rt_adr->src_full_name.addr = GTM_TRIGGER_SOURCE_NAME;
 		trigdsc->rtn_desc.rt_adr->src_full_name.len = STRLEN(GTM_TRIGGER_SOURCE_NAME);
 		trigdsc->rtn_desc.rt_adr->trigr_handle = trigdsc;       /* Back pointer to trig def */
+		/* Release trigger source field since it was compiled with -embed_source */
+		assert(0 < trigdsc->xecute_str.str.len);
+		free(trigdsc->xecute_str.str.addr);
+		trigdsc->xecute_str.str.len = 0;
+		trigdsc->xecute_str.str.addr = NULL;
 	}
 	if (MVST_MSAV == mv_chain->mv_st_type && &dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr)
 	{       /* Top mv_stent is one we pushed on there - restore dollar_zsource and get rid of it */
@@ -876,6 +881,8 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	int		size;
 	stack_frame	*fp;
 
+	/* TODO: We don't expect the trigger source to exist now the gtm_trigger cleans it up ASAP. Remove it after a few releases */
+	assert (0 == trigdsc->xecute_str.str.len);
 	/* First thing to do is release trigger source field if it exists */
 	if (0 < trigdsc->xecute_str.str.len)
 	{

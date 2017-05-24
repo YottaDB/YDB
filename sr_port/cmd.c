@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +49,8 @@ error_def(ERR_PCONDEXPECTED);
 error_def(ERR_SPOREOL);
 
 int cmd(void)
-{	/* All the commands are listed here. Two pairs of entries in general.
+{	/* module driving parsing of commands */
+	/* All the commands are listed here. Two pairs of entries in general.
 	 * One for full command and one for short-hand notation.
 	 * For example, B and and BREAK.
 	 */
@@ -205,11 +207,11 @@ LITDEF struct
 		,{m_zwrite, 1, 1, ALL_SYS}, {m_zwrite, 1, 1, ALL_SYS}
 	};
 
-	triple		*temp_expr_start, *ref0, *ref1, *fetch0, *triptr;
+	boolean_t	sense, shifting;
 	char		*c;
 	int		rval, x;
 	oprtype		*cr;
-	boolean_t	shifting;
+	triple		*fetch0, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -218,7 +220,7 @@ LITDEF struct
 		DECREMENT_EXPR_DEPTH;				/* in case of prior errors */
 	(TREF(side_effect_base))[0] = FALSE;
 	TREF(temp_subs) = FALSE;
-	CHKTCHAIN(TREF(curtchain));
+	CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 	TREF(pos_in_chain) = *TREF(curtchain);
 	if (TREF(window_token) != TK_IDENT)
 	{
@@ -233,23 +235,24 @@ LITDEF struct
 		return FALSE;
 	}
 	if (0 > (x = namelook(cmd_index, cmd_names, c, (TREF(window_ident)).len)))
-	{
+	{	/* if there's a postconditional, use ZINVCMD to let us peal off any arguments and get to the rest of the line */
 		if ((TK_COLON != TREF(director_token)) || (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7))))
 		{	/* the 2nd term of the above if should perform the assignment, but never be true - we're just paranoid */
 			stx_error(MAKE_MSG_TYPE(ERR_INVCMD, ERROR));	/* force INVCMD to an error so stx_error sees it as hard */
 			return FALSE;
 		}
-		stx_error(ERR_INVCMD);				/* the warning form so stx_error treats it as provisional */
+		stx_error(ERR_INVCMD);					/* use warning form so stx_error treats it as provisional */
 	}
 	if (!VALID_CMD(x) )
 	{
 	    	stx_error(ERR_CNOTONSYS);
 		return FALSE;
 	}
+	oldchain = NULL;
 	advancewindow();
 	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
 	{
-		assert((m_zinvcmd != cmd_data[x].fcn));
+		assert(m_zinvcmd != cmd_data[x].fcn);
 		cr = NULL;
 		shifting = FALSE;
 	} else
@@ -260,6 +263,20 @@ LITDEF struct
 		{
 			stx_error(ERR_PCONDEXPECTED);
 			return FALSE;
+		}
+		/* the next block could be simpler if done earlier, but doing it here picks up any Boolean optimizations  */
+		triptr = (TREF(curtchain))->exorder.bl;
+		while (OC_NOOP == triptr->opcode)
+			triptr = triptr->exorder.bl;
+		if (OC_LIT == triptr->opcode)
+		{
+			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			{	/* it's FALSE, so no need for this parse - get ready to discard it */
+				dqinit(&tmpchain, exorder);
+				oldchain = setcurtchain(&tmpchain);
+			}
+			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
 		}
 		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
 		{	/* NOTE - assignent above */
@@ -289,6 +306,11 @@ LITDEF struct
 			}
 		}
 	}
+	if (NULL != oldchain)
+	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
+		setcurtchain(oldchain);
+		return TRUE;
+	}
 	if ((EXPR_FAIL != rval) && cr)
 	{
 		if (fetch0 != curr_fetch_trip)
@@ -298,7 +320,7 @@ LITDEF struct
 		} else
 		{
 			if (shifting)
-			{
+			{	/* the following appears to be a hack ensuring emit_code doesn't find any unmatched OC_GVRECTARG */
 				ref0 = newtriple(OC_JMP);
 				ref1 = newtriple(OC_GVRECTARG);
 				ref1->operand[0] = put_tref(temp_expr_start);

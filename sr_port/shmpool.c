@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,52 +134,6 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 		/* Can only verify queue *AFTER* get the lock */
 		VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
 		/* We have the lock and fast_lock_count is incremented to prevent deadlock on interrupt */
-#ifdef VMS
-		/* Checks to make sure one mode or the other isn't over using its resources. Only important
-		   on VMS as reformat blocks do not exist on UNIX ports.
-		*/
-		if (SHMBLK_BACKUP == blktype)
-		{
-			/* See if backup has terminated itself for whatever reason */
-			if (sbufh_p->backup_errno)
-			{
-				shmpool_unlock_hdr(reg);
-				return (shmpool_blk_hdr_ptr_t)-1;
-			}
-			/* If we are in compatibility mode, backup is restricted to 50% of the buffers and must leave 1
-			   reformat buffer available */
-			if ((GDSV4 == csa->hdr->desired_db_format && (sbufh_p->total_blks / 2) < sbufh_p->backup_cnt)
-			    || (sbufh_p->total_blks - 1) <= sbufh_p->backup_cnt)
-			{	/* Too many backup blocks already in use for this type */
-				if (MAX_BACKUP_FLUSH_TRY < attempts)
-				{	/* We have tried too long .. backup errors out */
-					sbufh_p->failed = process_id;
-					sbufh_p->backup_errno = ERR_BCKUPBUFLUSH;
-					csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-					shmpool_unlock_hdr(reg);
-					return (shmpool_blk_hdr_ptr_t)-1;
-				}
-				limit_hit = TRUE;
-			} else
-				limit_hit = FALSE;
-		} else if (SHMBLK_REFORMAT == blktype)
-		{	/* If we are in compatibility mode and backup is active, reformat is restricted to 50% of the
-			   buffers. Else  must always leave 1 backup buffer available */
-			if (((GDSV4 == csa->hdr->desired_db_format && (sbufh_p->total_blks / 2) < sbufh_p->reformat_cnt)
-			     && csa->backup_in_prog) || (sbufh_p->total_blks - 1) <= sbufh_p->reformat_cnt)
-			{	/* Too many reformat blocks already in use */
-				if (MAX_BACKUP_FLUSH_TRY < attempts)
-				{	/* We have tried too long .. return non-buffer to signal do sync IO */
-					shmpool_unlock_hdr(reg);
-					return (shmpool_blk_hdr_ptr_t)-1;
-				}
-				limit_hit = TRUE;
-			} else
-				limit_hit = FALSE;
-		} else
-			assertpro(FALSE);
-		if (!limit_hit)
-#elif defined UNIX
 		assert(SHMBLK_BACKUP == blktype);
 		if (sbufh_p->backup_errno)
 		{
@@ -192,18 +146,17 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 #		endif
 		if (MAX_BACKUP_FLUSH_TRY < attempts)
 		{	/* We have tried too long .. backup errors out */
-#ifdef DEBUG
+#			ifdef DEBUG
 			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, TWICE);
-#else
+#			else
 			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, ONCE);
-#endif
+#			endif
 			sbufh_p->failed = process_id;
 			sbufh_p->backup_errno = ERR_BCKUPBUFLUSH;
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			shmpool_unlock_hdr(reg);
 			return (shmpool_blk_hdr_ptr_t)-1L;
 		}
-#endif
 		{	/* We didn't hit the limit for this */
 			/* Get the element (if available) */
 			sblkh_p = (shmpool_blk_hdr_ptr_t)remqh(&sbufh_p->que_free);
@@ -217,19 +170,9 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 				sblkh_p->blktype = blktype;
 				sblkh_p->holder_pid = process_id;
 				assert(FALSE == sblkh_p->valid_data); /* cleared when blocok was freed .. should still be free */
-				VMS_ONLY(if (SHMBLK_BACKUP == blktype))
-				{
-					insqt(&sblkh_p->sm_que, &sbufh_p->que_backup);
-					++sbufh_p->backup_cnt;
-					VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
-#ifdef VMS
-				} else
-				{
-					insqt(&sblkh_p->sm_que, &sbufh_p->que_reformat);
-					++sbufh_p->reformat_cnt;
-					VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_reformat);
-#endif
-				}
+				insqt(&sblkh_p->sm_que, &sbufh_p->que_backup);
+				++sbufh_p->backup_cnt;
+				VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
 				++sbufh_p->allocs_since_chk;
 				shmpool_unlock_hdr(reg);
 				return sblkh_p;
@@ -242,38 +185,13 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 		  are warranted.
 		*/
 		shmpool_unlock_hdr(reg);
-		VMS_ONLY(if (SHMBLK_BACKUP == blktype))
-		{	/* Too many backup blocks already in use */
-			BG_TRACE_PRO_ANY(csa, shmpool_alloc_bbflush);
-			if (!backup_buffer_flush(reg))
-			{	/* The lock was held by someone else, just do a micro sleep before cycling back
-				   around to try again.
-				*/
-				wcs_sleep(LOCK_SLEEP);
-			}
-#ifdef VMS
-			if ((sbufh_p->total_blks / 2) < sbufh_p->reformat_cnt)
-				/* There are too many reformat blocks in use, make sure we recover
-				   unused ones in a timely fashion.
-				*/
-				shmpool_harvest_reformatq(reg);
-		} else
-		{	/* Too many reformat blocks already in use */
-			shmpool_harvest_reformatq(reg);
-			if (attempts & 0x3)
-				/* On all but every 4th pass, do a simple rel_quant */
-				rel_quant();	/* Release processor to holder of lock (hopefully) */
-			else
-				/* On every 4th pass, we bide for awhile */
-				wcs_sleep(LOCK_SLEEP);
-			if ((sbufh_p->total_blks / 2) < sbufh_p->backup_cnt)
-			{	/* There are too many backup blocks in use, make sure we recover
-				   unused ones in a timely fashion.
-				*/
-				BG_TRACE_PRO_ANY(csa, shmpool_alloc_bbflush);
-				backup_buffer_flush(reg);
-			}
-#endif
+		/* Too many backup blocks already in use */
+		BG_TRACE_PRO_ANY(csa, shmpool_alloc_bbflush);
+		if (!backup_buffer_flush(reg))
+		{	/* The lock was held by someone else, just do a micro sleep before cycling back
+			   around to try again.
+			*/
+			wcs_sleep(LOCK_SLEEP);
 		}
 	}
 }
@@ -291,7 +209,7 @@ void shmpool_blk_free(gd_region *reg, shmpool_blk_hdr_ptr_t sblkh_p)
 	assert(sbufh_p->shmpool_crit_latch.u.parts.latch_pid == process_id);
 	/* Verify queue only *AFTER* have the lock */
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
-	assert(VMS_ONLY(SHMBLK_REFORMAT == sblkh_p->blktype ||) SHMBLK_BACKUP == sblkh_p->blktype);
+	assert(SHMBLK_BACKUP == sblkh_p->blktype);
 	sblkh_p->holder_pid = 0;
 	sblkh_p->valid_data = FALSE;
 	sblkh_p2 = (shmpool_blk_hdr_ptr_t)remqt((que_ent_ptr_t)((char_ptr_t)sblkh_p + sblkh_p->sm_que.fl));
@@ -302,17 +220,7 @@ void shmpool_blk_free(gd_region *reg, shmpool_blk_hdr_ptr_t sblkh_p)
 		--sbufh_p->backup_cnt;
 		assert(0 <= sbufh_p->backup_cnt);
 		VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
-	}
-#ifdef VMS
-	else if (SHMBLK_REFORMAT == sblkh_p->blktype)
-	{
-		--sbufh_p->reformat_cnt;
-		sblkh_p->use.rfrmt.cr_off = 0;		/* No longer queued to given CR */
-		assert(0 <= sbufh_p->reformat_cnt);
-		VERIFY_QUEUE(&(que_head_ptr_t)sbufh_p->que_reformat);
-	}
-#endif
-	else
+	} else
 		assertpro(FALSE);
 	sblkh_p->blktype = SHMBLK_FREE;
 	++sbufh_p->free_cnt;
@@ -320,88 +228,6 @@ void shmpool_blk_free(gd_region *reg, shmpool_blk_hdr_ptr_t sblkh_p)
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
 	return;
 }
-
-#ifdef VMS
-/* Routine to "harvest" reformat blocks that have complete IOs (VMS only). */
-void shmpool_harvest_reformatq(gd_region *reg)
-{
-	shmpool_buff_hdr_ptr_t	sbufh_p;
-	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
-	sgmnt_addrs		*csa;
-	cache_rec_ptr_t		cr;
-	unsigned int		iosb_cond;
-
-	csa = &FILE_INFO(reg)->s_addrs;
-	BG_TRACE_PRO_ANY(csa, shmpool_refmt_harvests);
-	sbufh_p = csa->shmpool_buffer;
-	if (FALSE == shmpool_lock_hdr(reg))
-	{
-		assert(FALSE);
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
-	}
-	if (0 < sbufh_p->reformat_cnt)
-	{	/* Only if there are some entries */
-		assert(0 != sbufh_p->que_reformat.fl);
-		for (sblkh_p = SBLKP_REL2ABS(&sbufh_p->que_reformat, fl);
-		     sblkh_p != (shmpool_blk_hdr_ptr_t)&sbufh_p->que_reformat;
-		     sblkh_p = next_sblkh_p)
-		{	/* Loop through the queued reformat blocks */
-			next_sblkh_p = SBLKP_REL2ABS(sblkh_p, fl);	/* Get next offset now in case remove entry */
-			/* Check cache entry to see if it is for the same block and if the pending
-			   IO is complete. */
-			if (!sblkh_p->valid_data)
-			{	/* Block is not in use yet */
-				BG_TRACE_ANY(csa, refmt_hvst_blk_ignored);
-				continue;
-			}
-			assert(SHMBLK_REFORMAT == sblkh_p->blktype);
-			cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, sblkh_p->use.rfrmt.cr_off);
-			/* Check that:
-
-			   1) This block and the cr it points to are linked.
-			   2) That the cycle is the same.
-
-			   If we fail either of these, the link can be broken and this block released.
-			*/
-			if (0 == sblkh_p->use.rfrmt.cr_off
-			    || (shmpool_blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->shmpool_blk_off) != sblkh_p
-			    || cr->cycle != sblkh_p->use.rfrmt.cycle)
-			{	/* Block no longer in (same) use .. release it */
-				shmpool_blk_free(reg, sblkh_p);
-				BG_TRACE_ANY(csa, refmt_hvst_blk_released_replaced);
-			} else
-			{	/* The link is intact. See if IO is done and recheck the cycle since we do not
-				   have the region critical section here to prevent the cache record from being
-				   modified while we are looking at it.
-				*/
-				SHM_READ_MEMORY_BARRIER;	/* Attempt to sync cr->* references */
-				iosb_cond = cr->iosb.cond;
-				if ((0 != iosb_cond && (WRT_STRT_PNDNG != iosb_cond))
-				    || cr->cycle != sblkh_p->use.rfrmt.cycle)
-				{	/* IO is complete or block otherwise reused. This means the IO ATTEMPT is
-					   complete. This is not entirely the same check in wcs_wtfini() which cares
-					   if the write was successful. We do not. If the write is retried, it will
-					   be with a newly reformatted buffer, not this iteration of this one. Note
-					   also that the missing part of this condition from wcs_wtfini() where an
-					   is_proc_alive check is done is not done because whether the process is
-					   alive or dead is wcs_wtfini's problem, not ours. When it clears up the
-					   cache entry, we will clear up the associated reformat buffer, if
-					   necessary.
-					*/
-					shmpool_blk_free(reg, sblkh_p);
-					BG_TRACE_ANY(csa, refmt_hvst_blk_released_io_complete);
-				} else
-				{
-					BG_TRACE_ANY(csa, refmt_hvst_blk_kept);
-				}
-			}
-		}
-	} else
-		/* Shouldn't be any queue elements either */
-		assert(0 == sbufh_p->que_reformat.fl);
-	shmpool_unlock_hdr(reg);
-}
-#endif
 
 /* Check if we have any "lost" blocks by failed (and now defunct) processes.
    There are 3 reasons this routine can be called:
@@ -439,8 +265,7 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 	BG_TRACE_PRO_ANY(csa, shmpool_recovery);
 	sbufh_p->que_free.fl = sbufh_p->que_free.bl = 0;
 	sbufh_p->que_backup.fl = sbufh_p->que_backup.bl = 0;
-	VMS_ONLY(sbufh_p->que_reformat.fl = sbufh_p->que_reformat.bl = 0);
-	sbufh_p->free_cnt = sbufh_p->backup_cnt = VMS_ONLY(sbufh_p->reformat_cnt = ) 0;
+	sbufh_p->free_cnt = sbufh_p->backup_cnt = 0;
 	sbufh_p->allocs_since_chk = 0;	/* Restart the counter */
 	/* Rebuild the queues and counts according to:
 	   1) What the block thinks it is (free, backup or reformat.
@@ -466,21 +291,11 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 			insqt(&sblkh_p->sm_que, &sbufh_p->que_backup);
 			++sbufh_p->backup_cnt;
 		} else
-		{
-#ifdef VMS
-			if (SHMBLK_REFORMAT == sblkh_p->blktype)
-			{
-				insqt(&sblkh_p->sm_que, &sbufh_p->que_reformat);
-				++sbufh_p->reformat_cnt;
-			} else
-#endif
-				assertpro(FALSE);
-		}
+			assertpro(FALSE);
 	}
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
-	VMS_ONLY(VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_reformat));
-	assert((sbufh_p->free_cnt + sbufh_p->backup_cnt VMS_ONLY(+ sbufh_p->reformat_cnt)) == sbufh_p->total_blks);
+	assert((sbufh_p->free_cnt + sbufh_p->backup_cnt) == sbufh_p->total_blks);
 	sbufh_p->shmpool_blocked = FALSE;
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SHMPLRECOV, 2, REG_LEN_STR(reg));
 }
@@ -585,7 +400,7 @@ void shmpool_unlock_hdr(gd_region *reg)
 	/* Quickly check if our counters are as we expect them to be. If not see if we need to run
 	   our recovery procedure (shmpool_blk_abandoned_chk()).
 	*/
-	cntr_delta = sbufh_p->free_cnt + sbufh_p->backup_cnt VMS_ONLY(+ sbufh_p->reformat_cnt) - sbufh_p->total_blks;
+	cntr_delta = sbufh_p->free_cnt + sbufh_p->backup_cnt - sbufh_p->total_blks;
 	if (0 != cntr_delta)
 		shmpool_abandoned_blk_chk(reg, FALSE);
 	DEBUG_ONLY(locknl = csa->nl);

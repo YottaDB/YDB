@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,9 +28,6 @@
 #include "iottdef.h"
 #include "iomtdef.h"
 #include "gds_blk_downgrade.h"
-#ifdef VMS
-#include "copy.h"
-#endif
 
 #define SPACE_NEEDED (SIZEOF(blk_hdr) - SIZEOF(v15_blk_hdr))
 
@@ -44,18 +42,26 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 	int		movesize;
 
 	/* Note that this routine is written in such a fashion that it is possible for the
-	   source and target blocks to point to the same area.
-	*/
+	 * source and target blocks to point to the same area.
+	 */
 	assert(gds_blk_trg);
 	assert(gds_blk_src);
-	assert(SIZEOF(v15_blk_hdr) > gds_blk_src->bver);	/* Check it is a GDSVCURR blk to begin with */
+	bsiz = gds_blk_src->bsiz;
+	assert(MAX_BLK_SZ >= bsiz);
+	if (SIZEOF(blk_hdr) > bsiz)
+	{	/* Input block size is lower than this function can handle. Return right away.
+		 * See comment in wcs_wtstart.c against similar assert (as below) for when this is possible.
+		 */
+		assert(0 == bsiz);
+		assert(gtm_white_box_test_case_enabled
+			&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
+		return;
+	}
+	assert(GDSVCURR == gds_blk_src->bver);
 	assert(0 == ((long)gds_blk_trg & 0x7));			/* Buffer alignment checks (8 byte) */
 	assert(0 == ((long)gds_blk_src & 0x7));
 	trg_p = (sm_uc_ptr_t)gds_blk_trg + SIZEOF(v15_blk_hdr);
 	src_p = (sm_uc_ptr_t)gds_blk_src + SIZEOF(blk_hdr);
-	bsiz = gds_blk_src->bsiz;
-	assert(MAX_BLK_SZ >= bsiz);
-	assert(SIZEOF(blk_hdr) <= bsiz);
 	tn = gds_blk_src->tn;
 	assert((MAX_TN_V4 >= tn) || dse_running);
 	levl = gds_blk_src->levl;
@@ -78,6 +84,5 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 	gds_blk_trg->bsiz = bsiz - SPACE_NEEDED;
 	gds_blk_trg->levl = levl;
 	v15tn = (v15_trans_num) tn;
-	UNIX_ONLY(gds_blk_trg->tn = v15tn);
-	VMS_ONLY(PUT_ULONG(&gds_blk_trg->tn, v15tn));
+	gds_blk_trg->tn = v15tn;
 }

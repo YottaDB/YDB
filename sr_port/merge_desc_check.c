@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,7 @@
 #include "format_targ_key.h"
 #include "ddphdr.h"
 #include "mvalconv.h"
+#include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
 
 GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
@@ -89,10 +91,10 @@ boolean_t merge_desc_check(void)
 			gvt2 = gblp2->s_gv_target;
 			acc_meth1 = REG_ACC_METH(reg1);
 			acc_meth2 = REG_ACC_METH(reg2);
-			assert(!(dba_bg == acc_meth1 || dba_mm == acc_meth1) || (NULL != gvt1->gd_csa));
-			assert(!(dba_bg == acc_meth2 || dba_mm == acc_meth2) || (NULL != gvt2->gd_csa));
-			assert((dba_bg == acc_meth1) || (dba_mm == acc_meth1) || (NULL == gvt1->gd_csa));
-			assert((dba_bg == acc_meth2) || (dba_mm == acc_meth2) || (NULL == gvt2->gd_csa));
+			assert(!IS_ACC_METH_BG_OR_MM(acc_meth1) || (NULL != gvt1->gd_csa));
+			assert(!IS_ACC_METH_BG_OR_MM(acc_meth2) || (NULL != gvt2->gd_csa));
+			assert(IS_ACC_METH_BG_OR_MM(acc_meth1) || (NULL == gvt1->gd_csa));
+			assert(IS_ACC_METH_BG_OR_MM(acc_meth2) || (NULL == gvt2->gd_csa));
 			gvnh_reg1 = gblp1->s_gd_targ_gvnh_reg;
 			gvnh_reg2 = gblp2->s_gd_targ_gvnh_reg;
 			/* A non-NULL value of gvnh_reg indicates a spanning global as confirmed by the asserts below */
@@ -117,9 +119,10 @@ boolean_t merge_desc_check(void)
 				/* Find list of regions corresponding to ^gvn1(subs1) */
 				base = (char *)&gvkey1->base[0];
 				addr = gblp1->s_gd_targ_addr;
-				start_map1 = gv_srch_map(addr, base, gvkey1->end - 1); /* -1 to remove trailing 0 */
+				/* -1 usage in "gv_srch_map" calls below is to remove trailing 0 */
+				start_map1 = gv_srch_map(addr, base, gvkey1->end - 1, SKIP_BASEDB_OPEN_FALSE);
 				GVKEY_INCREMENT_ORDER(gvkey1);
-				end_map1 = gv_srch_map(addr, base, gvkey1->end - 1); /* -1 to remove trailing 0 */
+				end_map1 = gv_srch_map(addr, base, gvkey1->end - 1, SKIP_BASEDB_OPEN_FALSE);
 				BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gvkey1->base, gvkey1->end - 1, end_map1);
 				GVKEY_UNDO_INCREMENT_ORDER(gvkey1);
 				/* Find list of regions corresponding to ^gvn2(subs2) */
@@ -127,9 +130,9 @@ boolean_t merge_desc_check(void)
 				assert(KEY_DELIMITER == gvkey2->base[gvkey2->end]);
 				base = (char *)&gvkey2->base[0];
 				addr = gblp2->s_gd_targ_addr;
-				start_map2 = gv_srch_map(addr, base, gvkey2->end - 1); /* -1 to remove trailing 0 */
+				start_map2 = gv_srch_map(addr, base, gvkey2->end - 1, SKIP_BASEDB_OPEN_FALSE);
 				GVKEY_INCREMENT_ORDER(gvkey2);
-				end_map2 = gv_srch_map(addr, base, gvkey2->end - 1); /* -1 to remove trailing 0 */
+				end_map2 = gv_srch_map(addr, base, gvkey2->end - 1, SKIP_BASEDB_OPEN_FALSE);
 				BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gvkey2->base, gvkey2->end - 1, end_map2);
 				GVKEY_UNDO_INCREMENT_ORDER(gvkey2);
 				/* At this point, we are sure all regions involved in ^gvn1 and ^gvn2 are dba_mm or dba_bg.
@@ -139,12 +142,14 @@ boolean_t merge_desc_check(void)
 				 */
 				for (map = start_map1; map <= end_map1; map++)
 				{
+					OPEN_BASEREG_IF_STATSREG(map);
 					reg = map->reg.addr;
 					if (!reg->open)
 						gv_init_reg(reg);
 				}
 				for (map = start_map2; map <= end_map2; map++)
 				{
+					OPEN_BASEREG_IF_STATSREG(map);
 					reg = map->reg.addr;
 					if (!reg->open)
 						gv_init_reg(reg);

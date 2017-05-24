@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +65,7 @@ error_def(ERR_DBTN);
 void mu_int_maps(void)
 {
 	unsigned char	*local;
-	uchar_ptr_t	disk;
+	uchar_ptr_t	blk_base, free_blk_base;
 	boolean_t	agree, disk_full, local_full, master_full;
 	int		maps, mapsize, mcnt, lcnt, bcnt;
 	unsigned int	level;
@@ -85,28 +86,28 @@ void mu_int_maps(void)
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
 		bml_busy(blkno, mu_int_locals);
-		disk = mu_int_read(blkno, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
-		if (!disk)
+		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
+		if (!blk_base)
 		{
 			mu_int_path[0] = blkno;
 			mu_int_plen = 1;
 			mu_int_err(ERR_DBREADBM, 0, 0, 0, 0, 0, 0, LCL_MAP_LEVL);
 			continue;
 		}
-		if (LCL_MAP_LEVL != (level = (unsigned int)((blk_hdr_ptr_t)disk)->levl))
+		if (LCL_MAP_LEVL != (level = (unsigned int)((blk_hdr_ptr_t)blk_base)->levl))
 		{
 			mu_int_path[0] = blkno;
 			mu_int_plen = 1;
 			mu_int_err(ERR_DBLVLINC, 0, 0, 0, 0, 0, 0, level);
 		}
-		if (((blk_hdr_ptr_t)disk)->bsiz < map_blk_size)
+		if (((blk_hdr_ptr_t)blk_base)->bsiz < map_blk_size)
 		{
 			mu_int_path[0] = blkno;
 			mu_int_plen = 1;
 			mu_int_err(ERR_DBMBSIZMN, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
-		if (((blk_hdr_ptr_t)disk)->bsiz > map_blk_size)
+		if (((blk_hdr_ptr_t)blk_base)->bsiz > map_blk_size)
 		{
 			mu_int_path[0] = blkno;
 			mu_int_plen = 1;
@@ -115,13 +116,13 @@ void mu_int_maps(void)
 		}
 		if (tn_reset_this_reg)
 		{
-			((blk_hdr_ptr_t)disk)->tn = 0;
-			mu_int_write(blkno, disk);
+			((blk_hdr_ptr_t)blk_base)->tn = 0;
+			mu_int_write(blkno, blk_base);
 			if (GDSVCURR != mu_int_data.desired_db_format)
 				mu_int_blks_to_upgrd++;
 		} else if (GDSVCURR != ondsk_blkver)
 			mu_int_blks_to_upgrd++;
-		map_tn = ((blk_hdr_ptr_t)disk)->tn;
+		map_tn = ((blk_hdr_ptr_t)blk_base)->tn;
  		if (map_tn >= mu_int_data.trans_hist.curr_tn)
  		{
 			if (trans_errors < disp_trans_errors)
@@ -139,9 +140,9 @@ void mu_int_maps(void)
 		master_full = !bit_set(mcnt, mu_int_master);
 		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);
-		disk_full = (NO_FREE_SPACE == bml_find_free(0, disk + SIZEOF(blk_hdr), mapsize));
+		disk_full = (NO_FREE_SPACE == bml_find_free(0, blk_base + SIZEOF(blk_hdr), mapsize));
 		agree = TRUE;
-		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
+		for (lcnt = 0, dskmap_p = (uint_ptr_t)(blk_base + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
 			lcnt < mapsize;
 			lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
 			dskmap_p++, lmap++)  /* # of bits/ bits per blk */
@@ -262,7 +263,7 @@ void mu_int_maps(void)
 			} else
 				mu_int_errknt++;
 		}
-		free(disk);
+		free(free_blk_base);
 	}
 	if (mu_map_errs >= disp_map_errors)
 	{

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -67,9 +67,9 @@ l40:
 	#
 	movq	REG64_RET0, REG64_ARG0
 	movq	REG64_RET1, REG64_ARG1
-	movl	$mval_byte_len, REG32_ARG3
+	movl	$mval_qword_len, REG32_ARG3
 	REP
-	movsb
+	movsq
 done:
 	addq	$FRAME_SIZE, REG_SP			# Remove save area from C stack
 	ret

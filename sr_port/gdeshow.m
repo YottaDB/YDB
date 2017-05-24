@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2015 Fidelity National Information 	;
+; Copyright (c) 2001-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -22,7 +22,7 @@ COMMANDS
 	m tmpseg=tmpseg2
 	k tmpreg2,tmpseg2
 	s BOL="!"
-	set delim=$select("VMS"=ver:"/",1:"-")
+	set delim="-"
 	; show NAMES after GBLNAME to avoid potential NAMRANGEORDER errors in case of non-zero collation
 	i '$l($get(cfile)) d
 	. f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,regionc,segmentc,gblnamec,namec
@@ -118,24 +118,27 @@ r1:	d regionhd s jnl=0,s=""
 	i jnl d jnlhd s s="" f  s s=$o(regs(s)) q:'$l(s)  i regs(s,"JOURNAL") d onejnl
 	q
 onereg:
-	w !,BOL,?x(1),s,?x(2),regs(s,"DYNAMIC_SEGMENT"),?x(3),$j(regs(s,"COLLATION_DEFAULT"),4)
-	i ver'="VMS" w ?x(4),$j(regs(s,"RECORD_SIZE"),7)
-	e  w ?x(4),$j(regs(s,"RECORD_SIZE"),5)
+	w !,BOL,?x(1),s
+	w ?x(2),regs(s,"DYNAMIC_SEGMENT")
+	w ?x(3),$j(regs(s,"COLLATION_DEFAULT"),4)
+	w ?x(4),$j(regs(s,"RECORD_SIZE"),7)
 	w ?x(5),$j(regs(s,"KEY_SIZE"),5)
 	w ?x(6),$s(regs(s,"NULL_SUBSCRIPTS")=1:"ALWAYS",regs(s,"NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
 	w ?x(7),$s(regs(s,"STDNULLCOLL"):"Y",1:"N")
 	w ?x(8),$s(regs(s,"JOURNAL"):"Y",1:"N")
-	i ver'="VMS" w ?x(9),$s(regs(s,"INST_FREEZE_ON_ERROR"):"ENABLED",1:"DISABLED")
-	i ver'="VMS" w ?x(10),$s(regs(s,"QDBRUNDOWN"):"ENABLED",1:"DISABLED")
-	i ver'="VMS" w ?x(11),$s(regs(s,"EPOCHTAPER"):"ENABLED",1:"DISABLED")
+	w ?x(9),$s(regs(s,"INST_FREEZE_ON_ERROR"):"Y",1:"N")
+	w ?x(10),$s(regs(s,"QDBRUNDOWN"):"Y",1:"N")
+	w ?x(11),$s(regs(s,"EPOCHTAPER"):"Y",1:"N")
+	w ?x(12),$s(regs(s,"AUTODB"):"Y",1:"N")
+	w ?x(13),$s(regs(s,"STATS"):"Y",1:"N")
+	w ?x(14),$s(regs(s,"LOCK_CRIT"):"Sep",1:"DB")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($zl(regs(s,"FILE_NAME")):$$namedisp(regs(s,"FILE_NAME"),1),1:"<based on DB file-spec>")
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(regs(s,"BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(regs(s,"BUFFER_SIZE"),5)
 	w ?x(5),$j(regs(s,"ALLOCATION"),10)
-	i ver="VMS" w ?x(6),$j(regs(s,"EXTENSION"),5)
-	e  w ?x(6),$j(regs(s,"EXTENSION"),10),?x(7),$j(regs(s,"AUTOSWITCHLIMIT"),13)
+	w ?x(6),$j(regs(s,"EXTENSION"),10),?x(7),$j(regs(s,"AUTOSWITCHLIMIT"),13)
 	w !,BOL
 	q
 regionc:
@@ -214,17 +217,18 @@ oneseg:
 BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
-	; For non-encryption platforms, always show FLAG as OFF. For VMS dont even display this line
-	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=",$S((encsupportedplat=TRUE&segs(s,"ENCRYPTION_FLAG")):"ON",1:"OFF")
+	; For non-encryption platforms, always show FLAG as OFF.
+	w !,BOL,?x(8),"ENCR=",$s((encsupportedplat=TRUE&segs(s,"ENCRYPTION_FLAG")):"  ON",1:" OFF")
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
-	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):"YES",1:"NO")
+	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
+	w !,BOL,?x(8),"AIO =",$s(segs(s,"ASYNCIO"):"  ON",1:" OFF")
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
-	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=OFF"
+	w !,BOL,?x(8),"ENCR= OFF"
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
-	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):"YES",1:"NO")
+	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
 	q
 segmentc:
 	n s,q,val,synval,tmpval,type,am
@@ -281,42 +285,53 @@ TEMPLATE
 	i log s BOL="!" u @uself w BOL d t1 w ! u @useio s BOL=""
 	q
 t1:	d tmpreghd
-	w !,BOL,?x(1),"<default>",?x(3),$j(tmpreg("COLLATION_DEFAULT"),4)
-	i ver'="VMS" w ?x(4),$j(tmpreg("RECORD_SIZE"),7)
-	e  w ?x(4),$j(tmpreg("RECORD_SIZE"),5)
+	w !,BOL,?x(1),"<default>"
+	w ?x(3),$j(tmpreg("COLLATION_DEFAULT"),4)
+	w ?x(4),$j(tmpreg("RECORD_SIZE"),7)
 	w ?x(5),$j(tmpreg("KEY_SIZE"),5)
 	w ?x(6),$s(tmpreg("NULL_SUBSCRIPTS")=1:"ALWAYS",tmpreg("NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
 	w ?x(7),$s(tmpreg("STDNULLCOLL"):"Y",1:"N")
 	w ?x(8),$s(tmpreg("JOURNAL"):"Y",1:"N")
-	i ver'="VMS" w ?x(9),$s(tmpreg("INST_FREEZE_ON_ERROR"):"ENABLED",1:"DISABLED")
-	i ver'="VMS" w ?x(10),$s(tmpreg("QDBRUNDOWN"):"ENABLED",1:"DISABLED")
-	i ver'="VMS" w ?x(11),$s(tmpreg("EPOCHTAPER"):"ENABLED",1:"DISABLED")
+	w ?x(9),$s(tmpreg("INST_FREEZE_ON_ERROR"):"Y",1:"N")
+	w ?x(10),$s(tmpreg("QDBRUNDOWN"):"Y",1:"N")
+	w ?x(11),$s(tmpreg("EPOCHTAPER"):"Y",1:"N")
+	w ?x(12),$s(tmpreg("AUTODB"):"Y",1:"N")
+	w ?x(13),$s(tmpreg("STATS"):"Y",1:"N")
+	w ?x(14),$s(tmpreg("LOCK_CRIT"):"Sep",1:"DB")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
-	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="BG":"  *",1:""),?x(3),"BG"
-	w ?x(4),$s(tmpseg("BG","FILE_TYPE")="DYNAMIC":"DYN",1:"STA"),?x(5),$j(tmpseg("BG","BLOCK_SIZE"),5)
-	w ?x(6),$j(tmpseg("BG","ALLOCATION"),10),?x(7),$j(tmpseg("BG","EXTENSION_COUNT"),5)
-	w ?x(8),"GLOB =",$j(tmpseg("BG","GLOBAL_BUFFER_COUNT"),3)
-	w !,BOL,?x(8),"LOCK =",$j(tmpseg("BG","LOCK_SPACE"),3)
+	w !,BOL,?x(1),"<default>"
+	w ?x(2),$s(tmpacc="BG":"  *",1:"")
+	w ?x(3),"BG"
+	w ?x(4),$s(tmpseg("BG","FILE_TYPE")="DYNAMIC":"DYN",1:"STA")
+	w ?x(5),$j(tmpseg("BG","BLOCK_SIZE"),5)
+	w ?x(6),$j(tmpseg("BG","ALLOCATION"),10)
+	w ?x(7),$j(tmpseg("BG","EXTENSION_COUNT"),5)
+	w ?x(8),"GLOB =",$j(tmpseg("BG","GLOBAL_BUFFER_COUNT"),4)
+	w !,BOL,?x(8),"LOCK =",$j(tmpseg("BG","LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES  =",$j(tmpseg("BG","RESERVED_BYTES"),4)
-	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR = ",$s((encsupportedplat=TRUE&tmpseg("BG","ENCRYPTION_FLAG")):"ON",1:"OFF")
+	w !,BOL,?x(8),"ENCR =",$s((encsupportedplat=TRUE&tmpseg("BG","ENCRYPTION_FLAG")):"  ON",1:" OFF")
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("BG","MUTEX_SLOTS"),4)
-	w !,BOL,?x(8),"DALL=",$s(tmpseg("BG","DEFER_ALLOCATE"):"YES",1:"NO")
-	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="MM":"   *",1:""),?x(3),"MM"
-	w ?x(4),$s(tmpseg("MM","FILE_TYPE")="DYNAMIC":"DYN",1:"STA"),?x(5),$j(tmpseg("MM","BLOCK_SIZE"),5)
-	w ?x(6),$j(tmpseg("MM","ALLOCATION"),10),?x(7),$j(tmpseg("MM","EXTENSION_COUNT"),5)
+	w !,BOL,?x(8),"DALL =",$s(tmpseg("BG","DEFER_ALLOCATE"):" YES",1:"  NO")
+	w !,BOL,?x(8),"AIO  =",$s(tmpseg("BG","ASYNCIO"):"  ON",1:" OFF")
+	w !,BOL,?x(1),"<default>"
+	w ?x(2),$s(tmpacc="MM":"   *",1:"")
+	w ?x(3),"MM"
+	w ?x(4),$s(tmpseg("MM","FILE_TYPE")="DYNAMIC":"DYN",1:"STA")
+	w ?x(5),$j(tmpseg("MM","BLOCK_SIZE"),5)
+	w ?x(6),$j(tmpseg("MM","ALLOCATION"),10)
+	w ?x(7),$j(tmpseg("MM","EXTENSION_COUNT"),5)
 	w ?x(8),$s(tmpseg("MM","DEFER"):"DEFER",1:"NODEFER")
-	w !,BOL,?x(8),"LOCK =",$j(tmpseg("MM","LOCK_SPACE"),3)
-	w !,BOL,?x(8),"MSLT =",$j(tmpseg("MM","MUTEX_SLOTS"),3)
-	w !,BOL,?x(8),"DALL=",$s(tmpseg("MM","DEFER_ALLOCATE"):"YES",1:"NO")
+	w !,BOL,?x(8),"LOCK =",$j(tmpseg("MM","LOCK_SPACE"),4)
+	w !,BOL,?x(8),"MSLT =",$j(tmpseg("MM","MUTEX_SLOTS"),4)
+	w !,BOL,?x(8),"DALL =",$s(tmpseg("MM","DEFER_ALLOCATE"):" YES",1:"  NO")
 	q
 tmpjnlbd:
 	w !,BOL,?x(1),"<default>",?x(2),$s($zl(tmpreg("FILE_NAME")):$$namedisp(tmpreg("FILE_NAME"),1),1:"<based on DB file-spec>")
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(tmpreg("BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(tmpreg("BUFFER_SIZE"),5)
 	w ?x(5),$j(tmpreg("ALLOCATION"),10)
-	i ver="VMS" w ?x(6),$j(tmpreg("EXTENSION"),5)
-	e  w ?x(6),$j(tmpreg("EXTENSION"),10),?x(7),$j(tmpreg("AUTOSWITCHLIMIT"),13)
+	w ?x(6),$j(tmpreg("EXTENSION"),10),?x(7),$j(tmpreg("AUTOSWITCHLIMIT"),13)
 	w !,BOL
 	q
 templatec:
@@ -423,37 +438,43 @@ gblnamehd:
 	q
 regionhd:
 	s x(0)=32,x(1)=1,x(2)=33,x(3)=65,x(4)=71
-	i ver'="VMS" s x(5)=79,x(6)=85,x(7)=96,x(8)=101,x(9)=105,x(10)=114,x(11)=123
-	e  s x(5)=77,x(6)=83,x(7)=94,x(8)=104
+	s x(5)=79,x(6)=85,x(7)=95,x(8)=100,x(9)=104,x(10)=111,x(11)=117,x(12)=123,x(13)=130,x(14)=136,x(15)=141
 	w !,BOL,!,BOL,?x(0),"*** REGIONS ***"
 	w !,BOL,?x(7),"Std"
-	i ver'="VMS" w ?x(9),"Inst"
-	w !,BOL,?x(2),"Dynamic",?x(3),$j("Def",4)
-	i ver'="VMS" w ?x(4),$j("Rec",7)
-	e  w ?x(4),$j("Rec",5)
-	w ?x(5),$j("Key",5),?x(6),"Null",?x(7),"Null"
-	i ver'="VMS" w ?x(9),"Freeze"
-	i ver'="VMS" w ?x(10),"Qdb"
-	i ver'="VMS" w ?x(11),"Epoch"
-	w !,BOL,?x(1),"Region",?x(2),"Segment",?x(3),$j("Coll",4)
-	if ver'="VMS" w ?x(4),$j("Size",7)
-	e  w ?x(4),$j("Size",5)
-	w ?x(5),$j("Size",5)
-	w ?x(6),"Subs",?x(7),"Coll",?x(8),"Jnl"
-	i ver'="VMS" w ?x(9),"on Error"
-	i ver'="VMS" w ?x(10),"Rndwn"
-	i ver'="VMS" w ?x(11),"Taper"
-	i ver'="VMS" w !,BOL,?x(1),$tr($j("",130)," ","-")
-	e  w !,BOL,?x(1),$tr($j("",107)," ","-")
+	w ?x(9),"Inst"
+	w !,BOL,?x(2),"Dynamic",?x(3)," Def"
+	w ?x(4),"    Rec"
+	w ?x(5),"  Key"
+	w ?x(6),"Null"
+	w ?x(7),"Null"
+	w ?x(9),"Freeze"
+	w ?x(10),"Qdb"
+	w ?x(11),"Epoch"
+	w ?x(14),"LOCK"
+	w !,BOL
+	w ?x(1),"Region"
+	w ?x(2),"Segment"
+	w ?x(3),"Coll"
+	w ?x(4),"   Size"
+	w ?x(5)," Size"
+	w ?x(6),"Subs"
+	w ?x(7),"Coll"
+	w ?x(8),"Jnl"
+	w ?x(9),"on Err"
+	w ?x(10),"Rndwn"
+	w ?x(11),"Taper"
+	w ?x(12),"AutoDB"
+	w ?x(13),"Stats"
+	w ?x(14),"Crit"
+	w !,BOL,?x(1),$tr($j("",139)," ","-")
 	q
 jnlhd:
-	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=$s(ver="VMS":88,1:91)
+	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=91
 	w !,BOL,!,BOL,?x(0),"*** JOURNALING INFORMATION ***"
 	w !,BOL,?x(1),"Region",?x(2),"Jnl File (def ext: .mjl)"
 	w ?x(3),"Before",?x(4),$j("Buff",5),?x(5),$j("Alloc",10)
-	i ver="VMS" w ?x(6),"Exten" 									;?x(7),"Stop"
-	e  w ?x(6),$j("Exten",10),?x(7),$j("AutoSwitch",13)
-	w !,BOL,?x(1),$tr($j("",$s(ver="VMS":87,1:104))," ","-")
+	w ?x(6),$j("Exten",10),?x(7),$j("AutoSwitch",13)
+	w !,BOL,?x(1),$tr($j("",104)," ","-")
 	q
 seghd:
 	s x(0)=32,x(1)=1,x(2)=33,x(3)=53,x(4)=57,x(5)=61,x(6)=67,x(7)=78,x(8)=84
@@ -472,38 +493,42 @@ maphd:
 	w !,BOL,?x(1),$tr($j("",$s(x(3)=66:122,1:x(3)+38))," ","-")
 	q
 tmpreghd:
-	s x(0)=31,x(1)=1,x(2)=19,x(3)=44,x(4)=49
-	i ver'="VMS" s x(5)=57,x(6)=63,x(7)=74,x(8)=79,x(9)=83,x(10)=92,x(11)=101
-	e  s x(5)=55,x(6)=61,x(7)=72,x(8)=82
+	s x(0)=32,x(1)=1,x(2)=19,x(3)=44,x(4)=50
+	s x(5)=58,x(6)=64,x(7)=74,x(8)=79,x(9)=83,x(10)=90,x(11)=96,x(12)=102,x(13)=109,x(14)=115,x(15)=120
 	w !,BOL,!,BOL,?x(0),"*** TEMPLATES ***"
 	w !,BOL,?x(7),"Std"
-	i ver'="VMS" w ?x(9),"Inst"
-	w !,BOL,?x(3),$j("Def",4)
-	i ver'="VMS" w ?x(4),$j("Rec",7)
-	e  w ?x(4),$j("Rec",5)
-	w ?x(5),$j("Key",5),?x(6),"Null",?x(7),"Null"
-	i ver'="VMS" w ?x(9),"Freeze"
-	i ver'="VMS" w ?x(10),"Qdb"
-	i ver'="VMS" w ?x(11),"Epoch"
-	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4)
-	i ver'="VMS" w ?x(4),$j("Size",7)
-	e  w ?x(4),$j("Size",5)
+	w ?x(9),"Inst"
+	w !,BOL
+	w ?x(3),$j("Def",4)
+	w ?x(4),$j("Rec",7)
+	w ?x(5),$j("Key",5)
+	w ?x(6),"Null"
+	w ?x(7),"Null"
+	w ?x(9),"Freeze"
+	w ?x(10),"Qdb"
+	w ?x(11),"Epoch"
+	w ?x(14),"LOCK"
+	w !,BOL,?x(1),"Region"
+	w ?x(3),$j("Coll",4)
+	w ?x(4),$j("Size",7)
 	w ?x(5),$j("Size",5)
-	w ?x(6),"Subs",?x(7),"Coll",?x(8),"Jnl"
-	i ver'="VMS" w ?x(9),"on Error"
-	i ver'="VMS" w ?x(10),"Rndwn"
-	i ver'="VMS" w ?x(11),"Taper"
-	i ver'="VMS" w !,BOL,?x(1),$tr($j("",107)," ","-")
-	e  w !,BOL,?x(1),$tr($j("",85)," ","-")
+	w ?x(6),"Subs"
+	w ?x(7),"Coll"
+	w ?x(8),"Jnl"
+	w ?x(9),"on Err"
+	w ?x(10),"Rndwn"
+	w ?x(11),"Taper"
+	w ?x(12),"AutoDB"
+	w ?x(13),"Stats"
+	w ?x(14),"Crit"
+	w !,BOL,?x(1),$tr($j("",118)," ","-")
 	q
 tmpjnlhd:
 	s x(0)=26,x(1)=1,x(2)=18,x(3)=44,x(4)=51,x(5)=57,x(6)=68,x(7)=74
 	w !,BOL,?x(2),"Jnl File (def ext: .mjl)"
 	w ?x(3),"Before",?x(4),$j("Buff",5),?x(5),$j("Alloc",10)
-	i ver="VMS" w ?x(6),"Exten"
-	e  w ?x(6),$j("Exten",10),?x(7),$j("AutoSwitch",13)
-	i ver="VMS" w !,BOL,?x(1),$tr($j("",78)," ","-")
-	e  w !,BOL,?x(1),$tr($j("",90)," ","-")
+	w ?x(6),$j("Exten",10),?x(7),$j("AutoSwitch",13)
+	w !,BOL,?x(1),$tr($j("",90)," ","-")
 	q
 tmpseghd:
 	s x(0)=32,x(1)=1,x(2)=18,x(3)=38,x(4)=42,x(5)=46,x(6)=52,x(7)=63,x(8)=69
@@ -588,7 +613,7 @@ mapdispcalc:
 	. s gblname=$ze(m,1,offset-2),coll=+$g(gnams(gblname,"COLLATION")),mlen=$zl(m)
 	. s isplusplus=$$isplusplus^GDEMAP(m,mlen)
 	. s mtmp=$s(isplusplus:$ze(m,1,mlen-1),1:m)  ; if ++ type map entry, remove last 01 byte before converting it into gvn
-	. s name=$view("YGDS2GVN",mtmp_ZERO_ZERO,coll)
+	. s name=$zcollate(mtmp_ZERO_ZERO,coll,1)
 	. i isplusplus s name=name_"++"
 	. s namelen=$zl(name),name=$ze(name,2,namelen) ; remove '^' at start of name
 	. s namedisp=$$namedisp(name,0)

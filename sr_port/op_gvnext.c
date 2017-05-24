@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +72,7 @@ void op_gvnext(mval *v)
 		} else
 			*(gv_currkey->base + gv_currkey->prev) = 01;
 	}
-	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
+	if (IS_ACC_METH_BG_OR_MM(acc_meth))
 	{
 		gvnh_reg = TREF(gd_targ_gvnh_reg);
 		if (NULL == gvnh_reg)

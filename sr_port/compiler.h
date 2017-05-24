@@ -88,6 +88,7 @@ typedef struct	mliteralstruct
 					*bl;
 	}			que;
 	INTPTR_T       		rt_addr;
+	int			reference_count;	/* Used in the hash table to track references */
 	mval			v;
 } mliteral;
 
@@ -152,7 +153,7 @@ typedef struct	tripletype
 
 typedef struct
 {
-	unsigned short		octype;
+	uint4		octype;
 } octabstruct;
 
 /* Values for octype */
@@ -167,6 +168,10 @@ typedef struct
 #define OCT_EXPRLEAF	64
 #define OCT_CGSKIP	128
 #define OCT_COERCE	256
+#define OCT_ARITH	512
+#define OCT_UNARY	1024
+#define OCT_NEGATED	2048
+#define OCT_REL	4096
 
 typedef struct
 {
@@ -529,6 +534,31 @@ typedef struct
 	UNICODE_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
 }
 
+/* Macro to put a literal truth value as an operand */
+#define PUT_LITERAL_TRUTH(TV, TRIP_REF)									\
+MBSTART {												\
+	LITREF mval		literal_zero, literal_one;						\
+													\
+	mval	*V;											\
+													\
+	V = (mval *)mcalloc(SIZEOF(mval));								\
+	*V = (TV) ? literal_one : literal_zero;								\
+	assert((1 == literal_one.str.len) && (1 == literal_zero.str.len));				\
+	ENSURE_STP_FREE_SPACE(1);									\
+	*(char *)stringpool.free = *V->str.addr;							\
+	V->str.addr = (char *)stringpool.free;								\
+	stringpool.free += 1;										\
+	put_lit_s(V, TRIP_REF);										\
+} MBEND
+
+/* Macro to decide whether an invocation of unary tail has any promise */
+#define UNARY_TAIL(OPR)											\
+MBSTART {												\
+	assert(TRIP_REF == (OPR)->oprclass);								\
+	if (OCT_UNARY & oc_tab[(OPR)->oprval.tref->opcode].octype)					\
+		unary_tail(OPR);									\
+} MBEND
+
 /* Autorelink enabled platforms pass a different argument to glue code when calling a non-local M
  * routine. Use put_cdlt() to pass addresses of the items and use put_cdidx() when passing an ofset
  * into the linkage table where the items reside. Also macroize the opcode to use.
@@ -544,7 +574,8 @@ typedef struct
 #endif
 
 int		actuallist(oprtype *opr);
-int		bool_expr(boolean_t op, oprtype *addr);
+int		bool_expr(boolean_t sense, oprtype *addr);
+void		bx_boollit(triple *t, boolean_t sense, oprtype *addr);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
 void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
 void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
@@ -600,8 +631,10 @@ int		f_two_mstrs(oprtype *a, opctype op);
 int		f_two_mval(oprtype *a, opctype op);
 int		f_view(oprtype *a, opctype op);
 int		f_zahandle(oprtype *a, opctype op);
+int		f_zatransform(oprtype *a, opctype op);
 int		f_zcall(oprtype *a, opctype op);
 int		f_zchar(oprtype *a, opctype op);
+int		f_zcollate(oprtype *a, opctype op);
 int		f_zconvert(oprtype *a, opctype op);
 int		f_zdate(oprtype *a, opctype op);
 int		f_zdebug(oprtype *a, opctype op);
@@ -662,9 +695,11 @@ oprtype		put_str(char *pt, mstr_len_t n);
 oprtype		put_tjmp(triple *x);
 oprtype		put_tnxt(triple *x);
 oprtype		put_tref(triple *x);
+boolean_t	resolve_optimize(triple *curtrip);
 int		resolve_ref(int errknt);
 void		resolve_tref(triple *, oprtype *);
 triple		*setcurtchain(triple *x);
+void		unary_tail(oprtype *opr);
 /* VMS uses same code generator as USHBIN so treat as USHBIN for these compiler routines */
 #		if defined(USHBIN_SUPPORTED) || defined(VMS)
 void		shrink_trips(void);
@@ -676,6 +711,7 @@ void		start_fetches(opctype op);
 void		start_for_fetches(void);
 void		tnxtarg(oprtype *a);
 void		tripinit(void);
+boolean_t	unuse_literal(mval *x);
 void		walktree(mvar *n,void (*f)(),char *arg);
 void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
 int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/

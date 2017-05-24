@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,32 +78,38 @@ void mupip_set(void)
 		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
 	}
-	if (cli_present("ACCESS_METHOD")		== CLI_PRESENT  ||
-	    cli_present("DEFER_ALLOCATE")		== CLI_NEGATED  ||
-	    cli_present("DEFER_ALLOCATE")		== CLI_PRESENT  ||
-	    cli_present("DEFER_TIME")			== CLI_PRESENT  ||
-	    cli_present("ENCRYPTABLE")			== CLI_PRESENT  ||
-	    cli_present("ENCRYPTABLE")			== CLI_NEGATED  ||
-	    cli_present("ENCRYPTIONCOMPLETE")		== CLI_PRESENT  ||
-	    cli_present("EPOCHTAPER")			== CLI_NEGATED  ||
-	    cli_present("EPOCHTAPER")			== CLI_PRESENT  ||
-	    cli_present("EXTENSION_COUNT")		== CLI_PRESENT  ||
-	    cli_present("FLUSH_TIME")			== CLI_PRESENT  ||
-	    cli_present("GLOBAL_BUFFERS")		== CLI_PRESENT  ||
-	    cli_present("INST_FREEZE_ON_ERROR")		== CLI_NEGATED  ||
-	    cli_present("INST_FREEZE_ON_ERROR")		== CLI_PRESENT  ||
-	    cli_present("KEY_SIZE")			== CLI_PRESENT  ||
-	    cli_present("LOCK_SPACE")			== CLI_PRESENT  ||
-	    cli_present("MUTEX_SLOTS")			== CLI_PRESENT  ||
-	    cli_present("PARTIAL_RECOV_BYPASS")		== CLI_PRESENT  ||
-	    cli_present("QDBRUNDOWN")			== CLI_NEGATED  ||
-	    cli_present("QDBRUNDOWN")			== CLI_PRESENT  ||
-	    cli_present("RECORD_SIZE")			== CLI_PRESENT  ||
-	    cli_present("RESERVED_BYTES")		== CLI_PRESENT  ||
-	    cli_present("SLEEP_SPIN_COUNT")		== CLI_PRESENT  ||
-	    cli_present("SPIN_SLEEP_LIMIT")		== CLI_PRESENT  ||
-	    cli_present("VERSION")			== CLI_PRESENT  ||
-	    cli_present("WAIT_DISK")			== CLI_PRESENT)
+	if ((CLI_PRESENT == cli_present("ACCESS_METHOD"))
+		|| (CLI_PRESENT == cli_present("ASYNCIO"))
+		|| (CLI_NEGATED == cli_present("ASYNCIO"))
+		|| (CLI_NEGATED == cli_present("DEFER_ALLOCATE"))
+		|| (CLI_PRESENT == cli_present("DEFER_ALLOCATE"))
+		|| (CLI_PRESENT == cli_present("DEFER_TIME"))
+		|| (CLI_PRESENT == cli_present("ENCRYPTABLE"))
+		|| (CLI_NEGATED == cli_present("ENCRYPTABLE"))
+		|| (CLI_PRESENT == cli_present("ENCRYPTIONCOMPLETE"))
+		|| (CLI_NEGATED == cli_present("EPOCHTAPER"))
+		|| (CLI_PRESENT == cli_present("EPOCHTAPER"))
+		|| (CLI_PRESENT == cli_present("EXTENSION_COUNT"))
+		|| (CLI_PRESENT == cli_present("FLUSH_TIME"))
+		|| (CLI_PRESENT == cli_present("GLOBAL_BUFFERS"))
+		|| (CLI_NEGATED == cli_present("INST_FREEZE_ON_ERROR"))
+		|| (CLI_PRESENT == cli_present("INST_FREEZE_ON_ERROR"))
+		|| (CLI_PRESENT == cli_present("KEY_SIZE"))
+		|| (CLI_PRESENT == cli_present("LCK_SHARES_DB_CRIT"))
+		|| (CLI_NEGATED == cli_present("LCK_SHARES_DB_CRIT"))
+		|| (CLI_PRESENT == cli_present("LOCK_SPACE"))
+		|| (CLI_PRESENT == cli_present("MUTEX_SLOTS"))
+		|| (CLI_PRESENT == cli_present("PARTIAL_RECOV_BYPASS"))
+		|| (CLI_NEGATED == cli_present("QDBRUNDOWN"))
+		|| (CLI_PRESENT == cli_present("QDBRUNDOWN"))
+		|| (CLI_PRESENT == cli_present("RECORD_SIZE"))
+		|| (CLI_PRESENT == cli_present("RESERVED_BYTES"))
+		|| (CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT"))
+		|| (CLI_PRESENT == cli_present("SPIN_SLEEP_LIMIT"))
+		|| (CLI_NEGATED == cli_present("STATS"))
+		|| (CLI_PRESENT == cli_present("STATS"))
+		|| (CLI_PRESENT == cli_present("VERSION"))
+		|| (CLI_PRESENT == cli_present("WAIT_DISK")))
 	{
 		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
 			mupip_exit(status);

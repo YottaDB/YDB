@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +101,10 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 			if (KEY_DELIMITER == *ptr++)
 				sbs_cnt++;
 		if (MAX_GVSUBSCRIPTS < (count + sbs_cnt))
+		{
+			gv_currkey->end = 0;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+		}
 	}
 	/* else naked reference will not increase number of subscripts, so do not worry about exceeding the limit */
 	reg = gv_cur_region;
@@ -138,6 +142,8 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 	val = val_arg;
 	is_null = FALSE;
 	was_null = TREF(gv_some_subsc_null);
+	if (!val->mvtype)
+		gv_currkey->end = 0;
 	for ( ; ; )
 	{
 		COPY_SUBS_TO_GVCURRKEY(val, reg, gv_currkey, was_null, is_null);
@@ -159,7 +165,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 	if (gv_currkey->end >= max_key)
 		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-	if ((dba_bg == REG_ACC_METH(reg)) || (dba_mm == REG_ACC_METH(reg)))
+	if (IS_REG_BG_OR_MM(reg))
 	{
 		assert(INVALID_GV_TARGET != gv_target);
                 if (dollar_tlevel)

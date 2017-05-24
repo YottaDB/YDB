@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>	/* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"		/* for VSIG_ATOMIC_T type */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -24,11 +24,11 @@
 #include "send_msg.h"
 #include "mutex.h"
 #include "deferred_signal_handler.h"
-#include "wcs_recover.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
 #include "gtmimagename.h"
 #include "error.h"
+#include "wcs_recover.h"
 
 GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
@@ -42,7 +42,7 @@ error_def(ERR_CRITRESET);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBFLCORRP);
 
-boolean_t grab_crit_immediate(gd_region *reg)
+boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 {
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
@@ -106,14 +106,19 @@ boolean_t grab_crit_immediate(gd_region *reg)
 	assert(!mupip_jnl_recover || TREF(skip_file_corrupt_check));
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
-	/* Ideally we do not want to do wcs_recover if we are in interrupt code (as opposed to mainline code).
-	 * This is easily accomplished in VMS with a library function lib$ast_in_prog but in Unix there is no way
-	 * to tell mainline code from interrupt code without the caller providing that information. Hence we
-	 * currently do the cache recovery even in case of interrupt code even though it is a heavyweight operation.
-	 * If it is found to cause issues, this logic has to be re-examined.
-	 */
 	if (cnl->wc_blocked)
-		wcs_recover(reg);
+	{
+		if (ok_for_wcs_recover)
+			wcs_recover(reg);
+		else
+		{	/* Caller says it is not okay to call "wcs_recover" so return as if crit could not be obtained right away.
+			 * These callers are periodic/cyclical and interrupt-based so they will retry later if needed
+			 * (e.g. wcs_wtstart and wcs_clean_dbsync).
+			 */
+			rel_crit(reg);
+			return(FALSE);
+		}
+	}
 	return(TRUE);
 }
 

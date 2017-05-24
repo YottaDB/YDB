@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,24 +15,14 @@
 
 /* Declarations common to all unix mdefsp.h, to be moved here */
 
-/* DSK_WRITE Macro needs <errno.h> to be included. Use this flavor if
-   writing from the cache.
-*/
-#define	DSK_WRITE(reg, blk, cr, status)				\
-{								\
-	if (-1 == dsk_write(reg, blk, cr))			\
-		status = errno;					\
-	else							\
-		status = 0;					\
-}
-/* Use this flavor if writing direct from storage (not cache buffer) */
+/* DSK_WRITE_NOCACHE macro needs <errno.h> to be included. Use this flavor if writing direct from storage (not cache buffer) */
 #define	DSK_WRITE_NOCACHE(reg, blk, ptr, odv, status)		\
-{								\
+MBSTART {							\
 	if (-1 == dsk_write_nocache(reg, blk, ptr, odv))	\
 		status = errno;					\
 	else							\
 		status = 0;					\
-}
+} MBEND
 
 #define DOTM			".m"
 #define DOTOBJ			".o"

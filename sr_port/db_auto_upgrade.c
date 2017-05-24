@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -26,6 +28,7 @@
 #include "mutex.h"
 #include "wcs_phase2_commit_wait.h"
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
+#include "db_write_eof_block.h"
 
 GBLREF  boolean_t       dse_running;
 
@@ -36,10 +39,16 @@ void db_auto_upgrade(gd_region *reg)
 	/* detect unitialized file header fields for this version of GT.M and do a mini auto-upgrade, initializing such fields
 	 * to default values in the new GT.M version
 	 */
-
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	off_t			new_eof;
+	unix_db_info		*udi;
+#	ifdef DEBUG
+	gtm_uint64_t		file_size;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(NULL != reg);
 	if (NULL == reg)
 		return;
@@ -127,28 +136,28 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V55000 introduced strm_reg_seqno, save_strm_reg_seqno, intrpt_recov_resync_strm_seqno
 				 * AND obsoleted dualsite_resync_seqno. For new fields, we are guaranteed they are
 				 * zero (in formerly unused sections of the file header) so no need for any initialization.
-				 * For obsoleted fields, it would be good to clear them here so we dont run into issues later.
+				 * For obsoleted fields, it would be good to clear them here so we don't run into issues later.
 				 */
-				UNIX_ONLY(csd->filler_seqno = 0;)	/* was "dualsite_resync_seqno" in pre-V55000 versions */
+				csd->filler_seqno = 0;	/* was "dualsite_resync_seqno" in pre-V55000 versions */
 				/* In addition, V55000 introduced before_trunc_total_blks for MUPIP REORG -TRUNCATE.
 				 * Since it is a new field no initialization necessary.
 				 */
 			case GDSMV55000:
-				UNIX_ONLY(csd->freeze_on_fail = FALSE;)
-				UNIX_ONLY(csd->span_node_absent = TRUE;)
-				UNIX_ONLY(csd->maxkeysz_assured = FALSE;)
+				csd->freeze_on_fail = FALSE;
+				csd->span_node_absent = TRUE;
+				csd->maxkeysz_assured = FALSE;
 			case GDSMV60000:
 			case GDSMV60001:
 				/* GT.M V60002 introduced mutex_spin_parms.mutex_que_entry_space_size */
 				NUM_CRIT_ENTRY(csd) = DEFAULT_NUM_CRIT_ENTRY;
 			case GDSMV60002:
 				/* GT.M V62001 introduced ^#t upgrade. Record this pending event in filehdr. */
-				UNIX_ONLY(csd->hasht_upgrade_needed = TRUE;)
+				csd->hasht_upgrade_needed = TRUE;
 			case GDSMV62001:
 				/* GT.M V62002 introduced database file preallocation. */
 				csd->defer_allocate = TRUE;
 				/* GT.M V62002 incremented ^#t label. Record this pending event in filehdr. */
-				UNIX_ONLY(csd->hasht_upgrade_needed = TRUE;)
+				csd->hasht_upgrade_needed = TRUE;
 				/* GT.M V62002 introduced epoch taper */
 				csd->epoch_taper = TRUE;
 		        	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
@@ -161,11 +170,25 @@ void db_auto_upgrade(gd_region *reg)
 				 memset(csd->encryption_hash2, 0, GTMCRYPT_RESERVED_HASH_LEN);
 				 SPIN_SLEEP_MASK(csd) = 0;	/* previously unused, but was 7FF and it should now default to 0 */
 			case GDSMV63000:
-				/* GT.M V63001 moved ftok_counter_halted and access_counter_halted from filehdr to node_local */
+				/* GT.M V63000A moved ftok_counter_halted and access_counter_halted from filehdr to node_local */
 				csd->filler_ftok_counter_halted = FALSE;
 				csd->filler_access_counter_halted = FALSE;
-				break;
 			case GDSMV63000A:
+				/* GT.M V63001 introduced asyncio but csd->asyncio could be set to TRUE by a MUPIP SET -ASYNCIO
+				 * command which did not come through here (because it needs standalone access). Therefore
+				 * do not set csd->asyncio to FALSE like is normally done for any newly introduced field.
+				 *	csd->asyncio = FALSE;
+				 */
+				 /* The database file would have a 512-byte EOF block. Enlarge it to be a GDS-block instead. */
+				udi = FILE_INFO(reg);
+				new_eof = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)csd->trans_hist.total_blks * csd->blk_size;
+				DEBUG_ONLY(file_size = gds_file_size(reg->dyn.addr->file_cntl);)
+				assert((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE));
+				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
+				/* GT.M V63001 introduced reservedDBFlags */
+				csd->reservedDBFlags = 0; /* RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE */
+				break;
+			case GDSMV63001:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

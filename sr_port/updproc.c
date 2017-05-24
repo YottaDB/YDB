@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,6 +183,7 @@ error_def(ERR_UPDREPLSTATEOFF);
 {														\
 	jnl_buffer_ptr_t	jbp;										\
 	uint4			jnl_status;									\
+	gd_region		*reg;										\
 														\
 	assert(CSA = &FILE_INFO(gv_cur_region)->s_addrs);	/* so we can use gv_cur_region below */		\
 	assert(JPC == CSA->jnl);										\
@@ -201,7 +202,9 @@ error_def(ERR_UPDREPLSTATEOFF);
 	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jnlpool_ctl);							\
 	if (JNL_ENABLED(CSA))											\
 	{													\
-		jnl_status = jnl_ensure_open();									\
+		reg = JPC->region;										\
+		assert(reg == gv_cur_region);									\
+		jnl_status = jnl_ensure_open(reg, CSA);								\
 		if (0 == jnl_status)										\
 		{												\
 			if (0 == JPC->pini_addr)								\
@@ -210,15 +213,14 @@ error_def(ERR_UPDREPLSTATEOFF);
 		{												\
 			if (SS_NORMAL != JPC->status)								\
 				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(CSA->hdr),	\
-					DB_LEN_STR(gv_cur_region), JPC->status);				\
+					DB_LEN_STR(reg), JPC->status);						\
 			else											\
 				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(CSA->hdr),	\
-					DB_LEN_STR(gv_cur_region));						\
+					DB_LEN_STR(reg));							\
 		}												\
 	}													\
 }
 
-#ifdef UNIX
 # define UPDPROC_ONLN_RLBK_CLNUP(REG)						\
 {										\
 	sgmnt_addrs		*csa;						\
@@ -264,7 +266,21 @@ error_def(ERR_UPDREPLSTATEOFF);
 	repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",					\
 			recvpool_ctl->jnl_seqno);										\
 }
-#endif
+
+#define INCR_TUPD_NUM_AND_OP_TSTART_IF_NEEDED								\
+MBSTART {												\
+	ts_mv.mvtype = MV_STR;										\
+	ts_mv.str.len = 0;										\
+	ts_mv.str.addr = NULL;										\
+	assert((!dollar_tlevel && !tupd_num) || dollar_tlevel && (tupd_num || dollar_trestart));	\
+	if (!dollar_tlevel)										\
+	{												\
+		assert(!donot_INVOKE_MUMTSTART);							\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);						\
+		op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0);/* 0 ==> save no locals but RESTART OK */	\
+	}												\
+	tupd_num++;											\
+} MBEND
 
 CONDITION_HANDLER(updproc_ch)
 {
@@ -433,6 +449,7 @@ int updproc(void)
 #	endif
 	is_updproc = TRUE;
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
+	TREF(ok_to_see_statsdb_regs) = TRUE;
 	gv_play_duplicate_kills = TRUE;	/* needed to ensure seqnos are kept in sync between source and receiver instances */
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
@@ -1035,21 +1052,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								bad_trans_type = upd_fence_bad_t_num;
 								assert(FALSE);
 							} else if (IS_TUPD(rectype))
-							{
-								ts_mv.mvtype = MV_STR;
-								ts_mv.str.len = 0;
-								ts_mv.str.addr = NULL;
-								assert((!dollar_tlevel && !tupd_num) || dollar_tlevel
-										&& (tupd_num || dollar_trestart));
-								if (!dollar_tlevel)
-								{
-									assert(!donot_INVOKE_MUMTSTART);
-									DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
-									op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0);
-										/* 0 ==> save no locals but RESTART OK */
-								}
-								tupd_num++;
-							}
+								INCR_TUPD_NUM_AND_OP_TSTART_IF_NEEDED;
 							upd_rec_seqno++;
 						} else if (IS_FUPD(rectype))
 							op_ztstart();
@@ -1076,16 +1079,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								: upd_fence_bad_lgtrig_t_num;
 					assert(FALSE);
 				} else if (IS_TUPD(rectype))
-				{
-					ts_mv.mvtype = MV_STR;
-					ts_mv.str.len = 0;
-					ts_mv.str.addr = NULL;
-					assert((!dollar_tlevel && !tupd_num) || dollar_tlevel && (tupd_num || dollar_trestart));
-					if (!dollar_tlevel)
-						 /* 0 ==> save no locals but RESTART OK */
-						op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0);
-					tupd_num++;
-				}
+					INCR_TUPD_NUM_AND_OP_TSTART_IF_NEEDED;
 				upd_rec_seqno++;
 			}
 		}
@@ -1327,7 +1321,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					{
 						csd = csa->hdr;
 						upd_helper_ctl->first_done = FALSE;
-						upd_helper_ctl->pre_read_offset = temp_read + rec_len;
+						upd_helper_ctl->pre_read_offset =
+							((temp_read + rec_len) >= write_wrap) ? 0 : temp_read + rec_len;
 						REPL_DPRINT2("pre_read_offset = %x\n", upd_helper_ctl->pre_read_offset);
 						csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd /
 						csd->avg_blks_per_100gbl) * csd->pre_read_trigger_factor / 100.0);

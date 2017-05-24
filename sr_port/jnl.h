@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,11 +37,11 @@ error_def(ERR_JNLENDIANLITTLE);
  * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef AND Vxx_JNL_VER #define in repl_filter.h
  * 	3) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
  *	4) Bump JNL_EXTR_LABEL and JNL_DET_EXTR_LABEL as appropriate in muprec.h.
- *		This is not needed if for example the newly added jnl record types dont get extracted at all.
+ *		This is not needed if for example the newly added jnl record types don't get extracted at all.
  * If the FILTER format is also changing, then do the following as well
  * 	4) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
  * 	5) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
- * 		Remove all entries that dont have the new jnl format in either the from or to part of the conversion.
+ * 		Remove all entries that don't have the new jnl format in either the from or to part of the conversion.
  * 	6) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
  * 	7) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
  * 		This is similar to the jnl_xTOy() filter conversion functions except that lot of byte-swaps are needed.
@@ -198,9 +198,6 @@ error_def(ERR_JNLENDIANLITTLE);
 #define JNL_FILE_LOST_ERRORS	1	/* Throw an rts_error. */
 #define MAX_JNL_FILE_LOST_OPT	JNL_FILE_LOST_ERRORS
 
-/* EPOCHs are written unconditionally in Unix (assuming jnl is ON) while they are written only for BEFORE_IMAGE in VMS */
-#define JNL_HAS_EPOCH(jnlfile)  UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
-
 #ifdef DEBUG
 #define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	30 /* exercise epoch-syncing code relatively more often in DBG */
 #else
@@ -257,10 +254,10 @@ error_def(ERR_JNLENDIANLITTLE);
 
 /* This macro should be used to initialize jgbl.gbl_jrec_time to the system time. The reason is that it does additional checks. */
 #define	SET_GBL_JREC_TIME				\
-{							\
+MBSTART {						\
 	assert(!jgbl.dont_reset_gbl_jrec_time);		\
 	JNL_SHORT_TIME(jgbl.gbl_jrec_time);		\
-}
+} MBEND
 
 #define	DO_GBL_JREC_TIME_CHECK_FALSE	FALSE
 #define	DO_GBL_JREC_TIME_CHECK_TRUE	TRUE
@@ -289,7 +286,7 @@ error_def(ERR_JNLENDIANLITTLE);
 }
 
 /* This macro is similar to ADJUST_GBL_JREC_TIME except that this ensures ordering of timestamps across
- * ALL replicated regions in a replicated environment. In VMS, we dont maintain this prev_jnlseqno_time
+ * ALL replicated regions in a replicated environment. In VMS, we don't maintain this prev_jnlseqno_time
  * field.
  */
 #	define	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl)		\
@@ -569,6 +566,7 @@ typedef struct jnl_private_control_struct
 	boolean_t		error_reported;		/* TRUE if jnl_file_lost already reported the journaling error */
 	uint4			status2;		/* for secondary error status, currently used only in VMS */
 	uint4			cycle;			/* private copy of the number of this journal file generation */
+	char			*err_str;		/* pointer to an extended error message */
 } jnl_private_control;
 
 typedef enum
@@ -806,7 +804,7 @@ typedef struct jnl_format_buff_struct
  * All variable size records are made 8-byte multiple size by run-time process */
 
 /* struct_jrec_upd for non-TP, TP or ZTP. For replication we use 8-byte jnl_seqno. Otherwise we use 8-byte token.
- * Currently we dont support ZTP + replication.
+ * Currently we don't support ZTP + replication.
  */
 typedef struct	/* variable length */
 {
@@ -1181,10 +1179,9 @@ typedef struct
 								 * potentially multi-region transaction. Used only by jnl recovery.
 								 */
 	boolean_t			mur_options_forward;	/* a copy of mur_options.forward to be accessible to GT.M runtime */
+	boolean_t			in_mupjnl;		/* TRUE if caller is a MUPIP JOURNAL command */
 #	endif
-#	ifdef UNIX
 	boolean_t			onlnrlbk;		/* TRUE if ONLINE ROLLBACK */
-#	endif
 	boolean_t			mur_extract;		/* a copy of mur_options.extr[0] to be accessible to GTM runtime*/
 	boolean_t			save_dont_reset_gbl_jrec_time;	/* save a copy of dont_reset_gbl_jrec_time */
 	boolean_t			mur_update;		/* a copy of mur_options.update to be accessible to GTM runtime */
@@ -1240,7 +1237,7 @@ typedef struct
  * records (EPOCH, jfh->strm_end_seqno etc.) to write the correct strm_seqno. Not doing so will cause the strm_seqno
  * to be higher than necessary and confuse everything else (including rollback) as far as replication is concerned.
  * Note: We check for process_exiting to differentiate between calls made from mur_close_files() to before. Once we
- * reach mur_close_files, we should no longer be in an active transaction and so we dont need to make any adjustments.
+ * reach mur_close_files, we should no longer be in an active transaction and so we don't need to make any adjustments.
  * VMS does not support supplementary instances so the below macro does not apply there at all.
  */
 #ifdef UNIX
@@ -1403,7 +1400,6 @@ typedef struct
 }
 
 #define MAX_EPOCH_DELAY		30
-#define EXT_NEW 		"_new"
 #define PREFIX_ROLLED_BAK	"rolled_bak_"
 #define REC_TOKEN(jnlrec)	((struct_jrec_upd *)jnlrec)->token_seq.token
 #define REC_JNL_SEQNO(jnlrec)	((struct_jrec_upd *)jnlrec)->token_seq.jnl_seqno
@@ -1537,6 +1533,62 @@ typedef struct
 # define CURRENT_JNL_IO_WRITER(JB)	JB->now_writer
 #endif
 
+/* This macro is invoked by callers just before grabbing crit to check if a db fsync is needed and if so do it.
+ * Note that we can do the db fsync only if we already have the journal file open. If we do not, we will end
+ * up doing this later after grabbing crit. This just minimizes the # of times db fsync happens while inside crit.
+ */
+#define	DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(REG, CSA, JPC, JBP)			\
+MBSTART {									\
+	assert(!CSA->now_crit);							\
+	if ((NULL != JPC) && JBP->need_db_fsync)				\
+		jnl_wait(REG);	/* Try to do db fsync outside crit */		\
+} MBEND
+
+/* The below macro is currently used by the source server but is placed here in case others want to avail it later.
+ * It does the equivalent of a "jnl_flush" but without holding crit for the most part.
+ * The only case it needs crit is if it finds we do not have access to the latest journal file.
+ * In that case it needs to do a "jnl_ensure_open" which requires crit.
+ * For the caller's benefit, this macro also returns whether a jnl_flush happened (in FLUSH_DONE)
+ * and the value of jbp->dskaddr & jbp->freeaddr before the flush (in DSKADDR & FREEADDR variables).
+ */
+#define	DO_JNL_FLUSH_IF_POSSIBLE(REG, CSA, FLUSH_DONE, DSKADDR, FREEADDR)	\
+MBSTART {									\
+	jnl_private_control	*jpc;						\
+	jnl_buffer_ptr_t	jbp;						\
+	boolean_t		was_crit;					\
+	uint4			jnl_status;					\
+										\
+	assert(JNL_ENABLED(CSA));						\
+	assert(CSA == &FILE_INFO(REG)->s_addrs);				\
+	jpc = CSA->jnl;								\
+	assert(NULL != jpc);							\
+	jbp = jpc->jnl_buff;							\
+	assert(NULL != jbp);							\
+	FLUSH_DONE = FALSE;							\
+	if (jbp->dskaddr != jbp->freeaddr)					\
+	{									\
+		was_crit = CSA->now_crit;					\
+		if (!was_crit)							\
+			grab_crit(REG);						\
+		DSKADDR = jbp->dskaddr;						\
+		FREEADDR = jbp->freeaddr;					\
+		if (JNL_ENABLED(CSA->hdr) && (DSKADDR != FREEADDR))		\
+		{								\
+			jnl_status = jnl_ensure_open(REG, CSA);			\
+			assert(0 == jnl_status);				\
+			if (0 == jnl_status)					\
+			{							\
+				FLUSH_DONE = TRUE;				\
+				jnl_status = jnl_flush(REG);			\
+				assert(SS_NORMAL == jnl_status);		\
+			}							\
+			/* In case of error, silently return for now. */	\
+		}								\
+		if (!was_crit)							\
+			rel_crit(REG);						\
+	}									\
+} MBEND
+
 /* jnl_ prototypes */
 uint4	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size);
 uint4	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
@@ -1548,7 +1600,7 @@ uint4	cre_jnl_file(jnl_create_info *info);
 uint4 	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
 void	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
 void	jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header);
-uint4	jnl_ensure_open(void);
+uint4	jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
 void	jnl_write_epoch_rec(sgmnt_addrs *csa);
 void	jnl_write_inctn_rec(sgmnt_addrs *csa);
@@ -1571,7 +1623,7 @@ void	jnl_qio_end(jnl_private_control *jpc);
 
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode);
-uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size);
+uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str);
 uint4	jnl_file_open_switch(gd_region *reg, uint4 sts);
 void	jnl_file_close(gd_region *reg, bool clean, bool dummy);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #define	GDL_SmStorHog		0x00000200	/* (512) Each piece of storage allocated is allocated in an element twice \
 						   the desired size to provide glorious amounts of backfill for \
 						   overrun checking. */
-#define GDL_DumpOnStackOFlow	0x00000400	/* (1024) When get a stack overflow, generate a core */
+#define GDL_DumpOnStackOFlow	0x00000400	/* (1024) When get a stack overflow or out-of-memory error, generate a core */
 #define GDL_ZSHOWDumpOnSignal	0x00000800	/* (2048) Don't supress GTM_FATAL file creation when get a signal */
 #define GDL_PrintIndCacheStats	0x00001000	/* (4096) Print indirect cacheing stats */
 #define GDL_PrintCacheStats	0x00002000	/* (8192) Print stats on $Piece and UTF8 cacheing (debug only) */
@@ -43,4 +43,5 @@
 #define GDL_PrintPipeIntStats	0x00080000	/* (524288) Print Pipe/Fifo(rm) interrupt stats on exit */
 #define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
 #define GDL_PrintPMAPStats	0x00200000	/* (2097152) Print process memory map on exit (using pmap or procmap utility) */
+#define GDL_AllowLargeMemcpy	0x00400000	/* (4194304) Bypass the 1GB sanity check in gtm_memcpy_validate_and_execute() */
 #endif

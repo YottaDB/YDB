@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +57,7 @@
 #include "trigger.h"		/* for MAX_TRIGNAME_LEN */
 #include "wbox_test_init.h"
 #include "have_crit.h"
+#include "gtm_trigger_trc.h"
 
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		is_dollar_incr;
@@ -129,20 +131,46 @@ LITREF	mval	literal_null;
 	memcpy(SAVE_VAR_NAME, GVT->gvname.var_name.addr, SAVE_VAR_NAME_LEN);		\
 }
 
-#define	GVTR_HASHTGBL_READ_CLEANUP(do_gvtr_cleanup)					\
-{											\
-	/* Restore gv_target, gv_currkey & gv_altkey */					\
-	gv_target = save_gvtarget;							\
-	if (do_gvtr_cleanup)								\
-		gvtr_free(gv_target);							\
-	/* check no keysize expansion occurred inside gvcst_root_search */		\
-	assert(gv_currkey->top == save_gv_currkey->top);				\
-	COPY_KEY(gv_currkey, save_gv_currkey);						\
-	/* check no keysize expansion occurred inside gvcst_root_search */		\
-	assert(gv_altkey->top == save_gv_altkey->top);					\
-	COPY_KEY(gv_altkey, save_gv_altkey);						\
-	TREF(gv_last_subsc_null) = save_gv_last_subsc_null;				\
-	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;				\
+/* GVTR_HASHTGBL_READ_CLEANUP
+ * Now that ^#t has been read/referenced, make sure this gvt is added to the gvt_tp_list, even if the gvt has no
+ * triggers associated with it.
+ *
+ * Callers gvcst_put and gvcst_kill perform database operations on gvt and an accompanying tp_hist() automatically
+ * ensures that gvt is added to gvt_tp_list. However, there is a window in time between gvtr_db_read_hasht() and
+ * tp_hist() where a restart could occur. If we did not add this gvt to the gvt_tp_list, a restart would not undo this
+ * gvt's trigger related cycles (in TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED).
+ *
+ * If the caller is op_ztrigger, it is possible only the ^#t global gvtarget gets added as part of the
+ * "gvtr_get_hasht_gblsubs" calls below and the triggering global does not get referenced anywhere else in the TP
+ * transaction. Since ZTRIGGER command does no db operations on the triggering global, it is possible gvt does not get
+ * added to the gvt_tp_list which means if a trollback/tprestart occurs we would not undo this gvt's trigger related
+ * cycles. To avoid this issue, we add this gvt to the gvt_tp_list always. The macro anyways does nothing if this gvt
+ * has already been added so we should be fine correctness and performance wise.
+ */														
+#define	GVTR_HASHTGBL_READ_CLEANUP(do_gvtr_cleanup)									\
+{															\
+	/* Restore gv_target, gv_currkey & gv_altkey */									\
+	gv_target = save_gvtarget;											\
+	/* This ADD_TO_GVT_TP_LIST could potentially happen BEFORE a gvcst_search of this gvt occurred in this		\
+	 * transaction.  This means if gvt->clue.end is non-zero, gvcst_search would not get a chance to clear the	\
+	 * first_tp_srch_status fields (which it does using the GVT_CLEAR_FIRST_TP_SRCH_STATUS macro) because		\
+	 * gvt->read_local_tn would be set to local_tn as part of the ADD_TO_GVT_TP_LIST macro invocation. We		\
+	 * therefore pass the second parameter indicating that first_tp_srch_status needs to be cleared too if		\
+	 * gvt->read_local_tn gets synced to local_tn. All other callers of ADD_TO_GVT_TP_LIST (as of this writing)	\
+	 * happen AFTER a gvcst_search of this gvt occurred in this TP transaction.  Therefore this is currently the	\
+	 * only place which uses TRUE for the second parameter.								\
+	 */														\
+	ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_TRUE);							\
+	if (do_gvtr_cleanup)												\
+		gvtr_free(gv_target);											\
+	/* check no keysize expansion occurred inside gvcst_root_search */						\
+	assert(gv_currkey->top == save_gv_currkey->top);								\
+	COPY_KEY(gv_currkey, save_gv_currkey);										\
+	/* check no keysize expansion occurred inside gvcst_root_search */						\
+	assert(gv_altkey->top == save_gv_altkey->top);									\
+	COPY_KEY(gv_altkey, save_gv_altkey);										\
+	TREF(gv_last_subsc_null) = save_gv_last_subsc_null;								\
+	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;								\
 }
 
 #define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MSTR)									\
@@ -246,7 +274,7 @@ LITREF	mval	literal_null;
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
 #define GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
 {												\
-	if (CDB_STAGNATE > t_tries)								\
+	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))					\
 	{											\
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
 		t_retry(cdb_sc_triggermod);							\
@@ -266,7 +294,7 @@ LITREF	mval	literal_null;
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<#COUNT|#CYCLE>) */
 #define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO,CSA)	\
 {								\
-	if (CDB_STAGNATE > t_tries)				\
+	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))	\
 	{							\
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);		\
 		t_retry(cdb_sc_triggermod);			\
@@ -735,6 +763,8 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		gvtr_free(gvt);
 		assert(NULL == gvt->gvt_trigger);
 	}
+	/* Force a cycle mismatch if a restart occurs during trigger content read */
+	gvt->db_trigger_cycle = gvt->gd_csa->db_trigger_cycle - 1;
 	gvt_trigger = (gvt_trigger_t *)malloc(SIZEOF(gvt_trigger_t));
 	gvt_trigger->gv_trigger_cycle = 0;
 	gvt_trigger->gv_trig_array = NULL;
@@ -1151,27 +1181,10 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 * we cannot be sure of the correctness of whatever we read so we need to undo the "cycle" update.
 	 * We take care of this by setting "gvt_triggers_read_this_tn" to TRUE and use this in "tp_clean_up".
 	 * Set gvt->trig_read_tn as well so this gvt is part of the list of gvts whose cycle gets restored in tp_clean_up.
-	 * In addition, make sure this gvt is added to the gvt_tp_list. In case callers are gvcst_put or gvcst_kill, they
-	 * do database operations on gvt and an accompanying tp_hist which automatically ensures this. But in case the caller
-	 * is ZTRIGGER, it is possible only the ^#t global gvtarget gets added as part of the above "gvtr_get_hasht_gblsubs"
-	 * calls and the triggering global does not get referenced anywhere else in the TP transaction. Since ZTRIGGER command
-	 * does no db operations on the triggering global, it is possible "gvt" does not get added to the gvt_tp_list which
-	 * means if a trollback/tprestart occurs we would not undo this gvt's trigger related cycles. To avoid
-	 * this issue, we add this gvt to the gvt_tp_list always. The macro anyways does nothing if this gvt has already been
-	 * added so we should be fine correctness and performance wise.
 	 */
 	gvt_trigger->gv_trigger_cycle = cycle;
 	TREF(gvt_triggers_read_this_tn) = TRUE;
 	gvt->trig_read_tn = local_tn;
-	/* This ADD_TO_GVT_TP_LIST could potentially happen BEFORE a gvcst_search of this gvt occurred in this transaction.
-	 * This means if gvt->clue.end is non-zero, gvcst_search would not get a chance to clear the first_tp_srch_status
-	 * fields (which it does using the GVT_CLEAR_FIRST_TP_SRCH_STATUS macro) because gvt->read_local_tn would be set to
-	 * local_tn as part of the ADD_TO_GVT_TP_LIST macro invocation. We therefore pass the second parameter indicating
-	 * that first_tp_srch_status needs to be cleared too if gvt->read_local_tn gets synced to local_tn. All other callers
-	 * of ADD_TO_GVT_TP_LIST (as of this writing) happen AFTER a gvcst_search of this gvt occurred in this TP transaction.
-	 * Therefore this is currently the only place which uses TRUE for the second parameter.
-	 */
-	ADD_TO_GVT_TP_LIST(gvt, RESET_FIRST_TP_SRCH_STATUS_TRUE);
 	return;
 }
 
@@ -1338,7 +1351,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	if (gvt == csa->hasht_tree)
 		return;
 	csd = csa->hdr;
-	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle < csa->db_dztrigger_cycle));
+	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle != csa->db_dztrigger_cycle));
 	root_srch_needed = FALSE;
 	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro). */
 	if (tp_is_implicit)
@@ -1443,6 +1456,8 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	 */
 	gvt->db_trigger_cycle = cycle;
 	gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle; /* No more trigger reads for this global until next $ZTRIGGER() */
+	DBGTRIGR((stderr, "gvtr_init(): GVT->db_trigger_cycle=%d ->db_dztrigger_cycle=%d\n",
+				gvt->db_trigger_cycle, gvt->db_dztrigger_cycle));
 }
 
 /* Determines matching triggers for a given gv_currkey and uses "gtm_trigger" to invokes them with appropriate parameters.
@@ -1642,16 +1657,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 			{
 				DBGTRIGR((stderr, "gvtr_match_n_invoke: Inside trigger drive block\n"));
 				DEBUG_ONLY(lcl_gtm_trigger_depth = gtm_trigger_depth);
-				/* To exercise the trigger load code, for a debug build, we often load the trigger source code even
-				 * when not needed (based on whether a random bit in an address is on or not). Trigger code is only
-				 * needed when the trigger has not yet been compiled (the routine address is NULL). For a pro
-				 * build, trigger source is only loaded when needed. Usually there will be no source here unless a
-				 * given trigger is nesting unpleasantly so is still loaded from an ealier invocation on the
-				 * stack. It's not strictly illegal but probably leads to a trigger depth error later.
-				 */
-				if ((0 == trigdsc->xecute_str.str.len) && ((NULL == trigdsc->rtn_desc.rt_adr)
-									   DEBUG_ONLY(|| (0 != ((INTPTR_T)trigdsc & 0x100)))))
-
+				if (NULL == trigdsc->rtn_desc.rt_adr)
 				{	/* Trigger xecute string not compiled yet, so load it */
 					/* Read in ^#t("GBL",1,"XECUTE")="do ^XNAMEinGBL"	*/
 					DBGTRIGR((stderr, "gvtr_match_n_invoke: Fetching trigger source\n"));
@@ -1673,18 +1679,6 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 				}
 				gtm_trig_status = gtm_trigger(trigdsc, trigparms);
 				/* note: the above call may update trigparms->ztvalue_new for SET type triggers */
-				if (NULL != trigdsc->xecute_str.str.addr)
-				{	/* Now that gtm_trigger() has compiled the xecute string, the source  can be freed
-					 * if it still allocated. Note a $TEXT() call or other source reference could have
-					 * stolen the buffer so it may no longer be here for us to free.
-					 */
-					if (0 < trigdsc->xecute_str.str.len)
-					{
-						free(trigdsc->xecute_str.str.addr);
-						trigdsc->xecute_str.str.addr = NULL;
-						trigdsc->xecute_str.str.len = 0;
-					}
-				}
 				assert(lcl_gtm_trigger_depth == gtm_trigger_depth);
 				num_triggers_invoked++;
 				ztupd_mval->mvtype = 0;	/* so stp_gcol -if invoked somehow - can free up any space

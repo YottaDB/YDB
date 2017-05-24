@@ -45,7 +45,6 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "dpgbldir.h"
-#include "fork_init.h"
 
 GBLREF boolean_t	created_core;		/* core file was created */
 GBLREF unsigned int	core_in_progress;
@@ -82,6 +81,7 @@ void gtm_fork_n_core(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd, tmp_csd;
 	gd_region		*reg, *r_top;
+	intrpt_state_t		prev_intrpt_state;
 	DEBUG_ONLY(struct rlimit rlim;)
 
 	DEBUG_ONLY(
@@ -171,9 +171,15 @@ void gtm_fork_n_core(void)
 	/* block SIGALRM signal */
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 
-	FORK(childid);
+	/* FORK() clears timers in the child, which shouldn't be necessary here since we have SIGALRM blocked,
+	 * and it disrupts diagnosis of any timer related issues, so inline the parts we want here.
+	 */
+	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
+	childid = fork();							/* BYPASSOK */
+	/* Only ENABLE_INTERRUPTS() in the parent, below, as we don't want any deferred handlers firing in the child. */
 	if (childid)
 	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
 		if (-1 == childid)
 		{	/* restore interrupt handler */
 			sigaction(SIGINT, &intr, 0);
@@ -201,6 +207,7 @@ void gtm_fork_n_core(void)
 			created_core = TRUE;
 	} else
 	{
+		intrpt_ok_state = prev_intrpt_state;	/* Restore from DEFER_INTERRUPTS */
 		DUMP_CORE;	/* This will (should) not return */
 		UNDERSCORE_EXIT(-1);	/* Protection to kill fork'd process with no rundown by exit handler(s) */
 	}

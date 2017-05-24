@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +65,7 @@ boolean_t line(uint4 *lnc)
 	curlin->line_number = *lnc;
 	*lnc = *lnc + 1;
 	curlin->table = TRUE;
-	CHKTCHAIN(TREF(curtchain));
+	CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 	TREF(pos_in_chain) = *(TREF(curtchain));
 	if (TK_IDENT == TREF(window_token))
 	{

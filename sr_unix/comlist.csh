@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -78,6 +78,9 @@ echo ""
 if ( "$version" =~ *ibm-aix* ) then
 	unsetenv gtm_icu_version
 endif
+
+# Unset gtm_custom_errors to prevent some errors, especially %GTM-E-FTOKERR if $gtm_repl_instance is set in the environment
+unsetenv gtm_custom_errors
 
 @ comlist_status = 0
 
@@ -312,6 +315,7 @@ endif
 
 chmod +x {lowerc,gtminstall}*
 
+cp $gtm_tools/*.xc .
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
 
@@ -572,7 +576,7 @@ foreach i ( $comlist_liblist )
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
 		set exclude = "^gtm\.o|^gtm_main\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
-		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o|^geteuid\.o|^dtgbldir\.o"
+		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o|^geteuid\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
 		set exclude = "$exclude|^gtcm_gnp_server\.o|^dbcertify_cmd\.o"
@@ -674,29 +678,28 @@ endif
 if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
 	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
 	set errmsg = "$errmsg - see log in $gtm_obj/gengtmdeftypes.log"
-	if (`expr $gtm_verno \< V900`) then
-		@ comlist_status++	# No errors for development - this fails the build
-	else
-		echo "Warning: Build of $gtm_verno on $HOST, $errmsg" | \
-			mailx -s "${HOST}: Build for $gtm_verno failed to create GTMDefinedTypes.m" $USER
-	endif
+	@ comlist_status++
 	echo $errmsg >> $errorlog
 endif
 if (-e GTMDefinedTypesInit.m) then
 	# Need a different name for each build type as they can be different
 	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m
+	cp -f gdeinitsz.m $gtm_pct/gdeinitsz.m
+	mv -f gdeinitsz.m GDEINITSZ.m
 	setenv LC_CTYPE C
 	setenv gtm_chset M
 	./mumps GTMDefinedTypesInit.m
 	if ($status) then
 		set errmsg = "COMLIST-E-FAIL Failed to compile generated $gtm_exe/GTMDefinedTypes.m"
-		if (`expr $gtm_verno \< V900`) then
-			@ comlist_status++
-		else
-			echo "Warning: During build of $gtm_verno on $HOST, ${errmsg}" | \
-				mailx -s "${HOST}: Compile for GTMDefinedTypes.m failed during build of $gtm_verno" $USER
-		endif
+		@ comlist_status++
 		echo "${errmsg}" >> $errorlog
+	endif
+	ls -l GDEINITSZ.m
+	./mumps GDEINITSZ.m
+	if ($status) then
+		@ comlist_status++
+		echo "${errmsg}" >> $errorlog
+		set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_pct/GDEINITSZ.m"
 	endif
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
@@ -705,6 +708,9 @@ if (-e GTMDefinedTypesInit.m) then
 	if (-e $gtm_dist/utf8 && ("TRUE" == "$is_unicode_support")) then
 		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+		endif
+		if (! -e $gtm_dist/utf8/GDEINITSZ.m) then
+		    ln -s $gtm_dist/GDEINITSZ.m $gtm_dist/utf8/GDEINITSZ.m
 		endif
 		pushd utf8
 		# Switch to UTF8 mode
@@ -716,13 +722,13 @@ if (-e GTMDefinedTypesInit.m) then
 		../mumps GTMDefinedTypesInit.m
 		if ($status) then
 			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
-			if (`expr $gtm_verno \< V900`) then
-				@ comlist_status++
-			else
-				echo "Warning: During build of $gtm_verno on $HOST, ${errmsg}" | \
-					mailx -s "${HOST}: Compile for utf8/GTMDefinedTypes.m failed during build of $gtm_verno" \
-					$USER
-			endif
+			@ comlist_status++
+			echo "${errmsg}" >> $errorlog
+		endif
+		../mumps GDEINITSZ.m
+		if ($status) then
+			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GDEINITSZ.m"
+			@ comlist_status++
 			echo "${errmsg}" >> $errorlog
 		endif
 		popd

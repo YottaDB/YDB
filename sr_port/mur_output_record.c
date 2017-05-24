@@ -62,14 +62,17 @@ GBLREF	boolean_t		write_after_image;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnl_fence_control	jnl_fence_ctl; /* Needed to set the token, optimize jnl_write_logical for recover */
-GBLREF 	jnl_gbls_t		jgbl;
-GBLREF  jnl_process_vector	*prc_vec;
-GBLREF 	mur_gbls_t		murgbl;
-GBLREF  mur_opt_struct  	mur_options;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct  	mur_options;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF  sgmnt_data_ptr_t 	cs_data;
+GBLREF	sgmnt_data_ptr_t 	cs_data;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	uint4			dollar_tlevel;
+#ifdef DEBUG
+GBLREF	boolean_t		forw_recov_lgtrig_only;
+#endif
 
 error_def(ERR_JNLBADRECFMT);
 error_def(ERR_TRIGLOADFAIL);
@@ -170,6 +173,10 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	assert(NULL == TREF(gd_targ_gvnh_reg));
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* TP and non-TP has same format */
+		DEBUG_ONLY(forw_recov_lgtrig_only = FALSE;)	/* now that we have seen a non-LGTRIG record, reset this global
+								 * variable which would have been set to TRUE after op_tstart
+								 * done in mur_forward_play_cur_jrec.
+								 */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		if (jnl_enabled)
 		{
@@ -392,16 +399,16 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	case JRT_PFIN:
 		if (jnl_enabled)
 		{
-			if (FALSE == ((was_crit = rctl->csa->now_crit)))
+			if (FALSE == ((was_crit = csa->now_crit)))
 				grab_crit(reg);
 			/* MUPIP RECOVER should be the only one updating the database so journal state not expected to changes */
 			assert(JNL_ENABLED(csd));
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(reg, csa);
 			if (0 == jnl_status)
 			{
 				assert(plst->new_pini_addr == csa->jnl->pini_addr);
 				if (0 != csa->jnl->pini_addr)
-					jnl_put_jrt_pfin(rctl->csa);
+					jnl_put_jrt_pfin(csa);
 			} else
 			{
 				if (SS_NORMAL != csa->jnl->status)

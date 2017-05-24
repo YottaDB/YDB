@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,31 +12,31 @@
 
 typedef struct
 {
-	unsigned char *base, *free, *top, *lasttop, prvprt;
+	unsigned char *base, *free, *top, *lasttop, prvprt, *invokestpgcollevel;
 } spdesc;
 
 void	stp_expand_array(void);
-void	stp_gcol(int space_needed);										/* BYPASSOK */
+void	stp_gcol(size_t space_needed);										/* BYPASSOK */
 void	stp_move(char *from, char *to);
-void	stp_init(unsigned int size);
+void	stp_init(size_t size);
 void	s2pool(mstr *a);
 void	s2pool_align(mstr *string);
 void	s2pool_concat(mval *dst, mstr *a);	/* concatenates strings "dst->str" + "a" and stores result in "dst->str" */
 
 #ifdef DEBUG
 void		stp_vfy_mval(void);
-boolean_t	is_stp_space_available(int space_needed);
+boolean_t	is_stp_space_available(ssize_t space_needed);
 #endif
 
 #ifdef DEBUG
-#define	IS_STP_SPACE_AVAILABLE(SPC)	is_stp_space_available(SPC)
+#define	IS_STP_SPACE_AVAILABLE(SPC)	is_stp_space_available((ssize_t)SPC)
 #else
-#define	IS_STP_SPACE_AVAILABLE(SPC)	IS_STP_SPACE_AVAILABLE_PRO(SPC)
+#define	IS_STP_SPACE_AVAILABLE(SPC)	IS_STP_SPACE_AVAILABLE_PRO((ssize_t)SPC)
 #endif
 
 GBLREF	spdesc		stringpool;
 
-#define	IS_STP_SPACE_AVAILABLE_PRO(SPC)	((stringpool.free + SPC) <= stringpool.top)
+#define	IS_STP_SPACE_AVAILABLE_PRO(SPC)	((stringpool.free + SPC) <= stringpool.invokestpgcollevel)
 #define	IS_IN_STRINGPOOL(PTR, LEN)		\
 		((((unsigned char *)PTR + (int)(LEN)) <= stringpool.top) && ((unsigned char *)PTR >= stringpool.base))
 #define	IS_AT_END_OF_STRINGPOOL(PTR, LEN)		(((unsigned char *)PTR + (int)(LEN)) == stringpool.free)
@@ -89,4 +90,18 @@ GBLREF	boolean_t	stringpool_unexpandable;
 	}												\
 	*PTRARRAYCUR++ = PTR;										\
 }
+
+#define	COPY_ARG_TO_STRINGPOOL(DST, KEYEND, KEYSTART)				\
+MBSTART {									\
+	int	keylen;								\
+										\
+	keylen = (unsigned char *)(KEYEND) - (unsigned char *)(KEYSTART);	\
+	ENSURE_STP_FREE_SPACE(keylen);						\
+	assert(stringpool.top - stringpool.free >= keylen);			\
+	memcpy(stringpool.free, (KEYSTART), keylen);				\
+	(DST)->mvtype = (MV_STR);						\
+	(DST)->str.len = keylen;						\
+	(DST)->str.addr = (char *)stringpool.free;				\
+	stringpool.free += keylen;						\
+} MBEND
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +54,7 @@ STATICFNDEF void print_reg_if_mismatch(char *key, int keylen)
 	 */
 	if (!IS_GVKEY_HASHT_GBLNAME(keylen -2, key))
 	{
-		map = gv_srch_map(original_header, key, keylen - 2); /* -2 to remove two trailing 0s */
+		map = gv_srch_map(original_header, key, keylen - 2, SKIP_BASEDB_OPEN_FALSE); /* -2 to remove two trailing 0s */
 		reg = map->reg.addr;
 		if (gv_cur_region != reg)
 		{
@@ -93,7 +94,7 @@ void dse_f_key(void)
 	UNIX_ONLY(nogbldir_present = (CLI_NEGATED == cli_present("GBLDIR"));)
 	VMS_ONLY(nogbldir_present = TRUE;)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	if (!dse_key_srch(root_path[0], &root_path[1], &root_offset[0], &targ_key_root[0], size_root))
+	if (!dse_ksrch(root_path[0], &root_path[1], &root_offset[0], &targ_key_root[0], size_root))
 	{
 		util_out_print("!/Key not found, no root present.", TRUE);
 		if (!nogbldir_present)
@@ -106,7 +107,7 @@ void dse_f_key(void)
 	patch_path_count = 1;
 	path[0] = ksrch_root;
 	patch_find_root_search = FALSE;
-	if (!dse_key_srch(path[0], &path[1], &offset[0], &targ_key[0], size))
+	if (!dse_ksrch(path[0], &path[1], &offset[0], &targ_key[0], size))
 	{	memcpy(util_buff, "!/Key not found, would be in block  ", 36);
 		util_len = 36;
 		util_len += i2hex_nofill(path[patch_path_count - 2], (uchar_ptr_t)&util_buff[util_len], 8);

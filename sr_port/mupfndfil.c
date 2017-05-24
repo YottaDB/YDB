@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,16 +22,13 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "util.h"
-#if defined(UNIX)
 #include "parse_file.h"
 #include "is_raw_dev.h"
-#endif
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
 
-GBLREF 	jnl_gbls_t	jgbl;
-
 error_def(ERR_NOUSERDB);
+error_def(ERR_REGFILENOTFOUND);
 
 /* mupfndfil.c
  * Description:
@@ -43,7 +41,7 @@ error_def(ERR_NOUSERDB);
  * Side Effects:
  *	reg->dyn.addr->fname_len and reg->dyn.addr->fname are updated
  */
-boolean_t mupfndfil(gd_region *reg, mstr *filestr)
+boolean_t mupfndfil(gd_region *reg, mstr *filestr, boolean_t log_error)
 {
 	char 	filename[MAX_FN_LEN];
 	mstr 	file, def, ret, *retptr;
@@ -51,21 +49,15 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 
 	switch(reg->dyn.addr->acc_meth)
 	{
-	case dba_mm:
-	case dba_bg:
-		break;
-#	ifdef VMS
-	case dba_usr:
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("specified function"), REG_LEN_STR(reg));
-		return FALSE;		/* This is currently a VMS only possibility and has no corresponding test case */
-#	endif
-	default:
-		util_out_print("REGION !AD has an unrecognized access method.", TRUE, REG_LEN_STR(reg));
-		return FALSE;
+		case dba_mm:
+		case dba_bg:
+			break;
+		default:
+			util_out_print("REGION !AD has an unrecognized access method.", TRUE, REG_LEN_STR(reg));
+			return FALSE;
 	}
 	file.addr = (char *)reg->dyn.addr->fname;
 	file.len = reg->dyn.addr->fname_len;
-#if defined(UNIX)
 	file.addr[file.len] = 0;
 	if (is_raw_dev(file.addr))
 	{
@@ -76,10 +68,6 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 		def.addr = DEF_DBEXT;	/* UNIX need to pass "*.dat" but reg->dyn.addr->defext has "DAT" */
 		def.len = SIZEOF(DEF_DBEXT) - 1;
 	}
-#elif defined(VMS)
-	def.addr = (char *)reg->dyn.addr->defext;
-	def.len = SIZEOF(reg->dyn.addr->defext);
-#endif
 	if (NULL == filestr)
 	{
 		ret.len = SIZEOF(filename);
@@ -89,12 +77,9 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 		retptr = filestr;
 	if (FILE_PRESENT != gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
 	{
-		if (!jgbl.mupip_journal)
-		{	/* Do not print error messages in case of call from mur_open_files().
-			 * Currently we use "jgbl.mupip_journal" to identify a call from mupip_recover code */
-			util_out_print("REGION !AD's file !AD cannot be found.", TRUE, REG_LEN_STR(reg), LEN_AND_STR(file.addr));
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ustatus);
-		}
+		if (log_error)
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7)
+						ERR_REGFILENOTFOUND, 4, LEN_AND_STR(file.addr), REG_LEN_STR(reg), ustatus);
 		return FALSE;
 	}
 	reg->dyn.addr->fname_len = retptr->len;

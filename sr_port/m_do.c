@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,10 +25,14 @@ GBLREF	boolean_t	run_time;
 error_def(ERR_ACTOFFSET);
 
 int m_do(void)
+/* compiler module for a DO command */
 {
 	int		opcd;
 	oprtype		*cr;
-	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr, *tripsize;
+	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr;
+#	ifndef __i386
+	triple		*tripsize;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -38,7 +42,9 @@ int m_do(void)
 		{
 			calltrip = newtriple(OC_CALLSP);
 			calltrip->operand[0] = put_mnxl();
+#			ifndef __i386
 			calltrip->operand[1] = put_ocnt();
+#			endif
 		}
 		return TRUE;
 	} else if (TK_AMPERSAND == TREF(window_token))
@@ -60,21 +66,31 @@ int m_do(void)
 		{
 			assert(MLAB_REF == calltrip->operand[0].oprclass);
 			calltrip->opcode = OC_EXCAL;
+#			ifdef __i386
+			ref0 = calltrip;
+#			else
 			ref0 = newtriple(OC_PARAMETER);
 			calltrip->operand[1] = put_tref(ref0);
 			ref0->operand[0] = put_tsiz();	/* parm to hold size of jump codegen */
 			tripsize = ref0->operand[0].oprval.tref;
 			assert(OC_TRIPSIZE == tripsize->opcode);
+#			endif
 		} else
 		{
 			if (OC_EXTCALL == calltrip->opcode)
 			{
 				assert(TRIP_REF == calltrip->operand[1].oprclass);
+#				ifdef __i386
+				if (OC_CDLIT == calltrip->operand[1].oprval.tref->opcode)
+				{
+					assert(CDLT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
+#				else
 				opcd = calltrip->operand[1].oprval.tref->opcode;
 				if ((OC_CDLIT == opcd) || (OC_CDIDX == opcd))
 				{
 					DEBUG_ONLY(opcd = calltrip->operand[1].oprval.tref->operand[0].oprclass);
 					assert((CDLT_REF == opcd) || (CDIDX_REF == opcd));
+#				endif
 				} else
 				{
 					assert(OC_LABADDR == calltrip->operand[1].oprval.tref->opcode);
@@ -106,8 +122,8 @@ int m_do(void)
 						return FALSE;
 					}
 				}
-			} else		/* DO _ @dlabel actuallist */
-			{
+			} else
+			{	/* DO _ @dlabel actuallist */
 				assert(OC_COMMARG == calltrip->opcode);
 				assert(TRIP_REF == calltrip->operand[1].oprclass);
 				assert(OC_ILIT == calltrip->operand[1].oprval.tref->opcode);
@@ -137,10 +153,12 @@ int m_do(void)
 			return FALSE;
 	} else if (OC_CALL == calltrip->opcode)
 	{
+#		ifndef __i386
 		calltrip->operand[1] = put_ocnt();
-		if (TREF(for_stack_ptr) != TADR(for_stack))
+#		endif
+		if (TREF(for_stack_ptr) != (oprtype **)TADR(for_stack))
 		{
-			if (TAREF1(for_temps, (TREF(for_stack_ptr) - TADR(for_stack))))
+			if (TAREF1(for_temps, (TREF(for_stack_ptr) - (oprtype **)TADR(for_stack))))
 				calltrip->opcode = OC_FORLCLDO;
 		}
 	}
@@ -150,19 +168,49 @@ int m_do(void)
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr(FALSE, cr))
 			return FALSE;
+		for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+			;
+		if (OC_LIT == triptr->opcode)
+		{	/* it's a literal so optimize it */
+			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			dqdel(triptr, exorder);
+			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			{
+				setcurtchain(oldchain);		/* it's a FALSE so just discard the whole thing */
+#				ifndef __i386
+				if (OC_EXCAL == calltrip->opcode)
+					tripsize->opcode = OC_NOOP;		/* if we are abandoning this DO, clear this too */
+#				endif
+				return TRUE;
+			}					/* the code below is the same as for the no postconditional case */
+			obp = oldchain->exorder.bl;		/* it's a TRUE - just pretend it isn't even there */
+			dqadd(obp, &tmpchain, exorder);		/* this is a violation of info hiding */
+			if (OC_EXCAL == calltrip->opcode)
+			{	/* this code is the same as below for no condition */
+				triptr = newtriple(OC_JMP);
+				triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
+				calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
+#				ifndef __i386
+				tripsize->operand[0].oprval.tsize->ct = triptr;
+#				endif
+			}
+			return TRUE;
+		}
 		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
 		{
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
 		obp = oldchain->exorder.bl;
-		dqadd(obp, &tmpchain, exorder);   /*this is a violation of info hiding*/
+		dqadd(obp, &tmpchain, exorder);			/* this is a violation of info hiding */
 		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
+#			ifndef __i386
 			tripsize->operand[0].oprval.tsize->ct = triptr;
+#			endif
 		}
 		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
 		{
@@ -174,15 +222,17 @@ int m_do(void)
 		} else
 			tnxtarg(cr);
 	} else
-	{
+	{	/* the code below is the same as for the case of a postconditional known at compile time to be TRUE */
 		obp = oldchain->exorder.bl;
-		dqadd(obp, &tmpchain, exorder);   /*this is a violation of info hiding*/
+		dqadd(obp, &tmpchain, exorder);			/* this is a violation of info hiding */
 		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
+#			ifndef __i386
 			tripsize->operand[0].oprval.tsize->ct = triptr;
+#			endif
 		}
 	}
 	return TRUE;

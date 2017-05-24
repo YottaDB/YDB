@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2014 Fidelity Information Services, Inc	;
+; Copyright (c) 2006-2016 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -109,7 +110,9 @@ seg1:	i '$d(segs(SEGMENT,"ACCESS_METHOD")) s verified=0 zm $$info(gdeerr("QUALRE
 	f  s s=$o(segs(SEGMENT,s)) q:'$l(s)  s squals(s)=segs(SEGMENT,s)
 	f  s s=$o(minseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
 	f  s s=$o(maxseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
-	i "MM"=am,1=squals("ENCRYPTION_FLAG") s verified=0 zm $$info(gdeerr("CRYPTNOMM")):s,gdeerr("SEGIS"):am:SEGMENT
+	i "MM"=am  do
+	. i 1=squals("ENCRYPTION_FLAG") s verified=0 zm $$info(gdeerr("GDECRYPTNOMM")):SEGMENT
+	. i 1=squals("ASYNCIO")         s verified=0 zm $$info(gdeerr("GDEASYNCIONOMM")):SEGMENT
 	s x=$$SQUALS(am,.squals)
 	q
 usereg:	n REGION,NAME s REGION=""

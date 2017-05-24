@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,9 +28,7 @@ typedef struct err_ctl_struct
 	int		msg_cnt;
 } err_ctl;
 
-#ifdef UNIX
 #include "wbox_test_init.h"	/* needed for DUMPABLE macro which uses WBTEST_ENABLED */
-#endif
 #include "errorsp.h"
 
 #define ERROR_RETURN		error_return
@@ -58,7 +56,7 @@ typedef struct err_ctl_struct
 #define	SET_ERROR_CONDITION(MSGID)							\
 {											\
 	error_condition = MSGID;							\
-	UNIX_ONLY(severity = (NULL == err_check(MSGID)) ? ERROR : SEVMASK(MSGID);)	\
+	severity = (NULL == err_check(MSGID)) ? ERROR : SEVMASK(MSGID);			\
 }
 
 /* Macro used intermittently to trace various error handling invocations */
@@ -85,9 +83,7 @@ CONDITION_HANDLER(dse_f_blk_ch);
 CONDITION_HANDLER(exi_ch);
 CONDITION_HANDLER(fgncal_ch);
 CONDITION_HANDLER(fntext_ch);
-#ifdef UNIX
 CONDITION_HANDLER(fnzsrch_ch);
-#endif
 CONDITION_HANDLER(gds_rundown_ch);
 CONDITION_HANDLER(gtcm_ch);
 CONDITION_HANDLER(gtcm_exi_ch);
@@ -99,6 +95,9 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch);
 CONDITION_HANDLER(gtmsource_ch);
 CONDITION_HANDLER(gvcmy_open_ch);
 CONDITION_HANDLER(gvcmz_netopen_ch);
+CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch);
+CONDITION_HANDLER(gvcst_statsDB_init_ch);
+CONDITION_HANDLER(gvcst_statsDB_open_ch);
 CONDITION_HANDLER(gvzwrite_ch);
 CONDITION_HANDLER(hashtab_rehash_ch);
 CONDITION_HANDLER(io_init_ch);
@@ -107,11 +106,6 @@ CONDITION_HANDLER(iomt_ch);
 CONDITION_HANDLER(jnl_file_autoswitch_ch);
 CONDITION_HANDLER(job_init_ch);
 CONDITION_HANDLER(jobexam_dump_ch);
-#ifdef VMS
-CONDITION_HANDLER(lastchance1);
-CONDITION_HANDLER(lastchance2);
-CONDITION_HANDLER(lastchance3);
-#endif
 CONDITION_HANDLER(mdb_condition_handler);
 CONDITION_HANDLER(mu_freeze_ch);
 CONDITION_HANDLER(mu_int_ch);
@@ -132,11 +126,11 @@ CONDITION_HANDLER(trans_code_ch);
 CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
-#ifdef UNIX
 CONDITION_HANDLER(zro_ins_rec_fail_ch);
-#endif
 CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);
+CONDITION_HANDLER(op_fnzatransform_ch);
+CONDITION_HANDLER(gvn2gds_ch);
 
 void mum_tstart();
 

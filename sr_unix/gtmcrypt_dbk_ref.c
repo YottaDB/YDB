@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -305,9 +305,22 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname_plus(char *keyname, char 
 {
 	int				diff, match;
 	gtm_keystore_keyname_link_t 	*cur_node;
+	char				*ynew_ext;
+	char				lcl_keyname[GTM_PATH_MAX];
+	int				keynamelen;
 
 	assert((SEARCH_BY_KEYPATH == search_type) || (SEARCH_BY_HASH == search_type));
 	assert(NULL != search_field);
+	assert(keyname);
+	/* Strip off EXT_NEW from autodb paths so that the key lookup works correctly */
+	keynamelen = strlen(keyname);
+	ynew_ext = keyname + keynamelen - STRLEN(EXT_NEW);
+	if (0 == strcmp(ynew_ext, EXT_NEW))
+	{	/* This is an autodb, fixup the path */
+		strncpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
+		lcl_keyname[keynamelen - STRLEN(EXT_NEW)] = '\0';
+		keyname = lcl_keyname;
+	}
 	cur_node = keystore_by_keyname_head;
 	while (cur_node)
 	{
@@ -353,7 +366,11 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 	gtm_keystore_unres_key_link_t	*curr, *prev;
 	gtm_keystore_t			*node;
 	int				name_length, path_length, search_fail;
-	char				*name_search_field_ptr, *path_search_field_ptr;
+	char				*name_search_field_ptr, *path_search_field_ptr, *ynew_ext;
+	char				*lcl_key_name, lcl_key_name_buff[GTM_PATH_MAX];
+	char				name_search_field_buff[GTM_PATH_MAX];
+	int				search_field_len;
+	int				isautodb;
 
 	assert(NULL != search_field1);
 	assert((SEARCH_BY_KEYNAME == search_field1_type) || (SEARCH_BY_HASH == search_field1_type));
@@ -362,9 +379,24 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 			|| ((SEARCH_BY_HASH == search_field1_type) && (SEARCH_BY_KEYNAME == search_field2_type)));
 	/* Prepare the character array pointers to use for searching by key name or path. */
 	path_search_field_ptr = NULL;
+	isautodb = FALSE;
 	if (SEARCH_BY_KEYNAME == search_field1_type)
 	{
 		name_search_field_ptr = search_field1;
+		if (database && (NULL == search_field2))
+		{	/* Newly created AutoDBs have EXT_NEW appended to them, but the crypt cfg doesn't have those keys */
+			search_field_len = strlen(search_field1);
+			ynew_ext = search_field1 + search_field_len - STRLEN(EXT_NEW);
+			if (0 == strcmp(ynew_ext, EXT_NEW))
+			{	/* Strip EXT_NEW off the path string for comparison later. Note that this path, minus EXT_NEW,
+				 * is a fully resolved path.
+				 */
+				isautodb = TRUE;
+				strncpy(name_search_field_buff, search_field1, search_field_len - STRLEN(EXT_NEW));
+				name_search_field_buff[search_field_len - STRLEN(EXT_NEW)] = '\0';
+				name_search_field_ptr = name_search_field_buff;
+			}
+		}
 		if ((NULL != search_field2) && (SEARCH_BY_KEYPATH == search_field2_type))
 			path_search_field_ptr = search_field2;
 	} else if ((NULL != search_field2) && (SEARCH_BY_KEYNAME == search_field2_type))
@@ -381,7 +413,14 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 			search_fail = 0;
 			if (UNRES_KEY_UNRES_DB == curr->status)
 			{
-				if (NULL == realpath(curr->key_name, path_array))
+				if (isautodb)
+				{	/* Append EXT_NEW to see if this a matching AutoDB */
+					strncpy(lcl_key_name_buff, curr->key_name, GTM_PATH_MAX);
+					strcat(lcl_key_name_buff, EXT_NEW);
+					lcl_key_name = lcl_key_name_buff;
+				} else
+					lcl_key_name = curr->key_name;
+				if (NULL == realpath(lcl_key_name, path_array))
 				{
 					if (ENAMETOOLONG == errno)
 					{
@@ -402,9 +441,19 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 					if (SEARCH_BY_KEYNAME == search_field1_type)
 						search_fail = 1;
 				} else
-				{	/* Once the path has been resolved, save it to avoid future realpath()s. */
-					strcpy(curr->key_name, path_array);
-					curr->status = UNRES_KEY_RES_DB;
+				{	/* Once the path has been resolved, save it to avoid future realpath()s.
+					 * If this isn't an autodb, use the path as is. If it is an autodb ensure that the target
+					 * path and the existing db match before storing it.
+					 */
+					if (!isautodb || (!strcmp(path_array, search_field1)))
+					{
+						if (isautodb) /* Save the resolved path minus EXT_NEW */
+							strcpy(curr->key_name, name_search_field_buff);
+						else
+							strcpy(curr->key_name, path_array);
+						curr->status = UNRES_KEY_RES_DB;
+					} else
+						continue;
 				}
 			}
 			/* Do not proceed examining the current item if the file we are looking for is missing. */
@@ -652,7 +701,7 @@ STATICFNDEF int read_files_section(config_t *cfgp)
 			return -1;
 		}
 		/* Length should be under GTM_PATH_MAX because that is the size of the array where the name of a key is stored. */
-		name_length = strlen(key_name);
+		name_length = strlen(key_name) + 1;
 		if (GTM_PATH_MAX <= name_length)
 		{
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", 'files' entry #%d's field length exceeds %d",
@@ -729,11 +778,12 @@ STATICFNDEF int read_database_section(config_t *cfgp)
 			return -1;
 		}
 		/* Length should be under GTM_PATH_MAX because that is the size of the array where the name of a key is stored. */
-		name_length = strlen(key_name);
+		name_length = strlen(key_name) + 1 + STR_LIT_LEN(EXT_NEW);
 		if (GTM_PATH_MAX <= name_length)
 		{
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", in entry #%d corresponding to 'database.keys' "
-					"file name exceeds %d", ELLIPSIZE(gc_config_filename), i + 1, GTM_PATH_MAX - 1);
+					"file name exceeds %d", ELLIPSIZE(gc_config_filename), i + 1,
+					(int)(GTM_PATH_MAX - STR_LIT_LEN(EXT_NEW) - 1));
 			return -1;
 		}
 		if (!config_setting_lookup_string(elem, "key", (const char **)&key_path))
@@ -770,7 +820,7 @@ STATICFNDEF int read_database_section(config_t *cfgp)
 int keystore_new_cipher_ctx(gtm_keystore_t *entry, char *iv, int length, int action)
 {
 	int			rv;
-	crypt_key_t		handle;
+	crypt_key_t		handle = NULL;
 	gtm_cipher_ctx_t	*ctx;
 	unsigned char		iv_array[GTMCRYPT_IV_LEN];
 
@@ -809,8 +859,7 @@ int keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx)
 
 	assert(NULL != ctx);
 	status = 0;
-	if (-1 == gc_sym_destroy_cipher_handle(ctx->handle))
-		status = -1;
+	gc_sym_destroy_cipher_handle(ctx->handle);
 	next = ctx->next;
 	prev = ctx->prev;
 	if (NULL != prev)
@@ -888,8 +937,7 @@ STATICFNDEF int gtm_keystore_cleanup_node(gtm_keystore_t *node)
 	while (NULL != curr)
 	{
 		temp = curr->next;
-		if (-1 == gc_sym_destroy_cipher_handle(curr->handle))
-			status = -1;
+		gc_sym_destroy_cipher_handle(curr->handle);
 		FREE(curr);
 		curr = temp;
 	}

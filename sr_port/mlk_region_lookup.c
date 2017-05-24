@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +68,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 			}
 		} else
 		{
-			map = gv_srch_map(addr, gvent.var_name.addr, gvent.var_name.len);
+			map = gv_srch_map(addr, gvent.var_name.addr, gvent.var_name.len, SKIP_BASEDB_OPEN_FALSE);
 			reg = map->reg.addr;
 			if (!reg->open)
 				gv_init_reg(reg);

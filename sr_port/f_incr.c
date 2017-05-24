@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,8 +81,8 @@ int f_incr(oprtype *a, opctype op)
 			setcurtchain(oldchain);
 			return FALSE;
 		}
-		dqadd(&targchain, &incrchain, exorder);	/* dir before targ - this is a violation of info hiding */
 		setcurtchain(&targchain);
+		dqadd(&targchain, &incrchain, exorder);	/* dir before targ - this is a violation of info hiding */
 	}
 	coerce(increment, OCT_MVAL);
 	ins_triple(r);

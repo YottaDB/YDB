@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +28,6 @@ static struct RAB	ceprep_rab;	/* record access block for compiler escape preproc
 
 #define CEPREP_OPEN_TIMEOUT 30
 
-GBLREF unsigned char		source_buffer[];
 GBLREF mident			module_name;
 GBLREF io_pair			io_curr_device;
 GBLREF command_qualifier	cmd_qlf;
@@ -38,10 +38,6 @@ void open_ceprep_file(void)
 {
 #ifdef VMS
 /* stub except for VMS */
-#ifdef __ALPHA
-# pragma member_alignment save
-# pragma nomember_alignment
-#endif
 	static readonly struct
 	{
 		unsigned char	newversion;
@@ -57,9 +53,6 @@ void open_ceprep_file(void)
 		(int4)		MAX_SRCLINE,
 		(unsigned char)	iop_eol
 	};
-#ifdef __ALPHA
-# pragma member_alignment restore
-#endif
 	int		mname_len;
 	uint4		status;
 	char		charspace, ceprep_name_buff[MAX_MIDENT_LEN + SIZEOF(".MCI") - 1], fname[255];
@@ -93,7 +86,7 @@ void open_ceprep_file(void)
 	ceprep_fab.fab$l_nam = &ceprep_nam;
 	ceprep_fab.fab$l_fop = FAB$M_NAM;
 	if (RMS$_NORMAL != (status = sys$parse(&ceprep_fab, 0, 0)))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(NULL VARLSTCNT(1) status);
 	file.mvtype = params.mvtype = MV_STR;
 	file.str.len = ceprep_nam.nam$b_esl;
 	file.str.addr = fname;
@@ -133,10 +126,12 @@ void put_ceprep_line(void)
 #ifdef VMS
 /* stub except for VMS */
 	mval	out;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	out.mvtype = MV_STR;
-	out.str.len = strlen((char *)source_buffer);
-	out.str.addr = source_buffer;
+	out.str.len = (TREF(source_buffer)).len - 1;
+	out.str.addr = (TREF(source_buffer)).addr;
 	op_write(&out);
 	op_wteol(1);
 #endif

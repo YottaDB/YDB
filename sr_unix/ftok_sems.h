@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,8 +15,12 @@
 
 #include "gtm_semutils.h"
 
-boolean_t ftok_sem_get2(gd_region *reg, uint4 stacktrace_on_wait, semwait_status_t *retstat, boolean_t *bypass,
-			boolean_t *ftok_counter_halted, boolean_t incr_cnt);
+#define	DECR_CNT_FALSE		FALSE
+#define	DECR_CNT_TRUE		TRUE
+#define	DECR_CNT_SAFE		2
+
+boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *timedout, semwait_status_t *retstat,
+			boolean_t *bypass, boolean_t *ftok_counter_halted, boolean_t incr_cnt);
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate,
 		       boolean_t *ftok_counter_halted);
 boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate);

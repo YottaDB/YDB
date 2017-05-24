@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2016 Fidelity National Information		!
+! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -577,7 +577,7 @@ TEXT		<!AD>/info/fao=2!/ansi=0
 ZWRSPONE	<Subscript patterns in ZWRITE are atomic; Invalid delimiter>/error/fao=0!/ansi=0
 FILEDEL		<File !AD successfully deleted>/info/fao=2!/ansi=0
 JNLBADLABEL	<Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
-JNLREADEOF	<End of journal file encountered for !AD>/error/fao=2!/ansi=0
+JNLREADEOF	<End of journal file encountered>/error/fao=0!/ansi=0
 JNLRECFMT	<Journal file record format error encountered>/error/fao=0!/ansi=0
 BLKTOODEEP	<Block level too deep>/error/fao=0!/ansi=0
 NESTFORMP	<Formal parameter list cannot be combined with nested line>/error/fao=0!/ansi=0
@@ -714,8 +714,8 @@ NOTERMINFODB	<No "terminfo" database.  Terminal handling problems likely.> /info
 INVACCMETHOD	<Invalid access method> /error /fao=0!/ansi=0
 JNLOPNERR	<Error opening journal file !AD!/  for database !AD>/error/fao=4!/ansi=0
 JNLRECTYPE	<Journal record type does not match expected type>/error/fao=0!/ansi=0
-JNLTRANSGTR	<Transaction number in journal is greater than in database>/error/fao=0!/ansi=0
-JNLTRANSLSS	<Transaction number in journal is less than in database>/error/fao=0!/ansi=0
+JNLTRANSGTR	<Transaction number !@UQ in journal header is greater than !@UQ in database header>/error/fao=2!/ansi=0
+JNLTRANSLSS	<Transaction number !@UQ in journal header is less than !@UQ in database header>/error/fao=2!/ansi=0
 JNLWRERR	<Error writing journal file !AD.  Unable to update header.>/error/fao=2!/ansi=0
 FILEIDMATCH	<Saved File ID does not match the current ID - the file appears to have been moved>/error/fao=0!/ansi=0
 EXTSRCLIN	<!_!AD!/!_!AD>/info/fao=4!/ansi=0
@@ -773,8 +773,8 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
-STOPTIMEOUT	<Waited too long for stopped process to release.  Region: !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG777	<TRIGMODINTP last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG776	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
+PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -960,7 +960,7 @@ DBRLEVLTONE	<!AD Root level less than one>/error/fao=2!/ansi=0
 DBSVBNMIN	<!AD Start VBN smaller than possible>/error/fao=2!/ansi=0
 DBTTLBLK0	<!AD Total blocks equal zero>/error/fao=2!/ansi=0
 DBNOTDB		<!AD File does not have a valid GDS file header>/error/fao=2!/ansi=0
-DBTOTBLK	<Total blocks should be 0x!XL, is 0x!XL>/error/fao=2!/ansi=0
+DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL>/error/fao=2!/ansi=0
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
 DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
@@ -1253,7 +1253,7 @@ REPLINSTSECUNDF	<Secondary replication instance name not defined>/error/fao=0!/a
 REPLINSTSEQORD	<!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD>/error/fao=6!/ansi=0
 REPLINSTSTNDALN	<Could not get exclusive access to replication instance file !AD>/error/fao=2!/ansi=0
 REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first>/error/fao=2!/ansi=0
-REQROLLBACK	<Error accessing database !AD.  Run MUPIP JOURNAL ROLLBACK on cluster node !AD.>/error/fao=4!/ansi=0
+REQROLLBACK	<Error accessing database !AD.  Run MUPIP JOURNAL -ROLLBACK -NOONLINE on cluster node !AD.>/error/fao=4!/ansi=0
 INVOBJFILE	<Cannot ZLINK object file !AD due to unexpected format>/error/fao=2!/ansi=0
 SRCSRVEXISTS	<Source server for secondary instance !AD is already running with pid !UL>/error/fao=3!/ansi=0
 SRCSRVNOTEXIST	<Source server for secondary instance !AD is not alive>/error/fao=2!/ansi=0
@@ -1268,7 +1268,7 @@ BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/f
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
-DBMISALIGN	<Database file !AD has !UL blocks which does not match alignment rules. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
+DBMISALIGN	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
@@ -1442,7 +1442,7 @@ REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
 SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting>/error/fao=2!/ansi=0
 IGNBMPMRKFREE	<Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK>/info/fao=4!/ansi=0
 PERMGENFAIL	<Failed to determine access permissions to use for creation of !AD for file !AD>/error/fao=4!/ansi=0
-PERMGENDIAG	<Permissions: Proc(uid:!UL,gid:!UL), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD), Group Mem(opener:!UL,owner:!UL)>/info/fao=11!/ansi=0
+PERMGENDIAG	<Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)>/info/fao=11!/ansi=0
 MUTRUNC1ATIME	<Process with PID !UL already performing truncate in region !AD>/info/fao=3!/ansi=0
 MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !AD>/info/fao=2!/ansi=0
 MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!/ansi=0
@@ -1526,7 +1526,7 @@ GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
 GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
 SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
-REGOPENRETRY	<Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...>/info/fao=4!/ansi=0
+UNUSEDMSG1529	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
 REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool>/error/fao=2!/ansi=0
 DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0
@@ -1536,8 +1536,8 @@ ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from gl
 GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
-GVSUBSERR	<Invalid subscripted global name specification in $VIEW() function>/error/fao=0!/ansi=0
-UNUSEDMSG1540	<TRIGNOSPANBL : Last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG1539	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
+ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
 TLSINIT		<Failed to initialize GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
@@ -1558,7 +1558,7 @@ NOUSERDB	<!AD does not support operation on non-GDS format region: !AD>/error/fa
 DSENOTOPEN	<DSE could not open region !AD - see DSE startup error message for cause>/error/fao=2!/ansi=0
 ZSOCKETATTR	<Attribute "!AD" invalid for $ZSOCKET function>/error/fao=2!/ansi=0
 ZSOCKETNOTSOCK	<$ZSOCKET function called but device is not a socket>/error/fao=0!/ansi=0
-CHSETALREADY	<CHSET !AD already specified for socket device>/error/fao=2!/ansi=0
+CHSETALREADY	<Socket device already contains sockets with iCHSET=!AD, oCHSET=!AD>/error/fao=4!/ansi=0
 DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL>/error/fao=1!/ansi=0
 BLKINVALID	<!XL is not a valid block as database file !AD has !XL total blocks>/error/fao=4!/ansi=0
 CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
@@ -1618,6 +1618,43 @@ MUREENCRYPTV4NOALLOW	<Database (re)encryption supported only on fully upgraded V
 ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
 JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=3!/ansi=0
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
+PBNUNSUPTYPE	<$ZPEEK() does not support type !AD>/error/fao=2!/ansi=0
+DBFHEADLRU	<Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned>/info/fao=5!/ansi=0
+ASYNCIONOV4	<!AD database has !AD; cannot !AD>/error/fao=6!/ansi=0
+AIOCANCELTIMEOUT	<Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD>/error/fao=3!/ansi=0
+DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ>/error/fao=9!/ansi=0
+DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0
+ASYNCIONOMM	<Database file !AD!AD cannot !AD>/error/fao=6!/ansi=0
+RESYNCSEQLOW	<MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested is lower than !@ZQ [0x!16@XQ] which is the starting sequence number of the instance>/error/fao=4!/ansi=0
+DBNULCOL	<NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD>/error/fao=6!/ansi=0
+UTF16ENDIAN	<The device previously set UTF-16 endianness to !AD and cannot change to !AD>/error/fao=4!/ansi=0
+OFRZACTIVE	<Region !AD has an Online Freeze>/warning/fao=2!/ansi=0
+OFRZAUTOREL	<Online Freeze automatically released for region !AD>/warning/fao=2!/ansi=0
+OFRZCRITREL	<Proceeding with a write to region !AD after Online Freeze while holding crit>/warning/fao=2!/ansi=0
+OFRZCRITSTUCK	<Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=2!/ansi=0
+OFRZNOTHELD	<Online Freeze had been automatically released for at least one region>/warning/fao=0!/ansi=0
+AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL>/error/fao=5!/ansi=0
+DBDUPNULCOL	<Discarding !AD=!AD key due to duplicate null collation record>/error/fao=4!/ansi=0
+CHANGELOGINTERVAL	<!AD Server now logging to !AD with a !UL second interval>/info/fao=5!/ansi=0
+DBNONUMSUBS	<!AD key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0
+AUTODBCREFAIL	<Automatic creation of database file !AD associated with region !AD failed; see associated messages for details>/error/fao=4!/ansi=0
+RNDWNSTATSDBFAIL	<Rundown of statistics database region !AD (DB !AD) failed at/in !AD with following error: !AD>/error/fao=8!/ansi=0
+STATSDBNOTSUPP	<Attempted operation is not supported on statistics database file !AD>/error/fao=2!/ansi=0
+TPNOSTATSHARE	<VIEW "[NO]STATSHARE" is not allowed inside a TP transaction>/error/fao=0!/ansi=0
+FNTRANSERROR	<Buffer too small error occurred trying to translate filename !AD>/error/fao=2!/ansi=0
+NOCRENETFILE	<Database file !AD not created; cannot create across network>/error/fao=2!/ansi=0
+DSKSPCCHK	<Error while checking for available disk space to create file !AD>/error/fao=2!/ansi=0
+NOCREMMBIJ	<MM access method not compatible with BEFORE image journaling; Database file !AD not created>/error/fao=2!/ansi=0
+FILECREERR	<Error !AD for file !AD during DB creation>/error/fao=4!/ansi=0
+RAWDEVUNSUP	<RAW device for region !AD is not supported>/error/fao=2!/ansi=0
+DBFILECREATED	<Database file !AD created>/info/fao=2!/ansi=0
+PCTYRESERVED	<Attempted operation not supported on ^%Y* namespace>/error/fao=0!/ansi=0
+REGFILENOTFOUND	<Database file !AD corresponding to region !AD cannot be found>/info/fao=4!/ansi=0
+DRVLONGJMP	<Fake internal error that drives longjmp()>/error/fao=0!/ansi=0
+INVSTATSDB	<Database file !AD associated with statistics database region !AD is not a valid statistics database>/error/fao=4!/ansi=0
+STATSDBERR	<Error in/at !AD attempting to use a statistics database: !AD>/error/fao=4!/ansi=0
+STATSDBINUSE	<Statistics database !AD is in use with database !AD so cannot also be used with database !AD>/error/fao=6!/ansi=0
+STATSDBFNERR	<This database has no accessible statistics database due to the following error: !AD>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,6 @@
 #include "advancewindow.h"
 #include "lb_init.h"
 
-GBLREF	unsigned char			*source_buffer;
 GBLREF	struct ce_sentinel_desc		*ce_def_list;
 
 error_def(ERR_CETOOMANY);
@@ -33,31 +32,29 @@ void lb_init(void)
 {
 	int				num_subs, y;
 	short int			sav_last_src_col, source_col;
-	int4				source_len, skip_count;
+	int4				skip_count;
 	unsigned char			*cp, *cp1;
-	bool				possible_sentinel;
+	boolean_t			possible_sentinel;
 	struct ce_sentinel_desc		*shp;
 #	ifdef DEBUG
-	unsigned char			original_source[MAX_SRCLINE];
+	unsigned char			original_source[MAX_SRCLINE + 1];
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (NULL != ce_def_list)
 	{
-		for (source_len = 0; '\0' != source_buffer[source_len]; source_len++);
 #		ifdef DEBUG
-		memcpy (original_source, source_buffer, source_len + 2);	/* include terminating null characters */
+		memcpy(original_source, (TREF(source_buffer)).addr, (TREF(source_buffer)).len + 1);	/* include NUL term chars */
 #		endif
 		source_col = 1;
 		num_subs = 0;
-		cp = source_buffer;
 		possible_sentinel = TRUE;
-		while (possible_sentinel && source_buffer[source_col - 1])
+		while (possible_sentinel)
 		{
 			possible_sentinel = FALSE;
-			cp = source_buffer + source_col - 1;
-			if (DEL < *cp)
+			cp = (unsigned char *)((TREF(source_buffer)).addr + source_col - 1);
+			if (('\0' == *cp) || (DEL < *cp))
 				break;
 			if ('\"' == *cp)
 			{
@@ -138,7 +135,7 @@ void lb_init(void)
 			}
 		}
 	}
-	TREF(lexical_ptr) = (char *)source_buffer;
+	TREF(lexical_ptr) = (TREF(source_buffer)).addr;
 	advancewindow();
 	advancewindow();
 	return;

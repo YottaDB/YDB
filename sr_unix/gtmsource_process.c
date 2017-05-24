@@ -68,7 +68,6 @@
 #include "gv_trigger_common.h"
 #include "wbox_test_init.h"
 #ifdef GTM_TLS
-#include "heartbeat_timer.h"
 #include "gtm_repl.h"
 #endif
 
@@ -214,7 +213,6 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 GBLREF	uint4			process_id;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
-GBLREF	uint4			heartbeat_counter;
 
 STATICDEF	boolean_t	xon_wait_logged = FALSE;
 STATICDEF	boolean_t	already_communicated = FALSE;
@@ -222,9 +220,9 @@ STATICDEF	seq_num		recvd_seqno = 0;
 STATICDEF	int		recvd_start_flags = START_FLAG_NONE;
 STATICDEF	int		poll_time = REPL_POLL_NOWAIT;
 #ifdef GTM_TLS
-STATICDEF	uint4		next_renegotiate_hrtbt = 0;
+STATICDEF	boolean_t	next_renegotiate_hrtbt = FALSE;
 #ifdef DEBUG
-STATICDEF	boolean_t	renegotiation_pending = 0;
+STATICDEF	boolean_t	renegotiation_pending = FALSE;
 #endif
 #endif
 
@@ -404,8 +402,7 @@ void gtmsource_recv_ctl(void)
 		return;
 #	ifdef GTM_TLS
 	assert(repl_tls.enabled || (REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state));
-	if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state)
-		&& (heartbeat_counter >= next_renegotiate_hrtbt))
+	if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state) && next_renegotiate_hrtbt)
 	{	/* Time to renegotiate the TLS/SSL parameters. */
 		heartbeat_stalled = TRUE;	/* Defer heartbeats until renegotiation is done. */
 		DEBUG_ONLY(renegotiation_pending = TRUE);
@@ -761,6 +758,10 @@ int gtmsource_process(void)
 		if (max_epoch_interval < csa->hdr->epoch_interval)
 			max_epoch_interval = csa->hdr->epoch_interval;
 	}
+	/* Since we want to wait at least a couple of minutes before timing out on the latch, ensure max_epoch_interval
+	 * is at least 1 minute even if the individual file header epoch intervals are not that big.
+	 */
+	max_epoch_interval = MAX(60, max_epoch_interval);
 	while (TRUE)
 	{
 		assert(!udi->grabbed_ftok_sem);
@@ -1356,9 +1357,14 @@ int gtmsource_process(void)
 			}
 		}
 #		endif
-		if (QWLT(gtmsource_local->read_jnl_seqno, sav_read_jnl_seqno) && (NULL != repl_ctl_list))
-		{	/* The journal files may have been positioned ahead of the read_jnl_seqno for the next read.
-			 * Indicate that they have to be repositioned into the past.
+		if (NULL != repl_ctl_list)
+		{	/* The journal files may have been positioned
+			 *	a) Ahead of the read_jnl_seqno for the next read in which case indicate that they have to be
+			 *		repositioned into the past OR
+			 *	b) Behind the read_jnl_seqno for the next read and ctl->lookback might have been set when
+			 *		the disconnect of the previous connection occured and the newer connection happens
+			 *		with a receiver database that is much more ahead in time than when it disconnected.
+			 *		In this case fix ctl->lookback. (GTM-8547)
 			 */
 			assert(READ_FILE == gtmsource_local->read_state);
 			gtmsource_set_lookback();	/* In case we read ahead, enable looking back. */

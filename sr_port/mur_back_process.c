@@ -42,9 +42,7 @@
 #include "gtmcrypt.h"
 #include "wbox_test_init.h"
 #include "timers.h"
-#ifdef GTM_TRUNCATE
 #include "gdsfilext_nojnl.h"
-#endif
 #include "have_crit.h"
 #include "gtm_multi_thread.h"
 #include "gtm_pthread_init_key.h"
@@ -283,6 +281,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 	reg_ctl_list		*rctl, *rctl_top;
 	seq_num			rec_token_seq, save_resync_seqno, strm_seqno;
 	sgmnt_data_ptr_t	csd;
+	unix_db_info		*udi;
 
 	reg_total = murgbl.reg_total;
 	max_lvrec_time = 0;			/* To find maximum of all valid record's timestamp */
@@ -384,7 +383,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RESOLVESEQSTRM, 3, idx,
 							&murgbl.resync_strm_seqno[idx], &murgbl.resync_strm_seqno[idx]);
 				}
-				/* If -resync=<strm_seqno> is specified, we dont yet know what jnl_seqno it maps back to.
+				/* If -resync=<strm_seqno> is specified, we don't yet know what jnl_seqno it maps back to.
 				 * To facilitate that determination, set resync_seqno to maximum possible value. It will
 				 * be adjusted below based on the records we see in backward processing.
 				 */
@@ -399,7 +398,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 				{	/* When the 'if' condition is TRUE, we apply PBLKs in mur_back_process.
 					 * Store the jgbl.mur_tp_resolve_time/murgbl.resync_seqno.
 					 * So we remember to undo PBLKs at least upto that point,
-					 * in case this recovery is interrupted/crashes.
+					 * in case this recovery is interrupted/crashed.
 					 */
 					assert(0 == iterationcnt || csd->intrpt_recov_tp_resolve_time >= jgbl.mur_tp_resolve_time);
 					csd->intrpt_recov_tp_resolve_time = jgbl.mur_tp_resolve_time;
@@ -415,8 +414,19 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 					/* flush the changed csd to disk */
 					fc = rctl->gd->dyn.addr->file_cntl;
 					fc->op = FC_WRITE;
+					/* Note: csd points to shared memory and is already aligned
+					 * appropriately even if db was opened using O_DIRECT.
+					 */
 					fc->op_buff = (sm_uc_ptr_t)csd;
-					fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
+					/* The size of the write depends on the extent to which the mastermap has changes
+					 * due to the PBLK application. Round it to the nearest filesystem-block alignment
+					 * in case of O_DIRECT.
+					 */
+					udi = FC2UDI(fc);
+					if (!udi->fd_opened_with_o_direct)
+						fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
+					else
+						fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(csd), DIO_ALIGNSIZE(udi));
 					fc->op_pos = 1;
 					dbfilop(fc);
 				}
@@ -594,9 +604,9 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	int			gtmcrypt_errno;
 	boolean_t		use_new_key;
 	char			s[TRANS_OR_SEQ_NUM_CONT_CHK_FAILED_SZ];	/* for appending sequence or transaction number */
-#	ifdef GTM_TRUNCATE
 	uint4			cur_total, old_total;
-#	endif
+	file_control		*fc;
+	unix_db_info		*udi;
 
 	jctl = mur_back_options->jctl;
 	rctl = jctl->reg_ctl;
@@ -620,6 +630,12 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	status = mur_back_options->status;
 	this_reg_resolved = FALSE;
 	apply_pblk_this_region = mur_back_apply_pblk && !rctl->jfh_recov_interrupted;
+	fc = rctl->gd->dyn.addr->file_cntl;
+	udi = FC2UDI(fc);
+	if (udi->fd_opened_with_o_direct)
+	{	/* Check if rctl->dio_buff is allocated. If not allocate it now before invoking "mur_output_pblk" */
+		DIO_BUFF_EXPAND_IF_NEEDED(udi, rctl->csd->blk_size, &rctl->dio_buff);
+	}
 	reg_total = murgbl.reg_total;
 	last_tcom_token = 0;
 	for ( ; SS_NORMAL == status; status = mur_prev_rec(&jctl))
@@ -713,7 +729,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				/* In case this journal file was crashed it is possible that we see a good PBLK at
 				 * this point in time but could find bad journal data in the journal file at an
 				 * EARLIER offset (further in backward processing). If the current recovery has been
-				 * invoked with -noverify, we dont have a separate pblk application phase. One might
+				 * invoked with -noverify, we don't have a separate pblk application phase. One might
 				 * wonder if in such a case, it is safe to apply good pblks at this point without
 				 * knowing if bad pblks could be encountered later in backward processing. Turns out
 				 * it is safe. If there were bad pblks BEFORE this good pblk, this means the good pblk
@@ -742,7 +758,6 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			mur_output_pblk(rctl);
 			continue;
 		}
-#		ifdef GTM_TRUNCATE
 		if (JRT_TRUNC == rectype)
 		{
 			if (mur_options.forward)
@@ -756,7 +771,6 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				MUR_BACK_PROCESS_ERROR(jctl, "File extend for JRT_TRUNC record failed");
 			continue;
 		}
-#		endif
 		rec_tn = jnlrec->prefix.tn;
 		rec_time = jnlrec->prefix.time;
 		/* In journal records token_seq field is a union of jnl_seqno and token for TP, ZTP or unfenced records.
@@ -1099,13 +1113,16 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	assert((SS_NORMAL != status) || !mur_options.rollback || this_reg_resolved);
 	if (SS_NORMAL != status)
 	{
+		/* For mur_options.forward ERR_JNLREADBOF is not error but others are.
+		 * For mur_options.backward ERR_NOPREVLINK is not an error in some cases (based on tp_resolve_time).
+		 */
 		if (!mur_options.forward)
 		{
 			if (ERR_NOPREVLINK == status)
 			{	/* We check if there is an EPOCH with a time EQUAL to the tp_resolve_time. If so we
 				 * try not to issue the NOPREVLINK error for this boundary condition.
 				 */
-				assert(JNL_HDR_LEN ==  jctl->rec_offset);
+				assert(JNL_HDR_LEN == jctl->rec_offset);
 				if (rec_time <= jgbl.mur_tp_resolve_time)
 				{
 					jctl->rec_offset = JNL_HDR_LEN + PINI_RECLEN;
@@ -1175,8 +1192,31 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		{
 			rctl->jctl_error = jctl;
 			return status;
+		} else if (mur_options.rollback && !this_reg_resolved)
+		{	/* Forward rollback and this region has still not been resolved. Fix it to reflect
+			 * the seqno of the earliest EPOCH in this region. Note: The below code is very
+			 * similar to the ERR_NOPREVLINK case (for backward rollback) in the above "if" block.
+			 */
+			assert(JNL_HDR_LEN == jctl->rec_offset);
+			jctl->rec_offset = JNL_HDR_LEN + PINI_RECLEN;
+			status = mur_prev(jctl, jctl->rec_offset);
+			if (SS_NORMAL != status)
+			{
+				rctl->jctl_error = jctl;
+				return status;
+			}
+			jnlrec = mur_desc->jnlrec;
+			rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+			rec_time = jnlrec->prefix.time;
+			assert(rec_time >= jgbl.mur_tp_resolve_time);
+			rec_token_seq = GET_JNL_SEQNO(jnlrec);
+			assert(JRT_EPOCH == rectype);
+			assert(!murgbl.resync_seqno || (rec_token_seq <= murgbl.resync_seqno));	/* else RESYNCSEQNOLOW error
+												 * would have been issued.
+												 */
+			SAVE_PRE_RESOLVE_SEQNO(rectype, rec_time, rec_token_seq);
+			this_reg_resolved = TRUE;
 		}
-		/* for mur_options.forward ERR_JNLREADBOF is not error but others are */
 	}
 	assertpro(mur_options.forward || (NULL != rctl->jctl_turn_around));
 	return SS_NORMAL;

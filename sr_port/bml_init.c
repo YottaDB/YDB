@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +12,7 @@
 
 #include "mdef.h"
 
-#ifdef UNIX
-#include <errno.h>		/* for DSK_WRITE macro */
-#elif defined(VMS)
-#include "efn.h"		/* for DSK_WRITE macro */
-#else
-#error UNSUPPORTED PLATFORM
-#endif
+#include <errno.h>		/* for DSK_WRITE_NOCACHE macro */
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -42,7 +37,7 @@ int4 bml_init(block_id bml)
 	trans_num	blktn;
 
 	size = BM_SIZE(cs_data->bplmap);
-	/* Allocate full block .. bml_newmap will set the write size, dsk_write will write part or all of it as appropriate. */
+	/* Allocate full block. bml_newmap will set the write size. DSK_WRITE_NOCACHE will write part or all of it as appropriate */
 	ptr = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	/* We are about to create a local bitmap. Setting its block transaction number to the current database transaction
 	 * number gives us a clear history of when this bitmap got created. There are two exceptions.
@@ -63,7 +58,7 @@ int4 bml_init(block_id bml)
 		blktn = cs_data->trans_hist.curr_tn;
 
 	bml_newmap(ptr, size, blktn);
-	/* status holds the status of any error return from dsk_write */
+	/* status holds the status of any error return from DSK_WRITE_NOCACHE */
 	DSK_WRITE_NOCACHE(gv_cur_region, bml, (sm_uc_ptr_t)ptr, cs_data->desired_db_format, status);
 	free(ptr);
 	return status;

@@ -1,6 +1,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
+! Copyright (c) 2001-2017 Fidelity National Information		!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -67,7 +68,7 @@ GDNOTSET	<Global Directory not changed because the current GD cannot be written>
 INVGBLDIR	<Invalid Global Directory spec: !AD.!/Continuing with !AD>/info/fao=4
 WRITEERROR	<Cannot exit because of write failure.  Reason for failure: !AD>/info/fao=2
 NONASCII	<!AD is illegal for a !AD as it contains non-ASCII characters>/error/fao=4
-CRYPTNOMM	<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2
+GDECRYPTNOMM	<!AD segment has encryption turned on. Cannot support MM access method.>/error/fao=2
 JNLALLOCGROW	<Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD>/info/fao=8
 KEYFORBLK	<But block size !AD and reserved bytes !AD limit key size to !AD>/info/fao=6
 STRMISSQUOTE	<Missing double-quote at end of string specification !AD>/error/fao=2
@@ -96,4 +97,6 @@ NAMGVSUBOFLOW	<Subscripted name !AD...!AD is too long to represent in the databa
 GBLNAMCOLLRANGE	<Collation sequence #!UL is out of range (0 thru 255)>/error/fao=3
 STDNULLCOLLREQ	<Region !AD needs Standard Null Collation enabled because global !AD spans through it>/info/fao=4
 GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL>/error/fao=5
+GDEASYNCIONOMM	<!AD segment has ASYNCIO turned on. Cannot support MM access method.>/error/fao=2
+NOPERCENTY	<^%Y* is a reserved global name in GT.M>/error/fao=0
 	.end

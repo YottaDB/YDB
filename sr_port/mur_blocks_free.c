@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,10 +48,11 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	int4		x;
 	block_id 	bnum;
 	int 		maps, mapsize, i, j, k, fcnt, status;
-	unsigned char 	*disk, *c, *m_ptr;
+	unsigned char 	*c, *disk, *m_ptr;
 	uint4 		*dskmap, map_blk_size;
 	file_control 	*db_ctl;
 	enum db_ver	dummy_ondskblkver;
+	unix_db_info	*udi;
 
 	db_ctl = rctl->db_ctl;
 	cs_data = rctl->csd;
@@ -58,8 +60,17 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	fcnt = 0;
 	maps = (cs_data->trans_hist.total_blks + cs_data->bplmap - 1) / cs_data->bplmap;
 	map_blk_size = BM_SIZE(cs_data->bplmap);
-	m_ptr = (unsigned char*)malloc(cs_data->blk_size + 8);
-	disk = (unsigned char *)(((UINTPTR_T)m_ptr) + 7 & (UINTPTR_T)(-8L));
+	udi = FC2UDI(db_ctl);
+	if (udi->fd_opened_with_o_direct)
+	{	/* We need aligned buffers */
+		m_ptr = (unsigned char *)malloc(ROUND_UP2(cs_data->blk_size, DIO_ALIGNSIZE(udi)) + OS_PAGE_SIZE);
+		disk = (unsigned char *)ROUND_UP2((UINTPTR_T)m_ptr, OS_PAGE_SIZE);
+	} else
+	{
+		m_ptr = (unsigned char *)malloc(cs_data->blk_size);
+		assert(IS_PTR_8BYTE_ALIGNED(m_ptr));
+		disk = m_ptr;
+	}
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
@@ -69,13 +80,13 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
 		status = dbfilop(db_ctl);
 		if (SYSCALL_ERROR(status))
-			rts_error(VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
+			rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
 		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
 			if (ERR_DYNUPGRDFAIL == status)
-				rts_error(VARLSTCNT(5) status, 3, bnum, DB_LEN_STR(gv_cur_region));
+				rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) status, 3, bnum, DB_LEN_STR(gv_cur_region));
 			else
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(1) status);
 		if (((blk_hdr *)disk)->bsiz != map_blk_size)
 		{
 			util_out_print("Wrong size map block", TRUE);

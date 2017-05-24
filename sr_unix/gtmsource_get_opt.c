@@ -44,7 +44,6 @@
 #include "gtm_zlib.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
-#include "heartbeat_timer.h"
 #endif
 
 #define MAX_SECONDARY_LEN 		(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and port number */
@@ -362,8 +361,6 @@ int gtmsource_get_opt(void)
 				renegotiate_interval = renegotiate_interval * 60;	   /* Convert to seconds. */
 			} else
 				renegotiate_interval = DEFAULT_RENEGOTIATE_TIMEOUT * 60; /* Convert to seconds. */
-			/* Convert renegotiate_interval to heartbeat units (# of 8 second intervals). */
-			renegotiate_interval = DIVIDE_ROUND_UP(renegotiate_interval, HEARTBEAT_INTERVAL_IN_SECS);
 			gtmsource_options.renegotiate_interval = renegotiate_interval;
 			/* Check if plaintext-fallback mode is specified. Default option is NOPLAINTEXTFALLBACK. */
 			if (CLI_PRESENT == (plaintext_fallback = cli_present("PLAINTEXTFALLBACK")))

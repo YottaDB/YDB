@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +37,7 @@ gv_namehead *dse_find_gvt(gd_region *reg, char *name, int name_len)
 	sgmnt_addrs		*csa;
 
 	assert(reg->open);
-	assert((dba_mm == REG_ACC_METH(reg)) || (dba_bg == REG_ACC_METH(reg)));
+	assert(IS_REG_BG_OR_MM(reg));
 	csa = &FILE_INFO(reg)->s_addrs;
 	gvt_hashtab = (hash_table_mname *)csa->miscptr;
 	if (NULL == gvt_hashtab)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,7 @@ void gvnh_spanreg_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, gd_binding *gvmap_st
 	unsigned int	min_reg_index, max_reg_index;
 	gd_region	*reg, *reg_start;
 #	ifdef DEBUG
+	boolean_t	min_reg_index_adjusted = FALSE;
 	gd_region	*reg_top;
 	gd_binding	*gdmap_top;
 	trans_num	gd_targ_tn, *tn_array;
@@ -91,6 +93,14 @@ void gvnh_spanreg_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, gd_binding *gvmap_st
 		return;
 	}
 	TREF(spangbl_seen) = TRUE;	/* we found at least one global that spans multiple regions */
+	/* If global name is ^%YGS, the map entries for ^%YGS might change with time (see OPEN_BASEREG_IF_STATSREG macro
+	 * AND ygs_map->reg.addr in "gvcst_init_statsDB"). So keep min_reg_index as lowest possible value.
+	 */
+	if ((gvent_len == STATSDB_GBLNAME_LEN) && (0 == memcmp(gvent_name, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)))
+	{
+		DEBUG_ONLY(min_reg_index_adjusted = TRUE;)
+		min_reg_index = 0;
+	}
 	/* Allocate and initialize a gvnh_spanreg_t structure and link it to gvnh_reg.
 	 * Note gvt_array[] size is max_reg_index - min_reg_index + 1.
 	 */
@@ -109,7 +119,8 @@ void gvnh_spanreg_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, gd_binding *gvmap_st
 	 */
 	memset(&gvspan->gvt_array[0], 0, gvspan_size + SIZEOF(gvspan->gvt_array[0]));
 #	ifdef DEBUG
-		/* Initialize the region slots that are not spanned to by this global with a distinct "invalid" value */
+	if (!min_reg_index_adjusted)
+	{	/* Initialize the region slots that are not spanned to by this global with a distinct "invalid" value */
 		assert(tn_array[min_reg_index] == gd_targ_tn);
 		assert(tn_array[max_reg_index] == gd_targ_tn);
 		for (reg_index = min_reg_index; reg_index <= max_reg_index; reg_index++)
@@ -117,6 +128,7 @@ void gvnh_spanreg_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, gd_binding *gvmap_st
 			if (tn_array[reg_index] != gd_targ_tn)
 				gvspan->gvt_array[reg_index - min_reg_index] = INVALID_GV_TARGET;
 		}
+	}
 #	endif
 	gvnh_reg->gvspan = gvspan;
 	/* Initialize gvt for the region that the unsubscripted global name maps to */

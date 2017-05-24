@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,10 +104,9 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		mglvnp->lclp[IND2] = lvp;
 		break;
 	case MARG2_GBL:
-		if (dba_bg  == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth ||
-		    dba_usr == gv_cur_region->dyn.addr->acc_meth ||
-		    (dba_cm == gv_cur_region->dyn.addr->acc_meth &&
-		     ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
+		if (IS_REG_BG_OR_MM(gv_cur_region) || (dba_usr == gv_cur_region->dyn.addr->acc_meth)
+			|| ((dba_cm == gv_cur_region->dyn.addr->acc_meth)
+				&& ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
 			gvname_env_save(mglvnp->gblp[IND2]);
 		else
 		{ /* M ^LHS=^RHS where RHS resides on a remote node served by a GTCM server that does not support QUERYGET

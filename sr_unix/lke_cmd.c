@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,6 @@ GBLDEF CLI_ENTRY lke_cmd_ary[] = {
 	{ "CLEAR",  lke_clear,  clear_qual, 0, 0, cli_disallow_lke_clear, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
 	{ "EXIT",   lke_exit,   0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "HELP",   util_help,  0,          0, 0, 0, 0, VAL_NOT_REQ,    1, 0, 0,       0},
-	{ "SETGDR", lke_setgdr,	0,          0, 0, 0, 0, VAL_REQ,        1, 0, 0,       0},
 	{ "SHOW",   lke_show,   show_qual,  0, 0, 0, 0, VAL_NOT_REQ,    1, 0, VAL_STR, 0},
 	{ "SPAWN",  util_spawn,	0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "" }

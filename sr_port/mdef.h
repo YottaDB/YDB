@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,11 +92,13 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
 
 #include <inttypes.h>
+#include <stdarg.h>
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
 #include <mdefsp.h>
 #include "gtm_sizeof.h"
 #include "gtm_threadgbl.h"
+
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
@@ -636,6 +638,7 @@ void dec_err(int4 msgnum, ...);
 #error unsupported platform
 #endif
 void stx_error(int in_error, ...);
+void stx_error_va(int in_error, va_list args);
 void ins_errtriple(int4 in_error);
 
 int4 timeout2msec(int4 timeout);
@@ -668,12 +671,12 @@ int4 timeout2msec(int4 timeout);
 #define	DB_LEN_STR(reg)			(reg)->dyn.addr->fname_len, (reg)->dyn.addr->fname
 #define	REG_STR_LEN(reg)		(reg)->rname, (reg)->rname_len
 #define	REG_LEN_STR(reg)		(reg)->rname_len, (reg)->rname
+#define	SEG_LEN_STR(seg)		(seg)->sname_len, (seg)->sname
 #define	JNL_STR_LEN(csd)		(csd)->jnl_file_name, (csd)->jnl_file_len
 #define	JNL_LEN_STR(csd)		(csd)->jnl_file_len, (csd)->jnl_file_name
 
 #define	FAB_LEN_STR(fab)		(fab)->fab$b_fns, (fab)->fab$l_fna
 /* *********************************************************************************************************** */
-
 
 #ifdef DEBUG
 /* Original debug code has been removed since it was superfluous and did not work on all platforms. SE 03/01 */
@@ -693,40 +696,27 @@ void m_usleep(int useconds);
 #endif
 
 #ifdef UNIX
-#	define UNIX_ONLY(X)		X
-#	define UNIX_ONLY_COMMA(X)	X,
+#	define UNIX_ONLY(X)			X
+#	define UNIX_ONLY_COMMA(X)		X,
+#	define UNSUPPORTED_PLATFORM_CHECK
+	/* z/OS is not able to have dynamic file extensions while running in MM access mode
+	 * If multiple processes are accessing the same mapped file, and one process needs to extend/remap the file,
+	 * all the other processes must also unmap the file.
+	 * This same comment is in the test framework in set_gtm_machtype.csh.  If this comment is updated, also update the other.
+	 */
+#	if !defined(__MVS__)
+#		define MM_FILE_EXT_OK
+#	else
+#		undef MM_FILE_EXT_OK
+#	endif
 #else
 #	define UNIX_ONLY(X)
 #	define UNIX_ONLY_COMMA(X)
-#endif
-
-/* z/OS is not able to have dynamic file extensions while running in MM access mode
- * If multiple processes are accessing the same mapped file, and one process needs to extend/remap the file,
- * all the other processes must also unmap the file.
- *
- * This same comment is in the test framework in set_gtm_machtype.csh.  If this comment is updated, also update the other.
- */
-#ifdef UNIX
-#	if !defined(__MVS__)
-#	define MM_FILE_EXT_OK
-#	else
-#	undef MM_FILE_EXT_OK
-#	endif
-#endif
-
-#ifdef VMS
-#	define VMS_ONLY(X)		X
-#	define VMS_ONLY_COMMA(X)	X,
-#else
-#	define VMS_ONLY(X)
-#	define VMS_ONLY_COMMA(X)
-#endif
-
-#if (defined(UNIX) || defined(VMS))
-#	define UNSUPPORTED_PLATFORM_CHECK
-#else
 #	define UNSUPPORTED_PLATFORM_CHECK	#error UNSUPPORTED PLATFORM
 #endif
+
+#define VMS_ONLY(X)
+#define VMS_ONLY_COMMA(X)
 
 /* Note the macros below refer to the UNIX Shared Binary Support. Because the
  * support is *specifically* for the UNIX platform, "NON_USHBIN_ONLY()" will
@@ -860,9 +850,9 @@ typedef struct
 #define	IS_PTR_IN_RANGE(ptr, ptr_lo, ptr_hi)								\
 	(((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(ptr_lo)) && ((sm_uc_ptr_t)(ptr) < (sm_uc_ptr_t)(ptr_hi)))
 
-#define	IS_PTR_2BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 2))
-#define	IS_PTR_4BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 4))
-#define	IS_PTR_8BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 8))
+#define	IS_PTR_2BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) & 0x1))
+#define	IS_PTR_4BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) & 0x3))
+#define	IS_PTR_8BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) & 0x7))
 
 #ifdef DB64
 # ifdef __osf__
@@ -1729,19 +1719,6 @@ typedef enum
 	for (i = 0; i < len; i+=2)						\
 		SPRINTF((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
 }
-
-#ifdef UNIX
-#	define	GTM_SNAPSHOT
-#	define	NON_GTM_SNAPSHOT_ONLY(X)
-#	define	GTM_SNAPSHOT_ONLY(X)		X
-#else
-#	define	NON_GTM_SNAPSHOT_ONLY(X)	X
-#	define	GTM_SNAPSHOT_ONLY(X)
-#endif
-
-#define	GTM_TRUNCATE
-#define	NON_GTM_TRUNCATE_ONLY(X)
-#define	GTM_TRUNCATE_ONLY(X)		X
 
 /* Currently triggers are supported only on UNIX */
 #if defined(UNIX)

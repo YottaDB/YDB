@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,10 +28,8 @@
 #include "stp_parms.h"
 #include "iosp.h"
 #include "jnl.h"
-#ifdef UNIX
 #include "io.h"
 #include "gtmsecshr.h"
-#endif
 #include "util.h"
 #include "cli.h"
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
@@ -41,25 +39,23 @@
 #include "gdsfilext.h"
 #include "wcs_backoff.h"
 #include "gt_timer.h"
-#if defined(VMS) || defined(MM_FILE_EXT_OK)
-#define DB_IPCS_RESET(REG)
+#if defined(MM_FILE_EXT_OK)
+#	define DB_IPCS_RESET(REG)
 #else
-#include "mu_rndwn_file.h"
-#include "db_ipcs_reset.h"
-#define DB_IPCS_RESET(REG)			\
-{						\
-	if (dba_mm == REG->dyn.addr->acc_meth)	\
-		db_ipcs_reset(REG);		\
-}
+#	 include "mu_rndwn_file.h"
+#	 include "db_ipcs_reset.h"
+#	define DB_IPCS_RESET(REG)			\
+	{						\
+		if (dba_mm == REG->dyn.addr->acc_meth)	\
+			db_ipcs_reset(REG);		\
+	}
 #endif
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-#ifdef UNIX
 GBLREF	boolean_t		jnlpool_init_needed;
-#endif
 
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBRDONLY);
@@ -79,7 +75,7 @@ void mupip_extend(void)
 	boolean_t	defer_alloc;
 
 	r_len = SIZEOF(regionname);
-	UNIX_ONLY(jnlpool_init_needed = TRUE);
+	jnlpool_init_needed = TRUE;
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
 	gvinit();
@@ -93,7 +89,7 @@ void mupip_extend(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, r_len, regionname);
 		mupip_exit(ERR_MUNOACTION);
 	}
-	if ((dba_bg != gv_cur_region->dyn.addr->acc_meth) && (dba_mm != gv_cur_region->dyn.addr->acc_meth))
+	if (!IS_REG_BG_OR_MM(gv_cur_region))
 	{
 		util_out_print("Can only EXTEND BG and MM databases",TRUE);
 		mupip_exit(ERR_MUNOACTION);
@@ -103,7 +99,7 @@ void mupip_extend(void)
 		util_out_print("!/Can't EXTEND region !AD across network",TRUE, REG_LEN_STR(gv_cur_region));
 		mupip_exit(ERR_MUNOACTION);
 	}
-#	if !defined(MM_FILE_EXT_OK) && defined(UNIX)
+#	if !defined(MM_FILE_EXT_OK)
 	if (dba_mm == gv_cur_region->dyn.addr->acc_meth)
 	{
 		FILE_CNTL_INIT(gv_cur_region->dyn.addr);
@@ -134,6 +130,7 @@ void mupip_extend(void)
 		if ((tblocks < 0) || (defer_alloc && (tblocks == 0)))
 		{
 			util_out_print("!/BLOCKS too small, no extension done",TRUE);
+			DB_IPCS_RESET(gv_cur_region);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		blocks = tblocks;
@@ -178,7 +175,7 @@ void mupip_extend(void)
 			rel_crit(gv_cur_region);
 			break;
 		default:
-			assertpro(dba_bg == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth);
+			assertpro(IS_REG_BG_OR_MM(gv_cur_region));
 	}
 	util_out_print("Extension successful, file !AD extended by !UL blocks.  Total blocks = !UL.",TRUE,
 		DB_LEN_STR(gv_cur_region), total - old_total - bit_maps, total - DIVIDE_ROUND_UP(total, bplmap));

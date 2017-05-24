@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "trigger_update_protos.h"
 #include "trigger_compare_protos.h"
 #include "trigger_user_name.h"
+#include "gtm_trigger_trc.h"
 #include "gtm_string.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
@@ -326,7 +327,7 @@ static	boolean_t		promptanswer = TRUE;
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<#LABEL|#COUNT|#CYCLE>) */
 #define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT, MOREINFO, CSA)	\
 {									\
-	if (CDB_STAGNATE > t_tries)					\
+	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))		\
 		t_retry(cdb_sc_triggermod);				\
 	else								\
 	{								\
@@ -458,7 +459,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 	 * on the max # of duplicated auto-generated names.
 	 */
 	assert(0 < trigger_name_len);
-	SAVE_TRIGGER_REGION_INFO(save_currkey);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	name_found = FALSE;
 	reg = *srch_reg;
 	if (NULL != reg)
@@ -471,6 +472,8 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 	}
 	for ( ; reg < reg_top; reg++)
 	{
+		if (IS_STATSDB_REGNAME(reg))
+			continue;
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 		if (NULL == cs_addrs)	/* not BG or MM access method */
 			continue;
@@ -485,7 +488,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		ptr2 = memchr(ptr, '\0', val->str.len);	/* Do it this way since "val" has multiple fields null separated */
 		if (NULL == ptr2)
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
@@ -507,7 +510,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		name_found = TRUE;
 		break;
 	}
-	RESTORE_TRIGGER_REGION_INFO(save_currkey);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	return name_found;
 }
 
@@ -537,10 +540,12 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 	*new_match = TRUE;
 	if (0 == value_len[TRIGNAME_SUB])
 		return TRUE;
-	SAVE_TRIGGER_REGION_INFO(save_currkey);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	overall_name_found = FALSE;
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 	{
+		if (IS_STATSDB_REGNAME(reg))
+			continue;
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 		if (NULL == cs_addrs)	/* not BG or MM access method */
 			continue;
@@ -565,7 +570,7 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 			}
 		}
 	}
-	RESTORE_TRIGGER_REGION_INFO(save_currkey);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	return !overall_name_found;
 }
 
@@ -1531,16 +1536,6 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(cs_addrs == gv_target->gd_csa);
-	csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time */
-	if (dollar_ztrigger_invoked)
-	{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction, on this region,
-		 * will re-read triggers. Note that the below increment happens for every record added. So, even if a
-		 * single trigger file loaded multiple triggers on the same region, db_dztrigger_cycle will be incremented
-		 * more than one for same transaction. This is considered okay since we only need db_dztrigger_cycle to
-		 * be equal to a different value than gvt->db_dztrigger_cycle.
-		 */
-		csa->db_dztrigger_cycle++;
-	}
 	if (!*jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 	{	/* Attach to jnlpool if replication is turned on. Normally SET or KILL of the ^#t records take care of this
 		 * but in case this is a NO-OP trigger operation that wont happen and we still want to write a
@@ -1780,7 +1775,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 								&tmp_index, &db_matched_set, &db_matched_kill,
 								&full_match, trigname[oprtype], trigname[oprtype])))
 					{	/* SET trigger found previously is not found again */
-						if (CDB_STAGNATE > t_tries)
+						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 							t_retry(cdb_sc_triggermod);
 						assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 						util_out_print_gtmio("Error : Previously found SET trigger " \
@@ -2011,7 +2006,21 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	}
 	assert((STATS_UNCHANGED_TRIGFILE == trigload_status) || (STATS_NOERROR_TRIGFILE == trigload_status));
 	if ((0 == trig_stats[STATS_ERROR_TRIGFILE]) && (STATS_NOERROR_TRIGFILE == trigload_status))
+	{
 		trigger_incr_cycle(trigvn, trigvn_len);	/* ^#t records changed in this function, increment cycle */
+		csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time */
+		if (dollar_ztrigger_invoked)
+		{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction, on this region,
+			 * will re-read triggers. Note that the below increment happens for every record added. So, even if a
+			 * single trigger file loaded multiple triggers on the same region, db_dztrigger_cycle will be incremented
+			 * more than one for same transaction. This is considered okay since we only need db_dztrigger_cycle to
+			 * be equal to a different value than gvt->db_dztrigger_cycle.
+			 */
+			csa->db_dztrigger_cycle++;
+			DBGTRIGR((stderr, "trigupdrec_reg: dollar_ztrigger_invoked CSA->db_dztrigger_cycle=%d\n",
+						csa->db_dztrigger_cycle));
+		}
+	}
 	RETURN_AND_POP_MVALS(trigload_status);
 }
 

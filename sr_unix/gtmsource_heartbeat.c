@@ -65,7 +65,7 @@ void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 	assert(0 != gtmsource_now);
 	UNIX_ONLY(assert(*interval_ptr == heartbeat_period);)	/* interval_len and interval_ptr are dummies on VMS */
 	gtmsource_now += heartbeat_period;			/* cannot use *interval_ptr on VMS */
-	REPL_DPRINT2("Starting heartbeat timer with %d s\n", heartbeat_period);
+	REPL_DPRINT4("Repeating heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
 	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
 }
@@ -105,6 +105,7 @@ int gtmsource_init_heartbeat(void)
 	 */
 	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
+	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
 	heartbeat_stalled = FALSE;
 	earliest_sent_time = 0;
 	return (SS_NORMAL);
@@ -112,6 +113,7 @@ int gtmsource_init_heartbeat(void)
 
 int gtmsource_stop_heartbeat(void)
 {
+	REPL_DPRINT4("Stopping heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
 	cancel_timer((TID)gtmsource_heartbeat_timer);
 	if (NULL != repl_heartbeat_que_head)
 		free(repl_heartbeat_que_head);
@@ -121,7 +123,7 @@ int gtmsource_stop_heartbeat(void)
 	earliest_sent_time = 0;
 	gtmsource_now = 0;
 	heartbeat_stalled = TRUE;
-	REPL_DPRINT1("Stopped heartbeat\n");
+	REPL_DPRINT2("Stopped heartbeat (%d)\n", intrpt_ok_state);
 	return (SS_NORMAL);
 }
 

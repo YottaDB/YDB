@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #ifdef GTM_PTHREAD
-#  include <pthread.h>
+#  include "gtm_pthread.h"
 #endif
 #include "gtm_stdlib.h"
 
@@ -34,6 +35,7 @@
 #include "callintogtmxfer.h"
 #include "min_max.h"
 #include "have_crit.h"
+#include "gtm_malloc.h"		/* for verifyAllocatedStorage */
 
 /******************************************************************************
  *
@@ -386,7 +388,6 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef GTM_PTHREAD
-	assert(gtm_jvm_process == gtm_main_thread_id_set);
 	gtm_jvm_process = TRUE;
 	if (!gtm_main_thread_id_set)
 	{
@@ -449,28 +450,15 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			if (MV_DEFINED(v))
 			{
 				MV_FORCE_STR(v);
-				n += SIZEOF(gtm_long_t) + SIZEOF(void *) + v->str.len + 1;  /* length + pointer + string + '\0' */
+				n += SIZEOF(gtm_long_t) + v->str.len + 1;  /* length + string + '\0' */
 			} else
-				n += SIZEOF(gtm_long_t) + SIZEOF(void *) + 1;		    /* length + pointer + '\0' */
-			space_n += SIZEOF(gtm_long_t) + SIZEOF(void *);
+				n += SIZEOF(gtm_long_t) + 1;		    /* length + '\0' */
 		}
-#		ifdef GTM64
-		else if (MASK_BIT_ON(m2) || (gtm_jfloat == entry_ptr->parms[j]) || (gtm_jdouble == entry_ptr->parms[j]))
-		{	/* Account for a pointer space, since floats and doubles cannot be passed by value. */
-			n += SIZEOF(void *);
-			space_n += SIZEOF(void *);
-		}
-#		else
+#		ifndef GTM64
 		else if ((gtm_jdouble == entry_ptr->parms[j]) || (gtm_jlong == entry_ptr->parms[j]))
-		{	/* Account for a pointer space, since longs and doubles cannot be passed by value on 32-bit boxes, and also
-			 * make room for a potential 8-byte alignment.
-			 */
-			n += SIZEOF(void *) + SIZEOF(gtm_int64_t);
-			space_n += SIZEOF(void *) + SIZEOF(gtm_int64_t);
-		} else if (MASK_BIT_ON(m2) || (gtm_jfloat == entry_ptr->parms[j]))
-		{	/* Account for a pointer space, since floats cannot be passed by value. */
-			n += SIZEOF(void *);
-			space_n += SIZEOF(void *);
+		{	/* Account for potential 8-byte alignment on 32-bit boxes */
+			n += SIZEOF(gtm_int64_t);
+			space_n += SIZEOF(gtm_int64_t);
 		}
 #		endif
 		jtype_char = entry_ptr->parms[j] - gtm_jtype_start_idx;
@@ -550,7 +538,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				 * alignment requirement on those platforms.
 				 */
 				free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t)));
-#				else
+#				endif
+#				ifdef GTM64
 				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
 #				endif
@@ -615,8 +604,13 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
+#ifdef DEBUG
+	verifyAllocatedStorage();		/* GTM-8669 verify that argument placement did not trash allocated memory */
+#endif
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
+	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
+	TREF(in_ext_call) = FALSE;
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -995,7 +989,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	param_list->n = argcnt;
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
+	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
+	TREF(in_ext_call) = FALSE;
 	mumps_status = save_mumps_status;
 
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might

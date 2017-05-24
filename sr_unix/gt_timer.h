@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,11 +70,12 @@ typedef struct tag_ts
         int4            safe;           /* Indicates if handler can be delivered while we are in
 					 * a deferred mode
 					 */
+	int4		block_int;	/* Set to intrpt_state_t value if timer handling was blocked
+					 * by an uninterruptible state. For use in debugging, but not
+					 * conditional on DEBUG to keep the structure stable.
+					 */
 	int4		hd_len_max;	/* Max length this blk can hold */
 	int4		hd_len;		/* Handler data length */
-  	GTM64_ONLY(int4 padding;)       /* Padding for 8 byte alignment of hd_data. Remove if hd_data
-					 * is made to start on a 8 byte boundary (for GTM64)
-					 */
 	char		hd_data[1];	/* Handler data */
 } GT_TIMER;
 
@@ -84,12 +86,56 @@ typedef struct st_timer_alloc
 	struct st_timer_alloc	*next;
 } st_timer_alloc;
 
-#define MAX_SAFE_TIMER_HNDLRS	10	/* Max # of safe timer handlers */
+#define MAX_SAFE_TIMER_HNDLRS		16	/* Max # of safe timer handlers */
 #define GT_WAKE
-#define CANCEL_TIMERS		cancel_unsafe_timers()
+#define CANCEL_TIMERS			cancel_unsafe_timers()
+
+/* Set a timeout timer, using a local variable as the timeout indicator.
+ * Note: This macro establishes a condition handler which cancels the timer in case of an rts_error.
+ *       The TIMEOUT_DONE() macro must be used on all normal routine exit paths in order to REVERT the handler.
+ */
+#define TIMEOUT_INIT(TIMEOUT_VAR, TIMEOUT_MILLISECS)									\
+MBSTART {														\
+	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);								\
+	boolean_t	got_error;											\
+															\
+	TIMEOUT_VAR = FALSE;												\
+	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_MILLISECS, simple_timeout_timer,					\
+			SIZEOF(ptr_to_##TIMEOUT_VAR), &ptr_to_##TIMEOUT_VAR);						\
+	ESTABLISH_NORET(timer_cancel_ch, got_error);									\
+	if (got_error)													\
+	{														\
+		TIMEOUT_DONE(TIMEOUT_VAR);										\
+		DRIVECH(error_condition);										\
+	}														\
+} MBEND
+#define TIMEOUT_DONE(TIMEOUT_VAR)						\
+MBSTART {									\
+	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);			\
+										\
+	assert(ctxt->ch == timer_cancel_ch);					\
+	REVERT;									\
+	cancel_timer((TID)ptr_to_##TIMEOUT_VAR);				\
+} MBEND
+
+/* Lighter versions with no condition handler, for when it is safe to have the timer hang around after it is no longer relevant. */
+#define TIMEOUT_INIT_NOCH(TIMEOUT_VAR, TIMEOUT_MILLISECS)								\
+MBSTART {														\
+	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);								\
+															\
+	TIMEOUT_VAR = FALSE;												\
+	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_MILLISECS, simple_timeout_timer,					\
+			SIZEOF(ptr_to_##TIMEOUT_VAR), &ptr_to_##TIMEOUT_VAR);						\
+} MBEND
+#define TIMEOUT_DONE_NOCH(TIMEOUT_VAR)						\
+MBSTART {									\
+	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);			\
+										\
+	cancel_timer((TID)ptr_to_##TIMEOUT_VAR);				\
+} MBEND
 
 /* Uncomment the below #define if you want to print the status of the key timer-related variables as well as the entire timer queue
- * when operations such as addition, cancelation, or handling of a timer occur.
+ * when operations such as addition, cancellation, or handling of a timer occur.
  *
  * #define TIMER_DEBUGGING
  */
@@ -97,13 +143,17 @@ typedef struct st_timer_alloc
 #ifdef TIMER_DEBUGGING
 #  define DUMP_TIMER_INFO(LOCATION)								\
 {												\
+	extern void	(*fake_enospc_ptr)();							\
+	extern void	(*simple_timeout_timer_ptr)();						\
 	int		i;									\
 	GT_TIMER	*cur_timer;								\
-	char		*s_heartbeat_timer = "heartbeat_timer";					\
+	char		*s_jnl_file_close_timer = "jnl_file_close_timer";			\
 	char		*s_wcs_clean_dbsync = "wcs_clean_dbsync";				\
 	char		*s_wcs_stale = "wcs_stale";						\
 	char		*s_hiber_wake = "hiber_wake";						\
-	char		*s_unknown = "unknown";							\
+	char		*s_fake_enospc = "fake_enospc";						\
+	char		*s_simple_timeout_timer = "simple_timeout_timer";			\
+	char		s_unknown[20];								\
 	char		*handler;								\
 												\
 	cur_timer = (GT_TIMER *)timeroot;							\
@@ -113,22 +163,30 @@ typedef struct st_timer_alloc
 		"  system timer active: %d\n"							\
 		"  timer in handler:    %d\n"							\
 		"  timer stack count:   %d\n"							\
-		"  heartbeat started:   %d\n",							\
-		LOCATION, timer_active, timer_in_handler, timer_stack_count, heartbeat_started);\
+		"  oldjnlclose started: %d\n",							\
+		LOCATION, timer_active, timer_in_handler,					\
+		timer_stack_count, oldjnlclose_started);					\
 	FFLUSH(stderr);										\
 	i = 0;											\
 	while (cur_timer)									\
 	{											\
-		if ((void (*)())heartbeat_timer_ptr == cur_timer->handler)			\
-			handler = s_heartbeat_timer;						\
+		if ((void (*)())jnl_file_close_timer_ptr == cur_timer->handler)			\
+			handler = s_jnl_file_close_timer;					\
 		else if ((void (*)())wcs_clean_dbsync_fptr == cur_timer->handler)		\
 			handler = s_wcs_clean_dbsync;						\
 		else if ((void (*)())wcs_stale_fptr == cur_timer->handler)			\
 			handler = s_wcs_stale;							\
 		else if ((void (*)())hiber_wake == cur_timer->handler)				\
 			handler = s_hiber_wake;							\
+		else if ((void (*)())fake_enospc_ptr == cur_timer->handler)			\
+			handler = s_fake_enospc;						\
+		else if ((void (*)())simple_timeout_timer_ptr == cur_timer->handler)		\
+			handler = s_simple_timeout_timer;					\
 		else										\
+		{										\
+			SPRINTF(s_unknown, "%p", (void *)handler);				\
 			handler = s_unknown;							\
+		}										\
 		FPRINTF(stderr, "  - timer #%d:\n"						\
 			"      handler:    %s\n"						\
 			"      safe:       %d\n"						\
@@ -166,17 +224,18 @@ GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 void		check_for_deferred_timers(void);
 void		add_safe_timer_handler(int safetmr_cnt, ...);
 void		sys_canc_timer(void);
+void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);
 STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
-	void *hdata, boolean_t safe_timer);
-STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)());
+					void *hdata, boolean_t safe_timer);
+STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
 STATICFNDCL void	timer_handler(int why);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
-STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
-	void *hdata, boolean_t safe_timer);
+STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
 STATICFNDCL void	init_timers(void);
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +13,10 @@
 #define GTMCRYPT_REF_H
 
 #ifdef USE_OPENSSL
-# include <openssl/blowfish.h>
 # include <openssl/sha.h>
 # include <openssl/evp.h>
 # include <openssl/err.h>
-typedef EVP_CIPHER_CTX		crypt_key_t;
+typedef EVP_CIPHER_CTX		*crypt_key_t;
 #else
 # include <gcrypt.h>
 typedef gcry_cipher_hd_t	crypt_key_t;

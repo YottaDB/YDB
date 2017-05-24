@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 
 GBLREF	boolean_t	run_time;
 GBLREF	spdesc		stringpool;
-GBLREF	unsigned char	*source_buffer;
 GBLREF	int		source_column;
 
 error_def(ERR_EXPR);
@@ -77,7 +76,7 @@ int indirection(oprtype *a)
 				stx_error(ERR_RPARENMISSING);
 				return FALSE;
 			}
-			end = (char *)source_buffer + (INTPTR_T)source_column - 1;	/* lexical_ptr before last advancewindow */
+			end = ((TREF(source_buffer)).addr + (INTPTR_T)source_column - 1); /* lexical_ptr b4 last advancewindow */
 			len = INTCAST(end - start);
 			oldlen = (TREF(indirection_mval)).str.len;
 			ENSURE_STP_FREE_SPACE(oldlen + len);

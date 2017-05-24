@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015 Fidelity National Information		;
+; Copyright (c) 2015-2016 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,9 +12,10 @@
 
 ; This is called by generate_help.csh to put offset, length, type and format info into the gtmhelp database
 GTMDEFINEDTYPESTODB
+	set $etrap="use $principal write $zstatus,! zhalt 1"
 	do Init^GTMDefinedTypesInit
-	merge ^gtmtypes=gtmtypes
 	merge ^gtmtypfldindx=gtmtypfldindx
 	merge ^gtmstructs=gtmstructs
 	merge ^gtmunions=gtmunions
+	merge ^gtmtypes=gtmtypes
 	quit

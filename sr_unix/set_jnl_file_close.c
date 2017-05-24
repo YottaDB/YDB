@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +31,7 @@ uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode)
 	uint4 		jnl_status = 0;
 
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-	jnl_status = jnl_ensure_open();
+	jnl_status = jnl_ensure_open(gv_cur_region, cs_addrs);
 	if (0 == jnl_status)
 	{
 		if (0 == cs_addrs->jnl->pini_addr)
@@ -39,7 +40,7 @@ uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode)
 		jnl_put_jrt_pfin(cs_addrs);
 		jnl_file_close(gv_cur_region, TRUE, TRUE);
 	} else
-		gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),
-			DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),
+				DB_LEN_STR(gv_cur_region));
 	return jnl_status;
 }

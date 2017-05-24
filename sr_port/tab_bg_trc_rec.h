@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,21 +12,6 @@
 
 /* All additions to the end please */
 
-#if defined(VMS)
-TAB_BG_TRC_REC("  Removed from free     ", rmv_free)
-TAB_BG_TRC_REC("  Scratched clean       ", rmv_clean)
-TAB_BG_TRC_REC("  Reused clean          ", clean_to_mod)
-TAB_BG_TRC_REC("  Reused qio            ", qio_to_mod)
-TAB_BG_TRC_REC("  Blocked by qio        ", blocked)
-TAB_BG_TRC_REC("  Blkd qio fnshd 2 late ", blkd_made_empty)
-TAB_BG_TRC_REC("  Obsolete to empty     ", obsolete_to_empty)
-TAB_BG_TRC_REC("  Qio to clean          ", qio_to_clean)
-TAB_BG_TRC_REC("  Former Activelvltriggr", active_lvl_trigger_obsolete)
-TAB_BG_TRC_REC("  Former T_end new got b", new_buff_obsolete)
-TAB_BG_TRC_REC("  Getnew buff           ", get_new_buff)
-TAB_BG_TRC_REC("  Reused modified       ", mod_to_mod)
-TAB_BG_TRC_REC("  Wcs_wtfini invoked    ", wcs_wtfini_invoked)
-#elif defined(UNIX)
 TAB_BG_TRC_REC("  Total buffer flushes  ", total_buffer_flush)		/* # of wcs_flu calls */
 TAB_BG_TRC_REC("  Flsh for buff cnt     ", bufct_buffer_flush)		/* # of flushing-till-buffers-free-cnt (wcs_get_space) */
 TAB_BG_TRC_REC("  Flsh for buff cnt lps ", bufct_buffer_flush_loop)	/* # of flushing-till-buffers-free-cnt looping back */
@@ -39,9 +25,6 @@ TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec2)		/* Reserved fill
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec3)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Lost block recovery   ", lost_block_recovery)		/* Performing lost block recovery in gds_rundown  */
 TAB_BG_TRC_REC("  WcBlocked onln_rlbk   ", wc_blocked_onln_rlbk)	/* Set by online rollback due to incomplete wcs_flu */
-#else
-# error Unsupported platform
-#endif
 TAB_BG_TRC_REC("  Stale                 ", stale)
 TAB_BG_TRC_REC("  Starved               ", starved)
 TAB_BG_TRC_REC("  Stale timer started   ", stale_timer_started)		/* Stale buffer timer started */
@@ -51,7 +34,7 @@ TAB_BG_TRC_REC("  Stale deferd procsd   ", stale_defer_processed)	/* Stale proce
 TAB_BG_TRC_REC("  Spcfc buff flshs      ", spcfc_buffer_flush)		/* Count of flushing specific buffer (wcs_get_space) */
 TAB_BG_TRC_REC("  Spcfc buff flsh lps   ", spcfc_buffer_flush_loop)	/* # of passes to flush a specific buffer (wcs_get_space) */
 TAB_BG_TRC_REC("  Spcfc buff flsh rtries", spcfc_buffer_flush_retries)	/* Times we re-flushed when 1st flush didn't flush buffer */
-TAB_BG_TRC_REC("  Spcfc buff lkwait flsh", spcfc_buffer_flushed_during_lockwait)
+TAB_BG_TRC_REC("  Spcfc buff lkwait flsh", spcfc_buffer_flushed_during_lockwait) /* UNUSED */
 TAB_BG_TRC_REC("  TP crit retries       ", tp_crit_retries)		/* # of times re-tried getting crit (common Unix & VMS) */
 TAB_BG_TRC_REC("  DbCshGetn_FlushDirty  ", db_csh_getn_flush_dirty)	/* all the fields from now on use the BG_TRACE_PRO macro  */
 TAB_BG_TRC_REC("  DbCshGetn_RipWait     ", db_csh_getn_rip_wait)	/* since they are incremented rarely, they will go in	  */
@@ -165,3 +148,11 @@ TAB_BG_TRC_REC("  recompute_upd blk_fini", recompute_upd_array_blk_fini)
 TAB_BG_TRC_REC("  recompute_upd blksplit", recompute_upd_array_blk_split)
 TAB_BG_TRC_REC("  T_qread ripsleep_cnt  ", t_qread_ripsleep_cnt)
 TAB_BG_TRC_REC("  T_qread ripsleep_nblks", t_qread_ripsleep_nblks)
+TAB_BG_TRC_REC("  Wcs_wtfini invoked    ", wcs_wtfini_invoked)
+TAB_BG_TRC_REC("  Wcs_wterror invoked   ", wcs_wterror_invoked)
+TAB_BG_TRC_REC("  Wcs_wt_restart invoked", wcs_wt_restart_invoked)
+TAB_BG_TRC_REC("  Wcs_wt_restart EAGAIN ", wcs_wt_restart_eagain)
+TAB_BG_TRC_REC("  Wcs_wt_restart reinsrt", wcs_wt_restart_reinsert)
+TAB_BG_TRC_REC("  Wcs_wtstart EAGAIN    ", wcs_wtstart_eagain)
+TAB_BG_TRC_REC("  Wcs_wtstart EAGAINcrit", wcs_wtstart_eagain_incrit)
+TAB_BG_TRC_REC("  LseekAIORestart EAGAIN", async_restart_eagain)

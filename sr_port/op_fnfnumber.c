@@ -37,37 +37,33 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 {
 	boolean_t	comma, paren;
 	int 		ct, x, xx, y, z;
-	mval		*t_src_p;
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t;
 
 	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
-	PUSH_MV_STENT(MVST_MVAL);			/* Create a temporary on M stack so garbage collection can see it */
-	t_src_p = &mv_chain->mv_st_cont.mvs_mval;	/* Operate on copy of src so can modify without changing original */
-	*t_src_p = *src;
+	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
+	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
+	 */
+	*dst = *src;
 	if (use_fract)
-		op_fnj3(t_src_p, 0, fract, t_src_p);
+		op_fnj3(dst, 0, fract, dst);
 	else
 	{
-		MV_FORCE_NUM(t_src_p);
-		MV_FORCE_CANONICAL(t_src_p);	/* if the source operand is not a canonical number, force conversion */
+		MV_FORCE_NUM(dst);
+		MV_FORCE_CANONICAL(dst);	/* if the source operand is not a canonical number, force conversion */
 	}
 	assert (stringpool.free >= stringpool.base);
 	assert (stringpool.free <= stringpool.top);
 	/* assure there is adequate space for two string forms of a number as a local
 	 * version of the src must be operated upon in order to get a canonical number
 	 */
-	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE * 2);
 	MV_FORCE_STR(fmt);
-	MV_FORCE_STR(t_src_p);
+	MV_FORCE_STR(dst);
 	if (0 == fmt->str.len)
-	{
-		*dst = *t_src_p;
-		POP_MV_STENT(); 	/* Done with temporary */
 		return;
-	}
-	ch = (unsigned char *)t_src_p->str.addr;
-	ct = t_src_p->str.len;
+	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE * 2);
+	ch = (unsigned char *)dst->str.addr;
+	ct = dst->str.len;
 	cp = stringpool.free;
 	fncode = 0;
 	for (ff = (unsigned char *)fmt->str.addr, ff_top = ff + fmt->str.len; ff < ff_top;)
@@ -121,8 +117,8 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		/* Only add '+' if > 0 */
 		if ((0 != (fncode & PLUS)) && (0 == sign))
 		{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
-			MV_FORCE_NUM(t_src_p);
-			if ((0 == (t_src_p->mvtype & MV_INT)) || (0 != t_src_p->m[1]))
+			MV_FORCE_NUM(dst);
+			if ((0 == (dst->mvtype & MV_INT)) || (0 != dst->m[1]))
 				sign = '+';
 		}
 		if ((0 != (fncode & MINUS)) && ('-' == sign))
@@ -174,7 +170,6 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		dst->str.addr = (char *)stringpool.free;
 		dst->str.len = INTCAST(cp - stringpool.free);
 		stringpool.free = cp;
-		POP_MV_STENT(); 	/* Done with temporary */
 		return;
 	}
 	assertpro(FALSE);

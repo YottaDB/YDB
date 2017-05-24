@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +72,7 @@ void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 		 * in the middle of any transaction.
 		 */
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-		grab_crit(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region);
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 	}
 }

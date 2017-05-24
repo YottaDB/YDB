@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +21,6 @@
 
 GBLREF short int 	source_name_len, source_line;
 GBLREF char 		source_file_name[];
-GBLREF unsigned char	*source_buffer;
 GBLREF bool		dec_nofac;
 GBLREF boolean_t	run_time;
 
@@ -46,7 +46,7 @@ void show_source_line(boolean_t warn)
 	buf = source_line_buff;
 	buflen = SIZEOF(source_line_buff);
 	b_top = buf + buflen - STR_LIT_LEN(ARROW) - 1; /* allow room for arrow and string terminator */
-	for (c = (char *)source_buffer, b = buf, c_top = c + TREF(last_source_column) - 1; c < c_top;)
+	for (c = (TREF(source_buffer)).addr, b = buf, c_top = c + TREF(last_source_column) - 1; c < c_top;)
 	{
 		if ('\t' == *c)
 		{
@@ -100,7 +100,8 @@ void show_source_line(boolean_t warn)
 	}
 	if (warn)
 	{
-		for (c = (char *)source_buffer; c < (char *)source_buffer + STRLEN((char *)source_buffer) - 1; )
+		for (c = (TREF(source_buffer)).addr, c_top = ((TREF(source_buffer)).addr + (TREF(source_buffer)).len - 1)
+			; c < c_top; )
 		{
 			if ('\t' == *c)
 			{
@@ -114,7 +115,7 @@ void show_source_line(boolean_t warn)
 			} else
 			{
 #			ifdef UNICODE_SUPPORTED		/* funky positioning makes VMS compiler happy */
-				chlen = (int)(UTF8_MBTOWC(c, (char *)source_buffer + STRLEN((char *)source_buffer) - 1, ch)
+				chlen = (int)(UTF8_MBTOWC(c, ((TREF(source_buffer)).addr + (TREF(source_buffer)).len - 1), ch)
 						- (uchar_ptr_t)c);
 				if ((WEOF != ch) && 0 < (chwidth = UTF8_WCWIDTH(ch)))
 					line_chwidth += chwidth;
@@ -125,9 +126,11 @@ void show_source_line(boolean_t warn)
 		dec_nofac = TRUE;
 		if (MAXLINESIZEFORDISPLAY > line_chwidth)
 			if (unable_to_complete_arrow)
-				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, LEN_AND_STR((char *)source_buffer), msgstr.len, msgstr.addr);
+				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, (TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
+					msgstr.len, msgstr.addr);
 			else
-				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, LEN_AND_STR((char *)source_buffer), b - buf, buf);
+				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, (TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
+					b - buf, buf);
 		else
 			dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
 		if (!run_time)

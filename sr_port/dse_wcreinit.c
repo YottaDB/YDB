@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ void dse_wcreinit (void)
 	if (cs_addrs->critical)
 		crash_count = cs_addrs->critical->crashcnt;
 	GET_CONFIRM_AND_HANDLE_NEG_RESPONSE
-	if (cs_addrs->hdr->acc_meth != dba_bg && cs_addrs->hdr->acc_meth != dba_mm)
+	if (!IS_CSD_BG_OR_MM(cs_addrs->hdr))
 	{
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("WCINIT"));
 		return;

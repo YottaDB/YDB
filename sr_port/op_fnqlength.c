@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +12,12 @@
 
 #include "mdef.h"
 #include "mvalconv.h"
+#include "stringpool.h"
 #include "op.h"
 #include "is_canonic_name.h"
+#include "zshow.h"
+
+error_def(ERR_NOCANONICNAME);
 
 /*
  * -----------------------------------------------
@@ -31,10 +36,9 @@ void op_fnqlength(mval *src, mval *dst)
 	int	dummy1;
 	int	dummy2;
 	int	subscripts = -2; /* no interest in finding a particular component */
-	error_def(ERR_NOCANONICNAME);
 
 	if (!is_canonic_name(src, &subscripts, &dummy1, &dummy2))
-		rts_error(VARLSTCNT(4) ERR_NOCANONICNAME, 2, src->str.len, src->str.addr);
+		NOCANONICNAME_ERROR(src);
         MV_FORCE_MVAL(dst, subscripts);		/* is_canonic_name has to parse anyway, so take count from it */
 	return;
 }

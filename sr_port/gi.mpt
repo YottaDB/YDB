@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1991-2015 Fidelity National Information		;
+; Copyright (c) 1991-2016 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -105,7 +105,7 @@ read()	; concatenate reads that fill the buffer; also centralize the USE and dos
 	. if $principal=$io read "> ",x(i),!
 	. else  read x(i)
 	. if $zeof,$increment(e) quit
-	. quit:""=x(i)
+	. if ""=x(i),$increment(e) quit
 	. if 0=i#2,$increment(e) set saveread=x(i) quit
 	. set x=x_x(i)
 	. if 2044'=$zlength(x(i)),$increment(e) quit

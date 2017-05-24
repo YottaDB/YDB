@@ -64,3 +64,12 @@ Global changes in the gtm.mjl file:
 ^a="1"
 ^b="2"
 mupip integ returned a 0 status - as expected
+Build test the encryption plugin
+Default gtmroutines
+OK Your orders please
+D gtmrocks
+OK
+Null gtmroutines
+OK Your orders please
+D gtmrocks
+OK

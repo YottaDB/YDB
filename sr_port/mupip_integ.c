@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,9 +45,7 @@
 #include "mupip_integ.h"
 #include "gtmmsg.h"
 #include "collseq.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 #include "mupint.h"
 #include "mu_gv_cur_reg_init.h"
 
@@ -117,16 +115,20 @@ GBLDEF unsigned char		*mu_int_master;
 GBLDEF trans_num		largest_tn;
 GBLDEF int4			mu_int_blks_to_upgrd;
 GBLDEF span_node_integ		*sndata;
+GBLDEF boolean_t		null_coll_type_err = FALSE;
+GBLDEF boolean_t		null_coll_type;
+GBLDEF unsigned int		rec_num;
+GBLDEF block_id			blk_id;
+GBLDEF boolean_t		nct_err_type;
+GBLDEF int			rec_len;
 /* The following global variable is used to store the encryption information for the current database. The variable is initialized
  * in mu_int_init (mupip integ -file <file.dat>) and mu_int_reg (mupip integ -reg <reg_name>).
  */
 GBLDEF enc_handles		mu_int_encr_handles;
 GBLDEF boolean_t		ointeg_this_reg;
-GTM_SNAPSHOT_ONLY(
-	GBLDEF util_snapshot_ptr_t	util_ss_ptr;
-	GBLDEF boolean_t		preserve_snapshot;
-	GBLDEF boolean_t		online_specified;
-)
+GBLDEF util_snapshot_ptr_t	util_ss_ptr;
+GBLDEF boolean_t		preserve_snapshot;
+GBLDEF boolean_t		online_specified;
 
 GBLREF bool			mu_ctrly_occurred;
 GBLREF bool			mu_ctrlc_occurred;
@@ -152,22 +154,23 @@ error_def(ERR_DBRBNLBMN);
 error_def(ERR_DBRBNNEG);
 error_def(ERR_DBRBNTOOLRG);
 error_def(ERR_DBRDONLY);
+error_def(ERR_DBSPANCHUNKORD);
+error_def(ERR_DBSPANGLOINCMP);
 error_def(ERR_DBTNLTCTN);
-error_def(ERR_DBTNRESETINC);
 error_def(ERR_DBTNRESET);
+error_def(ERR_DBTNRESETINC);
 error_def(ERR_INTEGERRS);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUNOTALLINTEG);
 error_def(ERR_MUPCLIERR);
-error_def(ERR_DBSPANGLOINCMP);
-error_def(ERR_DBSPANCHUNKORD);
+error_def(ERR_REGFILENOTFOUND);
 
 void mupip_integ(void)
 {
 	boolean_t		full, muint_all_index_blocks, retvalue_mu_int_reg, region_was_frozen;
 	boolean_t		update_filehdr, update_header_tn;
-	boolean_t		online_integ = FALSE;
+	boolean_t		online_integ = FALSE, stats_specified;
 	char			*temp, util_buff[MAX_UTIL_LEN];
 	unsigned char		dummy;
 	unsigned char		key_buff[2048];
@@ -185,11 +188,15 @@ void mupip_integ(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	span_node_integ		span_node_data;
-	GTM_SNAPSHOT_ONLY(
-		char		ss_filename[GTM_PATH_MAX];
-		unsigned short	ss_file_len = GTM_PATH_MAX;
-	)
+	char			ss_filename[GTM_PATH_MAX];
+	unsigned short		ss_file_len = GTM_PATH_MAX;
+	unix_db_info		*udi;
+	gd_region		*baseDBreg, *reg;
+	sgmnt_addrs		*baseDBcsa;
+	node_local_ptr_t	baseDBnl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	sndata = &span_node_data;
 	error_mupip = FALSE;
 	if (NULL == gv_target)
@@ -246,8 +253,7 @@ void mupip_integ(void)
 		muint_fast = FALSE;
 	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
-	GTM_SNAPSHOT_ONLY(online_specified = (CLI_PRESENT == cli_present("ONLINE"));)
-#	ifdef GTM_SNAPSHOT
+	online_specified = (CLI_PRESENT == cli_present("ONLINE"));
 	if (online_specified)
 	{ 	/* if MUPIP INTEG -ONLINE -ANALYZE=<filename> is given then display details about the snapshot file
 		 * and do early return
@@ -258,10 +264,22 @@ void mupip_integ(void)
 			return;
 		}
 	}
-#	endif
-	if ((CLI_PRESENT == cli_present("REGION")) GTM_SNAPSHOT_ONLY(|| online_specified))
+	stats_specified = FALSE;
+	if ((CLI_PRESENT == cli_present("REGION")) || online_specified)
 	{
+		/* MUPIP INTEG -REG -STATS should work on statsdbs. So enable statsdb region visibility in gld */
+		assert(FALSE == TREF(ok_to_see_statsdb_regs));
+		if (CLI_PRESENT == cli_present("STATS"))
+		{
+			TREF(ok_to_see_statsdb_regs) = TRUE;
+			TREF(statshare_opted_in) = FALSE;	/* Do not open statsdb automatically when basedb is opened.
+								 * This is needed in the "mu_int_reg" calls done below.
+								 */
+			stats_specified = TRUE;
+		}
 		gvinit(); /* side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code) */
+		if (stats_specified)
+			TREF(ok_to_see_statsdb_regs) = FALSE;
 		region = TRUE;
 		mu_getlst("WHAT", SIZEOF(tp_region));
 		if (!grlist)
@@ -273,9 +291,9 @@ void mupip_integ(void)
 		rptr = grlist;
 	} else
 		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */
-	GTM_SNAPSHOT_ONLY(online_integ = ((TRUE != cli_negated("ONLINE")) && region)); /* Default option for INTEG is -ONLINE */
-	GTM_SNAPSHOT_ONLY(preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE"))); /* Should snapshot file be preserved ? */
-	GTM_SNAPSHOT_ONLY(assert(!online_integ || (region && !tn_reset_specified)));
+	online_integ = ((TRUE != cli_negated("ONLINE")) && region); /* Default option for INTEG is -ONLINE */
+	preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE")); /* Should snapshot file be preserved ? */
+	assert(!online_integ || (region && !tn_reset_specified));
 	assert(MUINTKEY_FALSE == muint_key);
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
 	{
@@ -304,7 +322,6 @@ void mupip_integ(void)
 	{
 		if (online_integ)
 		{
-#			ifdef GTM_SNAPSHOT
 			/* The below structure members will be assigned in ss_initiate done in mu_int_reg.
 			 * No free required as will be gone when process dies
 			 */
@@ -312,7 +329,6 @@ void mupip_integ(void)
 			util_ss_ptr->header = &mu_int_data;
 			util_ss_ptr->master_map = mu_int_master;
 			util_ss_ptr->native_size = 0;
-#			endif
 		} else /* Establish the condition handler ONLY if ONLINE INTEG was not requested */
 			ESTABLISH(mu_freeze_ch);
 	}
@@ -323,7 +339,8 @@ void mupip_integ(void)
 		if (region)
 		{
 			assert(NULL != rptr);
-			if (!mupfndfil(rptr->reg, NULL))
+			reg = rptr->reg;
+			if (!mupfndfil(reg, NULL, LOG_ERROR_TRUE))
 			{
 				mu_int_skipreg_cnt++;
 				rptr = rptr->fPtr;
@@ -348,11 +365,42 @@ void mupip_integ(void)
 		sndata->sn_type = SN_NOT;
 		if (region)
 		{
-			util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(rptr->reg));
-			ointeg_this_reg = online_integ;
-			mu_int_reg(rptr->reg, &retvalue_mu_int_reg);	/* sets "gv_cur_region" */
-			region_was_frozen = !ointeg_this_reg;
-			if (TRUE != retvalue_mu_int_reg)
+			if (stats_specified)
+			{	/* -STATS has been specified. So only work on the stats region, not the base region.
+				 * "mu_getlst" would have added only the base region in the list. Replace that with
+				 * the corresponding stats region and continue integ. But first open base region db
+				 * in order to determine stats region. It is safe to do this replacement as mupip integ
+				 * does not get crit across all regions. If it did, then statsdb region cannot replace
+				 * the basedb region as ftok order across all involved regions matter in that case (and
+				 * only "insert_region" knows to insert based on that ordering but that is not possible
+				 * for statsdb region because the statsdb file location is not known at "mu_getlst" time).
+				 */
+				assert(FALSE == TREF(statshare_opted_in));	/* So we only open basedb & not statsdb */
+				mu_int_reg(reg, &retvalue_mu_int_reg, RETURN_AFTER_DB_OPEN_TRUE);	/* sets "gv_cur_region" */
+				/* Copy statsdb file name into statsdb region and then do "mupfndfil" to check if the file exists */
+				if (retvalue_mu_int_reg)
+				{
+					baseDBreg = reg;
+					baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+					baseDBnl = baseDBcsa->nl;
+					BASEDBREG_TO_STATSDBREG(baseDBreg, reg);
+					COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
+					if (!mupfndfil(reg, NULL, LOG_ERROR_FALSE))
+					{	/* statsDB does not exist. Print an info message and skip to next region */
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGFILENOTFOUND, 4,
+											DB_LEN_STR(reg), REG_LEN_STR(reg));
+						retvalue_mu_int_reg = FALSE;
+					}
+				}
+			} else
+				retvalue_mu_int_reg = TRUE;
+			if (retvalue_mu_int_reg)
+			{
+				util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(reg));
+				ointeg_this_reg = online_integ;	/* used by "mu_int_reg" if called with RETURN_AFTER_DB_OPEN_FALSE */
+				mu_int_reg(reg, &retvalue_mu_int_reg, RETURN_AFTER_DB_OPEN_FALSE); /* sets "gv_cur_region" */
+			}
+			if (!retvalue_mu_int_reg)
 			{
 				rptr = rptr->fPtr;
 				if (NULL == rptr)
@@ -364,6 +412,7 @@ void mupip_integ(void)
 			 * blks_to_upgrd, free blocks calculation. Otherwise (ONLINE INTEG) then use mu_int_data for
 			 * the verification.
 			 */
+			region_was_frozen = !ointeg_this_reg;
 			if (region_was_frozen)
 				csd = csa->hdr;
 			else
@@ -423,13 +472,16 @@ void mupip_integ(void)
 			{
 				if (region_was_frozen)
 				{
-					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
-					if (!rptr->reg->read_only)
+					region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
+					if (!reg->read_only)
 					{
 						fc = gv_cur_region->dyn.addr->file_cntl;
 						fc->op = FC_WRITE;
-						fc->op_buff = (unsigned char *)FILE_INFO(rptr->reg)->s_addrs.hdr;
-						fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
+						/* Note: cs_addrs->hdr points to shared memory and is already aligned
+						 * appropriately even if db was opened using O_DIRECT.
+						 */
+						fc->op_buff = (unsigned char *)FILE_INFO(reg)->s_addrs.hdr;
+						fc->op_len = SGMNT_HDR_LEN;
 						fc->op_pos = 1;
 						dbfilop(fc);
 					}
@@ -712,32 +764,30 @@ void mupip_integ(void)
 				}
 				csd->span_node_absent = (sndata->sn_cnt) ? FALSE : TRUE;
 				csd->maxkeysz_assured = (maxkey_errors) ? FALSE : TRUE;
-				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
+				region_freeze(gv_cur_region, FALSE, FALSE, FALSE, FALSE, FALSE);
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
+				/* Note: cs_addrs->hdr points to shared memory and is already aligned
+				 * appropriately even if db was opened using O_DIRECT.
+				 */
 				fc->op_buff = (unsigned char *)FILE_INFO(gv_cur_region)->s_addrs.hdr;
-				fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
+				fc->op_len = SGMNT_HDR_LEN;
 				fc->op_pos = 1;
 				dbfilop(fc);
-			}
-			else if (region_was_frozen)
-			{
-				/* If online_integ, then database is not frozen, so no need to unfreeze. */
-				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
-			}
-#			ifdef GTM_SNAPSHOT
-			else
+			} else if (region_was_frozen)
+			{	/* If online_integ, then database is not frozen, so no need to unfreeze. */
+				region_freeze(gv_cur_region, FALSE, FALSE, FALSE, FALSE, FALSE);
+			} else
 			{
 				assert(SNAPSHOTS_IN_PROG(csa));
 				assert(NULL != csa->ss_ctx);
 				ss_release(&csa->ss_ctx);
 				CLEAR_SNAPSHOTS_IN_PROG(csa);
 			}
-#			endif
 			rptr = rptr->fPtr;
 			if (NULL == rptr)
 				break;
-		} else  if (!gv_cur_region->read_only)
+		} else if (!gv_cur_region->read_only)
 		{
 			assert(!online_integ);
 			update_filehdr = FALSE;
@@ -784,12 +834,18 @@ void mupip_integ(void)
 				update_filehdr = TRUE;
 				util_out_print(MSG1, TRUE);
 			}
-			if (FALSE != update_filehdr)
+			if (update_filehdr)
 			{
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
-				fc->op_buff = (unsigned char *)&mu_int_data;
-				fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
+				udi = FC2UDI(fc);
+				if (udi->fd_opened_with_o_direct)
+				{	/* Do aligned writes if opened with O_DIRECT */
+					memcpy((TREF(dio_buff)).aligned, &mu_int_data, SGMNT_HDR_LEN);
+					fc->op_buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+				} else
+					fc->op_buff = (unsigned char *)&mu_int_data;
+				fc->op_len = SGMNT_HDR_LEN;
 				fc->op_pos = 1;
 				dbfilop(fc);
 				fc->op = FC_CLOSE;
@@ -799,14 +855,12 @@ void mupip_integ(void)
 		} else
 			break;
 	}
-#	ifdef UNIX
 	if (!region)
 	{
 		db_ipcs_reset(gv_cur_region);
 		mu_gv_cur_reg_free(); /* mu_gv_cur_reg_init done in mu_int_init() */
 		REVERT;
 	}
-#	endif
 	total_errors += mu_int_errknt;
 	if (error_mupip)
 		total_errors++;

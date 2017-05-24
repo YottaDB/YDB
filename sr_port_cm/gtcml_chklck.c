@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,8 @@
 #include "gtcmlkdef.h"
 #include "is_proc_alive.h"
 #include "gtcml.h"
+#include "interlock.h"
+#include "rel_quant.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4            process_id;
@@ -74,8 +76,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 						if ((d = prc1->blocked))
 						{	/* Blocking process shrblk exists. Check it under crit lock */
 							csa = &FILE_INFO(gv_cur_region)->s_addrs;
-							if (!(was_crit = csa->now_crit))
-								grab_crit(gv_cur_region);
+							GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
 							if (d->sequence != prc1->blk_sequence)
 							{	/* Blocking structure no longer ours - do artificial wakeup */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
@@ -90,8 +91,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 							{	/* No longer any owner (lke stole?). Wake up */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
 							}
-							if (!was_crit)
-								rel_crit(gv_cur_region);
+							REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
 						}
 						prc1 = prc1->next;
 					} while (prc1 != prc);

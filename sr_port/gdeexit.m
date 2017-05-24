@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2016 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -34,5 +35,7 @@ GETOUT	; Routine executed just before exiting from GDE. This tries to restore th
 	s gdeEntryStateZlvl=+gdeEntryState("zlevel")
 	k (gdeEntryStateZlvl,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct)
 	i $$set^%LCLCOL(gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct) ; restores local variable collation characteristics
+	; If GDE was invoked from the shell, exit to shell with proper exit status else use ZGOTO to go to parent mumps invocation
+	if gdeEntryStateZlvl=0 zhalt $select($ecode'="":+$zstatus,1:0)
 	zg gdeEntryStateZlvl ; this should exit GDE and return control to parent mumps process invocation
 	h  ; to be safe in case control ever reaches here

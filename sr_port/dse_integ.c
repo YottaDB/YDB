@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +44,10 @@ void dse_integ(void)
 	int		util_len;
 	int4		dummy_int, nocrit_present;
 	sm_uc_ptr_t	bp;
+	unsigned char	*r_ptr;
+	char		key_buff[MAX_KEY_SZ + 1];
+	int		key_len;
+	gv_namehead	*gvt = NULL;
 
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
@@ -58,7 +63,14 @@ void dse_integ(void)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-	if (TRUE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, FALSE))
+	if (0 == ((blk_hdr_ptr_t)bp)->levl)
+	{
+		r_ptr = (unsigned char *)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) + SIZEOF(rec_hdr);
+		for (key_len = 0; KEY_DELIMITER != *r_ptr; r_ptr++)
+			key_buff[key_len++] = *r_ptr;;
+		gvt = dse_find_gvt(gv_cur_region, (char *)key_buff, (key_len));
+	}
+	if (TRUE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, FALSE, gvt))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);

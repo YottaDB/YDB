@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 	if (!reg->open)
 	{
-		if (!mupfndfil(reg, NULL))
+		if (!mupfndfil(reg, NULL, LOG_ERROR_TRUE))
 			return NULL;
 		if (SS_NORMAL != (save_errno = filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname)))
 		{	/* WARNING: assignment above */
@@ -163,7 +163,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-		t_retry_needed = (FALSE == grab_crit_immediate(reg));		/* Attempt lockdown now */
+		t_retry_needed = (FALSE == grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE));	/* Attempt lockdown now */
 		if (!t_retry_needed)
 		{	/* The "grab_crit_immediate" returned successfully. Check if encryption cycles match.
 			 * If they dont, we need to do "grab_crit_encr_cycle_check" but that uses grab_crit and

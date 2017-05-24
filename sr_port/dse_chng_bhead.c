@@ -46,7 +46,7 @@
 #include "gtmmsg.h"
 #include "gtmcrypt.h"
 
-GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
+GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	gd_region		*gv_cur_region;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -326,7 +326,7 @@ void cdbg_dump_mstr(int indent, mstr *ms)
 	 * in the mvals to offsets. De-offset them if they don't point into the (indirect)
 	 * stringpool. This *ONLY* happens during an indirect compilation.
 	 */
-	assert(TREF(compile_time) || indr_stringpool.base != indr_stringpool.free);
+	assert(TREF(compile_time) || indr_stringpool.base <= indr_stringpool.free);
 	if (!TREF(compile_time) && strp < indr_stringpool.base)
 		strp += (UINTPTR_T)(indr_stringpool.base - SIZEOF(ihdtyp) - PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE));
 #	endif

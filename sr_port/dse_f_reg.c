@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,7 @@
 #include "cli.h"
 #include "dse.h"
 #include "gtmmsg.h"
+#include "gvcst_protos.h"
 
 GBLREF block_id		patch_curr_blk;
 GBLREF gd_region	*gv_cur_region;
@@ -45,7 +47,7 @@ void dse_f_reg(void)
 	unsigned short	rnlen;
 	int		i;
 	boolean_t	found;
-	gd_region	*ptr;
+	gd_region	*regptr, *statsDBreg;
 
 	rnlen = SIZEOF(rn);
 	if (!cli_get_str("REGION", rn, &rnlen))
@@ -53,10 +55,10 @@ void dse_f_reg(void)
 	if (('*' == rn[0]) && (1 == rnlen))
 	{
 		util_out_print("List of global directory:!_!AD!/", TRUE, dollar_zgbldir.str.len, dollar_zgbldir.str.addr);
-		for (i = 0, ptr = original_header->regions; i < original_header->n_regions; i++, ptr++)
+		for (i = 0, regptr = original_header->regions; i < original_header->n_regions; i++, regptr++)
 		{
-			util_out_print("!/File  !_!AD", TRUE, ptr->dyn.addr->fname_len, &ptr->dyn.addr->fname[0]);
-			util_out_print("Region!_!AD", TRUE, REG_LEN_STR(ptr));
+			util_out_print("!/File  !_!AD", TRUE, regptr->dyn.addr->fname_len, &regptr->dyn.addr->fname[0]);
+			util_out_print("Region!_!AD", TRUE, REG_LEN_STR(regptr));
 		}
 		return;
 	}
@@ -64,9 +66,9 @@ void dse_f_reg(void)
 	for (i = 0; i < rnlen; i++)				/* Region names are always upper-case ASCII */
 		rn[i] = TOUPPER(rn[i]);
 	found = FALSE;
-	for (i = 0, ptr = original_header->regions; i < original_header->n_regions ;i++, ptr++)
+	for (i = 0, regptr = original_header->regions; i < original_header->n_regions ;i++, regptr++)
 	{
-		if (found = !memcmp(&ptr->rname[0], &rn[0], MAX_RN_LEN))
+		if (found = !memcmp(&regptr->rname[0], &rn[0], MAX_RN_LEN))
 			break;
 	}
 	if (!found)
@@ -74,37 +76,46 @@ void dse_f_reg(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, rnlen, rn);
 		return;
 	}
-	if (ptr == gv_cur_region)
+	assert(!IS_STATSDB_REG(regptr));
+	if (CLI_PRESENT == cli_present("STATS"))
+	{	/* Go to corresponding STATSDB if present */
+		if (!(RDBF_NOSTATS & regptr->reservedDBFlags))
+		{
+			BASEDBREG_TO_STATSDBREG(regptr, statsDBreg);
+			assert(NULL != statsDBreg);
+			if (!statsDBreg->open)
+				gv_init_reg(statsDBreg);
+			regptr = statsDBreg;
+		} else
+		{
+			util_out_print("Error:  Region: !AD does not have an associated stats region", TRUE, REG_LEN_STR(regptr));
+			return;
+		}
+	}
+	if (regptr == gv_cur_region)
 	{
 		util_out_print("Error:  already in region: !AD", TRUE, REG_LEN_STR(gv_cur_region));
 		return;
 	}
 	/* reg_cmcheck would have already been called for ALL regions at region_init time. In Unix, this would have set
 	 * reg->dyn.addr->acc_meth to dba_cm if it is remote database. So we can safely use this to check if the region
-	 * is dba_cm or not. In VMS though reg_cmcheck does not modify acc_meth so we call reg_cmcheck in that case.
+	 * is dba_cm or not.
 	 */
-	if (UNIX_ONLY(dba_cm == ptr->dyn.addr->acc_meth) VMS_ONLY(reg_cmcheck(ptr)))
+	if (dba_cm == regptr->dyn.addr->acc_meth)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOGTCMDB, 4, LEN_AND_LIT("DSE"), rnlen, rn);	/* no VMS test */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOGTCMDB, 4, LEN_AND_LIT("DSE"), rnlen, rn);
 		return;
 	}
-#	ifdef VMS
-	if (dba_usr == REG_ACC_METH(ptr))
-	{	/* VMS only; no test */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("DSE"), rnlen, rn);
-		return;
-	}
-#	endif
-	if (!ptr->open)
+	if (!regptr->open)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSENOTOPEN, 2, rnlen, rn);
 		return;
 	}
 	if (cs_addrs->now_crit)
 		util_out_print("Warning:  now leaving region in critical section: !AD", TRUE, REG_LEN_STR(gv_cur_region));
-	gv_cur_region = ptr;
+	gv_cur_region = regptr;
 	gv_target = NULL;	/* to prevent out-of-sync situations between gv_target and cs_addrs */
-	assert((dba_mm == REG_ACC_METH(gv_cur_region)) || (dba_bg == REG_ACC_METH(gv_cur_region)));
+	assert(IS_REG_BG_OR_MM(gv_cur_region));
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
 	if (cs_addrs && cs_addrs->critical)

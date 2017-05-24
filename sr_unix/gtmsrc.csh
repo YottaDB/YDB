@@ -72,7 +72,7 @@ if (0 < $#rtns) then
 	# Strip off "$gtm_exe/plugin/o($gtm_exe/plugin/r)" if present; assumption, it's at the end
 	if ("$rtns[$rtncnt]" =~ "*/plugin/o*(*/plugin/r)") @ rtncnt--
 	# Strip off "$gtm_exe"; assumption, it's next to last or the last
-	if ("${rtns[$rtncnt]:s;/utf8;;}" == "${gtmsrc_last_exe:s;/utf8;;}") @ rtncnt--
+	if ("${rtns[$rtncnt]:s;/utf8;;:s;*;;}" == "${gtmsrc_last_exe:s;/utf8;;:s;*;;}") @ rtncnt--
 	setenv gtmroutines "$rtns[-$rtncnt]"
 	unset rtncnt
 else

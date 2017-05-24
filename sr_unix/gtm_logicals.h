@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,6 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#include "gtm_libaio.h"
 
 /* gtm_logicals.h - Environment variables used by GT.M. */
 /* within each group, the entries are in alpha order of the third column */
@@ -94,6 +96,9 @@
 #define	GTM_TRIGGER_ETRAP		"$gtm_trigger_etrap"
 #define	GTM_SNAPTMPDIR			"$gtm_snaptmpdir"
 #define	GTM_DB_STARTUP_MAX_WAIT		"$gtm_db_startup_max_wait"
+#ifdef USE_LIBAIO
+#define GTM_AIO_NR_EVENTS		"$gtm_aio_nr_events"
+#endif
 
 /* Replication */
 #define	GTM_REPL_INSTANCE		"$gtm_repl_instance"
@@ -122,6 +127,11 @@
 #define	GTM_AUTORELINK_KEEPRTN		"$gtm_autorelink_keeprtn"	/* do not let go of objects in rtnobj shm */
 #define	GTM_AUTORELINK_CTLMAX		"$gtm_autorelink_ctlmax"
 
+/* Global shared stats related */
+#define GTM_STATSHARE			"$gtm_statshare"
+#define GTM_STATSDIR			"$gtm_statsdir"
+#define GTM_JNL_STATSDB			"gtm_jnl_statsdb"		/* Only seen/used in debug mode */
+
 /* Miscellaneous */
 #define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"
 #define GTM_ETRAP			"$gtm_etrap"
@@ -142,3 +152,4 @@
 #define GTM_LOCALE			"$gtm_locale"
 #define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
 #define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"
+

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2016 Fidelity National Information		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,15 +9,18 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#ifndef GTM_POLL_H_INCLUDED
+#define GTM_POLL_H_INCLUDED
 
-#include "mdef.h"
-#include "dskspace_msg_timer.h"
-#include "gt_timer.h"
+#include <poll.h>
 
-GBLREF volatile uint4 dskspace_msg_counter;
+#define EVENTFD_NOTIFIED(fds, n) (0 != (fds[n].revents & POLLIN))
 
-void dskspace_msg_timer(void)
-{
-	dskspace_msg_counter++;
+#define INIT_POLLFD(pollfd, efd)		\
+{						\
+	pollfd.fd = efd;			\
+	pollfd.revents = 0;			\
+	pollfd.events = POLLIN;			\
 }
 
+#endif

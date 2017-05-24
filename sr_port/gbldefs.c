@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,8 +128,12 @@
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
+#ifdef DEBUG
+#include "wcs_wt.h"
+#endif
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
+#include "gtm_libaio.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -187,7 +191,6 @@ GBLDEF	VSIG_ATOMIC_T	forced_exit;		/* Asynchronous signal/interrupt handler sets
 						 */
 GBLDEF	intrpt_state_t	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* any other value implies it is not ok to interrupt */
 GBLDEF	unsigned char	*msp,
-			*mubbuf,
 			*restart_ctxt,
 			*stackbase,
 			*stacktop,
@@ -281,7 +284,6 @@ GBLDEF	boolean_t	block_saved;
 GBLDEF	gtm_chset_t	dse_over_chset = CHSET_M;
 LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
-GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
 GBLDEF	src_line_struct	src_head;
 GBLDEF	short int	source_line;
 GBLDEF	int		source_column;
@@ -301,8 +303,7 @@ GBLDEF	char		**cmd_arg;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-GBLDEF	volatile uint4	heartbeat_counter;
-GBLDEF	boolean_t	heartbeat_started;
+GBLDEF	boolean_t	oldjnlclose_started;
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
@@ -319,7 +320,11 @@ GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
-GBLDEF	void			(*heartbeat_timer_ptr)(void);	/* Initialized only in gtm_startup() */
+/* Initialized only in gtm_startup() */
+GBLDEF	void			(*jnl_file_close_timer_ptr)(void);
+GBLDEF	void			(*fake_enospc_ptr)(void);
+GBLDEF	void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **timedout);
+
 #ifdef UNICODE_SUPPORTED
 GBLDEF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
@@ -395,7 +400,6 @@ GBLDEF	char			*cli_err_str_ptr;
 GBLDEF	boolean_t		gtm_pipe_child;
 GBLDEF	io_desc			*gtm_err_dev;
 /* this array is indexed by file descriptor */
-GBLDEF	boolean_t		*lseekIoInProgress_flags;
 /* Latch variable for Unix implementations. Used in SUN and HP */
 GBLDEF	global_latch_t		defer_latch;
 GBLDEF	int			num_additional_processors;
@@ -900,6 +904,11 @@ GBLDEF	sigset_t	blockalrm;
 GBLDEF	sigset_t	block_ttinout;
 GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
 					  (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
+GBLDEF  sigset_t	block_worker;	/* block all signals for use by the linux AIO worker thread, except for a few
+					 * fatal signals that can be internally generated inside the thread. This way
+					 * any signal externally sent always gets handled by the main process and not
+					 * by the worker thread.
+					 */
 GBLDEF  char            *gtm_core_file;
 GBLDEF  char            *gtm_core_putenv;
 #ifdef __MVS__
@@ -931,7 +940,7 @@ GBLDEF	boolean_t	stringpool_unexpandable;	/* Set to TRUE by any function for a s
 							 * collections or expansions.
 							 */
 GBLDEF	boolean_t	donot_INVOKE_MUMTSTART;		/* Set to TRUE whenever an implicit TSTART is done in gvcst_put/kill as
-							 * part of an explicit + trigger update. In this situation, we dont expect
+							 * part of an explicit + trigger update. In this situation, we don't expect
 							 * MUM_TSTART macro to be invoked at all (see skip_INVOKE_RESTART below
 							 * for description on why this is needed). So we keep this debug-only
 							 * flag turned on throughout the gvcst_put/kill. An assert in
@@ -967,9 +976,9 @@ GBLDEF	mval		*dollar_ztdata,
 GBLDEF	int		tprestart_state;		/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLDEF	boolean_t	skip_INVOKE_RESTART;		/* set to TRUE if caller of op_tcommit/t_retry does not want it to
 							 * use the INVOKE_RESTART macro (which uses an rts_error to trigger
-							 * the restart) instead return code. The reason we dont want to do
+							 * the restart) instead return code. The reason we don't want to do
 							 * rts_error is that this is an implicit tstart situation where we
-							 * did not do opp_tstart.s so we dont want control to be transferred
+							 * did not do opp_tstart.s so we don't want control to be transferred
 							 * using the MUM_TSTART macro by mdb_condition_handler (which assumes
 							 * opp_tstart.s invocation).
 							 */
@@ -1015,7 +1024,7 @@ GBLDEF	boolean_t	in_mu_rndwn_file;		/* TRUE if we are in mu_rndwn_file (holding 
 #endif
 GBLDEF	char		gvcst_search_clue;
 /* The following are replication related global variables. Ideally if we had a repl_gbls_t structure (like jnl_gbls_t)
- * this would be a member in that. But since we dont have one and since we need to initialize this specificially to a
+ * this would be a member in that. But since we don't have one and since we need to initialize this specificially to a
  * non-zero value (whereas usually everything else accepts a 0 default value), this is better kept as a separate global
  * variable instead of inside a global variable structure.
  */
@@ -1040,12 +1049,12 @@ GBLDEF  repl_conn_info_t        *this_side, *remote_side;
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
 GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-existent nodes will continue to
-							 * write jnl records and increment the db curr_tn even though they dont
+							 * write jnl records and increment the db curr_tn even though they don't
 							 * touch any GDS blocks in the db (i.e. treat it as a duplicate kill).
 							 * Set to TRUE for the update process & journal recovery currently.
 							 * Set to FALSE otherwise.
 							 */
-GBLDEF	boolean_t	donot_fflush_NULL;		/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
+GBLDEF	boolean_t	donot_fflush_NULL;		/* Set to TRUE whenever we don't want gtm_putmsg to fflush(NULL). BYPASSOK
 							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
 							 */
 GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time (eg., for
@@ -1066,7 +1075,10 @@ GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window insi
 							 * to autoswitch; used by jnl_write. */
 #ifdef GTM_PTHREAD
 GBLDEF	pthread_t	gtm_main_thread_id;		/* ID of the main GT.M thread. */
-GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is set. */
+GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is set. This is not set just for a jvm
+							 * process but also otherwise. This is necessary now for the linux kernel
+							 * interface to AIO.
+							 */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
 GBLDEF	size_t		gtm_max_storalloc;		/* Maximum that GTM allows to be allocated - used for testing */
@@ -1076,6 +1088,10 @@ GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value o
 GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
 							 * stx_error() into gtmsecshr, and thus just about everything else as well.
 							 */
+GBLDEF void (*stx_error_va_fptr)(int in_error, va_list args);	/* Function pointer for stx_error() so rts_error can avoid pulling
+								 * stx_error() into gtmsecshr, and thus just about everything else
+								 * as well.
+								 */
 GBLDEF void (*show_source_line_fptr)(boolean_t warn);	/* Func pointer for show_source_line() - same purpose as stx_error_fptr */
 #ifdef GTM_TLS
 GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. Any SSL/TLS connections that
@@ -1138,4 +1154,33 @@ GBLDEF	int		gtm_db_counter_sem_incr;	/* Value used to bump the counter semaphore
 							 * Default is 1. Higher values exercise the ERANGE code better
 							 * when the ftok/access/jnlpool counter semaphore overflows.
 							 */
+GBLDEF	boolean_t	forw_recov_lgtrig_only;		/* TRUE if jgbl.forw_phase_recovery is TRUE AND the current TP transaction
+							 * being played consists of only *LGTRIG* records (no SET/KILL etc.)
+							 * Used by an assert in op_tcommit.
+							 */
+GBLDEF	boolean_t	in_mu_cre_file;			/* TRUE only if inside "mu_cre_file" function (used by an assert).
+							 * This is MUPIP CREATE only (db does not exist at that point and so
+							 * threads are unlikely there) AND is dbg-only and hence okay to be a
+							 * gbldef instead of a threadgbldef.
+							 */
+GBLDEF	enum dbg_wtfini_lcnt_t	dbg_wtfini_lcnt;	/* "lcnt" value for WCS_OPS_TRACE tracking purposes. This is dbg-only
+							 * and hence it is okay to be a gbldef instead of a threadgbldef.
+							 */
 #endif
+GBLDEF	sgm_info	*sgm_info_ptr;
+GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
+GBLDEF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+
+#ifdef USE_LIBAIO
+GBLDEF  char 		*aio_shim_errstr;	/* If an error occurred (mostly but not limited to EAGAIN),
+						 * what triggered it?
+						 */
+GBLDEF	char		io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
+							/* The original nr_events used by the client is necessary
+							 * to understand why io_setup() failed on occasion. We set
+							 * up an error string of the form io_setup(nr_events).
+							 */
+#endif
+GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() in MUPIP but points to a routine
+							 * that assert fails if run from non-MUPIP builds.
+							 */

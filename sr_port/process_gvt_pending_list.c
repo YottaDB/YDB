@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +89,7 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 			 */
 			if (reg->max_key_size != db_max_key_size)
 			{	/* key sizes are different, need to reallocate */
-				assert((dba_bg == REG_ACC_METH(reg)) || (dba_mm == REG_ACC_METH(reg)));
+				assert(IS_REG_BG_OR_MM(reg));
 				new_gvt = (gv_namehead *)targ_alloc(db_max_key_size, &old_gvt->gvname, reg);
 				new_gvt->noisolation = old_gvt->noisolation;	/* Copy over noisolation status from old_gvt */
 				new_gvt->act = old_gvt->act; /* copy over act,nct,ver from old_gvt (actually from the gld file) */

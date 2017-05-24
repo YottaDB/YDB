@@ -33,6 +33,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "gtmio.h"
+#include "sgtm_putmsg.h"
 #include "eintr_wrappers.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -63,8 +64,15 @@ error_def(ERR_PREMATEOF);
 error_def(ERR_JNLPREVRECOV);
 error_def(ERR_CRYPTJNLMISMATCH);
 
+#define RETURN_AND_SET_JPC(ERR, ERR2, BUF)	\
+{						\
+	jpc->status = ERR2;			\
+	jpc->err_str = BUF;			\
+	return ERR;				\
+}
+
 /* note: returns 0 on success */
-uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
+uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -77,6 +85,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	unsigned char		eof_rec[(DISK_BLOCK_SIZE * 2) + MAX_IO_BLOCK_SIZE];
 	off_jnl_t		adjust;
 	uint4			jnl_fs_block_size, read_write_size, read_size;
+	int4			status;
 	gtm_uint64_t		header_virtual_size;
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -84,6 +93,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jpc = csa->jnl;
 	jb = jpc->jnl_buff;
 	jpc->status = jpc->status2 = SS_NORMAL;
+	assert(NULL != buff);
 	jnl_fs_block_size = get_fs_block_size(jpc->channel);
 	/* check that the filesystem block size is a power of 2 as we do a lot of calculations below assuming this is the case */
 	assert(!(jnl_fs_block_size & (jnl_fs_block_size - 1)));
@@ -107,12 +117,15 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		 * entire unaligned journal file size is lesser than the aligned journal file header size.
 		 */
 		assert(ERR_PREMATEOF == jpc->status);
-		return ERR_JNLRDERR;
+		return ERR_JNLRDERR; /* Has one !AD parameter, the journal file, which jnl_send_oper() provides */
 	}
 	/* Check if the header format matches our format. Cannot access any fields inside header unless this matches */
 	CHECK_JNL_FILE_IS_USABLE(header, jpc->status, FALSE, 0, NULL);	/* FALSE => NO gtm_putmsg even if errors */
 	if (SS_NORMAL != jpc->status)
-		return ERR_JNLOPNERR;
+	{
+		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, jpc->status, buff);
+	}
 	adjust = header->end_of_data & (jnl_fs_block_size - 1);
 	/* Read the journal JRT_EOF at header->end_of_data offset.
 	 * Make sure the buffer being read to is big enough and that as part of the read,
@@ -123,14 +136,12 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	assert(header->end_of_data - adjust >= JNL_HDR_LEN);
 	DO_FILE_READ(jpc->channel, header->end_of_data - adjust, eof_rec_buffer, read_size, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
-	{
-		return ERR_JNLRDERR;
-	}
+		return ERR_JNLRDERR; /* Has one !AD parameter, the journal file, which jnl_send_oper() provides */
 	if (header->prev_recov_end_of_data)
 	{
 		/* not possible for run time. In case it happens user must fix it */
-		jpc->status = ERR_JNLPREVRECOV;
-		return ERR_JNLOPNERR;
+		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLPREVRECOV);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLPREVRECOV, buff);
 	}
 	if (!is_gdid_file_identical(&FILE_ID(reg), (char *)header->data_file_name, header->data_file_name_length))
 	{
@@ -141,31 +152,34 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	memcpy(&eof_record, (unsigned char *)eof_rec_buffer + adjust, EOF_RECLEN);
 	if (JRT_EOF != eof_record.prefix.jrec_type)
 	{
-		jpc->status = ERR_JNLRECTYPE;
-		return ERR_JNLOPNERR;
+		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLRECTYPE);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLRECTYPE, buff);
 	}
 	if (eof_record.prefix.tn != csd->trans_hist.curr_tn)
 	{
 		if (eof_record.prefix.tn < csd->trans_hist.curr_tn)
-			jpc->status = ERR_JNLTRANSLSS;
+			status = ERR_JNLTRANSLSS;
 		else
-			jpc->status = ERR_JNLTRANSGTR;
-		return ERR_JNLOPNERR;
+			status = ERR_JNLTRANSGTR;
+		sgtm_putmsg(buff, VARLSTCNT(10) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+				status, 2, &eof_record.prefix.tn, &csd->trans_hist.curr_tn);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, status, buff);
 	}
 	if (eof_record.suffix.suffix_code != JNL_REC_SUFFIX_CODE ||
 		eof_record.suffix.backptr != eof_record.prefix.forwptr)
 	{
-		jpc->status = ERR_JNLBADRECFMT;
-		return ERR_JNLOPNERR;
+		sgtm_putmsg(buff, VARLSTCNT(11) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+				ERR_JNLBADRECFMT, 3, JNL_LEN_STR(csd), adjust);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLBADRECFMT, buff);
 	}
 	if (!mu_reorg_encrypt_in_prog && !SAME_ENCRYPTION_SETTINGS(header, csd))
 	{	/* We expect encryption settings in the journal to be in sync with those in the file header. The only exception is
 		 * MUPIP REORG -ENCRYPT, which switches the journal file upon changing encryption-specific fields in the file
 		 * header, thus temporarily violating this expectation.
 		 */
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_CRYPTJNLMISMATCH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-		jpc->status = ERR_CRYPTJNLMISMATCH;
-		return ERR_JNLOPNERR;
+		sgtm_putmsg(buff, VARLSTCNT(12) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+				ERR_CRYPTJNLMISMATCH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_CRYPTJNLMISMATCH, buff);
 	}
 	assert(header->eov_tn == eof_record.prefix.tn);
 	header->eov_tn = eof_record.prefix.tn;
@@ -179,10 +193,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	if ((ROUND_UP2((header_virtual_size * DISK_BLOCK_SIZE), jnl_fs_block_size) < os_file_size)
 		|| (header->jnl_deq && 0 != ((header_virtual_size - header->jnl_alq) % header->jnl_deq)))
 	{
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_JNLVSIZE, 6, JNL_LEN_STR(csd), header->virtual_size,
-			 header->jnl_alq, header->jnl_deq, os_file_size, jnl_fs_block_size);
-		jpc->status = ERR_JNLVSIZE;
-		return ERR_JNLOPNERR;
+		sgtm_putmsg(buff, VARLSTCNT(14) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+				ERR_JNLVSIZE, 7, JNL_LEN_STR(csd), header->virtual_size,
+					header->jnl_alq, header->jnl_deq, os_file_size, jnl_fs_block_size);
+		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLVSIZE, buff);
 	}
 	/* For performance reasons (to be able to do aligned writes to the journal file), we need to ensure the journal buffer
 	 * address is filesystem-block-size aligned in Unix. Although this is needed only in case of sync_io/direct-io, we ensure

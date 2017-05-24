@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,10 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include "gtm_stdio.h"
 #include "gtm_string.h"
+
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -35,6 +39,7 @@
 #include "gtmimagename.h"
 #include "gvnh_spanreg.h"
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
+#include "io.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
@@ -64,12 +69,12 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		if (!reg->open)
 		{
 			gv_init_reg(reg);	/* could modify gvnh_reg->gvt if multiple regions map to same db file */
-			assert(0 == gvnh_reg->gvt->clue.end);
+			assert((0 == gvnh_reg->gvt->clue.end) || IS_STATSDB_REG(reg)); /* A statsDB open writes to itself */
 		}
 		tmp_gvt = gvnh_reg->gvt;
 	} else
 	{
-		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len);
+		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len, SKIP_BASEDB_OPEN_FALSE);
 		reg = map->reg.addr;
 		if (!reg->open)
 			gv_init_reg(reg);
@@ -82,6 +87,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		format_key[0] = '^';
 		memcpy(&format_key[1], gvname->var_name.addr, gvname->var_name.len);
 		csa = &FILE_INFO(reg)->s_addrs;
+		gv_currkey->end = 0;
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_KEY2BIG, 4, keylen + 2, (int4)reg->max_key_size,
 			REG_LEN_STR(reg), ERR_GVIS, 2, 1 + gvname->var_name.len, format_key);
 	}

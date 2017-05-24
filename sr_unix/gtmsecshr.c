@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,6 @@
 #if defined(__MVS__)
 # include "gtm_zos_io.h"
 #endif
-
 #include "cli.h"
 #include "error.h"
 #include "gtm_logicals.h"
@@ -77,12 +76,14 @@
 #include "have_crit.h"
 #include "sig_init.h"
 #include "gtmio.h"
-#include "file_head_read.h"
-#include "file_head_write.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "hashtab.h"
 #include "fork_init.h"
+#include "jnl.h"
+#include "repl_msg.h"			/* needed by gtmsource.h */
+#include "gtmsource.h"			/* for anticipatory_freeze.h */
+#include "anticipatory_freeze.h"
 #ifdef UNICODE_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
@@ -92,8 +93,6 @@
 #define execname 	"gtmsecshr"	/* this is what this executable is supposed to be called. A different name is verboten */
 #define intent_open	"for open"	/* FLUSH_DB_IPCS_INFO types */
 #define intent_close	"for close"
-#define TZLOCATOR	"TZ="
-#define NEWLINE		0x0a
 
 GBLDEF CLI_ENTRY	*cmd_ary = NULL; /* GTMSECSHR does not have any command tables so initialize command array to NULL */
 
@@ -232,7 +231,7 @@ int main(int argc, char_ptr_t argv[])
 	timer_id = (TID)main;
 	while (TRUE)
 	{
-		input_timeval.tv_sec  = MAX_TIMEOUT_VALUE;	/* Restart timeout each interation for platforms that save
+		input_timeval.tv_sec = MAX_TIMEOUT_VALUE;	/* Restart timeout each interation for platforms that save
 								 * unexpired time when select exits.
 								 */
 		input_timeval.tv_usec = 0;
@@ -240,7 +239,7 @@ int main(int argc, char_ptr_t argv[])
 		FD_ZERO(&wait_on_fd);
 		FD_SET(gtmsecshr_sockfd, &wait_on_fd);
 		gtmsecshr_timer_popped = FALSE;
-		SELECT(gtmsecshr_sockfd+1, (void *)&wait_on_fd, NULL, NULL, &input_timeval, selstat);
+		SELECT(gtmsecshr_sockfd + 1, (void *)&wait_on_fd, NULL, NULL, &input_timeval, selstat);
 		if (0 > selstat)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
 		else if (0 == selstat)
@@ -294,7 +293,7 @@ int main(int argc, char_ptr_t argv[])
 			cancel_timer(timer_id);
 		} else
 			DBGGSSHR((LOGFLAGS, "gtmsecshr: SENDTO reply skipped due to mesg.code = INVALID_COMMAND\n"));
-		assert('a' > 'F' && 'a' > '9');
+		assert(('a' > 'F') && ('a' > '9'));
 		if ('a' <= client_addr.sun_path[strlen(client_addr.sun_path) - 1])
 			clean_client_sockets(client_addr.sun_path);
 	}
@@ -316,12 +315,6 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	int		status;
 	int		lib_gid;
 	struct stat	dist_stat_buff;
-#	ifdef _AIX
-	FILE		*envfile;
-	int		recnum, reclen;
-	char		*fgets_rc, *newtz;
-	boolean_t	tzfnd;
-#	endif
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -396,80 +389,9 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRBADDIR);
 		gtmsecshr_exit(BADGTMDISTDIR, FALSE);
 	}
-#	ifdef _AIX
-	/* Note time is handled very oddly on AIX. If one undefines the TZ environment variable (such as our wrapper does to
-	 * prevent reporting time in the timezone of the process that started gtmsecshr, process time reverts to GMT. So to
-	 * prevent that, lookup the default timezone in /etc/environment and use it to prevent whacky time reporting by
-	 * gtmsecshr in the operator log. Secure file read method is to switch dir first, then do relative open.
-	 */
-	if (-1 == CHDIR("/etc"))	/* Note chdir is changed again below so this is only temporary */
-	{
-		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT,
-			2, RTS_ERROR_LITERAL("Error during chdir to /etc - TZ cannot be determined"), save_errno);
-	} else
-	{
-		Fopen(envfile, "environment", "r");
-		if (NULL == envfile)
-		{
-			save_errno = errno;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
-				RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Failed to read /etc/environment - TZ cannot be determined"), save_errno);
-		} else
-		{	/* /etc/environments is open, locate TZ= record */
-			tzfnd = FALSE;
-			for (recnum = 0; ; recnum++)
-			{	/* Reuse realpathbef as it is not otherwise needed any longer */
-				FGETS(realpathbef, GTM_PATH_MAX, envfile, fgets_rc);
-				if (NULL == fgets_rc)
-					break;
-				if (STRLEN(TZLOCATOR) >= (reclen = STRLEN(realpathbef)))
-					continue;
-				if (0 == memcmp(TZLOCATOR, realpathbef, STRLEN(TZLOCATOR)))
-				{
-					tzfnd = TRUE;
-					break;
-				}
-			}
-			if (!tzfnd)
-			{	/* We didn't find the TZ record - report it depending if we just hit EOF or something more
-				 * severe.
-				 */
-				if (!feof(envfile))
-				{
-					save_errno = errno;
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
-						RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error reading /etc/environment - TZ cannot be determined"),
-						save_errno);
-				} else
-					/* Have EOF - didn't find TZ */
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
-						RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("TZ cannot be determined"));
-			} else
-			{	/* TZ record acquired - isolate TZ - malloc space to put it once determine exact length */
-				if (NEWLINE == realpathbef[reclen - 1])
-					realpathbef[reclen-- - 1] = '\0';	/* Overwrite nl with null and decr length */
-				newtz = malloc(reclen);				/* putenv arg must be new - no stack vars */
-				strcpy(newtz, realpathbef);
-				PUTENV(status, newtz);
-				if (0 != status)
-				{
-					save_errno = errno;
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
-						RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("TZ reset with putenv() failed"), save_errno);
-				}
-			}
-			FCLOSE(envfile, status);
-		}
-	}
-#	endif /* _AIX */
 	/*
-      **** With invocation validated, begin our priviledge escalation ****
-      */
+	 **** With invocation validated, begin our priviledge escalation ****
+	 */
 	if (-1 == setuid(ROOTUID))
 	{
 		save_errno = errno;
@@ -647,14 +569,16 @@ void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context)
 
 void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_len)
 {
-	int			fn_len, index, basind, save_errno, save_code;
+	int			flags, fn_len, index, basind, save_errno, save_code;
 	int			stat_res, fd;
 	char			*basnam, *fn;
 	struct shmid_ds		temp_shmctl_buf;
 	struct stat		statbuf;
-	sgmnt_data		header;
+	sgmnt_data		header, *csd;
 	endian32_struct		check_endian;
-	char			*intent;
+	char			*intent, *buff;
+	boolean_t		fd_opened_with_o_direct;
+	uint4			fsb_size;
 	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -860,7 +784,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			fn = buf->mesg.db_ipcs.fn;
 			fn_len = buf->mesg.db_ipcs.fn_len;
 			if ((GTM_PATH_MAX < fn_len) || ('\0' != *(fn + fn_len))
-			    || (fn_len != (msglen - GTM_MESG_HDR_SIZE - offsetof(ipcs_mesg, fn[0]) - 1)))
+				|| (fn_len != (msglen - GTM_MESG_HDR_SIZE - offsetof(ipcs_mesg, fn[0]) - 1)))
 			{
 				buf->code = EINVAL;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
@@ -869,7 +793,14 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				break;
 			}
 			/* First open and read-in the fileheader */
-			OPENFILE(fn, O_RDWR, fd);
+			flags = O_RDWR;
+			if (buf->mesg.db_ipcs.open_fd_with_o_direct)
+			{
+				fd_opened_with_o_direct = TRUE;
+				flags = flags | O_DIRECT_FLAGS;
+			} else
+				fd_opened_with_o_direct = FALSE;
+			OPENFILE(fn, flags, fd); /* udi not available so OPENFILE_DB not used */
 			if (FD_INVALID == fd)
 			{
 				save_errno = buf->code = errno;
@@ -911,7 +842,14 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
 			}
-			LSEEKREAD(fd, 0, &header, SIZEOF(header), save_errno);
+			if (fd_opened_with_o_direct)
+			{
+				fsb_size = get_fs_block_size(fd);
+				DIO_BUFF_EXPAND_IF_NEEDED_NO_UDI(SGMNT_HDR_LEN, fsb_size, &(TREF(dio_buff)));
+				csd = (sgmnt_data *)(TREF(dio_buff)).aligned;
+			} else
+				csd = &header;
+			DB_LSEEKREAD(((unix_db_info *)NULL), fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 			if (0 != save_errno)
 			{
 				buf->code = save_errno;
@@ -921,7 +859,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
 			}
-			if (0 != memcmp(header.label, GDS_LABEL, GDS_LABEL_SZ - 1))	/* Verify is GT.M database file */
+			if (0 != memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))	/* Verify is GT.M database file */
 			{
 				buf->code = ERR_DBNOTGDS;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
@@ -931,7 +869,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				break;
 			}
 			/* It would be easier to use the CHECK_DB_ENDIAN macro here but we'd prefer it didn't raise rts_error */
-			check_endian.word32 = header.minor_dbver;
+			check_endian.word32 = csd->minor_dbver;
 			if (!check_endian.shorts.ENDIANCHECKTHIS)
 			{
 				buf->code = ERR_DBENDIAN;
@@ -997,15 +935,12 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				}
 			}
 			/* Update file header fields */
-			header.semid = buf->mesg.db_ipcs.semid;
-			header.shmid = buf->mesg.db_ipcs.shmid;
-			header.gt_sem_ctime.ctime = buf->mesg.db_ipcs.gt_sem_ctime;
-			header.gt_shm_ctime.ctime = buf->mesg.db_ipcs.gt_shm_ctime;
-			/* And flush the changes back out. Note this service code is only used by read-only processes so
-			 * we don't need any anticipatory freeze insertion which anyway pulls in the world so LSEEKWRITE does
-			 * what we need.
-			 */
-			LSEEKWRITE(fd, 0, &header, SIZEOF(header), save_errno);
+			csd->semid = buf->mesg.db_ipcs.semid;
+			csd->shmid = buf->mesg.db_ipcs.shmid;
+			csd->gt_sem_ctime.ctime = buf->mesg.db_ipcs.gt_sem_ctime;
+			csd->gt_shm_ctime.ctime = buf->mesg.db_ipcs.gt_shm_ctime;
+			/* And flush the changes back out. */
+			GTMSECSHR_DB_LSEEKWRITE(((unix_db_info *)NULL), fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 			if (0 != save_errno)
 			{
 				buf->code = save_errno;

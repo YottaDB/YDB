@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,8 @@
 #include "cmd.h"
 #include "fullbool.h"
 
+GBLREF	int4		pending_errtriplecode;
+
 error_def(ERR_INDEXTRACHARS);
 error_def(ERR_SPOREOL);
 
@@ -33,11 +36,13 @@ typedef struct jmpchntype
 } jmpchn;
 
 int m_if(void)
+/* compiler module for IF */
 {
-	triple		*ref0, *ref1, *ref2, *jmpref, ifpos_in_chain, *triptr;
-	oprtype		x, y, *ta_opr;
-	boolean_t	first_time, t_set, is_commarg;
+	boolean_t	first_time, is_commarg, t_set;
+	int		sense;
 	jmpchn		*jmpchain, *nxtjmp;
+	oprtype		*ta_opr, x, y;
+	triple		ifpos_in_chain, *jmpref, *ref1, *ref2, *oldchain, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -49,6 +54,7 @@ int m_if(void)
 	is_commarg = (1 == TREF(last_source_column));
 	FOR_END_OF_SCOPE(0, x);
 	assert(INDR_REF == x.oprclass);
+	oldchain = NULL;
 	if (TK_SPACE == TREF(window_token))
 	{
 		jmpref = newtriple(OC_JMPTCLR);
@@ -64,17 +70,47 @@ int m_if(void)
 			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
 			if (!bool_expr(TRUE, ta_opr))
 				return FALSE;
-			if (((OC_JMPNEQ == (ref0 = (TREF(curtchain))->exorder.bl)->opcode))
-				&& (OC_COBOOL == (ref1 = ref0->exorder.bl)->opcode)
+			for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+				;
+			if ((OC_JMPNEQ == triptr->opcode)					/* WARNING: assignments */
+				&& (OC_COBOOL == (ref1 = triptr->exorder.bl)->opcode)
 				&& (OC_INDGLVN == (ref2 = ref1->exorder.bl)->opcode))
 			{	/* short-circuit only optimization that turns a trailing INDGLVN COBOOL into separate indirect IF */
-				dqdel(ref0, exorder);
-				ref1->opcode = OC_JMPTSET;
-				ref1->operand[0] = put_indr(ta_opr);
+				triptr->opcode = OC_JMPTSET;
+				triptr->operand[0] = put_indr(ta_opr);
+				dqdel(ref1, exorder);;
 				ref2->opcode = OC_COMMARG;
 				ref2->operand[1] = put_ilit((mint)indir_if);
 			}
-			t_set = (OC_JMPTSET == (TREF(curtchain))->exorder.bl->opcode);
+			if (OC_LIT == triptr->opcode)
+			{	/* it is a literal so we optimize it */
+				dqdel(triptr, exorder);
+				unuse_literal(&triptr->operand[0].oprval.mlit->v);
+				if (t_set = (0 == triptr->operand[0].oprval.mlit->v.m[1]))	/* WARNING: assignment */
+				{	/* it's FALSE, insert clear of $TEST */
+					newtriple(OC_CLRTEST);
+					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */
+						while (TK_SPACE == TREF(director_token))	/* eat them up */
+							advancewindow();
+					if (TK_EOL == TREF(director_token))
+						break;						/* line empty: no discard needed */
+					if (NULL == oldchain)
+					{	/* not already discarding, so get ready to discard the rest of the line */
+						dqinit(&tmpchain, exorder);
+						oldchain = setcurtchain(&tmpchain);
+					}
+				} else
+				{	/* it's TRUE so insert set of $TEST and step beyond the argument */
+					newtriple(OC_SETTEST);
+					if (TK_COMMA != TREF(window_token))
+						break;
+					if (TK_EOL == TREF(window_token))
+						return TRUE;
+					advancewindow();
+					continue;	/* leave first_time in case next arg is also a literal */
+				}
+			} else
+				t_set = (OC_JMPTSET == (TREF(curtchain))->exorder.bl->opcode);
 			if (!t_set)
 				newtriple(OC_CLRTEST);
 			if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
@@ -121,6 +157,8 @@ int m_if(void)
 	}
 	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)))
 	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);			/* reset from discard chain */
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
@@ -131,8 +169,15 @@ int m_if(void)
 			ref1 = nxtjmp->jmptrip;
 			ref1->operand[0] = x;
 		}
+		if (NULL != oldchain)
+		{	/* for a literal 0 postconditional, we just throw the command & args away along with any pending error */
+			pending_errtriplecode = 0;
+			setcurtchain(oldchain);			/* reset from discard chain */
+		}
 		TREF(pos_in_chain) = ifpos_in_chain;
 		return FALSE;
 	}
+	if (NULL != oldchain)
+		setcurtchain(oldchain);				/* reset from discard chain */
 	return TRUE;
 }

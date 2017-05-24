@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,7 +187,7 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 				if (data_len < 0  || (sm_uc_ptr_t)rp + rsiz > (sm_uc_ptr_t)bp + ((blk_hdr_ptr_t)bp)->bsiz)
 				{
 					assert(CDB_STAGNATE > t_tries);
-					t_retry(cdb_sc_rmisalign1);
+					t_retry(cdb_sc_rmisalign);
 					continue;
 				}
 				ENSURE_STP_FREE_SPACE(data_len);

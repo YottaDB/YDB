@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,53 +45,82 @@
 #include "gtmcrypt.h"
 #include "shmpool.h"	/* Needed for the shmpool structures */
 #include "jnl.h"
+#include "db_write_eof_block.h"
+#include "get_fs_block_size.h"
+#include "gtm_permissions.h"
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
 #define CLEANUP(XX)								\
-{										\
+MBSTART {									\
 	int	rc;								\
 										\
-	if (cc)									\
-		free(cc);							\
 	if (cs_data)								\
 		free(cs_data);							\
 	if (FD_INVALID != fd)							\
 		CLOSEFILE_RESET(fd, rc); /* resets "fd" to FD_INVALID */	\
 	if (EXIT_ERR == XX)							\
 		UNLINK(path);							\
-}
+} MBEND
 
-#define SPRINTF_AND_PERROR(MESSAGE)			\
-{							\
-	save_errno = errno;				\
-	SPRINTF(errbuff, MESSAGE, path);		\
-	errno = save_errno;				\
-	PERROR(errbuff);				\
-}
+#define PUTMSG_ERROR_CSA(MSGPARMS)			\
+MBSTART {						\
+	if (cleanup_needed)				\
+		CLEANUP(EXIT_ERR);			\
+	if (IS_MUPIP_IMAGE)				\
+		gtm_putmsg_csa MSGPARMS;		\
+	else						\
+		send_msg_csa MSGPARMS;			\
+} MBEND
 
+#define PUTMSG_WARN_CSA(MSGPARMS)			\
+MBSTART {						\
+	if (IS_MUPIP_IMAGE)				\
+		gtm_putmsg_csa MSGPARMS;		\
+	else						\
+		send_msg_csa MSGPARMS;			\
+} MBEND
+
+/* zOS is a currently unsupported platform so this macro remains unconverted but with an assertpro(FALSE) should
+ * the zOS port ever be resurrected. In that case, uses of this macro need to be converted to PUTMSG_ERROR_CSA
+ * invocations.
+ */
 #define SPRINTF_AND_PERROR_MVS(MESSAGE)					\
-{									\
+MBSTART {								\
+	assertpro(FALSE);						\
 	save_errno = errno;						\
 	SPRINTF(errbuff, MESSAGE, path, realfiletag, TAG_BINARY);	\
 	errno = save_errno;						\
 	PERROR(errbuff);						\
-}
+} MBEND
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			gtmDebugLevel;
+#ifdef DEBUG
+GBLREF	boolean_t		in_mu_cre_file;
+#endif
 
-error_def(ERR_NOSPACECRE);
+error_def(ERR_DBBLKSIZEALIGN);
+error_def(ERR_DBFILECREATED);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DSKSPCCHK);
+error_def(ERR_FILECREERR);
+error_def(ERR_FNTRANSERROR);
 error_def(ERR_LOWSPACECRE);
 error_def(ERR_MUNOSTRMBKUP);
+error_def(ERR_NOCREMMBIJ);
+error_def(ERR_NOCRENETFILE);
+error_def(ERR_NOSPACECRE);
+error_def(ERR_PARNORMAL);
 error_def(ERR_PREALLOCATEFAIL);
+error_def(ERR_RAWDEVUNSUP);
 
 unsigned char mu_cre_file(void)
 {
-	char		*cc = NULL, path[MAX_FBUFF + 1], errbuff[512];
+	char		path[MAX_FBUFF + 1], errbuff[512];
 	unsigned char	buff[DISK_BLOCK_SIZE];
 	int		fd = FD_INVALID, i, lower, upper, norm_vbn;
         ssize_t         status;
@@ -104,10 +133,21 @@ unsigned char mu_cre_file(void)
 	unix_db_info	udi_struct, *udi;
 	char		*fgets_res;
 	gd_segment	*seg;
+	gd_region	*baseDBreg;
 	char		hash[GTMCRYPT_HASH_LEN];
-	int		gtmcrypt_errno;
+	int		gtmcrypt_errno, retcode, perms, user_id, group_id;
+	off_t		new_eof;
+	uint4		fsb_size;
+	boolean_t	cleanup_needed;
+	sgmnt_addrs	*baseDBcsa;
+	struct stat	stat_buf;
+	struct perm_diag_data	pdd;
 	ZOS_ONLY(int	realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	cleanup_needed = FALSE;
+	DEBUG_ONLY(in_mu_cre_file = TRUE;)
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
 	cs_addrs = &udi_struct.s_addrs;
 	cs_data = (sgmnt_data_ptr_t)NULL;	/* for CLEANUP */
@@ -120,29 +160,26 @@ unsigned char mu_cre_file(void)
 	strncpy(path, file.addr, file.len);
 	*(path + file.len) = '\0';
 	if (is_raw_dev(path))
-	{	/* do not use a default extension for raw device files */
-		pblk.def1_buf = DEF_NODBEXT;
-		pblk.def1_size = SIZEOF(DEF_NODBEXT) - 1;
-	} else
 	{
-		pblk.def1_buf = DEF_DBEXT;
-		pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_RAWDEVUNSUP, 2, REG_LEN_STR(gv_cur_region)));
+		return EXIT_ERR;
 	}
-	if (1 != (parse_file(&file, &pblk) & 1))
+	pblk.def1_buf = DEF_DBEXT;
+	pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
+	if (ERR_PARNORMAL != (retcode = parse_file(&file, &pblk)))	/* Note assignment */
 	{
-		PRINTF("Error translating filename %s.\n", file.addr);
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FNTRANSERROR, 2, REG_LEN_STR(gv_cur_region)));
 		return EXIT_ERR;
 	}
 	path[pblk.b_esl] = 0;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node);
-		PRINTF("Database file for region %s not created; cannot create across network.\n", path);
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NOCRENETFILE, 2, LEN_AND_STR(path)));
 		return EXIT_WRN;
 	}
 	udi = &udi_struct;
 	memset(udi, 0, SIZEOF(unix_db_info));
-	udi->raw = is_raw_dev(pblk.l_dir);
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
@@ -154,111 +191,82 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	}
-	if (udi->raw)
+	fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
+	if (FD_INVALID == fd)
+	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also
+		 * STATSDBs.
+		 */
+		save_errno = errno;
+		TREF(mu_cre_file_openrc) = errno;		/* Save for gvcst_init() */
+		/* If this is an AUTODB (but not a STATSDB) and the file already exists, this is not an error (some other
+		 * process created the file. This is ok so return as if we created it.
+		 */
+		if (IS_AUTODB_REG(gv_cur_region) && !IS_STATSDB_REG(gv_cur_region) && (EEXIST == errno))
+			return EXIT_NRM;
+		/* Suppress EEXIST messages for statsDBs */
+		if (!IS_STATSDB_REG(gv_cur_region) || (EEXIST != errno))
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBOPNERR, 2, LEN_AND_STR(path), save_errno));
+		return EXIT_ERR;
+	}
+	cleanup_needed = TRUE;			/* File open now so cleanup needed */
+#	ifdef __MVS__
+	if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+		SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
+#	endif
+	if (0 != (save_errno = disk_block_available(fd, &avail_blocks, FALSE)))
 	{
-		fd = OPEN(pblk.l_dir,O_EXCL | O_RDWR);
-		if (FD_INVALID == fd)
+		errno = save_errno;
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DSKSPCCHK, 2, LEN_AND_STR(path), errno));
+		return EXIT_ERR;
+	}
+	seg = gv_cur_region->dyn.addr;
+	if (seg->asyncio)
+	{	/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
+		fsb_size = get_fs_block_size(fd);
+		if (0 != (seg->blk_size % fsb_size))
 		{
-			SPRINTF_AND_PERROR("Error opening file %s\n");
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_DBBLKSIZEALIGN, 4,
+					  LEN_AND_STR(path), seg->blk_size, fsb_size));
 			return EXIT_ERR;
 		}
-		if (-1 != (status = (ssize_t)lseek(fd, 0, SEEK_SET)))
+	}
+	/* Blocks_for_create is in the unit of DISK_BLOCK_SIZE */
+	blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1
+					   + (seg->blk_size / DISK_BLOCK_SIZE
+					      * (gtm_uint64_t)((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1))
+							       + seg->allocation)));
+	blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE
+				* ((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count,
+						    BLKS_PER_LMAP - 1))
+				   + EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count));
+	if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
+	{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparse DB
+		 * in space it could never fit it if wasn't sparse. Needed for some tests.
+		 * Also, if the anticipatory freeze scheme is in effect at this point, we would have issued
+		 * a NOSPACECRE warning (see NOSPACEEXT message which goes through a similar transformation).
+		 * But at this point, we are guaranteed to not have access to the journal pool or csa both
+		 * of which are necessary for the INST_FREEZE_ON_ERROR_ENABLED(csa) macro so we don't bother
+		 * to do the warning transformation in this case. The only exception to this is a statsdb
+		 * which is anyways not journaled so need not worry about INST_FREEZE_ON_ERROR_ENABLED.
+		 */
+		assert((NULL == jnlpool.jnlpool_ctl) || IS_STATSDB_REG(gv_cur_region));
+		if (avail_blocks < blocks_for_create)
 		{
-			DOREADRC(fd, buff, SIZEOF(buff), status);
-		} else
-			status = errno;
-		if (0 != status)
-		{
-			SPRINTF_AND_PERROR("Error reading header for file %s\n");
-			return EXIT_ERR;
-		}
-#		ifdef __MVS__
-		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
-			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
-#		endif
-		if (!memcmp(buff, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
-		{
-			char rsp[80];
-			PRINTF("Database already exists on device %s\n", path);
-			PRINTF("Do you wish to re-initialize (all current data will be lost) [y/n] ? ");
-			FGETS(rsp, 79, stdin, fgets_res);
-			if ('y' != *rsp)
-				return EXIT_NRM;
-		}
-		PRINTF("Determining size of raw device...\n");
-		for(i = 1; read(fd, buff, SIZEOF(buff)) == SIZEOF(buff);)
-		{
-			i *= 2;
-			lseek(fd, (off_t)i * BUFSIZ, SEEK_SET);
-		}
-		lower = i / 2;
-		upper = i;
-		while ((lower + upper) / 2 != lower)
-		{
-			i = (lower + upper) / 2;
-			lseek(fd, (off_t)i * BUFSIZ, SEEK_SET);
- 			if (read(fd, buff, SIZEOF(buff)) == SIZEOF(buff))
-				lower = i;
-			else
-				upper = i;
-		}
-		raw_dev_size = i * BUFSIZ;
-	} else
-	{
-		fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
-		if (FD_INVALID == fd)
-		{
-			SPRINTF_AND_PERROR("Error opening file %s\n");
-			return EXIT_ERR;
-		}
-#		ifdef __MVS__
-		if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
-			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
-#		endif
-		if (0 != (save_errno = disk_block_available(fd, &avail_blocks, FALSE)))
-		{
-			errno = save_errno;
-			SPRINTF_AND_PERROR("Error checking available disk space for %s\n");
-			CLEANUP(EXIT_ERR);
-			return EXIT_ERR;
-		}
-		seg = gv_cur_region->dyn.addr;
-
-		/* blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-		blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
-					(seg->blk_size / DISK_BLOCK_SIZE *
-					 (gtm_uint64_t)((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation)));
-		blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE *
-					((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count,
-							BLKS_PER_LMAP - 1))
-				 	  + EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count));
-		if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
-		{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparce DB
-			 * in space it could never fit it if wasn't sparse. Needed for some tests.
-			 * Also, if the anticipatory freeze scheme is in effect at this point, we would have issued
-			 * a NOSPACECRE warning (see NOSPACEEXT message which goes through a similar transformation).
-			 * But at this point, we are guaranteed to not have access to the journal pool or csa both
-			 * of which are necessary for the INST_FREEZE_ON_ERROR_ENABLED(csa) macro so we dont bother
-			 * to do the warning transformation in this case.
-			 */
-			assert(NULL == jnlpool.jnlpool_ctl);
-			if (avail_blocks < blocks_for_create)
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
-						&blocks_for_create, &avail_blocks);
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
+					  &blocks_for_create, &avail_blocks));
+			if (IS_MUPIP_IMAGE)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
-						&blocks_for_create, &avail_blocks);
-				CLEANUP(EXIT_ERR);
-				return EXIT_ERR;
-			}
-			delta_blocks = avail_blocks - blocks_for_create;
-			if (delta_blocks < blocks_for_extension)
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
-						EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+					     &blocks_for_create, &avail_blocks);
+			return EXIT_ERR;
+		}
+		delta_blocks = avail_blocks - blocks_for_create;
+		if (delta_blocks < blocks_for_extension)
+		{
+			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
+					 EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks));
+			if (IS_MUPIP_IMAGE)	/* Is not mupip, msg already went to operator log */
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
-						EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
-			}
+					     EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;
@@ -280,36 +288,16 @@ unsigned char mu_cre_file(void)
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if ((dba_mm == cs_data->acc_meth) && (gv_cur_region->jnl_before_image))
 	{
-		PRINTF("MM access method not compatible with BEFORE image journaling; Database file %s not created.\n", path);
-		CLEANUP(EXIT_ERR);
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NOCREMMBIJ, 2, LEN_AND_STR(path)));
 		return EXIT_ERR;
 	}
-	if (udi->raw)
-	{
-		/* calculate total blocks, reduce to make room for the
-		 * database header (size rounded up to a block), then
-		 * make into a multiple of BLKS_PER_LMAP to have a complete bitmap
-		 * for each set of blocks.
-		 */
-		cs_data->trans_hist.total_blks = raw_dev_size - (uint4)ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE);
-		cs_data->trans_hist.total_blks /= (uint4)(((gd_segment *)gv_cur_region->dyn.addr)->blk_size);
-		if (0 == (cs_data->trans_hist.total_blks - DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1)
-			  % (BLKS_PER_LMAP - 1)))
-			cs_data->trans_hist.total_blks -= 1;	/* don't create a bitmap with no data blocks */
-		cs_data->extension_size = 0;
-		PRINTF("Raw device size is %dK, %d GDS blocks\n",
-		raw_dev_size / 1000,
-		cs_data->trans_hist.total_blks);
-	} else
-	{
-		cs_data->trans_hist.total_blks = gv_cur_region->dyn.addr->allocation;
-		/* There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
-		 * and divide by (bplmap - 1) to get total number of bitmaps for expanded database. (must round up in this
-		 * manner as every non-bitmap block must have an associated bitmap)
-		 */
-		cs_data->trans_hist.total_blks += DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1);
-		cs_data->extension_size = gv_cur_region->dyn.addr->ext_blk_count;
-	}
+	cs_data->trans_hist.total_blks = gv_cur_region->dyn.addr->allocation;
+	/* There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
+	 * and divide by (bplmap - 1) to get total number of bitmaps for expanded database. (must round up in this
+	 * manner as every non-bitmap block must have an associated bitmap)
+	 */
+	cs_data->trans_hist.total_blks += DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1);
+	cs_data->extension_size = gv_cur_region->dyn.addr->ext_blk_count;
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
@@ -338,49 +326,71 @@ unsigned char mu_cre_file(void)
 	cs_data->maxkeysz_assured = TRUE;
 	mucregini(cs_data->trans_hist.total_blks);
 	cs_data->createinprogress = FALSE;
-	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
+	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
+	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
 	if (0 != status)
 	{
-		SPRINTF_AND_PERROR("Error writing out header for file %s\n");
-		CLEANUP(EXIT_ERR);
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"),
+				  LEN_AND_LIT(path), status));
 		return EXIT_ERR;
 	}
-	cc = (char*)malloc(DISK_BLOCK_SIZE);
-	memset(cc, 0, DISK_BLOCK_SIZE);
-	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd,
-		      BLK_ZERO_OFF(cs_data) + ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size),
-		      cc,
-		      DISK_BLOCK_SIZE,
-		      status);
+	new_eof = (off_t)BLK_ZERO_OFF(cs_data->start_vbn) + (off_t)cs_data->trans_hist.total_blks * cs_data->blk_size;
+	status = db_write_eof_block(udi, udi->fd, cs_data->blk_size, new_eof, &(TREF(dio_buff)));
 	if (0 != status)
 	{
-		SPRINTF_AND_PERROR("Error writing out end of file %s\n");
-		CLEANUP(EXIT_ERR);
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out end-of-file marker"),
+				  LEN_AND_LIT(path), status));
 		return EXIT_ERR;
 	}
-#	if !defined(__sun) && !defined(__hpux)
 	if (!cs_data->defer_allocate)
 	{
-		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) +
-					 ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size) + DISK_BLOCK_SIZE);
+		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
+					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size));
 		if (0 != status)
 		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region), status);
-			CLEANUP(EXIT_ERR);
+			assert(ENOSPC == status);
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
+					  status));
 			return EXIT_ERR;
 		}
 	}
-#	endif
-	if ((!udi->raw) && (-1 == CHMOD(pblk.l_dir, 0666)))
+	/* If we are opening a statsDB, use IPC type permissions derived from the baseDB */
+	if (IS_STATSDB_REG(gv_cur_region))
 	{
-		SPRINTF_AND_PERROR("Error changing file mode on file %s\n");
-		CLEANUP(EXIT_WRN);
+		STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);
+		assert(baseDBreg->open);
+		assert(!baseDBreg->was_open);
+		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+		STAT_FILE((char *)baseDBcsa->nl->fname, &stat_buf, retcode);
+		if (0 > retcode)
+		{	/* Should be rare-if-ever message as we just opened the baseDB so it should be there */
+			save_errno = errno;
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4,
+					  LEN_AND_LIT("getting base file information"), LEN_AND_STR(path), save_errno));
+			return EXIT_ERR;
+		}
+		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perms, PERM_IPC, &pdd))
+		{	/* Not sure what could cause this as we would have done the same call when opening the baseDB but
+			 * make sure it is present just in case.
+			 */
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4,
+					  LEN_AND_LIT("obtaining permissions from base DB"),  LEN_AND_STR(path), EPERM));
+			return EXIT_ERR;
+		}
+	} else
+		perms = 0666;
+	if (-1 == CHMOD(pblk.l_dir, perms))
+	{
+		save_errno = errno;
+		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) MAKE_MSG_WARNING(ERR_FILECREERR), 4,
+				 LEN_AND_LIT("changing file mode"), LEN_AND_LIT(path), save_errno));
 		return EXIT_WRN;
 	}
 	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path),
-				32 * 1024 - DISK_BLOCK_SIZE);
-	util_out_print("Created file !AD", TRUE, RTS_ERROR_STRING(path));
+		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path),
+				 32 * 1024 - DISK_BLOCK_SIZE));
+	if (!(RDBF_AUTODB & gv_cur_region->reservedDBFlags))
+		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBFILECREATED, 2, LEN_AND_STR(path)));
 	CLEANUP(EXIT_NRM);
 	return EXIT_NRM;
 }

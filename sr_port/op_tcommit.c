@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,10 +63,9 @@
 #include "process_deferred_stale.h"
 #include "wcs_timer_start.h"
 #include "mupipbckup.h"
+#include "gvcst_protos.h"
 
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
@@ -102,6 +101,9 @@ GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
+#endif
+#ifdef DEBUG
+GBLREF	boolean_t		forw_recov_lgtrig_only;
 #endif
 
 error_def(ERR_GBLOFLOW);
@@ -189,7 +191,7 @@ enum cdb_sc	op_tcommit(void)
 	enum cdb_sc		status;
 	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
 	blk_ident		*blk, *blk_top, *next_blk;
-	block_id		bit_map, next_bm, new_blk, temp_blk;
+	block_id		bit_map, next_bm, new_blk;
 	cache_rec_ptr_t		cr;
 	kill_set		*ks;
 	off_chain		chain1;
@@ -204,7 +206,6 @@ enum cdb_sc	op_tcommit(void)
 	boolean_t		before_image_needed;
 	boolean_t		skip_invoke_restart;
 #	ifdef DEBUG
-	boolean_t		forw_recov_lgtrig_only;
 	enum cdb_sc		prev_status;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -222,51 +223,43 @@ enum cdb_sc	op_tcommit(void)
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
 	tp_kill_bitmaps = FALSE;
-	GTMTRIG_ONLY(
-		/* The value of $ztlevel at the time of the TSTART, i.e. tstart_trigger_depth, can never be GREATER than
-		 * the current $ztlevel as otherwise a TPQUIT error would have been issued as part of the QUIT of the
-		 * M frame of the TSTART (which has a deeper trigger depth). Assert that.
-		 */
-		assert(tstart_trigger_depth <= gtm_trigger_depth);
-	)
+#	ifdef GTM_TRIGGER
+	/* The value of $ztlevel at the time of the TSTART, i.e. tstart_trigger_depth, can never be GREATER than
+	 * the current $ztlevel as otherwise a TPQUIT error would have been issued as part of the QUIT of the
+	 * M frame of the TSTART (which has a deeper trigger depth). Assert that.
+	 */
+	assert(tstart_trigger_depth <= gtm_trigger_depth);
+#	endif
 	if (1 == dollar_tlevel)		/* real commit */
 	{
-		GTMTRIG_ONLY(
-			if (gtm_trigger_depth != tstart_trigger_depth)
-			{	/* TCOMMIT to $tlevel=0 is being attempted at a trigger depth which is NOT EQUAL TO the trigger
-				 * depth at the time of the TSTART. This means we have a gvcst_put/gvcst_kill frame in the
-				 * C stack that invoked us through gtm_trigger and is in an incomplete state waiting for the
-				 * trigger invocation to be done before completing the explicit (outside-trigger) update.
-				 * Cannot commit such a transaction. Issue error.
-				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth,
-						tstart_trigger_depth);
-			}
-			if (tp_pointer->cannot_commit)
-			{	/* If this TP transaction was implicit, any unhandled error when crossing the trigger boundary
-				 * would have caused a rethrow of the error in the M frame that held the non-TP update which
-				 * would then have invoked "error_return" that would in turn have rolled back the implicit TP
-				 * transaction so we should never see an implicit TP inside op_tcommit.
-				 */
-				assert(!tp_pointer->implicit_tstart);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TCOMMITDISALLOW);
-			}
-		)
+#		ifdef GTM_TRIGGER
+		if (gtm_trigger_depth != tstart_trigger_depth)
+		{	/* TCOMMIT to $tlevel=0 is being attempted at a trigger depth which is NOT EQUAL TO the trigger
+			 * depth at the time of the TSTART. This means we have a gvcst_put/gvcst_kill frame in the
+			 * C stack that invoked us through gtm_trigger and is in an incomplete state waiting for the
+			 * trigger invocation to be done before completing the explicit (outside-trigger) update.
+			 * Cannot commit such a transaction. Issue error.
+			 */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth,
+					tstart_trigger_depth);
+		}
+		if (tp_pointer->cannot_commit)
+		{	/* If this TP transaction was implicit, any unhandled error when crossing the trigger boundary
+			 * would have caused a rethrow of the error in the M frame that held the non-TP update which
+			 * would then have invoked "error_return" that would in turn have rolled back the implicit TP
+			 * transaction so we should never see an implicit TP inside op_tcommit.
+			 */
+			assert(!tp_pointer->implicit_tstart);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TCOMMITDISALLOW);
+		}
+#		endif
 		save_cur_region = gv_cur_region;
 #		ifdef DEBUG
-		if ((NULL != gv_currkey) && (0 != gv_currkey->base[0]) && ((NULL == gv_target) || !gv_target->gvname.var_name.len))
-		{	/* This is a case where forward recovery is playing a TLGTRIG/ULGTRIG only transaction,
-			 * no other global references. In that case, no gv_bind_name would have happened and so
-			 * gv_target could be NULL (because of a MUR_CHANGE_REG done at the start of this transaction)
-			 * or gv_target could be equal to csa->dir_tree (done in mur_forward). Assert accordingly.
-			 */
-			assert(jgbl.forw_phase_recovery);
-			forw_recov_lgtrig_only = TRUE;
-		} else
-		{
+		/* With jgbl.forw_phase_recovery, it is possible gv_currkey is non-NULL and gv_target is NULL
+		 * (due to a MUR_CHANGE_REG) so do not invoke the below macro in that case.
+		 */
+		if (!forw_recov_lgtrig_only && (!jgbl.forw_phase_recovery || (NULL != gv_target)))
 			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-			forw_recov_lgtrig_only = FALSE;
-		}
 #		endif
 		if (NULL != first_sgm_info)	/* if (database work in the transaction) */
 		{
@@ -278,6 +271,7 @@ enum cdb_sc	op_tcommit(void)
 				csd = cs_data;
 				cnl = csa->nl;
 				is_mm = (dba_mm == csa->hdr->acc_meth);
+				csa->tp_hint = cnl->tp_hint;
 				si->cr_array_index = 0;
 #				ifdef DEBUG
 				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
@@ -329,7 +323,6 @@ enum cdb_sc	op_tcommit(void)
 					 */
 					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 					jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
-#					ifdef GTM_SNAPSHOT
 					if (SNAPSHOTS_IN_PROG(cnl))
 					{
 						/* If snapshot context is not already created, then create one now to be used
@@ -340,7 +333,6 @@ enum cdb_sc	op_tcommit(void)
 						SS_INIT_IF_NEEDED(csa, cnl);
 					} else
 						CLEAR_SNAPSHOTS_IN_PROG(csa);
-#					endif
 					read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
 					/* The following section allocates new blocks required by the transaction it is done
 					 * before going crit in order to reduce the change of having to wait on a read while crit.
@@ -365,6 +357,13 @@ enum cdb_sc	op_tcommit(void)
 							TRAVERSE_TO_LATEST_CSE(first_cse);
 							old_db_addrs[0] = csa->db_addrs[0];
 							old_db_addrs[1] = csa->db_addrs[1];
+							/* cse->blk could be a real block or a chain; we can't use a chain but
+							 * the following statement is unconditional because, in general, the region
+							 * hint works at least as well as the block, which is what we use in non-TP
+							 * we assign the hints in op_tcommit just before we grab crit to
+							 * maximize chances that the blocks we assign remain available in tp_tend
+							 */
+							cse->blk = ++csa->tp_hint;
 							while (FILE_EXTENDED == (new_blk = bm_getfree(cse->blk, &blk_used,
 								cw_depth, first_cse, &si->cw_set_depth)))
 							{
@@ -555,11 +554,12 @@ enum cdb_sc	op_tcommit(void)
 			}		/* for (all segments in the transaction) */
 			assert(NULL == temp_si || NULL == si->kill_set_head);
 		}	/* if (kills in the transaction) */
-		tp_clean_up(FALSE);	/* Not the rollback type of cleanup */
+		tp_clean_up(TP_COMMIT);
 		gv_cur_region = save_cur_region;
 		TP_CHANGE_REG(gv_cur_region);
 #		ifdef DEBUG
-		if (!forw_recov_lgtrig_only)
+		/* See comment in similar code before tp_tend call above */
+		if (!forw_recov_lgtrig_only && (!jgbl.forw_phase_recovery || (NULL != gv_target)))
 			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 #		endif
 		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
@@ -569,7 +569,14 @@ enum cdb_sc	op_tcommit(void)
 	assert(dollar_tlevel);
 	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION, NULL);
 	if (!dollar_tlevel) /* real commit */
+	{
+		/* Transaction is complete as the outer transaction has been committed. Check now to see if any statsDB
+		 * region initializations were deferred and drive them now if they were.
+		 */
+		if (NULL != TREF(statsDB_init_defer_anchor))
+			gvcst_deferred_init_statsDB();
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+	}
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return NORMAL status\n"));)
 	return cdb_sc_normal;
 }

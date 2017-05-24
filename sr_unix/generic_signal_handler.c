@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -303,6 +303,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
+					/* SIGABRT is usually delivered when memory corruption is detected by glibc
+					 * e.g.  *** glibc detected *** mupip: double free or corruption (!prev): 0x0983f180 ***
+					 * We want to detect that right when it happens so assert fail in that case.
+					 */
+					assert(SIGABRT != sig);
 					SEND_AND_PUT_MSG(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
 						process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
 					break;

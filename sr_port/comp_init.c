@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,12 +27,11 @@
  *	(indr_stringpool).  comp_fini changes it back from indr_stringpool to
  *	rts_stringpool when the compilation is finished.
  */
-GBLREF spdesc stringpool,rts_stringpool;
-GBLREF spdesc indr_stringpool;
-GBLREF unsigned char *source_buffer;
-GBLREF int4 curr_fetch_count;
-GBLREF triple *curr_fetch_trip;
-GBLREF char cg_phase;
+GBLREF char	cg_phase;
+GBLREF int4	aligned_source_buffer, curr_fetch_count;
+GBLREF spdesc	stringpool,rts_stringpool;
+GBLREF spdesc	indr_stringpool;
+GBLREF triple	*curr_fetch_trip;
 
 error_def(ERR_INDRMAXLEN);
 
@@ -41,10 +40,11 @@ void comp_init(mstr *src, oprtype *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((unsigned)src->len >= TREF(max_advancewindow_line))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, TREF(max_advancewindow_line));
-	memcpy(source_buffer,src->addr,src->len);
-	source_buffer[src->len + 1] = source_buffer[src->len] = 0;
+	if ((MAX_SRCLINE <= (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
+	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
+	(TREF(source_buffer)).len = src->len + 1;
+	*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';
 	TREF(compile_time) = TRUE;
 	TREF(transform) = FALSE;
 	cg_phase = CGP_PARSE;

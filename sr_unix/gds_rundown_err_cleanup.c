@@ -41,7 +41,7 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 	int		semop_res;
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
-	boolean_t	cancelled_timer, cancelled_dbsync_timer;
+	boolean_t	cancelled_dbsync_timer;
 
 	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in
 	 * gds_rundown().Because we don't have access to file header, we can not know if counters are disabled so we go by our best
@@ -50,7 +50,7 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
-	CANCEL_DB_TIMERS(gv_cur_region, csa, cancelled_timer, cancelled_dbsync_timer);
+	CANCEL_DB_TIMERS(gv_cur_region, csa, cancelled_dbsync_timer);
 	if (csa->now_crit)		/* Might hold crit if wcs_flu or other failure */
 	{
 		assert(!csa->hold_onto_crit || jgbl.onlnrlbk);

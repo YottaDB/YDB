@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +31,6 @@
 GBLREF spdesc		stringpool, rts_stringpool, indr_stringpool;
 GBLREF int		source_column;
 GBLREF char		cg_phase;
-GBLREF unsigned char	*source_buffer;
 
 error_def(ERR_INDEXTRACHARS);
 error_def(ERR_INDRCOMPFAIL);

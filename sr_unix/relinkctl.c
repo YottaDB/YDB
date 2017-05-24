@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,6 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/shm.h>
-
 #include "gtm_ipc.h"
 #include "gtm_limits.h"
 #include "gtm_fcntl.h"
@@ -75,7 +74,6 @@ STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 #define MAX_RCTL_OPEN_RETRIES	16
 
 error_def(ERR_FILEPARSE);
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
 error_def(ERR_REQRLNKCTLRNDWN);
@@ -235,6 +233,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	char			errstr[256];
 	struct stat		dir_stat_buf;
 	int			rctl_deleted_count, rctl_rundown_count, rctl_init_wait_count;
+	struct perm_diag_data	pdd;
 	struct shmid_ds		shmstat;
 	DCL_THREADGBL_ACCESS;
 
@@ -275,7 +274,13 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					SNPRINTF(errstr, SIZEOF(errstr), "stat() of file %s failed", linkctl->zro_entry_name.addr);
 					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
 				}
-				gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC);
+				if (!gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,
+						RTS_ERROR_MSTR(&linkctl->zro_entry_name), ERR_PERMGENFAIL, 4,
+						RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&linkctl->zro_entry_name),
+						PERMGENDIAG_ARGS(pdd));
+				}
 				/* Attempt to create the relinkctl file with desired permissions. */
 				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
 				obtained_perms = TRUE;
@@ -526,10 +531,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 		assert(linkctl->locked == is_mu_rndwn_rlnkctl);
 		assert(0 == ((UINTPTR_T)shm_base % 8));
 		assert(0 == (SIZEOF(relinkshm_hdr_t) % SIZEOF(uint4)));	/* assert SIZEOF(*sm_uint_ptr_t) alignment */
-#		ifdef DEBUG
-		if (TREF(gtm_autorelink_keeprtn))
-			shm_base->skip_rundown_check = TRUE;
-#		endif
+		shm_base->skip_rundown_check = TRUE;
 		linkctl->shm_hashbase = (sm_uint_ptr_t)(sm_uc_ptr_t)(shm_base + 1);
 			/* Skip past shm header to reach hash array start */
 		assert(0 == ((UINTPTR_T)linkctl->shm_hashbase % 8));	/* assert each section is 8-byte aligned at least */

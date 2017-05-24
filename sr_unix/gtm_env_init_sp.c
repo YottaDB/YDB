@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2016 Fidelity National Information	*
+ * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 
+#include "gtmio.h"
 #include "gtmimagename.h"
 #include "gtm_logicals.h"
 #include "trans_numeric.h"
@@ -54,6 +55,7 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 #include "utfcgr.h"
+#include "gtm_reservedDB.h"
 #ifdef __linux__
 #include "hugetlbfs_overrides.h"
 #endif
@@ -77,14 +79,6 @@
 # define GTM_TEST_JNLPOOL_SYNC			"$gtm_test_jnlpool_sync"
 #endif
 #define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
-
-/* Only for this function, define MAX_TRANS_NAME_LEN to be equal to GTM_PATH_MAX as some of the environment variables can indicate
- * path to files which is limited by GTM_PATH_MAX.
- */
-#ifdef MAX_TRANS_NAME_LEN
-#undef MAX_TRANS_NAME_LEN
-#endif
-#define MAX_TRANS_NAME_LEN			GTM_PATH_MAX
 
 /* Remove trailing '/' from path (unless only '/') */
 #define	REMOVE_TRAILING_SLASH_FROM_MSTR(TRANS)				\
@@ -110,6 +104,9 @@ ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
 GBLREF	volatile boolean_t	timer_in_handler;
+#ifdef USE_LIBAIO
+GBLREF	char			io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
+#endif
 
 #ifdef GTM_TRIGGER
 LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
@@ -146,8 +143,8 @@ void	gtm_env_init_sp(void)
 	int4		status, index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined, novalidate;
-	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
-	char		*cwdptr, *trigger_etrap, *c, *end, *strtokptr;
+	char		buf[MAX_SRCLINE + 1], *token, cwd[GTM_PATH_MAX];
+	char		*cwdptr, *c, *end, *strtokptr;
 	struct stat	outbuf;
 	int		gtm_autorelink_shm_min;
 	DCL_THREADGBL_ACCESS;
@@ -179,10 +176,11 @@ void	gtm_env_init_sp(void)
 		} /* else gtm_core_file/gtm_core_putenv remain null and we likely cannot generate proper core files */
 	}
 #	endif
+	assert(GTM_PATH_MAX <= MAX_SRCLINE);
 	/* Validate $gtm_tmp if specified, else that default is available */
 	val.addr = GTM_TMP_ENV;
 	val.len = SIZEOF(GTM_TMP_ENV) - 1;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 	{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
 		trans.addr = buf;
@@ -209,15 +207,14 @@ void	gtm_env_init_sp(void)
 	ret = trans_numeric(&val, &is_defined, TRUE); /* Not initialized enuf for errors yet so silent rejection of invalid vals */
 	TREF(lv_null_subs) = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
 #	ifdef GTM_TRIGGER
-	token = GTM_TRIGGER_ETRAP;
-	trigger_etrap = GETENV(++token);	/* Point past the $ in gtm_logicals definition */
-	if (trigger_etrap)
+	val.addr = GTM_TRIGGER_ETRAP;
+	val.len = SIZEOF(GTM_TRIGGER_ETRAP) - 1;
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 	{
-		len = STRLEN(trigger_etrap);
-		gtm_trigger_etrap.str.len = len;
-		gtm_trigger_etrap.str.addr = malloc(len);	/* Allocates special null addr if length is 0 which we can key on */
-		if (0 < len)
-			memcpy(gtm_trigger_etrap.str.addr, trigger_etrap, len);
+		gtm_trigger_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+		memcpy(gtm_trigger_etrap.str.addr, trans.addr, trans.len);
+		gtm_trigger_etrap.str.addr[trans.len] = '\0';
+		gtm_trigger_etrap.str.len = trans.len;
 		gtm_trigger_etrap.mvtype = MV_STR;
 	} else if (IS_MUPIP_IMAGE)
 		gtm_trigger_etrap = default_mupip_trigger_etrap;
@@ -231,9 +228,9 @@ void	gtm_env_init_sp(void)
 	gtm_principal_editing_defaults = 0;
 	val.addr = GTM_PRINCIPAL_EDITING;
 	val.len = SIZEOF(GTM_PRINCIPAL_EDITING) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 	{
-		assert(trans.len < SIZEOF(buf));
+		assert(trans.len < GTM_PATH_MAX);
 		trans.addr[trans.len] = '\0';
 		token = STRTOK_R(trans.addr, ":", &strtokptr);
 		while (NULL != token)
@@ -271,7 +268,7 @@ void	gtm_env_init_sp(void)
 	}
 	val.addr = GTM_CHSET_ENV;
 	val.len = STR_LIT_LEN(GTM_CHSET_ENV);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))
 	    && STR_LIT_LEN(UTF8_NAME) == trans.len)
 	{
 		if (!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
@@ -280,15 +277,16 @@ void	gtm_env_init_sp(void)
 #			ifdef __MVS__
 			val.addr = GTM_CHSET_LOCALE_ENV;
 			val.len = STR_LIT_LEN(GTM_CHSET_LOCALE_ENV);
-			if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) &&
+			if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) &&
 			    (0 < trans.len))
 			{	/* full path to 64 bit ASCII UTF-8 locale object */
 				gtm_utf8_locale_object = malloc(trans.len + 1);
-				strcpy(gtm_utf8_locale_object, buf);
+				STRNCPY_STR(gtm_utf8_locale_object, buf, trans.len);
+				gtm_utf8_locale_object[trans.len] = '\0';
 			}
 			val.addr = GTM_TAG_UTF8_AS_ASCII;
 			val.len = STR_LIT_LEN(GTM_TAG_UTF8_AS_ASCII);
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 			{	/* We to tag UTF8 files as ASCII so we can read them, this var disables that */
 				if (status = logical_truth_value(&val, FALSE, &is_defined) && is_defined)
 					gtm_tag_utf8_as_ascii = FALSE;
@@ -297,7 +295,7 @@ void	gtm_env_init_sp(void)
 			/* Initialize $ZPATNUMERIC only if $ZCHSET is "UTF-8" */
 			val.addr = GTM_PATNUMERIC_ENV;
 			val.len = STR_LIT_LEN(GTM_PATNUMERIC_ENV);
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))
 			    && STR_LIT_LEN(UTF8_NAME) == trans.len
 			    && !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
@@ -337,15 +335,13 @@ void	gtm_env_init_sp(void)
 	val.len = SIZEOF(GTM_DB_STARTUP_MAX_WAIT) - 1;
 	hrtbt_cntr_delta = trans_numeric(&val, &is_defined, FALSE);
 	if (!is_defined)
-		TREF(dbinit_max_hrtbt_delta) = DEFAULT_DBINIT_MAX_HRTBT_DELTA;
-	else if ((INDEFINITE_WAIT_ON_EAGAIN != hrtbt_cntr_delta) && (NO_SEMWAIT_ON_EAGAIN != hrtbt_cntr_delta))
-		TREF(dbinit_max_hrtbt_delta) = (ROUND_UP2(hrtbt_cntr_delta, 8)) / 8;
+		TREF(dbinit_max_delta_secs) = DEFAULT_DBINIT_MAX_DELTA_SECS;
 	else
-		TREF(dbinit_max_hrtbt_delta) = hrtbt_cntr_delta;
+		TREF(dbinit_max_delta_secs) = hrtbt_cntr_delta;
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	val.addr = GTM_CUSTOM_ERRORS;
 	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 	{
 		assert(GTM_PATH_MAX > trans.len);
 		(TREF(gtm_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
@@ -362,14 +358,11 @@ void	gtm_env_init_sp(void)
 	val.len = SIZEOF(GTM_ETRAP) - 1;
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 	{
-		if (MAX_SRCLINE >= trans.len)
-		{	/* Only set $ETRAP if the length is usable (may be NULL) */
-			dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-			memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
-			dollar_etrap.str.addr[trans.len] = '\0';
-			dollar_etrap.str.len = trans.len;
-			dollar_etrap.mvtype = MV_STR;
-		}
+		dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+		memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
+		dollar_etrap.str.addr[trans.len] = '\0';
+		dollar_etrap.str.len = trans.len;
+		dollar_etrap.mvtype = MV_STR;
 	} else if (0 == dollar_etrap.mvtype)
 	{	/* If didn't setup $ETRAP, set default $ZTRAP instead */
 		dollar_ztrap.mvtype = MV_STR;
@@ -381,20 +374,17 @@ void	gtm_env_init_sp(void)
 	val.len = SIZEOF(GTM_ZSTEP) - 1;
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 	{
-		if (MAX_SRCLINE >= trans.len)
-		{
-			dollar_zstep.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-			memcpy(dollar_zstep.str.addr, trans.addr, trans.len);
-			dollar_zstep.str.addr[trans.len] = '\0';
-			dollar_zstep.str.len = trans.len;
-			dollar_zstep.mvtype = MV_STR;
-		}
+		dollar_zstep.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+		memcpy(dollar_zstep.str.addr, trans.addr, trans.len);
+		dollar_zstep.str.addr[trans.len] = '\0';
+		dollar_zstep.str.len = trans.len;
+		dollar_zstep.mvtype = MV_STR;
 	}
 	/* See if gtm_link is set */
 	val.addr = GTM_LINK;
 	val.len = SIZEOF(GTM_LINK) - 1;
 	TREF(relink_allowed) = LINK_NORECURSIVE; /* default */
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 	{
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
 	}
@@ -403,11 +393,11 @@ void	gtm_env_init_sp(void)
 	{	/* Set default or supplied value for $gtm_linktmpdir */
 		val.addr = GTM_LINKTMPDIR;
 		val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 		{	/* Else use default $gtm_tmp value or its default */
 			val.addr = GTM_TMP_ENV;
 			val.len = SIZEOF(GTM_TMP_ENV) - 1;
-			if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+			if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 			{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
@@ -500,7 +490,7 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_DB_COUNTER_SEM_INCR;
 	val.len = SIZEOF(GTM_DB_COUNTER_SEM_INCR) - 1;
 	gtm_db_counter_sem_incr = trans_numeric(&val, &is_defined, TRUE);
-	if (!is_defined)
+	if (!is_defined || !gtm_db_counter_sem_incr)
 		gtm_db_counter_sem_incr = DEFAULT_DB_COUNTER_SEM_INCR;
 	/* DEBUG-only option to force the journal pool accounting out of sync every n transactions. */
 	val.addr = GTM_TEST_JNLPOOL_SYNC;
@@ -545,9 +535,9 @@ void	gtm_env_init_sp(void)
 	{
 		val.addr = GTM_LOCALE;
 		val.len = SIZEOF(GTM_LOCALE) - 1;
-		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
 		{
-			if ((0 < trans.len) && (SIZEOF(buf) > trans.len))
+			if ((0 < trans.len) && (GTM_PATH_MAX > trans.len))
 			{	/* Something was specified - need to clear LC_ALL and set LC_CTYPE but need room in buf[]
 				 * for string-ending null.
 				 */
@@ -559,4 +549,46 @@ void	gtm_env_init_sp(void)
 			}
 		}
 	}
+#	ifdef 	USE_LIBAIO
+	/* Initialize variable that controls the nr_events parameter to io_setup() for linux AIO. */
+	val.addr = GTM_AIO_NR_EVENTS;
+	val.len = SIZEOF(GTM_AIO_NR_EVENTS) - 1;
+	TREF(gtm_aio_nr_events) = trans_numeric(&val, &is_defined, FALSE);
+	if (!is_defined || (TREF(gtm_aio_nr_events) == 0))
+		TREF(gtm_aio_nr_events) = GTM_AIO_NR_EVENTS_DEFAULT;
+	/* Populate the io_setup() error string. */
+	SNPRINTF(io_setup_errstr, ARRAYSIZE(io_setup_errstr), IO_SETUP_FMT, TREF(gtm_aio_nr_events));
+#	endif
+	/* Check if gtm_statshare is enabled */
+	val.addr = GTM_STATSHARE;
+	val.len = SIZEOF(GTM_STATSHARE) - 1;
+	ret = logical_truth_value(&val, FALSE, &is_defined);
+	if (is_defined)
+		TREF(statshare_opted_in) = ret;
+	/* Pull in specified gtm_statsdir if specified, else default to gtm_tmp or its default. Note we don't validate the directory
+	 * here. It need not exist until a database is opened. If gtm_statsdir does not exist, find an appropriate default and
+	 * set it so it is always resolvable.
+	 */
+	val.addr = GTM_STATSDIR;
+	val.len = SIZEOF(GTM_STATSDIR) - 1;
+	/* Using MAX_FN_LEN below instead of GTM_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+	{	/* Either no translation for $gtm_statsdir or the current and/or expanded value of $gtm_statsdir exceeds the
+		 * max path length. For either case $gtm_statsdir needs to be (re)set so try to use $gtm_tmp instead - note
+		 * from here down we'll (re)set $gtm_statsdir so it ALWAYS has a (valid) value for mu_cre_file() to later use.
+		 */
+		val.addr = GTM_TMP_ENV;
+		val.len = SIZEOF(GTM_TMP_ENV) - 1;
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+		{	/* Nothing for $gtm_tmp - use DEFAULT_GTM_TMP instead */
+			trans.addr = DEFAULT_GTM_TMP;
+			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+		}
+		/* In the setenv() call below, trans.addr always points to a double quoted string so has a NULL terminator */
+		c = GTM_STATSDIR;
+		c++;				/* Bump past the '$' to get to the actual envvar name needed by setenv */
+		status = setenv(c, trans.addr, 1);
+		assert(0 == status);
+	}
+	assert(MAX_STATSDIR_LEN >= trans.len);
 }

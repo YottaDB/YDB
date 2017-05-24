@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -533,33 +533,6 @@ typedef enum
 	I2A(lcl_ptr, num_len, INT);		\
 	assert(MAX_DIGITS_IN_INT >= num_len);	\
 	*(lcl_ptr + num_len) = '\0';		\
-}
-
-#define SAVE_TRIGGER_REGION_INFO(SAVE_KEY)					\
-{										\
-	save_gv_target = gv_target;						\
-	save_gv_cur_region = gv_cur_region;					\
-	save_sgm_info_ptr = sgm_info_ptr;					\
-	assert(NULL != gv_currkey);						\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
-	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
-}
-#define RESTORE_TRIGGER_REGION_INFO(SAVE_KEY)					\
-{										\
-	gv_target = save_gv_target;						\
-	sgm_info_ptr = save_sgm_info_ptr;					\
-	/* check no keysize expansion occurred inside gvcst_root_search */	\
-	assert(gv_currkey->top == SAVE_KEY[0].top);				\
-	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
-	if (NULL != save_gv_cur_region)						\
-	{									\
-		TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);			\
-	} else									\
-	{									\
-		gv_cur_region = NULL;						\
-		cs_data = NULL;							\
-		cs_addrs = NULL;						\
-	}									\
 }
 
 /* If this is the first call of this macro inside a function, then note down whatever is in the util_output buffer.

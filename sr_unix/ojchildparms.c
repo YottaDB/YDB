@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,6 @@
 GBLREF spdesc			stringpool;
 GBLREF io_log_name		*dollar_principal;
 GBLREF io_pair			io_std_device;
-GBLREF unsigned char		*source_buffer;
 GBLREF int4			aligned_source_buffer[];
 GBLREF stack_frame		*frame_pointer;
 GBLREF hash_table_objcode	cache_table;
@@ -264,8 +263,8 @@ STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str
 	assert(ctxt == chnd);
 	DEBUG_ONLY(save_msp = msp);
 	*local_buff = malloc(MAX_STRLEN);
-	source_buffer = malloc(MAX_STRLEN + 2);
-	TREF(max_advancewindow_line) = MAX_STRLEN + 1;
+	(TREF(source_buffer)).addr = malloc(MAX_STRLEN + 2);	/* changing source_buffer prevents long items from causing errors */
+	(TREF(source_buffer)).len = MAX_STRLEN + 1;
 	/* Get space from the stack to save the command strings before putting the base stack frame This must be done first (before
 	 * putting the base frame) so that dm_start does not unintentionally pop strings off the stack
 	 */
@@ -290,10 +289,10 @@ STATICFNDEF void receive_child_locals_finalize(char **local_buff)
 	frame_pointer = *(stack_frame**)msp;
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
 	free(*local_buff);
-	free(source_buffer);
+	free((TREF(source_buffer)).addr);
 	/* Reset the source buffer */
-	TREF(max_advancewindow_line) = MAX_SRCLINE;
-	source_buffer = (unsigned char *)aligned_source_buffer;
+	(TREF(source_buffer)).len = MAX_SRCLINE;
+	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
 	/* Return the space saved for command strings */
 	POP_MV_STENT();
 	ctxt = active_ch = chnd;		/* Clear extra condition handlers added by dm_start()s */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,8 +13,12 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#ifdef DEBUG
+#include "gtm_ctype.h"
+#endif
 
 #include "gdsroot.h"
+#include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -24,17 +28,16 @@
 #include "iosize.h"
 #include "probe.h"
 #include "dpgbldir.h"
-#ifdef UNIX
+#include "filestruct.h"
+#include "aio_shim.h"
 #include "gtmio.h"
-#elif defined(VMS)
-#include <fab.h>
-#else
-#error unsupported platform
-#endif
 #include "dpgbldir_sysops.h"
 #include "targ_alloc.h"
 #include "gtm_logicals.h"
 #include "zshow.h"
+#ifdef DEBUG
+#include "gtm_caseconv.h"
+#endif
 
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
@@ -167,8 +170,8 @@ gd_addr *gd_load(mstr *v)
 	void			*file_ptr; /* is a temporary structure as the file open and manipulations are currently stubs */
 	header_struct		*header, temp_head, disp_head;
 	gd_addr			*table, *gd_addr_ptr;
-	gd_binding		*map, *map_top;
-	gd_region		*reg, *reg_top;
+	gd_binding		*map, *map_top, *next_stats_map;
+	gd_region		*reg, *reg_top, *first_stats_reg;
 	uint4			t_offset, size;
 	gd_gblname		*gnam, *gnam_top;
 	int			i, n_regions, arraysize, disp_len;
@@ -176,6 +179,9 @@ gd_addr *gd_load(mstr *v)
 #	ifdef DEBUG
 	boolean_t		prevMapIsSpanning, currMapIsSpanning, gdHasSpanGbls;
 	boolean_t		isSpannedReg[256];	/* currently we allow for a max of 256 regions in this dbg code */
+	gd_region		*base_reg, *stats_reg;
+	uint4			reg_index;
+	unsigned char		regname[MAX_MIDENT_LEN + 1];
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -223,7 +229,9 @@ gd_addr *gd_load(mstr *v)
 		assert((reg - table->regions) < ARRAYSIZE(isSpannedReg));
 		isSpannedReg[reg - table->regions] = FALSE;
 #		endif
+		reg->owning_gd = table; /* set backpointer from region to owning gbldir */
 	}
+	IF_LIBAIO(table->thread_gdi = NULL;)
 #	ifdef DEBUG
 	prevMapIsSpanning = FALSE;
 	currMapIsSpanning = FALSE;
@@ -251,7 +259,43 @@ gd_addr *gd_load(mstr *v)
 #	ifdef DEBUG
 	assert(table->has_span_gbls == gdHasSpanGbls);
 	for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
+	{
 		assert(reg->is_spanned == isSpannedReg[reg - table->regions]);
+		/* Validate "reg->statsDB_reg_index" */
+		reg_index = reg->statsDB_reg_index;
+		assert((INVALID_STATSDB_REG_INDEX != reg_index) && (reg_index < n_regions));
+		if (IS_STATSDB_REGNAME(reg))
+		{	/* is a statsDB reg */
+			stats_reg = reg;
+			base_reg = &table->regions[reg_index];
+		} else
+		{	/* is a base reg */
+			base_reg = reg;
+			stats_reg = &table->regions[reg_index];
+		}
+		assert(IS_BASEDB_REGNAME(base_reg));
+		assert(IS_STATSDB_REGNAME(stats_reg));
+		assert(base_reg->statsDB_reg_index == (stats_reg - table->regions));
+		assert(stats_reg->statsDB_reg_index == (base_reg - table->regions));
+		assert(base_reg->rname_len == stats_reg->rname_len);
+		assert(ARRAYSIZE(regname) > base_reg->rname_len);
+		upper_to_lower(regname, REG_STR_LEN(base_reg));
+		assert(!memcmp(regname, (stats_reg)->rname, (stats_reg)->rname_len));	/* BYPASSOK */
+		/* Since a statsdb region points to an MM database, setting defer_time=0 in that segment
+		 * automatically disables flush timers (wcs_stale) from being set up. GDE should have ensured this.
+		 */
+		assert(0 == stats_reg->dyn.addr->defer_time);
+		/* The below assert is relied upon by "gvcst_init". If it fails, it most likely means SIZEOF("gvstats_rec_t")
+		 * has increased enough to cause GDE to calculate the statsdb blk size as 1536 instead. Fix macro accordingly.
+		 */
+		assert(STATSDB_BLK_SIZE == stats_reg->dyn.addr->blk_size);
+		/* Similar asserts for a few other critical fields that are initialized in GDE & GT.M ("gvcst_init") */
+		assert(STATSDB_ALLOCATION == stats_reg->dyn.addr->allocation);
+		assert(STATSDB_EXTENSION == stats_reg->dyn.addr->ext_blk_count);
+		assert(STATSDB_MAX_KEY_SIZE == stats_reg->max_key_size);
+		assert(STATSDB_MAX_REC_SIZE == stats_reg->max_rec_size);
+		assert(stats_reg->mumps_can_bypass);
+	}
 	for (gnam = table->gblnames, gnam_top = gnam + table->n_gblnames; gnam < gnam_top; gnam++)
 	{
 		assert(SIZEOF(gnam->gblname) == (MAX_MIDENT_LEN + 1));
@@ -259,11 +303,58 @@ gd_addr *gd_load(mstr *v)
 	}
 #	endif
 	table->link = gd_addr_head;
+	table->is_dummy_gbldir = FALSE;
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
 	table->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname(table->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	/* For most MUPIP commands (except those that can do logical database updates ("is_replicator" == TRUE)
+	 * or MUPIP RUNDOWN or MUPIP CREATE, hide the statsdb regions so the commands do not even know about them
+	 * let alone operate on them. All of them would have set TREF(ok_to_see_statsdb_regs) appropriately.
+	 */
+	if (!TREF(ok_to_see_statsdb_regs))
+	{
+		first_stats_reg = NULL;
+		/* Coalesce the regions first given that at least one stats region will always exist (GDE ensures this) */
+		for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
+		{
+			reg->reservedDBFlags |= RDBF_NOSTATS;
+			if ((NULL == first_stats_reg) && IS_STATSDB_REGNAME(reg))
+			{
+				first_stats_reg = reg;
+				break;
+			}
+		}
+		if (NULL != first_stats_reg)
+		{
+#			ifdef DEBUG
+			/* Once a stats reg has been seen, all following regions should be stats regions. Assert that */
+			for (reg = first_stats_reg; reg < reg_top; reg++)
+				assert(IS_STATSDB_REGNAME(reg));
+#			endif
+			n_regions = table->n_regions = first_stats_reg - table->regions;
+			/* Coalesce the maps next. Move the non-statsdb-maps into one contiguous array */
+			map = table->maps;
+			map_top = map + table->n_maps;
+			assert(IS_BASEDB_REGNAME(map->reg.addr));		/* first map entry should be a nonstats region */
+			assert(IS_BASEDB_REGNAME(map_top[-1].reg.addr));	/* last map entry should be a nonstats region */
+			next_stats_map = NULL;
+			for ( ;  map < map_top; map++)
+			{
+				reg = map->reg.addr;
+				if (IS_BASEDB_REGNAME(reg))
+				{
+					if (NULL != next_stats_map)
+						*next_stats_map++ = *map;
+				} else if (NULL == next_stats_map)
+					next_stats_map = map;
+			}
+			assert(NULL != next_stats_map);
+			assert(next_stats_map < map_top);
+			table->n_maps = next_stats_map - table->maps;
+		}
+	}
 	if (table->has_span_gbls && (TREF(gd_targ_reg_array_size) < n_regions))
 	{
 		array = TREF(gd_targ_reg_array);
@@ -273,8 +364,10 @@ gd_addr *gd_load(mstr *v)
 		array = malloc(arraysize);
 		memset(array, 0, arraysize);
 		TREF(gd_targ_reg_array) = array;
-		TREF(gd_targ_reg_array_size) = arraysize;
+		TREF(gd_targ_reg_array_size) = n_regions;
 	}
+	/* Assert that all runtime-only fields are null-initialized by GDE */
+	assert(!table->ygs_map_entry_changed);
 	return table;
 }
 

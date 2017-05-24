@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,10 +38,8 @@
 error_def(ERR_DBFILOPERR);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_TEXT);
-ZOS_ONLY(error_def(ERR_BADTAG);)
 
-/*
- * This is a plain way to write file header to database.
+/* This is a plain way to write file header to database.
  * User needs to take care of concurrency issue etc.
  * Parameters :
  *	fn : full name of a database file.
@@ -54,27 +53,27 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 
 	header_size = (int)SIZEOF_FILE_HDR(header);
 	assert(SGMNT_HDR_LEN == len || header_size == len);
-	OPENFILE(fn, O_RDWR, fd);
+	OPENFILE(fn, O_RDWR, fd); /* udi not available so OPENFILE_DB not used */
 	if (FD_INVALID == fd)
 	{
 		save_errno = errno;
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 		return FALSE;
 	}
-#ifdef __MVS__
+#	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
-#endif
-	DB_LSEEKWRITE(NULL, NULL, fd, 0, header, len, save_errno);
+#	endif
+	DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, header, len, save_errno);
 	if (0 != save_errno)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 		return FALSE;
 	}
 	CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 	if (0 != save_errno)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 		return FALSE;
 	}
 	return TRUE;

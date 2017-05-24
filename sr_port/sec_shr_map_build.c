@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -21,33 +23,32 @@
 #include "probe.h"
 #include "sec_shr_map_build.h"
 #include "min_max.h"
+#include "bit_set.h"
+#include "bit_clear.h"
 
-int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, cw_set_element *cs, trans_num ctn, int bplmap)
+int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, cw_set_element *cs, trans_num ctn)
 {
 	uint4			setbit;
 	unsigned char		*ptr;
-	uint4			bitnum, ret, prev;
-#ifdef UNIX
+	uint4			bitnum, prev;
 	uint4			(*bml_func)();
-#else	/* gtmsecshr on VMS uses a very minimal set of modules so we dont want to pull in bml_*() functions there
-	 * and hence avoid using function pointers
-	 */
-	uint4			bml_func;
-	uint4			bml_busy = 1, bml_free = 2, bml_recycled = 3;
-#endif
-#ifdef DEBUG
+#	ifdef DEBUG
 	int4			prev_bitnum, actual_cnt = 0;
-#endif
+#	endif
+	int4			bml_full;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
+	block_id		blk;
+	unsigned int		total_blks;
+	int			bplmap;
 
-	assert(csa->now_crit || (ctn < csa->hdr->trans_hist.curr_tn));
-	assert(!csa->now_crit || (ctn == csa->hdr->trans_hist.curr_tn));
-	((blk_hdr *)base_addr)->tn = ctn;
+	blk = cs->blk;
+	assert(csa->now_crit && (ctn == csa->hdr->trans_hist.curr_tn));
+	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += SIZEOF(blk_hdr);
-	if (!GTM_PROBE(bplmap / 8, base_addr, WRITE))
-	{
-		assert(FALSE);
-		return FALSE;
-	}
+	csd = csa->hdr;
+	cnl = csa->nl;
+	bplmap = csd->bplmap;
 	/* The following PROBE's are needed before DETERMINE_BML_FUNC, as the macro uses these pointers. */
 	if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
 	{
@@ -74,11 +75,11 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 			return FALSE;
 		}
 		bitnum = *array;
-		assert((uint4)bitnum < csa->hdr->bplmap);	/* check that bitnum is positive and within 0 to bplmap */
+		assert((uint4)bitnum < bplmap);	/* check that bitnum is positive and within 0 to bplmap */
 		if (0 == bitnum)
 		{
 			assert(actual_cnt == cs->reference_cnt);
-			return TRUE;
+			break;
 		}
 		assert((int4)bitnum > prev_bitnum);	/* assert that blocks are sorted in the update array */
 		DEBUG_ONLY(prev_bitnum = (int4)bitnum);
@@ -96,11 +97,11 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 			DEBUG_ONLY(actual_cnt++);
 		} else
 		{
-			DEBUG_ONLY(
-				prev = ((*ptr >> setbit) & 1);	/* prev is 0 is block WAS busy and 0 otherwise */
-				if (!prev)
-					actual_cnt--;
-			)
+#			ifdef DEBUG
+			prev = ((*ptr >> setbit) & 1);	/* prev is 0 is block WAS busy and 0 otherwise */
+			if (!prev)
+				actual_cnt--;
+#			endif
 			if (bml_recycled == bml_func)
 				*ptr |= (3 << setbit);	/* mark block as RECYCLED (11) */
 			else
@@ -111,4 +112,18 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		}
 		++array;
 	}
+	/* Fix the local bitmap full/free status in the mastermap */
+	total_blks = ((csd->trans_hist.total_blks / bplmap) * bplmap == blk) ? csd->trans_hist.total_blks - blk : bplmap;
+	bml_full = bml_find_free(0, base_addr, total_blks);
+	if (NO_FREE_SPACE == bml_full)
+	{
+		bit_clear(blk / bplmap, MM_ADDR(csd));
+		if (blk > cnl->highest_lbm_blk_changed)
+			cnl->highest_lbm_blk_changed = blk;
+	} else if (!(bit_set(blk / bplmap, MM_ADDR(csd))))
+	{
+		if (blk > cnl->highest_lbm_blk_changed)
+			cnl->highest_lbm_blk_changed = blk;
+	}
+	return TRUE;
 }

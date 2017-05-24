@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -414,6 +414,14 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 #endif
 	tempv = *v;
 	socketptr->lastop = TCP_WRITE;
+	/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done,
+	 * there's no way to read the BOM bytes & to determine the variant. So default to UTF-16BE.
+	 */
+	if (!socketptr->first_write && (!IS_UTF16_CHSET(dsocketptr->ochset_utf16_variant) && (CHSET_UTF16 == iod->ochset)))
+	{
+		iod->ochset = dsocketptr->ochset_utf16_variant = CHSET_UTF16BE;
+		get_chset_desc(&chset_names[iod->ochset]);
+	}
 	if (socketptr->first_write)
 	{ /* First WRITE, do following
 	     Transition to UTF16BE if ochset is UTF16 and WRITE a BOM
@@ -423,6 +431,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			DBGSOCK2((stdout, "socwrite: First write UTF16 -- writing BOM\n"));
 			iod->ochset = CHSET_UTF16BE; /* per Unicode standard, assume big endian when endian
 							format is unspecified */
+			dsocketptr->ochset_utf16_variant = iod->ochset;
 			get_chset_desc(&chset_names[iod->ochset]);
 			DOTCPSEND(socketptr, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, status);
 			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
@@ -455,22 +464,20 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			if (tempv.addr == socketptr->zff.addr)
 				tempv = socketptr->ozff;	/* from iosocket_wtff so use converted form */
 		}
-		if ((0 < socketptr->n_delimiter) && (socketptr->odelimiter0.addr == socketptr->delimiter[0].addr))
-		{	/* Convert DELIMITER 0 to OCHSET format to avoid repeated conversions of DELIM0 on output */
-			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
-							&socketptr->delimiter[0], NULL, NULL);
-			if (MAX_DELIM_LEN < new_len)
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
-				return;
-			}
-			socketptr->odelimiter0.len = new_len;
-			UNICODE_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
-			socketptr->odelimiter0.addr = malloc(new_len);
-			memcpy(socketptr->odelimiter0.addr, stringpool.free, new_len);
-			if (tempv.addr == socketptr->delimiter[0].addr)
-				tempv = socketptr->odelimiter0;	/* from iosocket_wteol so use converted form */
-		}
+	}
+	/* Convert DELIMITER 0 to OCHSET format to avoid repeated conversions of DELIM0 on output.
+	 * CHSET can be switched b/w M/UTF-8/UTF-16* in UTF-8 mode. Convert the odelimitor0 accordingly
+	 * 1. odelimiter0 == idelimiter[0] (i.e. it's not been converted) && IS_UTF16_CHSET
+	 * 2. odelimiter0 != idelimiter[0] (i.e. it's been converted to UTF-16) && CHSET is NOT UTF-16
+	 */
+	if (gtm_utf8_mode && (0 < socketptr->n_delimiter))
+	{
+		if (((socketptr->delimiter[0].addr == socketptr->odelimiter0.addr) && IS_UTF16_CHSET(iod->ochset))
+			|| ((socketptr->delimiter[0].addr != socketptr->odelimiter0.addr) && !IS_UTF16_CHSET(iod->ochset)))
+			iosocket_odelim_conv(socketptr, iod->ochset);
+
+		if (tempv.addr == socketptr->delimiter[0].addr)
+			tempv = socketptr->odelimiter0;	/* from iosocket_wteol so use converted form */
 	}
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	if (CHSET_M != iod->ochset)

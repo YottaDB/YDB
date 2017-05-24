@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,13 +30,11 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
-#ifdef UNIX			/* needed for frame_pointer in GVCST_ROOT_SEARCH_AND_PREP macro */
-# include "repl_msg.h"
-# include "gtmsource.h"
-# include "rtnhdr.h"
-# include "stack_frame.h"
-# include "wbox_test_init.h"
-#endif
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
+#include "wbox_test_init.h"
 
 #include "t_end.h"		/* prototypes */
 #include "t_retry.h"
@@ -78,7 +77,6 @@ boolean_t gvcst_get(mval *v)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	gotit = gvcst_get2(v, NULL);
-#	ifdef UNIX
 	DEBUG_ONLY(debug_len = (int)v->str.len); /* Ensure v isn't garbage pointer by actually accessing it */
 	if (gotit && IS_SN_DUMMY(v->str.len, v->str.addr))
 	{	/* Start TP transaction to piece together value */
@@ -151,7 +149,6 @@ boolean_t gvcst_get(mval *v)
 		gotit = gotspan || gotdummy;
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
-#	endif
 	return gotit;
 }
 
@@ -182,8 +179,9 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
-#		if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == gtm_white_box_test_case_number))
+#		if defined(DEBUG)
+		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == gtm_white_box_test_case_number)
+			&& !IS_STATSDB_REG(gv_cur_region))
 		{
 			status = cdb_sc_blknumerr;
 			t_retry(status);
@@ -206,7 +204,7 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 				if ((0 > data_len) || ((sm_uc_ptr_t)rp + rsiz > b_top))
 				{
 					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_rmisalign1;
+					status = cdb_sc_rmisalign;
 				} else
 				{
 					if (!sn_ptr)

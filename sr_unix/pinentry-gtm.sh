@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2016 Fidelity National Information		#
+# Copyright (c) 2010-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -25,34 +25,44 @@ punt=1
 if [ -z "$gtm_dist" ] ; then
 	# $gtm_dist is not set in the environment. See if we can use dirname to find one
 	if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
-		export gtm_dist=$dir/../../utf8
+		gtm_dist=$dir/../../utf8
+		export gtm_dist
 	elif [ -x "$dir/../../mumps" ] ; then
-		export gtm_dist=$dir/../..
-		unset gtm_chset
+		gtm_dist=$dir/../..
+		gtm_chset=M
+		export gtm_dist gtm_chset
 	fi
 fi
 
 if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
-	pinentry=PINENTRY
+	pinentry=pinentry
 	# Password and MUMPS exists, perform some extended setup checks
 	if [ -z "$gtmroutines" ] ; then
 		utfodir=""
 		if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
 			utfodir="/utf8"
 		fi
-		# $gtmroutines is not set in the environment, attempt to pick it up from libgtmutil.so, $gtm_dist, $gtm_dist/plugin/o
+		# $gtmroutines is not set in the environment, attempt to pick it up from libgtmutil.so,
+		# $gtm_dist, $gtm_dist/plugin/o
 		if [ -e "$gtm_dist/libgtmutil.so" ] ; then
-			export gtmroutines="$gtm_dist/libgtmutil.so"
+			gtmroutines="$gtm_dist/libgtmutil.so"
+			export gtmroutines
 		elif [ -e "$gtm_dist/PINENTRY.o" ] ; then
-			export gtmroutines="$gtm_dist"
+			pinentry=PINENTRY
+			gtmroutines="$gtm_dist"
+			export gtmroutines
 		elif [ -e "$gtm_dist/plugin/o${utfodir}/pinentry.o" ] ; then
-			pinentry=pinentry
-			export gtmroutines="$gtm_dist $gtm_dist/plugin/o${utfodir}"
+			gtmroutines="$gtm_dist $gtm_dist/plugin/o${utfodir}"
+			export gtmroutines
 		fi
 	fi
 
+	# Protect the pinentry program from other env vars
+	gtm_env_translate= gtm_etrap= gtm_local_collate= gtm_sysid= gtm_trace_gbl_name= gtm_zdate_form= gtm_zstep= gtm_ztrap_form= gtm_zyerror= gtmcompile= gtmdbglvl= LD_PRELOAD=	#BYPASSOKLENGTH
+	export gtm_env_translate gtm_etrap gtm_local_collate gtm_sysid gtm_trace_gbl_name gtm_zdate_form gtm_zstep gtm_ztrap_form gtm_zyerror gtmcompile gtmdbglvl LD_PRELOAD		#BYPASSOKLENGTH
+
 	# Validate gtmroutines. Redirect output or it will affect the password protocol
-	printf 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | gtm_local_collate= LD_PRELOAD= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -direct >> /dev/null 2>&1
+	printf 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | $gtm_dist/mumps -direct >> /dev/null 2>&1
 	needsprivroutines=$?
 
 	if [ 0 -ne "${needsprivroutines}" ] ; then
@@ -65,10 +75,14 @@ if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
 		fi
 		trapstr="rm -rf $tmpdir"
 		trap "$trapstr" HUP INT QUIT TERM TRAP
-		export gtmroutines="$tmpdir($dir $gtm_dist/plugin/gtmcrypt)"
+		pinentry_in="$dir"
+		if [ -e "$gtm_dist/plugin/r/pinentry.m" ] ; then pinentry_in="$pinentry_in $gtm_dist/plugin/r"; fi
+		if [ -e "$gtm_dist/plugin/gtmcrypt/pinentry.m" ] ; then pinentry_in="$pinentry_in $gtm_dist/plugin/gtmcrypt"; fi
+		gtmroutines="$tmpdir($pinentry_in)"
+		export gtmroutines
 	fi
 
-	gtm_local_collate= LD_PRELOAD= gtm_trace_gbl_name= gtmdbglvl= gtmcompile= $gtm_dist/mumps -run $pinentry
+	$gtm_dist/mumps -run $pinentry
 	punt=$?
 	if [ -d "$tmpdir" ] ; then rm -rf "$tmpdir" ; fi
 fi

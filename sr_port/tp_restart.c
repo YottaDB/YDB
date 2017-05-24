@@ -452,6 +452,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			case cdb_sc_onln_rlbk2:
 			case cdb_sc_instancefreeze:
 			case cdb_sc_gvtrootmod2:
+			case cdb_sc_gvtrootnonzero:
 			case cdb_sc_optrestart:
 				assert(IS_FINAL_RETRY_CODE(status));
 				if (CDB_STAGNATE <= t_tries)
@@ -595,7 +596,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		if (FALSE == tf->restartable && IS_MCODE_RUNNING)
 			getzposition(TADR(tp_restart_entryref));
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as updated blocks) */
-		tp_clean_up(TRUE);
+		tp_clean_up(TP_RESTART);
 		/* Note: At this point, we are ready to begin the next retry. While we can sync the trigger cycles now to avoid
 		 * further restarts, we don't need to because tp_set_sgm (done for each region that is updated in a TP transaction)
 		 * does the syncing anyways.

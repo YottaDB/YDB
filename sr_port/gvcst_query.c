@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ error_def(ERR_GVQUERYFAIL);
 DEFINE_NSB_CONDITION_HANDLER(gvcst_query_ch)
 
 boolean_t	gvcst_query(void)
-{	/* Similar to gvcst_order and gvcst_zprevious. In each case we skip over hidden subscripts as needed.
+{	/* Similar to gvcst_order. In each case we skip over hidden subscripts as needed.
 	 *
 	 *     1  2  3  NULL                           <--- order/zprev...
 	 *     1  2  3  NULL  NULL
@@ -100,7 +100,13 @@ boolean_t	gvcst_query(void)
 	{
 		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, (gtm_uint64_t) -1);
 		found = gvcst_query2();
-		CHECK_HIDDEN_SUBSCRIPT_AND_BREAK(found, gv_altkey, is_hidden);
+		if (found)
+		{
+			CHECK_HIDDEN_SUBSCRIPT(gv_altkey, is_hidden);
+			if (!is_hidden)
+				break;
+		} else
+			break;
 		assert(found && is_hidden);
 		/* Replace last subscript to be the highest possible hidden subscript so another
 		 * gvcst_query2 will give us the next non-hidden subscript.

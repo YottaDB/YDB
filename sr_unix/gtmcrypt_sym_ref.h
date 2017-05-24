@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2015 Fidelity National Information	*
+ * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,9 +17,6 @@
 # if defined(USE_AES256CFB)
 #  define ALGO			EVP_aes_256_cfb128()
 #  define UNIQ_ENC_PARAM_STRING	"AES256CFB"
-# elif defined(USE_BLOWFISHCFB)
-#  define ALGO			EVP_bf_cfb64()
-#  define UNIQ_ENC_PARAM_STRING	"BLOWFISHCFB"
 # else
 #  error			"Unsupported Algorithm for OpenSSL"
 # endif
@@ -45,6 +42,6 @@ int gc_sym_init(void);
 #endif
 int gc_sym_destroy_key_handles(gtm_keystore_t *entry);
 int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt_key_t *handle, int direction, int reuse);
-int gc_sym_destroy_cipher_handle(crypt_key_t handle);
+void gc_sym_destroy_cipher_handle(crypt_key_t handle);
 int gc_sym_encrypt_decrypt(crypt_key_t *key, unsigned char *in_block, int in_block_len, unsigned char *out_block, int flag);
 #endif /* GTMCRYPT_SYM_REF_H */

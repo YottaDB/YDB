@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,9 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	boolean_t		is_gtcm;
 	char			*dist;
 	int			len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* First set the global variable image_type. */
 	image_type = img_type;
 	/* Get the process ID. */
@@ -80,16 +82,20 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	if (is_gtcm || (GTM_IMAGE == img_type))
 	{
 		is_replicator = TRUE; /* can go through t_end() and write jnl records to the jnlpool for replicated db */
+		TREF(ok_to_see_statsdb_regs) = TRUE;
 		run_time = TRUE;
 	} else if (DSE_IMAGE == img_type)
 	{
 		dse_running = TRUE;
 		write_after_image = TRUE; /* if block change is done, after image of the block needs to be written */
-	}
-#	ifdef UNIX
-	else if (MUPIP_IMAGE == img_type)
+		TREF(ok_to_see_statsdb_regs) = TRUE;
+	} else if (MUPIP_IMAGE == img_type)
+	{
 		run_time = FALSE;
-#	endif
+		TREF(ok_to_see_statsdb_regs) = FALSE;	/* In general, MUPIP commands should not even see the statsdb regions.
+							 * Specific MUPIP commands will override this later.
+							 */
+	}
 	return;
 }
 

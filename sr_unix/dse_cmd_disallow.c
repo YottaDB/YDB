@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -251,6 +252,8 @@ boolean_t cli_disallow_dse_find(void)
 	disallow_return_value = d_c_cli_present("HINT") && !d_c_cli_present("FREEBLOCK");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("FREEBLOCK") && !d_c_cli_present("HINT");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("STATS") && !d_c_cli_present("REGION");
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

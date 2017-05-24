@@ -92,7 +92,7 @@ cw_set_element *t_write (
 	blk = blkhist->blk_num;
 	if (!dollar_tlevel)
 	{
-		assert((blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
+		assert((blk < csa->ti->total_blks) || (CDB_STAGNATE > t_tries));
 		cse = &cw_set[cw_set_depth];
 		cse->mode = gds_t_noop;	/* initialize it to a value that is not "gds_t_committed" before incrementing
 					 * cw_set_depth as secshr_db_clnup relies on it */
@@ -100,7 +100,7 @@ cw_set_element *t_write (
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		assert(index < (int)cw_set_depth);
 		new_cse = TRUE;
-		tp_cse = NULL; /* dont bother returning tp_cse for non-TP; it's almost never needed and it distiguishes the cases */
+		tp_cse = NULL;/* don't bother returning tp_cse for non-TP; it's almost never needed and it distiguishes the cases */
 	} else
 	{
 		assert(!index || index < sgm_info_ptr->cw_set_depth);
@@ -198,7 +198,7 @@ cw_set_element *t_write (
 		assert(NULL != old_block);
 		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 		if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
-		{	/* Pre-compute CHECKSUM. Since we dont necessarily hold crit at this point, ensure we never try to
+		{	/* Pre-compute CHECKSUM. Since we don't necessarily hold crit at this point, ensure we never try to
 			 * access the buffer more than the db blk_size.
 			 */
 			bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);

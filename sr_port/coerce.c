@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,14 +23,15 @@ GBLREF hash_table_str	*complits_hashtab;
 LITREF octabstruct	oc_tab[];
 
 void coerce(oprtype *a,unsigned short new_type)
+/* ensure operand (*a) is of the desired type new_type */
 {
 
+	boolean_t	litdltd;
+	ht_ent_str	*litent;
 	mliteral 	*lit;
 	opctype		conv, old_op;
-	triple		*ref, *coerc;
 	stringkey	litkey;
-	ht_ent_str	*litent;
-	boolean_t	litdltd;
+	triple		*coerc, *ref;
 
 	assert (new_type == OCT_MVAL || new_type == OCT_MINT || new_type == OCT_BOOL);
 	assert (a->oprclass == TRIP_REF);
@@ -37,13 +39,19 @@ void coerce(oprtype *a,unsigned short new_type)
 	old_op = ref->opcode;
 	if (new_type & oc_tab[old_op].octype)
 		return;
-	if (old_op == OC_COMVAL || old_op == OC_COMINT)
+	if ((OC_COMVAL == old_op) || (OC_COMINT == old_op) || (OC_FORCENUM == old_op))
 	{
-		dqdel(ref,exorder);
-		ref = ref->operand[0].oprval.tref;
-		old_op = ref->opcode;
-		if (new_type & oc_tab[old_op].octype)
-			return;
+		assert(TRIP_REF == ref->operand[0].oprclass);
+		if ((OC_FORCENUM != old_op) || (OC_LIT == ref->operand[0].oprval.tref->opcode))
+		{	/* because compiler generated literals include their numeric form, we don't need to coerce */
+			assert(MV_NM & ref->operand[0].oprval.tref->operand[0].oprval.mlit->v.mvtype);
+			assert(ref->operand[0].oprval.tref == ref->exorder.bl);
+			dqdel(ref, exorder);
+			ref = ref->operand[0].oprval.tref;
+			old_op = ref->opcode;
+			if (new_type & oc_tab[old_op].octype)
+				return;
+		}
 	} else if (OC_LIT == old_op && OCT_MINT == new_type)
 	{
 		lit = ref->operand[0].oprval.mlit;

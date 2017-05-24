@@ -53,11 +53,17 @@ boolean_t mu_int_init(void)
 	file_control		*fc;
 	boolean_t		standalone;
 	char			msgbuff[MSGBUF_SIZE], *msgptr;
-	int			gtmcrypt_errno;
+	int			gtmcrypt_errno, read_len;
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	tsd;
+	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
-	mu_gv_cur_reg_init();
+	SETUP_THREADGBL_ACCESS;
+	mu_gv_cur_reg_init();	/* Creates a dummy segment with seg->asyncio FALSE so no DIO alignment issues to worry about
+				 * in the FC_OPEN/FC_READ below
+				 */
 	/* get filename */
 	gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
 	if (!cli_get_str("WHAT", (char *)gv_cur_region->dyn.addr->fname, &gv_cur_region->dyn.addr->fname_len))
@@ -70,7 +76,6 @@ boolean_t mu_int_init(void)
 		return (FALSE);
 	}
 	fc = gv_cur_region->dyn.addr->file_cntl;
-	fc->file_type = dba_bg;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
 	if (SS_NORMAL != status)
@@ -88,10 +93,16 @@ boolean_t mu_int_init(void)
 	}
 	assert(SGMNT_HDR_LEN == SIZEOF(sgmnt_data));
 	fc->op = FC_READ;
-	fc->op_buff = (uchar_ptr_t)&mu_int_data;
+	/* Do aligned reads if opened with O_DIRECT */
+	udi = FC2UDI(fc);
+	tsd = udi->fd_opened_with_o_direct ? (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned : &mu_int_data;
+	fc->op_buff = (uchar_ptr_t)tsd;
 	fc->op_len = SGMNT_HDR_LEN;
 	fc->op_pos = 1;
 	dbfilop(fc);
+	/* Ensure "mu_int_data" is populated even if we did not directly read into it for the O_DIRECT case */
+	if (udi->fd_opened_with_o_direct)
+		memcpy(&mu_int_data, (TREF(dio_buff)).aligned, SGMNT_HDR_LEN);
 	if (MASTER_MAP_SIZE_MAX < MASTER_MAP_SIZE(&mu_int_data) ||
 	    native_size < DIVIDE_ROUND_UP(SGMNT_HDR_LEN + MASTER_MAP_SIZE(&mu_int_data), DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
 	{
@@ -112,9 +123,20 @@ boolean_t mu_int_init(void)
 	}
 	mu_int_master = malloc(mu_int_data.master_map_len);
 	fc->op = FC_READ;
-	fc->op_buff = mu_int_master;
-	fc->op_len = MASTER_MAP_SIZE(&mu_int_data);
+	read_len = MASTER_MAP_SIZE(&mu_int_data);
+	/* Do aligned reads if opened with O_DIRECT */
+	if (udi->fd_opened_with_o_direct)
+	{
+		read_len = ROUND_UP2(read_len, DIO_ALIGNSIZE(udi));
+		DIO_BUFF_EXPAND_IF_NEEDED(udi, read_len, &(TREF(dio_buff)));
+		fc->op_buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+	} else
+		fc->op_buff = mu_int_master;
+	fc->op_len = read_len;
 	fc->op_pos = DIVIDE_ROUND_UP(SGMNT_HDR_LEN + 1, DISK_BLOCK_SIZE);
 	dbfilop(fc);
+	/* Ensure "mu_int_master" is populated even if we did not directly read into it for the O_DIRECT case */
+	if (udi->fd_opened_with_o_direct)
+		memcpy(mu_int_master, (TREF(dio_buff)).aligned, mu_int_data.master_map_len);
 	return (mu_int_fhead());
 }

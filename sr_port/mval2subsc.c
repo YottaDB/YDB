@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,8 +75,9 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	 * of trouble with $ORDER in a database when -1 was treated as a string. This assert is not a 100%
 	 * catchall of invalid settings but it provides at least some barrier. A full barrier would require
 	 * complete conversion which is a bit expensive to always re-do at this point - even in a dbg version.
-	 * There is an exception though and that is if the caller is op_fnview. In that case, it could set
-	 * MV_NUM_APPROX to indicate a number needs to be treated as a string subscript. Skip that in the assert.
+	 * There are exceptions though and that is if the caller is op_fnview or op_fnzatransform. In that
+	 * case, it could set MV_NUM_APPROX to indicate a number needs to be treated as a string subscript.
+	 * Skip that in the assert.
 	 */
 	assert(!(MV_NUM_APPROX & in_val->mvtype) || (NUM_DEC_DG_2L < in_val->str.len) || !val_iscan(in_val)
 		|| TREF(skip_mv_num_approx_assert));

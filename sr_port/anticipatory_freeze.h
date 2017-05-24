@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,12 +130,15 @@ error_def(ERR_TEXT);
  * 	the specified database.
  * INST_FREEZE_ON_NOSPC_ENABLED() determines whether an out-of-space condition associated with the specified database should
  * 	trigger an instance freeze.
+ * Note that it is possible for these macros to be invoked while in "gvcst_cre_autoDB" in which case CSA->nl would be NULL
+ *	hence the check for NULL before trying to access onln_rlbk_pid.
  */
 #define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
 							((NULL != jnlpool.jnlpool_ctl)						\
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
 									|| mupip_jnl_recover	/* recover or rollback */	\
-									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid)))
+									|| (NULL != ((sgmnt_addrs *)CSA)->nl)			\
+										&& (((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid))))
 #define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)							\
 							&& CUSTOM_ERRORS_LOADED							\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
@@ -172,7 +175,7 @@ error_def(ERR_TEXT);
 
 /* This is a version of the macro which waits for the instance freeze to be lifted off assuming the process has
  * already attached to the journal pool. We need to wait for the freeze only if the input database cares about
- * anticipatory freeze. Examples of those databases that dont care are non-replicated databases, databases with
+ * anticipatory freeze. Examples of those databases that don't care are non-replicated databases, databases with
  * "freeze_on_fail" field set to FALSE in the file header etc. Hence the use of INST_FREEZE_ON_ERROR_ENABLED below.
  * Note: Do not use "hiber_start" as that uses timers and if we are already in a timer handler now, nested timers
  * wont work. Since SHORT_SLEEP allows a max of 1000, we use 500 (half a second) for now.
@@ -247,10 +250,10 @@ error_def(ERR_TEXT);
 		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;	\
 }
 
-/* GTM_DB_FSYNC/GTM_JNL_FSYNC are similar to GTM_FSYNC except that we dont do the fsync
+/* GTM_DB_FSYNC/GTM_JNL_FSYNC are similar to GTM_FSYNC except that we don't do the fsync
  * (but instead hang) if we detect the instance is frozen. We proceed with the fsync once the freeze clears.
  * CSA is a parameter indicating which database it is that we want to fsync.
- * GTM_REPL_INST_FSYNC is different in that we currently dont care about instance freeze for replication
+ * GTM_REPL_INST_FSYNC is different in that we currently don't care about instance freeze for replication
  * instance file writes.
  */
 #define GTM_DB_FSYNC(CSA, FD, RC)						\
@@ -287,13 +290,15 @@ error_def(ERR_TEXT);
 
 #define GTM_REPL_INST_FSYNC(FD, RC)	GTM_FSYNC(FD, RC)
 
-#define	LSEEKWRITE_IS_TO_NONE		0
-#define	LSEEKWRITE_IS_TO_DB		1
-#define	LSEEKWRITE_IS_TO_JNL		2
+#define	LSEEKWRITE_IS_TO_NONE			0
+#define	LSEEKWRITE_IS_TO_DB			1
+#define	LSEEKWRITE_IS_TO_JNL			2
+#define	LSEEKWRITE_IS_TO_DB_ASYNC		3
+#define	LSEEKWRITE_IS_TO_DB_ASYNC_RESTART	4
 
 #ifdef DEBUG
 #define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)							\
-{																\
+MBSTART {															\
 	GBLREF	jnlpool_addrs		jnlpool;										\
 	GBLREF	boolean_t		multi_thread_in_use;									\
 																\
@@ -318,7 +323,7 @@ error_def(ERR_TEXT);
 			lseekwrite_target = LSEEKWRITE_TARGET;									\
 		}														\
 	}															\
-}
+} MBEND
 
 void clear_fake_enospc_if_master_dead(void);
 
@@ -329,29 +334,81 @@ void clear_fake_enospc_if_master_dead(void);
 #endif
 
 /* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITE) is thread-safe */
-#define	DB_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status)							\
-	DO_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status, fake_db_enospc, LSEEKWRITE_IS_TO_DB)
+#define	DB_LSEEKWRITE(CSA, UDI, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS)							\
+MBSTART {														\
+	GBLREF	uint4	process_id;											\
+	sgmnt_addrs	*CSA_LOCAL = CSA;										\
+															\
+	assert(!CSA_LOCAL || !CSA_LOCAL->region || FILE_INFO(CSA_LOCAL->region)->grabbed_access_sem			\
+			|| !FROZEN_CHILLED(CSA_LOCAL->hdr) || !(CSA_LOCAL)->nl || FREEZE_LATCH_HELD(CSA_LOCAL));	\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
+	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB);		\
+} MBEND
 
-#define	JNL_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status)							\
-	DO_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status, fake_jnl_enospc, LSEEKWRITE_IS_TO_JNL)
+/* This is similar to DB_LSEEKWRITE except that this is used by GTMSECSHR and since that is root-owned we do not want
+ * to pull in a lot of unnecessary things from the instance-freeze scheme so we directly invoke LSEEKWRITE instead of
+ * going through DO_LSEEKWRITE.
+ */
+#define	GTMSECSHR_DB_LSEEKWRITE(UDI, FD, OFFSET, BUFF, SIZE, STATUS)			\
+MBSTART {										\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);				\
+	LSEEKWRITE(FD, OFFSET, BUFF, SIZE, STATUS);					\
+} MBEND
+
+/* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITEASYNCSTART) is thread-safe */
+#define	DB_LSEEKWRITEASYNCSTART(CSA, UDI, DB_FN, FD, OFFSET, BUFF, SIZE, CR, STATUS)					\
+MBSTART {														\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
+	DO_LSEEKWRITEASYNC(CSA, DB_FN, FD, OFFSET, BUFF, SIZE, CR, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB_ASYNC);	\
+} MBEND
+
+/* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITEASYNCRESTART) is thread-safe */
+#define	DB_LSEEKWRITEASYNCRESTART(CSA, UDI, DB_FN, FD, BUFF, CR, STATUS)						\
+MBSTART {														\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, CR->aiocb.aio_offset, BUFF, CR->aiocb.aio_nbytes);					\
+	DO_LSEEKWRITEASYNC(CSA, DB_FN, FD, 0, BUFF, 0, CR, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB_ASYNC_RESTART);	\
+} MBEND
+
+/* #GTM_THREAD_SAFE : The below macro (JNL_LSEEKWRITE) is thread-safe */
+#define	JNL_LSEEKWRITE(CSA, JNL_FN, FD, OFFSET, BUFF, SIZE, STATUS)							\
+	DO_LSEEKWRITE(CSA, JNL_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_jnl_enospc, LSEEKWRITE_IS_TO_JNL)
 
 /* #GTM_THREAD_SAFE : The below macro (DO_LSEEKWRITE) is thread-safe */
-#define DO_LSEEKWRITE(csa, fnptr, fd, new_eof, buff, size, status, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)			\
-{																\
+#define DO_LSEEKWRITE(CSA, FNPTR, FD, OFFSET, BUFF, SIZE, STATUS, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)				\
+MBSTART {															\
 	int	lcl_status;													\
 																\
-	if (NULL != csa)													\
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);										\
-	LSEEKWRITE(fd, new_eof, buff, size, lcl_status);									\
-	FAKE_ENOSPC(csa, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, lcl_status);							\
+	if (NULL != CSA)													\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);										\
+	LSEEKWRITE(FD, OFFSET, BUFF, SIZE, lcl_status);										\
+	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, lcl_status);							\
 	if (ENOSPC == lcl_status)												\
 	{															\
-		wait_for_disk_space(csa, (char *)fnptr, fd, (off_t)new_eof, (char *)buff, (size_t)size, &lcl_status);		\
-		assert((NULL == csa) || (NULL == ((sgmnt_addrs *)csa)->nl) || !((sgmnt_addrs *)csa)->nl->FAKE_WHICH_ENOSPC	\
+		wait_for_disk_space(CSA, (char *)FNPTR, FD, (off_t)OFFSET, (char *)BUFF, (size_t)SIZE, &lcl_status);		\
+		assert((NULL == CSA) || (NULL == ((sgmnt_addrs *)CSA)->nl) || !((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC	\
 		       || (ENOSPC != lcl_status));										\
 	}															\
-	status = lcl_status;													\
-}
+	STATUS = lcl_status;													\
+} MBEND
+
+/* #GTM_THREAD_SAFE : The below macro (DO_LSEEKWRITEASYNC) is thread-safe */
+#define DO_LSEEKWRITEASYNC(CSA, FNPTR, FD, OFFSET, BUFF, SIZE, CR, STATUS, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)		\
+MBSTART {															\
+	if (NULL != CSA)													\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);										\
+	switch (LSEEKWRITE_TARGET)												\
+	{															\
+		case LSEEKWRITE_IS_TO_DB_ASYNC:											\
+			LSEEKWRITEASYNCSTART(CSA, FD, OFFSET, BUFF, SIZE, CR, STATUS);						\
+			break;													\
+		case LSEEKWRITE_IS_TO_DB_ASYNC_RESTART:										\
+			LSEEKWRITEASYNCRESTART(CSA, FD, BUFF, CR, STATUS);							\
+			break;													\
+		default:													\
+			assert(FALSE);												\
+			break;													\
+	}															\
+} MBEND
 
 /* Currently, writes to replication instance files do NOT trigger instance freeze behavior.
  * Neither does a pre-existing instance freeze affect replication instance file writes.

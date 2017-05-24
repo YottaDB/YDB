@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,5 +25,10 @@
 			 * so that divides can be done as shifts */
 #define STP_LOWRECLAIM_LEVEL(x) ((x >> 2) + (x >> 3) - (x >> 4)) /* level of available string pool (after reclaim) to
 			 * count as a low reclaim pass (31.25%) */
-#define STP_MAXLOWRECLAIM_PASSES 4 /* after compaction, if at least STP_LOWRECLAIM_LEVEL of string pool is not free for
+#define STP_MAXLOWRECLAIM_PASSES 2 /* after compaction, if at least STP_LOWRECLAIM_LEVEL of string pool is not free for
 			 * STP_MAXLOWRECLAIM_PASSES, force an expansion */
+#define STP_SPACE_USED_MULTIPLIER 3 /* This factor is used to multiply the space used after a garbage collection to set the target
+			 * level to invoke the garbage collector (so if you have a large string pool but later only use a small
+			 * part, it will be concentrated at the bottom of the stringpool (so the OS can swap the rest out).
+			 */
+#define STP_GCOL_TRIGGER_FLOOR 100000 /* Don't set the target level to call the garbage collector below this value. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -456,7 +456,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 */
 				gv_cur_region = csa->region;
 				assert(gv_cur_region->open);
-				assert((dba_mm == REG_ACC_METH(gv_cur_region)) || (dba_bg == REG_ACC_METH(gv_cur_region)));
+				assert(IS_REG_BG_OR_MM(gv_cur_region));
 				/* The above assert is needed to ensure that change_reg/tp_change_reg (invoked below)
 				 * will set cs_addrs, cs_data etc. to non-zero values.
 				 */
@@ -474,7 +474,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				assert(NULL != cs_data);
 			}
 			/* Fix gv_currkey to null-str in case gv_target points to dir_tree (possible in case of name-level-$order).
-			 * This is similar to how we fix gv_currkey for a successful name-level-$order operation (see op_gvorder.c).
 			 * Do same in case gv_target points to cs_addrs->hasht_tree so we dont take the fast path in op_gvname
 			 * when gv_target is clearly not GVT of a user-visible global.
 			 */
@@ -1079,6 +1078,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 					gtm_err_dev = err_dev;
 					err_dev = NULL;
 				}
+				if (err_dev && (n_io_dev_types == err_dev->type))
+				{
+					/* Got some error while opening the device. Clean up the structures. */
+					gtm_err_dev = err_dev;
+					err_dev = NULL;
+				}
 			}
 			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;
@@ -1117,7 +1122,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 #			endif
-			if ((dev_open != err_dev->state) && (rm == err_dev->type))
+			if (((dev_open != err_dev->state) && (rm == err_dev->type)) || (n_io_dev_types == err_dev->type))
 			{
 				remove_rms(err_dev);
 				err_dev = NULL;

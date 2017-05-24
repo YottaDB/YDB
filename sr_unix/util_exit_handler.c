@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,6 @@ GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	exit_handler_active;
 GBLREF	boolean_t	skip_exit_handler;
 GBLREF	uint4		dollar_tlevel;
-GBLREF	boolean_t	hold_onto_crit;
 
 void util_exit_handler()
 {
@@ -76,8 +75,6 @@ void util_exit_handler()
 	 * be holding crit in one or more regions and/or we could have other odds/ends to cleanup.
 	 */
 	secshr_db_clnup(NORMAL_TERMINATION);
-	assert(!dollar_tlevel);	/* MUPIP and GT.M are the only ones which can run TP and they have their own exit handlers.
-				 * So no need to run op_trollback here like mupip_exit_handler and gtm_exit_handler. */
 	WITH_CH(exi_ch, gv_rundown(), 0);
 	print_exit_stats();
 	util_out_close();

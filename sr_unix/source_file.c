@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,6 @@ GBLREF unsigned short	source_name_len;
 GBLREF unsigned char	source_file_name[];
 GBLREF char		rev_time_buf[];
 GBLREF mident		routine_name, module_name, int_module_name;
-GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
 GBLREF io_pair          io_curr_device, io_std_device;
 GBLREF char		object_file_name[];
@@ -242,23 +241,24 @@ int4	read_source_file (void)
 {
 	unsigned char	*cp;
 	mval		val;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	errno = 0;
 	tmp_list_dev = io_curr_device;
 	io_curr_device = compile_src_dev;
 	ESTABLISH_RET(read_source_ch, -1);
 	op_readfl(&val, MAX_SRCLINE, NO_M_TIMEOUT);
 	REVERT;
-	memcpy((char *)source_buffer, val.str.addr, val.str.len);
-	cp = source_buffer + val.str.len;
-	/*	if there is a newline charactor (end of a line)	*/
-	if (!(io_curr_device.in->dollar.x))
-		*cp++ = '\n';
+	memcpy((TREF(source_buffer)).addr, val.str.addr, val.str.len);
+	cp = (unsigned char *)((TREF(source_buffer)).addr + val.str.len);
+	*cp++ = '\n';				/* insert /n needed in checksum calculation */
 	*cp = '\0';
 	if ( FALSE != io_curr_device.in->dollar.zeof )
 		return -1;
 	io_curr_device = tmp_list_dev;	/*	restore list file after reading	if it's opened	*/
-	return (int4)(cp - source_buffer);	/*	var.str.len	*/
+	(TREF(source_buffer)).len = val.str.len + 1;
+	return (int4)((TREF(source_buffer)).len);
 }
 
 CONDITION_HANDLER(read_source_ch)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,12 +30,19 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "anticipatory_freeze.h"
+#include "toktyp.h"
+#include "cgp.h"
 
-GBLREF	int		gtm_errno;
 GBLREF	boolean_t 	created_core;
 GBLREF	boolean_t	dont_want_core;
+GBLREF	boolean_t	run_time;
+GBLREF	char		cg_phase;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	int		gtm_errno;
 GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	void		(*stx_error_va_fptr)(int in_error, ...);	/* Function pointer for stx_error_va() so this can avoid
+								 	 * pulling stx_error() into gtmsecshr.
+								 	 */
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -84,10 +91,10 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	va_list		var_dup;
 	const err_ctl	*ctl;
 	boolean_t	was_holder;
-#	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
 	if (TREF(rts_error_unusable) && !TREF(rts_error_unusable_seen))
 	{
 		TREF(rts_error_unusable_seen) = TRUE;
@@ -129,6 +136,12 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, RESET);
 		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
+		if (!run_time && (CGP_PARSE == cg_phase))
+		{
+			(*stx_error_va_fptr)(msgid, var_dup);
+			TREF(director_token) = TK_ERROR;
+			return FALSE;
+		}
 		gtm_putmsg_list(csa, argcnt, var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
@@ -142,5 +155,5 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	 * when the severity was error or above. That code had to be removed because of several errors
 	 * that are handled and returned from. An example is EOF errors.  SE 9/2000
 	 */
-	return 0;
+	return FALSE;
 }

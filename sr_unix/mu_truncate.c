@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,6 @@
 #include "gtmio.h"
 #include "util.h"
 #include "anticipatory_freeze.h"
-
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
 #include "interlock.h"
@@ -74,6 +73,7 @@
 #include "wcs_flu.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "db_write_eof_block.h"
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBFILERR);
@@ -143,6 +143,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	jnl_buffer_ptr_t	jbp;
 	char			*err_msg;
 	intrpt_state_t		prev_intrpt_state;
+	off_t			offset;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -308,11 +309,17 @@ boolean_t mu_truncate(int4 truncate_percent)
 	for (;;)
 	{ /* wait for FREEZE, we don't want to truncate a frozen database */
 		grab_crit(gv_cur_region);
-		if (!cs_data->freeze && !IS_REPL_INST_FROZEN)
+		if (FROZEN_CHILLED(cs_data))
+			DO_CHILLED_AUTORELEASE(csa, cs_data);
+		if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
 			break;
 		rel_crit(gv_cur_region);
-		while (cs_data->freeze || IS_REPL_INST_FROZEN)
+		while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+		{
 			hiber_start(1000);
+			if (FROZEN_CHILLED(cs_data) && CHILLED_AUTORELEASE(cs_data))
+				break;
+		}
 	}
 	assert(csa->nl->trunc_pid == process_id);
 	/* Flush pending updates to disk. If this is not done, old updates can be flushed AFTER ftruncate, extending the file. */
@@ -365,7 +372,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 		 * journal records (if it decides to switch to a new journal file).
 		 */
 		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		jnl_status = jnl_ensure_open();
+		jnl_status = jnl_ensure_open(gv_cur_region, csa);
 		if (SS_NORMAL != jnl_status)
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 		else
@@ -390,7 +397,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	CHECK_TN(csa, csd, curr_tn);
 	udi = FILE_INFO(gv_cur_region);
 	/* Information used by recover_truncate to check if the file size and csa->ti->total_blks are INCONSISTENT */
-	trunc_file_size = BLK_ZERO_OFF(csd) + ((off_t)csd->blk_size * new_total) + DISK_BLOCK_SIZE;
+	trunc_file_size = BLK_ZERO_OFF(csd->start_vbn) + ((off_t)csd->blk_size * (new_total + 1));
 	csd->after_trunc_total_blks = new_total;
 	csd->before_trunc_free_blocks = csa->ti->free_blocks;
 	csd->before_trunc_total_blks = old_total; /* Flags interrupted truncate for recover_truncate */
@@ -407,7 +414,8 @@ boolean_t mu_truncate(int4 truncate_percent)
 	/* past the point of no return -- shared memory deleted */
 	KILL_TRUNC_TEST(WBTEST_CRASH_TRUNCATE_2); /* 56 : Issue a kill -9 after 1st fsync */
 	clear_cache_array(csa, csd, gv_cur_region, new_total, old_total);
-	WRITE_EOF_BLOCK(gv_cur_region, csd, new_total, save_errno);
+	offset = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)new_total * csd->blk_size;
+	save_errno = db_write_eof_block(udi, udi->fd, csd->blk_size, offset, &(TREF(dio_buff)));
 	if (0 != save_errno)
 	{
 		err_msg = (char *)STRERROR(errno);

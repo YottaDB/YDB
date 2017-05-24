@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -72,8 +72,7 @@ if ( $buildaux_status ) then
 endif
 
 set buildaux_auxillaries = "gde dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
-set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dummy dbcertify"	# dummy needed for "dtgbldir"
-												# See runall.csh mapping
+set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
 

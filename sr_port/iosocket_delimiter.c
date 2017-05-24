@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,36 +121,81 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 	return TRUE;
 }
 
-void iosocket_delim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
+void iosocket_idelim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
 {
 	static char	*conv_buff = NULL;
 	int		conv_len, delim_index, new_delim_len;
 
 	assert(0 != socketptr->n_delimiter);
-	assert(CHSET_UTF16BE == to_chset || CHSET_UTF16LE == to_chset);
 	assert(gtm_utf8_mode);
 
-	if (NULL == conv_buff)
-		conv_buff = malloc(MAX_DELIM_LEN);
-	for (delim_index = 0; delim_index < socketptr->n_delimiter; delim_index++)
-	{
-		conv_len = MAX_DELIM_LEN;
-		new_delim_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[to_chset], &socketptr->delimiter[delim_index],
-					 conv_buff, &conv_len);
-		assert(MAX_DELIM_LEN > new_delim_len);
-		if (MAX_DELIM_LEN < new_delim_len)
+	if (IS_UTF16_CHSET(to_chset))
+	{	/* Convert idelimiter[] to UTF-16 */
+		assert(CHSET_UTF16BE == to_chset || CHSET_UTF16LE == to_chset);
+		if (NULL == conv_buff)
+			conv_buff = malloc(MAX_DELIM_LEN);
+		for (delim_index = 0; delim_index < socketptr->n_delimiter; delim_index++)
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
-			return;
+			conv_len = MAX_DELIM_LEN;
+			new_delim_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[to_chset], &socketptr->delimiter[delim_index],
+						 conv_buff, &conv_len);
+			assert(MAX_DELIM_LEN > new_delim_len);
+			if (MAX_DELIM_LEN < new_delim_len)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
+				return;
+			}
+			socketptr->idelimiter[delim_index].len = new_delim_len;
+			UNICODE_ONLY(socketptr->idelimiter[delim_index].char_len = socketptr->delimiter[delim_index].char_len);
+			socketptr->idelimiter[delim_index].addr = malloc(new_delim_len);
+			memcpy(socketptr->idelimiter[delim_index].addr, conv_buff, new_delim_len);
 		}
-		socketptr->idelimiter[delim_index].len = new_delim_len;
-		UNICODE_ONLY(socketptr->idelimiter[delim_index].char_len = socketptr->delimiter[delim_index].char_len);
-		socketptr->idelimiter[delim_index].addr = malloc(new_delim_len);
-		memcpy(socketptr->idelimiter[delim_index].addr, conv_buff, new_delim_len);
+	} else
+	{	/* Free up the converted idelimiter[] strings */
+		for (delim_index = 0; delim_index < socketptr->n_delimiter; delim_index++)
+		{
+			assert(socketptr->idelimiter[delim_index].addr != socketptr->delimiter[delim_index].addr);
+			if (socketptr->idelimiter[delim_index].addr != socketptr->delimiter[delim_index].addr)
+				free(socketptr->idelimiter[delim_index].addr);
+			socketptr->idelimiter[delim_index] = socketptr->delimiter[delim_index];
+		}
 	}
 	return;
 }
 
+void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
+{
+	static char	*conv_buff = NULL;
+	int		conv_len, delim_index, new_len;
+
+	assert(0 != socketptr->n_delimiter);
+	assert(gtm_utf8_mode);
+
+	if (IS_UTF16_CHSET(to_chset))
+	{	/* Convert odelimiter0 to UTF-16 */
+		assert(CHSET_UTF16BE == to_chset || CHSET_UTF16LE == to_chset);
+		if (NULL == conv_buff)
+			conv_buff = malloc(MAX_DELIM_LEN);
+		conv_len = MAX_DELIM_LEN;
+		new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[to_chset], &socketptr->delimiter[0], conv_buff, &conv_len);
+		assert(MAX_DELIM_LEN > new_len);
+		if (MAX_DELIM_LEN < new_len)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
+			return;
+		}
+		socketptr->odelimiter0.len = new_len;
+		UNICODE_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
+		socketptr->odelimiter0.addr = malloc(new_len);
+		memcpy(socketptr->odelimiter0.addr, conv_buff, new_len);
+	} else
+	{	/* Free up the converted odelimiter0 string */
+		assert(socketptr->odelimiter0.addr != socketptr->delimiter[0].addr);
+		if (socketptr->odelimiter0.addr != socketptr->delimiter[0].addr)
+			free(socketptr->odelimiter0.addr);
+		socketptr->odelimiter0 = socketptr->delimiter[0];
+	}
+}
 void iosocket_delimiter_copy(socket_struct *from, socket_struct *to)
 {
 	int	delim_index;

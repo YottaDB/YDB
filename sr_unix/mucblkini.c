@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,10 +35,21 @@
 #define DIR_ROOT 1
 #define DIR_DATA 2
 
+#define PUTMSG_ERROR_CSA(MSGPARMS)			\
+MBSTART {						\
+	if (IS_MUPIP_IMAGE)				\
+		gtm_putmsg_csa MSGPARMS;		\
+	else						\
+		rts_error_csa MSGPARMS;			\
+} MBEND
+
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 
-void mucblkini (void)
+error_def(ERR_AUTODBCREFAIL);
+error_def(ERR_FILECREERR);
+
+void mucblkini(void)
 {
 	uchar_ptr_t		c, bmp;
 	blk_hdr_ptr_t		bp1, bp2;
@@ -46,25 +57,28 @@ void mucblkini (void)
 	unix_db_info		*udi;
 	int4			tmp, bmpsize, status;
 
-	udi = (unix_db_info *)gv_cur_region->dyn.addr->file_cntl->file_info;
+	udi = FILE_INFO(gv_cur_region);
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);
 	if (cs_addrs->do_fullblockwrites)
 		bmpsize = (int4)ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
 	bmp = (uchar_ptr_t)malloc(bmpsize);
-	LSEEKREAD(udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
+	DB_LSEEKREAD(udi, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);
 	if (0 != status)
 	{
-		PERROR("Error reading first bitmap");
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("reading first bitmap"),
+				  DB_LEN_STR(gv_cur_region), status));
 		return;
 	}
 	bml_busy(DIR_ROOT, bmp + SIZEOF(blk_hdr));
 	bml_busy(DIR_DATA, bmp + SIZEOF(blk_hdr));
-	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
+	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
+	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);
 	if (0 != status)
 	{
-		PERROR("Error writing out first bitmap");
+		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out first bitmap"),
+				  DB_LEN_STR(gv_cur_region), status));
 		return;
 	}
 	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + SIZEOF(blk_hdr));
@@ -83,14 +97,26 @@ void mucblkini (void)
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_ROOT, (uchar_ptr_t)bp1, cs_addrs->hdr->desired_db_format, status);
 	if (0 != status)
 	{
-		PERROR("Error writing to disk");
-		EXIT(status);
+		if (IS_MUMPS_IMAGE)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
+				      REG_LEN_STR(gv_cur_region), status);
+		else
+		{
+			PERROR("Error writing to disk");
+			EXIT(status);
+		}
 	}
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_DATA, (uchar_ptr_t)bp2, cs_addrs->hdr->desired_db_format, status);
 	if (0 != status)
 	{
-		PERROR("Error writing to disk");
-		EXIT(status);
+		if (IS_MUMPS_IMAGE)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
+				      REG_LEN_STR(gv_cur_region), status);
+		else
+		{
+			PERROR("Error writing to disk");
+			EXIT(status);
+		}
 	}
 	return;
 }

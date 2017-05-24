@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,11 +49,9 @@ void ojchildioclean(void)
 	/* Run through the list of databases to simply close them out (still open by parent) */
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
-		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top;
-		     r_local++)
+		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 		{
-			if (r_local->open && !r_local->was_open &&
-			    (dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
+			if (r_local->open && !r_local->was_open && IS_REG_BG_OR_MM(r_local))
 			{
 				udi = (unix_db_info *)(r_local->dyn.addr->file_cntl->file_info);
 				csa = &udi->s_addrs;

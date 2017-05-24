@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2013, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2013-2016 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -67,7 +68,8 @@ add_definitions(
 set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmexe_symbols.export\"")
 set(gtm_dep   "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
-set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
+set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
+set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
 set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
 if(${bits} EQUAL 32)

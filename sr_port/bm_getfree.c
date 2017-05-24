@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,11 +71,11 @@ GBLREF unsigned int	t_tries;
 error_def(ERR_DBBADFREEBLKCTR);
 error_def(ERR_DBMBMINCFREFIXED);
 
-block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
+block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
 	sm_uc_ptr_t	bmp;
-	block_id	bml, hint, hint_cycled, hint_limit;
+	block_id	bml, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
 	int		cw_set_top, depth, lcnt;
 	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
@@ -85,13 +86,12 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 	srch_blk_status	blkhist;
 
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
-	if (orig_hint >= total_blks)		/* for TP, hint can be > total_blks */
-		orig_hint = 1;
-	hint = orig_hint;
+	if (hint >= total_blks)            /* for TP, hint can be > total_blks */
+		hint = 1;
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
-	hint_limit = DIVIDE_ROUND_DOWN(orig_hint, BLKS_PER_LMAP);
+	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
-	for (lcnt = 0; lcnt <= local_maps; lcnt++)
+	for (lcnt = local_maps; lcnt ; lcnt--)	/* loop control counts down for slight efficiency; it's not used in locating bit */
 	{
 		bml = bmm_find_free(hint / BLKS_PER_LMAP, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if ((NO_FREE_SPACE == bml) || (bml >= hint_cycled))
@@ -114,11 +114,11 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 			 * note that you can make an optimization of not going back over the whole database and going over
 			 * only the extended section. but since it is very unlikely that a free block won't be found
 			 * in the extended section and the fact that we are starting from the extended section in either
-			 * approach and the fact that we have a GTMASSERT to check that we don't have a lot of
+			 * approach and the fact that we have an assertpro to check that we don't have a lot of
 			 * free blocks while doing an extend and the fact that it is very easy to make the change to do
 			 * a full-pass, the full-pass solution is currently being implemented
 			 */
-			lcnt = -1;	/* allow it one extra pass to ensure that it can take advantage of the entension */
+			lcnt = local_maps;	/* allow it one extra pass to ensure that it can take advantage of the entension */
 			n_decrements++;	/* used only for debugging purposes */
 			continue;
 		}
@@ -215,7 +215,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 	 */
 	if ((map_size <= (uint4)free_bit) && (CDB_STAGNATE <= t_tries))
 	{	/* Bad free bit. */
-		assert((NO_FREE_SPACE == free_bit) && (lcnt > local_maps));	/* All maps full, should have extended */
+		assert((NO_FREE_SPACE == free_bit) && (!lcnt));	/* All maps full, should have extended */
 		assertpro(FALSE);
 	}
 	if (0 != depth)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1288,6 +1288,13 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 		ERROR_MSG_RETURN("Error : Invalid global name:\n", input_len, input);
 	}
 	trigvn_len = (int)(ptr1 - ptr);
+	/* If specified var name is global ^%Y*, the name is illegal to use in a TRIGGER */
+	if ((RESERVED_NAMESPACE_LEN <= trigvn_len) && (0 == MEMCMP_LIT(ptr, RESERVED_NAMESPACE)))
+	{	/* Triggers not allowed for ^%Y*. ERR_PCTYRESERVED error is better issued here but no easy way to fit it in
+		 * ERROR_MSG_RETURN macro so we copy its message text here.
+		 */
+		ERROR_MSG_RETURN("Error : ^%Y* global name not supported:\n", input_len, input);
+	}
 	if (MAX_MIDENT_LEN < trigvn_len)
 	{
 		trigvn_len = MAX_MIDENT_LEN;

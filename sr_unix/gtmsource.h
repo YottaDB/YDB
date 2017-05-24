@@ -85,6 +85,7 @@ typedef enum
 #define	LOG_WAIT_FOR_JNLOPEN_PERIOD		(50 * 1000) /* ms */
 #define	GTMSOURCE_WAIT_FOR_JNL_RECS		1 /* ms */
 #define	LOG_WAIT_FOR_JNL_RECS_PERIOD		(50 * 1000) /* ms */
+#define	LOG_WAIT_FOR_JNL_FLUSH_PERIOD		(8 * 1000) /* ms */
 #define	GTMSOURCE_WAIT_FOR_SRV_START		10 /* ms */
 #define	GTMSOURCE_WAIT_FOR_MODE_CHANGE		(1000 - 1) /* ms, almost 1 sec */
 #define	GTMSOURCE_WAIT_FOR_SHUTDOWN		(1000 - 1) /* ms, almost 1 sec */

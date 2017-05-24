@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,6 @@ int	gtm_compile (void)
 	free(orig_cmdstr.addr);
 	glb_cmd_qlf = save_qlf;
 	/* end command qualifier processing stuff */
-	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();	/* Not sure why compiler needs timers but .. */

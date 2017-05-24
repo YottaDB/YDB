@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,14 +78,7 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 	}
 	assert(min_resolve_seqno <= min_brkn_seqno);
 	lcl_losttn_seqno = *losttn_seqno;	/* Note down "pre_resolve_seqno" passed in through "losttn_seqno" variable */
-	if (0 == lcl_losttn_seqno)
-	{	/* Possible only in case of MUPIP JOURNAL -ROLLBACK -FORWARD. In this case, set losttn_seqno to
-		 * earliest seqno added in the hash table (note: hash table additions happen only till the tp_resolve_time).
-		 * So the lowest hash table seqno actually gives us the losttn_seqno that "mur_back_process" would have computed.
-		 */
-		assert(mur_options.forward);
-		lcl_losttn_seqno = min_resolve_seqno;
-	}
+	assert(0 < lcl_losttn_seqno);
 	/* "lcl_losttn_seqno" is the first possible seqno at the tp-resolve-time determined in mur_back_process based on
 	 * the seqno of journal records seen BEFORE the tp-resolve-time. "min_resolve_seqno" is the earliest seqno found at
 	 * or after tp-resolve-time. It is not possible for "min_resolve_seqno" to be LESSER than "lcl_losttn_seqno" since

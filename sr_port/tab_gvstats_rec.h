@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,13 @@
  *								*
  ****************************************************************/
 
-/* Note that each TAB_GVSTATS_REC entry corresponds to a field in the file-header
- * Therefore, any operation that changes the offset of any entry in the file-header shouldn't be attempted.
+/* Note that the order these fields appear in below is the same order the fields are defined in the
+ * gvstats_rec_t structure (fileheader, sgmnt_addrs, and node_local). They also represent the order
+ * these fields are displayed by zshow_gvstats() (ZSHOW "G"). Also the order the stats present themselves
+ * is assumed to be the order of the binary stats by ^%YGBLSTAT.m when processing shared global stats.
+ * Therefore, any operation that changes the order or offset of any given field should not be attempted.
  * Additions are to be done at the END of the file.
+ *
  * Replacing existing fields with new fields is allowed (provided their implications are thoroughly analyzed).
  */
 TAB_GVSTATS_REC(n_set                , "SET", "# of SET   operations                 ")
@@ -64,7 +69,6 @@ TAB_GVSTATS_REC(n_jrec_epoch_idle    , "JRI", "# of Idle epoch Journal Records  
 TAB_GVSTATS_REC(n_jrec_other         , "JRO", "# of Other Journal Records            ")
 TAB_GVSTATS_REC(n_jnl_extends        , "JEX", "# of Journal file EXtensions          ")
 TAB_GVSTATS_REC(n_db_extends         , "DEX", "# of Database file EXtensions         ")
-#ifdef UNIX
 TAB_GVSTATS_REC(n_crit_success       , "CAT", "# of crit acquired total successes    ")
 TAB_GVSTATS_REC(n_crits_in_epch      , "CFE", "# of attempts in CFT caused by epochs ")
 TAB_GVSTATS_REC(sq_crit_failed       , "CFS", "sum squares grab crit failed          ")
@@ -73,4 +77,4 @@ TAB_GVSTATS_REC(sq_crit_que_slps     , "CQS", "sum squares grab crit queued slee
 TAB_GVSTATS_REC(n_crit_que_slps      , "CQT", "# of grab crit queued sleeps          ")
 TAB_GVSTATS_REC(sq_crit_yields       , "CYS", "sum squares grab crit yields          ")
 TAB_GVSTATS_REC(n_crit_yields        , "CYT", "# of grab crit yields                 ")
-#endif
+TAB_GVSTATS_REC(n_clean2dirty        , "BTD", "# of Block Transitions to Dirty       ")

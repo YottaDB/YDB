@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,7 @@ void	mur_sort_files(void)
 				MUR_FIX_JCTL_BACK_POINTER_TO_RCTL(jctl, rctl0, rctl1, TRUE);
 				/* When fixing jctl back pointers for jctl_alt_head, do not check prev_gen being NULL.
 				 * This is because although it is non-NULL, that marks the beginning of the regular
-				 * rctl->jctl_head linked list so we dont need to do any more special processing going
+				 * rctl->jctl_head linked list so we don't need to do any more special processing going
 				 * backwards (only need to go forward from jctl_alt_head).
 				 * Hence FALSE passed as the 4th parameter to MUR_FIX_JCTL_BACK_POINTER_TO_RCTL below
 				 */
@@ -73,6 +74,11 @@ void	mur_sort_files(void)
 				jctl = rctl1->jctl_alt_head;
 				if (NULL != jctl)
 					MUR_FIX_JCTL_BACK_POINTER_TO_RCTL(jctl, rctl1, rctl0, FALSE);
+				/* Fix rctl->csa->miscptr in rctl0 and rctl1 */
+				if (NULL != rctl0->csa)
+					rctl0->csa->miscptr = (void *)rctl0;
+				if (NULL != rctl1->csa)
+					rctl1->csa->miscptr = (void *)rctl1;
 			}
 		}
 	}

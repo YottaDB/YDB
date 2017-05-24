@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +92,7 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 	}
 	if (0 == db_seqno)
 	{	/* No replicated region, or databases created with older * version of GTM */
-		gtm_putmsg(VARLSTCNT(5) ERR_NOREPLCTDREG, 3, LEN_AND_LIT("instance file"), gld_fn);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NOREPLCTDREG, 3, LEN_AND_LIT("instance file"), gld_fn);
 		/* Error, has to shutdown all regions 'cos mupip needs exclusive access to turn replication on */
 		gtmsource_exit(ABNORMAL_SHUTDOWN);
 	}
@@ -105,7 +106,8 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 		if (db_seqno != replinst_seqno)
 		{	/* Journal seqno from the databases does NOT match that stored in the replication instance file header. */
 			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4, LEN_AND_STR(udi->fn), &replinst_seqno, &db_seqno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4, LEN_AND_STR(udi->fn), &replinst_seqno,
+				       &db_seqno);
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 		if (is_supplementary)
@@ -116,7 +118,7 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 				if (strm_inst_seqno && (strm_db_seqno[idx] != strm_inst_seqno))
 				{
 					udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-					gtm_putmsg(VARLSTCNT(7) ERR_REPLINSTDBSTRM, 5, LEN_AND_STR(udi->fn),
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLINSTDBSTRM, 5, LEN_AND_STR(udi->fn),
 						&strm_inst_seqno, idx, &strm_db_seqno[idx]);
 					assert(FALSE);
 					gtmsource_exit(ABNORMAL_SHUTDOWN);

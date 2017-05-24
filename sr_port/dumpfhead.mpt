@@ -1,0 +1,180 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2016-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Routine to demonstrate reading of fileheader fields.
+;
+dumpfhead(dbname)
+	new $etrap
+	new (dbname,debug)
+	set $etrap="quit"	; defer error handling to the caller
+	if '$data(debug) new debug set debug=0
+	do getfields(.record,dbname)
+	zwrite record
+	quit
+
+;
+; Routine to grab the fields and return them in the passed-in array
+;
+getfields(fldarray,dbname)
+	new $etrap
+	set $etrap="quit:$quit """" quit"		; Defer error handling to the caller
+	new BigEndian,Endian,FALSE,Hex,HexDigits,LittleEndian,NullChar,TRUE
+	new endian,fhead,fldstring,flddim,fldidx,fldlen,fldname,fldnum,fldoff
+	new fldraw,fldtype,gtmhdwr,gtmos,gtmver,gtmzv,label,offset,platformendian,saveIO
+	new skey,typeconvert,x,$zgbldir
+	kill fldarray			; Clean array for new insertions
+	;
+	; Initialize field type translation to simple types
+	;
+	set typeconvert("boolean_t")="int"
+	set typeconvert("char")="string"
+	set typeconvert("int")="int"
+	set typeconvert("int1")="int"
+	set typeconvert("int2")="int"
+	set typeconvert("int4")="int"
+	set typeconvert("int64_t")="hex"
+	set typeconvert("long")="hex"
+	set typeconvert("short")="int"
+	set typeconvert("size_t")="hex"
+	set typeconvert("ssize_t")="hex"
+	set typeconvert("uint1")="uint"
+	set typeconvert("uint2")="uint"
+	set typeconvert("uint64_t")="hex"
+	set typeconvert("unsigned")="uint"
+	set typeconvert("unsigned-char")="string"
+	set typeconvert("unsigned-int")="uint"
+	set typeconvert("unsigned-int1")="uint"
+	set typeconvert("unsigned-long")="hex"
+	set typeconvert("unsigned-short")="uint"
+	;
+	; Other initializations
+	;
+	set Hex(0)=1
+	for x=1:1:16 set Hex(x)=Hex(x-1)*16
+	set HexDigits="0123456789ABCDEF"
+	set TRUE=1,FALSE=0,BigEndian=1,LittleEndian=0
+	set platformendian("AIX","RS6000")=BigEndian
+	set platformendian("Linux","x86")=LittleEndian
+	set platformendian("Linux","x86_64")=LittleEndian
+	set platformendian("Solaris","SPARC")=BigEndian
+	set gtmzv=$ZVersion,gtmver=$ZPiece(gtmzv," ",2),gtmos=$ZPiece(gtmzv," ",3),gtmhdwr=$ZPiece(gtmzv," ",4)
+	set Endian=platformendian(gtmos,gtmhdwr)
+	set NullChar=$zchar(0)			; 0x00
+	;
+	; Read database fileheader
+	;
+	set saveIO=$IO
+	open dbname:(readonly:fixed:recordsize=8192:chset="M":nowrap:exception="do badopen")
+	use dbname:exception="goto eof:$zeof,filerr"
+	read fhead#8192			; Read 8K of fileheader
+	close dbname
+	use saveIO
+	if $zlength(fhead)'=8192 do
+	. write "GETFIELDS: Error - unable to read fileheader from ",dbname,!
+	. write:0'=$data(fhead) "GETFIELDS: Read only ",$zlength(fhead)," bytes",!
+	. zhalt 1
+	;
+	; Determine if this is a valid database header. Note that we don't
+	; even need to go into the ^gtmtypes database because the header is
+	; always at offset 0, with len=12
+	;
+	set label=$$formatfld($zextract(fhead,1,12),"char")
+	if (label'["GDSDYNUNX02")&(label'["GDSDYNUNX03") do
+	. write "GETFIELDS: Error - invalid fileheader format from ",dbname,!
+	. zhalt 1
+	;
+	; Now parse out the fields
+	;
+	set $zgbldir="$gtm_dist/gtmhelp.gld"
+	set skey="sgmnt_data"
+	for fldnum=1:1:^gtmtypes(skey,0) do
+	. set fldtype=^gtmtypes(skey,fldnum,"type")
+	. quit:(0=$data(typeconvert(fldtype)))		; Ignore unknown types (likely a sub-struct header)
+	. set fldname=^gtmtypes(skey,fldnum,"name")
+	. quit:(fldname["filler")
+	. set fldoff=^gtmtypes(skey,fldnum,"off")
+	. set fldlen=^gtmtypes(skey,fldnum,"len")
+	. set flddim=$get(^gtmtypes(skey,fldnum,"dim"),1)
+	. if (1=flddim) do
+	. . set fldarray(fldname)=$$formatfld($zextract(fhead,fldoff+1,fldoff+fldlen),fldtype)
+	. else  do  ; array handling, made to be similar to %PEEKBYNAME() output
+	. . set fldlen=fldlen\flddim
+	. . set fldstring=$$formatfld($zextract(fhead,fldoff+1,fldoff+fldlen),fldtype)
+	. . for fldidx=1:1:flddim-1 do
+	. . . set offset=fldoff+(fldlen*fldidx)
+	. . . set fldstring=fldstring_","_$$formatfld($zextract(fhead,offset+1,offset+fldlen),fldtype)
+	. . set fldarray(fldname)=fldstring
+	quit:$quit "" quit
+
+eof
+	close dbname
+badopen
+	write "The file """,dbname,""" had error: "
+	zmessage +$zstatus
+	zhalt 1
+
+;
+; Routine to format fields into their proper format.
+;
+formatfld(fldval,fldtype)
+	set fldtype=typeconvert(fldtype)
+	quit:("int"=fldtype) $$BinToSInt(fldval)
+	quit:("uint"=fldtype) $$BinToUInt(fldval)
+	quit:("hex"=fldtype) $$BinToHex(fldval)
+	quit fldval
+
+;
+; Convert binary data of indeterminate length to a (printable) unsigned decimal value
+;
+BinToUInt(bin)
+	new num,i,binlen
+	set num=0,binlen=$ZLength(bin)
+	if Endian=BigEndian for i=binlen:-1:1 set num=$zascii(bin,i)*Hex((binlen-i)*2)+num
+	else  for i=1:1:binlen set num=$zascii(bin,i)*Hex((i-1)*2)+num
+	quit num
+
+;
+; Convert binary data of indeterminate length to a (printable) unsigned decimal value
+;
+BinToSInt(bin)
+	new num,i,binlen,sgntst,sign,fix
+	set num=0,binlen=$zlength(bin),sign=1,fix=0
+	set sgntst=NullChar_bin
+	if Endian=BigEndian do  ; See if we need to deal with a sign
+	. do:($zbitget(sgntst,1))
+	. . ;
+	. . ; Sign is set, need to generate twos-complement and remember to add "-" sign. Since we can't actually do the
+	. . ; +1 required by twos complement right now, remember to do it later after we do the numeric conversion.
+	. . ;
+	. . set bin=$zextract($zbitnot(sgntst),2,binlen+1)
+	. . set sign=-1,fix=1
+	. for i=binlen:-1:1 set num=$zascii(bin,i)*Hex((binlen-i)*2)+num
+	else  do
+	. do:($zbitget(sgntst,((binlen-1)*8)+1))  ; Sign is set, twos-complement and sign fixup.
+	. . set bin=$zextract($zbitnot(sgntst),2,binlen+1)
+	. . set sign=-1,fix=1
+	. for i=1:1:binlen set num=$zascii(bin,i)*Hex((i-1)*2)+num
+	quit (num+fix)*sign	       ; Important to apply fix before sign
+
+;
+; Convert binary data of indeterminate length to a (printable) hexadecimal value
+;
+BinToHex(bin,noendian)
+	new hex,i,binlen,num
+	set hex="",binlen=$zlength(bin)
+	if ((Endian=BigEndian)!($get(noendian,FALSE))) do
+	. for i=binlen:-1:1 do
+	. . set num=$zascii(bin,i),hex=$zextract(HexDigits,(num#16)+1)_hex,num=num\16,hex=$zextract(HexDigits,num+1)_hex
+	else  do
+	. for i=1:1:binlen do
+	. . set num=$zascii(bin,i),hex=$zextract(HexDigits,(num#16)+1)_hex,num=num\16,hex=$zextract(HexDigits,num+1)_hex
+	quit "0x"_hex

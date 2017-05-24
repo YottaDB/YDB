@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,7 @@
 #include "fileinfo.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "cli.h"
 #include "iosp.h"
 #include "util.h"
@@ -43,8 +45,11 @@ void mupip_create(void)
 	gd_region	*reg, *reg_top;
 	int		i;
 	unsigned short	reglen;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	exit_stat = EXIT_NRM;
+	TREF(ok_to_see_statsdb_regs) = TRUE;
 	gvinit();
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
@@ -69,14 +74,19 @@ void mupip_create(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, reglen, buff);
 			mupip_exit(ERR_MUPCLIERR);
 		}
-		gv_cur_region = reg;
-		create_stat = mu_cre_file();
-		exit_stat |= create_stat;
+		if (!(RDBF_AUTODB & reg->reservedDBFlags))
+		{	/* Ignore MUPIP CREATE for auto-created DBs */
+			gv_cur_region = reg;
+			create_stat = mu_cre_file();
+			exit_stat |= create_stat;
+		}
 	} else
 	{
 		for (gv_cur_region = gd_header->regions, reg_top = gv_cur_region + gd_header->n_regions;
 			gv_cur_region < reg_top; gv_cur_region++)
 		{
+			if ((RDBF_AUTODB & gv_cur_region->reservedDBFlags))
+				continue;		/* Ignore MUPIP CREATE for auto-created DBs */
 			create_stat = mu_cre_file();
 			exit_stat |= create_stat;
 	       	}

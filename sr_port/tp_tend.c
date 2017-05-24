@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,9 +79,7 @@
 #include "repl_instance.h"
 #endif
 #include "shmpool.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 #include "is_proc_alive.h"
 #include "process_reorg_encrypt_restart.h"
 
@@ -116,6 +114,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	uint4			process_id;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+GBLREF unsigned char		rdfail_detail;
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int4			strm_index;
@@ -164,7 +163,7 @@ error_def(ERR_TEXT);
 	}											\
 }
 
-boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
+enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
 boolean_t	tp_crit_all_regions()
@@ -214,11 +213,11 @@ boolean_t	tp_crit_all_regions()
 						 * cycles are in sync and crit is obtained. We cannot do that here as with TP
 						 * and multiple regions, we might end up calling "grab_crit_encr_cycle_sync"
 						 * for a region while holding crit on one or more previous regions and the
-						 * encryption keys need to be resynced. We dont want to do that while holding
+						 * encryption keys need to be resynced. We don't want to do that while holding
 						 * crit on any region. So take care of that explicitly here just like csd->freeze.
 						 */
 			assert(!(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
-			if (tmpcsd->freeze && tmpsi->update_trans)
+			if (FROZEN_HARD(tmpcsd) && tmpsi->update_trans)
 			{
 				tr = tr->fPtr;		/* Increment so we release the crit lock we actually got */
 				x_lock = FALSE;
@@ -294,7 +293,7 @@ boolean_t	tp_tend()
 	boolean_t		save_dont_reset_gbl_jrec_time;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size, in_tend;
-	uint4			update_trans;
+	uint4			lcl_update_trans;
 	jnlpool_ctl_ptr_t	jpl;
 	jnlpool_write_ctx_t 	jplctx;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
@@ -365,7 +364,7 @@ boolean_t	tp_tend()
 		 * 	(b) If we are in the final retry and we don't hold crit on some region.
 		 * 	(c) If we are in the final retry and we hold crit on a frozen region that we want to update.
 		 * 		This is possible if:
-		 *		(1) We did a grab_crit_immediate() through one of the gvcst_* routines when we first encountered the
+		 *		(1) We did a "grab_crit_immediate" through one of the gvcst_* routines when we first encountered the
 		 *		    region in the TP transaction and it wasn't locked down although it was frozen then.
 		 *		(2) tp_crit_all_regions notices that at least one of the participating regions did ONLY READs, it
 		 *		    will not wait for any freeze on THAT region to complete before grabbing crit. Later, in the
@@ -377,12 +376,12 @@ boolean_t	tp_tend()
 		 *	Note that in case of an online mupip journal rollback/recover, we will hold onto crit for the entire life
 		 *	of the process so that needs to be taken into account below.
 		 */
-		update_trans = si->update_trans;
-		assert(!(update_trans & ~UPDTRNS_VALID_MASK));
-		assert((UPDTRNS_JNL_LOGICAL_MASK & update_trans) || (NULL == si->jnl_head));
-		assert(!(UPDTRNS_JNL_LOGICAL_MASK & update_trans) || (NULL != si->jnl_head));
-		assert(!tr->reg->read_only || !update_trans);
-		region_is_frozen = (update_trans && csd->freeze);
+		lcl_update_trans = si->update_trans;
+		assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
+		assert((UPDTRNS_JNL_LOGICAL_MASK & lcl_update_trans) || (NULL == si->jnl_head));
+		assert(!(UPDTRNS_JNL_LOGICAL_MASK & lcl_update_trans) || (NULL != si->jnl_head));
+		assert(!tr->reg->read_only || !lcl_update_trans);
+		region_is_frozen = (lcl_update_trans && FROZEN_HARD(csd));
 		if ((CDB_STAGNATE > t_tries)
 				? (csa->now_crit && !csa->hold_onto_crit)
 				: (!csa->now_crit || region_is_frozen))
@@ -400,11 +399,11 @@ boolean_t	tp_tend()
 			goto failed_skip_revert;
 		}
 		/* Whenever si->first_cw_set is non-NULL, ensure that update_trans is non-zero */
-		assert((NULL == si->first_cw_set) || update_trans);
+		assert((NULL == si->first_cw_set) || lcl_update_trans);
 		/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE. See op_tcommit.c for exceptions */
 		assert((NULL != si->first_cw_set) || !si->update_trans || (UPDTRNS_ZTRIGGER_MASK & si->update_trans)
 			|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
-		if (!update_trans)
+		if (!lcl_update_trans)
 		{
 			/* See if we can take a fast path for read transactions based on the following conditions :
 			 * 1. If the transaction number hasn't changed since we read the blocks from the disk or cache
@@ -509,17 +508,17 @@ boolean_t	tp_tend()
 	 * after the loop above
 	 */
 	first_tp_si_by_ftok = tmp_first_tp_si_by_ftok;
-	DEBUG_ONLY(
-		/* Cross-check the validity of the ftok sorted sgm_info list with "tp_reg_list" */
-		tr = tp_reg_list;
-		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
-		{
-			tmpsi = (sgm_info *)(FILE_INFO(tr->reg)->s_addrs.sgm_info_ptr);
-			assert(tmpsi == si);
-			tr = tr->fPtr;
-		}
-		assert(NULL == tr);
-	)
+#	ifdef DEBUG
+	/* Cross-check the validity of the ftok sorted sgm_info list with "tp_reg_list" */
+	tr = tp_reg_list;
+	for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
+	{
+		tmpsi = (sgm_info *)(FILE_INFO(tr->reg)->s_addrs.sgm_info_ptr);
+		assert(tmpsi == si);
+		tr = tr->fPtr;
+	}
+	assert(NULL == tr);
+#	endif
 	assert(cdb_sc_normal == status);
 	/* The following section of code (initial part of the for loop) is similar to the function "tp_crit_all_regions".
 	 * The duplication is there only because of performance reasons. The latter function has to go through tp_reg_list
@@ -552,11 +551,11 @@ boolean_t	tp_tend()
 					BG_TRACE_ANY(csa, tp_crit_retries);
 				}
 			)
-			update_trans = si->update_trans;
-			assert(!(update_trans & ~UPDTRNS_VALID_MASK));
+			lcl_update_trans = si->update_trans;
+			assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
 			first_cw_set = si->first_cw_set;
 			/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
-			assert((NULL == first_cw_set) || update_trans);
+			assert((NULL == first_cw_set) || lcl_update_trans);
 			/* When si->first_cw_set is NULL, ensure that si->update_trans is FALSE. See op_tcommit.c for exceptions */
 			assert((NULL != si->first_cw_set) || !si->update_trans || (UPDTRNS_ZTRIGGER_MASK & si->update_trans)
 				|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
@@ -587,7 +586,7 @@ boolean_t	tp_tend()
 			 * that they become frozen just before we grab crit. In this case (should be rare though) release
 			 * crit on ALL regions that we have grabbed uptil this point and wait for the freeze to be removed.
 			 */
-			if (csd->freeze && update_trans)
+			if (FROZEN_HARD(csd) && lcl_update_trans)
 			{
 				x_lock = FALSE;
 				break;
@@ -623,7 +622,7 @@ boolean_t	tp_tend()
 				 */
 				/* Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
 				 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
-				 * updater on the secondary so we dont expect it to see any concurrent trigger changes.
+				 * updater on the secondary so we don't expect it to see any concurrent trigger changes.
 				 * The only exception is if this is a supplementary root primary instance. In that case,
 				 * the update process coexists with GT.M processes and hence can see restarts due to
 				 * concurrent trigger changes. Assert accordingly.
@@ -646,7 +645,7 @@ boolean_t	tp_tend()
 						cnl, csa, csd, status, process_id);
 				goto failed;
 			}
-			if (update_trans)
+			if (lcl_update_trans)
 			{
 				assert((NULL == first_cw_set) || (0 != si->cw_set_depth));
 #				ifdef DEBUG
@@ -663,7 +662,7 @@ boolean_t	tp_tend()
 				if (JNL_ALLOWED(csa))
 				{
 					if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
-					{	/* Take this opportunity to check/sync ALL regions where csa/csd dont match */
+					{	/* Take this opportunity to check/sync ALL regions where csa/csd don't match */
 						for (tmpsi = first_tp_si_by_ftok;
 							(NULL != tmpsi);
 							tmpsi = tmpsi->next_tp_si_by_ftok)
@@ -702,9 +701,7 @@ boolean_t	tp_tend()
 				if (NULL != first_cw_set)
 				{
 					ss_need_to_restart = new_bkup_started = FALSE;
-					GTM_SNAPSHOT_ONLY(
-						CHK_AND_UPDATE_SNAPSHOT_STATE_IF_NEEDED(csa, cnl, ss_need_to_restart);
-					)
+					CHK_AND_UPDATE_SNAPSHOT_STATE_IF_NEEDED(csa, cnl, ss_need_to_restart);
 					CHK_AND_UPDATE_BKUP_STATE_IF_NEEDED(cnl, csa, new_bkup_started);
 					if (ss_need_to_restart
 						|| (new_bkup_started && !(JNL_ENABLED(csa) && csa->jnl_before_image)))
@@ -754,7 +751,7 @@ boolean_t	tp_tend()
 					 * This is necessary to ensure that timestamps of successive journal records for each
 					 * database file are in non-decreasing order. A side-effect of this is that our recorded
 					 * time might not accurately reflect the current system time but that is considered not
-					 * an issue since we dont expect to be off by more than a second or two if at all.
+					 * an issue since we don't expect to be off by more than a second or two if at all.
 					 * Another side effect is that even if the system time went back, we will never write
 					 * out-of-order timestamped journal records in the lifetime of this database shared memory.
 					 */
@@ -771,7 +768,7 @@ boolean_t	tp_tend()
 					 * mur_output_record would have already set this.
 					 */
 					assert(jgbl.gbl_jrec_time);
-					jnl_status = jnl_ensure_open();
+					jnl_status = jnl_ensure_open(gv_cur_region, csa);
 					GTM_WHITE_BOX_TEST(WBTEST_TP_TEND_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 					if (jnl_status != 0)
 					{
@@ -805,8 +802,8 @@ boolean_t	tp_tend()
 						}
 						assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 					}
-					if (JNL_HAS_EPOCH(jbp)
-						&& ((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE)))
+					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
+						&& !FROZEN_CHILLED(csd))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						/* Note that at this point, jgbl.gbl_jrec_time has been computed taking into
 						 * account the current system time & the last journal record timestamp of ALL
@@ -973,7 +970,7 @@ boolean_t	tp_tend()
 							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 							goto failed;
 						}
-						assert(update_trans);	/* ensure read_before_image was computed above */
+						assert(lcl_update_trans);	/* ensure read_before_image was computed above */
 						if (!cse->new_buff || read_before_image)
 						{
 							if ((NULL == cr) || (cr->cycle != t1->cycle)
@@ -1000,7 +997,7 @@ boolean_t	tp_tend()
 							 * It is possible that t1->cse is non-NULL even though we eventually
 							 * decided NOT to update that particular block e.g. if t1->cse->mode
 							 * was originally t_write but later got set to kill_t_write. In such
-							 * cases, dont set in_cw_set as we dont need this buffer pinned at all.
+							 * cases, don't set in_cw_set as we don't need this buffer pinned at all.
 							 */
 							assert(n_gds_t_op != cse->mode);
 							assert(kill_t_create > n_gds_t_op);
@@ -1052,10 +1049,10 @@ boolean_t	tp_tend()
 				assert(!cse->high_tlevel);
 				if (is_mm)
 				{
-					if ((cse->tn <= ((blk_hdr_ptr_t)cse->old_block)->tn) && !reallocate_bitmap(si, cse))
+					if ((cse->tn <= ((blk_hdr_ptr_t)cse->old_block)->tn)
+						&& (status = reallocate_bitmap(si, cse)))	/* WARNING assignment */
 					{
 						assert(CDB_STAGNATE > t_tries);
-						status = cdb_sc_bmlmod;
 						TP_TRACE_HIST(cse->blk, NULL);
 						goto failed;
 					}
@@ -1065,10 +1062,9 @@ boolean_t	tp_tend()
 					bt = bt_get(tp_blk);
 					if (NULL != bt)
 					{
-						if ((cse->tn <= bt->tn) && !reallocate_bitmap(si, cse))
-						{
+						if ((cse->tn <= bt->tn) && (status = reallocate_bitmap(si, cse)))
+						{	/* WARNING assignment above */
 							assert(CDB_STAGNATE > t_tries);
-							status = cdb_sc_bmlmod;
 							TP_TRACE_HIST(tp_blk, NULL);
 							goto failed;
 						}
@@ -1219,7 +1215,7 @@ boolean_t	tp_tend()
 			 * occurs in the midst of commit and we end up invoking secshr_db_clnup which in turn will invoke
 			 * sec_shr_blk_build for these cses and that will expect that cse->new_buff be non-zero. For Unix
 			 * we invoke get_new_free_element to initialize cse->new_buff in secshr_db_clnup itself. But for VMS
-			 * we dont want this routine invoked in the privileged GTMSECSHR image so we do this beforehand.
+			 * we don't want this routine invoked in the privileged GTMSECSHR image so we do this beforehand.
 			 */
 			if (tp_has_kill_t_cse)
 			{
@@ -1396,7 +1392,7 @@ boolean_t	tp_tend()
 			{
 				for (jfb = si->jnl_head; NULL != jfb; jfb = jfb->next)
 				{
-					/* ZTWORMHOLE will have same update_num as following SET/KILL record so dont double count */
+					/* ZTWORMHOLE has same update_num as following SET/KILL record so don't double count */
 					if (IS_ZTWORM(jfb->rectype))
 						continue;
 					upd_num = ((struct_jrec_upd *)(jfb->buff))->update_num;
@@ -1535,7 +1531,7 @@ boolean_t	tp_tend()
 			jfb = si->jnl_head;
 			assert(NULL != jfb);
 			/* Fill in "num_participants" field in TSET/TKILL/TZKILL/TZTRIG/TZTWORM/TLGTRIG record.
-			 * The rest of the records (USET/UKILL/UZKILL/UZTRIG/UZTWORM/ULGTRIG) dont have this initialized.
+			 * The rest of the records (USET/UKILL/UZKILL/UZTRIG/UZTWORM/ULGTRIG) don't have this initialized.
 			 * Recovery looks at this field only in the T* records.
 			 */
 			rec = (jnl_record *)jfb->buff;
@@ -1577,9 +1573,9 @@ boolean_t	tp_tend()
 	for (csa = jnl_fence_ctl.fence_list;  JNL_FENCE_LIST_END != csa;  csa = csa->next_fenced)
 	{
 		jpc = csa->jnl;
-		DEBUG_ONLY(update_trans = ((sgm_info *)(csa->sgm_info_ptr))->update_trans;)
-		assert(!(update_trans & ~UPDTRNS_VALID_MASK));
-		assert(UPDTRNS_DB_UPDATED_MASK & update_trans);
+		DEBUG_ONLY(lcl_update_trans = ((sgm_info *)(csa->sgm_info_ptr))->update_trans;)
+		assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
+		assert(UPDTRNS_DB_UPDATED_MASK & lcl_update_trans);
 		tcom_record.prefix.pini_addr = jpc->pini_addr;
 		tcom_record.prefix.tn = csa->ti->curr_tn;
 		tcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
@@ -1601,7 +1597,7 @@ boolean_t	tp_tend()
 	/* the following section is the actual commitment of the changes in the database (phase1 for BG) */
 	for (si = first_tp_si_by_ftok;  (NULL != si); si = si->next_tp_si_by_ftok)
 	{
-		if (update_trans = si->update_trans)
+		if (lcl_update_trans = si->update_trans)
 		{
 			assert((NULL == si->first_cw_set) || (0 != si->cw_set_depth));
 			sgm_info_ptr = si;
@@ -1702,7 +1698,7 @@ boolean_t	tp_tend()
 							 * "si->cr_array_index" is reset to 0 by secshr_db_clnup.
 							 */
 							assert(0 == si->cr_array_index);
-							goto skip_failed; /* do not do "failed:" processing as we dont hold crit */
+							goto skip_failed; /* do not do "failed:" processing as we don't hold crit */
 						}
 					} else
 					{
@@ -1723,12 +1719,12 @@ boolean_t	tp_tend()
 				} while (NULL != cse);
 			}
 			/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
-			assert(!(update_trans & ~UPDTRNS_VALID_MASK));
-			assert(!(UPDTRNS_TCOMMIT_STARTED_MASK & update_trans));
-			si->update_trans = update_trans | UPDTRNS_TCOMMIT_STARTED_MASK;
+			assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
+			assert(!(UPDTRNS_TCOMMIT_STARTED_MASK & lcl_update_trans));
+			si->update_trans = lcl_update_trans | UPDTRNS_TCOMMIT_STARTED_MASK;
 			csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* set this BEFORE releasing crit */
 			/* should never increment curr_tn on a frozen database */
-			assert(!(csd->freeze UNIX_ONLY(|| (replication && IS_REPL_INST_FROZEN))));
+			assert(!(FROZEN_HARD(csd) UNIX_ONLY(|| (replication && IS_REPL_INST_FROZEN))));
 			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
 			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
 			 * modification.
@@ -1761,8 +1757,7 @@ boolean_t	tp_tend()
 			/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
 			 * otherwise do it here every HEADER_UPDATE_COUNT transactions.
 			 */
-			if ((!JNL_ENABLED(csa) || !JNL_HAS_EPOCH(csa->jnl->jnl_buff))
-					&& !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)))
+			if (!JNL_ENABLED(csa) && !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)) && !FROZEN_CHILLED(csd))
 				fileheader_sync(gv_cur_region);
 			if (NULL != si->kill_set_head)
 				INCR_KIP(csd, csa, si->kip_csa);
@@ -1840,7 +1835,7 @@ boolean_t	tp_tend()
 			ctn = si->start_tn;
 			is_mm = (dba_mm == cs_data->acc_meth);
 			/* If BG, check that we have not pinned any more buffers than we are updating */
-			DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(is_mm, si->cr_array, si->cr_array_index, si->tp_csd->bplmap);
+			DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(si->tp_csd, is_mm, si->cr_array, si->cr_array_index);
 			do
 			{
 				TRAVERSE_TO_LATEST_CSE(cse);
@@ -1873,7 +1868,7 @@ boolean_t	tp_tend()
 							 * "wcs_phase2_commit_pidcnt" so it is ok to skip all that processing
 							 * below and go directly to skip_failed.
 							 */
-							goto skip_failed; /* do not do "failed:" processing as we dont hold crit */
+							goto skip_failed; /* do not do "failed:" processing as we don't hold crit */
 						}
 					}
 					cse->mode = gds_t_committed;
@@ -1886,11 +1881,12 @@ boolean_t	tp_tend()
 			} while (NULL != cse);
 			/* Free up all pinnned cache-records */
 			tp_cr_array = si->cr_array;
-			UNPIN_CR_ARRAY_ON_COMMIT(tp_cr_array, si->cr_array_index);
+			ASSERT_CR_ARRAY_IS_UNPINNED(si->tp_csd, tp_cr_array, si->cr_array_index);
+			si->cr_array_index = 0;
+			csa = cs_addrs;
+			cnl = csa->nl;
 			if (!is_mm)
 			{	/* In BG, now that two-phase commit is done, decrement counter */
-				csa = cs_addrs;
-				cnl = csa->nl;
 				DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
 				/* Phase 2 commits are completed for the current region. See if we had done a snapshot
 				 * init (csa->snapshot_in_prog == TRUE). If so, try releasing the resources obtained
@@ -1902,6 +1898,7 @@ boolean_t	tp_tend()
 					SS_RELEASE_IF_NEEDED(csa, cnl);
 				}
 			}
+			cnl->tp_hint = csa->tp_hint;	/* update the region hint to reflect any (successful) allocations */
 		}
 		assert(!si->cr_array_index);
 		si->tp_csa->t_commit_crit = FALSE;
@@ -2253,23 +2250,21 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
  * See similar comment before the function definition of "recompute_upd_array". For the same reasons, it is considered
  * ok to do the reallocation since frozen regions are considered relatively rare.
  */
-boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
+enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 {
-	boolean_t		blk_used;
-	block_id_ptr_t		b_ptr;
+	blk_hdr_ptr_t		old_block;
 	block_id		bml, free_bit;
+	block_id_ptr_t		b_ptr;
+	boolean_t		before_image_needed, blk_used, is_mm;
+	boolean_t		read_before_image;		/* TRUE if before-image journaling or online backup in progress */
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse, *bmp_begin_cse;
 	int4			offset;
-	uint4			total_blks, map_size;
-	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
+	jnl_buffer_ptr_t	jbp;				/* jbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	boolean_t		is_mm;
-	jnl_buffer_ptr_t	jbp; /* jbp is non-NULL only if before-image journaling */
-	blk_hdr_ptr_t		old_block;
+	uint4			total_blks, map_size;
 	unsigned int		bsiz;
-	boolean_t		before_image_needed;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -2278,141 +2273,132 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	is_mm = (dba_mm == csd->acc_meth);
 	/* This optimization should only be used if blocks are being allocated (not if freed) in this bitmap. */
 	assert(0 <= bml_cse->reference_cnt);
-	bml = bml_cse->blk;
 	if (!is_mm && bml_cse->cr->in_tend)
 	{	/* Possible if this cache-record no longer contains the bitmap block we think it does. In this case restart.
 		 * Since we hold crit at this point, the block that currently resides should not be a bitmap block since
 		 * all updates to the bitmap (both phase1 and phase) happen inside of crit.
 		 */
 		assert(csa->now_crit && (bml != bml_cse->cr->blk) && (bml_cse->cr->blk % csd->bplmap));
-		return FALSE;
+		return cdb_sc_lostbmlcr;
 	}
 	assert(is_mm || (FALSE == bml_cse->cr->in_tend));
 	assert(is_mm || (FALSE == bml_cse->cr->data_invalid));
-	b_ptr = (block_id_ptr_t)bml_cse->upd_addr;
 	offset = 0;
+	bml = bml_cse->blk;
 	total_blks = is_mm ? csa->total_blks : csa->ti->total_blks;
-	if (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml)
-		map_size = total_blks - bml;
-	else
-		map_size = BLKS_PER_LMAP;
+	map_size = (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml) ? total_blks - bml : BLKS_PER_LMAP;
 	assert(bml >= 0 && bml < total_blks);
 	bmp_begin_cse = si->first_cw_bitmap;	/* stored in a local to avoid pointer de-referencing within the loop below */
 	jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 	read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
+	b_ptr = (block_id_ptr_t)bml_cse->upd_addr;
 	for (cse = si->first_cw_set;  cse != bmp_begin_cse; cse = cse->next_cw_set)
 	{
 		TRAVERSE_TO_LATEST_CSE(cse);
 		if ((gds_t_acquired != cse->mode) || (ROUND_DOWN2(cse->blk, BLKS_PER_LMAP) != bml))
 			continue;
+		assert(gds_t_acquired == cse->mode);
+		assert(GDSVCURR == cse->ondsk_blkver);
 		assert(*b_ptr == (cse->blk - bml));
 		/* If bm_find_blk is passed a hint (first arg) it assumes it is less than map_size and gives invalid results (for
 		 * values >= map_size). Instead of changing bm_find_blk we do the check here and assert that "hint" < "map_size" in
 		 * bm_find_blk.
 		 */
-		if (offset >= map_size)
-		{	/* We have a block that needs to be reallocated but there are no free blocks left in this local bitmap.
-			 * Note: It's possible for `offset' to be greater than `map_size' if the cache record holding the bitmap
-			 * gets reused for a non-bitmap block in which case donot_commit should be set (and hence asserted here).
-			 * In such a case, we return FALSE causing the caller to restart the transaction with a cdb_sc_bmlmod
-			 * even though it's a case of cdb_sc_lostbmlcr.
-			 */
-			assert((offset == map_size) || (TREF(donot_commit) & DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD));
-			return FALSE;
-		}
-		free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used);
-		if (MAP_RD_FAIL == free_bit || NO_FREE_SPACE == free_bit)
-			return FALSE;
-		cse->blk = bml + free_bit;
-#		ifdef DEBUG
-		if (cse->blk >= total_blks)
-			TREF(donot_commit) |= DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD;
-#		endif
-		blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state)
-			 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
-		/* re-point before-images into cse->old_block if necessary; if not available restart by returning FALSE */
-		BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, cse->blk, before_image_needed);
-		if (!before_image_needed)
+		do
 		{
-			cse->old_block = NULL;
-			cse->blk_checksum = 0;
-		} else if (!is_mm)
-		{
-			cr = db_csh_get(cse->blk);
-			assert(CR_NOTVALID != (sm_long_t)cr);
-			if ((NULL == cr) || (CR_NOTVALID == (sm_long_t)cr) || (0 <= cr->read_in_progress))
-				return FALSE;	/* if one block was freed a long time ago, most probably were; so just give up */
-			/* Reset cse->cr, cycle, old_block and checksums if we had not read a before-image previously (because
-			 * cse->blk was not a reused block previously) OR if old cse->cr and cse->cycle dont match current cr
-			 */
-			assert((NULL == cse->old_block) || (cse->cr != cr)
-				|| cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
-			if ((NULL == cse->old_block) || (cse->cr != cr) || (cse->cycle != cr->cycle)
-					|| (cse->tn <= ((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn))
-			{	/* Bitmap reallocation has resulted in a situation where checksums etc. have to be recomputed */
-				cse->cr = cr;
-				cse->cycle = cr->cycle;
-				cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-				old_block = (blk_hdr_ptr_t)cse->old_block;
-				if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
-				{
-					if (old_block->tn < jbp->epoch_tn)
-					{
-						/* See comment before similar check in "gvincr_recompute_upd_array"
-						 * for why this check is needed.
-						 */
-						bsiz = old_block->bsiz;
-						if (bsiz > csd->blk_size)
-						{
-							assert(CDB_STAGNATE > t_tries);
-							return FALSE;	/* This is a restartable condition. Restart */
-						}
-						JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_block, bsiz);
-					} else
-						cse->blk_checksum = 0;
-				}
-			}
-			assert(gds_t_acquired == cse->mode);
- 			assert(GDSVCURR == cse->ondsk_blkver);
-		} else
-		{	/* in MM, although mm_update does not use cse->old_block, tp_tend uses it to write before-images.
-			 * therefore, fix it to point to the reallocated block's buffer address
-			 */
-			cse->old_block = t_qread(cse->blk, (sm_int_ptr_t)&cse->cycle, &cse->cr);
-			assert(GDSVCURR == cse->ondsk_blkver);	/* should have been already initialized in t_write_map */
-			old_block = (blk_hdr_ptr_t)cse->old_block;
-			if (NULL == old_block)
-				return FALSE;
-			assert(NULL == jbp);	/* this means we dont need to have any JNL_GET_CHECKSUM_ACQUIRED_BLK logic */
-		}
-		*b_ptr++ = free_bit;
-		offset = free_bit + 1;
-	}
-	if (cse == bmp_begin_cse)
-	{
-		assert(0 == *b_ptr);
-		/* since bitmap block got modified, copy latest "ondsk_blkver" status from cache-record to bml_cse */
-		assert((NULL != bml_cse->cr) || is_mm);
-		old_block = (blk_hdr_ptr_t)bml_cse->old_block;
-		assert(!WAS_FREE(bml_cse->blk_prior_state));	/* Bitmap blocks are never of type gds_t_acquired or gds_t_create */
-		if (NULL != jbp)
-		{	/* recompute CHECKSUM for the modified bitmap block before-image */
-			if (old_block->tn < jbp->epoch_tn)
+			assert(offset <= map_size);
+			if ((offset >= map_size) || (NO_FREE_SPACE == (free_bit = bm_find_blk(offset,	/* WARNING assignment */
+					(sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used))))
+				return cdb_sc_bmlmod;
+			cse->blk = bml + free_bit;
+			if (cse->blk >= total_blks)
+				return cdb_sc_lostbmlcr;
+			/* re-point before-images into cse->old_block if necessary; if not available: restart */
+			BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, cse->blk, before_image_needed);
+			if (!before_image_needed)
 			{
-				bsiz = old_block->bsiz;
-				/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
-				if (bsiz > csd->blk_size)
-				{
-					assert(CDB_STAGNATE > t_tries);
-					return FALSE;	/* This is a restartable condition. Restart */
+				cse->old_block = NULL;
+				cse->blk_checksum = 0;
+			} else if (!is_mm)
+			{
+				cr = db_csh_get(cse->blk);			/* see if the before image is in memory and OK */
+				assert(CR_NOTVALID != (sm_long_t)cr);
+				if ((NULL == cr) || (CR_NOTVALID == (sm_long_t)cr) || (0 <= cr->read_in_progress))
+				{	/* if this before image is not at hand don't wait for it in crit */
+					if (free_bit == offset)			/* see if we have been through the bitmap; if so, */
+						return cdb_sc_lostbmlcr;	/* restart - we hold crit so it won't change */
+					offset = free_bit;			/* otherwise, try further in this bitmap */
+					continue;
 				}
-				bml_cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+				/* if we had not read a before-image previously (because cse->blk was not a reused block previously)
+				 * OR if old cse->cr and cse->cycle don't match current cr, reset cse->cr, cycle, old_block and
+				 * checksums
+				 */
+				assert((NULL == cse->old_block) || (cse->cr != cr)
+					|| cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+				if ((NULL == cse->old_block) || (cse->cr != cr) || (cse->cycle != cr->cycle)
+						|| (cse->tn <= ((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn))
+				{	/* Bitmap reallocation resulted in a situation where checksums etc. must be recomputed */
+					cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+					old_block = (blk_hdr_ptr_t)cse->old_block;
+					if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
+					{
+						if (old_block->tn < jbp->epoch_tn)
+						{	/* See comment before similar check in "gvincr_recompute_upd_array"
+							 * for why this check is needed.
+							 */
+							bsiz = old_block->bsiz;
+							if (bsiz > csd->blk_size)
+							{	/* if this before image is not valid don't wait for it in crit */
+								if (free_bit == offset)			/* if exhausted this map */
+									return cdb_sc_lostbmlcr;	/* restart (see above) */
+								offset = free_bit;
+								continue;
+							}
+							JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_block, bsiz);
+						} else
+							cse->blk_checksum = 0;
+					}
+					cse->cr = cr;
+					cse->cycle = cr->cycle;
+				}
+				blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state)
+					 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
 			} else
-				bml_cse->blk_checksum = 0;
-		}
-		if (!is_mm)
-			bml_cse->ondsk_blkver = bml_cse->cr->ondsk_blkver;
-		return TRUE;
-	} else
-		return FALSE;
+			{	/* in MM, although mm_update does not use cse->old_block, tp_tend uses it to write before-images.
+				 * therefore, fix it to point to the reallocated block's buffer address
+				 */
+				cse->old_block = t_qread(cse->blk, (sm_int_ptr_t)&cse->cycle, &cse->cr);
+				assert(GDSVCURR == cse->ondsk_blkver);	/* should have been already initialized in t_write_map */
+				old_block = (blk_hdr_ptr_t)cse->old_block;
+				if (NULL == old_block)
+					return ((enum cdb_sc)rdfail_detail);
+				assert(NULL == jbp);	/* don't need to have any JNL_GET_CHECKSUM_ACQUIRED_BLK logic */
+			}
+			*b_ptr++ = free_bit;
+			offset = free_bit + 1;
+			break;
+		} while (TRUE);
+	}
+	assert(cse == bmp_begin_cse);
+	assert(0 == *b_ptr);
+	/* since bitmap block got modified, copy latest "ondsk_blkver" status from cache-record to bml_cse */
+	assert((NULL != bml_cse->cr) || is_mm);
+	old_block = (blk_hdr_ptr_t)bml_cse->old_block;
+	assert(!WAS_FREE(bml_cse->blk_prior_state));	/* Bitmap blocks are never of type gds_t_acquired or gds_t_create */
+	if (NULL != jbp)
+	{	/* recompute CHECKSUM for the modified bitmap block before-image */
+		if (old_block->tn < jbp->epoch_tn)
+		{
+			bsiz = old_block->bsiz;
+			/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
+			if (bsiz > csd->blk_size)
+				return cdb_sc_lostbmlcr;	/* This is a restartable condition, so restart */
+			bml_cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+		} else
+			bml_cse->blk_checksum = 0;
+	}
+	if (!is_mm)
+		bml_cse->ondsk_blkver = bml_cse->cr->ondsk_blkver;
+	return cdb_sc_normal;
 }

@@ -96,12 +96,7 @@ uint4 mur_prev_rec(jnl_ctl_list **jjctl)
 			jctl->rec_offset -= mur_desc->jreclen;
 			assert(jctl->rec_offset >= mur_desc->cur_buff->dskaddr);
 			assert(JNL_HDR_LEN <= jctl->rec_offset);
-			if (JRT_EOF != mur_desc->jnlrec->prefix.jrec_type)
-				return SS_NORMAL;
-			/* unexpected EOF record in the middle of the file */
-			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [prev_rec]"));
-			status = ERR_JNLBADRECFMT;
+			return SS_NORMAL;
 		}
 		if (ERR_JNLBADRECFMT != status)
 			return status;	/* JNLBADRECFMT message already issued by mur_prev */
@@ -181,11 +176,7 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 		{
 			jctl->rec_offset += rec_size;
 			assert(jctl->rec_offset <= jctl->lvrec_off);
-			if (JRT_EOF != mur_desc->jnlrec->prefix.jrec_type || jctl->rec_offset == jctl->lvrec_off)
-				return SS_NORMAL;
-			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Unexpected EOF record found [next_rec]"));
-			status = ERR_JNLBADRECFMT;
+			return SS_NORMAL;
 		}
 		if (ERR_JNLBADRECFMT != status)
 			return status;
@@ -987,9 +978,7 @@ uint4	mur_fopen(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 			return jctl->status;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */
 	}
 	/* Now that we know for sure, jfh is of the format we expect it to be, we can safely access fields inside it */
-	cre_jnl_rec_size = JNL_HAS_EPOCH(jfh)
-			? PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN
-			: PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
+	cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 	if ((cre_jnl_rec_size + JNL_HDR_LEN) <= jctl->os_filesize)
 	{
 		DO_FILE_READ(jctl->channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, jctl->status, jctl->status2);
@@ -1034,17 +1023,14 @@ uint4	mur_fopen(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 		return ERR_JNLBADRECFMT;
 	}
 	/* We have at least one good record */
-	if (JNL_HAS_EPOCH(jfh))
+	jrec = (jnl_record *)((char *)jrec + PINI_RECLEN);
+	if (!IS_VALID_JNLREC(jrec, jfh) || (JRT_EPOCH != jrec->prefix.jrec_type))
 	{
-		jrec = (jnl_record *)((char *)jrec + PINI_RECLEN);
-		if (!IS_VALID_JNLREC(jrec, jfh) || JRT_EPOCH != jrec->prefix.jrec_type)
-		{
-			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-					JNL_HDR_LEN + PINI_RECLEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no EPOCH record found"));
-			return ERR_JNLBADRECFMT;
-		}
-		/* We have at least one valid EPOCH */
+		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+				JNL_HDR_LEN + PINI_RECLEN, ERR_TEXT, 2, LEN_AND_LIT("Invalid or no EPOCH record found"));
+		return ERR_JNLBADRECFMT;
 	}
+	/* We have at least one valid EPOCH */
 	if (mur_options.update && jfh->bov_tn > jfh->eov_tn)
 	{
 		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_BOVTNGTEOVTN, 4, jctl->jnl_fn_len, jctl->jnl_fn,

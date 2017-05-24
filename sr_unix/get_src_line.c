@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,21 +30,19 @@
 #include "op.h"
 #include "zbreak.h"
 #include "hashtab_mname.h"
-#ifdef GTM_TRIGGER
-# include "gdsroot.h"
-# include "gtm_facility.h"
-# include "fileinfo.h"
-# include "gdsbt.h"
-# include "gdsfhead.h"
-# include "gv_trigger.h"
-# include "gtm_trigger.h"
-# include "cdb_sc.h"
-# include "tp_frame.h" /* for tp_frame */
-# include "t_retry.h"
-# include "trigger_read_andor_locate.h"
-# include "gtm_trigger_trc.h"
-# include "zr_unlink_rtn.h"
-#endif
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#include "cdb_sc.h"
+#include "tp_frame.h" /* for tp_frame */
+#include "t_retry.h"
+#include "trigger_read_andor_locate.h"
+#include "gtm_trigger_trc.h"
+#include "zr_unlink_rtn.h"
 #include "stack_frame.h"
 #include "rtn_src_chksum.h"
 #include "cmd_qlf.h"
@@ -85,9 +83,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	off_t			srcsize;
 	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
-#	ifdef GTM_TRIGGER
 	boolean_t	is_trigger;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -112,7 +108,6 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		GTMTRIG_ONLY(is_trigger=(NULL != rtn_vector->trigr_handle));
 		DBGIFTRIGR((stderr, "get_src_line: entered $tlevel=%d and $t_tries=%d\n", dollar_tlevel, t_tries));
 	}
-#	ifdef GTM_TRIGGER
 	if (is_trigger && (NULL == rtn_vector))
 	{	/* Need source on a trigger. Get trigger loaded and its source becomes available since all triggers
 		 * are compiled with -EMBED_SOURCE.
@@ -138,21 +133,8 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 				*rtn_vec = NULL;
 			return OBJMODMISS;
 		}
-		DBGTRIGR((stderr, "get_src_line: source found @0x%lx(%d) for %lx\n", rtn_vector->trigr_handle,
-					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len, rtn_vector));
 		DBGARLNK((stderr, "get_src_line: Fetch trigger source from rtnhdr 0x"lvaddr"\n", rtn_vector));
-		/* Remove the source buffer from the trigger descriptor since we will use the source embedded in the
-		 * trigger object to return the line to the caller.
-		 */
-		if (0 != ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len)
-		{
-			free(((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr);
-			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len = 0;
-			((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr = NULL;
-		}
-	} else
-#	endif
-	if (NULL == rtn_vector)
+	} else if (NULL == rtn_vector)
 	{
 		assert(!is_trigger);
 		if (NULL == (rtn_vector = find_rtn_hdr(&routine->str)))		/* Note assignment */
@@ -373,7 +355,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	 * entry is not used in the source array for direct referencing ease.
 	 */
 	src_tbl = (routine_source *)malloc(SIZEOF(routine_source) + ((srcrecs - 1) * SIZEOF(mstr)));
-	src_tbl->srcbuff = (0 < srcsize) ? malloc(srcsize) : NULL;
+	src_tbl->srcbuff = (0 < srcsize) ? malloc(srcsize + 1) : NULL;
 	base = src_tbl->srclines;
 	srcptr = src_tbl->srcbuff;
 	DEBUG_ONLY(srcptr_max = srcptr + srcsize);
@@ -447,6 +429,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				assert(feof(fp));
 			}
 		}
+		if (srcsize && ('\n' != *(src_tbl->srcbuff + srcsize - 1)))
+			*(src_tbl->srcbuff + srcsize++) = '\n';		/* add \n in case last line was unterminated */
 		rtn_src_chksum_buffer(&checksum_ctx, src_tbl->srcbuff, srcsize);
 		if (!eof_seen
 			|| !rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))

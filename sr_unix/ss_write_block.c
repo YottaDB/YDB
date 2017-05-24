@@ -145,7 +145,7 @@ boolean_t ss_write_block(sgmnt_addrs *csa,
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, blk_ptr);
 	}
 	assert(NULL != blk_ptr);
-	blk_offset = ((off_t)(lcl_ss_ctx->shadow_vbn - 1) * DISK_BLOCK_SIZE + (off_t)blk * blk_size);
+	blk_offset = (off_t)BLK_ZERO_OFF(lcl_ss_ctx->shadow_vbn) + (off_t)blk * blk_size;
 	/* Note: If a FREE block is being written here, then we could avoid the write below: if the underlying file system
 	 * is guaranteed to give us all zeros for a block and if the block header is empty
 	 */

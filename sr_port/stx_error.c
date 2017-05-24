@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,24 +49,34 @@ error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FOROFLOW);
 error_def(ERR_INVDLRCVAL);
 error_def(ERR_LABELMISSING);
+error_def(ERR_PATNOTFOUND);
 error_def(ERR_SRCLIN);
 error_def(ERR_SRCLOC);
 error_def(ERR_SRCNAM);
 
 void stx_error(int in_error, ...)
 {
-	va_list		args;
+	va_list		var;
+
+	VAR_START(var, in_error);
+	stx_error_va(in_error, var);
+	return;
+}
+
+void stx_error_va(int in_error, va_list args)
+{
 	VA_ARG_TYPE	cnt, arg1, arg2, arg3, arg4;
-	bool		list, warn;
+	boolean_t	is_stx_warn, list, warn;
 	char		msgbuf[MAX_SRCLINE];
 	char		buf[MAX_SRCLINE + LISTTAB + SIZEOF(ARROW)];
 	char		*c;
 	mstr		msg;
-	boolean_t	is_stx_warn;	/* current error is actually of type warning and we are in CGP_PARSE phase */
+	va_list		dup_args;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	va_start(args, in_error);
+	VAR_COPY(dup_args, args);
+
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
 	 *	a) saw_side_effect
@@ -74,7 +84,7 @@ void stx_error(int in_error, ...)
 	 *	c) source_error_found
 	 */
 	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile_and_link));
-	if (!is_stx_warn)
+	if (!is_stx_warn)	/* is current error not of type warning or are we not in CGP_PARSE phase? */
 		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	if (run_time)
 	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert
@@ -186,7 +196,14 @@ void stx_error(int in_error, ...)
 		show_source_line(warn);
 		if (warn)
 		{
-			if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error) && (ERR_FOROFLOW != in_error))
+			if (ERR_PATNOTFOUND == in_error)
+			{
+				cnt = va_arg(args, VA_ARG_TYPE);
+				assert(cnt == 2);
+				arg1 = va_arg(args, VA_ARG_TYPE);
+				arg2 = va_arg(args, VA_ARG_TYPE);
+				dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
+			} else if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error) && (ERR_FOROFLOW != in_error))
 				dec_err(VARLSTCNT(1) in_error);
 			else
 			{
@@ -201,19 +218,18 @@ void stx_error(int in_error, ...)
 	va_end(args);
 	if (list)
 	{
-		va_start(args, in_error);
 		msg.addr = msgbuf;
 		msg.len = SIZEOF(msgbuf);
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
 #		ifdef UNIX
-		cnt = va_arg(args, VA_ARG_TYPE);
-		c = util_format(msgbuf, args, LIT_AND_LEN(buf), (int)cnt);
+		cnt = va_arg(dup_args, VA_ARG_TYPE);
+		c = util_format(msgbuf, dup_args, LIT_AND_LEN(buf), (int)cnt);
 		va_end(TREF(last_va_list_ptr));	/* set by util_format */
 #		else
-		c = util_format(msgbuf, args, LIT_AND_LEN(buf));
+		c = util_format(msgbuf, dup_args, LIT_AND_LEN(buf));
 #		endif
-		va_end(args);
+		va_end(dup_args);
 		*c = 0;
 		list_line(buf);
 	}

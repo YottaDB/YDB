@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,6 +121,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->write_occurred = FALSE;
 		d_rm->fsblock_buffer_size = 0;
 		d_rm->fsblock_buffer = NULL;
+		d_rm->ichset_utf16_variant = d_rm->ochset_utf16_variant = 0;
 	} else
 	{
 		d_rm = (d_rm_struct *)iod->dev_sp;
@@ -178,12 +179,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					new_position = d_rm->file_pos;
 				} else
 				{
-					if ((CHSET_M == iod->ichset) || d_rm->fixed)
+					if (d_rm->fixed)
 						new_position = d_rm->file_pos;
 					else
-					{
+					{	/* Buffered reads in non-fixed M & UTF modes. */
 						new_position = d_rm->file_pos +
-							d_rm->utf_tot_bytes_in_buffer - d_rm->utf_start_pos;
+							d_rm->tot_bytes_in_buffer - d_rm->start_pos;
 					}
 				}
 
@@ -211,11 +212,11 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					if (!append)
 						d_rm->file_pos = 0;
 					/* Reset temporary buffer so that the next read starts afresh */
-					if (IS_UTF_CHSET(iod->ichset))
+					if (!d_rm->fixed || IS_UTF_CHSET(iod->ichset))
 					{
-						DEBUG_ONLY(memset(d_rm->utf_tmp_buffer, 0, CHUNK_SIZE));
-						d_rm->utf_start_pos = 0;
-						d_rm->utf_tot_bytes_in_buffer = 0;
+						DEBUG_ONLY(MEMSET_IF_DEFINED(d_rm->tmp_buffer, 0, CHUNK_SIZE));
+						d_rm->start_pos = 0;
+						d_rm->tot_bytes_in_buffer = 0;
 					}
 				}
 			}
@@ -238,31 +239,13 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			if (NULL == d_rm->filstr)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 					      dev_name->dollar_io, ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
-			/* now fseeko required for nodestroy if non-fixed M streaming */
-			if (d_rm->no_destroy && !d_rm->fixed && !IS_UTF_CHSET(iod->ichset))
-			{
-				if ((off_t)-1 == fseeko(d_rm->filstr, d_rm->file_pos, SEEK_SET))	/* move input stream */
-				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseeko"),
-						      RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
-				}
-			}
 		}
 	}
-	recsize_before = d_rm->recordsize;
-	def_recsize_before = d_rm->def_recsize;
-	/* don't change character set on reopen */
+	/* setting of recordsize, WIDTH, etc, based on changed (if any) CHSET is taken care in iorm_use(). */
 	if (closed_nodestroy)
 		d_rm->no_destroy = TRUE;
 	iorm_use(iod, pp);
 
-	/* Now that recordsize and CHSET parms have been handled (if any), set WIDTH if necessary */
-	if (recsize_before != d_rm->recordsize || def_recsize_before != d_rm->def_recsize)
-	{	/* record size was specified even if the same value */
-		SET_WIDTH_BYTES;
-		assert(width_bytes <= d_rm->recordsize);	/* or else RECSIZENOTEVEN error would have been issued */
-		iod->width = d_rm->recordsize;/* we are guaranteed this width will hold at least one character due to above check */
-	}
 	/* Now that recordsize and CHSET parms have been handled (if any), allocate the record buffer if needed (utf8 fixed) */
 	if (dev_closed == iod->state)
 	{
@@ -327,57 +310,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			iod->wrap = TRUE;
 		}
 #endif
-		if (IS_UTF_CHSET(iod->ichset))
-		{
-			assert(gtm_utf8_mode);
-			/* We shouldn't have an existing buffer at this point if not closed nodestroy */
-			if (!d_rm->no_destroy)
-				assert(NULL == d_rm->inbuf);
-			/* if we already have a buffer then we opened previously in UTF char set so only allocate if NULL*/
-			if (NULL == d_rm->inbuf)
-			{
-				d_rm->bufsize = d_rm->fixed ? (d_rm->recordsize + 4) : 20;	/* +4 for one extra utf8 char */
-				d_rm->inbuf = malloc(d_rm->bufsize);
-				d_rm->inbuf_pos = d_rm->inbuf_top = d_rm->inbuf_off = d_rm->inbuf;/* Force read first time thru */
-			}
-		}
-		if (IS_UTF16_CHSET(iod->ochset))
-		{
-			/* We shouldn't have an existing buffer at this point if not closed nodestroy*/
-			if (!d_rm->no_destroy)
-				assert(NULL == d_rm->outbuf);
-			/* if we already have a buffer then we opened previously in UTF char set so only allocate if NULL*/
-			if (NULL == d_rm->outbuf)
-			{
-				d_rm->outbufsize = d_rm->recordsize + 4;
-				d_rm->outbuf = malloc(d_rm->outbufsize);
-				d_rm->out_bytes = 0;
-			}
-		}
 		/* Unless NEWVERSION is specified or the file is empty, or the file was CLOSEd with NODESTROY at EOF, we do not
 		 * allow APPEND with encryption.
 		 */
 		if (d_rm->output_encrypted && append && (!newversion) && (0 != statbuf.st_size) &&
 				(!d_rm->no_destroy || !iod->dollar.zeof))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOAPPEND, 2, dev_name->len, dev_name->dollar_io);
-	} else
-	{	/* check for changed recordsize */
-		if (IS_UTF_CHSET(iod->ichset) && (recsize_before != d_rm->recordsize))
-		{
-			if (NULL != d_rm->inbuf)
-				free(d_rm->inbuf);
-			d_rm->bufsize = d_rm->fixed ? (d_rm->recordsize + 4) : 20;		/* +4 for one extra utf8 char */
-			d_rm->inbuf = malloc(d_rm->bufsize);
-			d_rm->inbuf_pos = d_rm->inbuf_top = d_rm->inbuf_off = d_rm->inbuf;	/* Force read first time thru */
-		}
-		if (IS_UTF16_CHSET(iod->ochset) && (recsize_before != d_rm->recordsize))
-		{
-			if (NULL != d_rm->outbuf)
-				free(d_rm->outbuf);
-			d_rm->outbufsize = d_rm->recordsize + 4;
-			d_rm->outbuf = malloc(d_rm->outbufsize);
-			d_rm->out_bytes = 0;
-		}
 	}
 
 	if (!d_rm->bom_checked && !d_rm->fifo && !d_rm->pipe && (2 < fd) && IS_UTF_CHSET(iod->ochset))
@@ -472,7 +410,7 @@ int	open_get_bom(io_desc *io_ptr, int bom_size)
 		num_bom_bytes = gtm_utf_bomcheck(io_ptr, &io_ptr->ichset, &rm_ptr->bom_buf[0], bom_size);
 		if ((UTF16BE_BOM_LEN == bom_size) && chset != io_ptr->ichset)
 		{
-			chset = io_ptr->ichset;
+			rm_ptr->ichset_utf16_variant = chset = io_ptr->ichset;
 			get_chset_desc(&chset_names[chset]);
 		}
 	}

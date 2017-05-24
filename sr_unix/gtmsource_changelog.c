@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,17 +41,29 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 error_def(ERR_REPLLOGOPN);
+error_def(ERR_CHANGELOGINTERVAL);
 int gtmsource_changelog(void)
 {
-	uint4	changelog_desired = 0, changelog_accepted = 0;
+	uint4	changelog_accepted = 0;
 	int     log_fd = 0; /*used to indicate whether the new specified log file is writable*/
 	int     close_status = 0; /*used to indicate if log file is successfully closed*/
 	char*   err_code;
-	int	save_errno;
+	int	save_errno = 0;
+	int	retry_count = 5;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	repl_log(stderr, TRUE, TRUE, "Initiating CHANGELOG operation on source server pid [%d] for secondary instance [%s]\n",
 		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
+	if (0 != jnlpool.gtmsource_local->changelog)
+	{
+		retry_count = 5;
+		while (0 != retry_count--)
+		{
+			LONG_SLEEP(5);
+			if (!jnlpool.gtmsource_local->changelog)
+				break;
+		}
+	}
 	if (0 != jnlpool.gtmsource_local->changelog)
 	{
 		util_out_print("Change log is already in progress. Not initiating change in log file or log interval", TRUE);
@@ -59,7 +71,6 @@ int gtmsource_changelog(void)
 	}
 	if ('\0' != gtmsource_options.log_file[0]) /* trigger change in log file */
 	{
-		changelog_desired |= REPLIC_CHANGE_LOGFILE;
 		if (0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 		{	/*check if the new log file is writable*/
 			OPENFILE3_CLOEXEC(gtmsource_options.log_file,
@@ -68,10 +79,16 @@ int gtmsource_changelog(void)
 			{
 				save_errno = ERRNO;
 				err_code = STRERROR(save_errno);
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
-						   LEN_AND_STR(gtmsource_options.log_file),
-						   LEN_AND_STR(err_code),
-						   LEN_AND_STR(NULL_DEVICE));
+				if ('\0' != jnlpool.gtmsource_local->log_file[0])
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+						LEN_AND_STR(gtmsource_options.log_file),
+						LEN_AND_STR(err_code),
+						LEN_AND_STR(jnlpool.gtmsource_local->log_file));
+				else
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+						LEN_AND_STR(gtmsource_options.log_file),
+					   	LEN_AND_STR(err_code),
+						LEN_AND_STR(NULL_DEVICE));
 			} else {
 				CLOSEFILE_IF_OPEN(log_fd, close_status);
 				assert(close_status==0);
@@ -85,12 +102,14 @@ int gtmsource_changelog(void)
 	}
 	if (0 != gtmsource_options.src_log_interval) /* trigger change in log interval */
 	{
-		changelog_desired |= REPLIC_CHANGE_LOGINTERVAL;
 		if (gtmsource_options.src_log_interval != jnlpool.gtmsource_local->log_interval)
 		{
 			changelog_accepted |= REPLIC_CHANGE_LOGINTERVAL;
 			jnlpool.gtmsource_local->log_interval = gtmsource_options.src_log_interval;
-			util_out_print("Change log initiated with interval !UL", TRUE, gtmsource_options.src_log_interval);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_CHANGELOGINTERVAL, 5,
+					   LEN_AND_LIT("Source"),
+					   LEN_AND_STR(jnlpool.gtmsource_local->log_file),
+					   gtmsource_options.src_log_interval);
 		} else
 			util_out_print("Log interval is already !UL. Not initiating change in log interval", TRUE,
 					gtmsource_options.src_log_interval);
@@ -99,5 +118,5 @@ int gtmsource_changelog(void)
 		jnlpool.gtmsource_local->changelog = changelog_accepted;
 	else
 		util_out_print("No change to log file or log interval", TRUE);
-	return ((0 != changelog_accepted && changelog_accepted == changelog_desired) ? NORMAL_SHUTDOWN : ABNORMAL_SHUTDOWN);
+	return (0 != save_errno) ? ABNORMAL_SHUTDOWN : NORMAL_SHUTDOWN;
 }

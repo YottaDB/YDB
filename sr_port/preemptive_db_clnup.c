@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"	/* for the RESET_GV_TARGET macro which in turn uses "memcmp" */
+#include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
@@ -35,6 +37,7 @@
 #include "gtmimagename.h"
 #include "t_abort.h"
 #include "dpgbldir.h"
+#include "io.h"
 
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	gv_namehead		*gv_target;
@@ -43,90 +46,39 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF  sgm_info                *first_sgm_info;
-GBLREF	boolean_t		need_kip_incr;
-GBLREF	uint4			update_trans;
-GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	uint4			bml_save_dollar_tlevel;
 
-/* container for all the common chores that need to be performed on error conditions */
-
-#define CLEAR_CSE(GVNH)							\
-{									\
-	gv_namehead		*gvnh;					\
-	srch_blk_status		*s;					\
-									\
-	gvnh = GVNH;							\
-	if (NULL != gvnh)						\
-	{								\
-		for (s = &gvnh->hist.h[0]; s->blk_num; s++)		\
-			s->cse = NULL;					\
-	}								\
-}
-
+/* Function invoked to perform cleanup of an active transaction in case of an error condition */
 void preemptive_db_clnup(int preemptive_severe)
 {
 	sgmnt_addrs	*csa;
 	sgm_info	*si;
 	gd_region	*r_top, *reg;
 	gd_addr		*addr_ptr;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	/* Clear "inctn_opcode" global variable now that any in-progress transaction is aborted at this point.
-	 * Not doing so would cause future calls to "t_end" to get confused and skip writing logical jnl recs
-	 * and instead incorrectly write an INCTN record (GTM-8425).
+	/* If we are in the phase2 of an M-KILL (where "dollar_tlevel" is temporarily reset to 0), reset the global variable
+	 * "bml_save_dollar_tlevel" and restore "dollar_tlevel" now that we are going to go into error handling and unwind
+	 * from that "gvcst_expand_free_subtree" context altogether.
 	 */
-	if (bml_save_dollar_tlevel)
-	{
-		assert(!dollar_tlevel);
-		dollar_tlevel = bml_save_dollar_tlevel;
-		bml_save_dollar_tlevel = 0;
-	}
-	assert(!dollar_tlevel || (inctn_invalid_op == inctn_opcode) || (inctn_bmp_mark_free_gtm == inctn_opcode));
-	assert(dollar_tlevel || update_trans || (inctn_invalid_op == inctn_opcode));
-	inctn_opcode = inctn_invalid_op;
-	if (!dollar_tlevel && update_trans)
-	{	/* It's possible we hit an error in the middle of an update, at which point we have
-		 * a valid clue and non-NULL cse. However, this causes problems for subsequent
-		 * transactions (see comment in t_begin). In particular we could end up pinning buffers
-		 * unnecessarily. So clear the cse of any histories that may have been active during the update.
+	RESET_BML_SAVE_DOLLAR_TLEVEL;
+	t_abort_cleanup();
+	if ((INVALID_GV_TARGET != reset_gv_target) && (SUCCESS != preemptive_severe && INFO != preemptive_severe))
+	{	/* We know of a few cases in Unix where gv_target and gv_currkey could be out of sync at this point.
+		 *   a) If we are inside trigger code which in turn does an update that does
+		 *	reads of ^#t global and ends up in a restart. This restart would
+		 *	in turn do a rts_error_csa(TPRETRY) which would invoke mdb_condition_handler
+		 *	that would in turn invoke preemptive_db_clnup which invokes this macro.
+		 *	In this tp restart case though, it is ok for gv_target and gv_currkey
+		 *	to be out of sync because they are going to be reset by tp_clean_up anyways.
+		 *	So skip the dbg-only in-sync check.
+		 *   b) If we are in gvtr_init reading the ^#t global and detect an error (e.g. TRIGINVCHSET)
+		 *	gv_target after the reset would be pointing to a regular global whereas gv_currkey
+		 *	would be pointing to ^#t. It is ok to be out-of-sync since in this case, we expect
+		 *	mdb_condition_handler to be calling us. That has code to reset gv_currkey (and
+		 *	cs_addrs/cs_data etc.) to reflect gv_target (i.e. get them back in sync).
+		 * Therefore we pass SKIP_GVT_GVKEY_CHECK to skip gvtarget/gvcurrkey out-of-sync check in RESET_GV_TARGET.
 		 */
-		CLEAR_CSE(gv_target);
-		if ((NULL != gv_target) && (NULL != gv_target->gd_csa))
-		{
-			CLEAR_CSE(gv_target->gd_csa->dir_tree);
-			GTMTRIG_ONLY(CLEAR_CSE(gv_target->gd_csa->hasht_tree));
-		}
-		/* Resetting this is necessary to avoid blowing an assert in t_begin that it is 0 at the start of a transaction. */
-		update_trans = 0;
+		RESET_GV_TARGET(SKIP_GVT_GVKEY_CHECK);
 	}
-	if (INVALID_GV_TARGET != reset_gv_target)
-	{
-		if (SUCCESS != preemptive_severe && INFO != preemptive_severe)
-		{
-			/* We know of a few cases in Unix where gv_target and gv_currkey could be out of sync at this point.
-			 *   a) If we are inside trigger code which in turn does an update that does
-			 *	reads of ^#t global and ends up in a restart. This restart would
-			 *	in turn do a rts_error_csa(TPRETRY) which would invoke mdb_condition_handler
-			 *	that would in turn invoke preemptive_db_clnup which invokes this macro.
-			 *	In this tp restart case though, it is ok for gv_target and gv_currkey
-			 *	to be out of sync because they are going to be reset by tp_clean_up anyways.
-			 *	So skip the dbg-only in-sync check.
-			 *   b) If we are in gvtr_init reading the ^#t global and detect an error (e.g. TRIGINVCHSET)
-			 *	gv_target after the reset would be pointing to a regular global whereas gv_currkey
-			 *	would be pointing to ^#t. It is ok to be out-of-sync since in this case, we expect
-			 *	mdb_condition_handler to be calling us. That has code to reset gv_currkey (and
-			 *	cs_addrs/cs_data etc.) to reflect gv_target (i.e. get them back in sync).
-			 * Therefore in Unix we pass SKIP_GVT_GVKEY_CHECK to skip the gvtarget/gvcurrkey out-of-sync check
-			 * in RESET_GV_TARGET. In VMS we pass DO_GVT_GVKEY_CHECK as we dont yet know of an out-of-sync situation.
-			 */
-			RESET_GV_TARGET(UNIX_ONLY(SKIP_GVT_GVKEY_CHECK) VMS_ONLY(DO_GVT_GVKEY_CHECK));
-		}
-	}
-	need_kip_incr = FALSE;	/* in case we got an error in t_end (e.g. GBLOFLOW), dont want this global variable to get
-				 * carried over to the next non-TP transaction that this process does (e.g. inside an error trap).
-				 */
-	TREF(expand_prev_key) = FALSE;	/* reset global (in case it is TRUE) so it does not get carried over to future operations */
 	if (dollar_tlevel)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)

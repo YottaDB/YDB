@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "fullbool.h"
 
 GBLREF spdesc		stringpool;
-GBLREF unsigned char	*source_buffer;
 GBLREF int		source_column;
 
 int compile_pattern(oprtype *opr, boolean_t is_indirect)
@@ -60,10 +59,10 @@ int compile_pattern(oprtype *opr, boolean_t is_indirect)
 		return TRUE;
 	} else
 	{
-		instr.addr = (char *)&source_buffer[source_column - 1];
+		instr.addr = ((TREF(source_buffer)).addr + source_column - 1);
 		instr.len = STRLEN(instr.addr);
 		status = patstr(&instr, &retstr, NULL);
-		TREF(last_source_column) = (short int)(instr.addr - (char *)source_buffer);
+		TREF(last_source_column) = (short int)(instr.addr - (TREF(source_buffer)).addr);
 		assert(TREF(last_source_column));
 		if (status)
 		{	/* status == syntax error when non-zero */

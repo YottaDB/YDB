@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,8 @@
 #include "gtm_ffs.h"
 #include "cert_blk.h"
 #include "gtm_ctype.h"
+#include "collseq.h"
+#include "format_targ_key.h"
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>
 #include "gv_trigger.h"
@@ -73,6 +75,9 @@ error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a stri
 error_def(ERR_DBINVGBL);
 error_def(ERR_DBBDBALLOC);
 error_def(ERR_GVINVALID);
+error_def(ERR_DBNULCOL);
+error_def(ERR_NULSUBSC);
+error_def(ERR_DBNONUMSUBS);
 
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
@@ -89,15 +94,16 @@ error_def(ERR_GVINVALID);
 #define	RTS_ERROR_FUNC(CSA, ERR, BUFF)									\
 {													\
 	if (gtmassert_on_error)										\
-		assertpro(0 != ERR);										\
+		assertpro(0 == ERR);										\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
 }
 
-int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boolean_t gtmassert_on_error)
+int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
+			boolean_t gtmassert_on_error, gv_namehead *gvt)
 {
 	block_id		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
-	int			num_subscripts;
+	int			num_subscripts, fmtd_key_len;
 	uint4			bplmap, mask1, offset, rec_offset, rec_size;
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
 	uint4			chunk, blk_size;
@@ -105,6 +111,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	unsigned short		rec_cmpc, min_cmpc;	/* the minimum cmpc expected in any record (except star-key) in a gvt */
 	int			tmp_cmpc;
 	unsigned char		ch, prior_expkey[MAX_KEY_SZ + 1];
+	unsigned char		subscript;
+	unsigned char		*r_ptr;
 	unsigned int		prior_expkeylen;
 	unsigned short		temp_ushort;
 	int			blk_levl;
@@ -115,6 +123,11 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter;
+	unsigned int            null_subscript_cnt;
+	unsigned int		rec_num;
+	unsigned char		key_buffer[MAX_ZWR_KEY_SZ];
+	unsigned char		*temp;
+	gv_key			*tmp_gvkey = NULL;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -137,7 +150,6 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
 	util_len += SIZEOF(TEXT2) - 1;
 	util_buff[util_len] = 0;
-
 	chain = *(off_chain *)&blk;
 	/* Assert that if at all chain.flag is non-zero (i.e. a created block), we are in TP and not yet in the commit logic.
 	 * The only exception to this rule is if we are in TP and inside phase1 of the commit logic and trying to certify a
@@ -264,9 +276,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	prior_expkey[0] = prior_expkey[1] = 0;	/* double NUL also works for memvcmp test for key order */
 	next_tp_child_ptr = NULL;
 	prev_child = 0;
-
+	rec_num = 0;
 	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
 	{
+		rec_num++;
 		GET_RSIZ(rec_size, rp);
 		rec_offset = (uint4)((sm_ulong_t)rp - (sm_ulong_t)bp);
 		/*add util_buff here*/
@@ -419,6 +432,70 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			}
 			memcpy(prior_expkey + rec_cmpc, key_base, key_size);
 			prior_expkeylen = rec_cmpc + key_size;
+			null_subscript_cnt = 0;
+			if (is_gvt && (0 == blk_levl))
+			{
+				for (r_ptr = prior_expkey; *r_ptr != KEY_DELIMITER; r_ptr++)
+					;
+				for(;;)
+				{
+					if ((r_ptr - prior_expkey) > prior_expkeylen)
+						break;
+					if (KEY_DELIMITER == *r_ptr++)
+					{
+						subscript = *r_ptr;
+						if (KEY_DELIMITER == subscript)
+							break;
+						if ((NULL != gvt) && ((SUBSCRIPT_ZERO == subscript)
+								|| (KEY_DELIMITER != *(r_ptr + 1))))
+						{
+							if (1 == gvt->nct && STR_SUB_PREFIX != subscript)
+							{
+								assert(NULL == tmp_gvkey);
+								GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));
+								memcpy(tmp_gvkey->base, prior_expkey, prior_expkeylen);
+								tmp_gvkey->end = prior_expkeylen - 1;
+								temp = (unsigned char*)format_targ_key(key_buffer,
+									MAX_ZWR_KEY_SZ, tmp_gvkey, TRUE);
+								fmtd_key_len = (int)(temp - key_buffer);
+								key_buffer[fmtd_key_len] = '\0';
+								rts_error_csa(CSA_ARG(csa) VARLSTCNT(4)
+									MAKE_MSG_INFO(ERR_DBNONUMSUBS), 2,
+									LEN_AND_STR(key_buffer));
+								GVKEY_FREE_IF_NEEDED(tmp_gvkey);
+							}
+						}
+						if ((SUBSCRIPT_ZERO == subscript) || (KEY_DELIMITER != *(r_ptr + 1)))
+						{
+							r_ptr++;
+							continue;
+						}
+						if ((subscript == SUBSCRIPT_STDCOL_NULL) || (subscript == STR_SUB_PREFIX))
+								null_subscript_cnt++;
+						if (csd->null_subs)
+						{
+							if ((0 == csd->std_null_coll) ? (SUBSCRIPT_STDCOL_NULL == subscript) :
+								(STR_SUB_PREFIX == subscript))
+							{
+								if (csd->std_null_coll)
+									rts_error_csa(CSA_ARG(csa) VARLSTCNT(8)
+										MAKE_MSG_INFO(ERR_DBNULCOL), 6, rec_num, blk,
+										LEN_AND_STR(GTM_NULL_TEXT),
+										LEN_AND_STR(STD_NULL_TEXT));
+								else
+									rts_error_csa(CSA_ARG(csa) VARLSTCNT(8)
+										MAKE_MSG_INFO(ERR_DBNULCOL), 6, rec_num, blk,
+										LEN_AND_STR(STD_NULL_TEXT),
+										LEN_AND_STR(GTM_NULL_TEXT));
+							}
+						}
+					}
+				}
+				if (0 < null_subscript_cnt && !csd->null_subs)
+				{
+					RTS_ERROR_FUNC(csa, ERR_NULSUBSC, util_buff);
+				}
+			}
 		}
 		/* Check for proper child block numbers */
 		if ((0 != blk_levl) || (0 != is_directory))

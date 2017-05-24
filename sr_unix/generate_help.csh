@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2014-2016 Fidelity National Information		#
+# Copyright (c) 2014-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -64,8 +64,7 @@ foreach hlp (${hlpdir}/*.hlp)
 	setenv gtmgbldir ${gtm_dist}/${prefix}help.gld
 	${gtm_dist}/mumps -run GDE <<GDE_in_help
 Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/${prefix}help.dat
-Change -region DEFAULT	-record=1020	-key=255
-change -region DEFAULT  -qdbrundown
+Change -region DEFAULT -record=1020 -key=255 -qdbrundown -nostats
 GDE_in_help
 
 	if ($status) then
@@ -93,7 +92,14 @@ GTM_in_gtmhelp
 		echo "genreatehelp-E-hlp, Error while processing ${hlp}" $errout
 		continue
 	endif
-	if ("gtm" == "$prefix") $gtm_exe/mumps -run GTMDEFINEDTYPESTODB
+	if ("gtm" == "$prefix") then
+		$gtm_exe/mumps -run GTMDEFINEDTYPESTODB
+		if ($status) then
+			@ script_stat++
+			echo "generatehelp-E-hlp, Error during GTMDEFINEDTYPESTODB ${hlp}" $errout
+			continue
+		endif
+	endif
 	chmod ugo-x ${gtm_dist}/${prefix}help.{gld,dat}
 end
 

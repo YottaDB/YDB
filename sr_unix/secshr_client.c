@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,8 +234,8 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		} else if (FLUSH_DB_IPCS_INFO == code)
 		{
 			assert(GTM_PATH_MAX > db_ipcs.fn_len);
+			/* Most of the time file length is much smaller than GTM_PATH_MAX, hence the fn_len + 1 below */
 			memcpy(&mesg.mesg.db_ipcs, &db_ipcs, (offsetof(ipcs_mesg, fn[0]) + db_ipcs.fn_len + 1));
-			/* Most of the time file length is much smaller than GTM_PATH_MAX */
 			send_len += offsetof(ipcs_mesg, fn[0]);
 			send_len += mesg.mesg.db_ipcs.fn_len + 1;
 		} else

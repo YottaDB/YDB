@@ -70,6 +70,7 @@
 #include "gtmcrypt.h"
 #include "jnl.h"
 #include "anticipatory_freeze.h"
+#include "db_write_eof_block.h"
 
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
@@ -103,24 +104,6 @@ error_def(ERR_TEXT);
 	mupip_exit(EXIT_STATUS);					\
 }
 
-CONDITION_HANDLER(iob_io_error)
-{
-	char 	s[80];
-	char 	*fgets_res;
-
-	START_CH(TRUE);
-	if (SIGNAL == ERR_IOEOF)
-	{
-		PRINTF("End of media reached, please mount next volume and press Enter: ");
-		FGETS(s, 79, stdin, fgets_res);
-		util_out_print(0, 2, 0);  /* clear error message */
-		CONTINUE;
-	}
-	PRN_ERROR;
-	UNWIND(NULL, NULL);
-}
-
-
 void mupip_restore(void)
 {
 	static readonly char	label[] =   GDS_LABEL;
@@ -134,17 +117,14 @@ void mupip_restore(void)
 	trans_num		curr_tn;
 	uint4			ii;
 	block_id		blk_num;
-	boolean_t		extend, truncate;
+	boolean_t		extend;
 	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
-	uint4			old_blk_size, size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
+	uint4			old_blk_size, orig_size, size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
 	off_t			new_eof, offset;
-#	ifdef GTM_TRUNCATE
 	off_t			new_size;
-#	endif
-	char			buff[DISK_BLOCK_SIZE];
-	char			msg_buffer[1024], *newmap, *newmap_bptr;
+	char			msg_buffer[1024], *newmap;
 	mstr			msg_string;
 	char			addr[SA_MAXLEN + 1];
 	unsigned char		tcp[5];
@@ -166,15 +146,16 @@ void mupip_restore(void)
 	enc_handles		in_encr_handles, old_encr_handles;
 	int4			cur_mdb_ver;
 	gd_segment		*seg;
+	unix_db_info		*udi;
+	sgmnt_data_ptr_t	csd;
 	ZOS_ONLY(int 		realfiletag;)
-	DEBUG_ONLY(unix_db_info	*udi;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	inbuf = NULL;
 	extend = TRUE;
 	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
 		extend = FALSE;
-	truncate = FALSE;
-	GTM_TRUNCATE_ONLY(truncate = TRUE;)
 	mu_outofband_setup();
 	mu_gv_cur_reg_init();
 	n_len = SIZEOF(db_name);
@@ -187,8 +168,10 @@ void mupip_restore(void)
 		util_out_print("Error securing stand alone access to output file !AD. Aborting restore.", TRUE, n_len, db_name);
 		mupip_exit(ERR_MUPRESTERR);
 	}
-	DEBUG_ONLY(udi = FILE_INFO(gv_cur_region));
-	OPENFILE(db_name, O_RDWR, db_fd);
+	udi = FILE_INFO(gv_cur_region);
+	seg = gv_cur_region->dyn.addr;
+	OPENFILE_DB(db_name, O_RDWR, udi, seg);
+	db_fd = udi->fd;
 	if (FD_INVALID == db_fd)
 	{
 		save_errno = errno;
@@ -202,7 +185,8 @@ void mupip_restore(void)
 		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
 #	endif
 	murgetlst();
-	LSEEKREAD(db_fd, 0, &old_data, SIZEOF(sgmnt_data), save_errno);
+	csd = !udi->fd_opened_with_o_direct ? &old_data : (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
+	DB_LSEEKREAD(udi, db_fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 	if (0 != save_errno)
 	{
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -214,6 +198,8 @@ void mupip_restore(void)
 		} else
 			CLNUP_AND_EXIT(ERR_IOEOF, NULL);
 	}
+	if (udi->fd_opened_with_o_direct)
+		memcpy(&old_data, csd, SGMNT_HDR_LEN);
 	if (memcmp(old_data.label, label, GDS_LABEL_SZ))
 	{
 		util_out_print("Output file !AD has an unrecognizable format", TRUE, n_len, db_name);
@@ -276,7 +262,6 @@ void mupip_restore(void)
 					util_out_print("open : !AZ", TRUE, errptr);
 					CLNUP_AND_EXIT(save_errno, inbuf);
 				}
-				ESTABLISH(iob_io_error);
 				break;
 			case backup_to_exec:
 				pipe_child = 0;
@@ -361,7 +346,6 @@ void mupip_restore(void)
 		}
 		if (!SAME_ENCRYPTION_SETTINGS(&inhead, &old_data))
 		{
-			ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file (called from STANDALONE) */
 			same_encr_settings = FALSE;
 			INIT_DB_OR_JNL_ENCRYPTION(&in_encr_handles, &inhead, 0, NULL, gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
@@ -369,7 +353,6 @@ void mupip_restore(void)
 				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len, ptr->input_file.addr);
 				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 			}
-			seg = gv_cur_region->dyn.addr;
 			INIT_DB_OR_JNL_ENCRYPTION(&old_encr_handles, &old_data, seg->fname_len, seg->fname, gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
@@ -400,15 +383,14 @@ void mupip_restore(void)
 		new_bit_maps = DIVIDE_ROUND_UP(inhead.db_total_blks, bplmap);
 		if (old_tot_blks != inhead.db_total_blks)
 		{
-			if (old_tot_blks > inhead.db_total_blks && truncate)
+			if (old_tot_blks > inhead.db_total_blks)
 			{
 				/* Truncate occurred between incremental backups. FTRUNCATE the db file to the appropriate size,
-				 * write the EOF block. */
-				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
-						+ ((off_t)inhead.db_total_blks * old_blk_size);
-				new_size = new_eof + DISK_BLOCK_SIZE;
-				memset(buff, 0, DISK_BLOCK_SIZE);
-				DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
+				 * write the EOF block.
+				 */
+				new_eof = (off_t)BLK_ZERO_OFF(old_start_vbn) + ((off_t)inhead.db_total_blks * old_blk_size);
+				new_size = new_eof + old_blk_size;
+				status = db_write_eof_block(udi, db_fd, old_blk_size, new_eof, &(TREF(dio_buff)));
 				if (0 != status)
 				{
 					util_out_print("Aborting restore!/", TRUE);
@@ -456,10 +438,8 @@ void mupip_restore(void)
 				 * a GDSVCURR format block is the only one that can be added to the database without affecting
 				 * the blks_to_upgrd counter.
 				 */
-				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
-						+ ((off_t)inhead.db_total_blks * old_blk_size);
-				memset(buff, 0, DISK_BLOCK_SIZE);
-				DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
+				new_eof = (off_t)BLK_ZERO_OFF(old_start_vbn) + ((off_t)inhead.db_total_blks * old_blk_size);
+				status = db_write_eof_block(udi, db_fd, old_blk_size, new_eof, &(TREF(dio_buff)));
 				if (0 != status)
 				{
 					util_out_print("Aborting restore!/", TRUE);
@@ -475,19 +455,18 @@ void mupip_restore(void)
 				}
 				/* --- initialize all new bitmaps, just in case they are not touched later --- */
 				if (new_bit_maps > old_bit_maps)
-				{	/* -- similar logic exist in bml_newmap.c, which need to pick up any new updates here -- */
-					newmap = (char *)malloc(old_blk_size);
-					((blk_hdr *)newmap)->bver = GDSVCURR;
-					((blk_hdr *)newmap)->bsiz = (unsigned int)(BM_SIZE(bplmap));
-					((blk_hdr *)newmap)->levl = LCL_MAP_LEVL;
-					((blk_hdr *)newmap)->tn = curr_tn;
-					newmap_bptr = newmap + SIZEOF(blk_hdr);
-					*newmap_bptr++ = THREE_BLKS_FREE;
-					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - SIZEOF(blk_hdr) - 1);
+				{
+					if (udi->fd_opened_with_o_direct)
+					{	/* Align buffers for O_DIRECT */
+						DIO_BUFF_EXPAND_IF_NEEDED(udi, old_blk_size, &(TREF(dio_buff)));
+						newmap = (TREF(dio_buff)).aligned;
+					} else
+						newmap = (char *)malloc(old_blk_size);
+					bml_newmap((blk_hdr_ptr_t)newmap, BM_SIZE(bplmap), curr_tn);
 					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead.db_total_blks; ii += bplmap)
 					{
-						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
-						DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, newmap, old_blk_size, status);
+						offset = (off_t)BLK_ZERO_OFF(old_start_vbn) + (off_t)ii * old_blk_size;
+						DB_LSEEKWRITE(NULL, udi, NULL, db_fd, offset, newmap, old_blk_size, status);
 						if (0 != status)
 						{
 							util_out_print("Aborting restore!/", TRUE);
@@ -497,7 +476,8 @@ void mupip_restore(void)
 							CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 						}
 					}
-					free(newmap);
+					if (!udi->fd_opened_with_o_direct)
+						free(newmap);
 				}
 				old_tot_blks = inhead.db_total_blks;
 				old_bit_maps = new_bit_maps;
@@ -528,10 +508,8 @@ void mupip_restore(void)
 			blk_num = sblkh_p->blkid;
 			/* Between incremental backups, an extend followed by a truncate could have occurred. The block below
 			 * would have been truncated, so no need to write it. */
-			GTM_TRUNCATE_ONLY(
-				if (blk_num >= old_tot_blks) /* Should be a bitmap block */
-					continue;
-			)
+			if (blk_num >= old_tot_blks) /* Should be a bitmap block */
+				continue;
 			/* For blocks that were read during the main backup phase of stream backup, the blocks are
 			   recorded without version (there may even be some garbage blocks in the stream of
 			   indeterminate/invalid format if a bitmap was written out prior to the data blocks that
@@ -598,8 +576,17 @@ void mupip_restore(void)
 					}
 				}
 			}
-			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
-			DB_LSEEKWRITE(NULL, NULL, db_fd, offset, blk_ptr, size, save_errno);
+			offset = (off_t)BLK_ZERO_OFF(old_start_vbn) + (off_t)blk_num * old_blk_size;
+			if (udi->fd_opened_with_o_direct)
+			{	/* Align buffers for O_DIRECT */
+				assert(size <= old_blk_size);
+				DIO_BUFF_EXPAND_IF_NEEDED(udi, old_blk_size, &(TREF(dio_buff)));
+				memcpy((TREF(dio_buff)).aligned, blk_ptr, size);
+				memset((TREF(dio_buff)).aligned + size, 0, old_blk_size - size);
+				blk_ptr = (char *)(TREF(dio_buff)).aligned;
+				size = old_blk_size;
+			}
+			DB_LSEEKWRITE(NULL, udi, NULL, db_fd, offset, blk_ptr, size, save_errno);
 			if (0 != save_errno)
 			{
 				util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -610,10 +597,10 @@ void mupip_restore(void)
 		}
 		/* Next section is the file header which we need to restore */
 		COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
-		assert((SIZEOF(sgmnt_data) + SIZEOF(int4)) == rsize);
+		assert((SGMNT_HDR_LEN + SIZEOF(int4)) == rsize);
 		COMMON_READ(in, inbuf, rsize, inbuf);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
-		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
+		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(BLK_ZERO_OFF(old_start_vbn) - SIZEOF_FILE_HDR(inbuf));
 		GTMCRYPT_COPY_ENCRYPT_SETTINGS(&old_data, ((sgmnt_data_ptr_t)inbuf));
 		assert((udi->semid == old_data.semid) && (udi->gt_sem_ctime == old_data.gt_sem_ctime.ctime)
 			&& (udi->shmid == old_data.shmid) && (udi->gt_shm_ctime == old_data.gt_shm_ctime.ctime));
@@ -623,15 +610,21 @@ void mupip_restore(void)
 		 * db_ipcs_reset). So, before writing the new file header, set the semid/shmid (and ctime fields) to the semid and
 		 * shmid fields that is currently valid in the system (when we did the mu_rndwn_file).
 		 */
-		((sgmnt_data_ptr_t)inbuf)->semid = old_data.semid;
-		((sgmnt_data_ptr_t)inbuf)->gt_sem_ctime.ctime = old_data.gt_sem_ctime.ctime;
-		((sgmnt_data_ptr_t)inbuf)->shmid = old_data.shmid;
-		((sgmnt_data_ptr_t)inbuf)->gt_shm_ctime.ctime = old_data.gt_shm_ctime.ctime;
-		DB_LSEEKWRITE(NULL, NULL, db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
+		csd = (sgmnt_data_ptr_t)inbuf;
+		csd->semid = old_data.semid;
+		csd->gt_sem_ctime.ctime = old_data.gt_sem_ctime.ctime;
+		csd->shmid = old_data.shmid;
+		csd->gt_shm_ctime.ctime = old_data.gt_shm_ctime.ctime;
+		if (udi->fd_opened_with_o_direct)
+		{	/* Align buffers for O_DIRECT */
+			DIO_BUFF_EXPAND_IF_NEEDED(udi, SGMNT_HDR_LEN, &(TREF(dio_buff)));
+			memcpy((TREF(dio_buff)).aligned, csd, SGMNT_HDR_LEN);
+			csd = (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
+		}
+		DB_LSEEKWRITE(NULL, udi, NULL, db_fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 		if (0 != save_errno)
 		{
-			util_out_print("Error accessing output file !AD. Aborting restore.",
-				       TRUE, n_len, db_name);
+			util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("write : !AZ", TRUE, errptr);
 			CLNUP_AND_EXIT(save_errno, inbuf);
@@ -641,13 +634,11 @@ void mupip_restore(void)
 		COMMON_READ(in, inbuf, rsize, inbuf);
 		if (0 != MEMCMP_LIT(inbuf, HDR_MSG))
 		{
-			util_out_print("Unexpected backup format error restoring !AD. Aborting restore.",
-				       TRUE, n_len, db_name);
+			util_out_print("Unexpected backup format error restoring !AD. Aborting restore.", TRUE, n_len, db_name);
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("write : !AZ", TRUE, errptr);
 			CLNUP_AND_EXIT(save_errno, inbuf);
 		}
-
 		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 		rsize = temp;
 		offset = (MM_BLOCK - 1) * DISK_BLOCK_SIZE;
@@ -657,11 +648,17 @@ void mupip_restore(void)
 			COMMON_READ(in, inbuf, rsize, inbuf);
 			if (!MEMCMP_LIT(inbuf, MAP_MSG))
 				break;
-			DB_LSEEKWRITE(NULL, NULL, db_fd,
-				   offset,
-				   inbuf,
-				   rsize - SIZEOF(int4),
-				   save_errno);
+			size = rsize - SIZEOF(int4);
+			if (udi->fd_opened_with_o_direct)
+			{	/* Align buffers for O_DIRECT */
+				orig_size = size;
+				size = ROUND_UP2(orig_size, DIO_ALIGNSIZE(udi));
+				DIO_BUFF_EXPAND_IF_NEEDED(udi, size, &(TREF(dio_buff)));
+				memcpy((TREF(dio_buff)).aligned, inbuf, orig_size);
+				p = (char *)(TREF(dio_buff)).aligned;
+			} else
+				p = (char *)inbuf;
+			DB_LSEEKWRITE(NULL, udi, NULL, db_fd, offset, p, size, save_errno);
 			if (0 != save_errno)
 			{
 				util_out_print("Error accessing output file !AD. Aborting restore.",
@@ -670,15 +667,14 @@ void mupip_restore(void)
 				util_out_print("write : !AZ", TRUE, errptr);
 				CLNUP_AND_EXIT(save_errno, inbuf);
 			}
-			offset += rsize - SIZEOF(int4);
-			GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
+			offset += size;
+			GET_LONG(temp, inbuf + size);
 			rsize = temp;
 		}
 		curr_tn = inhead.end_tn;
 		switch (type)
 		{
 			case backup_to_file:
-				REVERT;
 				iob_close(in);
 				break;
 			case backup_to_exec:

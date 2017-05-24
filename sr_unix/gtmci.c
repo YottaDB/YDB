@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include <errno.h>
 #ifdef GTM_PTHREAD
-#  include <pthread.h>
+#  include "gtm_pthread.h"
 #endif
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
@@ -196,19 +196,6 @@ static callin_entry_list* get_entry(const char* call_name)
 	COMPUTE_HASH_STR(&symkey);
 	callin_entry = lookup_hashtab_str(TREF(callin_hashtab), &symkey);
 	return (callin_entry ? callin_entry->value : NULL);
-}
-
-int gtm_is_main_thread()
-{
-# 	ifdef GTM_PTHREAD
-	if (!gtm_main_thread_id_set)
-		return -1;
-	if (pthread_equal(gtm_main_thread_id, pthread_self()))
-		return 1;
-	return 0;
-#	else
-	return -1;
-#	endif
 }
 
 /* Java-specific version of call-in handler. */

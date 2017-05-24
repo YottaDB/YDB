@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2010, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2010-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -63,10 +64,8 @@ TFSPECP						; scan filespec token by token
 	; first undo any whitespace that was skipped
 	f i=1:1 s c=$ze(comline,cp-i) q:(c'=" ")&(c'=TAB)
 	s cp1=cp-(i-1)-$zl(ntoken)
-	i ver'="VMS" s i=$zl(comline)-cp1+1 ; in Unix any byte is considered acceptable in the file name at the end of the line
-	i ver="VMS" f i=0:1 s c=$ze(comline,cp1+i) q:c'?@dbfilpar!'$zl(c)
+	s i=$zl(comline)-cp1+1 ; in Unix any byte is considered acceptable in the file name at the end of the line
 	s filespec=$ze(comline,cp1,cp1+i-1),cp=cp1+i
-	i ver="VMS" d skipwhitespace^GDESCAN	; in VMS, spaces at the end of the file name are not part of the file so skip them
 	q
 TACCMETH
 	d GETTOK^GDESCAN
@@ -105,6 +104,7 @@ NAME
 	s type=NAMEtype		; before GETTOK overwrites it
 	d GETTOK^GDESCAN
 	s tokname=token
+	i "%Y"=$ze(tokname,1,2) zm gdeerr("NOPERCENTY")
 	i (MAXGVSUBS<(nsubs-1-$select(type="RANGE":1,1:0))) zm gdeerr("NAMGVSUBSMAX"):tokname:MAXGVSUBS
 	; parse subscripted tokname (potentially with ranges) to ensure individual pieces are well-formatted
 	; One would be tempted to use $NAME to do automatic parsing of subscripts for well-formedness, but there are issues
@@ -123,7 +123,6 @@ NAME
 	i (j-2)>PARNAMLN zm gdeerr("VALTOOLONG"):gblname:PARNAMLN:"name"
 	i j=(len+2) s NAME("NSUBS")=0 q  ; no subscripts to process. done.
 	; have subscripts to process
-	i ver="VMS" zm gdeerr("VALUEBAD"):tokname:"name"	; currently VMS does not support subscripts in namespaces
 	i type="STAR" zm gdeerr("NAMSTARSUBSMIX"):tokname
 	i $ze(tokname,len)'=")" zm gdeerr("NAMENDBAD"):tokname
 	s NAME=NAME_"("
@@ -232,7 +231,7 @@ namerangeoverlapcheck2:(nam1,reg1,nam2,coll)
 	n keylo1,keyhi1,keylo2,keyhi2,range,reg2,maxkey,keylo1inbetween,keyhi1inbetween,overlap
 	s reg2=nam2
 	s range=nam1("GVNPREFIX")
-	i range'=nam2("GVNPREFIX") q  ; if subscripts dont match before the range, there is no chance of a range overlap issue
+	i range'=nam2("GVNPREFIX") q  ; if subscripts don't match before the range, there is no chance of a range overlap issue
 	i '$data(coll) s coll=+$g(gnams(nam1("SUBS",0),"COLLATION"))
 	d getrangelohikey(.nam1,.keylo1,.keyhi1,coll,range)
 	d getrangelohikey(.nam2,.keylo2,.keyhi2,coll,range)
@@ -299,7 +298,7 @@ chkcoll(coll,gblname,collver)
 	. . i $view("YCOLLATE",coll,ver) zm gdeerr("GBLNAMCOLLVER"):gblname:coll:collver:ver
 	q
 collundeferr
-	i $zstatus'["COLLATIONUNDEF" q  ; dont know how a non-COLLATIONUNDEF error can occur.
+	i $zstatus'["COLLATIONUNDEF" q  ; don't know how a non-COLLATIONUNDEF error can occur.
 					; let parent frame handle this like any other error
 	s $ecode=""
 	s $etrap=savetrap
@@ -428,7 +427,7 @@ SEGMENT
 	q
 prefixbaderr:(name,str)
 	n namestr
-	s namestr=$s(ver="VMS":"name (other than $DEFAULT)",1:"name")
+	s namestr="name"
 	zm gdeerr("PREFIXBAD"):name:renpref_str:namestr
 	q
 matchtok:(tok,ent)

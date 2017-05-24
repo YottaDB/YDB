@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,6 @@
 #include "gtmsource.h"
 #include "do_shmat.h"		/* for do_shmat() prototype */
 #include "mutex.h"
-#include "heartbeat_timer.h"
 #include "gtm_file_stat.h"
 #include "util.h"
 #include "gtm_caseconv.h"
@@ -72,6 +71,7 @@
 #include "mu_getlst.h"
 #include "mu_outofband_setup.h"
 #include "gtmmsg.h"
+#include "wcs_backoff.h"
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "trans_log_name.h"
@@ -98,7 +98,6 @@ GBLREF 	bool		error_mupip;
 GBLREF 	bool		file_backed_up;
 GBLREF 	bool		incremental;
 GBLREF 	bool		online;
-GBLREF 	uchar_ptr_t	mubbuf;
 GBLREF 	int4		mubmaxblk;
 GBLREF	tp_region	*grlist;
 GBLREF 	tp_region 	*halt_ptr;
@@ -159,6 +158,7 @@ error_def(ERR_MUNOSTRMBKUP);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSELFBKUP);
 error_def(ERR_NOTRNDMACC);
+error_def(ERR_OFRZACTIVE);
 error_def(ERR_PERMGENFAIL);
 error_def(ERR_PREVJNLLINKCUT);
 error_def(ERR_REPLJNLCNFLCT);
@@ -243,7 +243,7 @@ void mupip_backup(void)
 	jnl_tm_t		save_gbl_jrec_time;
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
-	boolean_t		sync_io, sync_io_specified, wait_for_zero_kip;
+	boolean_t		sync_io, sync_io_specified;
 	boolean_t		dummy_ftok_counter_halted, repl_inst_available;
 	struct stat		stat_buf;
 	int			fstat_res, fclose_res, tmpfd;
@@ -266,6 +266,7 @@ void mupip_backup(void)
 	uint4			*kip_pids_arr_ptr;
 	seq_num			jnl_seqno;
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
+	struct perm_diag_data	pdd;
 	ZOS_ONLY(int		realfiletag;)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -517,7 +518,7 @@ void mupip_backup(void)
 		file->addr[file->len] = '\0';
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
-		if ((dba_bg != rptr->reg->dyn.addr->acc_meth) && (dba_mm != rptr->reg->dyn.addr->acc_meth))
+		if (!IS_REG_BG_OR_MM(rptr->reg))
 		{
 			util_out_print("Region !AD is not a BG or MM databases", TRUE, REG_LEN_STR(rptr->reg));
 			rptr->not_this_time = give_up_before_create_tempfile;
@@ -652,7 +653,21 @@ void mupip_backup(void)
 			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 			if (-1 != fstat_res)
-				gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
+				if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd))
+				{
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+						RTS_ERROR_STRING(
+							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+						PERMGENDIAG_ARGS(pdd));
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+						RTS_ERROR_STRING(
+							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+						PERMGENDIAG_ARGS(pdd));
+					mubclnup(rptr, need_to_del_tempfile);
+					mupip_exit(EPERM);
+				}
 			/* Setup new group and permissions if indicated by the security rules.  Use
 			 * 0770 anded with current mode for the new mode if masked permission selected.
 			 */
@@ -669,7 +684,7 @@ void mupip_backup(void)
 			}
 		} else
 		{
-			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE, FALSE, FALSE))
 			{
 				hiber_start(1000);
 				if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
@@ -860,6 +875,18 @@ repl_inst_bkup_done1:
 				grab_crit(gv_cur_region);
 				DEBUG_ONLY(reg_count++);
 			}
+			if (FROZEN_CHILLED(cs_data))
+			{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
+				 * shared memory up. Either autorelease, if enabled, or error out.
+				 */
+				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+				if (FROZEN_CHILLED(cs_data))
+				{
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
+					rptr->not_this_time = give_up_before_create_tempfile;
+					continue;
+				}
+			}
 			/* We will be releasing crit if KIP is set, so don't update jgbl.gbl_jrec_time now */
 			if (!kip_count)
 			{
@@ -868,18 +895,17 @@ repl_inst_bkup_done1:
 		}
 	}
 	/* If we have KILLs in progress on any of the regions, wait a maximum of 1 minute(s) for those to finish. */
-	wait_for_zero_kip = (online && kip_count);
-	for (crit_counter = 1; wait_for_zero_kip; )
-	{	/* Release all the crits before going into the wait loop */
+	for (crit_counter = 1; online && kip_count; )
+	{	/* The purpose of this loop is to wait for kip to clear on all regions, waiting for a maximum of about a minute.
+		 * This is complicated by the fact that in spite of setting INCR_INHIBIT_KILLS above, a process in crit for a
+		 * "fourth" retry may ignote that, and set the kip flag while we are waiting
+		 */
 		DEBUG_ONLY(nocritrptr = NULL;)
 		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
-		{
+		{	/* Release all the crits before going into the wait loop */
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
-			/* It is possible to not hold crit on some regions if we are in the second or higher iteration
-			 * of the outer for loop (the one with the loop variable wait_for_zero_kip).
-			 */
 			if (cs_addrs->now_crit)
 			{	/* once we encountered a region in the list that we did not hold crit on, we should also
 				 * not hold crit on all later regions in the list. assert that.
@@ -894,7 +920,7 @@ repl_inst_bkup_done1:
 		}
 		/* Wait for a maximum of 1 minute on all the regions for KIP to reset */
 		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
-		{
+		{	/* multiple regions might have kip, but waiting on any waits on all, so just do this for 1 fixed time */
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
@@ -910,49 +936,23 @@ repl_inst_bkup_done1:
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
 				wcs_sleep(crit_counter);
 			}
-		}
-		if (debug_mupip)
-		{
-			GET_CUR_TIME(time_str);
-			util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on ALL databases", TRUE,
-				CTIME_BEFORE_NL, time_str);
+			if (debug_mupip)
+			{
+				GET_CUR_TIME(time_str);
+				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on !AD", TRUE,
+					CTIME_BEFORE_NL, time_str, DB_LEN_STR(gv_cur_region));
+			}
+			if (MAX_CRIT_TRY < crit_counter)
+				break;
 		}
 		/* Since we have waited a while for KIP to get reset, get current time again to make it more accurate */
 		SET_GBL_JREC_TIME;
-		/* Most code in this for-loop is similar to the previous for loop where we grab_crit;
-		 * but most of the times the second for loop will never be executed (because KIP will be
-		 * zero on all database files) and in some rare cases, it is okay to take the hit of an
-		 * extra rel_crit/wait-for-kip/grab_crit sequence.
-		 */
-		wait_for_zero_kip = (MAX_CRIT_TRY > crit_counter);
-		kip_count = 0;
-		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
+		for (kip_count = 0, rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
 			grab_crit(gv_cur_region);
-			if (cs_data->kill_in_prog)
-			{	/* It is possible for this to happen in case a concurrent GT.M process is in its 4th retry.
-				 * In that case, it will not honor the inhibit_kills flag since it holds crit and therefore
-				 * could have set kill-in-prog to a non-zero value while we were outside of crit.
-				 * Check if we have waited 1 minute until now. If not, release crit and continue the wait.
-				 * If waited already, then proceed with the backup. The reasoning is that once the GT.M process
-				 * that is in the final retry finishes off the second part of the M-kill, it will not start
-				 * a new transaction in the first try which is outside of crit so will honor the inhibit-kills
-				 * flag and therefore not increment the kill_in_prog counter any more until backup is done.
-				 * So we could be waiting for at most 1 kip increment per concurrent process that is updating
-				 * the database. We expect these kills to be complete within 1 minute.
-				 */
-				if (wait_for_zero_kip)
-				{
-					kip_count++;
-					break;
-				}
-				assert(!kip_count);
-				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 2, MAX_KIP_PID_SLOTS);
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
-			}
 			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
 			 * adjusted (to ensure time ordering of journal records within this region's journal file).
 			 * This needs to be done BEFORE writing any journal records for this region. The value of
@@ -960,9 +960,18 @@ repl_inst_bkup_done1:
 			 * regions so all regions will have same eov/bov timestamps.
 			 */
 			UPDATE_GBL_JREC_TIME;
+			if (cs_data->kill_in_prog)
+			{
+				if (MAX_CRIT_TRY < crit_counter)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPKILLIP,
+						       2, DB_LEN_STR(gv_cur_region));
+				else	/* lets wait some more */
+				{
+					kip_count++;
+					break;
+				}
+			}
 		}
-		if (0 == kip_count)
-			break;	/* all regions have zero kill-in-prog so we can break out of this loop unconditionally */
 	}
 	assert(reg_count == have_crit(CRIT_HAVE_ANY_REG | CRIT_ALL_REGIONS));
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
@@ -1039,7 +1048,7 @@ repl_inst_bkup_done1:
 					jnlpool.repl_inst_filehdr = &repl_instance;
 					assert(0 != jnl_seqno);
 					/* All the cleanup we want is exactly done by the "repl_inst_histinfo_truncate" function.
-					 * But we dont want to clean the instance file. We want to instead clean the backed up
+					 * But we don't want to clean the instance file. We want to instead clean the backed up
 					 * instance file. To that effect, temporarily change "udi->fn" to reflect the backed up
 					 * file so all the changes get flushed there. Restore it after the function call.
 					 */
@@ -1268,6 +1277,9 @@ repl_inst_bkup_done2:
 									4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 							fc = gv_cur_region->dyn.addr->file_cntl;
 							fc->op = FC_WRITE;
+							/* Note: cs_data points to shared memory and is already aligned
+							 * appropriately even if db was opened using O_DIRECT.
+							 */
 							fc->op_buff = (sm_uc_ptr_t)cs_data;
 							fc->op_len = SGMNT_HDR_LEN;
 							fc->op_pos = 1;
@@ -1365,9 +1377,11 @@ repl_inst_bkup_done2:
 			/*
 			 * For backed up database we want to change some file header fields.
 			 */
-			rptr->backup_hdr->freeze = 0;
+			rptr->backup_hdr->freeze = FALSE;
 			rptr->backup_hdr->image_count = 0;
-			rptr->backup_hdr->kill_in_prog = 0;
+			if (rptr->backup_hdr->kill_in_prog)
+				rptr->backup_hdr->abandoned_kills = TRUE;
+			rptr->backup_hdr->kill_in_prog = FALSE;
 			memset(rptr->backup_hdr->machine_name, 0, MAX_MCNAMELEN);
 			rptr->backup_hdr->repl_state = repl_closed;
 			rptr->backup_hdr->semid = INVALID_SEMID;
@@ -1389,7 +1403,6 @@ repl_inst_bkup_done2:
 					LEN_AND_STR(jnl_state_lit[rptr->backup_hdr->jnl_state]));
 		}
 		ENABLE_AST
-		mubbuf = (uchar_ptr_t)malloc(BACKUP_READ_SIZE);
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)
@@ -1416,7 +1429,6 @@ repl_inst_bkup_done2:
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
 				break;
 		}
-		free(mubbuf);
 	} else
 	{
 		mubclnup((backup_reg_list *)halt_ptr, need_to_rel_crit);

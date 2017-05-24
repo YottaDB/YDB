@@ -73,7 +73,6 @@ GBLREF	int			process_exiting;
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_MAXSSREACHED);
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_SSFILOPERR);
 error_def(ERR_SSTMPCREATE);
 error_def(ERR_SSTMPDIRSTAT);
@@ -166,13 +165,13 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 /* In case of an error, un-freeze the region before returning if we had done the region_freeze
  * in mu_int_reg for a read_only process
  */
-#define UNFREEZE_REGION_IF_NEEDED(CSD, REG)			\
-{								\
-	if (process_id == CSD->freeze)				\
-	{							\
-		assert(reg->read_only);				\
-		region_freeze(reg, FALSE, FALSE, FALSE);	\
-	}							\
+#define UNFREEZE_REGION_IF_NEEDED(CSD, REG)					\
+{										\
+	if (process_id == (CSD)->image_count)					\
+	{									\
+		assert((REG)->read_only);					\
+		region_freeze((REG), FALSE, FALSE, FALSE, FALSE, FALSE);	\
+	}									\
 }
 
 /* The below function is modelled around mupip_backup_call_on_signal. This is invoked for doing snapshot clean up if ss_initiate
@@ -204,7 +203,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	enum db_acc_method	acc_meth;
 	gtm_uint64_t		db_file_size, native_size;
-	DEBUG_ONLY(gtm_uint64_t	db_size;)
 	int			dsk_addr = 0;
 	int			fclose_res, fstat_res, group_id, perm, pwrite_res, retries;
 	int			save_errno, shdw_fd, ss_shmsize, ss_shm_vbn, status, tmpfd, user_id;
@@ -218,6 +216,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
+	struct perm_diag_data	pdd;
 	struct stat		stat_buf;
 	uint4			crit_counter, fstat_status, prev_ss_shmsize, tempnamprefix_len, tot_blks;
 	void			*ss_shmaddr;
@@ -265,7 +264,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(ss_lock_held_by_us(reg));
 	ss_release_lock(reg);
 	/* For a readonly database for the current process, we better have the region frozen */
-	assert(!reg->read_only || csd->freeze);
+	assert(!reg->read_only || FROZEN_HARD(csd));
 	/* ============================ STEP 1 : Shadow file name construction ==============================
 	 *
 	 * --> Directory is taken from GTM_SNAPTMPDIR, if available, else GTM_BAK_TEMPDIR_LOG_NAME_UC, if available,
@@ -383,7 +382,19 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * INTEG started by read-only processes to create snapshot files that are writable by processes having write
 		 * permissions on the database file.
 		 */
-		gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC);
+		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
+		{
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
+				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
+				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			UNFREEZE_REGION_IF_NEEDED(csd, reg);
+			return FALSE;
+		}
 	}
 	if ((-1 == fstat_res) || (-1 == FCHMOD(shdw_fd, perm))
 		|| (((INVALID_UID != user_id) || (INVALID_GID != group_id)) && (-1 == fchown(shdw_fd, user_id, group_id))))
@@ -431,6 +442,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	INCR_INHIBIT_KILLS(cnl);
 	kip_pids_arr_ptr = cnl->kip_pid_array;
 	prev_ss_shmsize = 0;
+	crit_counter = 1;
 	for (retries = 0; MAX_TRY_FOR_TOT_BLKS >= retries; ++retries)
 	{
 		final_retry = (MAX_TRY_FOR_TOT_BLKS == retries);
@@ -499,7 +511,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			ISSUE_WRITE_ERROR_AND_EXIT(reg, status, csa, tempfilename);
 		}
 		/* Wait for KIP to reset */
-		wait_for_zero_kip = csd->kill_in_prog;
+		wait_for_zero_kip = csd->kill_in_prog && (MAX_CRIT_TRY > crit_counter);	/* only do kip wait once */
 		/* Wait for existing kills-in-progress to be reset. Since a database file extension is possible as
 		 * we don't hold crit while wcs_sleep below, we will retry if the total blocks have changed since
 		 * we last checked it. However, in the final retry, the shared memory and shadow file initialization
@@ -508,8 +520,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * issued by the caller of ss_initiate if csd->kill_in_prog is set to TRUE. But, such a case should
 		 * be rare.
 		 */
-		for (crit_counter = 1; wait_for_zero_kip && !final_retry; )
-		{
+		if (wait_for_zero_kip)
+		{	/* after inhibitting kills wait once for up to a minute; if that's insufficient, it's probably abandoned */
 			/* Release crit before going into the wait loop */
 			rel_crit(reg);
 			if (debug_mupip)
@@ -529,42 +541,14 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on !AD", TRUE,
 					CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
 			}
-			wait_for_zero_kip = (MAX_CRIT_TRY > crit_counter); /* if TRUE, we can wait for some more time on
-									    * this region */
-			grab_crit(reg);
-			if (csd->kill_in_prog)
-			{
-				/* It is possible for this to happen in case a concurrent GT.M process is in its 4th retry.
-				 * In that case, it will not honor the inhibit_kills flag since it holds crit and therefore
-				 * could have set kill-in-prog to a non-zero value while we were outside of crit.
-				 * Since we have waited for 1 minute already, proceed with snapshot. The reasoning is that
-				 * once the GT.M process that is in the final retry finishes off the second part of the M-kill,
-				 * it will not start a new transaction in the first try which is outside of crit so will honor
-				 * the inhibit-kills flag and therefore not increment the kill_in_prog counter any more until
-				 * this crit is released.  So we could be waiting for at most 1 kip increment per concurrent process
-				 * that is updating the database. We expect these kills to be complete within 1 minute.
-				 */
-				if (!wait_for_zero_kip)
-					break;
-			} else
-				break;
 		}
 		grab_crit(reg);
-		/* There are two reasons why we might go for another iteration of this loop
-		 * (a) After we have created the shared memory and before we grab crit, another process can add new blocks to the
+		/* After we have created the shared memory and before we grab crit, another process can add new blocks to the
 		 * database, in which case csd->trans_hist.total_blks is no longer the value as we noted down above. Check if this
 		 * is the case and if so, retry to obtain a consistent copy of the total number of blocks.
-		 * (b) Similarly, csd->kill_in_prog was FALSE before grab_crit, but non-zero after grab-crit due to concurrency
-		 * reasons. Check if this is the case and if so, retry to wait for KIP to reset.
 		 */
-		if ((tot_blks == csd->trans_hist.total_blks) && !csd->kill_in_prog)
-		{	/* We have a consistent copy of the total blocks and csd->kill_in_prog is FALSE inside crit. No need for
-			 * retry.
-			 */
-			DEBUG_ONLY(db_size = ((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn);)
-			assert((native_size == db_size) || (native_size == ROUND_UP(db_size, (OS_PAGE_SIZE / DISK_BLOCK_SIZE))));
-			break;
-		}
+		if (tot_blks == csd->trans_hist.total_blks)
+			break;	/* We have a consistent copy of the total blocks No need for retry. */
 	}
 	/* At this point, we are MOST likely guaranteed that kill-in-prog is set to zero for this region and CERTAINLY
 	 * guaranteed that no more kills will be started for this region. Now, we are still holding crit, so any error
@@ -572,8 +556,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 * proceed gracefully
 	 */
 	assert(csa->now_crit);
-	DEBUG_ONLY(db_size = ((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn);)
-	assert((native_size == db_size) || (native_size == ROUND_UP(db_size, (OS_PAGE_SIZE / DISK_BLOCK_SIZE))));
 	assert(NULL != ss_shmaddr);
 	assert(0 == ((long)ss_shmaddr % OS_PAGE_SIZE));
 	assert(0 == ss_shmsize % OS_PAGE_SIZE);
@@ -619,7 +601,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 */
 	if (reg->read_only)
 	{
-		region_freeze(reg, FALSE, FALSE, FALSE);
+		region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
 	}
 	else if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_MSYNC_DB)) /* wcs_flu guarantees that all the pending
 								   * phase 2 commits are done with before returning */
@@ -684,7 +666,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * Cleanup and exit
 		 */
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
-		UNFREEZE_REGION_IF_NEEDED(csa, reg);
+		UNFREEZE_REGION_IF_NEEDED(csa->hdr, reg);
 		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
 		return FALSE;
 	}

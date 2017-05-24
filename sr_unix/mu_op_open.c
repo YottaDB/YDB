@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,8 +133,8 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	{
 		if (0 == tl->iod)
 		{
-			tl->iod = iod = (io_desc *)malloc(SIZEOF(io_desc));
-			memset((char*)tl->iod, 0, SIZEOF(io_desc));
+			iod = (io_desc *)malloc(SIZEOF(io_desc));
+			memset((char*)iod, 0, SIZEOF(io_desc));
 			iod->pair.in  = iod;
 			iod->pair.out = iod;
 			iod->trans_name = tl;
@@ -149,7 +150,9 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 				else
 					p_offset += io_params_size[ch];
 			}
-		}
+			tl->iod = iod;
+		} else
+			iod = tl->iod;
 		if ((n_io_dev_types == iod->type) && mspace && mspace->str.len)
 			iod->type = us;
 		if (n_io_dev_types == iod->type)

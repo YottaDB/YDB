@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,6 @@ GBLREF	boolean_t	in_mu_rndwn_file;
 #endif
 
 #ifdef UNIX
-GBLREF	volatile uint4		heartbeat_counter;
 GBLREF	volatile int4		timer_stack_count;
 #endif
 
@@ -86,14 +85,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 {
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
-	uint4			lcnt, blocking_pid, start_in_tend, spincnt, maxspincnt, start_heartbeat, heartbeat_delta;
+	uint4			lcnt, blocking_pid, start_in_tend, spincnt, maxspincnt;
 	int4			value;
 	boolean_t		was_crit;
-	boolean_t		use_heartbeat;
+	boolean_t		use_timer;
+	boolean_t		timedout;
 	block_id		blk;
-#	ifdef VMS
-	uint4			heartbeat_counter = 0;	/* dummy variable to make compiler happy */
-#	endif
 	int4			index, crarray_size, crarray_index;
 	cache_rec_ptr_t		cr_lo, cr_top, curcr;
 	phase2_wait_trace_t	crarray[MAX_PHASE2_WAIT_CR_TRACE_SIZE];
@@ -123,19 +120,19 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	 * the sleep approach for Tru64. Choosing a spincnt of 0 would choose the sleep approach (versus rel_quant).
 	 */
 #	if (defined(UNIX) && !defined(__osf__))
-	use_heartbeat = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && (1 > timer_stack_count));
+	use_timer = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && (1 > timer_stack_count));
 #	else
-	use_heartbeat = FALSE;
+	use_timer = FALSE;
 #	endif
-	DEBUG_ONLY(phase2_commit_half_wait = use_heartbeat ? (PHASE2_COMMIT_WAIT_HTBT >> 1) : (PHASE2_COMMIT_WAIT >> 1);)
-	if (use_heartbeat)
+	if (use_timer)
 	{
 		maxspincnt = csd->wcs_phase2_commit_wait_spincnt;
 		assert(maxspincnt);
 		if (!maxspincnt)
 			maxspincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
-		start_heartbeat = heartbeat_counter;
-	}
+		TIMEOUT_INIT(timedout, PHASE2_COMMIT_WAIT_MS DEBUG_ONLY(/ 2));
+	} else
+		DEBUG_ONLY(phase2_commit_half_wait = (PHASE2_COMMIT_WAIT >> 1));
 	assert(dba_bg == csd->acc_meth);
 	if (dba_bg != csd->acc_meth)	/* in pro, be safe and return */
 		return TRUE;
@@ -159,12 +156,18 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		/* we better not deadlock wait for ourself */
 		if (!was_crit && (process_id == start_in_tend))
 		{
+			if (use_timer)
+				TIMEOUT_DONE(timedout);
 			assert(gtm_white_box_test_case_enabled);
 			return TRUE;
 		}
 		assertpro(process_id != start_in_tend);	/* should not deadlock on our self */
 		if (!start_in_tend)
+		{
+			if (use_timer)
+				TIMEOUT_DONE(timedout);
 			return TRUE;
+		}
 	} else
 	{	/* initialize the beginning and the end of cache-records to be used later (only in case of cr == NULL) */
 		cr_lo = ((cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array) + csd->bt_buckets;
@@ -178,7 +181,11 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		{
 			value = cnl->wcs_phase2_commit_pidcnt;
 			if (!value)
+			{
+				if (use_timer)
+					TIMEOUT_DONE(timedout);
 				return TRUE;
+			}
 		} else
 		{	/* If we dont hold crit and are sleep looping waiting for cr->in_tend to become 0, it is
 			 * theoretically possible (though very remote) that every one of the 1000s of iterations we look
@@ -200,6 +207,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			value = cr->in_tend;
 			if (value != start_in_tend)
 			{
+				if (use_timer)
+					TIMEOUT_DONE(timedout);
 				assert(!was_crit || !value);
 				return TRUE;
 			}
@@ -208,15 +217,16 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				 * a minute, we will time out for no reason. No point proceeding with this transaction
 				 * anyway as we are bound to restart. Do that right away. Caller knows to restart.
 				 */
+				if (use_timer)
+					TIMEOUT_DONE(timedout);
 				return FALSE;
 			}
 		}
-		if (use_heartbeat)
+		if (use_timer)
 		{
 			if (spincnt < maxspincnt)
 				continue;
 			assert(spincnt == maxspincnt);
-			heartbeat_delta = heartbeat_counter - start_heartbeat;
 		}
 		spincnt = 0;
 		lcnt++;
@@ -234,13 +244,25 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		{
 			BG_TRACE_PRO_ANY(csa, phase2_commit_wait_pidcnt);
 		}
-		if (use_heartbeat)
+		if (use_timer)
 		{	/* this seems like a nanosleep would be better than a rel_quant,
 			 * but a wake mechanism, perhaps using a queue shared by all phase 2 blockers might be better still
 			 */
-			if (PHASE2_COMMIT_WAIT_HTBT < heartbeat_delta)
+			if (timedout)
+			{
+#				ifdef DEBUG
+				if(!half_time)
+				{
+					half_time = TRUE;
+					TIMEOUT_DONE(timedout);
+					TIMEOUT_INIT(timedout, PHASE2_COMMIT_WAIT_MS / 2);
+				}
+				else
+					break;
+#				else
 				break;
-			DEBUG_ONLY(half_time = (phase2_commit_half_wait == heartbeat_delta));
+#				endif
+			}
 			rel_quant();
 		} else
 		{
@@ -269,6 +291,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 #		endif
 
 	}
+	if (use_timer)
+		TIMEOUT_DONE(timedout);
 	if (NULL == cr)
 	{	/* This is the case where we wait for all the phase2 commits to complete. Note down the cache records that
 		 * are still not done with the commits. Since there can be multiple cache records held by the same PID, note

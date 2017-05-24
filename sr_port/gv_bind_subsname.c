@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -21,6 +25,7 @@
 #include "change_reg.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype used in GV_BIND_SUBSREG macro */
 #include "gtmimagename.h"
+#include "io.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
@@ -33,7 +38,7 @@ void gv_bind_subsname(gd_addr *addr, gv_key *key, gvnh_reg_t *gvnh_reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	map = gv_srch_map(addr, (char *)&key->base[0], key->end - 1);
+	map = gv_srch_map(addr, (char *)&key->base[0], key->end - 1, SKIP_BASEDB_OPEN_FALSE);
 	TREF(gd_targ_map) = map;
 	reg = map->reg.addr;
 	GV_BIND_SUBSREG(addr, reg, gvnh_reg);	/* sets gv_target/gv_cur_region/cs_addrs */

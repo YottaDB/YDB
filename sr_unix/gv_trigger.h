@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -184,6 +184,7 @@ typedef struct gvtr_invoke_parms_struct
 	LITREF	mval			literal_batch;										\
 	uint4				cycle;											\
 	boolean_t			set_upd_trans_t_err, cycle_mismatch, db_trigger_cycle_mismatch, ztrig_cycle_mismatch;	\
+	DBGTRIGR_ONLY(char 		gvnamestr[MAX_MIDENT_LEN + 1];)								\
 																\
 	assert(TPRESTART_STATE_NORMAL == tprestart_state);									\
 	assert(!skip_dbtriggers);												\
@@ -203,7 +204,10 @@ typedef struct gvtr_invoke_parms_struct
 	ztrig_cycle_mismatch = (CSA->db_dztrigger_cycle && (GVT->db_dztrigger_cycle != CSA->db_dztrigger_cycle));		\
 	db_trigger_cycle_mismatch = (GVT->db_trigger_cycle != cycle);								\
 	cycle_mismatch = (db_trigger_cycle_mismatch || ztrig_cycle_mismatch);							\
-	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA->db_ztrigger_cycle=%d\n", cycle));				\
+	DBGTRIGR_ONLY(memcpy(gvnamestr, GVT->gvname.var_name.addr, GVT->gvname.var_name.len);)					\
+	DBGTRIGR_ONLY(gvnamestr[GVT->gvname.var_name.len]='\0';)								\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA=%s GVT=%s\n", CSA->region->rname, gvnamestr));			\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA->db_trigger_cycle=%d\n", cycle));				\
 	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: GVT->db_trigger_cycle=%d\n", GVT->db_trigger_cycle));		\
 	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA->db_dztrigger_cycle=%d\n", CSA->db_dztrigger_cycle));		\
 	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: GVT->db_dztrigger_cycle=%d\n", GVT->db_dztrigger_cycle));		\
@@ -287,7 +291,7 @@ typedef struct gvtr_invoke_parms_struct
 				 * because of $ZTRIGGER as part of this transaction as that could cause unintended restarts.	\
 				 */												\
 				assert(!LCL_TSTART);										\
-				assert(CDB_STAGNATE > t_tries);									\
+				assert(UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]));					\
 				DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: throwing TP restart\n"));			\
 				t_retry(cdb_sc_triggermod);									\
 			}													\
@@ -493,6 +497,7 @@ typedef struct gvtr_invoke_parms_struct
 	GBLREF	gd_region	*gv_cur_region;								\
 	GBLREF	gv_key		*gv_currkey;								\
 													\
+	assert(!IS_STATSDB_REGNAME(reg));	/* caller should have ensured this */			\
 	if (!reg->open)											\
 		gv_init_reg(reg);									\
 	gv_cur_region = reg;										\
@@ -672,7 +677,7 @@ GBLREF	int4		tstart_trigger_depth;
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
 #define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
 {												\
-	if (CDB_STAGNATE > t_tries)								\
+	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))					\
 		t_retry(cdb_sc_triggermod);							\
 	else											\
 	{											\

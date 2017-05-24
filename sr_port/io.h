@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 #endif
 
 error_def(ERR_BADCHSET);
+error_def(ERR_UTF16ENDIAN);
 
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
@@ -420,6 +421,40 @@ LITREF unsigned char ebcdic_spaces_block[];
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);		\
 }
 #define SET_ENCODING(CHSET, CHSET_MSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR,)
+
+#define GET_ADDR_AND_LEN(ADDR, LEN)												\
+{																\
+	ADDR = (char *)(pp->str.addr + p_offset + 1);										\
+	LEN = (int)(*(pp->str.addr + p_offset));										\
+}
+
+/* Set the UTF-16 variant IFF not already set. Use the UTF16 variant to set the new CHSET (for SOCKET devices) */
+#define CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(VARIANT, DEV_CHSET, TMP_CHSET, ASSERT_SOCKETPTR_NULL)				\
+{																\
+	DEBUG_ONLY(														\
+	if (IS_UTF16_CHSET(VARIANT)												\
+		&& (IS_UTF16_CHSET(DEV_CHSET) && (CHSET_UTF16 != DEV_CHSET)))							\
+		assert(VARIANT == DEV_CHSET);											\
+	)															\
+	if (IS_UTF16_CHSET(TMP_CHSET) && (CHSET_UTF16 != TMP_CHSET))								\
+	{															\
+		if (!IS_UTF16_CHSET(VARIANT))											\
+			VARIANT = TMP_CHSET;											\
+		else if (TMP_CHSET != VARIANT)											\
+		{														\
+			ASSERT_SOCKETPTR_NULL;											\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UTF16ENDIAN, 4, chset_names[VARIANT].len,			\
+				chset_names[VARIANT].addr, chset_names[TMP_CHSET].len, chset_names[TMP_CHSET].addr);		\
+		}														\
+	}															\
+	if (IS_UTF16_CHSET(TMP_CHSET) && IS_UTF16_CHSET(VARIANT))								\
+		DEV_CHSET = VARIANT;												\
+	else															\
+		DEV_CHSET = TMP_CHSET;												\
+}
+/* Set the UTF-16 variant IFF not already set. Use the UTF16 variant to set the new CHSET (for IORM*) */
+#define CHECK_UTF16_VARIANT_AND_SET_CHSET(VARIANT, DEV_CHSET, TMP_CHSET) 	\
+		CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(VARIANT, DEV_CHSET, TMP_CHSET,)
 
 /* Establish a GT.M I/O condition handler if one is not already active and the principal device is the current one. */
 #define ESTABLISH_GTMIO_CH(IOD, SET_CH)												\

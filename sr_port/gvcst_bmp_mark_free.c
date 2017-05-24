@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -164,7 +165,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					ret_tn = 0;
 					break;
 				}
-#				ifdef GTM_SNAPSHOT
 				/* if this is freeing a level-0 directory tree block, we need to transition the block to free
 				 * right away and write its before-image thereby enabling fast integ to avoid writing level-0
 				 * block before-images altogether. It is possible the fast integ hasn't started at this stage,
@@ -195,7 +195,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					mark_level_as_special = TRUE;
 				} else
 					mark_level_as_special = FALSE;
-#				endif
 				bmphist.blk_num = bit_map;
 				if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 									&bmphist.cr)))
@@ -204,7 +203,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					continue;
 				}
 				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
-#				ifdef GTM_SNAPSHOT
 				if (mark_level_as_special)
 				{
 					/* The special level value will be used later in gvcst_map_build to set the block to be
@@ -212,11 +210,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					 */
 					cw_set[cw_set_depth-1].level = CSE_LEVEL_DRT_LVL0_FREE;
 				}
-#				endif
-				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+				DEBUG_ONLY(lcl_t_tries = t_tries);
 				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 				{
-#					ifdef UNIX
 					assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
 					status = LAST_RESTART_CODE;
 					if ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)
@@ -230,7 +226,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 						t_abort(gv_cur_region, cs_addrs);
 						return ret_tn; /* actually 0 */
 					}
-#					endif
 					continue;
 				}
 				break;
@@ -328,7 +323,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
-#			ifdef GTM_SNAPSHOT
 			if ((MUSWP_FREE_BLK == TREF(in_mu_swap_root_state)) && blk->level)
 			{
 				assert(1 == ks->used);
@@ -338,11 +332,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				 * snapshot file without checking whether it belongs to DIR or GV tree
 				 */
 			}
-#			endif
 			UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 			{
-#				ifdef UNIX
 				assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
 				assert(0 < t_tries);
 				DEBUG_ONLY(status = LAST_RESTART_CODE); /* get the recent restart code */
@@ -350,7 +342,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				 * upgraded. This means, online rollback cannot even start (it issues ORLBKNOV4BLK). Assert that.
 				 */
 				assert((cdb_sc_onln_rlbk1 != status) && (cdb_sc_onln_rlbk2 != status));
-#				endif
 				continue;
 			}
 			break;

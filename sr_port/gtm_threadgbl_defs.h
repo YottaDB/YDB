@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,6 @@ THREADGBLDEF(last_source_column,		int)				/* parser tracker */
 THREADGBLDEF(lexical_ptr,			char *)				/* parser character position */
 THREADGBLDEF(linkage_first,			struct linkage_entry *)		/* Start of linkage (extern) list this routine */
 THREADGBLDEF(linkage_last,			struct linkage_entry *)		/* Last added entry */
-THREADGBLDEF(max_advancewindow_line,		int4)				/* the maximum source line length */
 #ifdef USHBIN_SUPPORTED
 THREADGBLDEF(objhash_state,			hash128_state_t)		/* Seed value - progressive hash of object file */
 #endif
@@ -76,6 +75,7 @@ THREADGBLDEF(side_effect_base,			boolean_t *)			/* anchor side effect array: bin
 THREADGBLDEF(side_effect_depth,			uint4)				/* current high water of side effect expr array */
 THREADGBLDEF(side_effect_handling,		int)				/* side effect handling in actuallists, function
 										 * args & non-boolean binary operator operands */
+THREADGBLDEF(source_buffer,			mstr)				/* source line buffer control */
 THREADGBLDEF(source_error_found,		int4)				/* flag to partially defer compiler error */
 THREADGBLDEF(temp_subs,				boolean_t)			/* flag temp storing of subscripts to preserve
 										 * current evaluation */
@@ -85,7 +85,7 @@ THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow 
 THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindow */
 
 /* Database */
-THREADGBLDEF(dbinit_max_hrtbt_delta,		uint4)				/* max heartbeats before we bail out in db_init */
+THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
@@ -102,6 +102,8 @@ THREADGBLDEF(gd_targ_reg_array,			trans_num *)			/* Indicates which regions are 
 THREADGBLDEF(gd_targ_reg_array_size,		uint4)				/* Size of current gd_targ_reg_array allocation.
 										 * Non-zero only if at least one spanning global
 										 * has been seen at time of gld open.
+										 * Note: the dimension is the # of regions involved
+										 * and not the # of bytes allocated in the array.
 										 */
 THREADGBLDEF(gd_targ_addr,			gd_addr *)			/* current global directory reference. Needed by
 										 * name level $order or $zprevious to know inside
@@ -241,6 +243,7 @@ THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the G
 										 * prompt */
 THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmsecshr communications
 										 * eliminates cross-version issues */
+THREADGBLDEF(gvcst_statsDB_open_ch_active,	boolean_t)			/* Condition handler is active */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
 										 * Points into either lab_proxy or linkage table
@@ -270,6 +273,7 @@ THREADGBLDEF(mprof_reclaim_cnt,			int)				/* Amount of mem to reclaim after unw_
 THREADGBLDEF(mprof_stack_curr_frame, 		mprof_stack_frame *)		/* Pointer to the last frame on the mprof stack */
 THREADGBLDEF(mprof_stack_next_frame, 		mprof_stack_frame *)		/* Pointer to the next frame to be put on the
 										 * mprof stack */
+THREADGBLDEF(mu_cre_file_openrc,		int)				/* 0 if success otherwise holds errno after open */
 #ifdef AUTORELINK_SUPPORTED
 THREADGBLDEF(open_relinkctl_list,		open_relinkctl_sgm *)		/* Anchor for open relinkctl list; similar to
 										 * open_shlib_root */
@@ -281,6 +285,7 @@ THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
+THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */
 THREADGBLDEF(zpeek_reg_ptr,			gd_region *)			/* Resolved pointer for zpeekop_regname */
@@ -295,6 +300,8 @@ THREADGBLDEF(save_zhist,			zro_hist *)			/* Temp storage for zro_hist blk so con
 THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTINES between
 										 * linking a routine and invoking it
 										 */
+THREADGBLDEF(statsDB_init_defer_anchor,		statsDB_deferred_init_que_elem *) /* Anchor point for deferred init of statsDBs */
+THREADGBLDEF(statshare_opted_in,		boolean_t)			/* Flag when true shared stats collection active */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
@@ -402,6 +409,16 @@ THREADGBLDEF(expand_prev_key,			boolean_t)	/* Want gvcst_search_blk/gvcst_search
 								 * "gvcst_expand_key" to determine prev_key after the search.
 								 */
 THREADGBLDEF(gtm_autorelink_ctlmax,		uint4)		/* Maximum number of routines allowed for auterelink */
+/* Each process that opens a database file with O_DIRECT (which happens if asyncio=TRUE) needs to do
+ * writes from a buffer that is aligned at the filesystem-blocksize level. We ensure this in database shared
+ * memory global buffers where each buffer is guaranteed aligned at OS_PAGE_SIZE as private memory buffers that are
+ * used (e.g. dbfilop etc.). All the private memory usages will use the global variable "dio_buff.aligned".
+ * It is guaranteed to be OS_PAGE_SIZE aligned. "dio_buff.unaligned_size" holds the size of the allocated buffer
+ * and it has enough space to hold one GDS block (max db blocksize across ALL dbs opened by this process till now)
+ * with OS_PAGE_SIZE padding. "dio_buff.unaligned" points to the beginning of this unaligned buffer and
+ * "dio_buff.aligned" points to an offset within this unaligned buffer that is also OS_PAGE_SIZE aligned.
+ */
+THREADGBLDEF(dio_buff,				dio_buff_t)
 #ifdef GTM_TRIGGER
 THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates triggers were read for
 										 * at least one gv_target in this transaction.
@@ -427,6 +444,19 @@ THREADGBLDEF(ztrigbuffLen,			int)				/* Length of used ztrigbuff buffer */
 THREADGBLDEF(ztrig_use_io_curr_device,		boolean_t)	/* Use current IO device instead of stderr/util_out_print */
 #endif
 
+THREADGBLDEF(in_ext_call,			boolean_t)	/* Indicates we are in an external call */
+
+/* linux AIO related data */
+#ifdef 	USE_LIBAIO
+THREADGBLDEF(gtm_aio_nr_events,			uint4)		/* Indicates the value of the nr_events parameter suggested for
+								 * use by io_setup().
+								 */
+#endif
+
+THREADGBLDEF(crit_reg_count,			int4)		/* A count of the number of regions/jnlpools where this process
+								 * has crit
+								 */
+THREADGBLDEF(ok_to_see_statsdb_regs,		boolean_t)	/* FALSE implies statsdb regions are hidden at "gd_load" time */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to count time
@@ -467,3 +497,9 @@ THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not 
 								 *  inherited shm so shm_nattch could be higher than we expect.
 								 */
 #endif	/* #ifdef DEBUG */
+
+/* (DEBUG_ONLY relevant points reproduced from the comment at the top of this file)
+ *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.
+ *   6. If a DEBUG_ONLY array is declared whose dimension is a macro, then it is necessary, for gtmpcat to work,
+ *      that the macro shouldn't be defined as DEBUG_ONLY.
+ */

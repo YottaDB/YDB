@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,7 +218,6 @@ void dbcertify_scan_phase(void)
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
 	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
 	/* Initialize for db processing - open and read in file-header */
 	psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
@@ -268,7 +267,7 @@ void dbcertify_scan_phase(void)
 	psa->curr_lbmap_buff= malloc(psa->dbc_cs_data->blk_size);	/* Current local bit map cache */
 	psa->local_bit_map_cnt = (psa->dbc_cs_data->trans_hist.total_blks + psa->dbc_cs_data->bplmap - 1)
 		/ psa->dbc_cs_data->bplmap;
-	dbptr = (psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE;
+	dbptr = BLK_ZERO_OFF(psa->dbc_cs_data->start_vbn);
 	blk_num = 0;
 	/* Loop to process every local bit map in the database. Since the flag tells us only
 	 * (0) it is full or (1) it is not full, we have to completely process each local bit map.
@@ -322,7 +321,7 @@ void dbcertify_scan_phase(void)
 				if (bitmap_blk_num != last_bitmap_blk_num)
 				{
 					psa->fc->op_buff = psa->curr_lbmap_buff;
-					dbptr = ((psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE)
+					dbptr = BLK_ZERO_OFF((psa->dbc_cs_data->start_vbn))
 						+ psa->dbc_cs_data->free_space
 						+ ((gtm_off_t)psa->dbc_cs_data->blk_size * bitmap_blk_num);
 					psa->fc->op_pos = (dbptr / DISK_BLOCK_SIZE) + 1;
@@ -330,7 +329,7 @@ void dbcertify_scan_phase(void)
 					last_bitmap_blk_num = bitmap_blk_num;
 				}
 				lm_offset = (blk_num - bitmap_blk_num) * 2;
-				dbptr = ((psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + psa->dbc_cs_data->free_space
+				dbptr = BLK_ZERO_OFF((psa->dbc_cs_data->start_vbn)) + psa->dbc_cs_data->free_space
 					+ ((gtm_off_t)psa->dbc_cs_data->blk_size * blk_num);
 				if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + SIZEOF(v15_blk_hdr), lm_offset))
 					/* This block is in use -- process it */

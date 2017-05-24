@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009, 2015 Fidelity National Information	#
+# Copyright (c) 2009-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -37,14 +37,18 @@ check_files()
 	for each_file in $srch_files
 	do
 		flag=0
-		for each_path in $srch_path
+		list=`echo $each_file | tr '|' ' '`
+		for file in $list
 		do
-			for each_ext in $srch_ext
+			for each_path in $srch_path
 			do
-				if [ -f $each_path/$each_file$each_ext ]; then flag=1 break ; fi
+				for each_ext in $srch_ext
+				do
+					if [ -f $each_path/$file$each_ext ]; then flag=1 break ; fi
+				done
+				# The below takes care of files whose extensions are already determined by the caller
+				if [ -f $each_path/$file ]; then flag=1 break; fi
 			done
-			# The below takes care of files whose extensions are already determined by the caller
-			if [ -f $each_path/$each_file ]; then flag=1 break; fi
 		done
 		if [ $flag -eq 0 ]; then
 			missing="$missing $each_file"
@@ -108,10 +112,10 @@ bin_search_path="/usr/bin /usr/local/bin /bin"
 
 mandate_headers="gpgme.h gpg-error.h"
 mandate_libs="libgpg-error libgpgme"
-mandate_bins="gpg"
+mandate_bins="gpg|gpg2"
 gcrypt_headers="gcrypt.h"
 gcrypt_libs="libgcrypt"
-openssl_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h openssl/ssl.h openssl/err.h"
+openssl_headers="openssl/evp.h openssl/sha.h openssl/ssl.h openssl/err.h"
 openssl_libs="libcrypto libssl"
 lib_ext=".so"
 if [ "AIX" = "$hostos" ]; then

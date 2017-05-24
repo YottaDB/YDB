@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,13 +38,14 @@
 # include "trigger.h"
 # include "gv_trigger.h"
 #endif
+#include "gtm_reservedDB.h"
 #include "mtables.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
 	/* ASCII 0-127 */
 	TK_EOL,    TK_ERROR,        TK_ERROR,    TK_ERROR,     TK_ERROR,     TK_ERROR,    TK_ERROR,      TK_ERROR,
-	TK_ERROR,  TK_SPACE,        TK_ERROR,    TK_ERROR,     TK_EOR,       TK_ERROR,    TK_ERROR,      TK_ERROR,
+	TK_ERROR,  TK_SPACE,        TK_ERROR,    TK_ERROR,     TK_EOR,       TK_CR,       TK_ERROR,      TK_ERROR,
 	TK_ERROR,  TK_ERROR,        TK_ERROR,    TK_ERROR,     TK_ERROR,     TK_ERROR,    TK_ERROR,      TK_ERROR,
 	TK_ERROR,  TK_ERROR,        TK_ERROR,    TK_ERROR,     TK_ERROR,     TK_ERROR,    TK_ERROR,      TK_ERROR,
 	TK_SPACE,  TK_EXCLAIMATION, TK_QUOTE,    TK_HASH,      TK_DOLLAR,    TK_PERCENT,  TK_AMPERSAND,  TK_APOSTROPHE,
@@ -133,7 +134,8 @@ LITDEF toktabtype tokentable[] =
 	tokdef("TK_EXPONENT", OC_EXP, 0, OCT_MVAL),
 	tokdef("TK_SORTS_AFTER", OC_SORTS_AFTER, 0, OCT_MVAL),
 	tokdef("TK_NSORTS_AFTER", OC_NSORTS_AFTER, 0, OCT_MVAL),
-	tokdef("TK_ATHASH", 0, 0, 0)
+	tokdef("TK_ATHASH", 0, 0, 0),
+	tokdef("TK_CR", 0, 0, 0 )
 };
 
 GBLREF mv_stent *mv_chain;	/* Needed for MV_SIZE macro */
@@ -197,15 +199,16 @@ LITDEF boolean_t mvs_save[] =
 /* The address of this literal is assigned to mval pointers for arguments which are deliberately skipped in label invocations. */
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
-static readonly unsigned char localpool[7] = {'1', '1', '1', '0', '1', '0', '0'};
-LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,   0);
-LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[0], 0,   1 * MV_BIAS);
-LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[2], 0,  10 * MV_BIAS);
-LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  11 * MV_BIAS);
-LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[4], 0, 100 * MV_BIAS);
-LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101 * MV_BIAS);
-LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110 * MV_BIAS);
-LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111 * MV_BIAS);
+static readonly unsigned char localpool[8] = {'-', '1', '1', '1', '0', '1', '0', '0'};
+LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
+LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,   1 * MV_BIAS);
+LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[3], 0,  10 * MV_BIAS);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[1], 0,  11 * MV_BIAS);
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[5], 0, 100 * MV_BIAS);
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0, 101 * MV_BIAS);
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 110 * MV_BIAS);
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 111 * MV_BIAS);
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval
@@ -221,14 +224,22 @@ LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_
 LITDEF mval literal_batch       = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, TP_BATCH_SHRT, (char *)TP_BATCH_ID, 0, 0);
 
 #ifdef GTM_TRIGGER
-LITDEF mval literal_curlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, HASHT_GBL_CURLABEL_LEN, (char *)HASHT_GBL_CURLABEL, 0, HASHT_GBL_CURLABEL_INT * MV_BIAS);	/* BYPASSOK */
-LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHLABEL_LEN,  (char *)LITERAL_HASHLABEL, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCYCLE_LEN,  (char *)LITERAL_HASHCYCLE, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCOUNT_LEN,  (char *)LITERAL_HASHCOUNT, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_hashtrhash	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHTRHASH_LEN, (char *)LITERAL_HASHTRHASH, 0, 0);/* BYPASSOK */
+LITDEF mval literal_curlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, HASHT_GBL_CURLABEL_LEN,
+							(char *)HASHT_GBL_CURLABEL, 0, HASHT_GBL_CURLABEL_INT * MV_BIAS);
+LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHLABEL_LEN,
+							(char *)LITERAL_HASHLABEL, 0, 0);
+LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCYCLE_LEN,
+							(char *)LITERAL_HASHCYCLE, 0, 0);
+LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCOUNT_LEN,
+							(char *)LITERAL_HASHCOUNT, 0, 0);
+LITDEF mval literal_hashtrhash	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHTRHASH_LEN,
+							(char *)LITERAL_HASHTRHASH, 0, 0);
 
 #define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	\
 	LITDEF mval LITMVALNAME = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, STR_LIT_LEN(SUBSNAME), (char *)SUBSNAME, 0, 0);
+
+LITDEF mval literal_statsDB_gblname =
+	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, STATSDB_GBLNAME_LEN,  (char *)STATSDB_GBLNAME, 0, 0);
 
 #include "trigger_subs_def.h"		/* BYPASSOK */
 #undef TRIGGER_SUBSDEF

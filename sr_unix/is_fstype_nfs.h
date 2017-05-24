@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2016 Fidelity National Information		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,12 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef _DSKSPACE_MSG_TIMER_H
-#define _DSKSPACE_MSG_TIMER_H
+#ifndef IS_FSTYPE_NFS_H_INCLUDED
+#define IS_FSTYPE_NFS_H_INCLUDED
 
-/* define heartbeat interval */
-#define DSKSPACE_MSG_INTERVAL 	60 * 1000 /* one minute */
-
-void dskspace_msg_timer(void);
+boolean_t	is_fstype_nfs(int fd);
 
 #endif

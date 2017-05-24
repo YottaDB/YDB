@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,6 @@
 #define MAX_EXTN_COUNT          65535
 #define MIN_EXTN_COUNT          0
 #define	MAX_DB_BLK_SIZE		((1 << 16) - 512)	/* 64Kb - 512 (- 512 to take care of VMS's max I/O capabilities) */
-
 
 /* Note: EVAL_CMPC not to be confused with the previously existing GET_CMPC macro in mu_reorg.h!
  * The maximum key size in V5 was 255 bytes, including the two null bytes at the end. Two distinct keys

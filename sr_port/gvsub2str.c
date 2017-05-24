@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -134,10 +135,10 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 				;
 			for (rev_num = 0; num > 0; rev_num = (rev_num * DECIMAL_BASE + num % DECIMAL_BASE), num /= DECIMAL_BASE)
 				;
-			for (; rev_num > 0 && targ < targ_end;
+			for (; (rev_num > 0) && (targ < targ_end);
 				*targ++ = (rev_num % DECIMAL_BASE + ASCII_0), rev_num /= DECIMAL_BASE)
 				;
-			for (; trail_zero > 0 && targ < targ_end; *targ++ = '0', trail_zero--);
+			for (; (trail_zero > 0) && (targ < targ_end); *targ++ = '0', trail_zero--);
 			if (*sub != 0)
 				*targ++ = '*';
 		}
@@ -145,7 +146,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 		{
 			tbl_ptr = (unsigned short *)&dpos[0] - 1;
 			trail_ch = KEY_DELIMITER;
-			if (0 <= (signed char)ch && targ < targ_end)
+			if ((0 <= (signed char)ch) && (targ < targ_end))
 			{	/* Bit 7 of the exponent is set for positive numbers; must be negative */
 				trail_ch = NEG_MNTSSA_END;
 				tbl_ptr = (unsigned short *)dneg;
@@ -161,13 +162,13 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 				*targ++ = '.';
 					/* generate leading 0's */
 				do *targ++ = '0';
-				while ((signed char)ch-- > 0 && targ < targ_end)
+				while (((signed char)ch-- > 0) && (targ < targ_end))
 					;
 					/* make expon. really large to avoid
 					 * generating extra dots */
 				expon = LARGE_EXP;
 			}
-			while ((ch = *sub++) && ch != trail_ch)
+			while ((ch = *sub++) && (ch != trail_ch) && (targ < targ_end))
 			{	/* Convert digits loop */
 					/* adjust dcm. point */
 				if (0 >= (expon -= 2))

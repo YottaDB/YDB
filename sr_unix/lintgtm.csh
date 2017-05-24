@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2017 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -175,12 +176,7 @@ foreach i ( $lintgtm_liblist )
 		# Exclude files that define the same externals (e.g., "main" and the VMS CLI [command line interpreter]
 		# emulator arrays):
 		pwd
-		rm -f gtm.c \
-			lke.c lke_cmd.c \
-			dse.c dse_cmd.c \
-			mupip.c mupip_cmd.c \
-			daemon.c gtmsecshr.c geteuid.c dtgbldir.c semstat2.c ftok.c
-
+		rm -f gtm.c lke.c lke_cmd.c dse.c dse_cmd.c mupip.c mupip_cmd.c daemon.c gtmsecshr.c geteuid.c semstat2.c ftok.c
 		gt_lint ${gt_lint_option_output}$i $gt_lint_options $gt_lint_options_library *.c >>& llib-l$i.log
 		rm *.c
 		breaksw

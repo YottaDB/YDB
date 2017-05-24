@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,14 @@
 #include "compiler.h"
 #include "mdq.h"
 
+LITREF octabstruct	oc_tab[];
+
 void bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr)
+/* work Boolean relational arguments
+ * *t points to the Boolean operation
+ * cmp and tst give (respectively) the opcode and the associated jump
+ * *addr points the operand for the jump and is eventually used by logic back in the invocation stack to fill in a target location
+ */
 {
 	triple *ref;
 

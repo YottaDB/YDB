@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +11,7 @@
  ****************************************************************/
 #ifndef GTM_AIO_H
 #define GTM_AIO_H
-
+#if defined(MUR_USE_AIO)
 #ifndef __CYGWIN__
 #include <aio.h>
 #endif
@@ -90,4 +91,5 @@ struct aiocb {
 	STATUS = aio_cancel(FD, AIOCBP);		\
 }
 
+#endif
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,7 +122,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	boolean_t		startblk_specified, stopblk_specified, set_fully_upgraded, db_got_to_v5_once, mark_blk_free;
 	cache_rec_ptr_t		cr;
 	char			*bml_lcl_buff = NULL, *command, *reorg_command;
-	sm_uc_ptr_t		bptr = NULL;
+	sm_uc_ptr_t		bptr = NULL, buff;
 	cw_set_element		*cse;
 	enum cdb_sc		cdb_status;
 	enum db_ver		new_db_format, ondsk_blkver;
@@ -141,7 +141,10 @@ void	mu_reorg_upgrd_dwngrd(void)
 	trans_num		curr_tn;
 	unsigned char    	save_cw_set_depth;
 	uint4			lcl_update_trans;
+	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	region    = (CLI_PRESENT == cli_present("REGION"));
 	upgrade   = (CLI_PRESENT == cli_present("UPGRADE"));
 	downgrade = (CLI_PRESENT == cli_present("DOWNGRADE"));
@@ -170,7 +173,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	status = SS_NORMAL;
 	error_mupip = FALSE;
 	gvinit();	/* initialize gd_header (needed by the later call to mu_getlst) */
-	mu_getlst("REG_NAME", SIZEOF(tp_region));	/* get the parameter corresponding to REGION qualifier */
+	mu_getlst("REG_NAME", SIZEOF(tp_region)); /* get the parm for the REGION qualifier */
 	if (error_mupip)
 	{
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
@@ -304,7 +307,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 		last_bmp  = ROUND_DOWN2(stop_blk - 1, BLKS_PER_LMAP);
 		curblk = start_blk;	/* curblk is the block to be upgraded/downgraded */
 		util_out_print("Region !AD : Started processing from block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
-		if (NULL != bptr)
+		udi = FILE_INFO(reg);
+		if (udi->fd_opened_with_o_direct)
+		{
+			DIO_BUFF_EXPAND_IF_NEEDED(udi, blk_size, &(TREF(dio_buff)));
+		} else if (NULL != bptr)
 		{	/* malloc/free "bptr" for each region as GDS block-size can be different */
 			free(bptr);
 			bptr = NULL;
@@ -365,7 +372,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			if (NULL == bml_lcl_buff)
 				bml_lcl_buff = malloc(BM_SIZE(BLKS_PER_LMAP));
 			memcpy(bml_lcl_buff, (blk_hdr_ptr_t)bml_sm_buff, BM_SIZE(BLKS_PER_LMAP));
-			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, FALSE))
+			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, FALSE, NULL))
 			{	/* certify the block while holding crit as cert_blk uses fields from file-header (shared memory) */
 				assert(FALSE);	/* in pro, skip ugprading/downgarding all blks in this unreliable local bitmap */
 				rel_crit(reg);
@@ -392,7 +399,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 					goto stop_reorg_on_this_reg;	/* goto needed because of nested FOR Loop */
 				}
 				GET_BM_STATUS(bml_lcl_buff, lcnt, bml_status);
-				assert(BLK_MAPINVALID != bml_status); /* cert_blk ran clean so we dont expect invalid entries */
+				assert(BLK_MAPINVALID != bml_status); /* cert_blk ran clean so we don't expect invalid entries */
 				if (BLK_FREE == bml_status)
 				{
 					reorg_stats.blks_skipped_free++;
@@ -403,10 +410,15 @@ void	mu_reorg_upgrd_dwngrd(void)
 				{	/* Do NOT read recycled V4 block from disk unless it is guaranteed NOT to be too full */
 					if (lcnt)
 					{	/* non-bitmap block */
-						/* read in block from disk into private buffer. dont pollute the cache yet */
-						if (NULL == bptr)
-							bptr = (sm_uc_ptr_t)malloc(blk_size);
-						status1 = dsk_read(curblk, bptr, &ondsk_blkver, FALSE);
+						/* read in block from disk into private buffer. don't pollute the cache yet */
+						if (!udi->fd_opened_with_o_direct)
+						{
+							if (NULL == bptr)
+								bptr = (sm_uc_ptr_t)malloc(blk_size);
+							buff = bptr;
+						} else
+							buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+						status1 = dsk_read(curblk, buff, &ondsk_blkver, FALSE);
 						/* dsk_read on curblk could return an error (DYNUPGRDFAIL) if curblk needs to be
 						 * upgraded and if its block size was too big to allow the extra block-header space
 						 * requirements for a dynamic upgrade. a MUPIP REORG DOWNGRADE should not error out

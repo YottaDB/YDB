@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -608,8 +608,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
-	   0,	/* STOPTIMEOUT */
-	   0,	/* UNUSEDMSG777 */
+	   0,	/* UNUSEDMSG776 */
+	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
 	   0,	/* JNLREAD */
@@ -1359,7 +1359,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* REGOPENRETRY */
+	   0,	/* UNUSEDMSG1529 */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */
@@ -1369,8 +1369,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-	   0,	/* GVSUBSERR */
-	   0,	/* UNUSEDMSG1540 */
+	   0,	/* UNUSEDMSG1539 */
+	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
 	   0,	/* TLSINIT */
@@ -1451,4 +1451,41 @@ const static readonly int error_ansi[] = {
 	   0,	/* ENCRYPTCONFLT */
 	   0,	/* JNLPOOLRECOVERY */
 	   0,	/* LOCKTIMINGINTP */
+	   0,	/* PBNUNSUPTYPE */
+	   0,	/* DBFHEADLRU */
+	   0,	/* ASYNCIONOV4 */
+	   0,	/* AIOCANCELTIMEOUT */
+	   0,	/* DBGLDMISMATCH */
+	   0,	/* DBBLKSIZEALIGN */
+	   0,	/* ASYNCIONOMM */
+	   0,	/* RESYNCSEQLOW */
+	   0,	/* DBNULCOL */
+	   0,	/* UTF16ENDIAN */
+	   0,	/* OFRZACTIVE */
+	   0,	/* OFRZAUTOREL */
+	   0,	/* OFRZCRITREL */
+	   0,	/* OFRZCRITSTUCK */
+	   0,	/* OFRZNOTHELD */
+	   0,	/* AIOBUFSTUCK */
+	   0,	/* DBDUPNULCOL */
+	   0,	/* CHANGELOGINTERVAL */
+	   0,	/* DBNONUMSUBS */
+	   0,	/* AUTODBCREFAIL */
+	   0,	/* RNDWNSTATSDBFAIL */
+	   0,	/* STATSDBNOTSUPP */
+	   0,	/* TPNOSTATSHARE */
+	   0,	/* FNTRANSERROR */
+	   0,	/* NOCRENETFILE */
+	   0,	/* DSKSPCCHK */
+	   0,	/* NOCREMMBIJ */
+	   0,	/* FILECREERR */
+	   0,	/* RAWDEVUNSUP */
+	   0,	/* DBFILECREATED */
+	   0,	/* PCTYRESERVED */
+	   0,	/* REGFILENOTFOUND */
+	   0,	/* DRVLONGJMP */
+	   0,	/* INVSTATSDB */
+	   0,	/* STATSDBERR */
+	   0,	/* STATSDBINUSE */
+	   0,	/* STATSDBFNERR */
 	};

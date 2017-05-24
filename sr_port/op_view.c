@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
+#include "io.h"
 #include "util.h"
 #include "have_crit.h"
 #include "gdsroot.h"
@@ -76,6 +77,9 @@
 #include "gtmimagename.h"
 #include "cache.h"
 #include "set_gbuff_limit.h"	/* Needed for set_gbuff_limit() */
+#include "interlock.h"
+#include "wcs_backoff.h"
+#include "wcs_wt.h"
 
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
 
@@ -104,7 +108,7 @@ GBLREF	uint4			gtmDebugLevel;
 GBLREF	boolean_t		lvmon_enabled;
 GBLREF	spdesc			stringpool;
 GBLREF	boolean_t		is_updproc;
-GBLREF	pid_t			process_id;
+GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_tlevel;
 UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
 
@@ -116,6 +120,7 @@ error_def(ERR_GBLNOMAPTOREG);
 error_def(ERR_INVZDIRFORM);
 error_def(ERR_ISOLATIONSTSCHN);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_TPNOSTATSHARE);
 error_def(ERR_PATLOAD);
 error_def(ERR_PATTABNOTFND);
 error_def(ERR_REQDVIEWPARM);
@@ -287,7 +292,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 #		ifndef VMS
 		case VTK_JNLERROR:
-			/* In case of update process, dont let this variable be user-controlled. We always want to error out
+			/* In case of update process, don't let this variable be user-controlled. We always want to error out
 			 * if we are about to invoke "jnl_file_lost". This way we will force the operator to fix whatever
 			 * caused the jnl_file_lost invocation (e.g. permissions, disk space issues etc.) and restart
 			 * the receiver server so replication can resume from wherever we last left. On the other hand,
@@ -371,7 +376,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						case dba_mm:
 						case dba_bg:
 							csa = &FILE_INFO(reg)->s_addrs;
-							memset(&csa->gvstats_rec, 0, SIZEOF(gvstats_rec_t));
+							memset((char *)csa->gvstats_rec_p, 0, SIZEOF(gvstats_rec_t));
 							break;
 						case dba_cm:
 						case dba_usr:
@@ -779,6 +784,28 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			op_wteol(1);
 			break;
 #		endif
+		case VTK_STATSHARE:
+			if (!TREF(statshare_opted_in))
+			{	/* Don't both to opt-in if already opted-in - it just confuses things */
+				if (0 < dollar_tlevel)
+				{	/* Can't do this in TP */
+					va_end(var);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+				}
+				gvcst_statshare_optin();
+			}
+			break;
+		case VTK_NOSTATSHARE:
+			if (TREF(statshare_opted_in))
+			{	/* Don't both to opt-out if already opted-out - it just confuses things */
+				if (0 < dollar_tlevel)
+				{	/* Can't do this in TP */
+					va_end(var);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+				}
+				gvcst_statshare_optout();
+			}
+			break;
 		default:
 			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWCMD);
@@ -810,6 +837,8 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 		r_top = reg = parmblkptr->gv_ptr;
 	for (; reg <= r_top; reg++)
 	{
+		if (IS_STATSDB_REG(reg))
+			continue;	/* Skip statsdb regions for the VIEW command */
 		if (!reg->open)
 			gv_init_reg(reg);
 		TP_CHANGE_REG(reg);
@@ -819,7 +848,7 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				if (!reg->read_only)
 				{
 					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
-					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, dummy_errno);
+					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, NULL, FALSE, dummy_errno);
 				}
 				break;
 			case VTK_DBSYNC:
@@ -840,7 +869,7 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				break;
 			case VTK_EPOCH:
 			case VTK_FLUSH:
-				if (!reg->read_only)
+				if (!reg->read_only  && !FROZEN_CHILLED(cs_data))
 				{
 					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
 					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
@@ -857,7 +886,8 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				change_reg();
 				if (!reg->read_only)
 					CLRGVSTATS(cs_addrs);
-				memset((char *)&cs_addrs->gvstats_rec, 0, SIZEOF(gvstats_rec_t));	/* Always process-private */
+				/* Always reset process stats in process-private storage */
+				memset((char *)cs_addrs->gvstats_rec_p, 0, SIZEOF(gvstats_rec_t));
 				break;
 #			ifndef VMS
 			case VTK_JNLERROR:
@@ -888,7 +918,7 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 						grab_crit(reg);
 					if (JNL_ENABLED(csd))
 					{
-						jnl_status = jnl_ensure_open();
+						jnl_status = jnl_ensure_open(reg, csa);
 						if (0 == jnl_status)
 						{
 							jb = csa->jnl->jnl_buff;

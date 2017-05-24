@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2016 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -24,10 +25,9 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	; Prepare special $etrap to issue error in case VIEW "YLCT" call to set local collation fails below
 	; Need to use this instead of the gde $etrap (set a few lines later below) as that expects some initialization
 	; to have happened whereas we are not yet there since setting local collation is a prerequisite for that init.
-	i $zver'["VMS" s $et="w !,$p($zs,"","",3,999) s $ecode="""" zm 150503603:$zparse(""$gtmgbldir"","""",""*.gld"") quit"
-	else           s $et="w !,$p($zs,"","",3,999) s $ecode="""" zm 150503603:$zparse(""GTM$GBLDIR"","""",""*.GLD"") quit"
+	s $et="w !,$p($zs,"","",3,999) s $ecode="""" zm 150503603:$zparse(""$gtmgbldir"","""",""*.gld"") quit"
 	v "YLCT":0:1:0		; sets local variable alternate collation = 0, null collation = 1, numeric collation = 0
-	; since GDE creates null subscripts, we dont want user level setting of gtm_lvnullsubs to affect us in any way
+	; since GDE creates null subscripts, we don't want user level setting of gtm_lvnullsubs to affect us in any way
 	s gdeEntryState("nullsubs")=$v("LVNULLSUBS")
 	v "LVNULLSUBS"
 	s gdeEntryState("zlevel")=$zlevel-1
@@ -49,7 +49,7 @@ comline:
 	f cp=1:1 s c=$e(comline,cp) q:(c'=" ")&(c'=TAB)	 ; remove extraneous whitespace at beginning of line
 	s ntoken="",ntoktype="TKEOL" s:runtime comline="/"_comline
 	d GETTOK^GDESCAN
-	i ntoktype="TKEOL" q	 ; if comline begins with a ! dont even bother parsing this line anymore
+	i ntoktype="TKEOL" q	 ; if comline begins with a ! don't even bother parsing this line anymore
 	i log u @uself w comline,! u @useio
 	i runtime n NAME,REGION,SEGMENT,gqual,lquals zg:"/QUIT"[$tr(comline,lower,upper) combase-1 d SHOW^GDEPARSE q
 	i ntoktype="TKAT" s resume(comlevel+1)=$zl d comfile q
@@ -60,7 +60,9 @@ CTRL
 	. i comlevel>0 d comeof ; if we take a ctrl-c in a command file then get out of that command file
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(25) encountered" d GETOUT^GDEEXIT h
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
-	i $p($zs,",",3,999)="%GTM-E-IOEOF, Attempt to read past an end-of-file" d comexit
+	i $p($zs,",",3,999)="%GTM-E-IOEOF, Attempt to read past an end-of-file" d
+	. s $ecode=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
+	. d comexit
 	i $zeof d EXIT^GDEEXIT
 	d ABORT
 	;
@@ -87,6 +89,7 @@ comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
 	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
+	e  s $ecode=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
 	q
 SCRIPT:
 	s comlevel=comlevel+1
@@ -103,7 +106,7 @@ ABORT
         o abort:(newversion:noreadonly) u abort zsh "*" c abort
         u @useio
 	; make GDECHECK error fatal except native UNIX
-        i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select($ZVersion'["VMS"&(256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
+        i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
         e  w $zs
         d GETOUT^GDEEXIT
 	h

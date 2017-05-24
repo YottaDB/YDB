@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,6 +145,12 @@ void iosocket_close(io_desc *iod, mval *pp)
 		end = 0;
 	}
 	iosocket_close_range(dsocketptr, start, end, socket_delete, socket_specified);
+	/* "forget" the UTF-16 CHSET variant if no sockets are connected */
+	if (0 >= dsocketptr->n_socket)
+	{
+		dsocketptr->ichset_utf16_variant = iod->ichset = 0;
+		dsocketptr->ochset_utf16_variant = iod->ochset = 0;
+	}
 	if (!socket_specified)
 	{
 		iod->state = dev_closed;

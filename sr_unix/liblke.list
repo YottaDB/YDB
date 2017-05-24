@@ -8,7 +8,6 @@ lke_getansw
 lke_getcli
 lke_getki
 lke_help
-lke_setgdr
 lke_show
 lke_showlock
 lke_showtree

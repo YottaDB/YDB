@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,46 +23,70 @@ GBLREF io_pair		io_std_device;
 GBLREF bool		prin_in_dev_failure;
 GBLREF bool		prin_out_dev_failure;
 
-void io_dev_close (io_log_name *d);
+void io_dev_close(io_log_name *d);
 
 void io_rundown (int rundown_type)
 {
 	io_log_name	*l;		/* logical name pointer	*/
 
-	if (io_root_log_name == 0)
+	if (NULL == io_root_log_name)
 		return;
-	for (l = io_root_log_name;  l != 0; l = io_root_log_name)
+	for (l = io_root_log_name;  NULL != l; l = io_root_log_name)
 	{
 		io_root_log_name = l->next;
-		if (l->iod != 0)
+		if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+		{	/* Device setup has started but did not complete (e.g. SIG-15 during device set up took us to exit handler)
+			 * Not much can be done in terms of rundown of this device so skip it.
+			 */
+			continue;
+		}
+		if (NULL != l->iod)
 		{
-			if ((NORMAL_RUNDOWN == rundown_type) ||
-			   ((RUNDOWN_EXCEPT_STD == rundown_type) &&
-				((l->iod->pair.in != io_std_device.in) && (l->iod->pair.out != io_std_device.out))))
+			if ((NORMAL_RUNDOWN == rundown_type)
+				|| ((RUNDOWN_EXCEPT_STD == rundown_type)
+					&& ((l->iod->pair.in != io_std_device.in) && (l->iod->pair.out != io_std_device.out))))
 				io_dev_close(l);
 		}
 	}
 }
 
-
 void io_dev_close (io_log_name *d)
 {
 	static readonly unsigned char	p[] = {iop_rundown, iop_eol};
+	io_desc				*iod;
 	mval				pp;
+#	ifdef DEBUG
+	int				close_called;
+#	endif
 
-	if (d->iod->pair.in == io_std_device.in  &&  d->iod->pair.out == io_std_device.out)
+	iod = d->iod;
+	if (iod->pair.in == io_std_device.in  &&  iod->pair.out == io_std_device.out)
 	{
 		if (prin_in_dev_failure || prin_out_dev_failure)
 			return;
 	}
-
-	VMS_ONLY(ESTABLISH(lastchance3);)
 	pp.mvtype = MV_STR;
 	pp.str.addr = (char *) p;
 	pp.str.len = SIZEOF(p);
-	if (d->iod->pair.in && d->iod->pair.in->state == dev_open)
-		(d->iod->pair.in->disp_ptr->close)(d->iod->pair.in, &pp);
-	if (d->iod->pair.out && d->iod->pair.out->state == dev_open)
-		(d->iod->pair.out->disp_ptr->close)(d->iod->pair.out, &pp);
-	VMS_ONLY(REVERT;)
+	DEBUG_ONLY(close_called = 0;)
+	if (iod->pair.in && (iod->pair.in->state == dev_open))
+	{
+		DEBUG_ONLY(close_called = __LINE__;)
+		(iod->pair.in->disp_ptr->close)(iod->pair.in, &pp);
+	}
+	if (iod->pair.out && (iod->pair.out->state == dev_open))
+	{
+		DEBUG_ONLY(close_called = __LINE__;)
+		(iod->pair.out->disp_ptr->close)(iod->pair.out, &pp);
+	}
+	if (iod->newly_created)
+	{
+		assert(0 == close_called);
+		if (gtmsocket == iod->type)
+			iosocket_destroy(iod);
+		else if (rm == iod->type)
+			remove_rms(iod);
+		else
+			assert(FALSE);	/* Not sure what to cleanup */
+	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #define DEF_RM_WIDTH		32767
 #define DEF_RM_RECORDSIZE	32767
 #define DEF_RM_LENGTH		66
-#define CHUNK_SIZE		512
+#define CHUNK_SIZE		BUFSIZ
 
 #define	ONE_COMMA		"1,"
 #define	ONE_COMMA_UNAVAILABLE	"1,Resource temporarily unavailable"
@@ -26,7 +26,7 @@
 
 #define	DEF_RM_PADCHAR		' '	/* SPACE */
 
-/*#define DEBUG_PIPE*/
+/*	#define DEBUG_PIPE	*/
 
 #ifdef DEBUG_PIPE
 #define PIPE_DEBUG(X) X
@@ -67,6 +67,12 @@ int pid;
 
 error_def(ERR_CLOSEFAIL);
 error_def(ERR_CRYPTBADWRTPOS);
+
+#define MEMSET_IF_DEFINED(BUFFER, CHAR, SIZE)				\
+{									\
+	if (NULL != BUFFER)						\
+		memset(BUFFER, CHAR, SIZE);				\
+}
 
 #define	IORM_FCLOSE(D_RM, FILDES, FILSTR)								\
 {													\
@@ -260,9 +266,9 @@ typedef struct
 	FILE		*filstr;
 	off_t		file_pos;
 	long		pipe_buff_size;
-	char		utf_tmp_buffer[CHUNK_SIZE];	/* Buffer to store CHUNK bytes */
-	int		utf_tot_bytes_in_buffer;	/* Number of bytes read from device, it refers utf_tmp_buffer buffer */
-	int		utf_start_pos;			/* Current position in utf_tmp_buffer */
+	char		*tmp_buffer;			/* Buffer to store CHUNK_SIZE bytes */
+	int		tot_bytes_in_buffer;		/* Number of bytes read from device, it refers tmp_buffer buffer */
+	int		start_pos;			/* Current position in tmp_buffer */
 	boolean_t	write_occurred;			/* Flag indicating whether a write has occurred on this device. */
 	boolean_t	read_occurred;			/* Flag indicating whether a read has occurred on this device. */
 	boolean_t	input_encrypted;		/* Whether this device's input stream is encrypted or not. */
@@ -273,6 +279,8 @@ typedef struct
 	mstr		output_key;			/* Name that maps to an output encryption key on disk. */
 	gtmcrypt_key_t	input_cipher_handle;		/* Encryption cipher handle for this device. */
 	gtmcrypt_key_t	output_cipher_handle;		/* Decryption cipher handle for this device. */
+	gtm_chset_t	ichset_utf16_variant;		/* Used to determine UTF16 variant when CHSET is changed b/w UTF16 & M. */
+	gtm_chset_t	ochset_utf16_variant;		/* Used to determine UTF16 variant when CHSET is changed b/w UTF16 & M. */
 	uint4		fsblock_buffer_size;		/* I/O buffer size; 1 == default size; 0 == no buffering */
 	char		*fsblock_buffer;		/* I/O buffer for, erm, buffered I/O */
 } d_rm_struct;	/*  rms		*/

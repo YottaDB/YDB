@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2015 Fidelity National Information 	;
+; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,8 +12,8 @@
 gdeput:	;output the result of the session to the global directory file
 GDEPUT()
 	n rec,gds,cregs,csegs,cregcnt,csegcnt,maxrecsize,mapcnt,map,hasSpanGbls,isSpanned,curMapSpanning,prevMapSpanning
-	n varmapslen,vargblnamelen,tmplen,ptrsize,varmapoff,gnamcnt,gblnamelen,filler16byte,filler12byte,filler11byte
-	d CREATEGLDMAP^GDEMAP
+	n varmapslen,vargblnamelen,tmplen,ptrsize,varmapoff,gnamcnt,gblnamelen,filler16byte,filler12byte,filler45byte
+	d gblstatmap,CREATEGLDMAP^GDEMAP
 	s ptrsize=$s((gtm64=TRUE):8,1:4)
 	s s="",gdeputzs="",varmapslen=0,mapcnt=0,hasSpanGbls=0
 	f  s s=$o(map(s)),tmplen=$zl(s) q:'tmplen  d
@@ -38,7 +38,7 @@ GDEPUT()
 	s x=x+(csegcnt*SIZEOF("gd_segment"))
 	s gnamcnt=gnams
 	s rec=""
-	s $p(filler11byte,ZERO,11)=ZERO
+	s $p(filler45byte,ZERO,45)=ZERO				; this may be used by the runtime logic
 	s $p(filler12byte,ZERO,12)=ZERO
 	s $p(filler16byte,ZERO,16)=ZERO
 ; contents
@@ -91,7 +91,12 @@ GDEPUT()
 	s rec=rec_$tr($j($l(tmpacc),3)," ",0)
 	s rec=rec_tmpacc
 ; templates
+	new x
+	s x=tmpreg("STATS"),tmpreg("AUTODB")='x*2+tmpreg("AUTODB") k tmpreg("STATS")	;combine items for bit mask - restore below
+	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; again an adjustment before and after
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpreg(s)),3)," ",0) s rec=rec_tmpreg(s)
+	s tmpreg("STATS")=x,tmpreg("AUTODB")=tmpreg("AUTODB")#2				; save/restore cheaper than checking in loop
+	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; restore GDE representation
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) s s="" d
 	. f  s s=$o(tmpseg(am,s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpseg(am,s)),3)," ",0),rec=rec_tmpseg(am,s)
 	u tempfile
@@ -99,9 +104,68 @@ GDEPUT()
 	u @useio
 	o file:chset="M" c file:delete
 	c tempfile:rename=file
+	i debug,$$MAP2NAM^GDEMAP(.map),$$ALL^GDEVERIF
 	q 1
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
+
+gblstatmap:
+	n s,ysr,cnt,xrefstatsreg,xrefcnt,ynam,blksiz
+	s s=""
+	s maxs=$o(regs(s),-1) 	; to ensure STDNULLCOLL for the statsDB mapping, last lower-case reg gets all of %YGS
+				; It cannot be the first lower-case region as that would cause problems for the runtime
+				; (since the map entries for %YGS and %YGS(FIRSTREG) would coalesce). Choosing the last
+				; lower-case region avoids this coalesce issue and ensure there is a separate map entry
+				; for just %YGS. This is needed by runtime (see "ygs_map_entry_changed" usage)
+	s ysr=$zconvert(maxs,"L")
+	; Map ^%Y* to a lower-case region
+	s ynam="%Y*",ynam("NSUBS")=0,ynam("SUBS",0)=ynam,ynam("TYPE")="STAR" m nams(ynam)=ynam s nams(ynam)=ysr i $incr(nams)
+	s blksiz=$$BLKSIZ($tr($j("",MAXREGLN)," ","x")) ; use maximum length region name for computation
+	s s=maxs d  s s="" f  s s=$o(regs(s)) q:(maxs=s)  i (s?1U.e) s ysr=$zconvert(s,"L") d
+	. d add2nams^GDEMAP("^%YGS("""_s_""")",ysr,"POINT")  i $incr(nams)
+	. s xrefstatsreg(ysr)=s,xrefstatsreg(s)=ysr
+	. m regs(ysr)=regs(s)				; copy & then partially override region settings for statsDB regions
+	. s regs(ysr,"AUTODB")=1
+	. s regs(ysr,"BEFORE_IMAGE")=0
+	. s regs(ysr,"DYNAMIC_SEGMENT")=ysr
+	. s regs(ysr,"JOURNAL")=0
+	. s regs(ysr,"KEY_SIZE")=dflreg("KEY_SIZE")
+	. s regs(ysr,"QDBRUNDOWN")=1	; have it always enabled on statsdbs as MUPIP SET can enable this only on basedb later
+	. s regs(ysr,"STATS")=0
+	. s regs(ysr,"STDNULLCOLL")=1
+	. m segs(ysr)=segs(regs(s,"DYNAMIC_SEGMENT"))	; copy & then partially override segment settings for statsDB segments
+	. s segs(ysr,"ACCESS_METHOD")="MM"
+	. s segs(ysr,"ALLOCATION")=2050			; about enough for 2000 processes
+	. s segs(ysr,"ASYNCIO")=0
+	. s segs(ysr,"BLOCK_SIZE")=blksiz,regs(ysr,"RECORD_SIZE")=segs(ysr,"BLOCK_SIZE")-SIZEOF("blk_hdr")
+	. s segs(ysr,"DEFER")=0		; setting defer=0 on an MM database implies NO flush timer on statsdb regions
+	. s segs(ysr,"DEFER_ALLOCATE")=1
+	. s segs(ysr,"ENCRYPTION_FLAG")=0
+	. s segs(ysr,"EXTENSION_COUNT")=2050		; and a 2000 more at a time
+	. ; Corresponding unique .gst file name for statsdb is determined at runtime when basedb is first opened.
+	. ; For now just keep the name as the basedb name + ".gst"
+	. s segs(ysr,"FILE_NAME")=segs(ysr,"FILE_NAME")_".gst"
+	. s segs(ysr,"LOCK_SPACE")=defseg("LOCK_SPACE")
+	. s segs(ysr,"RESERVED_BYTES")=0
+	. i $i(nams),$i(regs),$i(segs)			; increment the counts
+	; Determine gd_region.statsDB_reg_index for runtime
+	k sreg
+	s cnt=0,s=""
+	for  set s=$o(regs(s))  quit:s=""  s xrefcnt(s)=cnt i $incr(cnt)
+	for  set s=$o(xrefstatsreg(s))  quit:s=""  s sreg(s,"STATSDB_REG_INDEX")=xrefcnt(xrefstatsreg(s))
+	q
+
+BLKSIZ(regnm)
+	; Calculate minimum block size for ^%YGS(regnm)
+	new bhdsz,helpgld,maxksz,maxkpad,maxpid,minksz,minkpad,minreq,rhdsz,statsz,tmp
+	set tmp=$piece($zversion," ",3),maxpid=$select("AIX"=tmp:2**26-2,"Linux"=tmp:2**22-1,1:2**16)
+	set maxksz=$zlength($zcollate("%YGS("""_regnm_""","""_maxpid_""")",0))	; max key size for statistics record
+	set minksz=$zlength($zcollate("%YGS("""_regnm_""",1)",0))		; min key size for statistics record
+	set maxkpad=maxksz#8,maxkpad=$select(tmp:8-tmp,1:0)			; padding to align statistics of largest record
+	set minkpad=minksz#8,minkpad=$select(tmp:8-tmp,1:0)			; padding to align statistics of smallest record
+	set tmp=maxksz+maxkpad set:minksz+minkpad>tmp tmp=minksz+minkpad
+	set minreq=SIZEOF("blk_hdr")+SIZEOF("rec_hdr")+tmp+SIZEOF("gvstats")
+	quit $select(minreq#512:minreq\512+1*512,1:minreq)			; actual block size must round up to multiple of 512
 
 fdatum:
 	s x=segs(s,"ACCESS_METHOD")
@@ -160,8 +224,12 @@ cregion:
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	s rec=rec_$$num2bin(4,isSpanned(s))							; is_spanned
+	n maxregindex s maxregindex=$get(sreg(s,"STATSDB_REG_INDEX"),TWO(32)-1)
+	s rec=rec_$$num2bin(4,maxregindex)							; statsDB_reg_index
 	s rec=rec_$$num2bin(1,regs(s,"EPOCHTAPER"))						; epoch tapering
-	s rec=rec_filler11byte									; runtime filler
+	s rec=rec_$$num2bin(1,((s?1L.E)*4)+(('regs(s,"STATS"))*2)+regs(s,"AUTODB"))		; type of reserved DB
+	s rec=rec_$$num2bin(1,'regs(s,"LOCK_CRIT"))						; LOCK crit with DB (1) or not (0)
+	s rec=rec_filler45byte									; runtime filler
 	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; padding
 	q
 csegment:
@@ -196,8 +264,8 @@ csegment:
 	; always be 0 (ie encryption is off)
 	i (encsupportedplat=TRUE) s rec=rec_$$num2bin(4,segs(s,"ENCRYPTION_FLAG"))
 	e  s rec=rec_$$num2bin(4,0)
+	s rec=rec_$$num2bin(4,segs(s,"ASYNCIO"))
 	s rec=rec_filler16byte			; runtime filler
-	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0)
 	q
 cgblname:(s)
 	n len,coll,ver

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,10 +121,10 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	assertpro(MV_IS_STRING(val));
 	gvname.var_name = val->str;
 	gvname.hash_code = hash_code;
+	TREF(gd_targ_addr) = tmpgd;		/* needed by name-level $order/$zprevious and various other functions */
 	GV_BIND_NAME_AND_ROOT_SEARCH(tmpgd, &gvname, gvnh_reg);
 	/* cs_addrs is not initialized in case gvnh_reg->gvspan is non-NULL. Assert accordingly */
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC((NULL == gvnh_reg->gvspan) ? CHECK_CSA_TRUE : CHECK_CSA_FALSE);
-	TREF(gd_targ_addr) = tmpgd;		/* needed by name-level $order/$zprevious and various other functions */
 	was_null = is_null = FALSE;
 	/* gv_cur_region will not be set in case gvnh_reg->gvspan is non-NULL. So use region from gvnh_reg */
 	reg = gvnh_reg->gd_reg;

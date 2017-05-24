@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,8 +15,6 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "advancewindow.h"
-
-GBLREF unsigned char *source_buffer;
 
 error_def(ERR_RTNNAME);
 
@@ -38,7 +36,7 @@ int extern_func(oprtype *a)
 	assert(TK_AMPERSAND == TREF(window_token));
 	advancewindow();
 	cnt = 0;
-	extref = (char *)&source_buffer[TREF(last_source_column) - 1];
+	extref = ((TREF(source_buffer)).addr + TREF(last_source_column) - 1);
 	package.len = 0;
 	package.addr = NULL;
 	if (have_ident = (TK_IDENT == TREF(window_token)))			/* NOTE assignment */
@@ -69,7 +67,7 @@ int extern_func(oprtype *a)
 		stx_error(ERR_RTNNAME);
 		return FALSE;
 	}
-	extentry.len = INTCAST((char *)&source_buffer[TREF(last_source_column) - 1] - extref);
+	extentry.len = INTCAST((TREF(source_buffer)).addr + TREF(last_source_column) - 1 - extref);
 	extentry.len = INTCAST(extentry.len > MAX_EXTREF ? MAX_EXTREF : extentry.len);
 	extentry.addr = extref;
 	calltrip = maketriple(a ? OC_FNFGNCAL : OC_FGNCAL);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +28,10 @@ typedef unix_file_info		fi_type;
 #endif
 /* Since the journal buffer size always gets rounded up to the next multiple of
  * MIN(MAX_IO_BLOCK_SIZE, csd->blk_size) / DISK_BLOCK_SIZE), make the default journal
- * buffer size a multiple of default-block-size-to-512 ratio, which equals 2. That
- * value might need readjustment for certain block sizes, but should currently suit
- * well block sizes of 1K and 2K. */
-#define JNL_BUFFER_DEF		ROUND_UP(JNL_BUFFER_MIN, 2)
+ * buffer size a multiple of default-block-size-to-512 ratio, which equals 8 (default block size = 4K).
+ * That value might need readjustment for block sizes > 4K
+ */
+#define JNL_BUFFER_DEF		ROUND_UP(JNL_BUFFER_MIN, 8)
 #define NOJNL			FD_INVALID_NONPOSIX
 #define MID_TIME(W)		W
 #define EXTTIMEVMS(T)

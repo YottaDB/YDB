@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,9 @@
 
 #include "mdef.h"
 
+#include "sys/types.h"
+#include "gtm_stat.h"
+#include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_limits.h"
 
@@ -33,6 +37,7 @@
 #include "str_match.h"
 #include "mu_getlst.h"
 #include "gtmmsg.h"
+#include "gtm_reservedDB.h"
 
 GBLDEF	boolean_t		is_directory;
 GBLDEF	mstr			directory;
@@ -61,11 +66,13 @@ error_def(ERR_NOREGION);
 
 void mu_getlst(char *name, int4 size)
 {
-	boolean_t	matched;
-	char		*c1, *c2, *c3, *c4, fbuff[GTM_PATH_MAX], rbuff[GTM_PATH_MAX];
+	boolean_t	matched, is_statsDB, is_autoDB;
+	char		*c1, *c2, *c3, *c4, fbuff[GTM_PATH_MAX], rbuff[GTM_PATH_MAX], fnbuff[GTM_PATH_MAX + 1];
 	gd_region	*reg;
 	tp_region	*list;
 	unsigned short	flen, i, rlen;
+	struct stat	stat_buf;
+	int		rc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -146,6 +153,23 @@ void mu_getlst(char *name, int4 size)
 			matched = FALSE;
 			for (i = 0, reg = gd_header->regions; i < gd_header->n_regions; i++, reg++)
 			{
+				is_statsDB = IS_STATSDB_REG(reg);
+				is_autoDB = IS_AUTODB_REG(reg);
+				/* See if autoDB file actually exists to know whether to include this region in the list or not.
+				 * But a statsDB (which is also an autoDB) region does not point to the real statsdb file name.
+				 * (will be determined only when the baseDB is opened). So skip this check for statsDBs.
+				 * LOG_ERROR_FALSE usage below as we do not want error message displayed if file does not exist.
+				 */
+				if (!is_statsDB && is_autoDB && !mupfndfil(reg, NULL, LOG_ERROR_FALSE))
+					continue;	/* autoDB does not exist - do not include */
+				if (IS_STATSDB_REGNAME(reg))
+				{	/* This is a statsdb region. Since the statsdb file name is not determined until the
+					 * basedb region is opened, we cannot run "insert_region" on this region. Skip for now.
+					 * Caller needs to do the needful for statsdb regions since it is the one that will
+					 * do a "gvcst_init" of the baseDB region.
+					 */
+					continue;
+				}
 				if (TRUE == str_match((char *)REG_STR_LEN(reg), c1, c2 - c1))
 				{
 					matched = TRUE;

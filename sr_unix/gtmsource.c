@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,15 +56,19 @@
 #include "repl_instance.h"
 #include "ftok_sems.h"
 #include "ftok_sem_incrcnt.h"
-#include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) */
+#include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) and add_safe_timer_handler */
+#include "gtmsource_heartbeat.h" /* for gtmsource_heartbeat_timer */
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "gtm_zlib.h"
 #include "fork_init.h"
-#include "heartbeat_timer.h"
 #include "gtmio.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
+#endif
+#ifdef DEBUG
+#include "anticipatory_freeze.h"
+#include "fake_enospc.h"
 #endif
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
@@ -124,7 +128,9 @@ int gtmsource()
 	boolean_t		this_side_std_null_coll;
 	int			null_fd, rc;
 	uint4			shutdowntime = 0;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
@@ -296,6 +302,7 @@ int gtmsource()
 	assert(!holds_sem[SOURCE][SRC_SERV_COUNT_SEM]);
 	/* Start child source server initialization */
 	is_src_server = TRUE;
+	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
@@ -306,7 +313,6 @@ int gtmsource()
 	 */
 	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
 	mutex_per_process_init();
-	START_HEARTBEAT_IF_NEEDED;
 	ppid = getppid();
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
@@ -319,7 +325,6 @@ int gtmsource()
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 	REPL_DPRINT1("Setting up regions\n");
 	gvinit();
-
 	/* We use the same code dse uses to open all regions but we must make sure they are all open before proceeding. */
 	all_files_open = region_init(FALSE);
 	if (!all_files_open)
@@ -332,6 +337,7 @@ int gtmsource()
 	this_side_std_null_coll = -1;
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 	{
+		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
 		if (this_side_std_null_coll != csa->hdr->std_null_coll)
 		{
@@ -430,6 +436,17 @@ int gtmsource()
 		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 	}
+	add_safe_timer_handler(1, gtmsource_heartbeat_timer);
+#	ifdef DEBUG
+	if (is_jnlpool_creator)
+	{
+		if (TREF(gtm_test_fake_enospc) && CUSTOM_ERRORS_LOADED)
+		{	/* Only the journal pool creator drives fake_enospc */
+			srand(time(NULL));
+			start_timer((TID)fake_enospc, ENOSPC_INIT_DURATION, fake_enospc, 0, NULL);
+		}
+	}
+#	endif
 	gtmsource_local->jnlfileonly = gtmsource_options.jnlfileonly;
 	do
 	{ 	/* If mode is passive, go to sleep. Wakeup every now and then and check to see if I have to become active. */

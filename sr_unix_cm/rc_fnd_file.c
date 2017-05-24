@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,9 +139,12 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		/* No need to initialize g->clue.prev as it is never used */
 		g->clue.end = 0;
 		g->root = DIR_ROOT;
+		assertpro(FALSE);	/* Need to rework the below codepath if/when this is reached */
+#		ifdef DISABLED_CODE
 		addr = dsid_list->gda = (gd_addr *)malloc(SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
 		memset(addr, 0, SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
 		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
+#		endif
 		dsid_list->gda->max_rec_size = gv_cur_region->max_rec_size;
 		dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 		init_hashtab_mname(dsid_list->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
@@ -262,9 +266,12 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		/* No need to initialize g->clue.prev as it is not currently used */
 		g->clue.end = 0;
 		g->root = DIR_ROOT;
+		assert(FALSE);	/* Need to rework the below codepath if/when this is reached */
+#		ifdef DISABLED_CODE
 		addr = fdi_ptr->gda = (gd_addr *)malloc(SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
 		memset(addr, 0, SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
 		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
+#		endif
 		fdi_ptr->gda->max_rec_size = gv_cur_region->max_rec_size;
 		fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 		init_hashtab_mname(fdi_ptr->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Copyright (c) 2007-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,6 @@
 #include "gvcst_map_build.h"
 #include "relqop.h"
 #include "is_proc_alive.h"
-#include "wcs_sleep.h"
 #include "bm_update.h"
 #include "mm_update.h"
 #include "bg_update.h"
@@ -85,9 +84,8 @@
 #include "wcs_phase2_commit_wait.h"
 #include "wcs_recover.h"
 #include "shmpool.h"	/* Needed for the shmpool structures */
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
+#include "wcs_wt.h"
 
 error_def(ERR_DBFILERR);
 error_def(ERR_FREEBLKSLOW);
@@ -110,7 +108,6 @@ error_def(ERR_WCBLOCKED);
 }
 
 #define MAX_CYCLES	2
-NOPIO_ONLY(GBLREF boolean_t	*lseekIoInProgress_flags;)
 
 #define DO_FAST_INTEG_CHECK(old_block, cs_addrs, cs, lcl_ss_ctx, blkid, write_to_snapshot_file)					\
 {																\
@@ -185,12 +182,12 @@ void fileheader_sync(gd_region *reg)
 	csd = csa->hdr;
 	assert(csa->now_crit);	/* only way high water mark code works is if in crit */
 				/* Adding lock code to it would remove this restriction */
-	assert(!reg->read_only);
+	assert(csa->orig_read_write);
 	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
 	cnl = csa->nl;
 	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
-	cnl->highest_lbm_blk_changed = -1;			/* Reset to initial value */
+	cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;	/* Reset to initial value */
 	flush_len = SGMNT_HDR_LEN;
 	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
@@ -200,9 +197,11 @@ void fileheader_sync(gd_region *reg)
 		 */
 		flush_len = ROUND_UP(flush_len, csa->fullblockwrite_len);
 	}
-	assert(flush_len <= (csd->start_vbn - 1) * DISK_BLOCK_SIZE);	/* assert that we never overwrite GDS block 0's offset */
+	if (udi->fd_opened_with_o_direct)
+		flush_len = ROUND_UP2(flush_len, DIO_ALIGNSIZE(udi));
+	assert(flush_len <= BLK_ZERO_OFF(csd->start_vbn));	/* assert that we never overwrite GDS block 0's offset */
 	assert(flush_len <= SIZEOF_FILE_HDR(csd));	/* assert that we never go past the mastermap end */
-	DB_LSEEKWRITE(csa, udi->fn, udi->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
+	DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
 	if (0 != save_errno)
 	{
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
@@ -243,7 +242,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	/* assert that if cs->reference_cnt is 0, then we are in MUPIP REORG UPGRADE/DOWNGRADE or DSE MAPS or DSE CHANGE -BHEAD
 	 * or MUPIP REORG -TRUNCATE */
 	assert(mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || dse_running || (0 != reference_cnt)
-		GTM_TRUNCATE_ONLY(|| (NULL != csa->nl && process_id == csa->nl->trunc_pid)));
+		|| (NULL != csa->nl && process_id == csa->nl->trunc_pid));
 	if (0 < reference_cnt)
 	{	/* Blocks were allocated in this bitmap. Check if local bitmap became full as a result. If so update mastermap. */
 		bml_full = bml_find_free(0, (SIZEOF(blk_hdr) + (is_mm ? lclmap : ((sm_uc_ptr_t)GDS_REL2ABS(lclmap)))), total_blks);
@@ -289,10 +288,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
-#	ifdef GTM_SNAPSHOT
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -314,7 +311,6 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		else
 			si->backup_block_saved = TRUE;
 	}
-#	ifdef GTM_SNAPSHOT
 	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
 	{
 		lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
@@ -334,7 +330,6 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 					|| ((blk_hdr_ptr_t)(db_addr[0]))->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn);
 		}
 	}
-#	endif
 	if (gds_t_writemap == cs->mode)
 	{
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
@@ -424,11 +419,12 @@ enum cdb_sc	bg_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 
 enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 {
+	boolean_t		twinning_on;
 	int			dummy;
 	int4			n;
 	uint4			lcnt;
 	bt_rec_ptr_t		bt;
-	cache_rec_ptr_t		cr, save_cr;
+	cache_rec_ptr_t		cr, cr_new, save_cr;
 	boolean_t		read_finished, wait_for_rip, write_finished, intend_finished;
 	boolean_t		read_before_image;
 	block_id		blkid;
@@ -438,10 +434,12 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	enum gds_t_mode		mode;
 	enum db_ver		desired_db_format;
 	trans_num		dirty_tn;
+	gv_namehead		*gvt;
+	srch_blk_status		*blk_hist;
+	void_ptr_t		retcrptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
 	cnl = csa->nl;
@@ -456,7 +454,6 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
 	bt = bt_put(gv_cur_region, blkid);
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
-	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DBDANGER, bt, NULL);
 	if (NULL == bt)
 	{
 		assert(gtm_white_box_test_case_enabled);
@@ -480,6 +477,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 #			ifdef DEBUG
 			save_cr = NULL;
 			if (gtm_white_box_test_case_enabled)
+			{
 				save_cr = cr;	/* save cr for r_epid cleanup before setting it to INVALID */
 				/* stop self to test sechshr_db_clnup clears the read state */
 				if (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number)
@@ -489,21 +487,22 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					for (dummy = 10; dummy; dummy--)
 						LONG_SLEEP(10); /* time for sigterm to take hit before we clear block_now_locked */
 				}
+			}
 #			endif
 			GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DBCSHGETN_INVALID, cr, (cache_rec_ptr_t)CR_NOTVALID);
 			if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 			{
 				assert(gtm_white_box_test_case_enabled);
-				DEBUG_ONLY(
-					if (NULL != save_cr)
-					{	/* release the r_epid lock on the valid cache-record returned from db_csh_getn */
-						assert(save_cr->r_epid == process_id);
-						save_cr->r_epid = 0;
-						assert(0 == save_cr->read_in_progress);
-						RELEASE_BUFF_READ_LOCK(save_cr);
-						TREF(block_now_locked) = NULL;
-					}
-				)
+#				ifdef DEBUG
+				if (NULL != save_cr)
+				{	/* release the r_epid lock on the valid cache-record returned from db_csh_getn */
+					assert(save_cr->r_epid == process_id);
+					save_cr->r_epid = 0;
+					assert(0 == save_cr->read_in_progress);
+					RELEASE_BUFF_READ_LOCK(save_cr);
+					TREF(block_now_locked) = NULL;
+				}
+#				endif
 				BG_TRACE_PRO(wcb_t_end_sysops_nocr_invcr);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
@@ -538,18 +537,24 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		}
 		cs->first_copy = TRUE;
 		assert(0 == cr->in_tend);
-		cr->in_tend = process_id;		/* in_tend should be set before the semaphore (and data_invalid) */
-		assert(0 == cr->dirty);
-		/* Even though the buffer is not in the active queue and we are in crit, it is possible
-		 * for the cache-record to have the write interlock still set. This is because in wcs_wtstart
-		 * csr->dirty is reset to 0 before it releases the write interlock on the buffer. Because all
-		 * routines (bt_put, db_csh_getn and wcs_get_space) wait only for cr->dirty to become 0 before
-		 * considering the buffer ready for reuse, it is possible to have the write interlock set at this
-		 * point with a concurrent wcs_wtstart almost ready to release the interlock. In this case wait.
-		 * Hence we cannot call LOCK_NEW_BUFF_FOR_UPDATE directly.
+		/* Set cr->in_tend before the semaphore (and data_invalid). But note that cr->in_tend needs to be reset
+		 * in case we encounter an error in phase1. This way if "secshr_db_clnup" is invoked and does a commit for
+		 * this block into a new cr it would set cr->stopped and "wcs_recover" would know to use the cr->stopped one.
+		 * If "secshr_db_clnup" is not invoked (e.g. kill -9 of process in middle of commit), "wcs_recover" would
+		 * see cr->in_tend as non-zero and in that case it can know this cr cannot be discarded (i.e. no corresponding
+		 * new cr with cr->stopped=TRUE got created).
 		 */
-		/* Since the only case where the write interlock is not clear is a two-instruction window
-		 * (described in the above comment), we dont expect the lock-not-clear situation to be frequent.
+		cr->in_tend = process_id;
+		assert(0 == cr->dirty);
+		/* Even though the buffer is not in the active (or wip queue if csd->asyncio is ON) and we are in crit, it is
+		 * possible for the cache-record to have the write interlock still set. This is because in wcs_wtstart
+		 * (and wcs_wtfini) csr->dirty is reset to 0 before it releases the write interlock on the buffer.
+		 * Because all routines (bt_put, db_csh_getn and wcs_get_space) wait only for cr->dirty to become 0 before
+		 * considering the buffer ready for reuse, it is possible to have the write interlock set at this
+		 * point with a concurrent wcs_wtstart/wcs_wtfini almost ready to release the interlock. In this case wait.
+		 * Hence we cannot call LOCK_NEW_BUFF_FOR_UPDATE directly.
+		 * Since the only case where the write interlock is not clear is a two-instruction window
+		 * (described in the above comment), we don't expect the lock-not-clear situation to be frequent.
 		 * Hence, for performance reasons we do the check before invoking the wcs_write_in_progress_wait function
 		 * (instead of moving the if check into the function which would mean an unconditional function call).
 		 */
@@ -563,6 +568,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"), process_id, &ctn,
 						DB_LEN_STR(gv_cur_region));
+				cr->in_tend = 0;
 				return cdb_sc_cacheprob;
 			}
 		} else
@@ -571,10 +577,11 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		BG_TRACE(new_buff);
 		cr->bt_index = GDS_ABS2REL(bt);
 		bt->cache_index = (int4)GDS_ABS2REL(cr);
+		cr->backup_cr_is_twin = FALSE;
 	} else	/* end of if else on cr NOTVALID */
 	{
 		cr = (cache_rec_ptr_t)GDS_REL2ABS(cr);
-		assert(0 != cr->bt_index);
+		assert(bt == (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index));
 		assert(CR_BLKEMPTY != cr->blk);
 		assert(blkid == cr->blk);
 		if (cr->in_tend)
@@ -601,26 +608,213 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		assert(0 == cr->data_invalid);
 		cr->in_tend = process_id;
 		wait_for_rip = FALSE;
-		/* If we find the buffer we intend to update is concurrently being flushed to disk, wait for an active writer to
-		 * finish flushing.
+		/* If we find the buffer we intend to update is concurrently being flushed to disk,
+		 *	a) If asyncio=OFF, writes are to the filesystem cache (which are relatively fast) so wait for the
+		 *		active writer to finish flushing.
+		 *	b) If asyncio=ON, then writes are with O_DIRECT and directly hardened to disk (no cache in between)
+		 *		so take a long time to return. Do not want to wait for that IO event while holding crit.
+		 *		Create a twin buffer and dump the update on that buffer instead of waiting.
 		 */
 		LOCK_BUFF_FOR_UPDATE(cr, n, &cnl->db_latch);
-		if (!OWN_BUFF(n))
-		{
-			write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK2);
-			if (!write_finished)
+		assert((LATCH_CONFLICT >= n) && (LATCH_CLEAR <= n));
+		twinning_on = TWINNING_ON(csd);
+		cr->backup_cr_is_twin = FALSE;
+		if (!twinning_on)
+		{	/* TWINNING is not active because of asyncio=OFF */
+			if (!OWN_BUFF(n))
 			{
-				assert(gtm_white_box_test_case_enabled);
-				BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck2);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
-						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
-						process_id, &ctn, DB_LEN_STR(gv_cur_region));
-				return cdb_sc_cacheprob;
+				write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK2);
+				if (!write_finished)
+				{
+					assert(gtm_white_box_test_case_enabled);
+					BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck2);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
+							6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
+							process_id, &ctn, DB_LEN_STR(gv_cur_region));
+					cr->in_tend = 0;
+					return cdb_sc_cacheprob;
+				}
+			}
+			assert((0 == cr->dirty) || (-1 == cr->read_in_progress)); /* dirty buffer cannot be read in progress */
+			if (-1 != cr->read_in_progress)
+				wait_for_rip = TRUE;
+		} else
+		{	/* TWINNING is enabled because of asyncio=ON. Create TWIN instead of waiting for write to complete */
+			if (0 == cr->dirty)		/* Free, move to active queue */
+			{	/* If "asyncio" is turned ON, "wcs_wtfini" is the only one that will reset "cr->dirty". And
+				 * that runs inside crit. Since we hold crit now, wcs_wtfini could not have run after we
+				 * did the LOCK_BUFF_FOR_UPDATE and so we are guaranteed the current value of the write
+				 * interlock is LATCH_SET. Assert that.
+				 */
+				assert(LATCH_SET == WRITE_LATCH_VAL(cr));
+				assert(0 == cr->twin);
+				if (-1 != cr->read_in_progress)
+					wait_for_rip = TRUE;
+			} else if (LATCH_CONFLICT > n)
+			{	/* it's modified but available */
+				assert(-1 == cr->read_in_progress);	/* so "wait_for_rip" can stay FALSE */
+			} else
+			{	/* This cr is owned by a concurrent writer. Create TWIN. */
+				assert(-1 == cr->read_in_progress);	/* so "wait_for_rip" can stay FALSE */
+				cr_new = db_csh_getn(blkid);
+#				ifdef DEBUG
+				save_cr = NULL;
+				if (gtm_white_box_test_case_enabled)
+					save_cr = cr_new;	/* save cr for r_epid cleanup before setting to INVALID */
+#				endif
+				GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DBCSHGETN_INVALID2, cr_new, (cache_rec *)CR_NOTVALID);
+				if ((cache_rec *)CR_NOTVALID == cr_new)
+				{
+					assert(gtm_white_box_test_case_enabled);
+#					ifdef DEBUG
+					if (NULL != save_cr)
+					{	/* Since we are simulating a "db_csh_getn" failure return,
+						 * undo all changes in db_csh_getn that would otherwise persist.
+						 */
+						assert(save_cr->r_epid == process_id);
+						retcrptr = remqh((que_ent_ptr_t)((sm_uc_ptr_t)save_cr + save_cr->blkque.bl));
+						assert(retcrptr == save_cr);
+						save_cr->r_epid = 0;
+						assert(0 == save_cr->read_in_progress);
+						RELEASE_BUFF_READ_LOCK(save_cr);
+						assert(blkid == save_cr->blk);
+						save_cr->blk = CR_BLKEMPTY;
+						TREF(block_now_locked) = NULL;
+					}
+#					endif
+					BG_TRACE_PRO(wcb_t_end_sysops_dirty_invcr);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_t_end_sysops_dirty_invcr"),
+							process_id, &ctn, DB_LEN_STR(gv_cur_region));
+					cr->in_tend = 0;
+					return cdb_sc_cacheprob;
+				}
+				assert(NULL != cr_new);
+				assert(0 == cr_new->dirty);
+				assert(cr_new->blk == blkid);
+				LOCK_NEW_BUFF_FOR_UPDATE(cr_new);	/* is new or cleaning up old; can't be active */
+				if (cr != cr_new)
+				{	/* db_csh_getn did not give back the same cache-record, which it could do
+					 * if it had to invoke wcs_wtfini.
+					 */
+					assert(0 == cr_new->in_cw_set);
+					assert(0 == cr_new->in_tend);
+					if (0 != cr->dirty)
+					{	/* "cr" is still dirty and in WIP queue. "cr" cannot already have an OLDER twin.
+						 * This is because we know "n" == LATCH_CONFLICT at this point which means
+						 * "wcs_wtstart" took over this "cr" for writing. But it will not have done that
+						 * if "cr->twin" was still non-zero.
+						 */
+						assert(!cr->twin);
+						if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
+						{
+							assert(ARRAYSIZE(cr_array) > cr_array_index);
+							PIN_CACHE_RECORD(cr_new, cr_array, cr_array_index);
+						} else
+							TP_PIN_CACHE_RECORD(cr_new, si);
+						assert(process_id == cr->in_tend);
+						cr->in_tend = 0;
+						cr_new->in_tend = process_id;
+						cr_new->ondsk_blkver = cr->ondsk_blkver; /* copy blk version from old cache rec */
+						if (gds_t_writemap == mode)
+						{	/* gvcst_map_build doesn't do first_copy */
+							memcpy(GDS_REL2ABS(cr_new->buffaddr), GDS_REL2ABS(cr->buffaddr),
+													BM_SIZE(csd->bplmap));
+						}
+						/* form twin*/
+						cr_new->twin = GDS_ABS2REL(cr);
+						cr->twin = GDS_ABS2REL(cr_new);
+						/* Currently we compare out-of-crit "cr->buffaddr->tn" with the "hist->tn"
+						 * to see if a block has been modified since the time we did our read
+						 * (places are t_qread, tp_hist, gvcst_search and gvcst_put). With twinning,
+						 * if a cache-record is currently being written to disk, and we need to
+						 * update it, we find out another free cache-record and twin the two
+						 * and make all changes only in the newer twin. Because of this, if we
+						 * are doing our blkmod check against the old cache-record, our check
+						 * may incorrectly conclude that nothing has changed. To prevent this
+						 * the cycle number of the older twin has to be incremented. This way,
+						 * the following cycle-check (in all the above listed places, a
+						 * cdb_sc_blkmod check is immediately followed by a cycle check) will
+						 * detect a restartable condition. Note that cr->bt_index should be set to 0
+						 * BEFORE cr->cycle++ as t_qread relies on this order.
+						 */
+						cr->bt_index = 0;
+						cr->cycle++;	/* increment cycle whenever blk number changes (for tp_hist) */
+						cs->first_copy = TRUE;
+						if (gds_t_write == mode) /* update landed in a different cache-record (twin) */
+						{	/* If valid clue and this block is in it, need to update buffer address to
+							 * point to NEWER twin. The NEWER twin has not yet been built (happens in
+							 * phase2 of commit) so its block contents are invalid but it is okay for
+							 * the clue to point to it since the clue will not be used until the commit
+							 * completes. In case of any error before we reach phase2 for this block,
+							 * we would invoke "secshr_db_clnup" which will create a cr->stopped
+							 * cache-record and update clue to point to that more-uptodate cr. So we
+							 * are fine setting clue prematurely to point to the incomplete NEWER twin
+							 * here in all cases.
+							 */
+							gvt = (!dollar_tlevel ? gv_target : cs->blk_target);
+							if ((NULL != gvt) && (0 != gvt->clue.end))
+							{
+								blk_hist = &gvt->hist.h[cs->level];
+								if (blk_hist->blk_num == blkid)
+								{
+									blk_hist->buffaddr =
+											(sm_uc_ptr_t)GDS_REL2ABS(cr_new->buffaddr);
+									blk_hist->cr = cr_new;
+									blk_hist->cycle = cr_new->cycle;
+								}
+							}
+						}
+						cr = cr_new;
+						cr->backup_cr_is_twin = TRUE;	/* OLDER "twin" has before-image for backup etc. */
+						/* Note that a "cr"'s read_in_progress will be set whenever it is obtained through
+						 *   db_csh_getn which is done for two cases in the bg_update function,
+						 *	(i) one for a newly created block
+						 *	(ii) one for the twin of an existing block
+						 * This read-in-progress lock is released before the actual gvcst_blk_build of the
+						 *	block by a RELEASE_BUFF_READ_LOCK done down below in a codepath common to
+						 *	both case(i) and (ii).
+						 * Both cases result in buffers that are empty and hence should not be used by any
+						 *	other process for doing their gvcst_blk_search. To this effect we should
+						 *	set things up so that one of the validation checks will fail later on these
+						 *	buffers.
+						 * Case (i) is easy since no other process would be trying to search through a
+						 *	to-be-created block and hence requires no special handling.
+						 * Case (ii) refers to an existing block and hence we need to set the block-tn in
+						 *	the empty buffer to be csa->ti->curr_tn to ensure the other process using
+						 *	this buffer for their gvcst_blk_search fails the cdb_sc_blkmod check in the
+						 *	intermediate validation routine tp_hist.
+						 * Since the above needs to be done only for case (ii), we do the necessary stuff
+						 *	here rather than just before the RELEASE_BUFF_READ_LOCK which is common to
+						 *	both cases.
+						 */
+						((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn = ctn;
+					} else
+					{	/* If not cr->dirty, then "wcs_wtfini" (invoked from "db_csh_getn" above)
+						 * has processed it, just proceed with "cr". Discard "cr_new".
+						 */
+						assert(process_id == cr_new->r_epid);	/* "db_csh_getn" returned "cr_new" */
+						cr_new->r_epid = 0;
+						assert(0 == cr_new->read_in_progress);
+						RELEASE_BUFF_READ_LOCK(cr_new);
+						TREF(block_now_locked) = NULL;
+						/* Release update lock on "cr_new" and get it on "cr" now that we changed minds */
+						assert(!cr_new->dirty);
+						WRITE_LATCH_VAL(cr_new) = LATCH_CLEAR;
+						assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
+						LOCK_NEW_BUFF_FOR_UPDATE(cr);
+						/* The block "blkid" can no longer be found in "cr_new".
+						 * It can only be found in "cr". Set that accordingly.
+						 */
+						assert(blkid == cr_new->blk);
+						cr_new->blk = CR_BLKEMPTY;
+					}
+				}	/* end of if (cr != cr_new) */
+				assert(cr->blk == blkid);
+				bt->cache_index = GDS_ABS2REL(cr);
+				cr->bt_index = GDS_ABS2REL(bt);
 			}
 		}
-		assert((0 == cr->dirty) || (-1 == cr->read_in_progress));	/* dirty buffer cannot be read in progress */
-		if (-1 != cr->read_in_progress)
-			wait_for_rip = TRUE;
 		if (wait_for_rip)
 		{	/* wait for another process in t_qread to stop overlaying the buffer, possible due to
 			 *	(a) reuse of a killed block that's still in the cache OR
@@ -636,6 +830,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 					LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
+				cr->in_tend = 0;
 				return cdb_sc_cacheprob;
 			}
 			assert(-1 == cr->read_in_progress);
@@ -651,7 +846,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				|| (gds_t_acquired != mode) && (0 != cs->new_buff));
 		if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
 		{
-			assert((((MAX_BT_DEPTH * 2) - 1) * 2) > cr_array_index);
+			assert(ARRAYSIZE(cr_array) > cr_array_index);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		} else
 			TP_PIN_CACHE_RECORD(cr, si);
@@ -716,9 +911,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		}
 	}
 	assert((gds_t_writemap != mode) || dse_running /* generic dse_running variable is used for caller = dse_maps */
-		VMS_ONLY(|| cr->twin || CR_BLKEMPTY == cs->cr->blk)
-		|| (cs->cr == cr) && (cs->cycle == cr->cycle));
-	assert((gds_t_writemap != mode) || (cs->cycle == cr->cycle));
+		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || (cs->cr == cr) && (cs->cycle == cr->cycle));
 	/* Before marking this cache-record dirty, record the value of cr->dirty into cr->tn.
 	 * This is used in phase2 to determine "recycled".
 	 */
@@ -730,7 +923,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	 */
 	if (0 == dirty_tn)
 	{
-		DECR_CNT(&cnl->wc_in_free, &cnl->wc_var_lock);
+		SUB_ENT_FROM_FREE_QUE_CNT(cnl);
+		assert(0 == cr->dirty);		/* dirty_tn just picked up above from cr->dirty of locked buffer */
+		INCR_GVSTATS_COUNTER(csa, cnl, n_clean2dirty, 1);
 		cr->dirty = ctn;		/* block will be dirty.	 Note the tn in which this occurred */
 		/* At this point cr->flushed_dirty_tn could be EQUAL to ctn if this cache-record was used to update a different
 		 * block in this very same transaction and reused later for the current block. Reset it to 0 to avoid confusion.
@@ -763,7 +958,6 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	int4			n;
 	off_chain		chain;
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr, chain_ptr;
-	sm_off_t		backup_cr_off;
 	cw_set_element		*cs_ptr, *nxt;
 	cache_rec_ptr_t		cr, backup_cr;
 	boolean_t		recycled;
@@ -774,10 +968,8 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	node_local_ptr_t        cnl;
 	enum gds_t_mode		mode;
 	cache_que_heads_ptr_t	cache_state;
-#ifdef GTM_SNAPSHOT
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
-#endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -811,22 +1003,31 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	 */
 	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_PHASE2FAIL, cr, NULL);
-	DEBUG_ONLY(
-		if (NULL == cr)
-		{
-			assert(gtm_white_box_test_case_enabled);
-			return cdb_sc_cacheprob;
-		}
-	)
+#	ifdef DEBUG
+	if (NULL == cr)
+	{
+		assert(gtm_white_box_test_case_enabled);
+		return cdb_sc_cacheprob;
+	}
+#	endif
 	blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 	/* Take backup of block in phase2 (outside of crit). */
-	backup_cr = cr;
-	backup_blk_ptr = blk_ptr;
-	if (!WAS_FREE(cs->blk_prior_state)) /* dont do before image write for backup for FREE blocks */
+	if (!WAS_FREE(cs->blk_prior_state)) /* don't do before image write for backup for FREE blocks */
+	{
+		if (!cr->backup_cr_is_twin)
+		{
+			backup_cr = cr;
+			backup_blk_ptr = blk_ptr;
+		} else
+		{
+			assert(TWINNING_ON(csd));
+			backup_cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
+			backup_blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(backup_cr->buffaddr);
+		}
 		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved);
+	}
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
-#	ifdef GTM_SNAPSHOT
 	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
 	{
 		lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
@@ -846,7 +1047,6 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 					|| ((blk_hdr_ptr_t)(blk_ptr))->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn);
 		}
 	}
-#	endif
 	SET_DATA_INVALID(cr);	/* data_invalid should be set signaling intent to update contents of a valid block */
 	if (gds_t_writemap == mode)
 	{
@@ -946,6 +1146,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	cache_state = csa->acc_meth.bg.cache_state;
 	if (!recycled)
 	{	/* stuff it on the active queue */
+		assert(0 == cr->epid);
 		/* Earlier revisions of this code had a kludge in place here to work around INSQTI failures (D9D06-002342).
 		 * Those are now removed as the primary error causing INSQTI failures is believed to have been resolved.
 		 */
@@ -959,7 +1160,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
 			return cdb_sc_cacheprob;
 		}
-		ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
+		ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
 	}
 	RELEASE_BUFF_UPDATE_LOCK(cr, n, &cnl->db_latch);
 	/* "n" holds the pre-release value, so check accordingly */
@@ -971,6 +1172,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		 * that a concurrent process in bg_update_phase1 could lock this buffer for update and incorrectly conclude that
 		 * it has been locked by a writer when it has actually been locked by a process in bg_update_phase2.
 		 */
+		assert(0 == cr->epid);
 		n = INSQHI((que_ent_ptr_t)&cr->state_que, (que_head_ptr_t)&cache_state->cacheq_active);
 		GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INSQHIFAIL, n, INTERLOCK_FAIL);
 		if (INTERLOCK_FAIL == n)
@@ -982,17 +1184,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			return cdb_sc_cacheprob;
 		}
 	}
-	/* A concurrent process reading this block will wait for in_tend to become FALSE and then proceed with its
-	 * database operation. Later it will reach t_end/tp_tend doing validations at which point it will need to set in_cw_set.
-	 * It expects in_cw_set to be 0 at that point. Therefore in_cw_set needs to be reset to 0 BEFORE resetting in_tend.
-	 * Need a write memory barrier to ensure that these two updates are seen in that order by any other concurrent process.
-	 */
-	assert(process_id == cr->in_cw_set);
-	UNPIN_CACHE_RECORD(cr);
-	assert(!cr->in_cw_set);
-	SHM_WRITE_MEMORY_BARRIER;
-	assert(process_id == cr->in_tend);	/* should still be valid */
-	cr->in_tend = 0;
+	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(cr);	/* resets cr->in_tend & cr->in_cw_set (for older twin too if needed) */
 	VERIFY_QUEUE_LOCK(&cache_state->cacheq_active, &cnl->db_latch);
 	cs->old_mode = -cs->old_mode;	/* negate it back to indicate phase2 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 < cs->old_mode);
@@ -1009,11 +1201,10 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	int4			wtstart_errno;
 	INTPTR_T		reg_parm;
 	jnl_private_control	*jpc;
-
 	uint4		buffs_per_flush, flush_target;
 
 	assert(reg->open); /* there is no reason we know of why a region should be closed at this point */
-	if (!reg->open)    /* in pro, be safe though and dont touch an already closed region */
+	if (!reg->open)    /* in pro, be safe though and don't touch an already closed region */
 		return;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -1029,6 +1220,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 		{
 			reg_parm = (UINTPTR_T)reg;
 			csa->timer = TRUE;
+			csa->canceled_flush_timer = FALSE;
 			INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 			INSERT_WT_PID(csa);
 			start_timer((TID)reg,
@@ -1063,11 +1255,10 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	{
 		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
 	}
-	if (flush_target  <= cnl->wcs_active_lvl)
+	if ((flush_target  <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csd))
 	{	/* Already in need of a good flush */
 		BG_TRACE_PRO_ANY(csa, active_lvl_trigger);
-		DCLAST_WCS_WTSTART(reg, buffs_per_flush, wtstart_errno);
-		/* a macro that dclast's wcs_wtstart and checks for errors etc. */
+		wtstart_errno = wcs_wtstart(reg, buffs_per_flush, NULL, NULL);
 		if ((dba_mm == acc_meth) && (ERR_GBLOFLOW == wtstart_errno))
 			wcs_recover(reg);
 		csa->stale_defer = FALSE;		/* This took care of any pending work for this region */
@@ -1082,12 +1273,13 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	gd_region		*save_region;
 	sgmnt_addrs		*csa, *save_csaddrs, *check_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
-	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
 	gd_region		*reg;
 	enum db_acc_method	acc_meth;
 	node_local_ptr_t	cnl;
 	jnl_private_control	*jpc;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	save_region = gv_cur_region;		/* Certain debugging calls expect gv_cur_region to be correct */
 	save_csaddrs = cs_addrs;
 	save_csdata = cs_data;
@@ -1106,7 +1298,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	cnl = csa->nl;
 	jpc = csa->jnl;
 	assert((NULL == jpc) || (NOJNL != jpc->channel) || JNL_FILE_SWITCHED(jpc));
-	/* Check if this is a condition where we dont want to start a new timer for sure */
+	/* Check if this is a condition where we don't want to start a new timer for sure */
 	if (((dba_mm == acc_meth) && (csa->total_blks != csa->ti->total_blks)) /* access method is MM and file extended */
 		|| (is_updproc && (cnl->wcs_timers > 0)) /* Update process need not take up the burden of flushing if
 							  * there is at least one other flusher */
@@ -1119,6 +1311,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 		REMOVE_WT_PID(csa);
 		csa->timer = FALSE;		/* No timer set for this region by this process anymore */
+		csa->canceled_flush_timer = TRUE;
 		/* Restore region */
 		if (save_region != gv_cur_region)
 		{
@@ -1138,32 +1331,38 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	      Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
 	      might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
 	      if we are in "mutex_deadlock_check" as otherwise it presents reentrancy issues.
-	   3) We have crit in any region OR are in the middle of commit for this region even though we dont
+	   3) We have crit in any region OR are in the middle of commit for this region even though we don't
 	      hold crit (in bg_update_phase2) OR are in wcs_wtstart (potentially holding write interlock and
 	      keeping another process in crit waiting). Assumption is that if region we were in was not crit, we're
 	      clear. This is not strictly true in some special TP cases on the final retry if the previous retry did
 	      not get far enough into the transaction to cause all regions to be locked down but this case is
 	      statistically infrequent enough that we will go ahead and do the IO in crit "this one time".
 	   4) We are in a "fast lock".
+	   5) We are in an external call and the database is encrypted (both of which could use memory management
+	      functions).
+	   6) We are in an online freeze.
+	   Note: Please ensure the terms in the "if" below appear in descending order based upon likelihood
+	      of their being FALSE. Any terms that call functions should be at the end.
 	   **************************************************************************************************/
-	GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-	if ((0 == crit_count) && !in_mutex_deadlock_check && OK_TO_INTERRUPT
-		NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
+	if ((0 == crit_count) && !in_mutex_deadlock_check
 		&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
-		&& (0 == fast_lock_count))
+		&& (0 == fast_lock_count)
+		&& !FROZEN_CHILLED(csd)
+		&& (!(TREF(in_ext_call) && csd->is_encrypted))
+		&& OK_TO_INTERRUPT)
 	{
 		BG_TRACE_PRO_ANY(csa, stale);
 		switch (acc_meth)
 		{
 			case dba_bg:
 				/* Flush at least some of our cache */
-				wcs_wtstart(reg, 0);
+				wcs_wtstart(reg, 0, NULL, NULL);
 				/* If there is no dirty buffer left in the active queue, then no need for new timer */
 				if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
 					need_new_timer = FALSE;
 				break;
 			case dba_mm:
-				wcs_wtstart(reg, 0);
+				wcs_wtstart(reg, 0, NULL, NULL);
 				assert(csd == csa->hdr);
 				need_new_timer = FALSE;
 				break;
@@ -1191,6 +1390,11 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 		REMOVE_WT_PID(csa);
 		csa->timer = FALSE;		/* No timer set for this region by this process anymore */
+		/* Since this is a case where we know for sure no dirty buffers remain, there is no need of
+		 * the flush timer anymore, so "csa->canceled_flush_timer" can be safely set to FALSE.
+		 */
+		assert(!csa->canceled_flush_timer);	/* should have been reset when "csa->timer = TRUE" happened */
+		csa->canceled_flush_timer = FALSE;	/* be safe in pro just in case */
 	}
 	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
 	 * if the region we are restoring has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures

@@ -92,7 +92,6 @@ ZOS_ONLY(error_def(ERR_BADTAG);)
 error_def(ERR_FILERENAME);
 error_def(ERR_JNLCRESTATUS);
 error_def(ERR_JNLFNF);
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_PREMATEOF);
 error_def(ERR_RENAMEFAIL);
 error_def(ERR_TEXT);
@@ -174,6 +173,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			group_id;
 	struct stat		sb;
 	int			perm;
+	struct perm_diag_data	pdd;
 	int			idx;
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
@@ -235,7 +235,22 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		return EXIT_ERR;
 	}
 	/* Setup new group and permissions if indicated by the security rules */
-	gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE);
+	if (!gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE, &pdd))
+	{
+		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+			PERMGENDIAG_ARGS(pdd));
+		if (IS_GTM_IMAGE)
+			rts_error_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		else
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
 	/* if group not the same then change group of temporary file */
 	if ((((INVALID_UID != user_id) && (user_id != stat_buf.st_uid))
 			|| ((INVALID_GID != group_id) && (group_id != stat_buf.st_gid)))
@@ -302,46 +317,36 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	temp_offset = JNL_HDR_LEN;
 	ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
 	ADJUST_CHECKSUM(temp_checksum, info->checksum, pini_record->prefix.checksum);
-	/* EPOCHs are written unconditionally in Unix */
-	if (JNL_HAS_EPOCH(info))
-	{
-		epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
-		epoch_record->prefix.jrec_type = JRT_EPOCH;
-		epoch_record->prefix.forwptr = epoch_record->suffix.backptr = EPOCH_RECLEN;
-		epoch_record->prefix.tn = db_tn;
-		epoch_record->prefix.pini_addr = JNL_HDR_LEN;
-		epoch_record->prefix.time = jgbl.gbl_jrec_time;
-		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
-		epoch_record->free_blocks   = info->free_blocks;
-		epoch_record->total_blks    = info->total_blks;
-		epoch_record->fully_upgraded = info->csd->fully_upgraded;
-		epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		epoch_record->jnl_seqno = info->reg_seqno;
-		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-			epoch_record->strm_seqno[idx] = info->csd->strm_reg_seqno[idx];
-		if (jgbl.forw_phase_recovery)
-		{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
-			MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
-		}
-		epoch_record->filler = 0;
-		epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
-		temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
-		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
-		ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
-		ADJUST_CHECKSUM(temp_checksum, info->checksum, epoch_record->prefix.checksum);
-		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
-		pfin_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
-		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN];
-		eof_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
-		cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
-	} else
-	{
-		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN];
-		pfin_offset = JNL_HDR_LEN + PINI_RECLEN;
-		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + PFIN_RECLEN];
-		eof_offset = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;
-		cre_jnl_rec_size = PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
+	/* EPOCHs are written unconditionally even for NOBEFORE_IMAGE journaling */
+	epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
+	epoch_record->prefix.jrec_type = JRT_EPOCH;
+	epoch_record->prefix.forwptr = epoch_record->suffix.backptr = EPOCH_RECLEN;
+	epoch_record->prefix.tn = db_tn;
+	epoch_record->prefix.pini_addr = JNL_HDR_LEN;
+	epoch_record->prefix.time = jgbl.gbl_jrec_time;
+	epoch_record->blks_to_upgrd = info->blks_to_upgrd;
+	epoch_record->free_blocks   = info->free_blocks;
+	epoch_record->total_blks    = info->total_blks;
+	epoch_record->fully_upgraded = info->csd->fully_upgraded;
+	epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	epoch_record->jnl_seqno = info->reg_seqno;
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		epoch_record->strm_seqno[idx] = info->csd->strm_reg_seqno[idx];
+	if (jgbl.forw_phase_recovery)
+	{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
+		MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
 	}
+	epoch_record->filler = 0;
+	epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
+	temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
+	temp_offset = JNL_HDR_LEN + PINI_RECLEN;
+	ADJUST_CHECKSUM(temp_checksum, temp_offset, temp_checksum);
+	ADJUST_CHECKSUM(temp_checksum, info->checksum, epoch_record->prefix.checksum);
+	pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
+	pfin_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
+	eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN];
+	eof_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
+	cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 	pfin_record->prefix.jrec_type = JRT_PFIN;
 	pfin_record->prefix.forwptr = pfin_record->suffix.backptr = PFIN_RECLEN;
 	pfin_record->prefix.tn = db_tn;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,10 @@
 #include "gtmimagename.h"
 #include "filestruct.h"			/* for FILE_INFO, needed by REG2CSA */
 #include "have_crit.h"
+#ifdef DEBUG
+#include "repl_msg.h"
+#include "gtmsource.h"			/* for jnlpool_addrs */
+#endif
 
 LITREF	mval			literal_ten;
 
@@ -44,10 +49,15 @@ error_def(ERR_TRIGDEFBAD);
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
-GBLREF	uint4			dollar_tlevel;
+#ifdef DEBUG
+GBLREF	boolean_t		is_updproc;
+GBLREF	jnlpool_addrs		jnlpool;
+#endif
 GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 
 LITREF	char			*trigger_subs[];
 
@@ -121,12 +131,13 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 			op_gvdata(&data_val);
 			if ((literal_ten.m[0] != data_val.m[0]) || (literal_ten.m[1] != data_val.m[1]))
 			{	/* The process' view of the triggers is likely stale. Restart to be safe.
-				 * Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
-				 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
-				 * updater on the secondary so we dont expect it to see any concurrent trigger changes
-				 * Assert accordingly. Note similar asserts occur in t_end.c and tp_tend.c.
+				 * Triggers can be invoked only by GT.M and Update process. We expect to see GT.M processes to
+				 * restart due to concurrent trigger changes. The Update Process should only restart if it is a
+				 * supplementary instance. Assert accordingly. Note similar asserts occur in t_end.c and
+				 * tp_tend.c.
 				 */
-				assert(IS_GTM_IMAGE);
+				assert(!is_updproc || (jnlpool.repl_inst_filehdr->is_supplementary
+							&& !jnlpool.jnlpool_ctl->upd_disabled));
 				DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: multiline not found, retry\n"));
 				/* Assert that the cycle has changed but in order to properly do the assert, we need a memory
 				 * barrier since cs_data->db_trigger_cycle could be stale in our cache.
@@ -136,7 +147,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				DEBUG_ONLY(gvt_cycle = gv_target->db_trigger_cycle);
 				DEBUG_ONLY(csd_cycle = cs_data->db_trigger_cycle);
 				assert(csd_cycle > gvt_cycle);
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				trgindx = mval2i(&index);
@@ -153,7 +164,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 		if (!gvcst_get(&key_val))
 		{	/* There has to be an XECUTE string or else it is a retry situation (due to concurrent updates) */
 			DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: problem getting multiline record count, retry\n"));
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			trgindx = mval2i(&index);
@@ -179,7 +190,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				 */
 				DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: problem getting multiline component, retry\n"));
 				free(xecute_buff);
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				SET_PARAM_STRING(util_buff, util_len, num, ",\"XECUTE\"");

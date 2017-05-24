@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +29,14 @@ void iosocket_destroy (io_desc *ciod)
 	assertpro(ciod->type == gtmsocket);
 	assertpro(ciod->state == dev_closed);
 	dsocketptr = (d_socket_struct *) ciod->dev_sp;
-	assertpro(dsocketptr != NULL);
+	assertpro(NULL != dsocketptr);
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{
+		if ((NULL != lp->iod) && (n_io_dev_types == lp->iod->type))
+		{
+			assert(FALSE);
+			continue;       /* skip it on pro */
+		}
 		if (lp->iod->pair.in == ciod)
 		{
 			/* The only device that may be "split" is the principal device. Since it is permanently open,

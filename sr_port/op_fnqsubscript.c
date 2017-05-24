@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,7 @@
 #include "op.h"
 #include "is_canonic_name.h"
 #include "gtm_ctype.h"
+#include "zshow.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
@@ -23,6 +25,9 @@ error_def(ERR_INVDLRCVAL);
 #endif
 
 GBLREF spdesc stringpool;
+
+error_def(ERR_NOSUBSCRIPT);
+error_def(ERR_NOCANONICNAME);
 
 #ifdef UNICODE_SUPPORTED
 #define UTF_CHAR_CPY(FROM, TO, FROM_OFFSET, TO_OFFSET, UTF_LEN)			\
@@ -69,14 +74,12 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	int		subs_count;
 	unsigned char	*temp_cp;
 
-	error_def(ERR_NOSUBSCRIPT);
-	error_def(ERR_NOCANONICNAME);
 
 	if (seq < -1)	/* error "Cannot return subscript number ###" */
-		rts_error(VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
 	subs_count = seq;
 	if (!is_canonic_name(src, &subs_count, &isrc, &stop))
-		rts_error(VARLSTCNT(4) ERR_NOCANONICNAME, 2, src->str.len, src->str.addr);
+		NOCANONICNAME_ERROR(src);
 	/*  is_canonic_name has to parse it all anyway so it returns a start and stop for the compenent we want
 	    because is_canonic_name has established src is of good form, we don't have to be paranoid in parsing
 	*/

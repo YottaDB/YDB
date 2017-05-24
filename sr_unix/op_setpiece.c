@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,10 +138,17 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 		str_addr += first_src_ind;
 	}
 	/* copy delimiters */
-	while (0 < delim_cnt--)
-	{
-		memcpy(str_addr, del->str.addr, del->str.len);
-		str_addr += del->str.len;
+	if (gtm_utf8_mode && (1 < del->str.len))
+	{	/* In this mode, delimiters can exceed 1 character so copy them this way */
+		while (0 < delim_cnt--)
+		{
+			memcpy(str_addr, del->str.addr, del->str.len);
+			str_addr += del->str.len;
+		}
+	} else
+	{	/* If delimiters are 1 byte (M mode always and perhaps UTF8 mode), use this simpler/faster method */
+		memset(str_addr, (char)*del->str.addr, delim_cnt);
+		str_addr += delim_cnt;
 	}
 	/* copy expression */
 	memcpy(str_addr, expr->str.addr, expr->str.len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,7 +10,7 @@
  *								*
  ****************************************************************/
 
-/* mupip_downgrade.c: Driver program to downgrade v5.0-000 database files to v4.x */
+/* mupip_downgrade.c: Driver program to downgrade V6.x database files to V4.x */
 
 #include "mdef.h"
 
@@ -50,6 +50,9 @@
 #include "anticipatory_freeze.h"
 #include "mu_all_version_standalone.h"
 
+#define	GTM_VER_LIT		"GT.M "
+#define	MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
+
 LITREF  char     	 	gtm_release_name[];
 LITREF  int4            	gtm_release_name_len;
 
@@ -73,18 +76,19 @@ error_def(ERR_MUDWNGRDTN);
 error_def(ERR_MUDWNGRDNOTPOS);
 error_def(ERR_MUDWNGRDNRDY);
 error_def(ERR_MUSTANDALONE);
+error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
-ZOS_ONLY(error_def(ERR_BADTAG);)
 
 void mupip_downgrade(void)
 {
-	char		db_fn[MAX_FN_LEN + 1], ver_spec[MAX_DB_VER_LEN + 1];
+	char		db_fn[MAX_FN_LEN + 1], ver_spec[MAX_VERSION_LEN], dwngrd_ver[MAX_VERSION_LEN + STR_LIT_LEN(GTM_VER_LIT)];
 	unsigned short	db_fn_len;	/* cli_get_str expects short */
-	unsigned short	ver_spec_len=MAX_DB_VER_LEN;
+	unsigned short	ver_spec_len;
+	char		*hdr_ptr;
 	fd_type		channel;
 	int		save_errno, csd_size, rec_size;
-	int		fstat_res, idx;
+	int		fstat_res, idx, dwngrd_ver_len;
 	int4		status, rc;
 	uint4		status2;
 	off_t 		file_size;
@@ -95,6 +99,7 @@ void mupip_downgrade(void)
 	ZOS_ONLY(int	realfiletag;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
 	enum db_ver	desired_dbver;
+	int		ftrunc_status;
 
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
@@ -108,17 +113,41 @@ void mupip_downgrade(void)
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
 	if (cli_present("VERSION"))
 	{
+		ver_spec_len = ARRAYSIZE(ver_spec);
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
-		ver_spec[ver_spec_len] = '\0';
 		cli_strupper(ver_spec);
 		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
+		{	/* Downgrade file header to V4 format and downgrade EOF block from GDS-block to 512-byte block */
 			desired_dbver = GDSV4;
-		else  if (0 == memcmp(ver_spec, "V5", ver_spec_len))
+		} else if (0 == memcmp(ver_spec, "V5", ver_spec_len))
+		{	/* Downgrade file header to V5 format and downgrade EOF block from GDS-block to 512-byte block */
 			desired_dbver = GDSV5;
-		else
-			assertpro(FALSE);              /* CLI should prevent us ever getting here */
+		} else if (0 == memcmp(ver_spec, "V63000A", ver_spec_len))
+		{	/* No file header downgrade needed. Only EOF block downgrade needed. */
+			desired_dbver = GDSNOVER;
+		} else
+			assert(FALSE);              /* CLI should prevent us ever getting here */
 	} else
+	{
+		MEMCPY_LIT(ver_spec, "V4");
+		ver_spec_len = STR_LIT_LEN("V4");
 		desired_dbver = GDSV4;       /* really want to keep version, which has not yet been read */
+	}
+	/* Need to find out if this is a statsDB file. This necessitates opening the file to read the sgmnt_data
+	 * file header before we have the proper locks obtained for it so after checking, the file is closed again
+	 * so it can be opened under lock to prevent race conditions.
+	 */
+	if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
+	{
+		DO_FILE_READ(channel, 0, &csd, SIZEOF(sgmnt_data), status, status2);
+		if ((0 == memcmp(csd.label, GDS_LABEL, STR_LIT_LEN(GDS_LABEL))) && (RDBF_STATSDB_MASK == csd.reservedDBFlags))
+		{
+			F_CLOSE(channel, rc);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBNOTSUPP, 2, db_fn_len, db_fn);
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		F_CLOSE(channel, rc);
+	}
 	if (!mu_upgrd_dngrd_confirmed())
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Downgrade canceled by user"));
@@ -126,8 +155,7 @@ void mupip_downgrade(void)
 	}
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Mupip downgrade started"));
 	mu_all_version_get_standalone(db_fn, sem_inf);
-	mu_outofband_setup();	/* Will ignore user interrupts. Note that the
-				 * elapsed time for this is order of milliseconds */
+	mu_outofband_setup();	/* Will ignore user interrupts. Note that the elapsed time for this is order of milliseconds */
 	if (FD_INVALID == (channel = OPEN(db_fn, O_RDWR)))
 	{
 		save_errno = errno;
@@ -147,10 +175,10 @@ void mupip_downgrade(void)
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	file_size = stat_buf.st_size;
-#if defined(__MVS__)
+#	if defined(__MVS__)
 	if (-1 == gtm_zos_tag_to_policy(channel, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
-#endif
+#	endif
 	csd_size = SIZEOF(sgmnt_data);
 	DO_FILE_READ(channel, 0, &csd, csd_size, status, status2);
 	if (SS_NORMAL != status)
@@ -176,7 +204,7 @@ void mupip_downgrade(void)
 				2, LEN_AND_LIT("Database creation in progress"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
-	if (csd.freeze)
+	if (FROZEN(&csd))
 	{
 		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database is frozen"));
@@ -213,7 +241,7 @@ void mupip_downgrade(void)
 				2, LEN_AND_LIT("Recovery was interrupted"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
-	if (desired_dbver == GDSV5)	/*Downgrading to V5 version*/
+	if (GDSV5 == desired_dbver)	/* Downgrading to V5 version*/
 	{
 		if ((START_VBN_V6 == csd.start_vbn) || (MASTER_MAP_BLOCKS_DFLT == csd.master_map_len))
 		{	/* DB is created with V6 version*/
@@ -262,80 +290,107 @@ void mupip_downgrade(void)
 		csd.freeze_on_fail = FALSE;
 		csd.span_node_absent = TRUE;
 		csd.maxkeysz_assured = FALSE;
+		csd.minor_dbver = GDSMV63000A;
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
 				LEN_AND_LIT("V5 supportable record size for current DB configuration "), rec_size, rec_size);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
 				LEN_AND_LIT("V5 supportable max key size for current DB configuration"),
 				OLD_MAX_KEY_SZ, OLD_MAX_KEY_SZ);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn,
-				RTS_ERROR_LITERAL("downgraded"), RTS_ERROR_LITERAL("GT.M V5"));
-		DB_DO_FILE_WRITE(channel, 0, &csd, csd_size, status, status2);
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		mu_all_version_release_standalone(sem_inf);
-		mupip_exit(SS_NORMAL);
-	}
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file header size"), csd_size, csd_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Old file length"), &file_size, &file_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4,
-			4, LEN_AND_LIT("Old file start_vbn"), csd.start_vbn, csd.start_vbn);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4,
-			4, LEN_AND_LIT("Old file gds blk_size"), csd.blk_size, csd.blk_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file total_blks"),
-				csd.trans_hist.total_blks, csd.trans_hist.total_blks);
-	assert(ROUND_DOWN2(csd.blk_size, DISK_BLOCK_SIZE) == csd.blk_size);
-	assert((((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +
-		(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)DISK_BLOCK_SIZE == file_size) ||
-	   (((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +
-		(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)csd.blk_size == file_size));
-	if (START_VBN_V4 != csd.start_vbn)
-	{	/* start_vbn is not something that GT.M V4 can handle. signal downgrade not possible */
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUDWNGRDNOTPOS, 2, csd.start_vbn, START_VBN_V4);
-		mupip_exit(ERR_MUNODWNGRD);
-	}
-	if ((trans_num)MAX_TN_V4 < csd.trans_hist.curr_tn)
+		hdr_ptr = (char *)&csd;
+	} else if (GDSV4 == desired_dbver)	/* Downgrading to V4 version*/
 	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDTN, 3, &csd.trans_hist.curr_tn, db_fn_len, db_fn);
-		mupip_exit(ERR_MUNODWNGRD);
-	}
-	if (csd.blks_to_upgrd != (csd.trans_hist.total_blks - csd.trans_hist.free_blocks))
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file header size"),
+			csd_size, csd_size);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Old file length"),
+			&file_size, &file_size);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4,
+				4, LEN_AND_LIT("Old file start_vbn"), csd.start_vbn, csd.start_vbn);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4,
+				4, LEN_AND_LIT("Old file gds blk_size"), csd.blk_size, csd.blk_size);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file total_blks"),
+					csd.trans_hist.total_blks, csd.trans_hist.total_blks);
+		assert(ROUND_DOWN2(csd.blk_size, DISK_BLOCK_SIZE) == csd.blk_size);
+		assert((((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +
+			(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)DISK_BLOCK_SIZE == file_size) ||
+		   (((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +
+			(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)csd.blk_size == file_size));
+		if (START_VBN_V4 != csd.start_vbn)
+		{	/* start_vbn is not something that GT.M V4 can handle. signal downgrade not possible */
+			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUDWNGRDNOTPOS, 2, csd.start_vbn, START_VBN_V4);
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		if ((trans_num)MAX_TN_V4 < csd.trans_hist.curr_tn)
+		{
+			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDTN, 3, &csd.trans_hist.curr_tn, db_fn_len, db_fn);
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		if (csd.blks_to_upgrd != (csd.trans_hist.total_blks - csd.trans_hist.free_blocks))
+		{
+			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDNRDY, 3, db_fn_len, db_fn,
+				   (csd.trans_hist.total_blks - csd.trans_hist.free_blocks - csd.blks_to_upgrd));
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		if (MASTER_MAP_SIZE_V4 < csd.master_map_len || MAXTOTALBLKS_V4 < csd.trans_hist.total_blks)
+		{
+			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("master_map_len"),
+				   csd.master_map_len,  csd.master_map_len);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR),
+					2, LEN_AND_LIT("Master map is too large"));
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		DO_FILE_READ(channel, 0, new_master_map, csd.master_map_len, status, status2);
+		if (SS_NORMAL != status)
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
+			mupip_exit(ERR_MUNODWNGRD);
+		}
+		if (csd.master_map_len < MASTER_MAP_SIZE_V4)
+			memset(new_master_map + csd.master_map_len, 0xFF, MASTER_MAP_SIZE_V4 - csd.master_map_len);
+		/* Now call mu_dwngrd_header to do file header downgrade */
+		mu_dwngrd_header(&csd, &v15_csd);
+		memcpy(v15_csd.master_map, new_master_map, MASTER_MAP_SIZE_V4);
+		hdr_ptr = (char *)&v15_csd;
+	} else
 	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDNRDY, 3, db_fn_len, db_fn,
-			   (csd.trans_hist.total_blks - csd.trans_hist.free_blocks - csd.blks_to_upgrd));
-		mupip_exit(ERR_MUNODWNGRD);
+		assert(GDSNOVER == desired_dbver);	/* Downgrading to V4 version*/
+		csd.minor_dbver = GDSMV63000A;
+		hdr_ptr = (char *)&csd;	/* No file header downgrade for V63000A case */
 	}
-	if (MASTER_MAP_SIZE_V4 < csd.master_map_len || MAXTOTALBLKS_V4 < csd.trans_hist.total_blks)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("master_map_len"),
-			   csd.master_map_len,  csd.master_map_len);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR),
-				2, LEN_AND_LIT("Master map is too large"));
-		mupip_exit(ERR_MUNODWNGRD);
-	}
-	DO_FILE_READ(channel, 0, new_master_map, csd.master_map_len, status, status2);
+	/* Write updated file header first */
+	DB_DO_FILE_WRITE(channel, 0, hdr_ptr, csd_size, status, status2);
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
-	if (csd.master_map_len < MASTER_MAP_SIZE_V4)
-		memset(new_master_map + csd.master_map_len, 0xFF, MASTER_MAP_SIZE_V4 - csd.master_map_len);
-	/* Now call mu_dwngrd_header to do file header downgrade */
-        mu_dwngrd_header(&csd, &v15_csd);
-	memcpy(v15_csd.master_map, new_master_map, MASTER_MAP_SIZE_V4);
-	DB_DO_FILE_WRITE(channel, 0, &v15_csd, csd_size, status, status2);
-	if (SS_NORMAL != status)
+	/* V6 format had a GDS block EOF block whereas V4 format has only a 512-byte EOF block. Do truncate as necessary */
+	FTRUNCATE(channel, file_size - csd.blk_size + DISK_BLOCK_SIZE, ftrunc_status);
+	if (0 != ftrunc_status)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
+		save_errno = errno;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("ftruncate()"), CALLFROM, save_errno);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
+	if (0 != rc)
+	{
+		save_errno = errno;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, save_errno);
+		mupip_exit(ERR_MUNODWNGRD);
+	}
+	/* Print success message */
+	MEMCPY_LIT(dwngrd_ver, GTM_VER_LIT);
+	dwngrd_ver_len = STR_LIT_LEN(GTM_VER_LIT);
+	memcpy(dwngrd_ver + dwngrd_ver_len, ver_spec, ver_spec_len);
+	dwngrd_ver_len += ver_spec_len;
+	assert(dwngrd_ver_len <= ARRAYSIZE(dwngrd_ver));
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn,
+					RTS_ERROR_LITERAL("downgraded"), dwngrd_ver_len, dwngrd_ver);
 	mu_all_version_release_standalone(sem_inf);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn, RTS_ERROR_LITERAL("downgraded"),
-		   RTS_ERROR_LITERAL("GT.M V4"));
 	mupip_exit(SS_NORMAL);
 }
 

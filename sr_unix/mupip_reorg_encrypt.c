@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2016 Fidelity National Information	*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 #include "gtm_c_stack_trace.h"
 #include "is_proc_alive.h"
 #include "gtmsecshr.h"
+#include "wcs_backoff.h"
 #include "wcs_sleep.h"
 #include "gtm_sem.h"
 #include "gtm_semutils.h"
@@ -50,6 +51,7 @@
 #include "have_crit.h"
 #include "mupip_reorg_encrypt.h"
 #include "t_abort.h"
+#include "interlock.h"
 
 GBLREF bool		error_mupip;
 GBLREF bool		mu_ctrlc_occurred;
@@ -104,11 +106,12 @@ STATICFNDEF void	release_ftok_semaphore(gd_region *reg, sgmnt_addrs *csa, sgmnt_
 STATICFNDEF void	switch_journal_file(sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
 
 #define EXIT_MUPIP_REORG(STATUS)											\
-{															\
+MBSTART {														\
 	mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_FALSE;								\
 	mupip_exit(STATUS);												\
-}
+} MBEND
 
+/* Note: The below should not use MBSTART/MBEND as it does a "continue" (see MBSTART macro definition comment) */
 #define CONTINUE_TO_NEXT_REGION(CSA, CSD, CNL, REG, REG_STATUS, STATUS, REORG_IN_PROG, HAVE_CRIT, ERROR, OPER, ...)	\
 {															\
 	if (REORG_IN_PROG)												\
@@ -158,7 +161,7 @@ void mupip_reorg_encrypt(void)
 	sm_uc_ptr_t		blkBase, bml_sm_buff;	/* shared memory pointer to the bitmap global buffer */
 	cache_rec_ptr_t		cr;
 	blk_segment		*bs1, *bs_ptr;
-	sm_uc_ptr_t		bptr;
+	sm_uc_ptr_t		bptr, buff;
 	blk_hdr			new_hdr;
 	unsigned char    	save_cw_set_depth;
 	uint4			lcl_update_trans, pid, bptr_size;
@@ -167,7 +170,10 @@ void mupip_reorg_encrypt(void)
 	uint4			reencryption_count;
 	uint4			initial_blk_cnt;
 #	endif
+	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_TRUE;
 	status = SS_NORMAL;
 	/* Get the region(s) parameter. */
@@ -175,9 +181,8 @@ void mupip_reorg_encrypt(void)
 	error_mupip = FALSE;
 	mu_getlst("REG_NAME", SIZEOF(tp_region));
 	if (error_mupip)
-	{
 		EXIT_MUPIP_REORG(ERR_MUNOACTION);
-	} else if (!grlist)
+	else if (!grlist)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBNOREGION);
 		EXIT_MUPIP_REORG(ERR_MUNOACTION);
@@ -426,7 +431,11 @@ void mupip_reorg_encrypt(void)
 				reencryption_count = gtm_white_box_test_case_count;
 		}
 #		endif
-		if ((NULL != bptr) && (bptr_size < blk_size))
+		udi = FILE_INFO(reg);
+		if (udi->fd_opened_with_o_direct)
+		{
+			DIO_BUFF_EXPAND_IF_NEEDED(udi, blk_size, &(TREF(dio_buff)));
+		} else if ((NULL != bptr) && (bptr_size < blk_size))
 		{	/* malloc/free "bptr" for each region as GDS block-size can be different */
 			free(bptr);
 			bptr = NULL;
@@ -438,7 +447,7 @@ void mupip_reorg_encrypt(void)
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			{
 				reg_status = ERR_MUNOFINISH;
-				goto stop_reorg_on_this_reg;
+				break;
 			}
 			assert(!csa->now_crit);
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
@@ -449,7 +458,7 @@ void mupip_reorg_encrypt(void)
 			{
 				rel_crit(reg);
 				reg_status = ERR_MUNOFINISH;
-				goto stop_reorg_on_this_reg;
+				break;
 			}
 			if (total_blks > csd->trans_hist.total_blks)
 			{
@@ -457,9 +466,9 @@ void mupip_reorg_encrypt(void)
 				last_bmp = ROUND_DOWN2(total_blks - 1, BLKS_PER_LMAP);
 				if (curbmp >= total_blks)
 				{
-					curbmp = last_bmp;
 					rel_crit(reg);
-					goto stop_reorg_on_this_reg;
+					assert(SS_NORMAL == reg_status);
+					break;
 				}
 			}
 			/* Before changing the hash cutoff, check if the journal file is not open in shared memory (possible
@@ -489,7 +498,7 @@ void mupip_reorg_encrypt(void)
 			if (NULL == bml_lcl_buff)
 				bml_lcl_buff = malloc(BM_SIZE(BLKS_PER_LMAP));
 			memcpy(bml_lcl_buff, (blk_hdr_ptr_t)bml_sm_buff, BM_SIZE(BLKS_PER_LMAP));
-			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, FALSE))
+			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, FALSE, NULL))
 			{	/* Certify the block while holding crit as cert_blk uses fields from file-header (shared memory). */
 				rel_crit(reg);
 				assert(FALSE);	/* In pro, skip ugprading/downgarding all blks in this unreliable local bitmap. */
@@ -511,23 +520,28 @@ void mupip_reorg_encrypt(void)
 				if (mu_ctrly_occurred || mu_ctrlc_occurred)
 				{
 					reg_status = ERR_MUNOFINISH;
-					goto stop_reorg_on_this_reg;
+					break;
 				}
 				GET_BM_STATUS(bml_lcl_buff, lcnt, bml_status);
-				assert(BLK_MAPINVALID != bml_status); /* cert_blk ran clean so we dont expect invalid entries */
+				assert(BLK_MAPINVALID != bml_status); /* cert_blk ran clean so we don't expect invalid entries */
 				if (BLK_FREE == bml_status)
 					continue;
 				curblk = curbmp + lcnt;
 				if (lcnt)
 				{	/* non-bitmap block */
-					/* read in block from disk into private buffer. dont pollute the cache yet */
-					if (NULL == bptr)
+					/* read in block from disk into private buffer. don't pollute the cache yet */
+					if (!udi->fd_opened_with_o_direct)
 					{
-						bptr = (sm_uc_ptr_t)malloc(blk_size);
-						bptr_size = blk_size;
-					}
+						if (NULL == bptr)
+						{
+							bptr = (sm_uc_ptr_t)malloc(blk_size);
+							bptr_size = blk_size;
+						}
+						buff = bptr;
+					} else
+						buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
 					mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_LOCAL_DSK_READ;
-					status1 = dsk_read(curblk, bptr, NULL, FALSE);
+					status1 = dsk_read(curblk, buff, NULL, FALSE);
 					mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_TRUE;
 					if (SS_NORMAL != status1)
 					{
@@ -535,9 +549,9 @@ void mupip_reorg_encrypt(void)
 						util_out_print("Region !AD : Error occurred while reading block [0x!XL]",
 								TRUE, REG_LEN_STR(reg), curblk);
 						reg_status = ERR_MUNOFINISH;
-						goto stop_reorg_on_this_reg;/* goto needed due to nested FOR Loop */
+						break;
 					}
-					blk_tn = ((blk_hdr_ptr_t)bptr)->tn;
+					blk_tn = ((blk_hdr_ptr_t)buff)->tn;
 					if (blk_tn >= start_tn)
 						continue;
 				}
@@ -560,14 +574,13 @@ void mupip_reorg_encrypt(void)
 						assert(csa->now_crit);
 						total_blks = csd->trans_hist.total_blks;
 						last_bmp = ROUND_DOWN2(total_blks - 1, BLKS_PER_LMAP);
-						if (curbmp >= total_blks)
-						{
-							curbmp = last_bmp;
-							assert(NULL == reorg_encrypt_restart_csa);
-							t_abort(reg, csa);
-							assert(!csa->now_crit);	/* "t_abort" should have released crit */
-							goto stop_reorg_on_this_reg;
-						}
+						assert(NULL == reorg_encrypt_restart_csa);
+						t_abort(reg, csa);
+						assert(!csa->now_crit);	/* "t_abort" should have released crit */
+						assert(SS_NORMAL == reg_status);
+						curbmp = last_bmp; /* ensure we "break" out of 1st level (outermost) for loop */
+						lcnt = mapsize;	/* to break out of 2nd level (outer) for-loop */
+						break;
 					}
 					blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist->cycle, &blkhist->cr);
 					if (NULL == blkBase)
@@ -683,7 +696,7 @@ void mupip_reorg_encrypt(void)
 							if (0 == reencryption_count)
 							{
 								reg_status = ERR_MUNOFINISH;
-								goto stop_reorg_on_this_reg;
+								break;
 							}
 						}
 #						endif
@@ -694,53 +707,54 @@ void mupip_reorg_encrypt(void)
 					}
 					assert(csd == cs_data);
 				}
+#				ifdef DEBUG
+				if (SS_NORMAL != reg_status)
+					break;	/* this takes into account the WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT case above */
+#				endif
 			}
-stop_reorg_on_this_reg:
-			if (SS_NORMAL == reg_status)
-			{
-				if (curbmp == last_bmp)
-				{
-					get_ftok_semaphore(reg, csa);
-					grab_crit(reg);
-					/* Wait for all the readers to complete to prevent them from attempting to digest an
-					 * encrypted block or decrypt a block with a wrong key in case MUPIP REORG -ENCRYPT has
-					 * concurrently processed that block.
-					 */
-					if (!wait_for_concurrent_reads(csa))
-					{
-						util_out_print("Region !AD : Timed out waiting for concurrent reads to finish2",
-								TRUE, REG_LEN_STR(reg));
-						reg_status = ERR_MUNOFINISH;
-						break;
-					}
-					/* Same for writers. */
-					if (!wcs_flu(WCSFLU_WRITE_EPOCH))
-					{
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
-								LEN_AND_LIT("MUPIP REORG ENCRYPT3"), db_name_len, db_name);
-						reg_status = ERR_MUNOFINISH;
-						break;
-					}
-					/* We are not resetting encryption_hash2_start_tn because we do not want the
-					 * database to be reencryptable before the user had a chance to back it up.
-					 */
-					csd->encryption_hash_cutoff = UNSTARTED;
-					csd->non_null_iv = TRUE;
-					SET_AS_ENCRYPTED(csd->is_encrypted);
-					memcpy(csd->encryption_hash, csd->encryption_hash2, GTMCRYPT_RESERVED_HASH_LEN);
-					memset(csd->encryption_hash2, 0, GTMCRYPT_RESERVED_HASH_LEN);
-					/* A simple copy because gtmcrypt_key_t is a pointer type. */
-					csa->encr_key_handle = csa->encr_key_handle2;
-					csa->encr_key_handle2 = NULL;
-					cnl->reorg_encrypt_cycle++;
-					assert(NULL != csa->encr_ptr);
-					COPY_ENC_INFO(csd, csa->encr_ptr, cnl->reorg_encrypt_cycle;);
-					if (JNL_ENABLED(csd))
-						switch_journal_file(csa, csd);
-					DBG_RECORD_CRYPT_UPDATE(csd, csa, cnl, process_id);
-				}
-			} else
+			if (SS_NORMAL != reg_status)
 				break;
+		}
+		if (SS_NORMAL == reg_status)
+		{
+			get_ftok_semaphore(reg, csa);
+			grab_crit(reg);
+			/* Wait for all the readers to complete to prevent them from attempting to digest an
+			 * encrypted block or decrypt a block with a wrong key in case MUPIP REORG -ENCRYPT has
+			 * concurrently processed that block.
+			 */
+			if (!wait_for_concurrent_reads(csa))
+			{
+				util_out_print("Region !AD : Timed out waiting for concurrent reads to finish2",
+						TRUE, REG_LEN_STR(reg));
+				reg_status = ERR_MUNOFINISH;
+				break;
+			}
+			/* Same for writers. */
+			if (!wcs_flu(WCSFLU_WRITE_EPOCH))
+			{
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
+						LEN_AND_LIT("MUPIP REORG ENCRYPT3"), db_name_len, db_name);
+				reg_status = ERR_MUNOFINISH;
+				break;
+			}
+			/* We are not resetting encryption_hash2_start_tn because we do not want the
+			 * database to be reencryptable before the user had a chance to back it up.
+			 */
+			csd->encryption_hash_cutoff = UNSTARTED;
+			csd->non_null_iv = TRUE;
+			SET_AS_ENCRYPTED(csd->is_encrypted);
+			memcpy(csd->encryption_hash, csd->encryption_hash2, GTMCRYPT_RESERVED_HASH_LEN);
+			memset(csd->encryption_hash2, 0, GTMCRYPT_RESERVED_HASH_LEN);
+			/* A simple copy because gtmcrypt_key_t is a pointer type. */
+			csa->encr_key_handle = csa->encr_key_handle2;
+			csa->encr_key_handle2 = NULL;
+			cnl->reorg_encrypt_cycle++;
+			assert(NULL != csa->encr_ptr);
+			COPY_ENC_INFO(csd, csa->encr_ptr, cnl->reorg_encrypt_cycle;);
+			if (JNL_ENABLED(csd))
+				switch_journal_file(csa, csd);
+			DBG_RECORD_CRYPT_UPDATE(csd, csa, cnl, process_id);
 		}
 		/* We are done (although potentially due to an error or a Ctrl-C), so update file-header fields to store reorg's
 		 * progress before exiting.
@@ -829,7 +843,7 @@ boolean_t wait_for_concurrent_reads(sgmnt_addrs *csa)
 					 cr->blk, cr, blocking_pid, DB_LEN_STR(csa->region));
 				return FALSE;
 			}
-			if ((0 != blocking_pid) && is_proc_alive(blocking_pid, cr->image_count))
+			if ((0 != blocking_pid) && is_proc_alive(blocking_pid, 0))
 			{	/* Kickstart the process taking a long time in case it was suspended */
 				UNIX_ONLY(continue_proc(blocking_pid));
 			}
@@ -877,7 +891,7 @@ void switch_journal_file(sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 	 */
 	jbp = jpc->jnl_buff;
 	ADJUST_GBL_JREC_TIME(jgbl, jbp);
-	jnl_status = jnl_ensure_open();
+	jnl_status = jnl_ensure_open(gv_cur_region, csa);
 	if (0 == jnl_status)
 	{
 		if (EXIT_ERR == SWITCH_JNL_FILE(jpc))

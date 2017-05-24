@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -155,12 +155,9 @@ onintr cleanup
 set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
 
-# ---- currently, dtgbldir isn't built into an executable. So a "dummy" executable is assigned to it.
-
 cat - << LABEL >>! ${TMP_DIR}_exclude
 dse dse
 dse_cmd dse
-dtgbldir dummy
 mupip mupip
 mupip_cmd mupip
 lke lke
@@ -250,7 +247,8 @@ else
 	# Look down the $gtm_exe recursively so that the search for recent build executable is inclusive of $gtm_exe/plugin/ and
 	# $gtm_exe/plugin/gtmcrypt. Also the new shell invocation is needed to redirect the stderr that will arise due to the
 	# gtmsecshr privileges for which (find .) will issue 'permission denied'.
-	(ls -lart `find . -type f`| grep "\-..x..x..x" | tail -n 1 | awk '{print $NF}' > ${TMP_DIR}_latest_exe) >&! /dev/null
+	# Look for files with execute permissions (-111) and ignore help database (! -name "*.dat")
+	(ls -lart `find . -type f -perm -111 ! -name "*.dat"` | tail -n 1 | awk '{print $NF}' > ${TMP_DIR}_latest_exe) >&! /dev/null
 	set latest_exe_with_rel_path = `cat ${TMP_DIR}_latest_exe`
 	set latest_exe = `basename $latest_exe_with_rel_path`
 	rm -f ${TMP_DIR}_latest_exe

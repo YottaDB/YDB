@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,12 +50,17 @@ void op_close(mval *v, mval *p)
 	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))
 			return;
 		ciod = tl->iod;
-		if (0 == ciod || TRUE == ciod->perm ||
+		if ((NULL == ciod) || (TRUE == ciod->perm) ||
 		    (ciod->state != dev_open))
 			return;
 
-		for (prev = io_root_log_name, l = prev->next;  l != 0;  prev = l, l = l->next)
+		for (prev = io_root_log_name, l = prev->next; NULL != l;  prev = l, l = l->next)
 		{
+			if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+			{
+				assert(FALSE);
+				continue;       /* skip it on pro */
+			}
 		        if (l->iod == ciod && l != tl)
 			{
 			        prev->next = l->next;

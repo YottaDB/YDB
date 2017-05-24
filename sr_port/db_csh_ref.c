@@ -89,7 +89,7 @@ void	db_csh_ref(sgmnt_addrs *csa, boolean_t init)
 		 * cache but do not do the longset (above), bt_index can be a non-zero value. Assert that and set it to zero since
 		 * we are invalidating the cache record anyways.
 		 */
-		assert((0 == cr->bt_index) UNIX_ONLY(|| jgbl.onlnrlbk));
+		assert((0 == cr->bt_index) || jgbl.onlnrlbk);
 		cr->bt_index = 0;
 		if (init)
 		{

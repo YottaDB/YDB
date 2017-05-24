@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,7 @@ GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_crea
 #endif
 #ifdef DEBUG
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+GBLREF	uint4			update_trans;
 #endif
 
 #define NORESTART -1
@@ -160,6 +161,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	DBGFPF((stderr, "\n\nop_tstart: Entered - dollar_tlevel: %d, implicit_flag: %d, mpc: 0x"lvaddr"\n", dollar_tlevel,
 		implicit_flag, frame_pointer->mpc));
 #	endif
+	assert(dollar_tlevel || implicit_tstart || !update_trans);
 	if (implicit_tstart)
 		/* An implicit op_tstart is being done. In this case, even if we are in direct mode, we want to do
 		 * regular TPHOLD processing (no setting of tphold in the parent frame and shifting of all mv_stents).
@@ -178,8 +180,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		{
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 			{
-				if (r_local->open && !r_local->was_open &&
-				    (dba_bg == REG_ACC_METH(r_local) || dba_mm == REG_ACC_METH(r_local)))
+				if (r_local->open && !r_local->was_open && IS_REG_BG_OR_MM(r_local))
 				{	/* Let's initialize those regions but only if it came through gvcst_init_sysops
 					 * (being a bg or mm region).
 					 */

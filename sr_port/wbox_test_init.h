@@ -14,10 +14,18 @@
 #ifndef __WBOX_TEST_INIT_
 #define __WBOX_TEST_INIT_
 
-GBLREF	boolean_t	gtm_white_box_test_case_enabled;
-GBLREF	int		gtm_white_box_test_case_number;
-GBLREF	int		gtm_white_box_test_case_count;
-GBLREF	int 		gtm_wbox_input_test_case_count;
+/* The standalone routine gtmsecshr_wrapper needs these to be GBLDEFs so create a scheme to force that. If WBOX_GBLDEF is
+ * defined, create these as GBLDEFs instead of GBLREFs.
+ */
+#ifdef WBOX_GBLDEF
+# define REFTYPE GBLDEF
+#else
+# define REFTYPE GBLREF
+#endif
+REFTYPE	boolean_t	gtm_white_box_test_case_enabled;
+REFTYPE	int		gtm_white_box_test_case_number;
+REFTYPE	int		gtm_white_box_test_case_count;
+REFTYPE	int 		gtm_wbox_input_test_case_count;
 
 void wbox_test_init(void);
 
@@ -29,19 +37,19 @@ typedef enum {
 	WBTEST_BG_UPDATE_BTPUTNULL,		/*  4 */
 	WBTEST_BG_UPDATE_DBCSHGET_INVALID,	/*  5 */
 	WBTEST_BG_UPDATE_DBCSHGETN_INVALID,	/*  6 */
-	WBTEST_BG_UPDATE_DBCSHGETN_INVALID2,	/*  7 : VMS only twin logic */
+	WBTEST_BG_UPDATE_DBCSHGETN_INVALID2,	/*  7 : twin logic */
 	WBTEST_BG_UPDATE_READINPROGSTUCK1,	/*  8 */
 	WBTEST_BG_UPDATE_READINPROGSTUCK2,	/*  9 */
-	WBTEST_BG_UPDATE_DIRTYSTUCK1,		/* 10 : Unix only dirty wait logic */
+	WBTEST_BG_UPDATE_DIRTYSTUCK1,		/* 10 : dirty wait logic */
 	WBTEST_BG_UPDATE_DIRTYSTUCK2,		/* 11 */
 	WBTEST_BG_UPDATE_INTENDSTUCK,		/* 12 */
 	WBTEST_BG_UPDATE_INSQTIFAIL,		/* 13 */
 	WBTEST_BG_UPDATE_INSQHIFAIL,		/* 14 */
 	WBTEST_BG_UPDATE_PHASE2FAIL,		/* 15 */
 	WBTEST_JNL_FILE_LOST_DSKADDR,		/* 16 */
-	WBTEST_REPL_HEARTBEAT_NO_ACK,		/* 17 : Unix only */
-	WBTEST_REPL_TEST_UNCMP_ERROR,		/* 18 : Unix only */
-	WBTEST_REPL_TR_UNCMP_ERROR,		/* 19 : Unix only */
+	WBTEST_REPL_HEARTBEAT_NO_ACK,		/* 17 */
+	WBTEST_REPL_TEST_UNCMP_ERROR,		/* 18 */
+	WBTEST_REPL_TR_UNCMP_ERROR,		/* 19 */
 	WBTEST_TP_HIST_CDB_SC_BLKMOD,		/* 20 */
 	WBTEST_ABANDONEDKILL,			/* 21 : MUPIP STOP a kill in progress in 2nd stage*/
 	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption-initialized assert from happening */
@@ -103,7 +111,7 @@ typedef enum {
 	/* Begin ANTIFREEZE related white box test cases */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
-	WBTEST_ANTIFREEZE_DBDANGER,		/* 71 :  */
+	WBTEST_EXPECT_CRYPTOPFAILED,		/* 71 :  set when expecting CRYPTOPFAILED so we don't take a core*/
 	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	 */
 	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 :  */
 	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 :  */
@@ -161,7 +169,14 @@ typedef enum {
 	WBTEST_MM_CONCURRENT_FILE_EXTEND,	/* 122 : Extend database concurrently in MM */
 	WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT,	/* 123 : Sleep in mupip_reorg_encrypt() upon releasing crit */
 	WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR,	/* 124 : gtm_strToTitle() returning U_FILE_ACCESS_ERROR error */
-	WBTEST_MUEXTRACT_GVCST_RETURN_FALSE	/* 125 : check return value of gvcst_get in concurrent update. */
+	WBTEST_MUEXTRACT_GVCST_RETURN_FALSE,	/* 125 : check return value of gvcst_get in concurrent update. */
+	WBTEST_SECSHRWRAP_NOETC,		/* 126 : gtmsecshr_wrapper pretending /etc doesn't exist */
+	WBTEST_SECSHRWRAP_NOENVIRON,		/* 127 : gtmsecshr_wrapper pretending /etc/environment doesn't exist */
+	WBTEST_SECSHRWRAP_NOTZREC_READERR,	/* 128 : gtmsecshr_wrapper read error */
+	WBTEST_SECSHRWRAP_NOTZREC_EOF,		/* 129 : gtmsecshr_wrapper no TZ record found in environment file */
+	WBTEST_SECSHRWRAP_SETENVFAIL1,		/* 130 : gtmsecshr_wrapper pretend setenv failed (before clearenv) */
+	WBTEST_SECSHRWRAP_SETENVFAIL2,		/* 131 : gtmsecshr_wrapper pretend setenv failed (after clearenv) */
+	WBTEST_HELPOUT_FAILGROUPCHECK		/* 132 : Create GTM-8654 : EUID and file owners are not group members */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

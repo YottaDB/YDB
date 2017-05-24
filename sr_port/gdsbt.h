@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,6 +214,45 @@ typedef struct
 	uint4		cycle;
 } dskread_trace;
 
+enum wcs_ops_trace_t
+{
+	wcs_ops_flu1,
+	wcs_ops_flu2,
+	wcs_ops_flu3,
+	wcs_ops_flu4,
+	wcs_ops_flu5,
+	wcs_ops_flu6,
+	wcs_ops_flu7,
+	wcs_ops_wtstart1,
+	wcs_ops_wtstart2,
+	wcs_ops_wtstart3,
+	wcs_ops_wtstart4,
+	wcs_ops_wtstart5,
+	wcs_ops_wtstart6,
+	wcs_ops_wtstart7,
+	wcs_ops_wtstart8,
+	wcs_ops_wtfini1,
+	wcs_ops_wtfini2,
+	wcs_ops_wtfini3,
+	wcs_ops_wtfini4,
+	wcs_ops_getspace1
+};
+
+typedef struct
+{
+	trans_num		db_tn;
+	uint4			process_id;
+	uint4			wc_in_free;
+	uint4			wcs_active_lvl;
+	uint4			wcs_wip_lvl;
+	enum wcs_ops_trace_t	type;
+	block_id		blk;
+	sm_off_t		cr_off;
+	trans_num		cr_dirty;
+	uint4			detail1;
+	uint4			detail2;
+} wcs_ops_trace_t;
+
 #define OP_LOCK_SIZE	4
 
 /* Structure to hold lock history */
@@ -239,7 +278,8 @@ typedef struct
 	trans_num       cr_tn;
 } ftokhist;
 
-#define	DSKREAD_OPS_ARRAY_SIZE	 512
+#define	DSKREAD_OPS_ARRAY_SIZE		 512
+#define	WCS_OPS_ARRAY_SIZE		1024
 #define	CRIT_OPS_ARRAY_SIZE		 512
 #define	LOCKHIST_ARRAY_SIZE		 512
 #define	SECSHR_OPS_ARRAY_SIZE		1023		/* 1 less than 1K to accommodate the variable secshr_ops_index */
@@ -549,6 +589,10 @@ typedef struct node_local_struct
 	CACHELINE_PAD(4, 8)
 	volatile CNTR4DCL(wcs_phase2_commit_pidcnt, 7);		/* number of processes actively finishing phase2 commit */
 	CACHELINE_PAD(4, 9)
+	volatile CNTR4DCL(wcs_wip_lvl, 8);			/* number of entries in wip queue */
+	CACHELINE_PAD(4, 10)
+	volatile int4	wtfini_in_prog;				/* whether wcs_wtfini() is in progress at this time */
+	boolean_t	freezer_waited_for_kip;			/* currently used only in dbg code */
 	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
 	int4            highest_lbm_blk_changed;                /* Records highest local bit map block that
 									changed so we know how much of master bit
@@ -558,9 +602,12 @@ typedef struct node_local_struct
 	int4		crit_ops_index;				/* "circular" index into crit_ops_array */
 	int4		dskread_ops_index;			/* "circular" index into dskread_ops_array */
 	int4		ftok_ops_index;				/* "circular" index into ftok_ops_array */
+	int4		wcs_ops_index;				/* "circular" index into wcs_ops_array */
+	NON_GTM64_ONLY(int4 filler_8byte_align2;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
 	lockhist	lockhists[LOCKHIST_ARRAY_SIZE];		/* Keep lock histories here */
 	crit_trace	crit_ops_array[CRIT_OPS_ARRAY_SIZE];	/* space for CRIT_TRACE macro to record info */
 	dskread_trace	dskread_ops_array[DSKREAD_OPS_ARRAY_SIZE];	/* space for DSKREAD_TRACE macro to record info */
+	wcs_ops_trace_t	wcs_ops_array[WCS_OPS_ARRAY_SIZE];	/* space for WCS_OPS_TRACE macro to record info */
 	unique_file_id	unique_id;
 	uint4		owner_node;
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
@@ -579,13 +626,15 @@ typedef struct node_local_struct
 			 */
 	boolean_t	donotflush_dbjnl; /* whether database and journal can be flushed to disk or not (TRUE for mupip recover) */
 	int4		n_pre_read;
-	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db.
-							  *       In VMS, this is the name of the corresponding global directory.
-							  */
+	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db */
+	char		statsdb_fname[MAX_FN_LEN + 1];	/* Is empty-string if IS_RDBF_STATSDB(csd) is FALSE.
+							 * Is name of the statsdb corresponding to this basedb otherwise.
+							 */
 	int4		secshr_ops_index;
 	gtm_uint64_t	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 8K */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
+	trans_num	last_wcs_recover_tn;		/* csa->ti->curr_tn of most recent "wcs_recover" */
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
 	global_latch_t	snapshot_crit_latch;	/* To be acquired by any process that wants to clean up an orphaned snapshot or
 						 * initiate a new snapshot
@@ -597,7 +646,7 @@ typedef struct node_local_struct
 	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
-	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
+	NON_GTM64_ONLY(int4 filler_8byte_align3;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS];	/* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
@@ -651,29 +700,88 @@ typedef struct node_local_struct
 	boolean_t	first_nonbypas_writer_seen;	/* TRUE when first writer is seen that also does not bypass ftok/access */
 	boolean_t	ftok_counter_halted;		/* The ftok semaphore counter reached 32K at some point in time */
 	boolean_t	access_counter_halted;		/* The access semaphore counter reached 32K at some point in time */
-	uint4		filler_8byte_align1;
+	boolean_t	statsdb_created;		/* TRUE if a statsdb has been created for this basedb */
+	uint4		statsdb_fname_len;		/* length of "cnl->statsdb_fname" */
+	boolean_t	statsdb_rundown_clean;		/* TRUE if statsdb "gds_rundown"/"mu_rndwn_file" was clean.
+							 *      This means statsdb file can be removed on a clean basedb rundown.
+							 */
 #	ifdef GTM_CRYPT_UPDATES_REPORT
 	blk_info	blk_infos[BLK_INFO_ARRAY_SIZE];
 	uint4		blk_info_cnt;
-	int4		filler_8byte_align2;
+	int4		filler_8byte_align5;
 #	endif
+	global_latch_t	freeze_latch;		/* Protect freeze/freeze_online field updates */
+	gtm_uint64_t	wcs_buffs_freed; /* this is a count of the number of buffers transitioned to the free "queue" */
+	volatile gtm_uint64_t	dskspace_next_fire;
+	global_latch_t	lock_crit;		/* mutex for LOCK processing */
+	volatile block_id	tp_hint;
+	int4		filler_8byte_align6;
 } node_local;
 
+#define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
+MBSTART {													\
+	unsigned int		fnameLen;									\
+														\
+	assert(ARRAYSIZE(statsDBreg->dyn.addr->fname) >= ARRAYSIZE(statsDBfname));				\
+	fnameLen = MIN(statsDBfname_len, ARRAYSIZE(statsDBreg->dyn.addr->fname) - 1);				\
+	assert('\0' == statsDBfname[fnameLen]);									\
+	memcpy(statsDBreg->dyn.addr->fname, statsDBfname, fnameLen + 1);	/* copy trailing '\0' too */	\
+	statsDBreg->dyn.addr->fname_len = fnameLen;								\
+} MBEND
+
+#define	COPY_BASEDB_FNAME_INTO_STATSDB_HDR(statsDBreg, baseDBreg, statsDBcsd)						\
+MBSTART {														\
+	unsigned int		fname_len;										\
+															\
+	assert(IS_STATSDB_REG(statsDBreg));										\
+	assert(ARRAYSIZE(baseDBreg->dyn.addr->fname) <= ARRAYSIZE(statsDBcsd->basedb_fname));				\
+	fname_len = MIN(baseDBreg->dyn.addr->fname_len, ARRAYSIZE(baseDBreg->dyn.addr->fname) - 1);			\
+	assert(fname_len);												\
+	assert('\0' == baseDBreg->dyn.addr->fname[fname_len]);								\
+	memcpy(statsDBcsd->basedb_fname, baseDBreg->dyn.addr->fname, fname_len + 1);	/* copy trailing '\0' too */	\
+	statsDBcsd->basedb_fname_len = fname_len;									\
+} MBEND
+
+#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL)										\
+MBSTART {														\
+	if (CNL->statsdb_created && CNL->statsdb_rundown_clean)								\
+	{														\
+		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
+		assert('\0' == CNL->statsdb_fname[CNL->statsdb_fname_len]);						\
+		rc = UNLINK(CNL->statsdb_fname);									\
+		/* If error removing statsdb, ignore as we want to continue rundown of basedb (more important) */	\
+		CNL->statsdb_created = FALSE;										\
+	}														\
+} MBEND
+
+#define ADD_ENT_TO_ACTIVE_QUE_CNT(CNL)		(INCR_CNT((sm_int_ptr_t)(&CNL->wcs_active_lvl),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+#define SUB_ENT_FROM_ACTIVE_QUE_CNT(CNL)	(DECR_CNT((sm_int_ptr_t)(&CNL->wcs_active_lvl),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+#define ADD_ENT_TO_WIP_QUE_CNT(CNL)		(INCR_CNT((sm_int_ptr_t)(&CNL->wcs_wip_lvl),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+#define SUB_ENT_FROM_WIP_QUE_CNT(CNL)		(DECR_CNT((sm_int_ptr_t)(&CNL->wcs_wip_lvl),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+#define ADD_ENT_TO_FREE_QUE_CNT(CNL)		(INCR_CNT((sm_int_ptr_t)(&CNL->wc_in_free),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+#define SUB_ENT_FROM_FREE_QUE_CNT(CNL)		(DECR_CNT((sm_int_ptr_t)(&CNL->wc_in_free),			\
+								(sm_global_latch_ptr_t)(&CNL->wc_var_lock)))
+
 #define DSKREAD_TRACE(CSA, CR_OFF, CR_TN, PID, BLK, CYCLE)		\
-{									\
+MBSTART {								\
 	int4			doidx;					\
 	node_local_ptr_t	cnl;					\
 	assert((NULL != CSA)&& (NULL != (CSA->nl)));			\
 	cnl = CSA->nl;							\
 	doidx = ++cnl->dskread_ops_index;				\
 	if (DSKREAD_OPS_ARRAY_SIZE <= doidx)				\
-		doidx = cnl->dskread_ops_index = 0;			\
+		cnl->dskread_ops_index = doidx = 0;			\
 	cnl->dskread_ops_array[doidx].cr_off = CR_OFF;			\
 	cnl->dskread_ops_array[doidx].cr_tn = CR_TN;			\
 	cnl->dskread_ops_array[doidx].process_id = PID;			\
 	cnl->dskread_ops_array[doidx].blk = BLK;			\
 	cnl->dskread_ops_array[doidx].cycle = CYCLE;			\
-}
+} MBEND
 
 #ifdef DEBUG
 /* The following macro does not use a separate semaphore to protect its maintenance of the shared memory
@@ -682,7 +790,7 @@ typedef struct node_local_struct
  * and before rel_crit. Also we will increment the index first and cache it so we can shorten our exposure window.
  */
 #define CRIT_TRACE(X)							\
-{									\
+MBSTART {								\
 	int4			coidx;					\
 	node_local_ptr_t	cnl;					\
 	boolean_t		in_ast;					\
@@ -692,13 +800,13 @@ typedef struct node_local_struct
 	cnl = csa->nl;							\
 	coidx = ++cnl->crit_ops_index;					\
 	if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
-		coidx = cnl->crit_ops_index = 0;			\
+		cnl->crit_ops_index = coidx = 0;			\
 	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
 	cnl->crit_ops_array[coidx].curr_tn = (NULL != csa->hdr) ?	\
 		csa->hdr->trans_hist.curr_tn  : 0;			\
-}
+} MBEND
 
 /* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.
  * The only exception we know of is if a process in the midst of commit had been killed (kill -9 or STOP/ID)
@@ -710,12 +818,12 @@ typedef struct node_local_struct
  *	b) the immediately previous crit operation should NOT be a release crit crit_ops_rw but instead should be a crit_ops_gw
  *	c) there are two exceptions to this and they are
  *		(i) that there could be one or more crit_ops_nocrit actions from processes that tried releasing crit
- *			even though they dont own it (cases we know of are in gds_rundown and in t_end/tp_tend if
+ *			even though they don't own it (cases we know of are in gds_rundown and in t_end/tp_tend if
  *			t_commit_cleanup completes the transaction after a mid-commit error).
  *		(ii) there could be one or more crit_ops_gw/crit_ops_rw pair of operations by a pid in between.
  */
 #define	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, currtn)						\
-{												\
+MBSTART {											\
 	GBLREF	uint4 			process_id;						\
 												\
 	assert((currtn) == csa->ti->curr_tn);							\
@@ -753,7 +861,7 @@ typedef struct node_local_struct
 		}										\
 		assert(CRIT_OPS_ARRAY_SIZE > lcnt); /* assert if did not find lone grab-crit */	\
 	}											\
-}
+} MBEND
 
 /*
  * The following macro places lock history entries in an array for debugging.
@@ -763,7 +871,7 @@ typedef struct node_local_struct
  * If "locknl" is non-NULL, it is used to store the lock history. If not only then is gv_cur_region used.
  */
 #define LOCK_HIST(OP, LOC, ID, CNT)					\
-{									\
+MBSTART {								\
 	GBLREF	node_local_ptr_t	locknl;				\
 									\
 	int			lockidx;				\
@@ -778,25 +886,53 @@ typedef struct node_local_struct
 		lcknl = locknl;						\
 	lockidx = ++lcknl->lockhist_idx;				\
 	if (LOCKHIST_ARRAY_SIZE <= lockidx)				\
-		lockidx = lcknl->lockhist_idx = 0;			\
+		lcknl->lockhist_idx = lockidx = 0;			\
 	GET_LONGP(&lcknl->lockhists[lockidx].lock_op[0], (OP));		\
 	lcknl->lockhists[lockidx].lock_addr = (sm_int_ptr_t)(LOC);	\
 	lcknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id();	\
 	lcknl->lockhists[lockidx].lock_pid = (int4)(ID);		\
 	lcknl->lockhists[lockidx].loop_cnt = (int4)(CNT);		\
-}
+} MBEND
 
+#define WCS_OPS_TRACE(CSA, PID, TYPE, BLK, CR_OFF, CR_DIRTY, DETAIL1, DETAIL2)		\
+MBSTART {										\
+	int4			wtidx;							\
+	node_local_ptr_t	cnl;							\
+	boolean_t		donotflush_dbjnl;					\
+											\
+	assert((NULL != CSA) && (NULL != (CSA->nl)));					\
+	cnl = CSA->nl;									\
+	donotflush_dbjnl = cnl->donotflush_dbjnl;					\
+	assert((FALSE == cnl->donotflush_dbjnl) || (TRUE == cnl->donotflush_dbjnl));	\
+	wtidx = ++cnl->wcs_ops_index;							\
+	if (WCS_OPS_ARRAY_SIZE <= wtidx)						\
+		cnl->wcs_ops_index = wtidx = 0;						\
+	cnl->wcs_ops_array[wtidx].db_tn = CSA->ti->curr_tn;				\
+	cnl->wcs_ops_array[wtidx].process_id = PID;					\
+	cnl->wcs_ops_array[wtidx].wc_in_free = cnl->wc_in_free;				\
+	cnl->wcs_ops_array[wtidx].wcs_active_lvl = cnl->wcs_active_lvl;			\
+	cnl->wcs_ops_array[wtidx].wcs_wip_lvl = cnl->wcs_wip_lvl;			\
+	cnl->wcs_ops_array[wtidx].type = TYPE;						\
+	cnl->wcs_ops_array[wtidx].blk = BLK;						\
+	cnl->wcs_ops_array[wtidx].cr_off = CR_OFF;					\
+	cnl->wcs_ops_array[wtidx].cr_dirty = CR_DIRTY;					\
+	cnl->wcs_ops_array[wtidx].detail1 = DETAIL1;					\
+	cnl->wcs_ops_array[wtidx].detail2 = DETAIL2;					\
+	assert((FALSE == cnl->donotflush_dbjnl) || (TRUE == cnl->donotflush_dbjnl));	\
+	assert(donotflush_dbjnl == cnl->donotflush_dbjnl);				\
+} MBEND
 
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
 #define CRIT_TRACE(X)
 #define	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, currtn)
 #define LOCK_HIST(OP, LOC, ID, CNT)
+#define WCS_OPS_TRACE(CSA, PID, TYPE, BLK, CR_OFF, CR_TN, DETAIL1, DETAIL2)
 #define DUMP_LOCKHIST()
 #endif
 
 #define FTOK_TRACE(CSA, CR_TN, FTOK_OPER, PID)				\
-{									\
+MBSTART {								\
 	node_local_ptr_t        cnl;                                    \
 	int4 			foindx;					\
 	assert(NULL != CSA);						\
@@ -809,7 +945,7 @@ typedef struct node_local_struct
 		cnl->ftok_ops_array[foindx].cr_tn = CR_TN;		\
 		cnl->ftok_ops_array[foindx].ftok_oper = FTOK_OPER;	\
 	}								\
-}
+} MBEND
 
 #define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
@@ -835,7 +971,8 @@ typedef struct node_local_struct
 #define NODE_LOCAL_SIZE_DBS			(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
 
 #define INIT_NUM_CRIT_ENTRY_IF_NEEDED(CSD)											\
-{	/* The layout of shared memory depends on the number of mutex queue entries specified in the file header. Thus in	\
+MBSTART {															\
+	/* The layout of shared memory depends on the number of mutex queue entries specified in the file header. Thus in	\
 	 * order to set, for example, csa->critical or csa->shmpool_buffer, we need to know this number. However, this		\
 	 * number can be zero if we have not yet done db_auto_upgrade. So go ahead and upgrade to the value that will		\
 	 * eventually be used, which is DEFAULT_NUM_CRIT_ENTRY.									\
@@ -843,7 +980,7 @@ typedef struct node_local_struct
 	/* Be safe in PRO and check if we need to initialize crit entries, even for GDSMV60002 and later. */			\
 	if (0 == NUM_CRIT_ENTRY(CSD))												\
 		NUM_CRIT_ENTRY(CSD) = DEFAULT_NUM_CRIT_ENTRY;									\
-}
+} MBEND
 
 #define ETGENTLE  2
 #define ETSLOW    8

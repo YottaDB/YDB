@@ -58,6 +58,7 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			{
 				a->rt_addr--;
 				ref->operand[0].oprval.mlit = a;
+				a->reference_count += 1;
 				return put_tref(ref);
 			}
 	} else
@@ -91,12 +92,15 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			assert(a);
 			assert(MV_DEFINED(&(a->v)));
 			assert(is_equ(x, &(a->v)));
+			assert(a->reference_count);
 			a->rt_addr--;
 			ref->operand[0].oprval.mlit = a;
+			a->reference_count += 1;
 			return put_tref(ref);
 		}
 	}
 	ref->operand[0].oprval.mlit = a = (mliteral *)mcalloc(SIZEOF(mliteral));
+	a->reference_count = 1;
 	dqins(&literal_chain, que, a);
 	a->rt_addr = -1;
 	a->v = *x;

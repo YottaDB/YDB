@@ -885,7 +885,7 @@ void gtmrecv_free_filter_buff(void)
 
 int gtmrecv_alloc_msgbuff(void)
 {
-	gtmrecv_max_repl_msglen = MAX_REPL_MSGLEN + SIZEOF(gtmrecv_msgp->type); /* add SIZEOF(...) for alignment */
+	gtmrecv_max_repl_msglen = MAX_REPL_MSGLEN;
 	assert(NULL == gtmrecv_msgp); /* first time initialization. The receiver server doesn't need to re-allocate */
 	msgbuff = (unsigned char *)malloc(gtmrecv_max_repl_msglen + OS_PAGE_SIZE);
 	gtmrecv_msgp = (repl_msg_ptr_t)ROUND_UP2((unsigned long)msgbuff, OS_PAGE_SIZE);
@@ -2724,7 +2724,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	int4				msghdrlen, strm_num, processed_hdrlen;
 	int4				need_histinfo_num;
 	int				cmpret;
-	int				msg_type, msg_len;
+	int				msg_type, msg_len, hdr_msg_type, hdr_msg_len;
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
@@ -2974,16 +2974,20 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				}
 				if (remote_side->cross_endian)
 				{
-					((repl_msg_ptr_t)buffp)->type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
-					((repl_msg_ptr_t)buffp)->len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);
+					hdr_msg_type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
+					hdr_msg_len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);
+				} else
+				{
+					hdr_msg_type = ((repl_msg_ptr_t)buffp)->type;
+					hdr_msg_len = ((repl_msg_ptr_t)buffp)->len;
 				}
-				msg_type = (((repl_msg_ptr_t)buffp)->type & REPL_TR_CMP_MSG_TYPE_MASK);
+				msg_type = hdr_msg_type & REPL_TR_CMP_MSG_TYPE_MASK;
 				if (REPL_TR_CMP_JNL_RECS == msg_type)
 				{
 					processed_hdrlen = REPL_MSG_HDRLEN;
-					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
+					msg_len = hdr_msg_len - processed_hdrlen;
 					gtmrecv_repl_cmpmsglen = msg_len;
-					gtmrecv_repl_uncmpmsglen = (((repl_msg_ptr_t)buffp)->type >> REPL_TR_CMP_MSG_TYPE_BITS);
+					gtmrecv_repl_uncmpmsglen = (hdr_msg_type >> REPL_TR_CMP_MSG_TYPE_BITS);
 					assert(0 < gtmrecv_repl_uncmpmsglen);
 					assert(REPL_TR_CMP_THRESHOLD > gtmrecv_repl_uncmpmsglen);
 					/* Since msg_len is compressed length, it need not be 8-byte aligned. Make it so
@@ -3014,7 +3018,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					gtmrecv_repl_uncmpmsglen = cmpmsgp->uncmplen;
 					assert(0 < gtmrecv_repl_uncmpmsglen);
 					assert(REPL_TR_CMP_THRESHOLD <= gtmrecv_repl_uncmpmsglen);
-					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
+					msg_len = hdr_msg_len - processed_hdrlen;
 					/* Unlike REPL_TR_CMP_JNL_RECS message, msg_len is guaranteed to be 8-byte aligned here */
 					buffp += processed_hdrlen;
 					exp_data_len = gtmrecv_repl_uncmpmsglen;
@@ -3024,7 +3028,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				} else
 				{
 					processed_hdrlen = REPL_MSG_HDRLEN;
-					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
+					msg_len = hdr_msg_len - processed_hdrlen;
 					exp_data_len = msg_len;
 					if (REPL_TR_JNL_RECS == msg_type || REPL_OLD_TRIPLE == msg_type || REPL_HISTREC == msg_type)
 					{
@@ -3697,20 +3701,18 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		{	/* We are at the tail of the current received buffer. */
 			if ((0 != data_len) && !copied_to_recvpool)
 			{	/* We have a complete header for a control message, but not the complete message. Move the message
-				 * (including the header) to the beginning of the allocated buffer space and update data_len and
-				 * buff_unprocessed.
+				 * (including the header) to the beginning of the allocated buffer space. Restore the remaining
+				 * length to buff_unprocessed and reset data_len so that the header is read again.
 				 */
-				buff_unprocessed += buffered_data_len;
-				data_len += buffered_data_len;
+				data_len = 0;
+				buff_unprocessed += buffered_data_len + processed_hdrlen;
 				if (buffp_start != buff_start)
-					memmove(buff_start, buffp_start, buff_unprocessed + processed_hdrlen);
-				buffp = buff_start + processed_hdrlen;
+					memmove(buff_start, buffp_start, buff_unprocessed);
 			} else if (0 != buff_unprocessed)
 			{	/* We have an incomplete header. Move it to the beginning of the allocated buffer space. */
 				memmove(buff_start, buffp, buff_unprocessed);
-				buffp = buff_start;
-			} else
-				buffp = buff_start;
+			}
+			buffp = buff_start;
 		}
 		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -384,7 +384,6 @@ int m_set(void)
 					assert(OC_RTERROR == tmp->opcode);
 					dqdel(tmp, exorder);
 					dqins(targchain.exorder.bl, exorder, tmp);
-					CHKTCHAIN(&targchain);
 				}
 				break;
 			}
@@ -403,7 +402,6 @@ int m_set(void)
 				assert(OC_RTERROR == tmp->opcode);
 				dqdel(tmp, exorder);
 				dqins(targchain.exorder.bl, exorder, tmp);
-				CHKTCHAIN(&targchain);
 				advancewindow();	/* skip past the function name */
 				advancewindow();	/* skip past the left paren */
 				/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
@@ -507,7 +505,6 @@ int m_set(void)
 				s->operand[0] = put_tref(get);
 				/* Code to fetch args for target triple are on targchain. Put get there now too. */
 				dqins(targchain.exorder.bl, exorder, get);
-				CHKTCHAIN(&targchain);
 				if (!is_extract)
 				{	/* Set $[z]piece */
 					delimiter = newtriple(OC_PARAMETER);
@@ -670,7 +667,6 @@ int m_set(void)
 			{
 				dqins(targchain.exorder.bl, exorder, s);
 				dqins(targchain.exorder.bl, exorder, put);
-				CHKTCHAIN(&targchain);
 				/* Put result operand on the chain. End of chain depends on whether or not
 				 * we are calling the shortcut or the full set-piece code
 				 */

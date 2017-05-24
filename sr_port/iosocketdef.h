@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -387,6 +388,8 @@ typedef struct d_socket_struct_type
 	uint4				waitcycle;			/* count waits */
 	boolean_t			ichset_specified;
 	boolean_t			ochset_specified;
+	gtm_chset_t			ichset_utf16_variant;		/* Save the UTF-16 variant (BE/LE) for reuse */
+	gtm_chset_t			ochset_utf16_variant;		/* Save the UTF-16 variant (BE/LE) for reuse */
 	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
 	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
 } d_socket_struct;
@@ -394,7 +397,8 @@ typedef struct d_socket_struct_type
 boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion);
 boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
 boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
-void iosocket_delim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
+void iosocket_idelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
+void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_delimiter_copy(socket_struct *from, socket_struct *to);
 boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to);
 int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr);

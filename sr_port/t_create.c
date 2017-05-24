@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,24 +27,13 @@
 #include "tp.h"
 #include "t_create.h"
 
-#define TP_ALLOCATION_CLUE_INCREMENT	1	/* This is the default value. Defined below (under a #ifdef) is another value
-						 * Enable below #ifdef/#endif block if you want that value instead.
-						 */
-#ifdef TP_ALLOCATION_CLUE_BUMP_BY_512
-#define	TP_ALLOCATION_CLUE_INCREMENT	512	/* Change this to some other number if you want a different bump to the
-						 * tp allocation clue each time it is used.
-						 */
-#endif
-
 GBLREF	cw_set_element		cw_set[];
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	uint4			dollar_tlevel;
-GBLREF	block_id		tp_allocation_clue;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	block_id		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 
 block_index t_create (
 		      block_id	hint,			/*  A hint block number.  */
@@ -68,20 +58,6 @@ block_index t_create (
 		cse = &cw_set[cw_set_depth];
 	} else
 	{
-		if (!tp_allocation_clue)
-		{
-			tp_allocation_clue = gtm_tp_allocation_clue + 1; /* + 1 so we dont start out with 0 value for "hint" */
-			hint = tp_allocation_clue;			 /* this is copied over to cse->blk which is asserted
-									  * in gvcst_put as never being 0.
-									  */
-		} else
-		{
-			tp_allocation_clue += TP_ALLOCATION_CLUE_INCREMENT;
-			hint = tp_allocation_clue;
-			/* What if hint becomes greater than total_blks. Should we wrap back to 0? */
-			if (tp_allocation_clue < 0)
-				GTMASSERT;
-		}
 		tp_cw_list(&cse);
 		assert(gv_target);
 		cse->blk_target = gv_target;

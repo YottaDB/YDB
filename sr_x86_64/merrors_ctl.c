@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -414,7 +414,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZWRSPONE", "Subscript patterns in ZWRITE are atomic; Invalid delimiter", 0 },
 	{ "FILEDEL", "File !AD successfully deleted", 2 },
 	{ "JNLBADLABEL", "Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.", 6 },
-	{ "JNLREADEOF", "End of journal file encountered for !AD", 2 },
+	{ "JNLREADEOF", "End of journal file encountered", 0 },
 	{ "JNLRECFMT", "Journal file record format error encountered", 0 },
 	{ "BLKTOODEEP", "Block level too deep", 0 },
 	{ "NESTFORMP", "Formal parameter list cannot be combined with nested line", 0 },
@@ -551,8 +551,8 @@ LITDEF	err_msg merrors[] = {
 	{ "INVACCMETHOD", "Invalid access method", 0 },
 	{ "JNLOPNERR", "Error opening journal file !AD!/  for database !AD", 4 },
 	{ "JNLRECTYPE", "Journal record type does not match expected type", 0 },
-	{ "JNLTRANSGTR", "Transaction number in journal is greater than in database", 0 },
-	{ "JNLTRANSLSS", "Transaction number in journal is less than in database", 0 },
+	{ "JNLTRANSGTR", "Transaction number !@UQ in journal header is greater than !@UQ in database header", 2 },
+	{ "JNLTRANSLSS", "Transaction number !@UQ in journal header is less than !@UQ in database header", 2 },
 	{ "JNLWRERR", "Error writing journal file !AD.  Unable to update header.", 2 },
 	{ "FILEIDMATCH", "Saved File ID does not match the current ID - the file appears to have been moved", 0 },
 	{ "EXTSRCLIN", "!_!AD!/!_!AD", 4 },
@@ -610,8 +610,8 @@ LITDEF	err_msg merrors[] = {
 	{ "MEMORYRECURSIVE", "Memory Subsystem called recursively", 0 },
 	{ "FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7 },
 	{ "BLKWRITERR", "Unable to queue disk write for block 0x!XL.  Will keep trying.", 1 },
-	{ "STOPTIMEOUT", "Waited too long for stopped process to release.  Region: !AD.", 2 },
-	{ "UNUSEDMSG777", "TRIGMODINTP last used in V6.2-000", 0 },
+	{ "UNUSEDMSG776", "STOPTIMEOUT last used in V6.3-000A", 0 },
+	{ "PINENTRYERR", "Custom pinentry program failure", 0 },
 	{ "BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0 },
 	{ "NOFORKCORE", "Unable to fork off process to create core.  Core creation postponed.", 0 },
 	{ "JNLREAD", "Error reading from journal file !AD at offset [0x!XL]", 3 },
@@ -797,7 +797,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBSVBNMIN", "!AD Start VBN smaller than possible", 2 },
 	{ "DBTTLBLK0", "!AD Total blocks equal zero", 2 },
 	{ "DBNOTDB", "!AD File does not have a valid GDS file header", 2 },
-	{ "DBTOTBLK", "Total blocks should be 0x!XL, is 0x!XL", 2 },
+	{ "DBTOTBLK", "File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL", 2 },
 	{ "DBTN", "Block TN is 0x!16@XQ", 1 },
 	{ "DBNOREGION", "None of the database regions accessible", 0 },
 	{ "DBTNRESETINC", "WARNING: tn_reset for database is incomplete due to integrity errors", 0 },
@@ -1090,7 +1090,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLINSTSEQORD", "!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD", 6 },
 	{ "REPLINSTSTNDALN", "Could not get exclusive access to replication instance file !AD", 2 },
 	{ "REPLREQROLLBACK", "Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first", 2 },
-	{ "REQROLLBACK", "Error accessing database !AD.  Run MUPIP JOURNAL ROLLBACK on cluster node !AD.", 4 },
+	{ "REQROLLBACK", "Error accessing database !AD.  Run MUPIP JOURNAL -ROLLBACK -NOONLINE on cluster node !AD.", 4 },
 	{ "INVOBJFILE", "Cannot ZLINK object file !AD due to unexpected format", 2 },
 	{ "SRCSRVEXISTS", "Source server for secondary instance !AD is already running with pid !UL", 3 },
 	{ "SRCSRVNOTEXIST", "Source server for secondary instance !AD is not alive", 2 },
@@ -1105,7 +1105,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DLRCILLEGAL", "!_!AD!/!_!_!_Illegal $CHAR() value !UL", 3 },
 	{ "NONUTF8LOCALE", "Locale has character encoding (!AD) which is not compatible with UTF-8 character set", 2 },
 	{ "INVDLRCVAL", "Invalid $CHAR() value !UL", 1 },
-	{ "DBMISALIGN", "Database file !AD has !UL blocks which does not match alignment rules. Reconstruct the database from a backup or extend it by at least !UL blocks.", 4 },
+	{ "DBMISALIGN", "File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.", 4 },
 	{ "LOADINVCHSET", "Extract file CHSET (!AD) is incompatible with gtm_chset", 2 },
 	{ "DLLCHSETM", "Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.", 4 },
 	{ "DLLCHSETUTF8", "Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.", 4 },
@@ -1277,7 +1277,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting", 2 },
 	{ "IGNBMPMRKFREE", "Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK", 4 },
 	{ "PERMGENFAIL", "Failed to determine access permissions to use for creation of !AD for file !AD", 4 },
-	{ "PERMGENDIAG", "Permissions: Proc(uid:!UL,gid:!UL), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD), Group Mem(opener:!UL,owner:!UL)", 11 },
+	{ "PERMGENDIAG", "Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)", 11 },
 	{ "MUTRUNC1ATIME", "Process with PID !UL already performing truncate in region !AD", 3 },
 	{ "MUTRUNCBACKINPROG", "Truncate detected concurrent backup in progress for region !AD", 2 },
 	{ "MUTRUNCERROR", "Truncate of region !AD encountered service error !AD", 4 },
@@ -1361,7 +1361,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GETNAMEINFO", "Error in getting name info", 0 },
 	{ "SOCKBIND", "Error in binding socket", 0 },
 	{ "INSTFRZDEFER", "Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict", 4 },
-	{ "REGOPENRETRY", "Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...", 4 },
+	{ "UNUSEDMSG1529", "REGOPENRETRY last used in V6.3-000A", 0 },
 	{ "REGOPENFAIL", "Failed to open region !AD (!AD) due to conflicting database shutdown activity", 4 },
 	{ "REPLINSTNOSHM", "Database !AD has no active connection to a replication journal pool", 2 },
 	{ "DEVPARMTOOSMALL", "Deviceparameter must be greater than zero (0)", 0 },
@@ -1371,8 +1371,8 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLNOMAPTOREG", "Global !AD does not map to region !AD in current global directory", 4 },
 	{ "ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2 },
 	{ "TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0 },
-	{ "GVSUBSERR", "Invalid subscripted global name specification in $VIEW() function", 0 },
-	{ "UNUSEDMSG1540", "TRIGNOSPANBL : Last used in V6.2-000", 0 },
+	{ "UNUSEDMSG1539", "GVSUBSERR last used in V6.3-000A", 0 },
+	{ "ZATRANSERR", "The input string is too long to convert", 0 },
 	{ "FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1 },
 	{ "TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0 },
 	{ "TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0 },
@@ -1393,7 +1393,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DSENOTOPEN", "DSE could not open region !AD - see DSE startup error message for cause", 2 },
 	{ "ZSOCKETATTR", "Attribute \"!AD\" invalid for $ZSOCKET function", 2 },
 	{ "ZSOCKETNOTSOCK", "$ZSOCKET function called but device is not a socket", 0 },
-	{ "CHSETALREADY", "CHSET !AD already specified for socket device", 2 },
+	{ "CHSETALREADY", "Socket device already contains sockets with iCHSET=!AD, oCHSET=!AD", 4 },
 	{ "DSEMAXBLKSAV", "DSE cannot SAVE another block as it already has the maximum of !UL", 1 },
 	{ "BLKINVALID", "!XL is not a valid block as database file !AD has !XL total blocks", 4 },
 	{ "CANTBITMAP", "Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)", 0 },
@@ -1453,6 +1453,43 @@ LITDEF	err_msg merrors[] = {
 	{ "ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6 },
 	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.", 3 },
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2 },
+	{ "PBNUNSUPTYPE", "$ZPEEK() does not support type !AD", 2 },
+	{ "DBFHEADLRU", "Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned", 5 },
+	{ "ASYNCIONOV4", "!AD database has !AD; cannot !AD", 6 },
+	{ "AIOCANCELTIMEOUT", "Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD", 3 },
+	{ "DBGLDMISMATCH", "Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ", 9 },
+	{ "DBBLKSIZEALIGN", "Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL", 4 },
+	{ "ASYNCIONOMM", "Database file !AD!AD cannot !AD", 6 },
+	{ "RESYNCSEQLOW", "MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested is lower than !@ZQ [0x!16@XQ] which is the starting sequence number of the instance", 4 },
+	{ "DBNULCOL", "NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD", 6 },
+	{ "UTF16ENDIAN", "The device previously set UTF-16 endianness to !AD and cannot change to !AD", 4 },
+	{ "OFRZACTIVE", "Region !AD has an Online Freeze", 2 },
+	{ "OFRZAUTOREL", "Online Freeze automatically released for region !AD", 2 },
+	{ "OFRZCRITREL", "Proceeding with a write to region !AD after Online Freeze while holding crit", 2 },
+	{ "OFRZCRITSTUCK", "Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.", 2 },
+	{ "OFRZNOTHELD", "Online Freeze had been automatically released for at least one region", 0 },
+	{ "AIOBUFSTUCK", "Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL", 5 },
+	{ "DBDUPNULCOL", "Discarding !AD=!AD key due to duplicate null collation record", 4 },
+	{ "CHANGELOGINTERVAL", "!AD Server now logging to !AD with a !UL second interval", 5 },
+	{ "DBNONUMSUBS", "!AD key contains a numeric form of subscript in a global defined to collate all subscripts as strings", 2 },
+	{ "AUTODBCREFAIL", "Automatic creation of database file !AD associated with region !AD failed; see associated messages for details", 4 },
+	{ "RNDWNSTATSDBFAIL", "Rundown of statistics database region !AD (DB !AD) failed at/in !AD with following error: !AD", 8 },
+	{ "STATSDBNOTSUPP", "Attempted operation is not supported on statistics database file !AD", 2 },
+	{ "TPNOSTATSHARE", "VIEW \"[NO]STATSHARE\" is not allowed inside a TP transaction", 0 },
+	{ "FNTRANSERROR", "Buffer too small error occurred trying to translate filename !AD", 2 },
+	{ "NOCRENETFILE", "Database file !AD not created; cannot create across network", 2 },
+	{ "DSKSPCCHK", "Error while checking for available disk space to create file !AD", 2 },
+	{ "NOCREMMBIJ", "MM access method not compatible with BEFORE image journaling; Database file !AD not created", 2 },
+	{ "FILECREERR", "Error !AD for file !AD during DB creation", 4 },
+	{ "RAWDEVUNSUP", "RAW device for region !AD is not supported", 2 },
+	{ "DBFILECREATED", "Database file !AD created", 2 },
+	{ "PCTYRESERVED", "Attempted operation not supported on ^%Y* namespace", 0 },
+	{ "REGFILENOTFOUND", "Database file !AD corresponding to region !AD cannot be found", 4 },
+	{ "DRVLONGJMP", "Fake internal error that drives longjmp()", 0 },
+	{ "INVSTATSDB", "Database file !AD associated with statistics database region !AD is not a valid statistics database", 4 },
+	{ "STATSDBERR", "Error in/at !AD attempting to use a statistics database: !AD", 4 },
+	{ "STATSDBINUSE", "Statistics database !AD is in use with database !AD so cannot also be used with database !AD", 6 },
+	{ "STATSDBFNERR", "This database has no accessible statistics database due to the following error: !AD", 2 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2052,8 +2089,8 @@ LITDEF	int ERR_KRNLKILL = 150377108;
 LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
 LITDEF	int ERR_FREEZEID = 150377123;
 LITDEF	int ERR_BLKWRITERR = 150377131;
-LITDEF	int ERR_STOPTIMEOUT = 150377138;
-LITDEF	int ERR_UNUSEDMSG777 = 150377146;
+LITDEF	int ERR_UNUSEDMSG776 = 150377138;
+LITDEF	int ERR_PINENTRYERR = 150377146;
 LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
 LITDEF	int ERR_NOFORKCORE = 150377160;
 LITDEF	int ERR_JNLREAD = 150377170;
@@ -2803,7 +2840,7 @@ LITDEF	int ERR_GETADDRINFO = 150383114;
 LITDEF	int ERR_GETNAMEINFO = 150383122;
 LITDEF	int ERR_SOCKBIND = 150383130;
 LITDEF	int ERR_INSTFRZDEFER = 150383139;
-LITDEF	int ERR_REGOPENRETRY = 150383147;
+LITDEF	int ERR_UNUSEDMSG1529 = 150383146;
 LITDEF	int ERR_REGOPENFAIL = 150383154;
 LITDEF	int ERR_REPLINSTNOSHM = 150383162;
 LITDEF	int ERR_DEVPARMTOOSMALL = 150383170;
@@ -2813,8 +2850,8 @@ LITDEF	int ERR_ACTCOLLMISMTCH = 150383194;
 LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
 LITDEF	int ERR_ISSPANGBL = 150383210;
 LITDEF	int ERR_TPNOSUPPORT = 150383218;
-LITDEF	int ERR_GVSUBSERR = 150383226;
-LITDEF	int ERR_UNUSEDMSG1540 = 150383234;
+LITDEF	int ERR_UNUSEDMSG1539 = 150383226;
+LITDEF	int ERR_ZATRANSERR = 150383234;
 LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
 LITDEF	int ERR_TLSDLLNOOPEN = 150383250;
 LITDEF	int ERR_TLSINIT = 150383258;
@@ -2895,9 +2932,46 @@ LITDEF	int ERR_MUREENCRYPTV4NOALLOW = 150383850;
 LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
 LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;
+LITDEF	int ERR_PBNUNSUPTYPE = 150383882;
+LITDEF	int ERR_DBFHEADLRU = 150383891;
+LITDEF	int ERR_ASYNCIONOV4 = 150383898;
+LITDEF	int ERR_AIOCANCELTIMEOUT = 150383906;
+LITDEF	int ERR_DBGLDMISMATCH = 150383914;
+LITDEF	int ERR_DBBLKSIZEALIGN = 150383922;
+LITDEF	int ERR_ASYNCIONOMM = 150383930;
+LITDEF	int ERR_RESYNCSEQLOW = 150383938;
+LITDEF	int ERR_DBNULCOL = 150383946;
+LITDEF	int ERR_UTF16ENDIAN = 150383954;
+LITDEF	int ERR_OFRZACTIVE = 150383960;
+LITDEF	int ERR_OFRZAUTOREL = 150383968;
+LITDEF	int ERR_OFRZCRITREL = 150383976;
+LITDEF	int ERR_OFRZCRITSTUCK = 150383984;
+LITDEF	int ERR_OFRZNOTHELD = 150383992;
+LITDEF	int ERR_AIOBUFSTUCK = 150384002;
+LITDEF	int ERR_DBDUPNULCOL = 150384010;
+LITDEF	int ERR_CHANGELOGINTERVAL = 150384019;
+LITDEF	int ERR_DBNONUMSUBS = 150384026;
+LITDEF	int ERR_AUTODBCREFAIL = 150384034;
+LITDEF	int ERR_RNDWNSTATSDBFAIL = 150384042;
+LITDEF	int ERR_STATSDBNOTSUPP = 150384050;
+LITDEF	int ERR_TPNOSTATSHARE = 150384058;
+LITDEF	int ERR_FNTRANSERROR = 150384066;
+LITDEF	int ERR_NOCRENETFILE = 150384074;
+LITDEF	int ERR_DSKSPCCHK = 150384082;
+LITDEF	int ERR_NOCREMMBIJ = 150384090;
+LITDEF	int ERR_FILECREERR = 150384098;
+LITDEF	int ERR_RAWDEVUNSUP = 150384106;
+LITDEF	int ERR_DBFILECREATED = 150384115;
+LITDEF	int ERR_PCTYRESERVED = 150384122;
+LITDEF	int ERR_REGFILENOTFOUND = 150384131;
+LITDEF	int ERR_DRVLONGJMP = 150384138;
+LITDEF	int ERR_INVSTATSDB = 150384146;
+LITDEF	int ERR_STATSDBERR = 150384154;
+LITDEF	int ERR_STATSDBINUSE = 150384162;
+LITDEF	int ERR_STATSDBFNERR = 150384170;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1440};
+	1477};

@@ -49,6 +49,7 @@ GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		mu_reorg_process;
 #ifdef DEBUG
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+GBLREF	uint4			bml_save_dollar_tlevel;
 #endif
 
 error_def(ERR_MMREGNOACCESS);
@@ -99,10 +100,15 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 		{
 			histtn = s->tn;
 			/* Assert that we have a NULL cse in case of a non-zero clue as this will otherwise confuse t_end.c.
-			 * The only exception is reorg in which case we nullify the clue AFTER the t_begin call (in mu_reorg.c,
-			 * mu_swap_root.c, mu_truncate.c) but BEFORE the gvcst_search call so the clue does not get used.
+			 * The only exceptions are
+			 *	a) reorg in which case we nullify the clue AFTER the t_begin call (in mu_reorg.c, mu_swap_root.c,
+			 *	   mu_truncate.c) but BEFORE the gvcst_search call so the clue does not get used.
+			 *	b) gvcst_bmp_mark_free : It could be invoked from op_tcommit (through gvcst_expand_free_subtree)
+			 *	   to free up blocks in a bitmap in which case it does not deal with histories/gv_target and
+			 *	   so gv_target->clue and/or gv_target->hist.h[x].cse does not matter. The global variable
+			 *	   bml_save_dollar_tlevel exactly identifies this scenario.
 			 */
-			assert(mu_reorg_process || (NULL == s->cse));
+			assert(mu_reorg_process || (NULL == s->cse) || bml_save_dollar_tlevel);
 			if (start_tn > histtn)
 				start_tn = histtn;
 		}

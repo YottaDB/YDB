@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@ LITREF octabstruct oc_tab[];
 LITREF toktabtype tokentable[];
 
 GBLREF  spdesc          stringpool;
-GBLREF boolean_t        gtm_utf8_mode;
 
 /**
  * Given a start token that represents a non-unary operation, consumes tokens and constructs an appropriate triple tree.
@@ -46,6 +45,7 @@ GBLREF boolean_t        gtm_utf8_mode;
  *  - Calls ins_triple, which adds triples to the execution chain
  */
 int eval_expr(oprtype *a)
+/* process an expression into the operand at *a */
 {
 	boolean_t	ind_pat, saw_local, saw_se, se_warn, replaced;
 	int		op_count, se_handling;
@@ -117,9 +117,12 @@ int eval_expr(oprtype *a)
 					memcpy(tmp_mval.str.addr, m1->v.str.addr, m1->v.str.len);
 					memcpy(tmp_mval.str.addr + m1->v.str.len, m2->v.str.addr, m2->v.str.len);
 					stringpool.free = (unsigned char *)tmp_mval.str.addr + tmp_mval.str.len;
+					s2n(&tmp_mval);		/* things rely on the compiler doing literals with complete types */
 					ref1->operand[0] = put_lit(&tmp_mval);
 					optyp_1 = ref1->operand[0];
 					replaced = TRUE;
+					unuse_literal(&m1->v);
+					unuse_literal(&m2->v);
 					op_count--;
 				} else
 				{
@@ -159,6 +162,7 @@ int eval_expr(oprtype *a)
 						saw_local = FALSE;	/* just clear the backptrs - shut off other processing */
 					/* This code checks to see if the only parameter for this OC_CAT is a string literal,
 						and if it is, then it simply returns the literal*/
+					assert(1 < op_count);
 					if ((2 == op_count) && (OC_PARAMETER == ref1->opcode)
 						&& (TRIP_REF == ref1->operand[0].oprclass)
 						&& (OC_LIT == ref1->operand[0].oprval.tref->opcode))

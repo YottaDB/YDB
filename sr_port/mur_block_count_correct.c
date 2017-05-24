@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +12,9 @@
 #include "mdef.h"
 
 #include <errno.h>
+
 #include "gtm_unistd.h"
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_stat.h"
 #include "gtm_time.h"
 
@@ -66,13 +68,9 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		default:
 			assertpro(FALSE && acc_meth);
 	}
-	mu_int_ovrhd += 1;
-	assert(mu_int_ovrhd == mu_data->start_vbn);
-	size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
+	assert(mu_int_ovrhd == (mu_data->start_vbn - 1));
+	size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * (mu_data->trans_hist.total_blks + 1);
 	native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
-	/* In the following tests, the EOF block should always be 1 greater than the actual size of the file.
-	 * This is due to the GDS being allocated in even DISK_BLOCK_SIZE-byte blocks.
-	 */
 	if (native_size && (size < native_size))
 	{
 		total_blks = (dba_mm == acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
@@ -105,7 +103,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
 #		ifdef DEBUG
 		/* Check that the filesize and blockcount in the fileheader match now after the extend */
-		size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
+		size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * (mu_data->trans_hist.total_blks + 1);
 		native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
 		ALIGN_DBFILE_SIZE_IF_NEEDED(size, native_size);
 		assert(size == native_size);

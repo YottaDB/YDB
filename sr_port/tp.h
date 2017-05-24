@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -641,146 +641,177 @@ typedef struct trans_restart_hist_struct
 }
 
 #ifdef GTM_TRIGGER
-#define TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(INCREMENTAL, COMMIT)								\
+/* State information needed by TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(). Currently needed for trigger cycle handling */
+typedef enum
+{
+	TP_COMMIT,
+	TP_ROLLBACK,
+	TP_INCR_ROLLBACK,
+	TP_RESTART
+
+} tp_cleanup_state;
+
+/* TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED uses the logic below to manage CSA's and GVT's trigger cycle information
+ *
+ * Manage cached trigger state for regions and gvts. If either $ZTRIGGER() was invoked (dollar_ztrigger_invoked == TRUE) or
+ * triggers were read from the database in the current (TREF(gvt_triggers_read_this_tn) == TRUE) transaction, certain state
+ * information needs to be cleaned up at transaction commit, complete/incremental rollback or restart.
+ * Rules for gvt:
+ * - For all cases, commit, incr/complete rollback and restart, each gvt's db_dztrigger_cycle must be reset to zero. We do
+ *   this to ensure that any $ZTRIGGER() causes a cycle mismatch which will result in a call to gvtr_db_read_hasht(). The end
+ *   of this macro ASSERTs that cleanup will always reset gvt->db_dztrigger_cycle to zero.
+ * - Any gvt that read trigger info from the DB since the transaction start will have gvt->trig_read_tn >= tstart_local_tn
+ *   and gvt->trig_read_tn == local_tn if read in the current (possibly sub) transaction. For commits, there is nothing to
+ *   do. Complete rollbacks and restarts, if gvt->gvt_trigger is non-NULL, reset gvt_trigger->gv_trigger_cycle to zero.
+ *   Incremental rollbacks only reset gvt_trigger->gv_trigger_cycle to zero when the trigger was read in the current
+ *   transaction. Alone, resetting gvt_trigger->gv_trigger_cycle to zero will not force a cycle mismatch.
+ *   The above reset of the gvt's db_dztrigger_cycle to zero only causes a mismatch when $ZTRIGGER() is involved. To cover
+ *   restarts and complete rollbacks without $ZTRIGGER() set gvt->db_trigger_cycle to gvt->gd_csa->db_trigger_cycle - 1 to force
+ *   a cycle mismatch. While resetting gvt->db_dztrigger_cycle and gvt->db_trigger_cycle is redundant doing both simplifies
+ *   the logic.
+ * - For commits and complete rollbacks cleanup asserts that gvt->db_dztrigger_cycle == gvt->gd_csa->db_dztrigger_cycle
+ * Rules for csa:
+ * - For commits and complete rollbacks, reset csa->db_dztrigger_cycle to zero as the transaction is over. Also reset
+ *   csa->incr_db_trigger_cycle to FALSE (this is redundant for commits as tp_tend will already have reset
+ *   csa->incr_db_trigger_cycle when it increment csd->db_trigger_cycle. Iterate over tp_reg_list in case a region that was
+ *   affected by a $ZTRIGGER() in a prior try, but not by the current try.
+ * - For restarts and incremental rollbacks, if $ZTRIGGER() was invoked (dollar_ztrigger_invoked == TRUE), iterate over
+ *   sgminfo to set each non-zero csa->db_dztrigger_cycle to 1. While any non-zero value will cause a cycle mismatch -
+ *   because each gvt will have its gvt->db_dztrigger_cycle reset to 0 - one is enough to preserve the knowledge that
+ *   $ZTRIGGER() affected loaded triggers. Assert that csa->db_dztrigger_cycle is non-zero when csa->incr_db_trigger_cycle is
+ *   TRUE.
+ * At clean up end:
+ * - Reset TREF(gvt_triggers_read_this_tn) to FALSE
+ * - Reset dollar_ztrigger_invoked to FALSE only for commits and complete rollbacks. Done last since it impacts both gvts and
+ *   CSAs. Restarts and incremental rollbacks must retain the knowledge that $ZTRIGGER() was invoked and leaving
+ *   dollar_ztrigger_invoked is one part of that.
+ */
+#define TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(STATE)										\
 {																\
 	GBLREF	boolean_t	dollar_ztrigger_invoked;									\
 	GBLREF	trans_num	local_tn;											\
 	GBLREF	gv_namehead	*gvt_tp_list;											\
 	GBLREF	sgm_info	*first_sgm_info;										\
+	GBLREF	tp_region	*tp_reg_list;											\
+	GBLREF	trans_num	tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */		\
+	DEBUG_ONLY(GBLDEF	boolean_t	was_dollar_ztrigger_invoked);							\
+	DEBUG_ONLY(GBLDEF	boolean_t	were_gvt_triggers_read_this_tn);						\
+	DBGTRIGR_ONLY(char	gvnamestr[MAX_MIDENT_LEN + 1];)									\
+	DBGTRIGR_ONLY(uint4	lcl_csadztrig;)											\
+	DBGTRIGR_ONLY(uint4	lcl_dztrig;)											\
 																\
 	gv_namehead		*gvnh, *lcl_hasht_tree;										\
 	cw_set_element		*cse;												\
 	sgmnt_addrs		*csa;												\
 	sgm_info		*si;												\
 	gvt_trigger_t		*gvt_trigger;											\
-	DEBUG_ONLY(boolean_t	matched_one_gvnh;)										\
+	tp_region               *tr;												\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
+	DEBUG_ONLY(was_dollar_ztrigger_invoked = dollar_ztrigger_invoked;)							\
+	DEBUG_ONLY(were_gvt_triggers_read_this_tn = TREF(gvt_triggers_read_this_tn);)						\
+	/* $ZTRIGGER() was invoked. Clean up csa->db_dztrigger_cycle as necessary. */						\
+	DBGTRIGR((stderr, "INVALIDATE_TRIG_CYCLE(): %s:%d t_tries %d, $tlevel=%d state=%d wasDZ=%d wasTREAD=%d\n",		\
+				__FILE__, __LINE__, t_tries, dollar_tlevel, STATE,						\
+				was_dollar_ztrigger_invoked, were_gvt_triggers_read_this_tn));					\
 	if (dollar_ztrigger_invoked)												\
-	{	/* There was at least one region where a $ZTRIGGER() was invoked. */						\
-		dollar_ztrigger_invoked = FALSE;										\
-		/* Phase 1: Adjust trigger/$ztrigger related fields for all gv_target read/updated in this transaction */	\
-		if (COMMIT)													\
-		{	/* Reset csa->db_dztrigger_cycle and gvt->db_dztrigger_cycle to zero. This is needed so that globals 	\
-			 * updated after the TCOMMIT don't re-read triggers when NOT necessary. Such a case is possible if	\
-			 * for instance a $ZTRIGGER() happened in a sub-transaction that got rolled back. Though no actual	\
-			 * trigger change happened, csa->db_dztrigger_cycle will be incremented and hence gvt(s) whose 		\
-			 * db_dztrigger_cycle does not match will now re-read triggers. We don't expect $ZTRIGGER() to be	\
-			 * frequent. So, it's okay to go through the list of gvt 						\
+	{															\
+		if ((STATE == TP_COMMIT) || (STATE == TP_ROLLBACK))								\
+		{	/* Reset csa->db_dztrigger_cycle to zero. This is needed so that globals updated after the commit or	\
+			 * rollback do not re-read triggers when NOT necessary. Such a case is possible if for instance a	\
+			 * $ZTRIGGER() happened in a sub-transaction that got rolled back. Though no actual trigger change	\
+			 * happened, csa->db_dztrigger_cycle will be incremented and hence gvt(s) whose db_dztrigger_cycle does	\
+			 * not match will now re-read triggers. We don't expect $ZTRIGGER() to be frequent. So, it's okay to go	\
+			 * through tp_reg_list											\
 			 */													\
-			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
+			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)							\
 			{													\
-				gvnh->db_dztrigger_cycle = 0;									\
-				gvnh->gd_csa->db_dztrigger_cycle = 0;								\
+				csa = &FILE_INFO(tr->reg)->s_addrs;								\
+				csa->db_dztrigger_cycle = 0;									\
+				/* This is safe to do here for commit because tp_tend() has already been done. This is safe	\
+				 * for a complete rollback as well because the transaction is now complete.			\
+				 */												\
+				csa->incr_db_trigger_cycle = FALSE;								\
 			}													\
 		} else														\
-		{														\
-			/* Now that the transaction is rolled back/restarted, invalidate gvt->gvt_trigger->gv_trigger_cycle	\
-			 * (by resetting it to zero) for all gvt read/updated in this transaction. Note that even though we	\
-			 * reset db_trigger_cycle for non-incremental rollbacks/restarts and increment db_dztrigger_cycle	\
-			 * for incremental rollbacks we still need to reset gv_trigger_cycle as otherwise gvtr_init will find 	\
-			 * that gv_trigger_cycle has NOT changed since it was updated last and will NOT do any trigger reads.	\
-			 */													\
-			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
-			{													\
-				assert(gvnh->read_local_tn == local_tn);							\
-				if (NULL != (gvt_trigger = gvnh->gvt_trigger))							\
-					gvt_trigger->gv_trigger_cycle = 0;							\
-				if (!INCREMENTAL)										\
-				{	/* TROLLBACK(0) or TRESTART. Reset db_dztrigger_cycle to 0 since we are going to start 	\
-					 * a new transaction. But, we want to ensure that the new transaction re-reads triggers	\
-					 * since any gvt which updated its gvt_trigger in this transaction will be stale as	\
-					 * they never got committed. We will later ensure csa->db_dztrigger_cycle is non-zero.	\
-					 */											\
-					gvnh->db_dztrigger_cycle = 0;								\
-					gvnh->db_trigger_cycle = 0;								\
-				}												\
-			}													\
-		}														\
-		/* Phase 2: Adjust trigger/$ztrigger related fields for all csa accessed in this transaction */			\
-		if (INCREMENTAL)												\
-		{	/* An incremental rollback. Find out if there are still any cse->blk_target containing ^#t updates. 	\
-			 * If not, set csa->incr_db_trigger_cycle to FALSE (if already set to TRUE) so that we don't 		\
-			 * increment csd->db_trigger_cycle during commit time 							\
+		{	/* In case of a restart or incremental rollback, reset the csa's db_dztrigger_cycle to force a		\
+			 * cycle mismatch in the next try or update (rollback)							\
 			 */													\
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)						\
 			{													\
-				cse = si->first_cw_set;										\
 				csa = si->tp_csa;										\
-				lcl_hasht_tree = csa->hasht_tree;								\
-				if (NULL != lcl_hasht_tree)									\
-				{												\
-					/* Walk through the cw_set_elements remaining after the incremental rollback to 	\
-					 * see if any of them has a ^#t update 							\
-					 */											\
-					while (NULL != cse)									\
-					{											\
-						if (lcl_hasht_tree == cse->blk_target)						\
-							break;									\
-						cse = cse->next_cw_set;								\
-					}											\
-					if (NULL != cse)									\
-						csa->incr_db_trigger_cycle = FALSE;						\
-				} else												\
-					assert(!csa->incr_db_trigger_cycle);							\
+				assert(!csa->db_dztrigger_cycle || ((csa->db_dztrigger_cycle) && (csa->incr_db_trigger_cycle)));\
+				DBGTRIGR_ONLY(lcl_csadztrig = csa->db_dztrigger_cycle;)						\
 				if (csa->db_dztrigger_cycle)									\
-					csa->db_dztrigger_cycle++; /* so that future updates in this TN re-read triggers */	\
-			}													\
-			/* Keep dollar_ztrigger_invoked as TRUE as the transaction is not yet complete and we need this 	\
-			 * variable being TRUE to reset csa->db_dztrigger_cycle and gvt->db_dztrigger_cycle to 0 during 	\
-			 * tp_clean_up of this transaction.									\
-			 */													\
-			dollar_ztrigger_invoked = TRUE;										\
-		} else if (!COMMIT)												\
-		{	/* This is either a complete rollback or a restart. In either case, set csa->incr_db_trigger_cycle 	\
-			 * to FALSE for all csa referenced in this transaction as they are anyways not going to be committed.	\
-			 * Based on this though, set csa->db_dztrigger_cycle to a non-zero value this way we ensure		\
-			 * triggers are forced to be re-read on the restart/rollback so any cached stale trigger state from	\
-			 * the current failed try is thrown away.								\
-			 */													\
-			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)						\
-			{													\
-				si->tp_csa->db_dztrigger_cycle = si->tp_csa->incr_db_trigger_cycle ? 1 : 0;			\
-				si->tp_csa->incr_db_trigger_cycle = FALSE;							\
+					csa->db_dztrigger_cycle = 1;								\
+				DBGTRIGR((stderr, "INVALIDATE_TRIG_CYCLE(): CSA is %s at %d, was %d\n",				\
+						csa->region->rname, csa->db_dztrigger_cycle, lcl_csadztrig));			\
 			}													\
 		}														\
 	}															\
-	/* If gvt_triggers_read_this_tn is TRUE and INCREMENTAL is TRUE, we are in an incremental commit or rollback.		\
-	 * In either case, we dont need to worry about resetting gv_target's trigger cycles as we will do this when the		\
-	 * outermost commit or rollback (or a restart) occurs. The key is that even if a gv_target gets used in a nested	\
-	 * tstart/tcommit that gets incrementally rolled back, it is still part of the gvt_tp_list and hence we can wait	\
-	 * to clean the cycle fields at restart/commit/non-incremental-rollback time. In case of a commit, no need to reset	\
-	 * the gv_trigger_cycle, db_dztrigger_cycle and db_trigger_cycle fields of gvnh as those are valid going forward.	\
+	/* Either $ZTRIGGER() was invoked or triggers were read for the first time in this transaction. In order for the next	\
+	 * try or update (in case of a rollback) to re-read triggers, force a cycle mismatch as necessary.			\
 	 */															\
-	if (TREF(gvt_triggers_read_this_tn) && !INCREMENTAL)									\
+	if (TREF(gvt_triggers_read_this_tn) || dollar_ztrigger_invoked)								\
 	{															\
-		if (!COMMIT)													\
-		{	/* There was at least one GVT where ^#t records were read and this is a complete			\
-			 * (i.e. non-incremental) transaction restart or rollback. In this case, reset cycle fields		\
-			 * in corresponding gv_target to force re-reads of ^#t records of this gvt (if any) in next retry.	\
+		for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)						\
+		{														\
+			assert(gvnh->read_local_tn == local_tn);								\
+			/* Always reset db_dztrigger_cycle, but capture current state */					\
+			DBGTRIGR_ONLY(lcl_dztrig = gvnh->db_dztrigger_cycle;)							\
+			gvnh->db_dztrigger_cycle = 0;										\
+			/* For commit and complete rollback the csa and gvt must share the same db_dztrigger_cycle value */	\
+			assert(((STATE != TP_COMMIT) && (STATE != TP_ROLLBACK))							\
+					|| (gvnh->db_dztrigger_cycle == gvnh->gd_csa->db_dztrigger_cycle));			\
+			DBGTRIGR_ONLY(memcpy(gvnamestr, gvnh->gvname.var_name.addr, gvnh->gvname.var_name.len);)		\
+			DBGTRIGR_ONLY(gvnamestr[gvnh->gvname.var_name.len]='\0';)						\
+			DBGTRIGR((stderr, "INVALIDATE_TRIG_CYCLE(): %s:%d %s dztrig=%d(%d) cycle=%d CSA\n", 			\
+					__FILE__, __LINE__, gvnamestr, gvnh->db_dztrigger_cycle, lcl_dztrig, 			\
+						gvnh->db_trigger_cycle));							\
+			if (STATE == TP_COMMIT)											\
+				continue;											\
+			/* If in a restart/complete rollback and gvhn's trigger was read since the transaction start, clear its	\
+			 * gv_trigger_cycle to force a complete re-read of trigger content in the next try or update (rollback).\
+			 * NOTE: While reseting gv_trigger_cycle forces a complete re-read, that only occurs with a cycle	\
+			 * mismatch by reseting some combination of gvnh->db_trigger_cycle and gvnh->db_dztrigger_cycle.	\
 			 */													\
-			DEBUG_ONLY(matched_one_gvnh = TRUE;)									\
-			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
-			{													\
-				assert(gvnh->read_local_tn == local_tn);							\
-				if (gvnh->trig_read_tn != local_tn)								\
-					continue;										\
-				DEBUG_ONLY(matched_one_gvnh = FALSE;)								\
-				if (NULL != (gvt_trigger = gvnh->gvt_trigger))							\
+			if (((STATE == TP_ROLLBACK) || (STATE == TP_RESTART)) && (gvnh->trig_read_tn >= tstart_local_tn) 	\
+				&& (NULL != (gvt_trigger = gvnh->gvt_trigger)))	/* in-line assigment */				\
 					gvt_trigger->gv_trigger_cycle = 0;							\
-				gvnh->db_dztrigger_cycle = 0;									\
-				gvnh->db_trigger_cycle = 0;									\
+			/* If in an incremental rollback, only clear gv_trigger_cycle if the trigger was read in the current 	\
+			 * transaction. Do not force a cycle mismatch. A $ZTRIGGER() operation in the current transaction will	\
+			 * cause a cycle mismatch. Without any external change - another process doing a $ZTRIGGER() - there is	\
+			 * no reason to reload the trigger. Inducing a mismatch would cause GVTR_INIT_AND_TPWRAP_IF_NEEDED	\
+			 * to restart when local_tn == GVT->trig_local_tn							\
+			 */													\
+			if (STATE == TP_INCR_ROLLBACK)										\
+			{													\
+				if ((gvnh->trig_read_tn == local_tn)		 						\
+					&& (NULL != (gvt_trigger = gvnh->gvt_trigger)))	/* in-line assigment */			\
+						gvt_trigger->gv_trigger_cycle = 0;						\
+				continue;											\
 			}													\
-			assert(!matched_one_gvnh);	/* we expect at least one gvnh with trig_read_tn == local_tn */		\
+			/* For complete rollback and restart always force a cycle mismatch */					\
+			gvnh->db_trigger_cycle = gvnh->gd_csa->db_trigger_cycle - 1;						\
 		}														\
-		TREF(gvt_triggers_read_this_tn) = FALSE;									\
 	}															\
+	/* At this point, assert that each gvt's db_dztrigger_cycle is zero */							\
+	DEBUG_ONLY(for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh))						\
+		assert(!gvnh->db_dztrigger_cycle);										\
+	/* Now it is safe to clear dollar_ztrigger_invoked and gvt_triggers_read_this_tn */					\
+	if (TREF(gvt_triggers_read_this_tn))											\
+		TREF(gvt_triggers_read_this_tn) = FALSE;									\
+	if (dollar_ztrigger_invoked && ((STATE == TP_COMMIT) || (STATE == TP_ROLLBACK)))					\
+		dollar_ztrigger_invoked = FALSE;										\
+	assert(!TREF(gvt_triggers_read_this_tn));										\
+	assert((FALSE == dollar_ztrigger_invoked) || (STATE == TP_RESTART) || (STATE == TP_INCR_ROLLBACK));			\
+	TP_ASSERT_ZTRIGGER_CYCLE_STATUS;											\
 }
 # ifdef DEBUG
-#  define TP_ASSERT_ZTRIGGER_CYCLE_RESET										\
+#  define TP_ASSERT_ZTRIGGER_CYCLE_STATUS										\
 {	/* At the end of a transaction commit ensure that csa->db_dztrigger_cycle is reset to zero.			\
-	 * In the case of trestart and/or rollback, this value could be 1 if $ztrigger activity happened in		\
+	 * In the case of trestart and/or rollback, this value could be 1 if $ZTRIGGER() activity happened in		\
 	 * the failed try. Because of this it is also possible the value could be 1 after a commit (that is preceded	\
 	 * by a restart). Assert this.											\
 	 * It's okay not to check if all gvt updated in this transaction also has gvt->db_dztrigger_cycle set		\
@@ -794,7 +825,7 @@ typedef struct trans_restart_hist_struct
 		assert((0 == si->tp_csa->db_dztrigger_cycle) || (1 == si->tp_csa->db_dztrigger_cycle));			\
 }
 # else
-#  define TP_ASSERT_ZTRIGGER_CYCLE_RESET
+#  define TP_ASSERT_ZTRIGGER_CYCLE_STATUS
 # endif	/* #ifdef DEBUG */
 #endif	/* #ifdef GTM_TRIGGER */
 
@@ -917,6 +948,33 @@ GBLREF	unsigned int	t_tries;
 	}														\
 }
 
+#define SAVE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR)	\
+MBSTART {									\
+	SAVE_TARGET = gv_target;						\
+	SAVE_CUR_REG = gv_cur_region;						\
+	SAVE_SI_PTR = sgm_info_ptr;						\
+	assert(NULL != gv_currkey);						\
+	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
+	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
+} MBEND
+#define RESTORE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR)	\
+MBSTART {									\
+	gv_target = SAVE_TARGET;						\
+	sgm_info_ptr = SAVE_SI_PTR;						\
+	/* check no keysize expansion occurred inside gvcst_root_search */	\
+	assert(gv_currkey->top == SAVE_KEY[0].top);				\
+	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
+	if (NULL != SAVE_CUR_REG)						\
+	{									\
+		TP_CHANGE_REG_IF_NEEDED(SAVE_CUR_REG);				\
+	} else									\
+	{									\
+		gv_cur_region = NULL;						\
+		cs_data = NULL;							\
+		cs_addrs = NULL;						\
+	}									\
+} MBEND
+
 /* Any retry transition where the destination state is the 3rd retry, we don't want to release crit, i.e. for 2nd to 3rd retry
  * transition or 3rd to 3rd retry transition. Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries.
  */
@@ -924,7 +982,7 @@ GBLREF	unsigned int	t_tries;
 							 UNIX_ONLY(|| cdb_sc_instancefreeze == STATUS))
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
-void tp_clean_up(boolean_t rollback_flag);
+void tp_clean_up(tp_cleanup_state clnup_state);
 void tp_cw_list(cw_set_element **cs);
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_incr_clean_up(uint4 newlevel);

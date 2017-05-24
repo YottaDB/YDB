@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@ static readonly char	space_text[] = {' '};
 GBLREF boolean_t	ctrlc_on, gtm_utf8_mode;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		*io_std_device;
+GBLREF int		process_exiting;
 
 LITREF mstr		chset_names[];
 LITREF nametabent	dev_param_names[];
@@ -145,23 +146,34 @@ void zshow_devices(zshow_out *output)
 		};
 	static readonly char morereadtime_text[] = "MOREREADTIME=";
 	char	*charptr;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	v.mvtype = MV_STR;
 	savel = NULL;
-	for (l = io_root_log_name;  ((l != 0) || (NULL != savel));  l = l->next)
+	for (l = io_root_log_name;  ((l != NULL) || (NULL != savel));  l = l->next)
 	{
 		/* If savel is set then process the output side of $principal */
 		if (NULL != savel)
-		{
 			l = savel;
+		if ((NULL != l) && (NULL != l->iod) && (n_io_dev_types == l->iod->type))
+		{
+			assert(FALSE);
+			continue;       /* skip it on pro */
+		}
+		if (NULL == l->iod)
+		{
+			assert(process_exiting); /* GTM-F-MEMORY occurred during device setup & we are creating zshow dump file */
+			assert(TREF(jobexam_counter));
+			continue;
 		}
 		if (l->iod->trans_name == l)
 		{
-			/* if it is an rm type we don't want to output the device if it is the stderr
-			   device for a pipe device */
+			/* If it is an rm type we don't want to output the device if it is the stderr device for a pipe device */
 			if ((rm_ptr = (d_rm_struct*)l->iod->dev_sp) && rm == l->iod->type && rm_ptr->pipe && rm_ptr->stderr_parent)
 				continue;
-
 			if (l->iod->pair.in != l->iod->pair.out)
 			{
 				/* process the output side of $principal if savel is set */
@@ -171,12 +183,10 @@ void zshow_devices(zshow_out *output)
 					savel = NULL;
 					rm_ptr = (d_rm_struct*)tiod->dev_sp;
 					if ('&' == tiod->trans_name->dollar_io[0])
-					{
-						/* replace & with 0-out */
+					{	/* replace & with 0-out */
 						ZS_STR_OUT(&v, stdout_text);
 					} else
-					{
-						/* prepend with 0-out and a space */
+					{	/* prepend with 0-out and a space */
 						ZS_STR_OUT(&v, stdout_text);
 						ZS_ONE_OUT(&v, space_text);
 						v.str.addr = &tiod->trans_name->dollar_io[0];
@@ -184,9 +194,7 @@ void zshow_devices(zshow_out *output)
 						zshow_output(output,&v.str);
 					}
 				} else
-				{
-					/* plan to process the output side of $principal if it is std out*/
-
+				{	/* plan to process the output side of $principal if it is std out */
 					if (l->iod->pair.out == io_std_device->out)
 						savel = l;
 					tiod = l->iod;

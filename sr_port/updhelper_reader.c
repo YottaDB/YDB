@@ -92,6 +92,14 @@
 
 #define MAX_LCNT 100
 
+#define IS_GOOD_RECORD(REC, RECLEN, READADDRS, LIMITADDRS, PRE_READ, LOCAL_READ) 	\
+	((IS_VALID_RECTYPE(REC))							\
+	    && (MIN_JNLREC_SIZE < RECLEN)						\
+	    && (ROUND_DOWN2(RECLEN, JNL_REC_START_BNDRY) == RECLEN)			\
+	    && (READADDRS + RECLEN <= LIMITADDRS)					\
+	    && (RECLEN == REC_LEN_FROM_SUFFIX(READADDRS, RECLEN))			\
+	    && (PRE_READ + RECLEN > LOCAL_READ))
+
 GBLREF	void			(*call_on_signal)();
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_key			*gv_currkey;
@@ -178,7 +186,7 @@ boolean_t updproc_preread(void)
 	gvnh_reg_t		*gvnh_reg;
 #	ifdef REPL_DEBUG
 	unsigned char 		buff[MAX_ZWR_KEY_SZ], *end;
-	uint4			write, write_wrap;
+	uint4			lcl_write, write_wrap;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -237,12 +245,12 @@ boolean_t updproc_preread(void)
 		}
 #		ifdef REPL_DEBUG
 		write_wrap = recvpool_ctl->write_wrap;
-		write = recvpool_ctl->write;
+		lcl_write = recvpool_ctl->write;
 #		endif
 		if (pre_read_offset >= recvpool_ctl->write_wrap)
 		{
 			REPL_DPRINT4("Wrapped: pre_read_offset = %x write_wrap = %x write = %x\n",
-				pre_read_offset, write_wrap, write);
+				pre_read_offset, write_wrap, lcl_write);
 			pre_read_offset = 0;
 		}
 		if (pre_read_offset == recvpool_ctl->write && (!recvpool_ctl->wrapped))
@@ -275,15 +283,12 @@ boolean_t updproc_preread(void)
 				readaddrs = recvpool.recvdata_base + pre_read_offset;
 				limit_readaddrs = recvpool.recvdata_base +
 					(recvpool_ctl->wrapped ? recvpool_ctl->write_wrap : recvpool_ctl->write);
-				if (limit_readaddrs - MIN_JNLREC_SIZE > readaddrs)
+				if ((limit_readaddrs - MIN_JNLREC_SIZE) > readaddrs)
 				{
 					rec = (jnl_record *)readaddrs;
 					rec_len = rec->prefix.forwptr;
-					if (IS_VALID_RECTYPE(rec)
-					    && (ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) == rec_len)
-					    && (readaddrs + rec_len <= limit_readaddrs)
-					    && (rec_len == REC_LEN_FROM_SUFFIX(readaddrs, rec_len))
-		    			    && (pre_read_offset + rec_len > upd_proc_local->read))
+					if (IS_GOOD_RECORD(rec, rec_len, readaddrs, limit_readaddrs,
+								pre_read_offset, upd_proc_local->read))
 						pre_read_offset += rec_len;
 					else
 						break;
@@ -306,35 +311,32 @@ boolean_t updproc_preread(void)
 				}
 			}
 		}
-		good_record = TRUE;
+		good_record = FALSE;
 		readaddrs = recvpool.recvdata_base + pre_read_offset;
 		limit_readaddrs = recvpool.recvdata_base +
 			(recvpool_ctl->wrapped ? recvpool_ctl->write_wrap : recvpool_ctl->write);
-		if (limit_readaddrs - MIN_JNLREC_SIZE > readaddrs)
+		if ((limit_readaddrs - MIN_JNLREC_SIZE) > readaddrs)
 		{
 			rec = (jnl_record *)readaddrs;
 			rec_len = rec->prefix.forwptr;
-			if (IS_VALID_RECTYPE(rec)
-			    && (ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) == rec_len)
-			    && (readaddrs + rec_len <= limit_readaddrs)
-			    && (rec_len == REC_LEN_FROM_SUFFIX(readaddrs, rec_len))
-			    && (pre_read_offset + rec_len > upd_proc_local->read))
+			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
+			if (IS_GOOD_RECORD(rec, rec_len, readaddrs, limit_readaddrs, pre_read_offset, upd_proc_local->read))
 			{
 				upd_helper_ctl->next_read_offset = pre_read_offset + rec_len;
+				good_record = TRUE;
 			}
-			else
-				good_record = FALSE;
-		} else
-			good_record = FALSE;
+		}
 		RELEASE_SWAPLOCK(&upd_helper_ctl->pre_read_lock);
 		DEBUG_ONLY(num_scanned++;)
-		if (good_record)
+		if (good_record && (IS_SET_KILL_ZKILL_ZTRIG(rectype)))
 		{
-			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-			if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
+			good_record = FALSE;	/* The record is good enough to look at, but it's not fully validated */
+			was_wrapped = recvpool_ctl->wrapped;
+			keystr = (limit_readaddrs > ((sm_uc_ptr_t)rec + SIZEOF(struct_jrec_upd))) ?
+					(jnl_string *)&rec->jrec_set_kill.mumps_node : NULL;
+			/* Avoid reading beyond receive pool boundary. Happens when reading at the end and the pool is wrapped */
+			if ((NULL != keystr) && (limit_readaddrs > ((sm_uc_ptr_t)keystr + keystr->length)))
 			{
-				was_wrapped = recvpool_ctl->wrapped;
-				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 				key_len = keystr->length;	/* local copy of shared recvpool key */
 				if (MAX_KEY_SZ >= key_len)
 				{	/* The receive pool is shared memory and the contents can be overwritten concurrently by the
@@ -425,22 +427,18 @@ boolean_t updproc_preread(void)
 								TRUE, &recvpool.recvpool_ctl->jnl_seqno,
 								rectype, end - buff, buff, status);
 #							endif
+							good_record = TRUE;
 						} else
-						{
 							REPL_DPRINT1("Unexpected bad record\n");
-							good_record = FALSE;
-						}
-					} else
-						good_record = FALSE;
-				} else
-					good_record = FALSE;
+					}
+				}
 			}
 		}
 		if (!good_record)
 		{
 #			ifdef REPL_DEBUG
-			REPL_DPRINT5("Skipping record: pre_read_offset = %x read = %x write_wrap = %x write = %x\n",
-				pre_read_offset, upd_proc_local->read, write_wrap, write);
+			REPL_DPRINT6("Skipping record: pre_read_offset = %x read = %x write_wrap = %x write = %x reclen = %x\n",
+				pre_read_offset, upd_proc_local->read, write_wrap, lcl_write, rec_len);
 			REPL_DPRINT3("New values: write_wrap = %x write = %x\n",
 					recvpool_ctl->write_wrap, recvpool_ctl->write);
 #			endif

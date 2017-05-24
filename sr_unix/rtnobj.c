@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,7 +119,6 @@
 
 #ifdef AUTORELINK_SUPPORTED
 
-error_def(ERR_PERMGENFAIL);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_REQRLNKCTLRNDWN);
 error_def(ERR_RLNKRECLATCH);
@@ -366,6 +365,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	int			perm;
 	int			maxvers, curvers;
 	struct shmid_ds		shmstat;
+	struct perm_diag_data	pdd;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -557,7 +557,17 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj stat() of file %s failed", linkctl->zro_entry_name.addr);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
-			gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC|PERM_EXEC);
+			if (!gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC|PERM_EXEC, &pdd))
+			{
+				rel_latch(&shm_hdr->relinkctl_latch);
+				rel_latch(&relinkrec->rtnobj_latch);
+				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT)
+						ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name),
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("rtnobj"),
+						RTS_ERROR_MSTR(&linkctl->zro_entry_name),
+						PERMGENDIAG_ARGS(pdd));
+			}
 			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
 			{
 				save_errno = errno;

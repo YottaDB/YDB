@@ -33,7 +33,8 @@ void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
-	assert(0 != jpc->pini_addr);
+	assert((0 != jpc->pini_addr) ||
+			(gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 	pfin_record.prefix.jrec_type = JRT_PFIN;
 	pfin_record.prefix.forwptr = pfin_record.suffix.backptr = PFIN_RECLEN;
 	pfin_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;

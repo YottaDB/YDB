@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@ LITREF	mstr			chset_names[];
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ACOMPTBINC);
 error_def(ERR_ADDRTOOLONG);
+error_def(ERR_CHSETALREADY);
 error_def(ERR_ANCOMPTINC);
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_DELIMSIZNA);
@@ -72,10 +73,11 @@ error_def(ERR_ZINTRECURSEIO);
 void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
-	int		handled_len, handlea_len, handles_len, int_len;
+	static char	*conv_buff = NULL;
+	int		new_ozff_len, conv_len, handled_len, handlea_len, handles_len, int_len, soc_cnt;
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
-	socket_struct	*socketptr, newsocket;
+	socket_struct	*socketptr, newsocket, *localsocketptr;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
  	char            addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 		        temp_addr[SA_MAXLITLEN], ioerror, *free_ozff = NULL;
@@ -90,6 +92,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		        delay_specified = FALSE,
 		        nodelay_specified = FALSE,
 		        bfsize_specified = FALSE,
+			ochset_specified = FALSE,
+			ichset_specified = FALSE,
 		        ibfsize_specified = FALSE,
 		        moreread_specified = FALSE,
 		        flush_specified = FALSE,
@@ -99,6 +103,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
 	char		*tab;
 	int		save_errno;
+	mstr		chset_mstr;
+	gtm_chset_t	temp_ochset, temp_ichset;
 	size_t		d_socket_struct_len;
 	boolean_t	ch_set;
 
@@ -254,6 +260,11 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->in_code_set)
 					ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
 #endif
+				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				SET_ENCODING(temp_ichset, &chset_mstr);
+				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ichset))
+					break;	/* ignore UTF chsets if not utf8_mode */
+				ichset_specified = TRUE;
 				break;
 			case iop_opchset:
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)
@@ -263,6 +274,20 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->out_code_set)
 					ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
 #endif
+				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				SET_ENCODING(temp_ochset, &chset_mstr);
+				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ochset))
+					break;	/* ignore UTF chsets if not utf8_mode */
+				ochset_specified = TRUE;
+				break;
+			case iop_chset:
+				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				SET_ENCODING(temp_ochset, &chset_mstr);
+				SET_ENCODING(temp_ichset, &chset_mstr);
+				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ichset))
+					break;	/* ignore UTF chsets if not utf8_mode */
+				ochset_specified = TRUE;
+				ichset_specified = TRUE;
 				break;
 			case iop_zff:
 				if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
@@ -340,6 +365,16 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"), LEN_AND_LIT("ZLISTEN"),
 				 LEN_AND_LIT("USE"));
 		return;
+	}
+	if ((ichset_specified || ochset_specified) && (listen_specified || connect_specified))
+	{	/* CHSET cannot be specified when opening a new socket, if there already are open sockets. */
+		if (0 < dsocketptr->n_socket && ((temp_ochset != iod->ochset) || (temp_ichset != iod->ichset)))
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_CHSETALREADY, 8,
+				chset_names[iod->ichset].len, chset_names[iod->ichset].addr,
+				chset_names[iod->ochset].len, chset_names[iod->ochset].addr);
+			return;
+		}
 	}
 	if (delay_specified && nodelay_specified)
 	{
@@ -474,6 +509,25 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	}
 	if (iod->wrap && 0 != newsocket.n_delimiter && iod->width < newsocket.delimiter[0].len)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
+	/* Process the CHSET changes */
+	if (ichset_specified)
+	{
+		CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(dsocketptr->ichset_utf16_variant, iod->ichset, temp_ichset,
+								assert(!socketptr));
+		newdsocket->ichset_utf16_variant = dsocketptr->ichset_utf16_variant;
+		newdsocket->ichset_specified = dsocketptr->ichset_specified = TRUE;
+	}
+	if (ochset_specified)
+	{
+		CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(dsocketptr->ochset_utf16_variant, iod->ochset, temp_ochset,
+								assert(!socketptr));
+		newdsocket->ochset_utf16_variant = dsocketptr->ochset_utf16_variant;
+		newdsocket->ochset_specified = dsocketptr->ochset_specified = TRUE;
+	}
+	if ((CHSET_M != iod->ichset) && (CHSET_UTF16 != iod->ichset) && (CHSET_MAX_IDX > iod->ichset))
+		get_chset_desc(&chset_names[iod->ichset]);
+	if ((CHSET_M != iod->ochset) && (CHSET_UTF16 != iod->ochset) && (CHSET_MAX_IDX > iod->ichset))
+		get_chset_desc(&chset_names[iod->ochset]);
 	if (0 <= zff_len && /* ZFF or ZNOFF specified */
 	    0 < (newsocket.zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
 	{	/* ZFF="non-zero-len-string" specified */
@@ -498,7 +552,75 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		if ((NULL != newsocket.ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
 			free_ozff = newsocket.ozff.addr;	/* previously converted */
 		newsocket.ozff = newsocket.zff;
-
+	}
+	if (gtm_utf8_mode)
+	{
+		/* If CHSET is being changed to UTF-16, and delimitors are not converted, convert them
+		 * 	But only if the UTF16 variant has already been determined.
+		 * If CHSET is being changed to non-UTF-16, and delims are converted, free them
+		 */
+		if (ichset_specified)
+			for (soc_cnt=0; soc_cnt < dsocketptr->n_socket; soc_cnt++)
+			{
+				localsocketptr = dsocketptr->socket[soc_cnt];
+				if (!(localsocketptr && (0 < localsocketptr->n_delimiter)))
+					continue;
+				if (((localsocketptr->delimiter[0].addr == localsocketptr->idelimiter[0].addr) &&
+						IS_UTF16_CHSET(iod->ichset) && IS_UTF16_CHSET(dsocketptr->ichset_utf16_variant))
+					|| ((localsocketptr->delimiter[0].addr != localsocketptr->idelimiter[0].addr)
+						&& !IS_UTF16_CHSET(iod->ichset)))
+							iosocket_idelim_conv(localsocketptr, iod->ichset);
+			}
+		if (ochset_specified)
+			for (soc_cnt=0; soc_cnt < dsocketptr->n_socket; soc_cnt++)
+			{
+				localsocketptr = dsocketptr->socket[soc_cnt];
+				if (!(localsocketptr && (0 < localsocketptr->n_delimiter)))
+					continue;
+				if (((localsocketptr->delimiter[0].addr == localsocketptr->odelimiter0.addr) &&
+						IS_UTF16_CHSET(iod->ochset) && IS_UTF16_CHSET(dsocketptr->ochset_utf16_variant))
+					|| ((localsocketptr->delimiter[0].addr != localsocketptr->odelimiter0.addr)
+						&& !IS_UTF16_CHSET(iod->ochset)))
+							iosocket_odelim_conv(localsocketptr, iod->ochset);
+			}
+		/* Now convert the ZFFs */
+		if (ochset_specified)
+		{
+			if (!IS_UTF16_CHSET(iod->ochset))
+			{	/* Changed to a non-UTF16 CHSET. free all converted ZFFs */
+				for (soc_cnt=0; soc_cnt < dsocketptr->n_socket; soc_cnt++)
+				{
+					localsocketptr = dsocketptr->socket[soc_cnt];
+					if (localsocketptr && (NULL != localsocketptr->ozff.addr) && (0 < localsocketptr->zff.len)
+						&& (localsocketptr->ozff.addr != localsocketptr->zff.addr))
+					{
+						if (localsocketptr->ozff.addr == free_ozff)
+							free_ozff = NULL;		/* Prevent double free of free_ozff */
+						free(localsocketptr->ozff.addr);	/* previously converted */
+					}
+					localsocketptr->ozff = localsocketptr->zff;	/* contains converted UTF-16 form */
+				}
+			} else if (IS_UTF16_CHSET(dsocketptr->ochset_utf16_variant))
+			{	/* Changed to UTF-16 CHSET. convert all ZFFs */
+				conv_buff = malloc(MAX_ZFF_LEN);
+				for (soc_cnt=0; soc_cnt < dsocketptr->n_socket; soc_cnt++)
+				{
+					localsocketptr = dsocketptr->socket[soc_cnt];
+					if (localsocketptr && (NULL != localsocketptr->zff.addr) && (0 < localsocketptr->zff.len)
+						&& (localsocketptr->ozff.addr == localsocketptr->zff.addr))
+					{
+						conv_len = MAX_ZFF_LEN;
+						new_ozff_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
+									&localsocketptr->zff, conv_buff, &conv_len);
+						assert(MAX_ZFF_LEN > new_ozff_len);
+						localsocketptr->ozff.len = new_ozff_len;
+						localsocketptr->ozff.addr = malloc(new_ozff_len);
+						memcpy(localsocketptr->ozff.addr, conv_buff, new_ozff_len);
+						memset(conv_buff, 0, MAX_ZFF_LEN);	/* Reset to be reused. */
+					}
+				}
+			}
+		}
 	}
 	if (ioerror_specified)
 		newsocket.ioerror = ('T' == ioerror || 't' == ioerror);

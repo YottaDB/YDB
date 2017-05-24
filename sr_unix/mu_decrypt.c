@@ -1,4 +1,4 @@
-/****************************************************************
+	/****************************************************************
  *								*
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
@@ -191,7 +191,7 @@ int get_file_encr_hash(boolean_t is_journal, char *fname, int fname_len, int *fd
 	int		save_errno, hdr_sz;
 	uint4		status;
 
-	OPENFILE(fname, O_RDONLY, *fd);
+	OPENFILE(fname, O_RDONLY, *fd);	/* udi not available so OPENFILE_DB not used */
 	if (-1 == *fd)
 	{
 		save_errno = errno;

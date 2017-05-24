@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1675,7 +1675,13 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			if (NULL != peer)
 			{
 				pubkey = X509_get_pubkey(peer);
-				SNPRINTF(conn_info->cert_algo, SIZEOF(conn_info->cert_algo), "%s", OBJ_nid2ln(pubkey->type));
+#				if OPENSSL_VERSION_NUMBER >= 0x10000001L
+				SNPRINTF(conn_info->cert_algo, SIZEOF(conn_info->cert_algo), "%s",
+						OBJ_nid2ln(EVP_PKEY_base_id(pubkey)));
+#				else
+				SNPRINTF(conn_info->cert_algo, SIZEOF(conn_info->cert_algo), "%s",
+						OBJ_nid2ln(pubkey->type));
+#				endif
 			} else
 				conn_info->cert_algo[0] = '\0';
 			/* Is Secure Renegotiation Supported? */

@@ -131,7 +131,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 			 */
 			jbp = jpc->jnl_buff;
 			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(gv_cur_region, cs_addrs);
 			if (0 == jnl_status)
 			{
 				if (EXIT_ERR == SWITCH_JNL_FILE(jpc))

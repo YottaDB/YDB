@@ -135,9 +135,9 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		LSEEKWRITE(fd, offset, buf, count, tmp_errno);
 #		ifdef DEBUG
 		if (LSEEKWRITE_IS_TO_DB == lcl_lseekwrite_target)
-			FAKE_ENOSPC(csa, fake_db_enospc, lcl_lseekwrite_target, tmp_errno)
+			FAKE_ENOSPC(csa, fake_db_enospc, lcl_lseekwrite_target, tmp_errno);
 		else if (LSEEKWRITE_IS_TO_JNL == lcl_lseekwrite_target)
-			FAKE_ENOSPC(csa, fake_jnl_enospc, lcl_lseekwrite_target, tmp_errno)
+			FAKE_ENOSPC(csa, fake_jnl_enospc, lcl_lseekwrite_target, tmp_errno);
 #		endif
 	}
 	/* Report that we were able to continue whether we are still frozen or not. */

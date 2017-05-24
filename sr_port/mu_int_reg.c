@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,14 +30,10 @@
 #include "change_reg.h"
 #include "gtmmsg.h"
 #include "mu_int_wait_rdonly.h"
-#include "wcs_sleep.h"
-#include "wcs_flu.h"
 #include "interlock.h"
 #include "gtmcrypt.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #include "gt_timer.h"
-#endif
 #include "mupint.h"
 #include "wbox_test_init.h"
 
@@ -48,37 +44,36 @@ GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_skipreg_cnt;
-#ifdef DEBUG
-GBLREF pid_t			process_id;
-#endif
 GBLREF enc_handles		mu_int_encr_handles;
 GBLREF sgmnt_addrs		*cs_addrs;
-#ifdef UNIX
 GBLREF boolean_t		jnlpool_init_needed, online_specified, preserve_snapshot;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
+#ifdef DEBUG
+GBLREF uint4			process_id;
 #endif
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_SSV4NOALLOW);
 error_def(ERR_SSMMNOALLOW);
 
-void mu_int_reg(gd_region *reg, boolean_t *return_value)
+void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open)
 {
 	boolean_t		read_only, was_crit;
 	freeze_status		status;
 	node_local_ptr_t	cnl;
 	sgmnt_addrs     	*csa;
 	sgmnt_data_ptr_t	csd;
+	sgmnt_data		*csd_copy_ptr;
+	gd_segment		*seg;
+	int			gtmcrypt_errno;
 #	ifdef DEBUG
 	boolean_t		need_to_wait = FALSE;
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 #	endif
-	sgmnt_data		*csd_copy_ptr;
-	gd_segment		*seg;
-	int			gtmcrypt_errno;
+
 	*return_value = FALSE;
-	UNIX_ONLY(jnlpool_init_needed = TRUE);
+	jnlpool_init_needed = TRUE;
 	ESTABLISH(mu_int_reg_ch);
 	if (dba_usr == reg->dyn.addr->acc_meth)
 	{
@@ -99,6 +94,11 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		gv_cur_region->open = FALSE;
 		return;
 	}
+	if (return_after_open)
+	{
+		*return_value = TRUE;
+		return;
+	}
 	change_reg();
 	csa = &FILE_INFO(gv_cur_region)->s_addrs;
 	cnl = csa->nl;
@@ -111,7 +111,6 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	 * However, if -ONLINE is not explicitly specified but rather assumed implicitly (as default for -REG)
 	 * then turn off ONLINE INTEG for this region and continue as if -NOONLINE was specified
 	 */
-#	ifdef GTM_SNAPSHOT
 	if (!csd->fully_upgraded)
 	{
 		ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
@@ -123,34 +122,48 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			return;
 		}
 	}
-#	endif
 	if (!ointeg_this_reg || read_only)
 	{
-		status = region_freeze(gv_cur_region, TRUE, FALSE, TRUE);
+		status = region_freeze(gv_cur_region, TRUE, FALSE, TRUE, FALSE, !read_only);
 		switch (status)
 		{
 			case REG_ALREADY_FROZEN:
-				UNIX_ONLY(if (csa->read_only_fs) break);
+				if (csa->read_only_fs)
+					break;
 				util_out_print("!/Database for region !AD is already frozen, not integing",
 					TRUE, REG_LEN_STR(gv_cur_region));
 				mu_int_skipreg_cnt++;
 				return;
+			case REG_FLUSH_ERROR:
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG),
+					DB_LEN_STR(gv_cur_region));
+				mu_int_skipreg_cnt++;
+				return;
 			case REG_HAS_KIP:
 				/* We have already waited for KIP to reset. This time do not wait for KIP */
-				status = region_freeze(gv_cur_region, TRUE, FALSE, FALSE);
+				status = region_freeze(gv_cur_region, TRUE, FALSE, FALSE, FALSE, !read_only);
 				if (REG_ALREADY_FROZEN == status)
 				{
-					UNIX_ONLY(if (csa->read_only_fs) break);
+					if (csa->read_only_fs)
+						break;
 					util_out_print("!/Database for region !AD is already frozen, not integing",
 						TRUE, REG_LEN_STR(gv_cur_region));
 					mu_int_skipreg_cnt++;
 					return;
+				} else if (REG_FLUSH_ERROR == status)
+				{
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG),
+						DB_LEN_STR(gv_cur_region));
+					mu_int_skipreg_cnt++;
+					return;
 				}
-				break;
+				assert(REG_FREEZE_SUCCESS == status);
+				/* no break */
 			case REG_FREEZE_SUCCESS:
 				break;
 			default:
 				assert(FALSE);
+				/* no break */
 		}
 		if (read_only && (dba_bg == csa->hdr->acc_meth) && !mu_int_wait_rdonly(csa, MUPIP_INTEG))
 		{
@@ -159,15 +172,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		}
 	}
 	if (!ointeg_this_reg)
-	{
-		if (!read_only && !wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
-		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG),
-				DB_LEN_STR(gv_cur_region));
-			mu_int_skipreg_cnt++;
-			return;
-		}
-		/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
+	{	/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
 		was_crit = csa->now_crit;
 		if (!was_crit)
 			grab_crit(gv_cur_region);
@@ -178,7 +183,6 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		csd_copy_ptr = &mu_int_data;
 	} else
 	{
-#		ifdef GTM_SNAPSHOT
 		if (!ss_initiate(gv_cur_region, util_ss_ptr, &csa->ss_ctx, preserve_snapshot, MUPIP_INTEG))
 		{
 			mu_int_skipreg_cnt++;
@@ -186,12 +190,11 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-			assert(process_id != csd->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
+			assert(!FROZEN_HARD(csd)); /* Ensure region is unfrozen before returning from ss_initiate */
 			assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 			return;
 		}
 		assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-		assert(process_id != csd->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
 		assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 		csd_copy_ptr = &csa->ss_ctx->ss_shm_ptr->shadow_file_header;
 #		if defined(DEBUG)
@@ -206,7 +209,6 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			cnl->wbox_test_seq_num++; /* let them know we took the next step */
 			assert(trynum);
 		}
-#		endif
 #		endif
 	}
 	if (USES_ANY_KEY(csd_copy_ptr))

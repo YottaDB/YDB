@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@ void op_fnzqgblmod(mval *v)
 
 	if (NULL != gv_cur_region)
 	{
-		if (gv_cur_region->dyn.addr->acc_meth == dba_bg  ||  gv_cur_region->dyn.addr->acc_meth == dba_mm)
+		if (IS_REG_BG_OR_MM(gv_cur_region))
 		{
 			if (gv_target->root)
 				gblmod = gvcst_gblmod(v);

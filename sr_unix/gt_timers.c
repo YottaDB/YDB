@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@
 #include "sleep.h"
 #include "error.h"
 #include "gtm_multi_thread.h"
+#include "gtmxc_types.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -96,6 +97,7 @@ int4	time();
 #define ADD_SAFE_HNDLR(HNDLR)									\
 {												\
 	assert((ARRAYSIZE(safe_handlers) - 1) > safe_handlers_cnt);				\
+	assert(NULL != (void *)HNDLR); /* void * to avoid warnings of always true */		\
 	safe_handlers[safe_handlers_cnt++] = HNDLR;						\
 }
 
@@ -121,7 +123,14 @@ int4	time();
 			1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
 }
 
+#define SYS_SETTIMER(TIMER, DELTA)								\
+MBSTART {											\
+	sys_timer_at = (TIMER)->expir_time;							\
+	sys_settimer((TIMER)->tid, DELTA);							\
+} MBEND
+
 STATICDEF struct itimerval	sys_timer, old_sys_timer;
+STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
 STATICDEF boolean_t		in_setitimer_error;
 #endif
 
@@ -183,14 +192,16 @@ GBLREF	boolean_t	blocksig_initialized;			/* Set to TRUE when blockalrm, block_tt
 GBLREF	sigset_t	blockalrm;
 GBLREF	sigset_t	block_ttinout;
 GBLREF	sigset_t	block_sigsent;
+GBLREF	sigset_t	block_worker;
 GBLREF 	volatile int4	fast_lock_count;
-GBLREF	boolean_t	heartbeat_started;
-GBLREF	void		(*heartbeat_timer_ptr)(void);		/* Initialized only in gtm_startup(). */
+GBLREF	boolean_t	oldjnlclose_started;
+GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_startup(). */
 GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
+GBLREF	boolean_t	gtm_jvm_process;
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -262,6 +273,11 @@ void set_blocksig(void)
 	sigaddset(&block_sigsent, SIGTSTP);
 	sigaddset(&block_sigsent, SIGCONT);
 	sigaddset(&block_sigsent, SIGALRM);
+	sigfillset(&block_worker);
+	sigdelset(&block_worker, SIGSEGV);
+	sigdelset(&block_worker, SIGKILL);
+	sigdelset(&block_worker, SIGFPE);
+	sigdelset(&block_worker, SIGBUS);
 	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
 }
 
@@ -451,7 +467,8 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
  */
 STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata, boolean_t safe_timer)
 {
-	ABS_TIME at;
+	ABS_TIME	at;
+	GT_TIMER 	*newt;
 
  	assert(0 <= time_to_expir);
 	sys_get_curr_time(&at);
@@ -471,9 +488,13 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 	if ((GT_TIMER_EXPAND_TRIGGER > num_timers_free) && (1 > timer_stack_count))
 		gt_timers_alloc();
 	DUMP_TIMER_INFO("Before invoking add_timer()");
-	add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata, safe_timer);	/* Put new timer in the queue. */
+	newt = add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata, safe_timer);	/* Put new timer in the queue. */
 	DUMP_TIMER_INFO("After invoking add_timer()");
-	if ((timeroot->tid == tid) || !timer_active)
+	if ((timeroot->tid == tid) || !timer_active
+			|| (timer_active
+				&& ((newt->expir_time.at_sec < sys_timer_at.at_sec)
+					|| ((newt->expir_time.at_sec == sys_timer_at.at_sec)
+						&& ((gtm_tv_usec_t)newt->expir_time.at_usec < sys_timer_at.at_usec)))))
 		start_first_timer(&at);
 }
 
@@ -509,11 +530,16 @@ void clear_timers(void)
 	sigset_t	savemask;
 	int		rc;
 
+	DUMP_TIMER_INFO("At the start of clear_timers()");
 	if (NULL == timeroot)
 	{	/* If no timers have been initialized in this process, take fast path (avoid system call) */
-		assert(FALSE == timer_in_handler);
+		/* If the only timer popped, and we got a SIGTERM while its handler was active, the timeroot
+		 * would be NULL and timer_in_handler would be TRUE, but that should be safe for the fast path,
+		 * so allow this case if the process is exiting.
+		 */
+		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
-		assert(FALSE == heartbeat_started);
+		assert(FALSE == oldjnlclose_started);
 		assert(FALSE == deferred_timers_check_needed);
 		return;
 	}
@@ -522,18 +548,18 @@ void clear_timers(void)
 		remove_timer(timeroot->tid);
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
-	heartbeat_started = FALSE;
+	oldjnlclose_started = FALSE;
 	deferred_timers_check_needed = FALSE;
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+	DUMP_TIMER_INFO("After invoking clear_timers()");
 	return;
 }
 
 /* System call to set timer. Time is given im msecs.
  * Arguments:	tid		- timer id
  *		time_to_expir	- time to expiration
- *		handler		- address of handler routine
  */
-STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir, void (*handler)())
+STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 {
 #	ifdef BSD_TIMER
 	if (in_setitimer_error)
@@ -577,7 +603,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		{
 			eltime = sub_abs_time((ABS_TIME *)&timeroot->expir_time, curr_time);
 			/* If nothing has expired yet, break. */
-			if ((0 < eltime.at_sec) || ((0 == eltime.at_sec) && (0 < eltime.at_usec)) || (0 < timer_stack_count))
+			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))) || (0 < timer_stack_count))
 				break;
 			/* Otherwise, drive the handler. */
 			timer_handler(DUMMY_SIG_NUM);
@@ -586,7 +612,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		if (timeroot)
 		{
 			deferred_timers_check_needed = FALSE;
-			sys_settimer(timeroot->tid, &eltime, timeroot->handler);
+			SYS_SETTIMER(timeroot, &eltime);
 		}
 	} else if (0 < safe_timer_cnt)
 	{	/* There are some safe timers on the queue. */
@@ -594,18 +620,27 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		while (tpop)
 		{
 			eltime = sub_abs_time((ABS_TIME *)&tpop->expir_time, curr_time);
-			if (tpop->safe)
-			{	/* Regular timers cannot be processed here, so only handle safe timers, and only if expired. */
-				if ((0 > eltime.at_sec) || ((0 == eltime.at_sec) && (0 == eltime.at_usec)))
+			if ((0 > eltime.at_sec) || ((0 == eltime.at_sec) && (0 == eltime.at_usec)))
+			{	/* Timer has expired. Handle safe timers, defer unsafe timers. */
+				if (tpop->safe)
+				{
 					timer_handler(DUMMY_SIG_NUM);
-				else
-					sys_settimer(tpop->tid, &eltime, tpop->handler);
-				break;
-			} else if (0 > eltime.at_sec)
-				deferred_timers_check_needed = TRUE;
-			tpop = tpop->next;
+					break;	/* timer_handler() handles all expired, so we are done. */
+				} else
+				{
+					deferred_timers_check_needed = TRUE;
+					tpop->block_int = intrpt_ok_state;
+					tpop = tpop->next;	/* Check next timer */
+				}
+			} else
+			{	/* Set system timer to wake on unexpired timer. */
+				SYS_SETTIMER(tpop, &eltime);
+				break;	/* System timer will handle subsequent timers, so we are done. */
+			}
 		}
 	}
+	else
+		deferred_timers_check_needed = (NULL != timeroot);
 	DUMP_TIMER_INFO("At the end of start_first_timer()");
 }
 
@@ -628,10 +663,13 @@ STATICFNDEF void timer_handler(int why)
 	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop;
 #	ifdef DEBUG
 	boolean_t	save_in_nondeferrable_signal_handler;
+	ABS_TIME	rel_time, old_at, late_time;
+	static int	last_continue_proc_cnt = -1;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(gtm_is_main_thread() || gtm_jvm_process);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 	if (SIGALRM == why)
 	{	/* If why is 0, we know that timer_handler() was called directly, so no need
@@ -640,11 +678,6 @@ STATICFNDEF void timer_handler(int why)
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
 	}
 #	ifdef DEBUG
-	if (IS_GTM_IMAGE)
-	{
-		tpop = find_timer((TID)heartbeat_timer_ptr, &tpop);
-		assert(process_exiting || (((NULL != tpop) && heartbeat_started) || ((NULL == tpop) && !heartbeat_started)));
-	}
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
 	 * (say to handle sig-3) and then had a timer handler pop while inside there (possible for example in receiver server).
 	 * So save current value of global and restore it at end of this function.
@@ -673,12 +706,31 @@ STATICFNDEF void timer_handler(int why)
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = IN_TIMER_HANDLER;
+	/* Allow a base 50 seconds of lateness for safe timers */
+	late_time.at_sec = 50;
+	late_time.at_usec = 0;
 #	endif
 	while (tpop)					/* fire all handlers that expired */
 	{
 		cmp = abs_time_comp(&at, (ABS_TIME *)&tpop->expir_time);
 		if (cmp < 0)
 			break;
+#		if defined(DEBUG) && !defined(_AIX)
+		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
+			&& !(gtm_white_box_test_case_enabled
+				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)))
+		{	/* Check if the timer is extremely overdue, with the following exceptions:
+			 *	- Unsafe timers can be delayed indefinitely.
+			 *	- AIX systems tend to arbitrarily delay processes when loaded.
+			 *	- WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP stops the process from running.
+			 *	- Some other mechanism causes a SIGSTOP/SIGCONT, bumping continue_proc_cnt.
+			 */
+			rel_time = sub_abs_time(&at, (ABS_TIME *)&tpop->expir_time);
+			if (abs_time_comp(&late_time, &rel_time) <= 0)
+				gtm_fork_n_core();	/* Dump core, but keep going. */
+		}
+		last_continue_proc_cnt = TREF(continue_proc_cnt);
+#		endif
 		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
 		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
 		 */
@@ -698,7 +750,7 @@ STATICFNDEF void timer_handler(int why)
 #				ifdef DEBUG
 				if (gtm_white_box_test_case_enabled
 					&& (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
-					&& ((void *)tpop->handler != (void*)heartbeat_timer_ptr))
+					&& ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
 				{
 					DBGFPF((stderr, "TIMER_HANDLER: handled a timer\n"));
 					timer_pop_cnt++;
@@ -708,7 +760,23 @@ STATICFNDEF void timer_handler(int why)
 				(*tpop->handler)(tpop->tid, tpop->hd_len, tpop->hd_data);
 				timer_in_handler = FALSE;
 				if (!tpop->safe)		/* if safe, avoid a system call */
+				{
+					DEBUG_ONLY(old_at = at);
 					sys_get_curr_time(&at);	/* refresh current time if called a handler */
+#					ifdef DEBUG
+					/* Include the time it took to handle the unsafe timer in the allowed late time.
+					 * Otherwise, a hung unsafe timer could cause a subsequent safe timer to be overdue.
+					 */
+					rel_time = sub_abs_time(&at, &old_at);
+					late_time.at_sec += rel_time.at_sec;
+					late_time.at_usec += rel_time.at_usec;
+					if (late_time.at_usec > MICROSEC_IN_SEC)
+					{
+						late_time.at_sec++;
+						late_time.at_usec -= MICROSEC_IN_SEC;
+					}
+#					endif
+				}
 				DEBUG_ONLY(TRACE_TIMER_POP(tpop));
 			}
 			tpop->next = (GT_TIMER *)timefree;	/* put timer block on the free chain */
@@ -759,6 +827,7 @@ STATICFNDEF void timer_handler(int why)
 				}
 			}
 #			endif
+			tpop->block_int = intrpt_ok_state;
 			tpop_prev = tpop;
 			tpop = tpop->next;
 			if (0 == safe_timer_cnt)	/* no more safe timers left, so quit */
@@ -816,7 +885,7 @@ STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
  *      	hdata   	- data to pass to timer rtn if any
  *      	safe_timer	- timer's handler is in safe_handlers array
  */
-STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 	void *hdata, boolean_t safe_timer)
 {
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
@@ -869,6 +938,7 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 		assert(0 < safe_timer_cnt);
 	} else
 		ntp->safe = FALSE;
+	ntp->block_int = INTRPT_OK_TO_INTERRUPT;
 	ntp->hd_len = hdata_len;
 	if (0 < hdata_len)
 		memcpy(ntp->hd_data, hdata, hdata_len);
@@ -890,7 +960,7 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 		timeroot = ntp;
 	else
 		tpp->next = ntp;
-	return;
+	return ntp;
 }
 
 /* Remove timer from the timer chain. */
@@ -900,6 +970,7 @@ STATICFNDEF void remove_timer(TID tid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DUMP_TIMER_INFO("At the start of remove_timer()");
 	if (tp = find_timer(tid, &tprev))		/* Warning: assignment */
 	{
 		if (tprev)
@@ -915,6 +986,7 @@ STATICFNDEF void remove_timer(TID tid)
 		/* assert that no duplicate timer entry with the same "tid" exists in the timer chain */
 		assert((NULL == find_timer(tid, &tpp)));
 	}
+	DUMP_TIMER_INFO("After invoking remove_timer()");
 }
 
 /* System call to cancel timer. Not static because can be called from generic_signal_handler() to stop timers
@@ -957,6 +1029,7 @@ void cancel_unsafe_timers(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DUMP_TIMER_INFO("At the start of cancel_unsafe_timers()");
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	active = curr = (GT_TIMER *)timeroot;
 	while (curr)
@@ -991,6 +1064,7 @@ void cancel_unsafe_timers(void)
 	}
 #	endif
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+	DUMP_TIMER_INFO("After invoking cancel_unsafe_timers()");
 }
 
 /* Initialize timers. */

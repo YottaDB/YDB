@@ -1571,7 +1571,7 @@
      Reference count                         1  Wait Disk                        0
      Journal State               [inactive] ON  Journal Before imaging        TRUE
      Journal Allocation                   2048  Journal Extension             2048
-     Journal Buffer Size                  2308  Journal Alignsize             4096
+     Journal Buffer Size                  2312  Journal Alignsize             4096
      Journal AutoSwitchLimit           8386560  Journal Epoch Interval          30
      Journal Yield Limit                     8  Journal Sync IO              FALSE
      Journal File: /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.mjl

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,12 @@ GBLREF gv_key			*muint_start_key;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF trans_num		largest_tn;
 GBLREF span_node_integ		*sndata;
-
+GBLREF boolean_t		null_coll_type_err;
+GBLREF boolean_t		null_coll_type;
+GBLREF unsigned int		rec_num;
+GBLREF block_id			blk_id;
+GBLREF boolean_t		nct_err_type;
+GBLREF int			rec_len;
 error_def(ERR_DBBADKYNM);
 error_def(ERR_DBBADNSUB);
 error_def(ERR_DBBADPNTR);
@@ -113,6 +118,9 @@ error_def(ERR_DBTN);
 error_def(ERR_DBTNTOOLG);
 error_def(ERR_DBSPANGLOINCMP);
 error_def(ERR_DBSPANCHUNKORD);
+error_def(ERR_DBNULCOL);
+error_def(ERR_NULSUBSC);
+error_def(ERR_DBNONUMSUBS);
 
 LITDEF boolean_t mu_int_possub[16][16] = {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -181,23 +189,24 @@ boolean_t mu_int_blk(
 	} sub_list;
 
 	unsigned char	buff[MAX_KEY_SZ + 1], old_buff[MAX_KEY_SZ + 1], temp_buff[MAX_MIDENT_LEN + 1], util_buff[MAX_UTIL_SIZE];
-	unsigned char	blk_levl, *c1, ch, *ctrlbytes;
+	unsigned char	blk_levl, *c1, ch, *ctrlbytes, subscript;
 	unsigned short	cc, rec_cmpc;
 	uchar_ptr_t	c0, c2, c_base, blk_base, blk_top, key_base, ptr, rec_base, rec_top, span_key;
 	unsigned short	temp_ushort;
 	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global;
-	boolean_t	muint_range_done = FALSE;
+	boolean_t	muint_range_done = FALSE, nct_checked = FALSE;
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
-			num_len, rec_size, s_index, start_index, hdr_len, idx;
+			num_len, rec_size, s_index, start_index, sub_start_index, hdr_len, idx;
 	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
 	block_id	child, root_pointer;
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
 	trans_num	blk_tn;
-	uchar_ptr_t	subrec_ptr;
+	uchar_ptr_t	subrec_ptr, free_blk_base;
 	enum db_ver	ondsk_blkver;
 	uint4		cnt, span_curr_blk, rval_len, gblsize;
 	unsigned short	numsubs;
+	unsigned int	null_subscript_cnt;
 
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;  /* Increment mu_int_plen on entry; decrement explicitly or via mu_int_err() on exit. */
@@ -207,7 +216,7 @@ boolean_t mu_int_blk(
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
 	}
-	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
+	blk_base = mu_int_read(blk, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 	if (!blk_base)
 		return FALSE;	/* Only occurs on malloc failure, so don't worry about mu_int_plen. */
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
@@ -229,14 +238,14 @@ boolean_t mu_int_blk(
 	{
 		mu_int_err(ERR_DBBSIZMN, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 				(unsigned int)((blk_hdr_ptr_t)blk_base)->levl);
-		free(blk_base);
+		free(free_blk_base);
 		return FALSE;
 	}
 	if (blk_size > mu_int_data.blk_size)
 	{
 		mu_int_err(ERR_DBBSIZMX, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 			(unsigned int)((blk_hdr_ptr_t)blk_base)->levl);
-		free(blk_base);
+		free(free_blk_base);
 		return FALSE;
 	}
 	blk_top = blk_base + blk_size;
@@ -248,20 +257,20 @@ boolean_t mu_int_blk(
 		if (blk_levl >= MAX_BT_DEPTH)
 		{
 			mu_int_err(ERR_DBRLEVTOOHI, 0, 0, 0, 0, 0, 0, (unsigned int)blk_levl);
-			free(blk_base);
+			free(free_blk_base);
 			return FALSE;
 		}
 		if (blk_levl < 1)
 		{
 			mu_int_err(ERR_DBRLEVLTONE, 0, 0, 0, 0, 0, 0, (unsigned int)blk_levl);
-			free(blk_base);
+			free(free_blk_base);
 			return FALSE;
 		}
 		mu_int_root_level = level = blk_levl;
 	} else  if (blk_levl != level)
 	{
 		mu_int_err(ERR_DBINCLVL, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)blk_levl);
-		free(blk_base);
+		free(free_blk_base);
 		return FALSE;
 	}
 	if (!master_dir)
@@ -291,7 +300,7 @@ boolean_t mu_int_blk(
 		if (muint_fast)
 		{
 			mu_int_plen--;
-			free(blk_base);
+			free(free_blk_base);
 			return FALSE;
 		}
 		if (blk_tn > largest_tn)
@@ -305,9 +314,11 @@ boolean_t mu_int_blk(
 	is_top = FALSE;
 	memcpy(buff, bot_key, bot_len);
 	mu_sub_list[0].index = NO_SUBSCRIPTS;
+	rec_num = 0;
 	for (rec_base = blk_base + SIZEOF(blk_hdr);  (rec_base < blk_top) && (FALSE == muint_range_done);
 		rec_base = rec_top, comp_length = buff_length)
 	{
+		rec_num++;
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			return FALSE;	/* Only happens on termination, so don't worry about mu_int_plen. */
 		mu_int_cum[RECS][level]++;
@@ -317,13 +328,13 @@ boolean_t mu_int_blk(
 		if (rec_size <= SIZEOF(rec_hdr))
 		{
 			mu_int_err(ERR_DBRSIZMN, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
-			free(blk_base);
+			free(free_blk_base);
 			return FALSE;
 		}
 		if ((rec_size > blk_top - rec_base))
 		{
 			mu_int_err(ERR_DBRSIZMX, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
-			free(blk_base);
+			free(free_blk_base);
 			return FALSE;
 		}
 		rec_top = rec_base + rec_size;
@@ -334,13 +345,13 @@ boolean_t mu_int_blk(
 			if (SIZEOF(rec_hdr) + SIZEOF(block_id) != rec_size)
 			{
 				mu_int_err(ERR_DBLRCINVSZ, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (rec_cmpc)
 			{
 				mu_int_err(ERR_DBSTARCMP, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			ptr = rec_base + SIZEOF(rec_hdr);
@@ -352,7 +363,7 @@ boolean_t mu_int_blk(
 				{
 					mu_int_err(ERR_DBCMPNZRO, TRUE, TRUE, buff,
 						comp_length, top_key, top_len, (unsigned int)blk_levl);
-					free(blk_base);
+					free(free_blk_base);
 					return FALSE;
 				}
 			} else  if ((rec_cmpc < name_len) && (FALSE == master_dir))
@@ -373,7 +384,7 @@ boolean_t mu_int_blk(
 			{
 				mu_int_err(ERR_DBCOMPTOOLRG, TRUE, TRUE, buff, comp_length, top_key,
 					top_len, (unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			key_base = rec_base + SIZEOF(rec_hdr);
@@ -383,7 +394,7 @@ boolean_t mu_int_blk(
 				{
 					mu_int_err(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
 							(unsigned int)blk_levl);
-					free(blk_base);
+					free(free_blk_base);
 					return FALSE;
 				}
 				if (KEY_DELIMITER == *ptr++)
@@ -411,7 +422,7 @@ boolean_t mu_int_blk(
 							{
 								mu_int_err(ERR_DBINVGBL, TRUE, TRUE, bot_key, bot_len,
 									top_key, top_len, (unsigned int)blk_levl);
-								free(blk_base);
+								free(free_blk_base);
 								return FALSE;
 							}
 						}
@@ -425,21 +436,21 @@ boolean_t mu_int_blk(
 			{
 				mu_int_err(ERR_DBKEYMN, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (key_size + rec_cmpc > MAX_KEY_SZ)
 			{	/* We'll allow index keys to be whatever length, so long as they don't exceed MAX_KEY_SZ */
 				mu_int_err(ERR_DBKGTALLW, TRUE, TRUE, buff, comp_length, top_key,
 						top_len, (unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if ((short int)rec_cmpc < buff_length && buff[rec_cmpc] == *key_base)
 			{
 				mu_int_err(ERR_DBCMPBAD, TRUE, TRUE, buff, comp_length, top_key, top_len,
 					(unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (memvcmp(buff + rec_cmpc, comp_length - rec_cmpc, key_base, key_size) >= 0)
@@ -453,13 +464,14 @@ boolean_t mu_int_blk(
 				{
 					mu_int_err(ERR_DBKEYORD, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
-					free(blk_base);
+					free(free_blk_base);
 					return FALSE;
 				}
 			}
 			memcpy(old_buff, buff, comp_length);
 			memcpy(buff + rec_cmpc, key_base, key_size);
 			buff_length = rec_cmpc + key_size;
+			rec_len = buff_length;
 			/* Now that we have the uncompressed global variable name, check for global name validity.
 			 * Note that it is enough to check the validity on the leaf level directory tree and not
 			 * for every block. Invalid global names in non-directory tree blocks will encounter
@@ -513,7 +525,7 @@ boolean_t mu_int_blk(
 							{
 								mu_int_cum[RECS][level]--;
 								mu_int_plen--;
-								free(blk_base);
+								free(free_blk_base);
 								return TRUE;
 							}
 						}
@@ -532,7 +544,7 @@ boolean_t mu_int_blk(
 							{
 								mu_int_cum[RECS][level]--;
 								mu_int_plen--;
-								free(blk_base);
+								free(free_blk_base);
 								return TRUE;
 							}
 						}
@@ -562,7 +574,7 @@ boolean_t mu_int_blk(
 						mu_sub_list[0].index = b_index;
 					}
 					b_index = mu_sub_list[s_index].index;
-					start_index = s_index;
+					start_index = sub_start_index = s_index;
 					while (buff[b_index])
 					{
 						if (mu_int_exponent[buff[b_index]])
@@ -583,6 +595,7 @@ boolean_t mu_int_blk(
 						mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
 						break;
 					}
+					nct_checked = FALSE;
 					mu_sub_list[s_index].index = 0;
 					for (;  (start_index != s_index) && (0 != mu_sub_list[start_index].index);  start_index++)
 					{
@@ -600,7 +613,7 @@ boolean_t mu_int_blk(
 										mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
 											buff, comp_length, top_key, top_len,
 											(unsigned int)blk_levl);
-										free(blk_base);
+										free(free_blk_base);
 										return FALSE;
 									}
 									b_index++;
@@ -616,7 +629,7 @@ boolean_t mu_int_blk(
 										mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
 											buff, comp_length, top_key, top_len,
 											(unsigned int)blk_levl);
-										free(blk_base);
+										free(free_blk_base);
 										return FALSE;
 									}
 									b_index++;
@@ -625,11 +638,51 @@ boolean_t mu_int_blk(
 								{
 									mu_int_err(ERR_DBBADNSUB, TRUE, TRUE, buff, comp_length,
 											top_key, top_len, (unsigned int)blk_levl);
-									free(blk_base);
+									free(free_blk_base);
 									return FALSE;
 								}
 							}
+							if (!nct_checked && trees->nct)
+							{
+								nct_checked = TRUE;
+								nct_err_type = TRUE;
+								mu_int_err(ERR_DBNONUMSUBS, TRUE, TRUE, buff, comp_length, top_key,
+										top_len, (unsigned int)blk_levl);
+								mu_int_plen++;
+								nct_err_type = FALSE;
+							}
 						}
+					}
+					for (null_subscript_cnt = 0;  (sub_start_index != s_index);  sub_start_index++)
+					{
+						subscript = buff[mu_sub_list[sub_start_index].index];
+						if ((STR_SUB_PREFIX == subscript)
+							&& (KEY_DELIMITER != buff[mu_sub_list[sub_start_index].index + 1]))
+							continue;
+						if ((subscript == SUBSCRIPT_STDCOL_NULL) || (subscript == STR_SUB_PREFIX))
+							null_subscript_cnt++;
+						else
+							continue;
+						if (mu_int_data.null_subs)
+						{
+							if ((0 == mu_int_data.std_null_coll) ? (SUBSCRIPT_STDCOL_NULL == subscript)
+								: (STR_SUB_PREFIX == subscript))
+							{
+								null_coll_type_err = TRUE;
+								null_coll_type = mu_int_data.std_null_coll;
+								blk_id = blk;
+								mu_int_err(ERR_DBNULCOL, TRUE, TRUE, buff, comp_length, top_key,
+										top_len, (unsigned int)blk_levl);
+								mu_int_plen++;
+								null_coll_type_err = FALSE;
+							}
+						}
+					}
+					if (0 < null_subscript_cnt && !mu_int_data.null_subs)
+					{
+						mu_int_err(ERR_NULSUBSC, TRUE, TRUE, buff, comp_length, 0,0,
+							(unsigned int)blk_levl);
+						 mu_int_plen++;
 					}
 				}
 			}
@@ -640,7 +693,7 @@ boolean_t mu_int_blk(
 				{
 					mu_int_err(ERR_DBDATAMX, TRUE, TRUE, buff, comp_length,
 							top_key, top_len, (unsigned int)blk_levl);
-					free(blk_base);
+					free(free_blk_base);
 					return FALSE;
 				}
 				span_key = buff + buff_length - SPAN_SUBS_LENGTH - 1;
@@ -703,7 +756,7 @@ boolean_t mu_int_blk(
 										   sndata->key_len, top_key,
 										   top_len,
 										   (unsigned int)blk_levl);
-									free(blk_base);
+									free(free_blk_base);
 									return FALSE;
 								}
 							}
@@ -794,21 +847,21 @@ boolean_t mu_int_blk(
 			{
 				mu_int_err(ERR_DBPTRNOTPOS, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (child > mu_int_data.trans_hist.total_blks)
 			{
 				mu_int_err(ERR_DBPTRMX, TRUE, TRUE, buff, comp_length, top_key,
 						top_len, (unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (!(child % mu_int_data.bplmap))
 			{
 				mu_int_err(ERR_DBBNPNTR, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 			if (!muint_fast || (level > 1) || master_dir)
@@ -826,7 +879,7 @@ boolean_t mu_int_blk(
 					mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, old_buff, comp_length, buff, buff_length,
 							(unsigned int)((blk_hdr_ptr_t)ptr)->levl);
 					mu_int_plen--;				/* Revert above increment */
-					free(blk_base);
+					free(free_blk_base);
 					return FALSE;
 				}
 				mu_int_cum[BLKS][0]++;
@@ -918,12 +971,12 @@ boolean_t mu_int_blk(
 			{
 				mu_int_err(ERR_DBKEYGTIND, TRUE, TRUE, buff, comp_length, top_key, top_len,
 					(unsigned int)blk_levl);
-				free(blk_base);
+				free(free_blk_base);
 				return FALSE;
 			}
 		}
 	}
 	mu_int_plen--;
-	free(blk_base);
+	free(free_blk_base);
 	return TRUE;
 }

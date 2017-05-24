@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		status, chset_index;
 	int		save_errno;
 	int		p_offset;
-	mstr		chset;
+	mstr		chset_mstr;
+	gtm_chset_t	temp_chset, old_ichset, old_ochset;
 	boolean_t	empt = FALSE;
 	boolean_t	ch_set;
 
@@ -75,6 +76,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	if (tt_ptr->mupintr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
+	old_ichset = ioptr->ichset;
+	old_ochset = ioptr->ochset;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
@@ -95,23 +98,28 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			ioptr->ichset = ioptr->ochset = CHSET_M;
 		else if (gtm_utf8_mode && iop_utf8 == ch)
 			ioptr->ichset = ioptr->ochset = CHSET_UTF8;
-		else if (gtm_utf8_mode && (iop_ipchset == ch || iop_opchset == ch))
+		else if (gtm_utf8_mode && (iop_ipchset == ch || iop_opchset == ch || iop_chset == ch))
 		{
-			chset.len = *(pp->str.addr + p_offset);
-			chset.addr = (char *)(pp->str.addr + p_offset + 1);
-			chset_index = verify_chset(&chset);
-			if (CHSET_M == chset_index)
-				if (iop_ipchset == ch)
-					ioptr->ichset = CHSET_M;
-				else
-					ioptr->ochset = CHSET_M;
-			else if (CHSET_UTF8 == chset_index)
-				if (iop_ipchset == ch)
-					ioptr->ichset = CHSET_UTF8;
-				else
-					ioptr->ochset = CHSET_UTF8;
+			GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+			SET_ENCODING(temp_chset, &chset_mstr);
+			if (IS_UTF16_CHSET(temp_chset))		/* Not allowed for terminals */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, chset_mstr.len, chset_mstr.addr);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, chset.len, chset.addr);
+			{
+				switch(ch)
+				{
+					case iop_ipchset:
+						ioptr->ichset = temp_chset;
+						break;
+					case iop_opchset:
+						ioptr->ochset = temp_chset;
+						break;
+					case iop_chset:
+						ioptr->ichset = temp_chset;
+						ioptr->ochset = temp_chset;
+						break;
+				}
+			}
 		}
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
@@ -162,7 +170,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			tt_ptr->ext_cap = 0;
 		if (empt)
 			tt_ptr->ext_cap |= TT_EMPTERM;
-		if (tt_ptr->default_mask_term)
+		/* Set terminal mask on the terminal not open, if default_term or if CHSET changes */
+		if (tt_ptr->default_mask_term || (old_ichset != ioptr->ichset))
 		{
 			memset(&tt_ptr->mask_term.mask[0], 0, SIZEOF(io_termmask));
 			if (CHSET_M != ioptr->ichset)
@@ -171,6 +180,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				tt_ptr->mask_term.mask[4] = TERM_MSK_UTF8_4;
 			} else
 				tt_ptr->mask_term.mask[0] = TERM_MSK;
+			tt_ptr->default_mask_term = TRUE;
 		}
 		ioptr->state = dev_open;
 		if ((TT_EDITING & tt_ptr->ext_cap) && !tt_ptr->recall_buff.addr)
@@ -180,6 +190,20 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			tt_ptr->recall_size = tt_ptr->in_buf_sz;
 			tt_ptr->recall_buff.len = 0;	/* nothing in buffer */
 			tt_ptr->recall_width = 0;
+		}
+	} else
+	{
+		/* Set terminal mask on the already open terminal, if CHSET changes */
+		if (old_ichset != ioptr->ichset)
+		{
+			memset(&tt_ptr->mask_term.mask[0], 0, SIZEOF(io_termmask));
+			if (CHSET_M != ioptr->ichset)
+			{
+				tt_ptr->mask_term.mask[0] = TERM_MSK_UTF8_0;
+				tt_ptr->mask_term.mask[4] = TERM_MSK_UTF8_4;
+			} else
+				tt_ptr->mask_term.mask[0] = TERM_MSK;
+			tt_ptr->default_mask_term = TRUE;
 		}
 	}
 	REVERT_GTMIO_CH(&ioptr->pair, ch_set);

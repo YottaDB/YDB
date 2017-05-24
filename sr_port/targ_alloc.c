@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,9 @@
 #include "mdef.h"
 
 #include <stddef.h>		/* for offsetof macro (used by OFFSETOF macro) */
+#include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -26,6 +28,7 @@
 #include "hashtab_mname.h"
 #include "gtmimagename.h"
 #include "dpgbldir.h"
+#include "io.h"
 
 GBLREF	gv_namehead		*gv_target_list;
 GBLREF	gv_namehead		*gv_target;
@@ -62,7 +65,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->gvname.hash_code = gvent->hash_code;
 		return gvt;
 	}
-	assert((NULL == reg) || dba_mm == REG_ACC_METH(reg) || (dba_bg == REG_ACC_METH(reg)));
+	assert((NULL == reg) || IS_REG_BG_OR_MM(reg));
 	assert((NULL == reg) || (reg->max_key_size <= MAX_KEY_SZ));
 	/* Ensure there are no additional compiler introduced filler bytes. This is a safety since a few elements in the
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
@@ -213,11 +216,13 @@ void	targ_free(gv_namehead *gvt)
 		 *      a) We are exiting and in the process of freeing up cs_addrs->dir_tree in gv_rundown
 		 *	b) The GT.CM GNP server which could free up a region as part of running down a client's database.
 		 *	c) In VMS, DAL calls could rundown the database. This is tough to check using an assert.
+		 *      d) This is a statsDB which can be closed on an opt-out and reopened on a subsequent opt-in.
 		 * Assert accordingly.
 		 */
 		UNIX_ONLY(assert(IS_GTCM_GNP_SERVER_IMAGE
 				 || (process_exiting && ((gvt == cs_addrs->dir_tree)
-							 GTMTRIG_ONLY(|| (gvt == cs_addrs->hasht_tree))))));
+							 GTMTRIG_ONLY(|| (gvt == cs_addrs->hasht_tree))))
+				 || (IS_STATSDB_REG(gvt->gd_csa->region))));
 		gv_target = NULL;	/* In that case, set gv_target to NULL to ensure freed up memory is never used */
 	}
 	/* assert we never delete a gvt that is actively used in a TP transaction */

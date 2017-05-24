@@ -88,7 +88,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 * risk reading a potential V4 format block directly into the cache and then upgrading it. Instead we read it into
 	 * a private buffer, upgrade it there and then copy it over to the cache in V5 format. This is the static variable
 	 * read_reformat_buffer. We could have as well used the global variable "reformat_buffer" for this purpose. But
-	 * that would then prevent dsk_reads and concurrent dsk_writes from proceeding. We dont want that loss of asynchronocity.
+	 * that would then prevent dsk_reads and concurrent dsk_writes from proceeding. We don't want that loss of asynchronocity.
 	 * Hence we keep them separate. Note that while "reformat_buffer" is used by a lot of routines, "read_reformat_buffer"
 	 * is used only by this routine and hence is a static instead of a GBLDEF.
 	 */
@@ -111,7 +111,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
 	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
 	DEBUG_ONLY(in_dsk_read++;)
-	udi = (unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info);
+	udi = FILE_INFO(gv_cur_region);
 	assert(csd == cs_data);
 	size = csd->blk_size;
 	assert(csd->acc_meth == dba_bg);
@@ -154,12 +154,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		enc_save_buff = GDS_ANY_ENCRYPTGLOBUF(buff, csa);
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, enc_save_buff);
 	}
-	LSEEKREAD(udi->fd,
-		  (DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * size),
-		  enc_save_buff,
-		  size,
-		  save_errno);
-	assert((0 == save_errno) GTM_TRUNCATE_ONLY(|| (-1 == save_errno)));
+	DB_LSEEKREAD(udi, udi->fd, (BLK_ZERO_OFF(csd->start_vbn) + (off_t)blk * size), enc_save_buff, size, save_errno);
+	assert((0 == save_errno) || (-1 == save_errno));
 	WBTEST_ASSIGN_ONLY(WBTEST_PREAD_SYSCALL_FAIL, save_errno, EIO);
 	if ((enc_save_buff != buff) && (0 == save_errno))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,14 +34,15 @@ uint4	gtm_pthread_init_key(gd_region *reg)
 		return 0;
 	/* Initialize thread_gtm_putmsg_rname_key at start of thread */
 	assert('\0' == reg->rname[reg->rname_len]);	/* ensure region name is null terminated */
-	/* In rare cases (e.g. "mur_db_files_from_jnllist"), rname is not initialized, but fname is. Use it then.
-	 */
-	if (reg->rname_len)
+	/* In rare cases (e.g. "mur_db_files_from_jnllist"), rname is not initialized, but fname is. Use it then. */
+	if (!reg->owning_gd->is_dummy_gbldir)
 	{
+		assert(reg->rname_len);
 		ptr = &reg->rname[0];
 		assert('\0' == ptr[reg->rname_len]);
 	} else
 	{
+		assert(!memcmp(reg->rname, "DEFAULT", reg->rname_len));
 		ptr = &reg->dyn.addr->fname[0];
 		assert('\0' == ptr[reg->dyn.addr->fname_len]);
 	}

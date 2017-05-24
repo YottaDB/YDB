@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #define MINSLPTIME 		1	/* min (millisec) sleep possible thru wcs_sleep. See comment above about loop usage */
 #define MAXSLPTIME 		10	/* max (millisec) sleep possible thru wcs_sleep */
 #define	SLEEP_ONE_MIN		6000	/* # of wcs_sleep iterations (each max MAXSLPTIME msec) needed to wait 1 minute */
+#define SLEEP_FIVE_SEC		5000	/* # of wcs_sleep(1) iterations needed to wait 5 seconds */
 
 #define MAXWTSTARTWAIT 		SLEEP_ONE_MIN
 #define BUF_OWNER_STUCK 	SLEEP_ONE_MIN
@@ -45,10 +46,12 @@
 #define MAX_LCK_TRIES 		SLEEP_ONE_MIN	/* vms only: wait in mu_rndwn_file */
 #define FSYNC_WAIT_TIME     	(2 * SLEEP_ONE_MIN)	/* 2 mins of wait for fsync between JNLFSYNCSTUCK complaints */
 #define FSYNC_WAIT_HALF_TIME    SLEEP_ONE_MIN	/* 1 min of wait for fsync between DEBUG JNLFSYNCSTUCK complaints */
+#define MAX_WIP_QWAIT 		SLEEP_ONE_MIN
+#define MAX_WTSTART_FINI_SLEEPS	(4 * SLEEP_ONE_MIN) /* after this many sleeps without progress request cache recovery */
 
 #define PHASE2_COMMIT_SLEEP	MAXSLPTIME	/* 10 msec inter-iteration sleep wait for active phase2 commits */
 #define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
-#define	PHASE2_COMMIT_WAIT_HTBT	8		/* = 8 heartbeats (each 8 seconds) = 64 seconds wait (used in Unix) */
+#define	PHASE2_COMMIT_WAIT_MS	(64 * MILLISECS_IN_SEC)
 
 #define	SLEEP_INSTFREEZEWAIT	100		/* 100-msec wait between re-checks of instance freeze status */
 #define	SLEEP_IORETRYWAIT	500		/* 500-msec wait between retries of the same write operation */
@@ -82,7 +85,7 @@
  */
 #define MAX_LOCK_SPINS(base, proc) (base + MAX(0, ((((proc - 7) * LOCK_SPINS_PER_4PROC) / 4))))
 
-/* Maximum duration (in minutes) that a process waits for the completion of read-in-progress after which
+/* Maximum duration (in minutes) that a process waits for the completion of read or write in-progress after which
  * it stops waiting but rather continue fixing the remaining cache records. This is done to avoid
  * waiting a long time in case there are many corrupt global buffers. After waiting 1 minute each for the
  * first 4 cache-records (a wait time of 4 mins in total), we might as well stop waiting more and fix

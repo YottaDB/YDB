@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,7 +27,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
-
+#include "io.h"
 #include "gvcst_protos.h"
 #include "change_reg.h"
 #include "op.h"
@@ -145,6 +148,7 @@ boolean_t	gvcst_spr_zprevious(void)
 		 * Note down the largest key found across the scanned regions until we find a key that belongs to the
 		 * same map (in the gld) as the currently scanned "map". At which point, the region-spanning zprevious is done.
 		 */
+		OPEN_BASEREG_IF_STATSREG(map);
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != first_map) || (tn_array[reg_index] != gd_targ_tn));

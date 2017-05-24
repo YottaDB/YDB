@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@ GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
 GBLREF	char				cli_err_str[];
 GBLREF	boolean_t			gtm_dist_ok_to_use;
+GBLREF	char				gtm_dist[GTM_PATH_MAX];
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
 GBLREF	boolean_t			skip_dbtriggers;
 #if defined (GTM_TRIGGER) && (DEBUG)
@@ -65,6 +66,7 @@ GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitl
 GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUMPS specific cmd table */
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
+#define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
 
 #ifdef __osf__
  /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -93,10 +95,12 @@ int gtm_main (int argc, char **argv, char **envp)
 #endif
 {
 	char			*ptr, *eq, **p;
+	char			gtmlibxc[GTM_PATH_MAX];
 	int             	eof, parse_ret;
 	int			gtmcrypt_errno;
-#	ifdef GTM_SOCKET_SSL_SUPPORT
 	int			status;
+
+#	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -146,6 +150,8 @@ int gtm_main (int argc, char **argv, char **envp)
 	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
+	SNPRINTF(gtmlibxc, GTM_PATH_MAX, GTMXC_gblstat, gtm_dist);
+	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
 	if (MUMPS_COMPILE != invocation_mode)
 	{
@@ -162,7 +168,8 @@ int gtm_main (int argc, char **argv, char **envp)
 				else if (ERR_CRYPTINIT == gtmcrypt_errno)
 					gtmcrypt_errno = ERR_CRYPTINIT2;
 				gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
-				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1, GTMCRYPT_ERRLIT); /* BYPASSOK */
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1,
+						      GTMCRYPT_ERRLIT);
 			}
 		}
 #		ifdef GTM_SOCKET_SSL_SUPPORT

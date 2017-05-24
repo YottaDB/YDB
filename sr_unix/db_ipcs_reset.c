@@ -66,7 +66,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	file_control		*fc;
 	unix_db_info		*udi;
 	gd_region		*temp_region;
-	char			sgmnthdr_unaligned[SGMNT_HDR_LEN + 8], *sgmnthdr_8byte_aligned;
+	sgmnt_data		old_data;
 	sgmnt_addrs             *csa;
 	DCL_THREADGBL_ACCESS;
 
@@ -94,9 +94,6 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		gv_cur_region = temp_region;
 		return FALSE;
 	}
-	sgmnthdr_8byte_aligned = &sgmnthdr_unaligned[0];
-	sgmnthdr_8byte_aligned = (char *)ROUND_UP2((unsigned long)sgmnthdr_8byte_aligned, 8);
-	csd = (sgmnt_data_ptr_t)&sgmnthdr_8byte_aligned[0];
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
@@ -106,8 +103,8 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
                 return FALSE;
 	}
-	LSEEKREAD(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
-	csa->hdr = csd;			/* needed for DB_LSEEKWRITE when instance is frozen */
+	csd = !udi->fd_opened_with_o_direct ? &old_data : (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
+	DB_LSEEKREAD(udi, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 	if (0 != status)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -116,6 +113,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return FALSE;
 	}
+	csa->hdr = csd;			/* needed for DB_LSEEKWRITE (done later) if/when instance is frozen */
 	assert((udi->semid == csd->semid) || (INVALID_SEMID == csd->semid));
 	semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL);	/* Get the counter semaphore's value */
 	/* Since we have standalone access to the db (caller ensures this) we do not need to worry about whether the
@@ -158,7 +156,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			csd->shmid = INVALID_SHMID;
 			csd->gt_sem_ctime.ctime = 0;
 			csd->gt_shm_ctime.ctime = 0;
-			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
+			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 			if (0 != status)
 			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -169,6 +167,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			}
 		} else
 		{
+			db_ipcs.open_fd_with_o_direct = udi->fd_opened_with_o_direct;
 			db_ipcs.semid = INVALID_SEMID;
 			db_ipcs.shmid = INVALID_SHMID;
 			db_ipcs.gt_sem_ctime = 0;

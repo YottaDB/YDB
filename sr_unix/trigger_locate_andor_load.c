@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		rtn_vector = NULL;
 	DBGTRIGR((stderr, "trigger_locate_andor_load: routine was %sfound (1)\n", (NULL == rtn_vector)?"not ":""));
 	/* If we have the trigger routine header, do some validation on it, else keep looking */
-	SAVE_TRIGGER_REGION_INFO(save_currkey);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	runtime_disambiguator_specified = ('#' != trigname->addr[trigname->len - 1]);
 	if (!runtime_disambiguator_specified && (NULL != reg))
 	{	/* Region-name has been specified and no runtime-disambiguator specified. Need to further refine the
@@ -217,7 +217,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		if (runtime_disambiguator_specified
 			|| (TRIG_FAILURE_RC == trigger_source_read_andor_verify(trigname, &rtn_vector)))
 		{
-			RESTORE_TRIGGER_REGION_INFO(save_currkey);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 			ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 			return TRIG_FAILURE_RC;
 		}
@@ -245,7 +245,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 				gv_init_reg(reg);
 			if (&FILE_INFO(reg)->s_addrs != csa)
 			{
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -257,7 +257,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
 			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 			{
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -266,7 +266,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	}
 	DBGTRIGR((stderr, "trigger_locate_andor_load: leaving with source from rtnhdr 0x%lx\n",
 		  (*rtn_vec) ? (*((rhdtyp **)rtn_vec))->trigr_handle : NULL));
-	RESTORE_TRIGGER_REGION_INFO(save_currkey);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 	assert(NULL != rtn_vector);
 	assert(trigdsc == rtn_vector->trigr_handle);
 	*rtn_vec = rtn_vector;

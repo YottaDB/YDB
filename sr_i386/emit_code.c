@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +95,7 @@ void trip_gen(triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
 	oprtype		*saved_opr[MAX_ARGS];
-	unsigned short	oct;
+	uint4		oct;
 	short		tp;	/* template pointer */
 	short		*tsp;	/* template short pointer */
 	triple		*ttp;	/* temp triple pointer */

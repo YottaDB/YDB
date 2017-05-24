@@ -66,6 +66,7 @@ GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	unsigned int		t_tries;
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
@@ -203,17 +204,23 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 			csa->next_fenced = jnl_fence_ctl.fence_list;
 			jnl_fence_ctl.fence_list = csa;
 		} else	/* G (or U) */
-		{	/* At least one call to "jnl_format" has occurred in this TP transaction already. We therefore
-			 * expect jgbl.tp_ztp_jnl_upd_num to be non-zero at this point. The only exception is if "jnl_format"
+		{	/* If this is a U type of record (jnl_fence_ctl.level would be 0 in that case), at least one call
+			 * to "jnl_format" has occurred in this TP transaction already. We therefore expect
+			 * jgbl.tp_ztp_jnl_upd_num to be non-zero at this point. The only exception is if "jnl_format"
 			 * had been called just once before and that was for a ZTWORM type of record in which case it would be
 			 * zero (both ZTWORM and following SET/KILL record will have the same update_num value of 1).
 			 */
-			assert(jgbl.tp_ztp_jnl_upd_num
+			assert(jnl_fence_ctl.level || jgbl.tp_ztp_jnl_upd_num
 				GTMTRIG_ONLY(|| ((jfb->prev == si->jnl_head) && (JRT_TZTWORM == jfb->prev->rectype))));
 			subcode = 3;
 		}
 		if (dollar_tlevel)
 			++subcode; /* TP */
+		else if (!jgbl.forw_phase_recovery && t_tries)
+			jgbl.tp_ztp_jnl_upd_num--;	/* If ZTP, increment this only ONCE per update, not ONCE per retry.
+							 * We do this by decrementing it if t_tries > 0 to balance the
+							 * tp_ztp_jnl_upd_num++ done a few lines below.
+							 */
 		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
 		assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);
 		assert(FIXED_UPD_RECLEN == FIXED_LGTRIG_RECLEN);

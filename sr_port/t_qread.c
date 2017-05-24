@@ -53,6 +53,8 @@
 #include "gtm_c_stack_trace.h"
 #include "gtm_time.h"
 #include "process_reorg_encrypt_restart.h"
+#include "wcs_backoff.h"
+#include "wcs_wt.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -83,7 +85,7 @@ GBLREF	uint4			update_trans;
  * The second pass which holds crit and is waiting for a concurrent reader to finish reading the input block in.
  * The third pass is needed because the concurrent reader (in dsk_read) might encounter a DYNUPGRDFAIL error in which case
  *	it is going to increment the cycle in the cache-record and reset the blk to CR_BLKEMPTY.
- * We dont need any pass more than this because if we hold crit then no one else can start a dsk_read for this block.
+ * We don't need any pass more than this because if we hold crit then no one else can start a dsk_read for this block.
  * This # of passes is hardcoded in the macro BAD_LUCK_ABOUNDS
  */
 #define BAD_LUCK_ABOUNDS 2
@@ -136,6 +138,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	gd_segment		*seg;
 	uint4			buffs_per_flush, flush_target;
 	enc_info_t		*encr_ptr;
+#	ifdef DEBUG
+	cache_rec_ptr_t		cr_lo, bt_cr;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -350,7 +355,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			/* If we are inside a TP read-write transaction, it is possible we already used the old keys for
 			 * prior calls to "jnl_format" so we have to restart (cannot sync up cycles). Do the same for
 			 * TP read-only transaction as well as NON-TP read-write transaction. In all these cases we know
-			 * the caller is capable of restarting. All other cases we dont know if the caller is capable so
+			 * the caller is capable of restarting. All other cases we don't know if the caller is capable so
 			 * sync up the cycles and proceed using the new keys for the read.
 			 *
 			 * But since it is possible the caller does not call t_retry right away (e.g. mupip reorg which can
@@ -398,7 +403,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, (gd_region *) 0, FALSE, buffs_per_flush, flush_target);
 				}
 				if ((flush_target <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
-					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, dummy_errno);
+					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, NULL, FALSE, dummy_errno);
 						/* a macro that dclast's "wcs_wtstart" and checks for errors etc. */
 				/* Get crit but also ensure encryption cycles are in sync ("dsk_read" relies on this).
 				 * Note: "sync_needed" should be TRUE very rarely since we synced the cycles just a few lines
@@ -473,7 +478,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					assert(-1 <= cr->read_in_progress);
 					assert(was_crit == csa->now_crit);
 					if (ERR_DYNUPGRDFAIL == status)
-					{	/* if we dont hold crit on the region, it is possible due to concurrency conflicts
+					{	/* if we don't hold crit on the region, it is possible due to concurrency conflicts
 						 * that this block is unused (i.e. marked free/recycled in bitmap, see comments in
 						 * gds_blk_upgrade.h). in this case we should not error out but instead restart.
 						 */
@@ -498,7 +503,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						 */
 						rdfail_detail = cdb_sc_truncate;
 						return (sm_uc_ptr_t)NULL;
-					} else if (IS_CRYPTERR_MASK(status))
+					} else if ((-1 != status) && IS_CRYPTERR_MASK(status))
 					{
 						seg = gv_cur_region->dyn.addr;
 						GTMCRYPT_REPORT_ERROR(status, rts_error, seg->fname_len, seg->fname);
@@ -571,23 +576,20 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					break;
 				}
 				*cr_out = cr;
-				VMS_ONLY(
-					/* If we were doing the "db_csh_get" above (in t_qread itself) and located the cache-record
-					 * which, before coming here and taking a copy of cr->cycle a few lines above, was made an
-					 * older twin by another process in bg_update (note this can happen in VMS only) which has
-					 * already incremented the cycle, we will end up having a copy of the old cache-record with
-					 * its incremented cycle number and hence will succeed in tp_hist validation if we return
-					 * this <cr,cycle> combination although we don't want to since this "cr" is not current for
-					 * the given block as of now. Note that the "indexmod" optimization in "tp_tend" relies on
-					 * an accurate intermediate validation by "tp_hist" which in turn relies on the <cr,cycle>
-					 * value returned by t_qread to be accurate for a given blk at the current point in time.
-					 * We detect the older-twin case by the following check. Note that here we depend on the
-					 * the fact that "bg_update" sets cr->bt_index to 0 before incrementing cr->cycle.
-					 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle
-					 */
-					if (cr->twin && (0 == cr->bt_index))
-						break;
-				)
+				/* If we were doing the "db_csh_get" above (in t_qread itself) and located the cache-record
+				 * which, before coming here and taking a copy of cr->cycle a few lines above, was made an
+				 * older twin by another process in "bg_update_phase1" which has already incremented the cycle,
+				 * we will end up having a copy of the old cache-record with its incremented cycle number and hence
+				 * will succeed in tp_hist validation if we return this <cr,cycle> combination although we don't
+				 * want to since this "cr" is not current for the given block as of now. Note that the "indexmod"
+				 * optimization in "tp_tend" relies on an accurate intermediate validation by "tp_hist" which in
+				 * turn relies on the <cr,cycle> value returned by t_qread to be accurate for a given blk at the
+				 * current point in time. We detect the older-twin case by the following check. Note that here
+				 * we depend on the the fact that "bg_update" sets cr->bt_index to 0 before incrementing cr->cycle.
+				 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle.
+				 */
+				if (cr->twin && (0 == cr->bt_index))
+					break;
 				if (cr->blk != blk)
 					break;
 				REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
@@ -618,7 +620,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * restart will be triggered (in tp_tend) and the function "recompute_upd_array" will be
 					 * invoked. Avoiding the sleep in this case (at the cost of recomputing the update array
 					 * in crit) is expected to improve throughput. The only exception is if we are in the
-					 * final retry in which case it is better to wait here as we dont want to end up in a
+					 * final retry in which case it is better to wait here as we don't want to end up in a
 					 * situation where "recompute_upd_array" indicates that a restart is necessary.
 					 */
 					if (dollar_tlevel && (gv_target && gv_target->noisolation) && (ERR_GVPUTFAIL == t_err)
@@ -661,10 +663,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				if (reset_first_tp_srch_status)
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
+				/* Assert that if we are returning a "twin" while in crit, it better be the NEWER "twin" */
 				assert(!csa->now_crit || !cr->twin || cr->bt_index);
-				assert(!csa->now_crit || (NULL == (bt = bt_get(blk)))
-					|| (CR_NOTVALID == bt->cache_index)
-					|| (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend));
+#				ifdef DEBUG
+				if (csa->now_crit && (NULL != (bt = bt_get(blk))) && (CR_NOTVALID != bt->cache_index))
+				{
+					cr_lo = (cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+					bt_cr = (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index);
+					assert(cr == bt_cr);
+					assert(0 == cr->in_tend);
+				}
+#				endif
 				/* Note that at this point we expect t_qread to return a <cr,cycle> combination that
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
 				 * since "tp_hist" relies on this for its intermediate validation.
@@ -689,7 +698,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					blocking_pid = cr->r_epid;
 					if ((0 != blocking_pid) && (process_id != blocking_pid))
 					{
-						if (FALSE == is_proc_alive(blocking_pid, cr->image_count))
+						if (FALSE == is_proc_alive(blocking_pid, 0))
 						{	/* process gone: release that process's lock */
 							assert(0 == cr->bt_index);
 							if (cr->bt_index)
@@ -722,8 +731,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					{	/* process stopped before could set r_epid OR
 						 * Process is waiting on the lock held by itself.
 						 * Process waiting on the lock held by itself is an out-of-design
-						 * situation that we dont how it can occur hence the following assert
-						 * but know how to handle so we dont have to gtmassert in pro.
+						 * situation that we don't how it can occur hence the following assert
+						 * but know how to handle so we don't have to gtmassert in pro.
 						 */
 						assert(process_id != blocking_pid);
 						assert(0 == cr->bt_index);

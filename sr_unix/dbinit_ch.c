@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
 	int			rc, lcl_new_dbinit_ipc;
-	boolean_t		ftok_counter_halted, access_counter_halted;
+	boolean_t		ftok_counter_halted, access_counter_halted, decrement_ftok_counter;
 
 	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in db_init().Because
 	 * we don't have access to file header, we can not know if counters are disabled so we go by our best guess, not disabled,
@@ -124,10 +124,16 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO | IPC_NOWAIT); /* release the startup-shutdown sem */
 			udi->grabbed_access_sem = FALSE;
 		}
+		decrement_ftok_counter = udi->counter_ftok_incremented
+						? (ftok_counter_halted ? DECR_CNT_SAFE : DECR_CNT_TRUE)
+						: DECR_CNT_FALSE;
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(db_init_region, udi->counter_ftok_incremented && !ftok_counter_halted, TRUE);
-		else if (udi->counter_ftok_incremented && !ftok_counter_halted)
+		{
+			ftok_sem_release(db_init_region, decrement_ftok_counter, TRUE);
+			assert(FALSE == udi->counter_ftok_incremented);
+		} else if (udi->counter_ftok_incremented)
 			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT);
+		/* Below reset needed for "else if" case above but do it for "if" case too (in pro) just in case */
 		udi->counter_ftok_incremented = FALSE;
 		udi->grabbed_ftok_sem = FALSE;
 		if (!IS_GTCM_GNP_SERVER_IMAGE && !retry_dbinit) /* gtcm_gnp_server reuses file_cntl */

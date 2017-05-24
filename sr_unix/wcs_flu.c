@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "gt_timer.h"
 #include "is_file_identical.h"
 #include "gtmmsg.h"
+#include "wcs_backoff.h"
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "wcs_recover.h"
@@ -47,6 +48,7 @@
 #include "gtm_c_stack_trace.h"
 #include "anticipatory_freeze.h"
 #include "eintr_wrappers.h"
+#include "wcs_wt.h"
 
 GBLREF	bool			in_backup;
 GBLREF	gd_region		*gv_cur_region;
@@ -54,6 +56,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	bool			in_mupip_freeze;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_rndwn_file;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -73,7 +76,7 @@ error_def(ERR_WCBLOCKED);
 error_def(ERR_WRITERSTUCK);
 
 #define	JNL_WRITE_EPOCH_REC(CSA, CNL, CLEAN_DBSYNC)					\
-{											\
+MBSTART {										\
 	jnl_write_epoch_rec(CSA);							\
 	/* Note: Cannot easily use ? : syntax below as INCR_GVSTATS_COUNTER macro	\
 	 * is not an arithmetic expression but a sequence of statements.		\
@@ -83,25 +86,29 @@ error_def(ERR_WRITERSTUCK);
 		INCR_GVSTATS_COUNTER(CSA, CNL, n_jrec_epoch_regular, 1);		\
 	} else										\
 		INCR_GVSTATS_COUNTER(CSA, CNL, n_jrec_epoch_idle, 1);			\
-}
+} MBEND
 
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT)							\
-{															\
-	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (cnl->in_wtstart), 1);						\
-	if (WRITERS_ACTIVE(cnl))											\
+#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT, REG, CSA, CNL)					\
+MBSTART {														\
+	unsigned int		lcnt;											\
+        struct shmid_ds         shm_buf;										\
+	int			save_errno;										\
+															\
+	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (CNL->in_wtstart), 1);						\
+	if (WRITERS_ACTIVE(CNL))											\
 	{														\
 		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
 		DEBUG_ONLY(int4	intent_wtstart;) 	/* temporary for debugging purposes */				\
 															\
-		assert(csa->now_crit);											\
-		SIGNAL_WRITERS_TO_STOP(cnl);		/* to stop all active writers */				\
+		assert(CSA->now_crit);											\
+		SIGNAL_WRITERS_TO_STOP(CNL);		/* to stop all active writers */				\
 		lcnt = 0;												\
 		do													\
 		{													\
-			DEBUG_ONLY(in_wtstart = cnl->in_wtstart;)							\
-			DEBUG_ONLY(intent_wtstart = cnl->intent_wtstart;)						\
+			DEBUG_ONLY(in_wtstart = CNL->in_wtstart;)							\
+			DEBUG_ONLY(intent_wtstart = CNL->intent_wtstart;)						\
 			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, lcnt, (MAXGETSPACEWAIT * 2) - 1);		\
-			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, cnl->wtstart_pid[0], process_id);		\
+			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, CNL->wtstart_pid[0], process_id);		\
 			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
 			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
 				 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
@@ -109,22 +116,22 @@ error_def(ERR_WRITERSTUCK);
 				 * to finish. To avoid false failures (where the other writer finishes its job in	\
 				 * a little over a minute) we wait for twice the time in the debug version.		\
 				 */											\
-				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
+				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
 				assert((gtm_white_box_test_case_enabled)						\
 					&& ((WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number)		\
 						|| (WBTEST_SLEEP_IN_WCS_WTSTART == gtm_white_box_test_case_number)));	\
-				cnl->wcsflu_pid = 0;									\
-				SIGNAL_WRITERS_TO_RESUME(cnl);								\
+				CNL->wcsflu_pid = 0;									\
+				SIGNAL_WRITERS_TO_RESUME(CNL);								\
 				if (!WAS_CRIT)										\
-					rel_crit(gv_cur_region);							\
+					rel_crit(REG);									\
 				/* Disable white box testing after the first time the					\
 				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
 				part of the exit handling process, the control once agin comes to wcs_flu		\
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
 				mechanism to kick in.*/									\
 				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart,		\
-						DB_LEN_STR(gv_cur_region));						\
+				send_msg_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_WRITERSTUCK, 3, CNL->in_wtstart,		\
+						DB_LEN_STR(REG));							\
 				return FALSE;										\
 			}												\
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
@@ -132,39 +139,73 @@ error_def(ERR_WRITERSTUCK);
 				save_errno = errno;									\
 				if (1 == lcnt)										\
 				{											\
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,				\
-							DB_LEN_STR(gv_cur_region));					\
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_DBFILERR, 2,				\
+							DB_LEN_STR(REG));						\
+					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_SYSCALL, 5,				\
 							RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);		\
 				} 											\
 			} else if (1 == shm_buf.shm_nattch)								\
 			{												\
-				assert((FALSE == csa->in_wtstart) && (0 <= cnl->in_wtstart));				\
-				cnl->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
+				assert((FALSE == CSA->in_wtstart) && (0 <= CNL->in_wtstart));				\
+				CNL->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
 				FIX_IN_WTSTART = TRUE;									\
-				cnl->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
+				CNL->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
 			} else												\
 				wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
-		} while (WRITERS_ACTIVE(cnl));										\
-		SIGNAL_WRITERS_TO_RESUME(cnl);										\
+		} while (WRITERS_ACTIVE(CNL));										\
+		SIGNAL_WRITERS_TO_RESUME(CNL);										\
 	}														\
-}
+} MBEND
 
-#define REL_CRIT_BEFORE_RETURN			\
-{						\
-	cnl->doing_epoch = FALSE;		\
-	cnl->wcsflu_pid = 0;			\
+#define REL_CRIT_BEFORE_RETURN(CNL, REG)	\
+MBSTART {					\
+	CNL->doing_epoch = FALSE;		\
+	CNL->wcsflu_pid = 0;			\
 	if (!was_crit)				\
-		rel_crit(gv_cur_region);	\
-}
+		rel_crit(REG);			\
+} MBEND
+
+/* The below macro returns TRUE if there is some cache-record is likely still dirty in
+ *	a) active queue     : (CNL->wcs_active_lvl || CRQ->fl) check OR
+ *	b) wip queue        : (CRWIPQ->fl)                     check OR
+ *	c) in neither queue : (N_BTS != CNL->wc_in_free)       check
+ */
+#define	FLUSH_NOT_COMPLETE(CNL, CRQ, CRWIPQ, N_BTS) (CNL->wcs_active_lvl || CRQ->fl || CRWIPQ->fl || (N_BTS != CNL->wc_in_free))
+
+/* Sets RET to FALSE if the caller needs to do a "return FALSE" after macro returns. Sets RET to TRUE otherwise. */
+#define	CLEAR_WIP_QUEUE_IF_NEEDED(ASYNCIO, WTSTART_OR_WTFINI_ERRNO, CNL, CRWIPQ, REG, RET)	\
+MBSTART {											\
+	int	wtfini_errno;									\
+												\
+	RET = TRUE;										\
+	if (ASYNCIO)										\
+	{											\
+		assert(ENOSPC != WTSTART_OR_WTFINI_ERRNO);					\
+		WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, ((cache_rec_ptr_t) NULL), REG, wtfini_errno);		\
+		if (wtfini_errno)								\
+		{										\
+			if (ENOSPC != wtfini_errno)						\
+			{									\
+				assert(FALSE);							\
+				REL_CRIT_BEFORE_RETURN(CNL, REG);				\
+				RET = FALSE;							\
+			} else									\
+			{									\
+				assert(!WTSTART_OR_WTFINI_ERRNO);				\
+				if (!WTSTART_OR_WTFINI_ERRNO)					\
+					WTSTART_OR_WTFINI_ERRNO = wtfini_errno;			\
+			}									\
+		}										\
+	}											\
+} MBEND
 
 boolean_t wcs_flu(uint4 options)
 {
-	bool			success, was_crit;
+	boolean_t		was_crit, ret;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
-	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current;
+	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current, asyncio;
 	unsigned int		lcnt, pass;
-	int			save_errno, wtstart_errno;
+	int			n_bts, save_errno, wtstart_or_wtfini_errno;
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
 	uint4			jnl_status, to_wait, to_msg;
@@ -173,10 +214,14 @@ boolean_t wcs_flu(uint4 options)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	file_control		*fc;
-	cache_que_head_ptr_t	crq;
-        struct shmid_ds         shm_buf;
+	cache_que_head_ptr_t	crq, crwipq;
 	uint4			fsync_dskaddr;
 	int4			rc;
+	gd_region		*reg;
+#	ifdef DEBUG
+	boolean_t		writers_active;
+	int			wcs_wip_lvl, wcs_active_lvl, wc_in_free; /* copy of cnl noted down for debugging purposes */
+#	endif
 
 	jnl_status = 0;
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
@@ -194,8 +239,13 @@ boolean_t wcs_flu(uint4 options)
 	 * the wcs_flu in the caller will fail because no buffer is pinned at that point.
 	 */
 	in_commit = options & WCSFLU_IN_COMMIT;
-	udi = FILE_INFO(gv_cur_region);
+	reg = gv_cur_region;
+	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	/* We do not want to do costly WCSFLU_SYNC_EPOCH inside crit. Only exception is if caller holds crit for a lot longer
+	 * than the current operation (e.g. DSE CRIT SEIZE etc.). csa->hold_onto_crit is TRUE in that case. Assert that.
+	 */
+	assert(!sync_epoch || csa->hold_onto_crit || !csa->now_crit);
 	csd = csa->hdr;
 	cnl = csa->nl;
 	assert(cnl->glob_sec_init);
@@ -206,14 +256,19 @@ boolean_t wcs_flu(uint4 options)
 	assert(mupip_jnl_recover || !csa->nl->donotflush_dbjnl);
 	assert(!csa->hold_onto_crit || csa->now_crit);
 	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
+	jpc = csa->jnl;
 	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
-		grab_crit(gv_cur_region);
+	{
+		DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jpc->jnl_buff);
+		grab_crit_encr_cycle_sync(reg);
+	}
+	if (!FREEZE_LATCH_HELD(csa))
+		WAIT_FOR_REGION_TO_UNCHILL(csa, csd);
 	/* jnl_enabled is an overloaded variable. It is TRUE only if JNL_ENABLED(csd) is TRUE
 	 * and if the journal file has been opened in shared memory. If the journal file hasn't
 	 * been opened in shared memory, we needn't (and shouldn't) do any journal file activity.
 	 */
 	jnl_enabled = (JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode));
-	jpc = csa->jnl;
 	if (jnl_enabled)
 	{
 		jb = jpc->jnl_buff;
@@ -223,7 +278,7 @@ boolean_t wcs_flu(uint4 options)
 			assert(jb->fsync_dskaddr == jb->freeaddr);
 			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
 				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
-			REL_CRIT_BEFORE_RETURN;
+			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return TRUE;
 		}
 		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
@@ -236,17 +291,17 @@ boolean_t wcs_flu(uint4 options)
 		 */
 		ADJUST_GBL_JREC_TIME(jgbl, jb);
 		assert(csa == cs_addrs);	/* for jnl_ensure_open */
-		jnl_status = jnl_ensure_open();
+		jnl_status = jnl_ensure_open(reg, csa);
 		WBTEST_ASSIGN_ONLY(WBTEST_WCS_FLU_FAIL, jnl_status, ERR_JNLFILOPN);
 		if (SS_NORMAL != jnl_status)
 		{
 			assert(ERR_JNLFILOPN == jnl_status);
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			if (JNL_ENABLED(csd))
 			{	/* If journaling is still enabled, but we failed to open the journal file,
 				 * we don't want to continue processing.
 				 */
-				REL_CRIT_BEFORE_RETURN;
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
 				return FALSE;
 			}
 			jnl_enabled = FALSE;
@@ -259,7 +314,7 @@ boolean_t wcs_flu(uint4 options)
 		epoch_already_current = (jb->post_epoch_freeaddr == jb->freeaddr);	/* crit held, so this stays valid */
 		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
 		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
-			 * processing to be speeded up in that case. Write only an epoch record, dont do heavyweight flush or fsync
+			 * processing to be speeded up in that case. Write only an epoch record, don't do heavyweight flush or fsync
 			 * of db.This will avoid bunching of IO at the epoch time like is the case with before-image journaling
 			 * where this is currently necessary for correctness. But for nobefore, there is no need to do this since
 			 * no backward recovery will be performed. Note that if db has journaling disabled OR enabled with before-
@@ -275,7 +330,7 @@ boolean_t wcs_flu(uint4 options)
 			 * current database transaction number. If this relation is not maintained by GT.M, Rollback/Recovery logic
 			 * can issue JNLDBTNNOMATCH error. To avoid this situation, flush and sync the DB file header.
 			 */
-			fileheader_sync(gv_cur_region);
+			fileheader_sync(reg);
 			assert(NULL != jpc);
 			if (!jgbl.mur_extract && !epoch_already_current)
 			{
@@ -288,21 +343,21 @@ boolean_t wcs_flu(uint4 options)
 		if (fsync_dskaddr != jb->freeaddr)
 		{
 			assert(fsync_dskaddr <= jb->dskaddr);
-			if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
+			if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
-				REL_CRIT_BEFORE_RETURN;
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd), ERR_TEXT, 2,
 					RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
 				return FALSE;
 			}
 			assert(jb->freeaddr == jb->dskaddr);
-			jnl_fsync(gv_cur_region, jb->dskaddr);
+			jnl_fsync(reg, jb->dskaddr);
 			assert(jb->fsync_dskaddr == jb->dskaddr);
 		}
 		if (return_early)
 		{
-			REL_CRIT_BEFORE_RETURN;
+			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return TRUE;
 		}
 	}
@@ -312,7 +367,7 @@ boolean_t wcs_flu(uint4 options)
 	if (dba_mm == csd->acc_meth)
 	{
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL)
-			|| ((csd->freeze || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn)))
+			|| ((FROZEN(csd) || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn)))
 		{
 			#ifdef _AIX
 			GTM_DB_FSYNC(csa, udi->fd, rc);
@@ -324,143 +379,187 @@ boolean_t wcs_flu(uint4 options)
 				csa->ti->last_mm_sync = csa->ti->curr_tn;
 			} else
 			{
-				REL_CRIT_BEFORE_RETURN;
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 					RTS_ERROR_TEXT("Error during file msync during flush"));
 				return FALSE;
 			}
 		}
-	}
-	if (dba_mm != csd->acc_meth)
+	} else
 	{	/* If not mupip rundown, wait for ALL active phase2 commits to complete first.
 		 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
 		 */
+		asyncio = csd->asyncio;
 		assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL) || (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL)))
 		{
 			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
 				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number));
-			REL_CRIT_BEFORE_RETURN;
+			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
 		/* Now that all concurrent commits are complete, wait for these dirty buffers to be flushed to disk.
 		 * Note that calling wcs_wtstart just once assumes that if we ask it to flush all the buffers, it will.
-		 * This may not be true in case of twins. But this is Unix. So not an issue.
+		 * This may not be true in case of twins since "wcs_wtstart" has to wait for the twin link to be broken
+		 * by "wcs_wtfini" before it can issue the write of the newer twin. We handle that case by calling
+		 * "wcs_wtstart" again down below.
 		 */
-		wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
+		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu1, 0, 0, 0, 0, 0);
+		DEBUG_ONLY(writers_active = WRITERS_ACTIVE(cnl);) /* Note down any concurrent writers BEFORE "wcs_wtstart" call.
+								   * This is needed by a later assert.
+								   */
+		n_bts = csd->n_bts;
+		wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);		/* Flush it all */
 		/* At this point the cache should have been flushed except if some other process is in wcs_wtstart waiting
 		 * to flush the dirty buffer that it has already removed from the active queue. Wait for it to finish.
 		 */
 		fix_in_wtstart = FALSE;		/* set to TRUE by the following macro if we needed to correct cnl->in_wtstart */
-		WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
-		/* Ideally at this point, the cache should have been flushed. But there is a possibility that the other
-		 *   process in wcs_wtstart which had already removed the dirty buffer from the active queue found (because
-		 *   csr->jnl_addr > jb->dskaddr) that it needs to be reinserted and placed it back in the active queue.
-		 *   In this case, issue another wcs_wtstart to flush the cache. Even if a concurrent writer picks up an
-		 *   entry, he should be able to write it out since the journal is already flushed.
-		 * The check for whether the cache has been flushed is two-pronged. One via "wcs_active_lvl" and the other
-		 *   via the active queue head. Ideally, both are interdependent and checking on "wcs_active_lvl" should be
-		 *   enough, but we don't want to take a risk in PRO (in case wcs_active_lvl is incorrect).
-		 */
-		crq = &csa->acc_meth.bg.cache_state->cacheq_active;
-		assert(((0 <= cnl->wcs_active_lvl) && (cnl->wcs_active_lvl || 0 == crq->fl)) || (ENOSPC == wtstart_errno));
 #		ifdef DEBUG
+		wcs_wip_lvl = cnl->wcs_wip_lvl;
+		wcs_active_lvl = cnl->wcs_active_lvl;
+		wc_in_free = cnl->wc_in_free;
+#		endif
+		crwipq = &csa->acc_meth.bg.cache_state->cacheq_wip;
+		assert(asyncio || !crwipq->fl);
+		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu2, 0, 0, 0, 0, 0);
+		WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
+		CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+		if (!ret)
+		{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+			return FALSE;
+		}
+		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu3, 0, 0, 0, 0, 0);
+		crq = &csa->acc_meth.bg.cache_state->cacheq_active;
+		/* At this point, we expect the cache to be flushed. Exceptions are
+		 *	a) twinning : "wcs_wtstart" could be waiting for a twin to be broken by "wcs_wtfini"
+		 *		OR "wcs_wtfini" could have reinserted a cr back in active queue because cr->epid
+		 *		corresponded to a dead pid.
+		 *	b) A concurrent writer (that was active before we did the "wcs_wtstart" above) had removed a
+		 *		cache record from the active queue but could not flush it out
+		 *		(e.g. cr->jnl_addr > jb->fsync_dskaddr) and so reinserted it back in the active queue.
+		 *	c) ENOSPC errors
+		 *	d) white-box cases which induce error codepaths.
+		 * Take this into account in the below assert.
+		 * The check for whether the cache has been flushed is multi-pronged. See FLUSH_NOT_COMPLETE macro definition.
+		 */
+		assert(!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts) || TWINNING_ON(csd) || writers_active
+			|| (ENOSPC == wtstart_or_wtfini_errno) || gtm_white_box_test_case_enabled);
+#		ifdef DEBUG
+		/* White-box code to exercise error codepaths */
 		if (in_commit)
 			GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, cnl->wcs_active_lvl, 1);
 		GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_OUTOFSPACE, cnl->wcs_active_lvl, 1);
 #		endif
-		if (cnl->wcs_active_lvl || crq->fl)
-		{
-			wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
-			WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
+		if (FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
+		{	/* Some cache-record is likely still dirty in either active queue or wip queue or in neither queue */
+			wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);		/* Flush it all */
+			WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
+			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu4, 0, 0, 0, 0, 0);
+			CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+			if (!ret)
+			{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+				return FALSE;
+			}
+			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu5, 0, 0, 0, 0, 0);
 #			ifdef DEBUG
 			if (in_commit)
 			{
 				GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, cnl->wcs_active_lvl, 1);
-				GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, wtstart_errno, ENOENT);
+				GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, wtstart_or_wtfini_errno, ENOENT);
 			}
 			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_OUTOFSPACE == gtm_white_box_test_case_number))
-			{
+			{	/* Simulate an ENOSPC return from "wcs_wtstart" or "wcs_wtfini" (if asyncio is TRUE) */
 				cnl->wcs_active_lvl = 1;
-				wtstart_errno = ENOSPC;
+				wtstart_or_wtfini_errno = ENOSPC;
 			}
 #			endif
-			if (cnl->wcs_active_lvl || crq->fl)		/* give allowance in PRO */
+			if (FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts)) /* give allowance in PRO */
 			{
-				if (ENOSPC == wtstart_errno)
-				{	/* wait for csd->wait_disk_space seconds, and give up if still not successful */
+				if (ENOSPC == wtstart_or_wtfini_errno)
+				{	/* wait for at least csd->wait_disk_space seconds, and give up if still not successful */
+					WCS_OPS_TRACE(csa, process_id, wcs_ops_flu6, 0, 0, 0, 0, 0);
 					to_wait = csd->wait_disk_space;
 					to_msg = (to_wait / 8) ? (to_wait / 8) : 1; /* send message 8 times */
-					while ((0 < to_wait) && (ENOSPC == wtstart_errno))
+					while ((0 < to_wait) && (ENOSPC == wtstart_or_wtfini_errno))
 					{
-						if ((to_wait == csd->wait_disk_space)
-						    || (0 == to_wait % to_msg))
+						if ((to_wait == csd->wait_disk_space) || (0 == (to_wait % to_msg)))
 						{
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
-								 process_id, to_wait, DB_LEN_STR(gv_cur_region), wtstart_errno);
+								 process_id, to_wait, DB_LEN_STR(reg), wtstart_or_wtfini_errno);
 							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4,
-								   process_id, to_wait, DB_LEN_STR(gv_cur_region), wtstart_errno);
+								   process_id, to_wait, DB_LEN_STR(reg), wtstart_or_wtfini_errno);
 						}
 						hiber_start(1000);
 						to_wait--;
-						wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);
-						if (0 == crq->fl)
+						wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);	/* Flush it all */
+						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+						if (!ret)
+						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+							return FALSE;
+						}
+						if (!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
 							break;
 					}
-					if ((to_wait <= 0) && (cnl->wcs_active_lvl || crq->fl))
+					if ((to_wait <= 0) && FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
 					{	/* not enough space became available after the wait */
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
-								DB_LEN_STR(gv_cur_region), process_id);
+								DB_LEN_STR(reg), process_id);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
-								DB_LEN_STR(gv_cur_region), process_id);
+								DB_LEN_STR(reg), process_id);
 					}
 				} else
-				{	/* There are four different cases we know of currently when this is possible:
+				{	/* There are different cases we know of currently when this is possible all of which
+					 * we currently test with white-box test cases.
 					 * (a) If a process encountered an error in the midst of committing in phase2 and
-					 * secshr_db_clnup completed the commit for it and set wc_blocked to TRUE (even though
-					 * it was OUT of crit) causing the wcs_wtstart calls done above to do nothing.
+					 *    secshr_db_clnup completed the commit for it and set wc_blocked to TRUE (even though
+					 *    it was OUT of crit) causing the wcs_wtstart calls done above to do nothing.
 					 * (b) If a process performing multi-region TP transaction encountered an error in
-					 * phase1 of the commit, but at least one of the participating regions have completed
-					 * the phase1 and released crit, secshr_db_clnup will set wc_blocked on all the regions
-					 * (including those that will be OUTSIDE crit) that participated in the commit. Hence,
-					 * like (a), wcs_wtstart calls done above will return immediately.
-					 * But phase1 and phase2 commit errors are currently enabled only through white-box testing.
+					 *    phase1 of the commit, but at least one of the participating regions have completed
+					 *    the phase1 and released crit, secshr_db_clnup will set wc_blocked on all the regions
+					 *    (including those that will be OUTSIDE crit) that participated in the commit. Hence,
+					 *    like (a), wcs_wtstart calls done above will return immediately. But phase1 and
+					 *    phase2 commit errors are currently enabled only through white-box testing.
 					 * (c) If a test does crash shutdown (kill -9) that hit the process in the middle of
-					 * wcs_wtstart which means the writes did not complete successfully.
+					 *    wcs_wtstart which means the writes did not complete successfully.
 					 * (d) If WBTEST_WCS_FLU_IOERR/WBTEST_WCS_WTSTART_IOERR white box test case is set that
-					 * forces wcs_wtstart invocations to end up with I/O errors.
+					 *    forces wcs_wtstart invocations to end up with I/O errors.
 					 */
+					WCS_OPS_TRACE(csa, process_id, wcs_ops_flu7, 0, 0, 0, wtstart_or_wtfini_errno, 0);
 					assert((WBTEST_BG_UPDATE_PHASE2FAIL == gtm_white_box_test_case_number)
 						|| (WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGET_INVALID == gtm_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID == gtm_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID2 == gtm_white_box_test_case_number)
 						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)
 						|| (WBTEST_WCS_FLU_IOERR == gtm_white_box_test_case_number)
 						|| (WBTEST_WCS_WTSTART_IOERR == gtm_white_box_test_case_number)
-						|| (WBTEST_ANTIFREEZE_DBDANGER == gtm_white_box_test_case_number)
-					        || (WBTEST_ANTIFREEZE_JNLCLOSE == gtm_white_box_test_case_number));
-					if (0 == wtstart_errno)
+						|| (WBTEST_ANTIFREEZE_JNLCLOSE == gtm_white_box_test_case_number)
+						|| ((WBTEST_ANTIFREEZE_OUTOFSPACE == gtm_white_box_test_case_number) && asyncio));
+					if (0 == wtstart_or_wtfini_errno)
 					{
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 								LEN_AND_LIT("wcb_wcs_flu1"), process_id, &csa->ti->curr_tn,
-								DB_LEN_STR(gv_cur_region));
+								DB_LEN_STR(reg));
 					} else
 					{	/* Encountered I/O error. Transfer control to error trap */
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(gv_cur_region),
-								DB_LEN_STR(gv_cur_region), wtstart_errno);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(reg),
+								DB_LEN_STR(reg), wtstart_or_wtfini_errno);
+						assert(FALSE);	/* control should not come back here */
 					}
 					if (in_commit)
 					{	/* We should NOT be invoking wcs_recover as otherwise the callers (t_end or tp_tend)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
-						assert(was_crit);	/* so dont need to rel_crit */
+						assert(was_crit);	/* so don't need to rel_crit */
 						cnl->doing_epoch = FALSE;
 						cnl->wcsflu_pid = 0;
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
-					if (0 == wtstart_errno)
-						wcs_recover(gv_cur_region);
+					assert(0 == wtstart_or_wtfini_errno);
+					wcs_recover(reg);
 					if (jnl_enabled)
 					{
 						fsync_dskaddr = jb->fsync_dskaddr;
@@ -471,10 +570,10 @@ boolean_t wcs_flu(uint4 options)
 							assert((jb->freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
 							/* above assert has a >= instead of == due to possible
 							 * ALIGN record in between */
-							if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
+							if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
 							{
 								assert(NOJNL == jpc->channel); /* jnl file lost */
-								REL_CRIT_BEFORE_RETURN;
+								REL_CRIT_BEFORE_RETURN(cnl, reg);
 								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
 									JNL_LEN_STR(csd), ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
@@ -482,7 +581,7 @@ boolean_t wcs_flu(uint4 options)
 								return FALSE;
 							}
 							assert(jb->freeaddr == jb->dskaddr);
-							jnl_fsync(gv_cur_region, jb->dskaddr);
+							jnl_fsync(reg, jb->dskaddr);
 							/* Use jb->fsync_dskaddr (instead of "fsync_dskaddr") below as the
 							 * shared memory copy is more uptodate (could have been updated by
 							 * "jnl_fsync" call above).
@@ -490,19 +589,37 @@ boolean_t wcs_flu(uint4 options)
 							assert(jb->fsync_dskaddr == jb->dskaddr);
 						}
 					}
-					wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
-					WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
-					if (cnl->wcs_active_lvl || crq->fl)
+					/* After the "wcs_recover" call above, it is possible a dirty cache-record which was
+					 * in the wip queue and corresponded to a dead pid got re-inserted into the wip
+					 * queue. In that case, the call to WAIT_FOR_WIP_QUEUE_CLEAR (which in turn calls
+					 * "wcs_wtfini") would reinsert this into the active queue. So we need to call
+					 * "wcs_wtstart"/WAIT_FOR_WIP_QUEUE_CLEAR once more to clean this out. Hence the
+					 * loop count of 2 below.
+					 */
+					for (lcnt = 0; lcnt < 2; lcnt++)
 					{
-						REL_CRIT_BEFORE_RETURN;
-						assertpro(FALSE);
+						wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);	/* Flush it all */
+						WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
+						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+						if (!ret)
+						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+							return FALSE;
+						}
+						if (FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
+						{
+							if (!lcnt)
+								continue;
+							/* Something wrong inspite of all these attempts */
+							REL_CRIT_BEFORE_RETURN(cnl, reg);
+							assertpro(FALSE);
+						}
 					}
 				}
 			}
 		}
 	}
 	if (flush_hdr)
-		fileheader_sync(gv_cur_region);
+		fileheader_sync(reg);
 	if (jnl_enabled && write_epoch)
 	{	/* If need to write an epoch,
 		 *	(1) get hold of the jnl io_in_prog lock.
@@ -526,7 +643,7 @@ boolean_t wcs_flu(uint4 options)
 			{
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
-				REL_CRIT_BEFORE_RETURN;
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
 				assertpro(FALSE);
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
@@ -550,7 +667,7 @@ boolean_t wcs_flu(uint4 options)
 		}
 	}
 	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
-	REL_CRIT_BEFORE_RETURN;
+	REL_CRIT_BEFORE_RETURN(cnl, reg);
 	/* sync the epoch record in the journal if needed. */
 	if (jnl_enabled && write_epoch && sync_epoch && (csa->ti->curr_tn == csa->ti->early_tn))
 	{	/* Note that if we are in the midst of committing and came here through a bizarre
@@ -558,17 +675,17 @@ boolean_t wcs_flu(uint4 options)
 		 * Note that we are guaranteed to come back to wcs_wtstart since we are currently in commit-phase
 		 * and will dirty atleast one block as part of the commit for a wtstart timer to be triggered.
 		 */
-		jnl_wait(gv_cur_region);
+		jnl_wait(reg);
 	}
 	if (need_db_fsync && JNL_ALLOWED(csd))
 	{
 		if (dba_mm != csd->acc_meth)
 		{
-			DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog, save_errno);
+			DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno);
 			if (0 != save_errno)
 			{
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 				assert(FALSE);	/* should not come here as the rts_error above should not return */
 				return FALSE;
 			}

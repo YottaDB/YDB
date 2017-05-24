@@ -3956,7 +3956,7 @@
    current journal-buffer-size as part of an online switch of the journal
    files.
 
-   The default value is 2308 blocks. The minimum BUFFER_SIZE is 2307 blocks.
+   The default value is 2312 blocks. The minimum BUFFER_SIZE is 2307 blocks.
    The maximum BUFFER_SIZE is 32K blocks which means that the maximum buffer
    you can set for your journal file output is 16MB.
 

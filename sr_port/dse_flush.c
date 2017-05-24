@@ -32,8 +32,6 @@ error_def(ERR_DSEONLYBGMM);
 
 void dse_flush(void)
 {
-	boolean_t	was_crit;
-
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 
@@ -43,12 +41,7 @@ void dse_flush(void)
 	case dba_mm:
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
-		was_crit = cs_addrs->now_crit;
-		if (!was_crit)
-			grab_crit_encr_cycle_sync(gv_cur_region);
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-		if (!was_crit)
-			rel_crit(gv_cur_region);
 		break;
 	default:
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("BUFFER_FLUSH"));

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,8 @@
 /* Include prototypes */
 #include "mlk_prcblk_delete.h"
 #include "mlk_unpend.h"
+#include "interlock.h"
+#include "rel_quant.h"
 
 GBLREF int4 process_id;
 GBLREF short	crash_count;
@@ -28,21 +31,12 @@ GBLREF short	crash_count;
 void mlk_unpend(mlk_pvtblk *p)
 {
 	bool			was_crit;
-	sgmnt_addrs		*sa;
+	sgmnt_addrs		*csa;
 
-	sa = &FILE_INFO(p->region)->s_addrs;
-
-	if (sa->critical)
-		crash_count = sa->critical->crashcnt;
-
-        if(FALSE == (was_crit = sa->now_crit))
-		grab_crit(p->region);
-
+	csa = &FILE_INFO(p->region)->s_addrs;
+	GRAB_LOCK_CRIT(csa, p->region, was_crit);
 	mlk_prcblk_delete(p->ctlptr, p->nodptr, process_id);
 	p->ctlptr->wakeups++;
-
-        if(FALSE == was_crit)
-		rel_crit(p->region);
-
+	REL_LOCK_CRIT(csa, p->region, was_crit);
 	return;
 }

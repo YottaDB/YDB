@@ -43,11 +43,8 @@ void jfh_from_jnl_info(jnl_create_info *info, jnl_file_header *header)
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
 	memcpy(&header->who_created, (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
 	memcpy(&header->who_opened,  (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
-	/* EPOCHs are written unconditionally in Unix while they are written only for BEFORE_IMAGE in VMS */
-	if (JNL_HAS_EPOCH(info))
-		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
-	else
-		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;
+	/* EPOCHs are written unconditionally even for NOBEFORE_IMAGE journaling */
+	header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
 	header->max_jrec_len = info->max_jrec_len;
 	header->bov_timestamp = jgbl.gbl_jrec_time;
 	header->eov_timestamp = jgbl.gbl_jrec_time;

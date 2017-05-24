@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,8 @@
 
 GBLREF io_log_name *io_root_log_name;
 
+error_def(ERR_INVSTRLEN);
+
 #define LOGNAME_LEN 255
 
 io_log_name *get_log_name(mstr *v, bool insert)
@@ -26,7 +29,6 @@ io_log_name *get_log_name(mstr *v, bool insert)
         io_log_name	*l, *prev, *new;
         int4		index, stat, v_len;
         unsigned char	buf[LOGNAME_LEN];
-        error_def	(ERR_INVSTRLEN);
 
         assert (io_root_log_name != 0);
         assert(io_root_log_name->len == 0);
@@ -34,10 +36,15 @@ io_log_name *get_log_name(mstr *v, bool insert)
         if (v_len == 0)
 	return io_root_log_name;
         if (v_len > LOGNAME_LEN)
-        	rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, v_len, LOGNAME_LEN);
+        	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, v_len, LOGNAME_LEN);
 	CONVERT_IDENT(buf, v->addr, v_len);
-        for (prev = io_root_log_name, l = prev->next;  l != 0;  prev = l, l = l->next)
+        for (prev = io_root_log_name, l = prev->next;  NULL != l;  prev = l, l = l->next)
         {
+		if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+		{
+			assert(FALSE);
+			continue;       /* skip it on pro */
+		}
                	stat = memvcmp(l->dollar_io, l->len, buf, v_len);
         	if (stat == 0)
         		return l;

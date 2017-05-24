@@ -15,7 +15,7 @@
 #include <sys/sem.h>
 
 /* Database startup wait related macros */
-#define DEFAULT_DBINIT_MAX_HRTBT_DELTA	12
+#define DEFAULT_DBINIT_MAX_DELTA_SECS	96
 #define NO_SEMWAIT_ON_EAGAIN		0
 #define INDEFINITE_WAIT_ON_EAGAIN	(uint4) -1
 #define MAX_BYPASS_WAIT_SEC		3
@@ -68,8 +68,8 @@ typedef struct semwait_status_struct
 	enum sem_syscalls	op;
 } semwait_status_t;
 
-boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr, semwait_status_t *status, gd_region *reg,
-			    boolean_t *bypass, boolean_t *sem_halted);
+boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stacktrace_time, boolean_t *timedout,
+				semwait_status_t *status, gd_region *reg, boolean_t *bypass, boolean_t *sem_halted);
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 {																 \
@@ -78,7 +78,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 		const char		*lcl_msgstr = NULL;									 \
 																 \
 		lcl_msgstr = (gtm_ftok_sem == SEMTYPE) ? "SEMWT2LONG_FTOK_SUCCEEDED: semop for the ftok semaphore succeeded"	 \
-							: "SEMWT2LONG_ACCSEM_SUCCEEDED: semop for the ftok semaphore succeeded"; \
+						       : "SEMWT2LONG_ACCSEM_SUCCEEDED: semop for the access semaphore succeeded";\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(lcl_msgstr));					 \
 	}															 \
 }
@@ -146,7 +146,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	{													\
 		assert(ERR_SEMWT2LONG == RETSTAT->status1);							\
 		assert(RETSTAT->sem_pid && (-1 != RETSTAT->sem_pid));						\
-		tot_wait_time = TREF(dbinit_max_hrtbt_delta) * HEARTBEAT_INTERVAL_IN_SECS;			\
+		tot_wait_time = TREF(dbinit_max_delta_secs);							\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) DBFILERR_PARAMS(REG),					\
 			SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, tot_wait_time));				\
 	} else													\

@@ -100,7 +100,7 @@ void dse_chng_fhead(void)
 		cs_data->image_count != image_count) && !override)
 #	endif
 #	ifdef UNIX
-	if (cs_data->freeze && (cs_data->image_count != process_id)
+	if (FROZEN(cs_data) && (cs_data->image_count != process_id)
 		&& !override)
 #	endif
 	{
@@ -529,7 +529,7 @@ void dse_chng_fhead(void)
 		x = cli_t_f_n("FREEZE");
 		if (1 == x)
 		{
-			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE))
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE, FALSE, FALSE))
 			{
 				hiber_start(1000);
 				if (util_interrupt)
@@ -541,14 +541,13 @@ void dse_chng_fhead(void)
 		}
 		else if (0 == x)
 		{
-			if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE))
+			if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE, FALSE, FALSE))
 			{
 				util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
 					TRUE, REG_LEN_STR(gv_cur_region));
 			}
-
 		}
-		if (x != !(cs_data->freeze))
+		if (x != !(FROZEN(cs_data)))
 			util_out_print("Region !AD is now !AD", TRUE, REG_LEN_STR(gv_cur_region), LEN_AND_STR(freeze_msg[x]));
 		cs_addrs->persistent_freeze = x;	/* secshr_db_clnup() shouldn't clear the freeze up */
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,10 +18,7 @@
 #include "gtm_string.h"
 #include "gtm_inet.h"	/* Required for gtmsource.h */
 
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
-
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsblk.h"
@@ -45,13 +42,12 @@
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
-#ifdef GTM_TRIGGER
-# include "gv_trigger.h"
-# include "gtm_trigger.h"
-# include "gv_trigger_protos.h"
-# include "subscript.h"
-# include "stringpool.h"
-#endif
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#include "gv_trigger_protos.h"
+#include "subscript.h"
+#include "stringpool.h"
+#include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
 
@@ -73,9 +69,7 @@
 #include "have_crit.h"
 #include "error.h"
 #include "gtmimagename.h" /* for spanning nodes */
-#ifdef UNIX
 #include "preemptive_db_clnup.h"
-#endif
 #include "spec_type.h"
 #include "collseq.h"
 #ifdef DEBUG
@@ -141,8 +135,8 @@ GBLREF	mval			increment_delta_mval;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-UNIX_ONLY(GBLREF	enum gtmImageTypes	image_type;)
-UNIX_ONLY(GBLREF	boolean_t 		span_nodes_disallowed;)
+GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t 		span_nodes_disallowed;
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVINCRISOLATION);
@@ -166,10 +160,11 @@ error_def(ERR_UNIMPLOP);
 {																\
 	if (dollar_tlevel)													\
 		ADD_TO_GVT_TP_LIST(GVT, RESET_FIRST_TP_SRCH_STATUS_FALSE); /* note: macro updates read_local_tn if necessary */	\
-	if (VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) value.len > gv_cur_region->max_rec_size)				\
+	if (value.len > gv_cur_region->max_rec_size)										\
 	{															\
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))					\
 			end = &buff[MAX_ZWR_KEY_SZ - 1];									\
+		gv_currkey->end = 0;												\
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)	\
 			  value.len, (int4)gv_cur_region->max_rec_size,								\
 			  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);						\
@@ -287,8 +282,7 @@ void	gvcst_put(mval *val)
 	parms.enable_trigger_read_and_fire = TRUE;
 	parms.enable_jnl_format = TRUE;
 	lcl_root = gv_target->root;
-	VMS_ONLY(gvcst_put2(val, &parms));
-#	ifdef UNIX /* deal with possibility of spanning nodes */
+	/* deal with possibility of spanning nodes */
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
 	save_in_gvcst_incr = in_gvcst_incr;
@@ -418,7 +412,6 @@ void	gvcst_put(mval *val)
 		REVERT; /* remove our condition handler */
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
-#	endif /* ifdef UNIX */
 }
 
 void	gvcst_put2(mval *val, span_parms *parms)
@@ -429,14 +422,14 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	int4			blk_size, blk_fill_size, blk_reserved_bytes;
 	const uint4		zeroes4byte = 0;
 	const gtm_uint64_t	zeroes8byte = 0;
-	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status;
+	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
 	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
 	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
 	cw_set_element		*cse, *cse_new, *old_cse;
 	gv_namehead		*save_targ, *split_targ, *dir_tree;
-	enum cdb_sc		status;
+	enum cdb_sc		status, status2;
 	gv_key			*temp_key, *src_key;
 	static gv_key		*gv_altkey2;
 	uchar_ptr_t		subrec_ptr;
@@ -469,6 +462,15 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	sgm_info		*si;
 	uint4			nodeflags;
 	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
+	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
+						 *	In this case, a "t_create" is needed for the new block on the left
+						 *	and a "t_write" is needed for the current block (right side of split).
+						 * TRUE if a block split creates a new block on the right of the split point.
+						 *	In this case, the pre-split block is untouched (i.e. no "t_write" needed)
+						 *	and serves as the left side of the split AND a new block is created on the
+						 *	right ("t_create" is needed for that).
+						 */
+	boolean_t		prev_split_to_right; /* copy of "split_to_right" after child level split (used in parent split) */
 	int			split_depth;
 	mval			*ja_val;
 	int			rc;
@@ -582,6 +584,14 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		skip_hasht_read = FALSE;
 	)
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
+#	ifdef DEBUG
+	/* ^%Y* should never be set (op_gvput would have issued a ERR_PCTYRESERVED error in that case).
+	 * The only exception is if we are adding a ^%YGS record into the statsdb from "gvcst_init_statsDB" but in that
+	 * case we would have reg->read_only set to FALSE for a statsdb region name. Account for that.
+	 */
+	assert((RESERVED_NAMESPACE_LEN > gv_currkey->end) || (0 != MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE))
+		|| (IS_STATSDB_REGNAME(gv_cur_region) && !gv_cur_region->read_only && csa->orig_read_write));
+#	endif
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	/* this needs to be initialized before any code that does a "goto retry" since this gets used there */
 	save_targ = gv_target;
@@ -669,6 +679,15 @@ tn_restart:
 			}
 		}
 	}
+	REDO_ROOT_SEARCH_IF_NEEDED(want_root_search, status2);
+	if (cdb_sc_normal != status2)
+	{	/* gvcst_root_search invoked from REDO_ROOT_SEARCH_IF_NEEDED ended up with a restart situation but did not
+		 * actually invoke t_retry. Instead, it returned control back to us asking us to restart.
+		 * Cannot enable assert (which has an assert about t_tries < CDB_STAGNATE) because it is possible for us
+		 * to get cdb_sc_gvtrootnonzero restart when t_tries == CDB_STAGNATE. Pass GOTO_RETRY parameter accordingly.
+		 */
+		GOTO_RETRY;
+	}
 #	endif
 	assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
 	si = sgm_info_ptr;	/* Cannot be moved before GVTR_INIT_AND_TPWRAP_IF_NEEDED macro since we could enter gvcst_put
@@ -750,6 +769,26 @@ tn_restart:
 			}
 			assert(0 == gv_target->root);
 			gv_target->root = tp_root;
+			if (tp_root)
+			{	/* root block was 0 at start of this function but became non-zero midway.
+				 * Need to do a "gvcst_root_search" to confirm all error scenarios (e.g. ACTCOLLMISMTCH)
+				 * are taken care of. Handle that by signaling a restart. The "t_retry" call
+				 * will take care of doing the GVCST_ROOT_SEARCH in case we are not in TP.
+				 * If we are in an explicit TP, a "tp_restart" will take care of redoing the transaction
+				 * which will redo the GVCST_ROOT_SEARCH (as part of the op_gvname before invoking
+				 * op_gvput/gvcst_put/gvcst_pu2 again). If we are in an implicit TP (possible with
+				 * triggers), then control will stay inside "gvcst_put2" so we need to explicitly do
+				 * the "gvcst_root_search". But we can only do a "gvcst_redo_root_search" and that too
+				 * after the "t_retry" happened and at the beginning of the next try. This is done through
+				 * setting "want_root_search" to TRUE at the end of the current try and using this variable
+				 * to invoke the "REDO_ROOT_SEARCH_IF_NEEDED" macro at the beginning of the next try.
+				 * The reason we cannot do the REDO_ROOT_SEARCH_IF_NEEDED until after the
+				 * GVTR_INIT_AND_TPWRAP_IF_NEEDED macro is invoked in the next try is because that macro
+				 * expects no other db activity to have happened until it is done.
+				 */
+				status = cdb_sc_gvtrootnonzero;
+				GOTO_RETRY;
+			}
 		}
 	}
 	blk_reserved_size = blk_size - blk_reserved_bytes;
@@ -849,7 +888,7 @@ tn_restart:
 			 */
 			no_4byte_collhdr = 0;
 		} else
-#		if defined(DEBUG) && defined(UNIX)
+#		if defined(DEBUG)
 		{	/* Starting V6.1, newly created nodes in the directory tree (DT) leaf block have a 4-byte collation header
 			 * unconditionally but in order to test the code below for correctness on pre-existing DT leaf block
 			 * records which might not contain a 4-byte collation header, we randomly enable the 4-byte collation
@@ -867,12 +906,8 @@ tn_restart:
 				no_4byte_collhdr = MV_FORCE_INT(random_mval);
 			}
 		}
-#		elif defined(UNIX)
-			no_4byte_collhdr = 0;	/* for Unix pro, add the 4-byte collation header even for "act" = 0 */
-#		elif defined(VMS)
-			no_4byte_collhdr = 1;	/* for VMS (pro and dbg) unconditionally disable the 4-byte collation header.
-						 * as otherwise it means fixing test reference files to account for new 4-bytes
-						 */
+#		else
+			no_4byte_collhdr = 0;	/* for pro, add the 4-byte collation header even for "act" = 0 */
 #		endif
 		if (no_4byte_collhdr)
 		{	/* No 4-byte collation header */
@@ -914,8 +949,9 @@ tn_restart:
 				GOTO_RETRY;
 		}
 #		endif
-#		if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVINCRPUTFAIL == gtm_white_box_test_case_number))
+#		if defined(DEBUG)
+		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVINCRPUTFAIL == gtm_white_box_test_case_number)
+			&& !IS_STATSDB_REG(gv_cur_region))
 		{
 			status = cdb_sc_blknumerr;
 			GOTO_RETRY;
@@ -926,7 +962,6 @@ tn_restart:
 		target_key_size = gv_currkey->end + 1;
 		bh = &gv_target->hist.h[0];
 		key_exists = (target_key_size == bh->curr_rec.match);
-#		ifdef UNIX
 		if (key_exists)
 		{	/* check for spanning node dummy value: a single zero byte */
 			rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bh->buffaddr + bh->curr_rec.offset);
@@ -977,7 +1012,6 @@ tn_restart:
 				return;
 			}
 		}
-#		endif
 		if (is_dollar_incr)
 		{
 			if (key_exists)
@@ -1016,6 +1050,7 @@ tn_restart:
 	 * --------------------------------------------------------------------------------------------
 	 */
 	need_extra_block_split = FALSE; /* Assume we don't require an additional block split (most common case) */
+	split_to_right = FALSE;
 	duplicate_set = FALSE; /* Assume this is NOT a duplicate set (most common case) */
 	split_depth = 0;
 	split_targ = gv_target;
@@ -1168,6 +1203,7 @@ tn_restart:
 		 * In those cases, we will go into the non-block-split case but eventually we will restart.
 		 */
 		assert((new_blk_size >= new_blk_size_single) || (CDB_STAGNATE > t_tries));
+		prev_split_to_right = split_to_right;	/* note down "split_to_right" corresponding to one lower level */
 		if ((new_blk_size <= blk_fill_size) || (new_blk_size <= new_blk_size_single))
 		{	/* Update can be done without overflowing the block's fillfactor OR the record to be updated
 			 * is the only record in the new block. Do not split block in either case. This means we might
@@ -1175,8 +1211,11 @@ tn_restart:
 			 * but in this case we are guaranteed the block has room for the current reserved bytes.
 			 */
 			if (no_pointers)	/* level zero (normal) data block: no deferred pointer chains */
+			{
+				assert(!prev_split_to_right);
 				ins_chain_offset = 0;
-			else			/* index or directory level block */
+				assert(0 == ins_chain_index);
+			} else			/* index or directory level block */
 			{	/* In case a new GVT is being created, it is possible 4-byte collation information is being
 				 * added to the leaf level directory tree record for this global name (after the 4-byte block_id).
 				 * Irrespective of the collation header, make sure ins_chain_offset points to the block_id part.
@@ -1210,19 +1249,38 @@ tn_restart:
 					if (new_rec)
 					{
 						BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-						next_rec_hdr->rsiz = rec_size - next_rec_shrink;
+						tmp_rsiz = rec_size - next_rec_shrink;
+						next_rec_hdr->rsiz = tmp_rsiz;
 						SET_CMPC(next_rec_hdr, curr_rec_match);
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 						next_rec_shrink += SIZEOF(rec_hdr);
 					}
-					if (n >= next_rec_shrink)
-					{
-						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
-					} else
+					if (n < next_rec_shrink)
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_mkblk;
 						GOTO_RETRY;
+					}
+					BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
+					if (prev_split_to_right)
+					{	/* This is an index block where a lower level block had a block split
+						 * to the right. The newly inserted record will be added before the
+						 * split point at this level. But the new block # created at the lower
+						 * level will be inserted in next_rec and the newly inserted record
+						 * will inherit the block number already there in "next_rec". Do those
+						 * adjustments here.
+						 */
+						assert(new_rec);	/* this is to ensure "tmp_rsiz" would have been set above
+									 * and that "rp" & rec_size are still in sync.
+									 */
+						ins_chain_offset += tmp_rsiz;
+						assert(value.len);	/* so "va" would be initialized by the
+									 * "BLK_ADDR(va, ...)" call above.
+									 */
+						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
+							/* or else we would have restarted above with "cdb_sc_mkblk" */
+						assert(SIZEOF(block_id) == value.len);
+						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
 			} else
@@ -1258,11 +1316,26 @@ tn_restart:
 				GOTO_RETRY;
 			}
 			assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
+			/* If we had a block split to right in a lower level, we need to disable the indexmod optimization
+			 * (see gdscc.h for a description of that optimization) at this level. Below is an example describing why.
+			 * Let us say Blk6 is a level-1 index block with a *-record pointing to a level-0 block Blk5 that has say
+			 * a record ^a(1). Let us say process P1 does a SET of ^a(2) to a value too big to fit in Blk5. And
+			 * the split_to_right scheme kicks in placing this record in a new block Blk7 (right sibling of Blk5).
+			 * Just before P1 commits this, let us say another process P2 does a SET of ^a(3) to a value that is
+			 * small enough to fit in Blk5. Since P1 has not yet committed its changes, Blk6 still contains a *-record
+			 * and so P2 descends that into Blk5 and finds ^a(3) can fit in and computes its update array based on that.
+			 * When P2 goes to commit time though, it finds Blk6 changed (by P1's commit). But P1 did not touch Blk5
+			 * because it used the split_to_right scheme. Therefore P2 incorrectly goes ahead with the commit even
+			 * though the index block (Blk6) has changed. This is because of the indexmod optimization. This will result
+			 * in Blk5 containins ^a(1),^a(3) and a right sibling block Blk7 containing ^a(2). Effectively a
+			 * DBKEYGTIND integrity error. Hence the GDS_WRITE_KILLTN usage below.
+			 */
 			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
-				FALSE, FALSE, GDS_WRITE_PLAIN);
+						FALSE, FALSE, (!prev_split_to_right ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN));
 			assert(!dollar_tlevel || !cse->high_tlevel);
 			if ((0 != ins_chain_offset) && (NULL != cse) && (0 != cse->first_off))
 			{	/* formerly tp_offset_chain - inserts a new_entry in the chain */
+				assert(dollar_tlevel && !prev_split_to_right);
 				assert((NULL != cse->new_buff) || horiz_growth && cse->low_tlevel->new_buff
 									&& (buffaddr == cse->low_tlevel->new_buff));
 				assert(0 == cse->next_off);
@@ -1422,6 +1495,7 @@ tn_restart:
 				 * We use that as the heuristic to identify the direction of data loading and do the
 				 * splits accordingly for future updates.
 				 */
+				assert(!level_0 || !IS_STATSDB_CSA(csa));
 				last_split_dir = (enum split_dir)gv_target->last_split_direction[bh_level];
 				if (NEWREC_DIR_FORCED == last_split_dir)
 				{	/* dont have prior information to use heuristic. choose whichever side is less full.
@@ -1483,49 +1557,92 @@ tn_restart:
 				new_rec_goes_to_right = (NEWREC_DIR_RIGHT == last_split_dir);
 			}
 			last_split_direction[bh_level] = (char)last_split_dir;
+			assert(!prev_split_to_right || !level_0);
 			if (new_rec_goes_to_right)
-			{	/* Left side of this block will be split off into a new block.
-				 * The new record and the right side of this block will remain in this block.
-				 */
-				/* prepare new block */
-				BLK_INIT(bs_ptr, bs1);
-				if (level_0)
-				{
-					BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), curr_rec_offset - SIZEOF(blk_hdr));
-				} else
-				{	/* for index records, the record before the split becomes a new *-key */
-					/* Note:  If the block split was caused by our appending the new record
-					 * to the end of the block, this code causes the record PRIOR to the
-					 * current *-key to become the new *-key.
+			{
+				if (!new_rec || (new_blk_size_r != new_blk_size_single) || dollar_tlevel)
+				{	/* Left side of this block will be split off into a new block.
+					 * The new record and the right side of this block will remain in this block.
 					 */
-					BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), prev_rec_offset - SIZEOF(blk_hdr));
-					BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
-					new_star_hdr->rsiz = BSTAR_REC_SIZE;
-					SET_CMPC(new_star_hdr, 0);
-					BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
-					BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp - SIZEOF(block_id), SIZEOF(block_id));
+					split_to_right = FALSE;
+					/* Prepare new (left-side) block */
+					BLK_INIT(bs_ptr, bs1);
+					if (level_0)
+					{	/* If this is a statsdb, it means we are potentially about to move an existing
+						 * leaf-level ^%YGS node from one block to another (a no-no). Assert accordingly.
+						 */
+#						ifdef DEBUG
+						if (IS_STATSDB_CSA(csa))
+							TREF(donot_commit) |= DONOTCOMMIT_GVCST_PUT_SPLIT_TO_RIGHT;
+#						endif
+						BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), curr_rec_offset - SIZEOF(blk_hdr));
+					} else
+					{	/* for index records, the record before the split becomes a new *-key */
+						/* Note:  If the block split was caused by our appending the new record
+						 * to the end of the block, this code causes the record PRIOR to the
+						 * current *-key to become the new *-key.
+						 */
+						BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), prev_rec_offset - SIZEOF(blk_hdr));
+						BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
+						new_star_hdr->rsiz = BSTAR_REC_SIZE;
+						SET_CMPC(new_star_hdr, 0);
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp - SIZEOF(block_id), SIZEOF(block_id));
+					}
+					new_blk_bs = bs1;
+					if (0 == BLK_FINI(bs_ptr, bs1))
+					{
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_mkblk;
+						GOTO_RETRY;
+					}
+					/* We want to assert that the left block has enough space for reserved bytes but
+					 * it is possible that it DOES NOT have enough space for reserved bytes if the pre-split
+					 * block was previously populated with a very low reserved bytes setting and if the current
+					 * reserved bytes setting is much higher than what the chosen split point would free up.
+					 * This is an issue waiting to be fixed by GTM-6522. Until then the following assert
+					 * has to remain commented out.
+					 *
+					 * assert(bs1[0].len <= blk_reserved_size);
+					 */
+					ins_chain_offset = no_pointers
+								? 0 : (int)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size);
+					left_hand_offset = left_hand_index = 0;
+					/* Prepare the right-side block (is an existing block) */
+					BLK_INIT(bs_ptr, bs1);
+				} else
+				{	/* The to-be inserted key is the only one on the right side and is non-existent.
+					 * No point moving all the current content of the existing block into a new left side block
+					 * and inserting the new record in the current block. It is less node motion to create
+					 * a new block and insert the new record there and leave the current block untouched.
+					 * Note that this is necessary for statsDB where a ^%YGS node once added in a particular
+					 * block offset is assumed to stay there irrespective of block splits in surrounding
+					 * nodes/blocks by other concurrent processes.
+					 */
+					split_to_right = TRUE;
+					/* Since we come here only if "new_blk_size_r == new_blk_size_single", it is not possible
+					 * to come here in case of an index block since there will always be a *-key in that
+					 * case and that will be to the right of the newly inserted record so "new_blk_size_r"
+					 * would always be greater than "new_blk_size_single" in that case. But in case of a
+					 * restartable situation it is possible to come here. Assert accordingly using the
+					 * TREF(donot_commit) scheme.
+					 */
+#					ifdef DEBUG
+					if (!level_0)
+						TREF(donot_commit) |= DONOTCOMMIT_GVCST_PUT_SPLIT_TO_RIGHT;
+#					endif
+					/* Since the "t_create" call (for the new block) below relies on "left_hand_index" and
+					 * "left_hand_offset" to be set, initialize them even though the newly created block
+					 * is actually the right side block (not the left side).
+					 */
+					left_hand_offset = no_pointers
+								? 0 : (int)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size);
+					left_hand_index = ins_chain_index;
+					ins_chain_index = ins_chain_offset = 0;
+					/* Prepare the right-side block (is a newly created block) */
+					BLK_INIT(bs_ptr, bs1);
+					new_blk_bs = bs1;
 				}
-				new_blk_bs = bs1;
-				if (0 == BLK_FINI(bs_ptr,bs1))
-				{
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_mkblk;
-					GOTO_RETRY;
-				}
-				/* We want to assert that the left block has enough space for reserved bytes but
-				 * it is possible that it DOES NOT have enough space for reserved bytes if the pre-split
-				 * block was previously populated with a very low reserved bytes setting and if the current
-				 * reserved bytes setting is much higher than what the chosen split point would free up.
-				 * This is an issue waiting to be fixed by C9K01-003221. Until then the following assert
-				 * has to remain commented out.
-				 *
-				 * assert(bs1[0].len <= blk_reserved_size);
-				 */
-				/* prepare the existing block */
-				BLK_INIT(bs_ptr, bs1);
-				ins_chain_offset = no_pointers ? 0 : (int)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size);
-				left_hand_offset = left_hand_index
-						 = 0;
 				if (!new_rec)
 					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
 				BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
@@ -1543,9 +1660,11 @@ tn_restart:
 				}
 				if (buffaddr + cur_blk_size > (sm_uc_ptr_t)rp)
 				{
+					assert(!split_to_right);
 					BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-					GET_USHORT(next_rec_hdr->rsiz, &rp->rsiz);
-					next_rec_hdr->rsiz -= next_rec_shrink;
+					GET_USHORT(tmp_rsiz, &rp->rsiz);
+					tmp_rsiz -= next_rec_shrink;
+					next_rec_hdr->rsiz = tmp_rsiz;
 					SET_CMPC(next_rec_hdr, new_rec ? curr_rec_match : EVAL_CMPC(rp));
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 					next_rec_shrink += SIZEOF(rec_hdr);
@@ -1557,6 +1676,18 @@ tn_restart:
 						GOTO_RETRY;
 					}
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n);
+					if (prev_split_to_right)
+					{	/* Do block# adjustment like done above (search for "if (split_to_right)") */
+						assert(new_rec);	/* ensure "rp" & rec_size are still in sync */
+						ins_chain_offset += tmp_rsiz;
+						assert(value.len);	/* so "va" would be initialized by the
+									 * "BLK_ADDR(va, ...)" call above.
+									 */
+						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
+							/* or else we would have restarted above with "cdb_sc_mkblk" */
+						assert(SIZEOF(block_id) == value.len);
+						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
+					}
 				}
 				if (0 == BLK_FINI(bs_ptr, bs1))
 				{
@@ -1564,7 +1695,8 @@ tn_restart:
 					status = cdb_sc_mkblk;
 					GOTO_RETRY;
 				}
-				assert(bs1[0].len <= blk_reserved_size); /* Assert that right block has space for reserved bytes */
+				/* Assert that right block has space for reserved bytes */
+				assert(bs1[0].len <= blk_reserved_size);
 				assert(gv_altkey->top == gv_currkey->top);
 				assert(gv_altkey->end < gv_altkey->top);
 				if (temp_key != gv_altkey)
@@ -1583,6 +1715,7 @@ tn_restart:
 					GOTO_RETRY;
 			} else
 			{	/* Insert in left hand (new) block */
+				split_to_right = FALSE;
 				if (!level_0)
 				{	/* In case of an index block, as long as the current record is not a *-record
 					 * (i.e. last record in the block) and copying an extra record into the left
@@ -1595,10 +1728,8 @@ tn_restart:
 					copy_extra_record = ((BSTAR_REC_SIZE != rec_size)
 									&& ((new_blk_size_l + BSTAR_REC_SIZE) <= blk_fill_size));
 				} else
-				{
 					copy_extra_record = ((0 == prev_rec_offset) && (NEWREC_DIR_LEFT == last_split_dir)
 								&& new_rec && (SIZEOF(blk_hdr) < cur_blk_size));
-				}
 				BLK_INIT(bs_ptr, bs1);
 				if (no_pointers)
 					left_hand_offset = 0;
@@ -1684,6 +1815,15 @@ tn_restart:
 						BLK_ADDR(va, value.len, char);
 						memcpy(va, value.addr, value.len);
 						BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
+						/* Do "prev_split_to_right" processing for "copy_extra_record" case */
+						if (prev_split_to_right)
+						{	/* Do block# adjustment like done above (searchstr "if (split_to_right)") */
+							left_hand_offset += BSTAR_REC_SIZE;
+							assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
+								/* or else we would have restarted above with "cdb_sc_mkblk" */
+							assert(SIZEOF(block_id) == value.len);
+							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
+						}
 						new_blk_size_l += BSTAR_REC_SIZE;
 					} else
 						new_blk_size_l = curr_rec_offset + BSTAR_REC_SIZE;
@@ -1692,8 +1832,24 @@ tn_restart:
 					SET_CMPC(new_star_hdr, 0);
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 					if (!copy_extra_record)
-					{
-						BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
+					{	/* Do "prev_split_to_right" processing for "!copy_extra_record" case */
+						if (prev_split_to_right)
+						{	/* Do block# adjustment like done above (searchstr "if (split_to_right)").
+							 * The newly inserted record is going in the left block whereas the record
+							 * to its right is going into the right block after the split at this level.
+							 * Adjust accordingly.
+							 */
+							ins_chain_index = left_hand_index;
+							ins_chain_offset = SIZEOF(blk_hdr) + rec_size + rec_cmpc - SIZEOF(block_id);
+							left_hand_index = left_hand_offset = 0;
+							assert(SIZEOF(block_id) == value.len);
+							BLK_ADDR(va, value.len, char);
+							assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
+								/* or else we would have restarted above with "cdb_sc_mkblk" */
+							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
+							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
+						} else
+							BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
 				}
@@ -1779,6 +1935,13 @@ tn_restart:
 				 */
 			}
 			next_blk_index = t_create(blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index, bh_level);
+			/* If "split_to_right" is TRUE, the existing block is untouched so no need to worry about any tp
+			 * chains that could be split due to the block-split. So we can safely skip the below chain stuff.
+			 * But currently if "dollar_tlevel" is TRUE, then we are guaranteed "split_to_right" is FALSE so
+			 * we do not need a "&& !split_to_right" check below. We will need it though if/when "split_to_right"
+			 * functionality is enabled even for TP.
+			 */
+			assert(!dollar_tlevel || !split_to_right);
 			if (!no_pointers && dollar_tlevel)
 			{	/* there may be chains */
 				assert(new_rec);
@@ -1812,7 +1975,7 @@ tn_restart:
 					GET_LONGP(&curr_chain, curr);
 					assert(1 == curr_chain.flag);
 					/* Determine "last_possible_left_offset" and "extra_record_blkid_off" */
-					copy_extra_record = !new_rec_goes_to_right && copy_extra_record;
+					copy_extra_record = (!new_rec_goes_to_right && copy_extra_record);
 					if (copy_extra_record)
 					{
 						assert(!new_rec_goes_to_right);
@@ -2135,15 +2298,14 @@ tn_restart:
 			} else
 				last_split_blk_num[bh_level] = blk_num;
 			assert(temp_key == gv_altkey);
-			/* If new_rec_goes_to_right is TRUE, then it almost always implies that the left side of
-			 * the block is almost full (i.e. adding the new record there caused it to exceed the fill
-			 * factor) therefore direct all future updates to keys in between (which lie between the
-			 * last key of the left block and the first key of the right block) to the right block.
-			 *
+			/* If new_rec_goes_to_right is TRUE (of which "split_to_right"=TRUE is a subset), then it most likely
+			 * implies that the left side of the block is almost full (i.e. adding the new record there caused it
+			 * to exceed the fill factor) therefore direct all future updates to keys in between (which lie between
+			 * the last key of the left block and the first key of the right block) to the right block.
 			 * If not, direct those updates to the left block thereby preventing it from staying at a
 			 * low capacity for a long period of time.
 			 *
-			 * This direction of future updates is implemented by controlling what key gets passed for
+			 * The direction of future updates is implemented by controlling what key gets passed for
 			 * record addition into the parent index block. For directing all in-between updates to the
 			 * right block, pass in the last key of the left block to the parent index block. For directing
 			 * all in-between updates to the left block, back off 1 spot from the first key of the right
@@ -2277,17 +2439,23 @@ tn_restart:
 			{	/* Not root;  write blocks and continue */
 				if (cdb_sc_normal != (status = gvcst_search_blk(temp_key, bq)))
 					GOTO_RETRY;
-				/* It's necessary to disable the indexmod optimization for splits of index blocks. Refer to
-				 * GTM-7353, C9B11-001813 (GTM-3984), and C9H12-002934 (GTM-6104).
-				 */
-				cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
-							TRUE, FALSE, (level_0) ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN);
-				assert(!dollar_tlevel || !cse->high_tlevel);
-				if (cse)
-				{
-					assert(dollar_tlevel);
-					cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
+				if (!split_to_right)
+				{	/* It's necessary to disable the indexmod optimization for splits of index blocks.
+					 * Hence the GDS_WRITE_KILLTN use below. Refer to GTM-7353, C9B11-001813 (GTM-3984),
+					 * and C9H12-002934 (GTM-6104) for more details.
+					 */
+					cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
+								TRUE, FALSE, level_0 ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN);
+					assert(!dollar_tlevel || !cse->high_tlevel);
+					if (cse)
+					{
+						assert(dollar_tlevel);
+						cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
+					}
 				}
+				/* else left-side (i.e. current) block was untouched and new contents went into right block
+				 * so no need to invoke "t_write".
+				 */
 				value.len = SIZEOF(block_id);
 				value.addr = (char *)&zeroes4byte;
 				++bh;
@@ -2773,6 +2941,13 @@ retry:
 		jnl_format_done = !needfmtjnl;	/* need to reformat jnl records unconditionally in case of TP */
 		tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);	/* set update_trans and t_err for wrapped TP */
+		if (cdb_sc_gvtrootnonzero == status)
+		{	/* This is an implicit TP and gv_target->root became non-zero midway in previous try but was
+			 * reset to 0 before the "t_retry" call. Read it afresh during start of next try.
+			 * Setting "want_root_search" to TRUE achieves that.
+			 */
+			want_root_search = TRUE;
+		}
 	} else if (is_dollar_incr)
 		jnl_format_done = !needfmtjnl;	/* need to reformat jnl records for $INCR even in case of non-TP */
 	assert(dollar_tlevel || update_trans);

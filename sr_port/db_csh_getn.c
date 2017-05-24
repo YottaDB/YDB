@@ -46,11 +46,11 @@
 #include "memcoherency.h"
 #include "gtm_c_stack_trace.h"
 #include "anticipatory_freeze.h"
+#include "wcs_wt.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
-GBLREF uint4		image_count;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
@@ -73,10 +73,18 @@ GBLREF jnlpool_addrs	jnlpool;
 error_def(ERR_BUFRDTIMEOUT);
 error_def(ERR_INVALIDRIP);
 
+/* Note: does not check cr against bounds of cache, i.e. against [start_cr..midnite) */
+#define WITHIN_POOLLIMIT_BOUNDS(cr, our_midnite, start_cr, gbuff_limit, max_ent)	\
+	((((our_midnite - gbuff_limit < start_cr)					\
+			/* there is a wrap so must check if cr is in the tail */	\
+			&& (cr >= our_midnite - gbuff_limit + max_ent)))		\
+		|| ((cr < our_midnite) && (cr >= our_midnite - gbuff_limit)))
+
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
-	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr;
+	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr, poollimit_cr;
 	bt_rec_ptr_t		bt;
+	gd_region		*reg;
 	unsigned int		lcnt, ocnt;
 	int			max_ent, pass0, pass0cnt, pass1, pass2, pass3, rip;
 	int4			flsh_trigger;
@@ -85,8 +93,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
-	boolean_t		dont_flush_buff;
+	boolean_t		asyncio, dont_flush_buff;
 	intrpt_state_t		prev_intrpt_state;
+#	ifdef DEBUG
+	cache_rec_ptr_t		cr_old;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -94,7 +105,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	csd = csa->hdr;
 	assert(dba_mm != csd->acc_meth);
 	assert(csa->now_crit);
-	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
+	reg = gv_cur_region;
+	assert(csa == &FILE_INFO(reg)->s_addrs);
 	/* If this is an encrypted database, make sure our private cycle matches the shared cycle. Or else
 	 * if we need to call "wcs_wtstart" below, it cannot flush dirty buffers and will create a wc_blocked
 	 * situation (which is best avoided).
@@ -104,7 +116,9 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	hdr = csa->acc_meth.bg.cache_state->cache_array + (block % csd->bt_buckets);
 	start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
 	pass0 = csa->gbuff_limit;		/* gbuff_limit set by VIEW "POOLLIMIT":<region> */
-	pass0cnt = (0 == pass0) ? 0 : 2;	/* used both as a flag we are limiting and a counter for 2 limited trips */
+	pass0cnt = (0 == pass0) ? 0 : 3;	/* Used both as a flag we are limiting and a counter for 2 limited trips,
+						 * over 3 passes in total.
+						 */
 	pass1 = max_ent;			/* skip referred or dirty or read-into cache records */
 	pass2 = 2 * max_ent;			/* skip referred cache records */
 	pass3 = 3 * max_ent;			/* skip nothing */
@@ -113,16 +127,21 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	if (pass0cnt)
 	{
 		our_midnite = csa->our_midnite;		/* local copy of private "hand" for efficiency - only used if pass0cnt */
-		cr = our_midnite - pass0;		/* direct this process to an area behind our chosen spot */
-		if (cr < start_cr)
-			cr += max_ent;			/* we have to wrap before we use our_midnite */
-		else
+		assert(start_cr < our_midnite);
+		/* Try starting where we left off from the last invocation of db_csh_getn */
+		poollimit_cr = cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->our_lru_cache_rec_off);
+		assert(WITHIN_POOLLIMIT_BOUNDS(cr, our_midnite, start_cr, pass0, max_ent));
+		if (cr < our_midnite)
+		{	/* We can only set midnite = our_midnite if our interval is not wrapped, or if it is wrapped cr must be
+			 * before our_midnite (i.e. we wrapped previously). In either case, cr < our_midnite.
+			 */
 			midnite = our_midnite;
+		}
 	}
 	assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
-	dont_flush_buff = gv_cur_region->read_only
-		 UNIX_ONLY(|| (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN));
+	dont_flush_buff = reg->read_only || (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN);
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
+	asyncio = csd->asyncio;
 	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);
 	for (lcnt = 0;  ; lcnt++)
 	{
@@ -133,7 +152,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			break;
 		}
 		cr++;
-		if (cr == midnite)
+		if (cr >= midnite)	/* == should work but >= is slightly safer and no more expensive */
 		{
 			cr = start_cr;
 			if (pass0cnt)
@@ -143,26 +162,59 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					assert((start_cr + max_ent) == midnite);
 					midnite = our_midnite;
 				} else
-				{	/* the end of our restricted area */
-					if (--pass0cnt)
-					{	/* if limiting and in pass0, do a 2nd scan of the limit area */
+				{	/* Here we perform retries on the local pool:
+					 * pass0cnt == 3: We start from where we last left off, walk to our_midnite
+					 * pass0cnt == 2: We start from our_midnite - pass0, and walk to our_midnite
+					 * pass0cnt == 1: We start from our_midnite - pass0, and walk to where we
+					 *                last left off (where we started in pass0cnt == 3).
+					 * This way we end up doing two full passes over the entire local pool.
+					 */
+					pass0cnt--;
+					if (2 == pass0cnt)
+					{
 						cr = our_midnite - pass0;		/* in our restricted area */
 						if (cr < start_cr)
 						{	/* wrap before our_midnite */
 							cr += max_ent;
 							midnite = start_cr + max_ent;
 						}
+					} else if (1 == pass0cnt)
+					{
+						cr = our_midnite - pass0;
+						our_midnite = poollimit_cr + 1;
+						if (cr < start_cr)
+						{
+							cr += max_ent;
+							midnite = cr > poollimit_cr ? start_cr + max_ent : our_midnite;
+						} else
+							midnite = our_midnite;
+						assert(cr < midnite);
+						/* we must have already restarted the search from our_midnite - pass0
+						 * (in pass0cnt == 2)
+						 */
+						assert(lcnt == pass0);
 					} else
 					{	/* or the limited area did not suffice - adopt the normal clock */
 						cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
 						midnite = start_cr + max_ent;
 					}
-					assert((pass0cnt + lcnt) == pass0);
 					lcnt = 0;
 				}
 			}
 		}
 		assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
+		/* If ASYNCIO is enabled, once in a while check if there is anything in the wip queue ready to be freed.
+		 * A call to "wcs_wtfini" does just that. Note that "wcs_wtfini" can return FALSE in case of some queue
+		 * interlock issues. But in that case it would have set "cnl->wc_blocked" to TRUE and a cache recovery
+		 * will be issued by the next process that gets crit. We do not rely on the success of the "wcs_wtfini"
+		 * cleanup so proceed even in case of a FALSE return. Hence not checking the return value.
+		 */
+		if (asyncio && ((lcnt == pass1) || (lcnt == pass2)))
+		{
+			DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_db_csh_getn);	/* used by "wcs_wtfini" */
+			/* do not do heavyweight "is_proc_alive" check inside crit */
+			wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_FALSE, NULL);
+		}
 		if (cr->refer && (lcnt < pass2))
 		{	/* in passes 1 & 2, set refer to FALSE and skip; in the third pass attempt reuse even if TRUE == refer */
 			cr->refer = FALSE;
@@ -213,7 +265,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			{	/* About to reuse a buffer that is part of the read-set of the current TP transaction.
 				 * Reset clue as otherwise the next global reference of that global will use an outofdate clue.
 				 * Even though tp_srch_status is available after the sgm_info_ptr->blks_in_use hashtable check,
-				 * we dont want to reset the clue in case the cw_stagnate hashtable check causes the same cr
+				 * we don't want to reset the clue in case the cw_stagnate hashtable check causes the same cr
 				 * to be skipped from reuse. Hence the placement of this reset logic AFTER the cw_stagnate check.
 				 */
 				tp_srch_status->blk_target->clue.end = 0;
@@ -235,8 +287,24 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				continue;
 			if (lcnt < pass1)
 				continue;
+#			ifdef DEBUG
+			/* If this cr is a newer twin check that the older twin has a 0 value of "in_cw_set" (bg_update_phase2
+			 * should have ensured this). If this condition is not met, it is possible for
+			 * "wcs_get_space/wcs_wtstart_fini/wcs_wtstart/wcs_wtfini" to go into a livelock while trying to
+			 * flush the newer twin as that requires the older twin to be flushed and that cannot be cleaned
+			 * up (even if the async IO is complete) because of the non-zero "in_cw_set", particularly if
+			 * the non-zero value matches "process_id".
+			 */
+			if (cr->twin && cr->bt_index)
+			{
+				assert(TWINNING_ON(csd));
+				cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);	/* get old twin */
+				assert(!cr_old->bt_index);
+				assert(process_id != cr_old->in_cw_set);
+			}
+#			endif
 			BG_TRACE_PRO(db_csh_getn_flush_dirty);
-			if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
+			if (FALSE == wcs_get_space(reg, 0, cr))
 			{	/* failed to flush it out - force a rebuild */
 				BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
 				assert(csa->nl->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
@@ -249,9 +317,9 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		 * This resetting is done by "wcs_wtstart" which is out-of-crit. Therefore, we need to
 		 * 	wait for this value to be LATCH_CLEAR before reusing this cache-record.
 		 * Note that we are examining the write-latch-value without holding the interlock. It is ok to do
-		 * 	this because the only two routines that modify the latch value are "bg_update" and
-		 * 	"wcs_wtstart". The former cannot be concurrently executing because we are in crit.
-		 * 	The latter will not update the latch value unless this cache-record is dirty. But in this
+		 * 	this because the only two routines that modify the latch value are "bg_update_phase1", "wcs_wtfini"
+		 * 	and "wcs_wtstart". The first two cannot be concurrently executing because we are in crit.
+		 * 	The last one will not update the latch value unless this cache-record is dirty. But in this
 		 * 	case we would have most likely gone through the if (cr->dirty) check above. Most likely
 		 * 	because there is one rare possibility where a concurrent "wcs_wtstart" has set cr->dirty
 		 * 	to 0 but not yet cleared the latch. In that case we wait for the latch to be cleared.
@@ -295,19 +363,19 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				RELEASE_BUFF_READ_LOCK(cr);
 				/* The owner has been unable to complete the read - check for some things before going to sleep.
 				 * Since cr->r_epid can be changing concurrently, take a local copy before using it below,
-				 * particularly before calling is_proc_alive as we dont want to call it with a 0 r_epid.
+				 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 				 */
 				latest_r_epid = cr->r_epid;
 				if (cr->read_in_progress < -1)
 				{
 					BG_TRACE_PRO(db_csh_getn_out_of_design);  /* outside of design; clear to known state */
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(gv_cur_region));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
 					assert(cr->r_epid == 0);
 					cr->r_epid = 0;
 					INTERLOCK_INIT(cr);
 				} else  if (0 != latest_r_epid)
 				{
-					if (is_proc_alive(latest_r_epid, cr->image_count))
+					if (is_proc_alive(latest_r_epid, 0))
 					{
 #						ifdef DEBUG
 						if ((BUF_OWNER_STUCK / 2) == ocnt)
@@ -335,7 +403,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
 					RELEASE_BUFF_READ_LOCK(cr);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
-						 cr->blk, cr, first_r_epid, DB_LEN_STR(gv_cur_region));
+						 cr->blk, cr, first_r_epid, DB_LEN_STR(reg));
 					continue;
 				}
 				cr->r_epid = 0;
@@ -360,7 +428,6 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		assert(NULL == TREF(block_now_locked));
 		TREF(block_now_locked) = cr;
 		cr->r_epid = process_id;	/* establish ownership */
-		cr->image_count = image_count;
 		cr->blk = block;
 		/* We want cr->read_in_progress to be locked BEFORE cr->cycle is incremented. t_qread relies on this order.
 		 * Enforce this order with a write memory barrier. Not doing so might cause the incremented cr->cycle to be
@@ -376,7 +443,10 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		cr->jnl_addr = 0;
 		cr->refer = TRUE;
 		if (cr->bt_index != 0)
-		{
+		{	/* Link between "cr" and "bt" was established at the time this "cr" was dirtied first and continued
+			 * to stay even when cr->dirty became 0. But now that this "cr" is going to point to a different block
+			 * (i.e. cr->blk is no longer the same as bt->blk) remove the link.
+			 */
 			bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
 			bt->cache_index = CR_NOTVALID;
 			cr->bt_index = 0;
@@ -386,6 +456,13 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		assert(0 == cr->dirty);
 		if (!pass0cnt)
 			csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
+		if (pass0 && pass0cnt)
+		{	/* pass0cnt != 0 implies we found a cr within our POOLLIMIT bounds. Assert that and update
+			 * our_lru_cache_rec_off in this case. If we fell through to the general pool, then never mind.
+			 */
+			assert(WITHIN_POOLLIMIT_BOUNDS(cr, csa->our_midnite, start_cr, pass0, max_ent));
+			csa->our_lru_cache_rec_off = GDS_ABS2REL(cr);
+		}
 		if (lcnt > pass1)
 			csa->nl->cache_hits = 0;
 		csa->nl->cache_hits++;

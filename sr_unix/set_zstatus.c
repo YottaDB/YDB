@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,12 +49,12 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	b_line = 0;
+	b_line = NULL;
 	if (!need_rtsloc)
 	 	trans_frame = FALSE;
 	else
 	{	/* get the line address of the last "known" MUMPS code that was executed.  MUMPS
-		 * indirection consitutes MUMPS code that is "unknown" is the sense that there is no
+		 * indirection constitutes MUMPS code that is "unknown" is the sense that there is no
 		 * line address for it.
 		 */
 		trans_frame = !(SFT_DM & frame_pointer->type) && ((!(frame_pointer->type & SFT_COUNT

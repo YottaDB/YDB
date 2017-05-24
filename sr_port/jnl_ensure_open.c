@@ -26,26 +26,23 @@
 #include "gtcm_jnl_switched.h"
 
 GBLREF	boolean_t		is_src_server;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_JNLFILOPN);
 
 /* make sure that the journal file is available if appropriate */
-uint4   jnl_ensure_open(void)
+uint4   jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa)
 {
 	uint4			jnl_status;
 	jnl_private_control	*jpc;
-	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		first_open_of_jnl, need_to_open_jnl;
 	int			close_res;
 
-	csa = cs_addrs;
 	csd = csa->hdr;
 	assert(csa->now_crit);
 	jpc = csa->jnl;
+	assert(&FILE_INFO(jpc->region)->s_addrs == csa);
+	assert(&FILE_INFO(reg)->s_addrs == csa);
 	assert(NULL != jpc);
 	assert(JNL_ENABLED(csa->hdr));
 	/* The goal is to change the code below to do only one JNL_FILE_SWITCHED(jpc) check instead of the additional
@@ -69,14 +66,14 @@ uint4   jnl_ensure_open(void)
 		jpc->pini_addr = 0;
 		jpc->new_freeaddr = 0;
 		if (IS_GTCM_GNP_SERVER_IMAGE)
-			gtcm_jnl_switched(jpc->region); /* Reset pini_addr of all clients that had any older journal file open */
+			gtcm_jnl_switched(reg); /* Reset pini_addr of all clients that had any older journal file open */
 		first_open_of_jnl = (0 == csa->nl->jnl_file.u.inode);
-		jnl_status = jnl_file_open(gv_cur_region, first_open_of_jnl, NULL);
+		jnl_status = jnl_file_open(reg, first_open_of_jnl, NULL);
 	}
-	DEBUG_ONLY(
-		else
-			GTM_WHITE_BOX_TEST(WBTEST_JNL_FILE_OPEN_FAIL, jnl_status, ERR_JNLFILOPN);
-	)
+#	ifdef DEBUG
+	else
+		GTM_WHITE_BOX_TEST(WBTEST_JNL_FILE_OPEN_FAIL, jnl_status, ERR_JNLFILOPN);
+#	endif
 	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc) || (is_src_server && !JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa)));
 	return jnl_status;
 }

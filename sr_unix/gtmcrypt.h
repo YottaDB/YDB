@@ -111,6 +111,13 @@ error_def(ERR_CRYPTOPFAILED);
 	MECHANISM(VARLSTCNT(6) errid, 4, LEN, PTR, LEN_AND_STR(errptr));							\
 }
 
+#define CORE_ON_CRYPTOPFAILED													\
+MBSTART {															\
+	/* if we are not expecting nor forcing CRYPTOPFAILED get a core for analysis */						\
+	if (!WBTEST_ENABLED(WBTEST_EXPECT_CRYPTOPFAILED) && !ENCR_WBOX_ENABLED)							\
+		gtm_fork_n_core();												\
+} MBEND
+
 /* =====================================================================================================*/
 /* 					GT.M Related Macros						*/
 /* =====================================================================================================*/
@@ -249,7 +256,10 @@ error_def(ERR_CRYPTOPFAILED);
 			RC = 0;													\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 	} else															\
+	{															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
+		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
+	}															\
 }
 
 /* Ensure that the symmetric key corresponding to the specified hash exists and that a handle is created. */
@@ -284,7 +294,10 @@ error_def(ERR_CRYPTOPFAILED);
 			RC = 0;													\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 	} else															\
+	{															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
+		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
+	}															\
 }
 
 /* Safely remove the specified handle to a particular symmetric key. */
@@ -345,7 +358,10 @@ error_def(ERR_CRYPTOPFAILED);
 		}														\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 	} else															\
+	{															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
+		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
+	}															\
 }
 
 /* Encrypt data with either a null IV or set to the specified value prior to the operation. */
@@ -472,7 +488,10 @@ error_def(ERR_CRYPTOPFAILED);
 			RC = SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED);								\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 	} else															\
+	{															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
+		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
+	}															\
 }
 #else
 #  define GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(CSA, KEY_HANDLE, INBUF, INBUF_LEN, OUTBUF, OPERATION, IV_MODE, IV, RC)		\
@@ -488,10 +507,16 @@ error_def(ERR_CRYPTOPFAILED);
 				OPERATION, IV_MODE, IV))									\
 			RC = 0;													\
 		else														\
+		{														\
 			RC = SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED);								\
+			DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);									\
+		}														\
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 	} else															\
+	{															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
+		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
+	}															\
 }
 #endif
 

@@ -82,9 +82,15 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 	jnl_record		*jnlrec;
         unix_db_info		*udi;
 
-	status = gtm_pthread_init_key(rctl->gd);
+	reg = rctl->gd;
+	status = gtm_pthread_init_key(reg);
 	if (0 != status)
 		return status;
+	udi = FILE_INFO(rctl->gd);
+	if (udi->fd_opened_with_o_direct)
+	{	/* Check if rctl->dio_buff is allocated. If not allocate it now before invoking "mur_output_pblk" */
+		DIO_BUFF_EXPAND_IF_NEEDED(udi, rctl->csd->blk_size, &rctl->dio_buff);
+	}
 	apply_intrpt_pblk = (MUR_STATE_INTRPT_RECOVERY == murgbl.mur_state);
 	if (!apply_intrpt_pblk)
 	{
@@ -144,10 +150,13 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 			MUR_SAVE_RESYNC_STRM_SEQNO(rctl, rctl->csd);
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 			/* flush the changed csd to disk */
-			fc = rctl->gd->dyn.addr->file_cntl;
+			fc = reg->dyn.addr->file_cntl;
 			fc->op = FC_WRITE;
+			/* Note: csd points to shared memory and is already aligned
+			 * appropriately even if db was opened using O_DIRECT.
+			 */
 			fc->op_buff = (sm_uc_ptr_t)rctl->csd;
-			fc->op_len = ROUND_UP(SGMNT_HDR_LEN, DISK_BLOCK_SIZE);
+			fc->op_len = SGMNT_HDR_LEN;
 			fc->op_pos = 1;
 			dbfilop(fc);
 		}
@@ -302,9 +311,7 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 		if (SS_NORMAL != mur_fread_eof_crash(jctl, jctl->jfh->end_of_data, jctl->rec_offset))
 			return ERR_JNLBADRECFMT;
 	} /* end infinite for */
-	reg = rctl->gd;
 	assert(reg == rctl->csa->region);
-	udi = FILE_INFO(reg);
 	DB_FSYNC(reg, udi, rctl->csa, db_fsync_in_prog, save_errno);
 	if (0 != save_errno)
 	{
@@ -322,7 +329,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	jnl_ctl_list		*jctl;
 	file_control		*db_ctl;
 	struct_jrec_blk		pblkrec;
-	uchar_ptr_t		pblkcontents, pblk_jrec_start;
+	uchar_ptr_t		pblkcontents, tmpbuf, pblk_jrec_start;
 	int4			fullblockwrite_len, blks_in_lmap;
 	uint4			size, fbw_size;
 	sgmnt_addrs		*csa, *repl_csa;
@@ -333,6 +340,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	blk_hdr_ptr_t		bp;
 	gd_segment		*seg;
 	boolean_t		use_new_key;
+	unix_db_info		*udi;
 
 	/* In case of a LOSTTNONLY rollback, it is still possible to reach here if one region has NOBEFORE_IMAGE
 	 * while another has BEFORE_IMAGE. Any case do NOT apply PBLKs.
@@ -420,6 +428,18 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		assert(MUR_BUFF_SIZE > MAX_DB_BLK_SIZE);
 	} else
 		fbw_size = size;
+	udi = FC2UDI(db_ctl);
+	if (udi->fd_opened_with_o_direct)
+	{	/* Need to align buffer before the write due to O_DIRECT. Note: We cannot use the global variable
+		 * "dio_buff.aligned" here (like in many other places) as this function needs to be multi-thread safe.
+		 * So we use a region-specific (and in turn thread-specific memory location) "rctl->dio_buff" instead.
+		 */
+		fbw_size = ROUND_UP2(fbw_size, DIO_ALIGNSIZE(udi));
+		assert(DIO_BUFF_NO_OVERFLOW(rctl->dio_buff, fbw_size));
+		tmpbuf = (uchar_ptr_t)rctl->dio_buff.aligned;
+		memcpy(tmpbuf, pblkcontents, fbw_size);
+		pblkcontents = tmpbuf;
+	}
 	db_ctl->op_buff = pblkcontents;
 	db_ctl->op_len = fbw_size;
 	bp = (blk_hdr_ptr_t)pblkcontents;

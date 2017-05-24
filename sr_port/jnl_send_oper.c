@@ -67,18 +67,18 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 		SEND_CALLERID("jnl_send_oper()");
 		if (0 != status)
 		{
-			if (SS_NORMAL != jpc->status)
-			{
-				if (SS_NORMAL != jpc->status2)
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(14)
-						ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
-						status, 2, JNL_LEN_STR(csd), jpc->status, 0, jpc->status2);
-				} else
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(12)
-						ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
-						status, 2, JNL_LEN_STR(csd), jpc->status);
-			} else
+			if (NULL != jpc->err_str)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_JNLSENDOPER, 5, process_id, status, jpc->status,
+					jpc->status2, jb->iosb.cond, ERR_TEXT, 2, LEN_AND_STR(jpc->err_str));
+			else if (SS_NORMAL != jpc->status2)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(14)
+					ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
+					status, 2, JNL_LEN_STR(csd), jpc->status, 0, jpc->status2);
+			else if (SS_NORMAL != jpc->status)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(12)
+					ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
+					status, 2, JNL_LEN_STR(csd), jpc->status);
+			else
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_JNLSENDOPER, 5, process_id, status, jpc->status,
 					jpc->status2, jb->iosb.cond, status, 2, JNL_LEN_STR(csd));
 		}

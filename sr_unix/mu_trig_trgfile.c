@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,17 +23,17 @@
 
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
-GBLREF	boolean_t		is_replicator;
 GBLREF	int			tprestart_state;
+
+error_def(ERR_MUNOACTION);
 
 void mu_trig_trgfile(char *trigger_filename, int trigger_filename_len, boolean_t noprompt)
 {
 	IN_PARMS		*cli_lex_in_ptr_save = NULL;
 	boolean_t		trigger_error;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUNOACTION);
-
-	is_replicator = TRUE;
+	SETUP_THREADGBL_ACCESS;
 	/* Since ^#t global is the ONLY global that is touched by MUPIP TRIGGERS and we currently dont support triggers
 	 * on ^#t global, it is safe to set skip_dbtriggers to TRUE for this process. This is in fact needed so we
 	 * skip cdb_sc_triggermod processing in t_end and tp_tend as otherwise that could cause unnecessary restarts in

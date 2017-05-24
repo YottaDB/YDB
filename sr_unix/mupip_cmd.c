@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,14 +55,13 @@
 #include "mupip_endiancvt.h"
 #include "mupip_crypt.h"
 #include "mupip_hash.h"
+#include "mupip_dump_fhead.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "read_db_files_from_gld.h"	/* Needed for updproc.h */
 #include "updproc.h"
 #include "repl_instance.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 #include "mupip_rctldump.h"
 #include "mu_rndwn_rlnkctl.h"
 
@@ -116,8 +115,20 @@ static CLI_ENTRY mup_crypt_type_qual[] = {
 };
 
 static CLI_ENTRY mup_downgrade_dbver_qual[] = {
-	{ "V4",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
-	{ "V5",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "V4",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "V5",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "V63000A",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "" }
+};
+
+static	CLI_PARM mup_dumpfhead_parm[] = {
+	{ "WHAT", "File or Region: ", 	PARM_REQ},
+	{ "", "",           		PARM_REQ}
+};
+
+static CLI_ENTRY mup_dumpfhead_qual[] = {
+	{ "FILE",	mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
+	{ "REGION",	mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
 	{ "" }
 };
 
@@ -280,13 +291,16 @@ static	CLI_PARM	mup_freeze_parm[] = {
 };
 
 static	CLI_ENTRY	mup_freeze_qual[] = {
-	{ "DBG",      mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
-	{ "OFF",      mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "ON",       mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "OVERRIDE", mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "RECORD",   mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "AUTORELEASE",	mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED, 1, NEG, VAL_N_A, 0 },
+	{ "DBG",		mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	2, NON_NEG, VAL_N_A, 0 },
+	{ "OFF",		mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
+	{ "ON",			mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
+	{ "ONLINE",		mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	1, NEG, VAL_N_A, 0 },
+	{ "OVERRIDE",		mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
+	{ "RECORD",		mupip_freeze, 0, 0, 0, 0, 0,				VAL_DISALLOWED,	1, NON_NEG, VAL_N_A, 0 },
 	{ "" }
 };
+
 static	CLI_PARM	mup_ftok_parm[] = {
 	{ "FILE", "File: ", PARM_REQ},
 	{ "", "",           PARM_REQ}
@@ -324,6 +338,7 @@ static	CLI_ENTRY	mup_integ_qual[] = {
 	{ "ONLINE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
 	{ "PRESERVE",	 mupip_integ, 0, 0,		     0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0	   },
 	{ "REGION",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+	{ "STATS",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
 	{ "SUBSCRIPT",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 	{ "TN_RESET",    mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{ "TRANSACTION", mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
@@ -672,6 +687,7 @@ static readonly CLI_PARM mup_set_ftime_parm[] = {
 
 static	CLI_ENTRY	mup_set_qual[] = {
 { "ACCESS_METHOD",        mupip_set, 0, 0,                  mup_set_acc_qual,     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
+{ "ASYNCIO",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED,	1, NEG,     VAL_N_A,  0 },
 { "BYPASS",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "DBFILENAME",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "DEFER_ALLOCATE",       mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
@@ -687,6 +703,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "JNLFILE",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "JOURNAL",              mupip_set, 0, 0,                  mup_set_journal_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0 },
 { "KEY_SIZE",             mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ "LCK_SHARES_DB_CRIT",   mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "LOCK_SPACE",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "MUTEX_SLOTS",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
@@ -700,6 +717,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "SLEEP_SPIN_COUNT",     mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "SPIN_SLEEP_LIMIT",     mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "STANDALONENOT",        mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
+{ "STATS",                mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "VERSION",              mupip_set, 0, 0,                  mup_set_dbver_qual,   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
 { "WAIT_DISK",            mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "" }
@@ -760,36 +778,37 @@ static	CLI_PARM	mup_rctldump_parm[] = {
 };
 
 GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
-{ "BACKUP",	mupip_backup,	mup_backup_qual,	mup_backup_parm,	0, cli_disallow_mupip_backup,	0, VAL_DISALLOWED, 2, 0, 0, 0 },
-{ "CONVERT",	mupip_cvtpgm,	mup_convert_qual,	mup_convert_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },
-{ "CREATE",	mupip_create,	mup_create_qual,	0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
-{ "CRYPT",	mupip_crypt,	mup_crypt_qual,		0,			0, cli_disallow_mupip_crypt,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "DOWNGRADE",	mupip_downgrade,mup_downgrade_qual,	mup_downgrade_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "ENDIANCVT",	mupip_endiancvt,mup_endian_qual,	mup_endian_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "EXIT",	mupip_quit,	0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
-{ "EXTEND",	mupip_extend,	mup_extend_qual,	mup_extend_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "EXTRACT",	mu_extract,	mup_extract_qual,	mup_extract_parm,	0, cli_disallow_mupip_extract,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "FREEZE",	mupip_freeze,	mup_freeze_qual,	mup_freeze_parm,	0, cli_disallow_mupip_freeze,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "FTOK",	mupip_ftok,	mup_ftok_qual,		mup_ftok_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "HASH",	mupip_hash,	0,			0,			0, 0,				0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
-{ "HELP",	util_help,	0,			0,			0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "INTEG",	mupip_integ,	mup_integ_qual,		mup_integ_parm,		0, cli_disallow_mupip_integ,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "INTRPT",	mupip_intrpt,	0,			mup_intrpt_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "JOURNAL",	mupip_recover,	mup_journal_qual,	mup_journal_parm,	0, cli_disallow_mupip_journal,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "LOAD",	mupip_cvtgbl,	mup_load_qual,		mup_load_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "QUIT",	mupip_quit,	0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
-{ "RCTLDUMP",	mupip_rctldump, 0,                      mup_rctldump_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "REORG",	mupip_reorg,	mup_reorg_qual,		mup_reorg_parm,		0, cli_disallow_mupip_reorg,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "REPLICATE",	0,		mup_replicate_qual,	mup_replicate_parm,	0, cli_disallow_mupip_replicate,0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "RESTORE",	mupip_restore,	mup_restore_qual,	mup_restore_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },
-{ "RUNDOWN",	mupip_rundown,	mup_rundown_qual,	mup_rundown_parm,	0, cli_disallow_mupip_rundown,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "SET",	mupip_set,	mup_set_qual,		mup_set_parm,		0, cli_disallow_mupip_set,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "SIZE",	mupip_size,	mup_size_qual,		0,			0, cli_disallow_mupip_size,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "STOP",	mupip_stop,	0,			mup_stop_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "BACKUP",	mupip_backup,		mup_backup_qual,	mup_backup_parm,	0, cli_disallow_mupip_backup,	0, VAL_DISALLOWED, 2, 0, 0, 0 },
+{ "CONVERT",	mupip_cvtpgm,		mup_convert_qual,	mup_convert_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },
+{ "CREATE",	mupip_create,		mup_create_qual,	0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "CRYPT",	mupip_crypt,		mup_crypt_qual,		0,			0, cli_disallow_mupip_crypt,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "DOWNGRADE",	mupip_downgrade,	mup_downgrade_qual,	mup_downgrade_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "DUMPFHEAD",	mupip_dump_fhead,	mup_dumpfhead_qual,	mup_dumpfhead_parm,	0, cli_disallow_mupip_dumpfhead,0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "ENDIANCVT",	mupip_endiancvt,	mup_endian_qual,	mup_endian_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "EXIT",	mupip_quit,		0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "EXTEND",	mupip_extend,		mup_extend_qual,	mup_extend_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "EXTRACT",	mu_extract,		mup_extract_qual,	mup_extract_parm,	0, cli_disallow_mupip_extract,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "FREEZE",	mupip_freeze,		mup_freeze_qual,	mup_freeze_parm,	0, cli_disallow_mupip_freeze,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "FTOK",	mupip_ftok,		mup_ftok_qual,		mup_ftok_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "HASH",	mupip_hash,		0,			0,			0, 0,				0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
+{ "HELP",	util_help,		0,			0,			0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "INTEG",	mupip_integ,		mup_integ_qual,		mup_integ_parm,		0, cli_disallow_mupip_integ,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "INTRPT",	mupip_intrpt,		0,			mup_intrpt_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "JOURNAL",	mupip_recover,		mup_journal_qual,	mup_journal_parm,	0, cli_disallow_mupip_journal,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "LOAD",	mupip_cvtgbl,		mup_load_qual,		mup_load_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "QUIT",	mupip_quit,		0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "RCTLDUMP",	mupip_rctldump, 	0,                      mup_rctldump_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "REORG",	mupip_reorg,		mup_reorg_qual,		mup_reorg_parm,		0, cli_disallow_mupip_reorg,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "REPLICATE",	0,			mup_replicate_qual,	mup_replicate_parm,	0, cli_disallow_mupip_replicate,0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "RESTORE",	mupip_restore,		mup_restore_qual,	mup_restore_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },
+{ "RUNDOWN",	mupip_rundown,		mup_rundown_qual,	mup_rundown_parm,	0, cli_disallow_mupip_rundown,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "SET",	mupip_set,		mup_set_qual,		mup_set_parm,		0, cli_disallow_mupip_set,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "SIZE",	mupip_size,		mup_size_qual,		0,			0, cli_disallow_mupip_size,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "STOP",	mupip_stop,		0,			mup_stop_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 #ifdef GTM_TRIGGER
-{ "TRIGGER",	mupip_trigger,	mup_trigger_qual,	mup_trig_parm,		0, cli_disallow_mupip_trigger,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "TRIGGER",	mupip_trigger,		mup_trigger_qual,	mup_trig_parm,		0, cli_disallow_mupip_trigger,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 #endif
-{ "UPGRADE",	mupip_upgrade, 0,			mup_upgrade_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "UPGRADE",	mupip_upgrade, 		0,			mup_upgrade_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "" }
 };
 

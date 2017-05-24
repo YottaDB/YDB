@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,20 +31,15 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdskill.h"
-#ifdef VMS
-#include <rms.h>		/* needed for muextr.h */
-#endif
 #include "muextr.h"
 #include "iosp.h"
 #include "cli.h"
 #include "mu_reorg.h"
 #include "util.h"
-#ifdef GTM_TRUNCATE
 #include "mu_truncate.h"
 #include "op.h"
 #include "tp_change_reg.h"
 #include "is_proc_alive.h"
-#endif
 #include "filestruct.h"
 #include "error.h"
 #include "gdscc.h"
@@ -84,30 +79,29 @@ error_def(ERR_NOEXCLUDE);
 error_def(ERR_REORGCTRLY);
 error_def(ERR_REORGINC);
 
-GBLREF bool		mu_ctrlc_occurred;
-GBLREF bool		mu_ctrly_occurred;
-GBLREF boolean_t	mu_reorg_process;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key           *gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
-GBLREF int		gv_keysize;
-GBLREF gv_namehead	*reorg_gv_target;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF uint4		process_id;
-GBLREF tp_region	*grlist;
-GBLREF bool		error_mupip;
-GBLREF inctn_opcode_t	inctn_opcode;
-#ifdef UNIX
-GBLREF	boolean_t	jnlpool_init_needed;
-#endif
+GBLREF	bool			error_mupip;
+GBLREF	bool			mu_ctrlc_occurred;
+GBLREF	bool			mu_ctrly_occurred;
+GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
+GBLREF	gv_namehead		*reorg_gv_target;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	int			gv_keysize;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	tp_region		*grlist;
+GBLREF	uint4			process_id;
 
 static readonly mval literal_poollimit =
 	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("POOLLIMIT") - 1), "POOLLIMIT", 0, 0);
+
 void mupip_reorg(void)
 {
 	boolean_t		resume, reorg_success = TRUE;
 	int			data_fill_factor, index_fill_factor;
-	int			reorg_op, reg_max_rec, reg_max_key, reg_max_blk;
+	int			reorg_op, reg_max_rec, reg_max_key, reg_max_blk, status;
 	char			cli_buff[MAX_LINE], *ptr;
 	glist			gl_head, exclude_gl_head, *gl_ptr, hasht_gl;
 	uint4			cli_status;
@@ -115,7 +109,6 @@ void mupip_reorg(void)
 	unsigned short		n_len;
 	boolean_t		truncate, cur_success, restrict_reg, arg_present;
 	int			root_swap_statistic;
-#	ifdef GTM_TRUNCATE
 	int4			truncate_percent;
 	boolean_t		gotlock;
 	sgmnt_data_ptr_t	csd;
@@ -124,19 +117,15 @@ void mupip_reorg(void)
 	trunc_region		*reg_list, *tmp_reg, *reg_iter, *prev_reg;
 	uint4			fs;
 	uint4			lcl_pid;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	UNIX_ONLY(jnlpool_init_needed = TRUE);
+	jnlpool_init_needed = TRUE;
 	mu_outofband_setup();
 	truncate = FALSE;
-	GTM_TRUNCATE_ONLY(
-		reg_list = NULL;
-		if (CLI_PRESENT == cli_present("TRUNCATE"))
-			truncate = TRUE;
-	)
-
+	reg_list = NULL;
+	if (CLI_PRESENT == cli_present("TRUNCATE"))
+		truncate = TRUE;
 	if ((CLI_PRESENT == cli_present("UPGRADE")) || (CLI_PRESENT == cli_present("DOWNGRADE")))
 	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -UPGRADE/DOWNGRADE.
 		 * This is intentional because we are not doing any REORG kind of processing.
@@ -159,7 +148,7 @@ void mupip_reorg(void)
 		error_mupip = FALSE;
 		restrict_reg = TRUE;
 		gvinit();	/* initialize gd_header (needed by the following call to mu_getlst) */
-		mu_getlst("REG_NAME", SIZEOF(tp_region));	/* get the parameter corresponding to REGION qualifier */
+		mu_getlst("REG_NAME", SIZEOF(tp_region)); /* get parm for REGION qualifier */
 		if (error_mupip)
 		{
 			util_out_print("!/MUPIP REORG cannot proceed with above errors!/", FLUSH);
@@ -203,8 +192,7 @@ void mupip_reorg(void)
 			data_fill_factor = MAX_FILLFACTOR;
 		else if (MIN_FILLFACTOR > data_fill_factor)
 			data_fill_factor = MIN_FILLFACTOR;
-	}
-	else
+	} else
 		data_fill_factor = MAX_FILLFACTOR;
 	if ((cli_status = cli_present("INDEX_FILL_FACTOR")) == CLI_PRESENT)
 	{
@@ -215,8 +203,7 @@ void mupip_reorg(void)
 			index_fill_factor = MIN_FILLFACTOR;
 		else if (MAX_FILLFACTOR < index_fill_factor)
 			index_fill_factor = MAX_FILLFACTOR;
-	}
-	else
+	} else
 		index_fill_factor = data_fill_factor;
 	util_out_print("Fill Factor:: Index blocks !UL%: Data blocks !UL%", FLUSH, index_fill_factor, data_fill_factor);
 
@@ -239,8 +226,7 @@ void mupip_reorg(void)
 	{
 		n_len = 1;
                 cli_buff[0] = '*';
-	}
-	else if (FALSE == CLI_GET_STR_ALL("SELECT", cli_buff, &n_len))
+	} else if (FALSE == CLI_GET_STR_ALL("SELECT", cli_buff, &n_len))
 	{
 		n_len = 1;
                 cli_buff[0] = '*';
@@ -295,7 +281,6 @@ void mupip_reorg(void)
 		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op);
 		reorg_success &= cur_success;
 		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
-#		ifdef GTM_TRUNCATE
 		if (truncate)
 		{	/* No need to move root blocks unless truncating */
 			assert(gv_cur_region == gl_ptr->reg);	/* should have been set inside "mu_reorg" call done above */
@@ -341,22 +326,20 @@ void mupip_reorg(void)
 				}
 			}
 		}
-#		endif
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 			mupip_exit(ERR_MUNOFINISH);
 		}
 	}
+	status = SS_NORMAL;
 	if (!reorg_success)
 	{
 		inctn_opcode = inctn_invalid_op;	/* needed by assert inside "preemptive_db_clnup" called by rts_error */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGINC);
-		mupip_exit(ERR_REORGINC);
-	}
-	else if (truncate)
+		status = ERR_REORGINC;
+	} else if (truncate)
 	{
-#		ifdef GTM_TRUNCATE
 		/* Move GVT ROOT blocks of all global names AFTER doing regular reorg on ALL global names.
 		 * This way we ensure one pass of reorg -truncate is enough to produce an optimally truncated file.
 		 */
@@ -421,8 +404,6 @@ void mupip_reorg(void)
 				mupip_exit(ERR_MUNOFINISH);
 			}
 		}
-#		endif
-		mupip_exit(SS_NORMAL);
-	} else
-		mupip_exit(SS_NORMAL);
+	}
+	mupip_exit(status);
 }

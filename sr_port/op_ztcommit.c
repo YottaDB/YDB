@@ -135,7 +135,7 @@ void    op_ztcommit(int4 n)
 			 * (if it decides to switch to a new journal file)
 			 */
 			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(gv_cur_region, csa);
 			if (jnl_status)
 			{
 				if (SS_NORMAL != jpc->status)

@@ -17,6 +17,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
+#include "have_crit.h"
 
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	spdesc 		stringpool;
@@ -55,10 +56,16 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	UErrorCode	status;
 	char		*dstbase;
 	UChar		src_ustr[MAX_ZCONVBUFF], dst_ustr[MAX_ZCONVBUFF], *src_ustr_ptr, *dst_ustr_ptr;
+	intrpt_state_t  prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 
 	MV_FORCE_STR(kase);
 	if (-1 == (index = verify_case(&kase->str)))
+	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCASECODE, 2, kase->str.len, kase->str.addr);
+	}
 
 	MV_FORCE_STR(src);
 	/* allocate stringpool */
@@ -91,6 +98,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);	/* to report BADCHAR error */
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
 						1, status); /* ICU said bad, we say good or don't recognize error*/
 		}
@@ -106,6 +114,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		} else if ( U_FILE_ACCESS_ERROR == status )
 		{
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
 					1, status);
 		}
@@ -118,6 +127,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		if (MAX_STRLEN < dstlen)
 		{
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 		ENSURE_STP_FREE_SPACE(dstlen);
@@ -128,6 +138,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		{
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
 					1, status); /* ICU said bad, but same call above just returned OK */
 		}
@@ -136,6 +147,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	}
 	MV_INIT_STRING(dst, dstlen, dstbase);
 	stringpool.free += dstlen;
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 }
 
 void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)

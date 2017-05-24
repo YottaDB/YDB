@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,11 +43,27 @@
 #include "wcs_phase2_commit_wait.h"
 
 #define WCR_SIZE_PER_BUF 	0
-#define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
+
+#define PUTMSG_WARN_CSA(MSGPARMS)			\
+MBSTART {						\
+	if (IS_MUPIP_IMAGE)				\
+		gtm_putmsg_csa MSGPARMS;		\
+	else						\
+		send_msg_csa MSGPARMS;			\
+} MBEND
+
+#define PUTMSG_ERROR_CSA(MSGPARMS)			\
+MBSTART {						\
+	if (IS_MUPIP_IMAGE)				\
+		gtm_putmsg_csa MSGPARMS;		\
+	else						\
+		rts_error_csa MSGPARMS;			\
+} MBEND
 
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF 	sgmnt_addrs		*cs_addrs;
+GBLREF	void			(*mupip_exit_fp)(int4 errnum);
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_COLLTYPVERSION);
@@ -67,207 +83,209 @@ void mucregini(int4 blk_init_size)
 	uint4			ustatus, reg_autoswitch;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
 	time_t			ctime;
+	gd_region		*baseDBreg;
+	gd_segment		*seg;
+	sgmnt_data_ptr_t	csd;
 
-	MEMCPY_LIT(cs_data->label, GDS_LABEL);
-	cs_data->desired_db_format = GDSVCURR;
-	cs_data->fully_upgraded = TRUE;
-	cs_data->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
-	cs_data->minor_dbver = GDSMVCURR;
-	cs_data->certified_for_upgrade_to = GDSVCURR;
-	cs_data->creation_db_ver = GDSVCURR;
-	cs_data->creation_mdb_ver = GDSMVCURR;
-	cs_data->master_map_len = MASTER_MAP_SIZE_DFLT;
-	cs_data->bplmap = BLKS_PER_LMAP;
-	assert(BLK_SIZE <= MAX_DB_BLK_SIZE);
-	cs_data->blk_size = BLK_SIZE;
-	i = cs_data->trans_hist.total_blks;
-	cs_data->trans_hist.free_blocks = i - DIVIDE_ROUND_UP(i, BLKS_PER_LMAP) - 2;
-	cs_data->max_rec_size = gv_cur_region->max_rec_size;
-	cs_data->max_key_size = gv_cur_region->max_key_size;
-	cs_data->null_subs = gv_cur_region->null_subs;
-	cs_data->std_null_coll = gv_cur_region->std_null_coll;
-#ifdef UNIX
-	cs_data->freeze_on_fail = gv_cur_region->freeze_on_fail;
-	cs_data->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
-	cs_data->epoch_taper = gv_cur_region->epoch_taper;
-	cs_data->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
-	cs_data->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
-#endif
-	cs_data->reserved_bytes = gv_cur_region->dyn.addr->reserved_bytes;
-	cs_data->clustered = FALSE;
-	cs_data->file_corrupt = 0;
-	if (gv_cur_region->dyn.addr->lock_space)
-		cs_data->lock_space_size = gv_cur_region->dyn.addr->lock_space * OS_PAGELET_SIZE;
+	csd = cs_data;
+	MEMCPY_LIT(csd->label, GDS_LABEL);
+	csd->desired_db_format = GDSVCURR;
+	csd->fully_upgraded = TRUE;
+	csd->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
+	csd->minor_dbver = GDSMVCURR;
+	csd->certified_for_upgrade_to = GDSVCURR;
+	csd->creation_db_ver = GDSVCURR;
+	csd->creation_mdb_ver = GDSMVCURR;
+	csd->master_map_len = MASTER_MAP_SIZE_DFLT;
+	csd->bplmap = BLKS_PER_LMAP;
+	seg = gv_cur_region->dyn.addr;
+	assert(seg->blk_size <= MAX_DB_BLK_SIZE);
+	csd->blk_size = seg->blk_size;
+	i = csd->trans_hist.total_blks;
+	csd->trans_hist.free_blocks = i - DIVIDE_ROUND_UP(i, BLKS_PER_LMAP) - 2;
+	csd->max_rec_size = gv_cur_region->max_rec_size;
+	csd->max_key_size = gv_cur_region->max_key_size;
+	csd->null_subs = gv_cur_region->null_subs;
+	csd->std_null_coll = gv_cur_region->std_null_coll;
+	csd->freeze_on_fail = gv_cur_region->freeze_on_fail;
+	csd->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
+	csd->epoch_taper = gv_cur_region->epoch_taper;
+	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
+	csd->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
+	csd->asyncio = IS_AIO_ON_SEG(seg);
+	csd->reserved_bytes = seg->reserved_bytes;
+	csd->clustered = FALSE;
+	csd->lock_crit_with_db = gv_cur_region->lock_crit_with_db;
+	csd->file_corrupt = 0;
+	if (seg->lock_space)
+		csd->lock_space_size = seg->lock_space * OS_PAGELET_SIZE;
 	else
-		cs_data->lock_space_size = DEF_LOCK_SIZE;
-	cs_data->staleness[0] = -300000000;	/* staleness timer = 30 seconds */
-	cs_data->staleness[1] = -1;
-	cs_data->ccp_quantum_interval[0] = -20000000;	/* 2 sec */
-	cs_data->ccp_quantum_interval[1] = -1;
-	cs_data->ccp_response_interval[0] = -600000000;	/* 1 min */
-	cs_data->ccp_response_interval[1] = -1;
-	cs_data->ccp_tick_interval[0] = -1000000;	/* 1/10 sec */
-	cs_data->ccp_tick_interval[1] = -1;
-	cs_data->last_com_backup = 1;
-	cs_data->last_inc_backup = 1;
-	cs_data->last_rec_backup = 1;
-	cs_data->defer_time = gv_cur_region->dyn.addr->defer_time;
-	cs_data->jnl_alq = gv_cur_region->jnl_alq;
-	if (cs_data->jnl_state && !cs_data->jnl_alq)
-		cs_data->jnl_alq = JNL_ALLOC_DEF;
-	cs_data->jnl_deq = gv_cur_region->jnl_deq;
-	cs_data->jnl_before_image = gv_cur_region->jnl_before_image;
-	cs_data->jnl_state = gv_cur_region->jnl_state;
-	cs_data->epoch_interval = JNL_ALLOWED(cs_data) ? DEFAULT_EPOCH_INTERVAL : 0;
-	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
-	ROUND_UP_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, gv_cur_region->jnl_buffer_size, cs_data);
-#ifdef UNIX
-	if (JNL_ALLOWED(cs_data))
+		csd->lock_space_size = DEF_LOCK_SIZE;
+	csd->staleness[0] = -300000000;	/* staleness timer = 30 seconds */
+	csd->staleness[1] = -1;
+	csd->ccp_quantum_interval[0] = -20000000;	/* 2 sec */
+	csd->ccp_quantum_interval[1] = -1;
+	csd->ccp_response_interval[0] = -600000000;	/* 1 min */
+	csd->ccp_response_interval[1] = -1;
+	csd->ccp_tick_interval[0] = -1000000;	/* 1/10 sec */
+	csd->ccp_tick_interval[1] = -1;
+	csd->last_com_backup = 1;
+	csd->last_inc_backup = 1;
+	csd->last_rec_backup = 1;
+	csd->defer_time = seg->defer_time;
+	csd->jnl_alq = gv_cur_region->jnl_alq;
+	if (csd->jnl_state && !csd->jnl_alq)
+		csd->jnl_alq = JNL_ALLOC_DEF;
+	csd->jnl_deq = gv_cur_region->jnl_deq;
+	csd->jnl_before_image = gv_cur_region->jnl_before_image;
+	csd->jnl_state = gv_cur_region->jnl_state;
+	csd->epoch_interval = JNL_ALLOWED(csd) ? DEFAULT_EPOCH_INTERVAL : 0;
+	csd->alignsize = JNL_ALLOWED(csd) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
+	ROUND_UP_JNL_BUFF_SIZE(csd->jnl_buffer_size, gv_cur_region->jnl_buffer_size, csd);
+	if (JNL_ALLOWED(csd))
 	{
 		reg_autoswitch = gv_cur_region->jnl_autoswitchlimit;
-		if (cs_data->jnl_alq + cs_data->jnl_deq > reg_autoswitch)
+		if (csd->jnl_alq + csd->jnl_deq > reg_autoswitch)
 		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, cs_data->jnl_alq,
-					gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
-			cs_data->autoswitchlimit = reg_autoswitch;
-			cs_data->jnl_alq = cs_data->autoswitchlimit;
+			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+					 gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region)));
+			csd->autoswitchlimit = reg_autoswitch;
+			csd->jnl_alq = csd->autoswitchlimit;
 		} else
 		{
-			cs_data->autoswitchlimit = ALIGNED_ROUND_DOWN(reg_autoswitch, cs_data->jnl_alq, cs_data->jnl_deq);
+			csd->autoswitchlimit = ALIGNED_ROUND_DOWN(reg_autoswitch, csd->jnl_alq, csd->jnl_deq);
 			/* If rounding down took us to less than the minimum autoswitch, then bump allocation to be
 			 * equal to the pre-round-down autoswitchlimit this way all values are above their respective
 			 * minimums. Note that the extension can be an arbitrary value because alloc == autoswitch.
 			 */
-			if (JNL_AUTOSWITCHLIMIT_MIN > cs_data->autoswitchlimit)
+			if (JNL_AUTOSWITCHLIMIT_MIN > csd->autoswitchlimit)
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, cs_data->jnl_alq,
-						reg_autoswitch, "database file", DB_LEN_STR(gv_cur_region));
-				cs_data->jnl_alq = reg_autoswitch;
-				cs_data->autoswitchlimit = reg_autoswitch;
+				PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+						 reg_autoswitch, "database file", DB_LEN_STR(gv_cur_region)));
+				csd->jnl_alq = reg_autoswitch;
+				csd->autoswitchlimit = reg_autoswitch;
 			}
 		}
 	} else
-		cs_data->autoswitchlimit = 0;
+		csd->autoswitchlimit = 0;
 	assert(!(MAX_IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
-	if (cs_data->jnl_alq + cs_data->jnl_deq > cs_data->autoswitchlimit)
-		cs_data->jnl_alq = cs_data->autoswitchlimit;
-#else
-	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
-#endif
-	if (!cs_data->jnl_buffer_size)
-		ROUND_UP_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, JNL_BUFFER_DEF, cs_data);
-	if (JNL_ALLOWED(cs_data))
-		if (cs_data->jnl_buffer_size < JNL_BUFF_PORT_MIN(cs_data))
+	if (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit)
+		csd->jnl_alq = csd->autoswitchlimit;
+	if (!csd->jnl_buffer_size)
+		ROUND_UP_JNL_BUFF_SIZE(csd->jnl_buffer_size, JNL_BUFFER_DEF, csd);
+	if (JNL_ALLOWED(csd))
+		if (csd->jnl_buffer_size < JNL_BUFF_PORT_MIN(csd))
 		{
-			ROUND_UP_MIN_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, cs_data);
-		} else if (cs_data->jnl_buffer_size > JNL_BUFFER_MAX)
+			ROUND_UP_MIN_JNL_BUFF_SIZE(csd->jnl_buffer_size, csd);
+		} else if (csd->jnl_buffer_size > JNL_BUFFER_MAX)
 		{
-			ROUND_DOWN_MAX_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, cs_data);
+			ROUND_DOWN_MAX_JNL_BUFF_SIZE(csd->jnl_buffer_size, csd);
 		}
-	cs_data->def_coll = gv_cur_region->def_coll;
-	if (cs_data->def_coll)
+	csd->def_coll = gv_cur_region->def_coll;
+	if (csd->def_coll)
 	{
-		if (csp = ready_collseq((int)(cs_data->def_coll)))
+		if (csp = ready_collseq((int)(csd->def_coll)))
 		{
-			cs_data->def_coll_ver = (csp->version)(cs_data->def_coll);
-			if (!do_verify(csp, cs_data->def_coll, cs_data->def_coll_ver))
+			csd->def_coll_ver = (csp->version)(csd->def_coll);
+			if (!do_verify(csp, csd->def_coll, csd->def_coll_ver))
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs)
-					VARLSTCNT(4) ERR_COLLTYPVERSION, 2, cs_data->def_coll, cs_data->def_coll_ver);
-				mupip_exit(ERR_MUNOACTION);
+				PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs)
+						  VARLSTCNT(4) ERR_COLLTYPVERSION, 2, csd->def_coll, csd->def_coll_ver));
+				assert(IS_MUPIP_IMAGE);
+				(*mupip_exit_fp)(ERR_MUNOACTION);
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, cs_data->def_coll);
-			mupip_exit(ERR_MUNOACTION);
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, csd->def_coll));
+			assert(IS_MUPIP_IMAGE);
+			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
 	}
-	/* mupip_set_journal() relies on cs_data->jnl_file_len being 0 if cs_data->jnl_state is jnl_notallowed.
+	/* mupip_set_journal() relies on csd->jnl_file_len being 0 if csd->jnl_state is jnl_notallowed.
 	 * Note that even though gv_cur_region->jnl_state is jnl_notallowed, gv_cur_region->jnl_file_len can be non-zero
 	 */
-	cs_data->jnl_file_len = JNL_ALLOWED(cs_data) ? gv_cur_region->jnl_file_len : 0;
-	cs_data->reg_seqno = 1;
-	VMS_ONLY(
-		cs_data->resync_seqno = 1;
-		cs_data->old_resync_seqno = 1;
-		cs_data->resync_tn = 1;
-	)
-	UNIX_ONLY(
-		/* zqgblmod_seqno is initialized to 0 at db creation time (to ensure that $ZQGBLMOD will unconditionally return
-		 * the safe value of TRUE by default). This default value of 0 is also relied upon by the source server logic
-		 * when updating this as part of a fetchresync rollback. Initialize zqgblmod_tn to 0 to correspond to the seqno.
-		 */
-		cs_data->zqgblmod_seqno = 0;
-		cs_data->zqgblmod_tn = 0;
-		assert(!cs_data->multi_site_open);
-		cs_data->multi_site_open = TRUE;
-	)
-	cs_data->repl_state = repl_closed;              /* default */
-	if (cs_data->jnl_file_len)
+	csd->jnl_file_len = JNL_ALLOWED(csd) ? gv_cur_region->jnl_file_len : 0;
+	csd->reg_seqno = 1;
+	/* zqgblmod_seqno is initialized to 0 at db creation time (to ensure that $ZQGBLMOD will unconditionally return
+	 * the safe value of TRUE by default). This default value of 0 is also relied upon by the source server logic
+	 * when updating this as part of a fetchresync rollback. Initialize zqgblmod_tn to 0 to correspond to the seqno.
+	 */
+	csd->zqgblmod_seqno = 0;
+	csd->zqgblmod_tn = 0;
+	assert(!csd->multi_site_open);
+	csd->multi_site_open = TRUE;
+	csd->repl_state = repl_closed;              /* default */
+	if (csd->jnl_file_len)
 	{
-		tmpjnlfile.addr = (char *)cs_data->jnl_file_name;
-		tmpjnlfile.len = SIZEOF(cs_data->jnl_file_name);
+		tmpjnlfile.addr = (char *)csd->jnl_file_name;
+		tmpjnlfile.len = SIZEOF(csd->jnl_file_name);
 		jnlfile.addr = (char *)gv_cur_region->jnl_file_name;
 		jnlfile.len = gv_cur_region->jnl_file_len;
 		jnldef.addr = JNL_EXT_DEF;
 		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
 		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus);
-			mupip_exit(ERR_MUNOACTION);
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus));
+			assert(IS_MUPIP_IMAGE);
+			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
-		cs_data->jnl_file_len = tmpjnlfile.len;
+		csd->jnl_file_len = tmpjnlfile.len;
 	}
-	cs_data->reserved_for_upd = UPD_RESERVED_AREA;
-	cs_data->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;
-	cs_data->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
-	cs_data->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
-	cs_data->db_trigger_cycle = 0;
-	cs_addrs->hdr = cs_data;
-	cs_addrs->ti = &cs_data->trans_hist;
+	csd->reserved_for_upd = UPD_RESERVED_AREA;
+	csd->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;
+	csd->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
+	csd->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
+	csd->db_trigger_cycle = 0;
+	cs_addrs->hdr = csd;
+	cs_addrs->ti = &csd->trans_hist;
 	th = cs_addrs->ti;
 	th->lock_sequence = 0;
 	th->ccp_jnl_filesize = 0;
-	cs_data->max_bts = GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS);
-	cs_data->n_bts = BT_FACTOR(gv_cur_region->dyn.addr->global_buffers);
-	cs_data->bt_buckets = getprime(cs_data->n_bts);
+	csd->max_bts = GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS);
+	csd->n_bts = BT_FACTOR(seg->global_buffers);
+	csd->bt_buckets = getprime(csd->n_bts);
 
-	cs_data->n_wrt_per_flu = 7;
-	cs_data->flush_trigger = FLUSH_FACTOR(cs_data->n_bts);
+	csd->n_wrt_per_flu = 7;
+	csd->flush_trigger = FLUSH_FACTOR(csd->n_bts);
 
-	cs_data->max_update_array_size = cs_data->max_non_bm_update_array_size
-				       = (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(cs_data), UPDATE_ARRAY_ALIGN_SIZE);
-	cs_data->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
+	csd->max_update_array_size = csd->max_non_bm_update_array_size
+				       = (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
+	csd->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 	/* bt_malloc(cs_addrs) Done by db_init at file open time -- not needed here */
 	if (dba_bg == REG_ACC_METH(gv_cur_region))
-		cs_data->flush_time[0] = TIM_FLU_MOD_BG;
+		csd->flush_time[0] = TIM_FLU_MOD_BG;
 	else
-		cs_data->flush_time[0] = TIM_FLU_MOD_MM;
-	cs_data->flush_time[1] = -1;
-	cs_data->yield_lmt = DEFAULT_YIELD_LIMIT;
-	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
-	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
-	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
-	NUM_CRIT_ENTRY(cs_data) = gv_cur_region->dyn.addr->mutex_slots;
-	cs_data->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
-#	if defined(__sun) || defined(__hpux)
-	/* There is no falloc on those platforms so we silently ignore the gld setting */
-	cs_data->defer_allocate = gv_cur_region->dyn.addr->defer_allocate = TRUE;
-#	else
-	cs_data->defer_allocate = gv_cur_region->dyn.addr->defer_allocate;
-#	endif
+		csd->flush_time[0] = TIM_FLU_MOD_MM;
+	csd->flush_time[1] = -1;
+	csd->yield_lmt = DEFAULT_YIELD_LIMIT;
+	csd->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
+	csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
+	csd->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+	NUM_CRIT_ENTRY(csd) = seg->mutex_slots;
+	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
+	csd->defer_allocate = seg->defer_allocate;
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
-	cs_data->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
-	cs_addrs->bmm = MM_ADDR(cs_data);
+	csd->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
+	if (IS_STATSDB_REG(gv_cur_region))
+	{	/* Copy basedb fname into statsdb file header (needed by MUPIP RUNDOWN -FILE statsdb-file-name) */
+		STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);
+		COPY_BASEDB_FNAME_INTO_STATSDB_HDR(gv_cur_region, baseDBreg, csd);
+		/* Assert that we never create a statsdb with NOSTATS in corresponding baseDB */
+		assert(baseDBreg->open);
+		assert(!(RDBF_NOSTATS & baseDBreg->reservedDBFlags));
+	}
+	csd->reservedDBFlags = gv_cur_region->reservedDBFlags;
+	cs_addrs->bmm = MM_ADDR(csd);
 	bmm_init();
-	for (i = 0; i < blk_init_size ; i += cs_data->bplmap)
+	for (i = 0; i < blk_init_size ; i += csd->bplmap)
 	{
 		status = bml_init(i);
 		if (status != SS_NORMAL)
 		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
-			mupip_exit(ERR_MUNOACTION);
+			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status));
+			assert(IS_MUPIP_IMAGE);
+			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
 	}
 	mucblkini();
@@ -277,7 +295,7 @@ void mucregini(int4 blk_init_size)
 				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
 				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
 				 */
-	cs_data->max_tn = MAX_TN_V6;
-	SET_TN_WARN(cs_data, cs_data->max_tn_warn);
-	SET_LATCH_GLOBAL(&cs_data->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
+	csd->max_tn = MAX_TN_V6;
+	SET_TN_WARN(csd, csd->max_tn_warn);
+	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }

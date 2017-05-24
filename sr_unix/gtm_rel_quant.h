@@ -20,7 +20,6 @@
 #include "gtm_unistd.h"
 #include "sleep.h"
 
-GBLREF	uint4 volatile	heartbeat_counter;
 GBLREF	uint4		process_id;
 /* yield processor macro - if argument is 0 or the (pseudo-)random value whose limit the argument defines is 0 just yield
  * otherwise do a microsleep
@@ -38,12 +37,17 @@ GBLREF	uint4		process_id;
 
 #define	GTM_REL_QUANT(MAX_TIME_MASK)									\
 MBSTART {												\
-	int	NANO_SLEEP_TIME;									\
+	int		NANO_SLEEP_TIME;								\
+	static uint4	TIME_ADJ = 0;									\
 													\
-	/* process_id provides cheap pseudo-random across processes */					\
+	/* process_id provides cheap pseudo-random across processes, but add in a timestamp/counter	\
+	 * so that the number varies a bit.								\
+	 */												\
+	if (0 == TIME_ADJ)										\
+		TIME_ADJ = (uint4) time(NULL);								\
 	if (MAX_TIME_MASK)										\
-	{	/* 1 below guards against 0 heartbeat_counter to which AIX is prone, or process_id */	\
-		NANO_SLEEP_TIME = (1 | (process_id ^ heartbeat_counter) & (MAX_TIME_MASK));		\
+	{	/* To get a value that moves a bit, xor with a timestamp/counter. */			\
+		NANO_SLEEP_TIME = (process_id ^ (TIME_ADJ++)) & (MAX_TIME_MASK);			\
 		if (!NANO_SLEEP_TIME)									\
 			NANO_SLEEP_TIME = MAX_TIME_MASK;						\
 		assert((NANO_SLEEP_TIME < E_9) && (NANO_SLEEP_TIME > 0));				\

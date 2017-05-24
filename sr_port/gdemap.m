@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2010, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2010-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -104,7 +105,7 @@ MAP2NAM(list1)
 	. s map="" f  s map=$o(mapisplusplus(lvl,map),-1) q:map=""  d
 	. . s mapLen=list(map,"MAPLEN"),currReg=list(map)
 	. . s gblname=$ze(map,1,list(map,"GBLNAMEOFF")),coll=+$g(gnams(gblname,"COLLATION"))
-	. . s key=$ze(map,1,mapLen-1),namSpc=$view("YGDS2GVN",key_ZERO_ZERO,coll) d add2nams(namSpc,currReg,"POINT")
+	. . s key=$ze(map,1,mapLen-1),namSpc=$zcollate(key_ZERO_ZERO,coll,1) d add2nams(namSpc,currReg,"POINT")
 	. . i '$d(list(key)) m list(key)=list(map)  s mapsublvl(lvl,key)="",list(key,"MAPLEN")=list(key,"MAPLEN")-1
 	. . e  d
 	. . . ; if we reach here, this means we are going to remove a ++ map entry and did not add anything instead in "list"
@@ -128,7 +129,7 @@ MAP2NAM(list1)
 	. . . i nextReg=prevReg q  ; x(1) and x(1,2:) map to same region
 	. . . ; add range x(1,2:)
 	. . . s mapLen=list(map,"MAPLEN")
-	. . . s key=$ze(map,1,mapLen),namSpc=$view("YGDS2GVN",key_ZERO_ZERO,coll)
+	. . . s key=$ze(map,1,mapLen),namSpc=$zcollate(key_ZERO_ZERO,coll,1)
 	. . . s nullsub="""""",namSpc=$ze(namSpc,1,$zl(namSpc)-1)_":"_nullsub_")"
 	. . . d add2nams(namSpc,nextReg,"RANGE")
 	. . s prevMap=$o(list(map),-1)
@@ -141,10 +142,10 @@ MAP2NAM(list1)
 	. . . ; Similar to the "trailingrange" case, we can check if the parent level map entry maps to same region as the current
 	. . . ; range and if so skip this range altogether.
 	. . . i list($o(list(parentMap)))'=currReg d
-	. . . . s prevMapLen=list(prevMap,"MAPLEN"),namSpc=$view("YGDS2GVN",prevMap_ZERO_ZERO,coll)
+	. . . . s prevMapLen=list(prevMap,"MAPLEN"),namSpc=$zcollate(prevMap_ZERO_ZERO,coll,1)
 	. . . . n lastSubs
 	. . . . s mapLen=list(map,"MAPLEN"),lastSubs=$ze(map,prfxoff2,mapLen)
-	. . . . s key=gblname_lastSubs,namSpc2=$view("YGDS2GVN",key_ZERO_ZERO,coll)
+	. . . . s key=gblname_lastSubs,namSpc2=$zcollate(key_ZERO_ZERO,coll,1)
 	. . . . s namSpc2=$ze(namSpc2,$zl(gblname)+3,$zl(namSpc2)-1) ; extract out the last/ONLY subscript
 	. . . . s namSpc=$ze(namSpc,1,$zl(namSpc)-1)_":"_namSpc2_")"
 	. . . . d add2nams(namSpc,currReg,"RANGE")
@@ -183,7 +184,7 @@ MAP2NAM(list1)
 	. . . ; the MAP x(1) already existed and we are about to delete the MAP x(1,2).
 	. . . ; check if the MAP after x(1,2) maps to same region as MAP x(1). If so, MAP x(1) can be removed
 	. . . d killPrevMapIfPossible(.list,map)
-	. . s namSpc=$view("YGDS2GVN",parentMap_ZERO_ZERO,coll)
+	. . s namSpc=$zcollate(parentMap_ZERO_ZERO,coll,1)
 	. . d add2nams(namSpc,currReg,"POINT")	; add NAMESPACE x(1)
 	. . d killmap(.list,map)		; delete MAP x(1,2)
 	; ------------------------------------------------------------------------------
@@ -309,7 +310,7 @@ MAP2NAM(list1)
 	s nams("#")=list("#)"),nams=nams+1
 	q 1
 ;----------------------------------------------------------------------------------------------------------------------------------
-add2nams:(nam,reg,type)
+add2nams(nam,reg,type)
 	; add a subscripted namespace to "nams" array
 	n nsubs,len,c,quotestate,start,i,isrange,gvnprefixoff
 	s nsubs=0,len=$zl(nam),start=1,quotestate=0,nam=$ze(nam,2,len)	; remove "^" from beginning of "nam"
@@ -437,7 +438,7 @@ gvn2gds(gvn,coll)
 	s savetrap=$etrap
 	n $etrap
 	s $etrap="goto gvsuboflowerr"
-	s key=$view("YGVN2GDS",gvn,coll)
+	s key=$zcollate(gvn,coll)
 	q key
 gvsuboflowerr
 	n len

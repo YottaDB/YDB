@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,6 +11,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
 
 #include "gtm_string.h"
 #include "gdsroot.h"
@@ -46,6 +48,8 @@
 #include "hashtab_mname.h"
 #include "gvnh_spanreg.h"
 #include "change_reg.h"
+#include "io.h"
+#include "gtmio.h"
 
 #ifdef EXTRACT_HASHT_GLOBAL
 # include "gv_trigger_common.h"	/* for IS_GVKEY_HASHT_GBLNAME and HASHT_GBL_CHAR1 macros */
@@ -269,6 +273,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 					gvinit();
 				for (reg = gd_header->regions, r_top = reg + gd_header->n_regions; reg < r_top; reg++)
 				{
+					if (IS_STATSDB_REGNAME(reg))
+						continue;
 					GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 					csa = cs_addrs;
 					if (NULL == csa)	/* not BG or MM access method */
@@ -281,7 +287,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 #			endif
 			COMPUTE_HASH_MSTR(curr_gbl_name.str, hash_code);
 			op_gvname_fast(VARLSTCNT(2) hash_code, &curr_gbl_name);
-			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+			assert(IS_REG_BG_OR_MM(gv_cur_region));
 				/* for dba_cm or dba_usr, op_gvname_fast/gv_bind_name/gv_init_reg would have errored out */
 			gvname.hash_code = hash_code;
 			gvname.var_name = curr_gbl_name.str;
@@ -375,7 +381,7 @@ STATICFNDEF void gv_select_reg(void *ext_hash, boolean_t freeze, int *reg_max_re
 	        NON_GTM64_ONLY(if (add_hashtab_int4((hash_table_int4 *)ext_hash, (uint4 *)&gv_cur_region,
 											HT_VALUE_DUMMY, &tabent)))
                 {
-                        if (cs_addrs->hdr->freeze)
+                        if (FROZEN(cs_addrs->hdr))
                         {
                                 gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
                                 mupip_exit(ERR_MUNOFINISH);
@@ -388,7 +394,7 @@ STATICFNDEF void gv_select_reg(void *ext_hash, boolean_t freeze, int *reg_max_re
 					DB_LEN_STR(gv_cur_region));
 				mupip_exit(ERR_MUNOFINISH);
 			}
-			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE, FALSE, TRUE))
 			{
 				hiber_start(1000);
 				if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -397,7 +403,6 @@ STATICFNDEF void gv_select_reg(void *ext_hash, boolean_t freeze, int *reg_max_re
                                 	mupip_exit(ERR_MUNOFINISH);
 				}
 			}
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
                 }
         }
 	if (*reg_max_rec < cs_data->max_rec_size)

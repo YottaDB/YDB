@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,7 +244,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						tmp_gvt = gvnh_reg->gvt;
 					} else
 					{
-						gd_map = gv_srch_map(gd_header, gvent.var_name.addr, gvent.var_name.len);
+						gd_map = gv_srch_map(gd_header, gvent.var_name.addr, gvent.var_name.len,
+													SKIP_BASEDB_OPEN_FALSE);
 						r_ptr = gd_map->reg.addr;
 						tmp_gvt = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
 						GVNH_REG_INIT(gd_header, gd_header->tab_ptr, gd_map, tmp_gvt,

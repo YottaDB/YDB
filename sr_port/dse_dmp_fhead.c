@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,9 +45,7 @@
 #include "op.h"
 #include "shmpool.h"	/* Needed for the shmpool structures */
 #include "mutex.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 
 #define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
@@ -88,9 +86,9 @@ LITREF	char		*gtm_dbversion_table[];
 
 void dse_dmp_fhead (void)
 {
-	boolean_t		jnl_buff_open;
+	boolean_t		is_mm, jnl_buff_open;
 	unsigned char		util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN];
-	int			util_len, rectype, time_len, index;
+	int			util_len, rectype, time_len, index, activeque_cnt, freeque_cnt, wipque_cnt;
 	uint4			jnl_status;
 	enum jnl_state_codes	jnl_state;
 	gds_file_id		zero_fid;
@@ -106,8 +104,7 @@ void dse_dmp_fhead (void)
 	uint4			pid;
 	boolean_t		new_line;
 	unsigned char		outbuf[GTMCRYPT_HASH_HEX_LEN + 1];
-	GTM_SNAPSHOT_ONLY(
-		shm_snapshot_t	*ss_shm_ptr;)
+	shm_snapshot_t		*ss_shm_ptr;
 
 	is_dse_all = dse_all_dump;
 	dse_all_dump = FALSE;
@@ -116,6 +113,9 @@ void dse_dmp_fhead (void)
 	cnl = csa->nl;
         jnl_state = (enum jnl_state_codes)csd->jnl_state;
 	jnl_buff_open = (0 != cnl->jnl_file.u.inode);
+	activeque_cnt = cnl->wcs_active_lvl;
+	wipque_cnt = cnl->wcs_wip_lvl;
+	freeque_cnt = cnl->wc_in_free;
 	if (is_dse_all || (CLI_NEGATED != cli_present("BASIC")))
 	{
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
@@ -124,8 +124,8 @@ void dse_dmp_fhead (void)
 		GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer);
 		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_mval.str.len, zdate_mval.str.addr,
 				dollarh_mval.str.len, dollarh_mval.str.addr);
-		util_out_print("  Access method                          !AD", FALSE,
-			2, (csd->acc_meth == dba_mm) ? "MM" : "BG");
+		is_mm = (csd->acc_meth == dba_mm);
+		util_out_print("  Access method                          !AD", FALSE, 2, is_mm ? "MM" : "BG");
 		util_out_print("  Global Buffers        !12UL", TRUE, csd->n_bts);
 		util_out_print("  Reserved Bytes        !19UL", FALSE, csd->reserved_bytes);
 		util_out_print("  Block size (in bytes) !12UL", TRUE, csd->blk_size);
@@ -165,6 +165,10 @@ void dse_dmp_fhead (void)
 		dse_puttime(csd->flush_time, "  Flush timer            !AD", TRUE);
 		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
+		util_out_print("  Freeze online                 !AD", FALSE, 11,
+					(csd->freeze_online) ? "       TRUE" : "      FALSE");
+		util_out_print("  Freeze online autorelease    !AD", TRUE, 5,
+					(csd->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
 		util_out_print("  Current transaction    0x!16@XQ", FALSE, &csa->ti->curr_tn);
 		util_out_print("  No. of writes/flush   !12UL", TRUE, csd->n_wrt_per_flu);
 		util_out_print("  Maximum TN             0x!16@XQ", FALSE, &csd->max_tn);
@@ -188,13 +192,7 @@ void dse_dmp_fhead (void)
 		}
 		util_out_print("  Create in progress           !AD", FALSE, 12, (csd->createinprogress) ?
 			"        TRUE" : "       FALSE");
-
-#		ifdef CNTR_WORD_32
-		util_out_print("  Modified cache blocks !12UL", TRUE, cnl->wcs_active_lvl);
-#		else
-		util_out_print("  Modified cache blocks !12UW", TRUE, cnl->wcs_active_lvl);
-#		endif
-
+		util_out_print("  Modified cache blocks !12UL", TRUE, activeque_cnt);
 		util_out_print("  Reference count       !19UL", FALSE, cnl->ref_cnt);
 		util_out_print("  Wait Disk             !12UL", TRUE, csd->wait_disk_space);
 		util_out_print("  Journal State               !AD", (jnl_notallowed == jnl_state), 13,
@@ -238,6 +236,14 @@ void dse_dmp_fhead (void)
 		util_out_print("  Maximum Key Size Assured     !AD", TRUE, 5, csd->maxkeysz_assured ? " TRUE" : "FALSE");
 		util_out_print("  Defer allocation                    !AD", FALSE, 5, csd->defer_allocate ? " TRUE" : "FALSE");
 		util_out_print("  Spin sleep time mask    0x!8XL", TRUE, SPIN_SLEEP_MASK(csd));
+		util_out_print("  Async IO                              !AD", FALSE, 3, csd->asyncio ? " ON" : "OFF");
+		assert(!is_mm || (0 == (activeque_cnt + wipque_cnt + freeque_cnt)));
+		util_out_print("  WIP queue cache blocks!12UL", TRUE, wipque_cnt);
+		util_out_print("  DB is auto-created                  !AD", FALSE, 5,
+				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+		util_out_print("  DB shares gvstats            !AD", TRUE, 5,
+				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+		util_out_print("  LOCK shares DB critical section     !AD", TRUE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -254,7 +260,7 @@ void dse_dmp_fhead (void)
                 util_out_print(0, TRUE);
 		util_out_print("  Total Global Buffers           0x!XL", FALSE, csd->n_bts);
 		util_out_print("  Phase2 commit pid count 0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);
-		util_out_print("  Dirty Global Buffers           0x!XL", FALSE, cnl->wcs_active_lvl);
+		util_out_print("  Dirty Global Buffers           0x!XL", FALSE, activeque_cnt);
 		util_out_print("  Write cache timer count 0x!XL", TRUE, cnl->wcs_timers);
 		new_line = FALSE;
 		for (index = 0; MAX_WT_PID_SLOTS > index; index++)
@@ -268,7 +274,7 @@ void dse_dmp_fhead (void)
 			}
 		}
 		util_out_print(0, new_line);
-		util_out_print("  Free Global Buffers            0x!XL", FALSE, cnl->wc_in_free);
+		util_out_print("  Free Global Buffers            0x!XL", FALSE, freeque_cnt);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
 		util_out_print("  Write Cache is Blocked              !AD", FALSE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
 		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
@@ -279,7 +285,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  FTOK counter halted          !AD", TRUE, 5, cnl->ftok_counter_halted ? " TRUE" : "FALSE");
 		util_out_print("  Access control rundown bypasses !9UL", FALSE, cnl->dbrndwn_access_skip);
 		util_out_print("  FTOK rundown bypasses   !10UL", TRUE, cnl->dbrndwn_ftok_skip);
-		util_out_print("  Epoch taper    !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
+		util_out_print("  Epoch taper                         !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)
 		{
@@ -295,8 +301,8 @@ void dse_dmp_fhead (void)
 		util_out_print(0, TRUE);
 		util_out_print("  Actual kills in progress     !12UL", FALSE, csd->kill_in_prog);
 		util_out_print("  Abandoned Kills       !12UL", TRUE, csd->abandoned_kills);
-		util_out_print("  Process(es) inhibiting KILLs        !5UL", TRUE, cnl->inhibit_kills);
-
+		util_out_print("  Process(es) inhibiting KILLs        !5UL", FALSE, cnl->inhibit_kills);
+		util_out_print("  DB is a StatsDB              !AD", TRUE, 5, IS_RDBF_STATSDB(csd) ? " TRUE" : "FALSE");
 		util_out_print(0, TRUE);
 		util_out_print("  DB Trigger cycle of ^#t      !12UL", TRUE, csd->db_trigger_cycle);
 		util_out_print(0, TRUE);
@@ -501,7 +507,6 @@ void dse_dmp_fhead (void)
 		util_out_print("  Pre read trigger factor [% upd rsrvd] !3UL", FALSE, csd->pre_read_trigger_factor);
 		util_out_print("  Upd writer trigger [%flshTrgr] !3UL", TRUE, csd->writer_trigger_factor);
 	}
-#	ifdef GTM_SNAPSHOT
 	if (NEED_TO_DUMP("SNAPSHOT"))
 	{
 		util_out_print(0, TRUE);
@@ -522,6 +527,5 @@ void dse_dmp_fhead (void)
 		util_out_print("  Snapshot shared memory identifier          !12SL", TRUE, ss_shm_ptr->ss_info.ss_shmid);
 		util_out_print("  Snapshot file name                   !AD", TRUE, LEN_AND_STR(ss_shm_ptr->ss_info.shadow_file));
 	}
-#	endif
         return;
 }

@@ -35,9 +35,7 @@ GBLREF unsigned char	cw_set_depth;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF uint4		dollar_tlevel;
-#ifdef GTM_TRUNCATE
 GBLREF unsigned int	t_tries;
-#endif
 
 void t_write_map (
 		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -77,7 +75,7 @@ void t_write_map (
 	cs->mode = gds_t_writemap;
 	cs->blk_checksum = 0;
 	cs->blk = blkhist->blk_num;
-	assert((cs->blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
+	assert((cs->blk < csa->ti->total_blks) || (CDB_STAGNATE > t_tries));
 	cs->old_block = blkhist->buffaddr;
 	BIT_CLEAR_FREE(cs->blk_prior_state);	/* t_write_map operates on BUSY blocks and hence
 						 * cs->blk_prior_state's free_status is set to FALSE unconditionally */
@@ -86,7 +84,7 @@ void t_write_map (
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 	if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
-	{	/* Pre-compute CHECKSUM. Since we dont necessarily hold crit at this point, ensure we never try to
+	{	/* Pre-compute CHECKSUM. Since we don't necessarily hold crit at this point, ensure we never try to
 		 * access the buffer more than the db blk_size.
 		 */
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);

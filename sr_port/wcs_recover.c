@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,23 +16,14 @@
 #include "gtm_time.h"
 #include "gtmimagename.h"
 
-#ifdef UNIX
-#  include <sys/mman.h>
-# ifdef _AIX
+#include <sys/mman.h>
+#ifdef _AIX
 # include <sys/shm.h>
-# endif
-#  include "gtm_stat.h"
-#  include <errno.h>
-#  include "gtm_signal.h"
-#elif defined(VMS)
-#  include <fab.h>
-#  include <iodef.h>
-#  include <ssdef.h>
-#else
-#  error UNSUPPORTED PLATFORM
 #endif
+#include "gtm_stat.h"
+#include <errno.h>
+#include "gtm_signal.h"
 
-#include "ast.h"	/* needed for DCLAST_WCS_WTSTART macro in gdsfhead.h */
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -41,24 +32,15 @@
 #include "gdsblk.h"
 #include "gdsfhead.h"
 #include "gdsbgtr.h"
-#include "gdsbml.h"
 #include "filestruct.h"
 #include "gdscc.h"
 #include "interlock.h"
 #include "jnl.h"
 #include "testpt.h"
 #include "sleep_cnt.h"
-#include "mupipbckup.h"
 #include "wbox_test_init.h"
-
-#ifdef UNIX
-#  include "eintr_wrappers.h"
-   GBLREF	sigset_t	blockalrm;
-#endif
-
+#include "eintr_wrappers.h"
 #include "send_msg.h"
-#include "bit_set.h"
-#include "bit_clear.h"
 #include "relqop.h"
 #include "is_proc_alive.h"
 #include "mmseg.h"
@@ -77,31 +59,26 @@
 #include "tp.h"
 #include "memcoherency.h"
 #include "gtm_c_stack_trace.h"
-
-#ifdef GTM_TRUNCATE
+#include "wcs_wt.h"
 #include "recover_truncate.h"
-#endif
 
-GBLREF	boolean_t		certify_all_blocks;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF 	sgmnt_data_ptr_t 	cs_data;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	gv_key			*gv_currkey;		/* needed in VMS for error logging in MM */
-GBLREF	uint4			process_id;
-GBLREF	testpt_struct		testpoint;
-GBLREF  inctn_opcode_t          inctn_opcode;
-GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF 	jnl_gbls_t		jgbl;
-GBLREF	enum gtmImageTypes	image_type;
-GBLREF	uint4			gtmDebugLevel;
-GBLREF	unsigned int		cr_array_index;
-GBLREF	uint4			dollar_tlevel;
-GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	uint4			process_id;
+GBLREF	unsigned int		cr_array_index;
+GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
+GBLREF 	jnl_gbls_t		jgbl;
+GBLREF 	sgmnt_data_ptr_t 	cs_data;
+GBLREF	inctn_opcode_t		inctn_opcode;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_exiting;
 GBLREF	boolean_t		in_mu_rndwn_file;
+GBLREF	boolean_t		dse_running;
 #endif
 
 error_def(ERR_BUFRDTIMEOUT);
@@ -111,10 +88,9 @@ error_def(ERR_DBCNTRLERR);
 error_def(ERR_DBCRERR);
 error_def(ERR_DBDANGER);
 error_def(ERR_DBFILERR);
-error_def(ERR_INVALIDRIP);
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
-error_def(ERR_STOPTIMEOUT);
+error_def(ERR_INVALIDRIP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
@@ -132,22 +108,22 @@ error_def(ERR_TEXT);
 void wcs_recover(gd_region *reg)
 {
 	bt_rec_ptr_t		bt;
-	cache_rec_ptr_t		cr, cr_alt, cr_alt_new, cr_lo, cr_top, hash_hdr;
+	cache_rec_ptr_t		cr, cr_alt, cr_lo, cr_hi, hash_hdr, cr_old, cr_new;
 	cache_que_head_ptr_t	active_head, hq, wip_head, wq;
 	gd_region		*save_reg;
 	que_ent_ptr_t		back_link; /* should be crit & not need interlocked ops. */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	int4			bml_full, dummy_errno, blk_size;
+	int4			dummy_errno, blk_size;
 	uint4			jnl_status, epid, r_epid;
-	int4			bt_buckets, bufindx;	/* should be the same type as "csd->bt_buckets" */
-	inctn_opcode_t          save_inctn_opcode;
-	unsigned int		bplmap, lcnt, total_blks, wait_in_rip;
+	int4			bt_buckets;
+	inctn_opcode_t		save_inctn_opcode;
+	unsigned int		bplmap, lcnt, total_rip_wait;
 	sm_uc_ptr_t		buffptr;
 	blk_hdr_ptr_t		blk_ptr;
-	INTPTR_T		bp_lo, bp_top, old_block;
-	boolean_t		backup_block_saved, change_bmm;
+	INTPTR_T		bp_lo, bp_top;
+	boolean_t		asyncio, twinning_on, wcs_wtfini_ret;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	sgm_info		*si;
@@ -156,7 +132,7 @@ void wcs_recover(gd_region *reg)
 	SETUP_THREADGBL_ACCESS;
 	/* If this is the source server, do not invoke cache recovery as that implies touching the database file header
 	 * (incrementing the curr_tn etc.) and touching the journal file (writing INCTN records) both of which are better
-	 * avoided by the source server; It is best to keep it as read-only to the db/jnl as possible.  It is ok to do
+	 * avoided by the source server; It is best to keep it as read-only to the db/jnl as possible. It is ok to do
 	 * so because the source server anyways does not rely on the integrity of the database cache and so does not need
 	 * to fix it right away. Any other process that does rely on the cache integrity will fix it when it gets crit next.
 	 */
@@ -176,7 +152,7 @@ void wcs_recover(gd_region *reg)
 	cnl = csa->nl;
 	si = csa->sgm_info_ptr;
 	/* If a mupip truncate operation was abruptly interrupted we have to correct any inconsistencies */
-	GTM_TRUNCATE_ONLY(recover_truncate(csa, csd, gv_cur_region);)
+	recover_truncate(csa, csd, gv_cur_region);
 	/* We are going to UNPIN (reset in_cw_set to 0) ALL cache-records so assert that we are not in the middle of a
 	 * non-TP or TP transaction that has already PINNED a few buffers as otherwise we will create an out-of-design state.
 	 * The only exception is if we are in the 2nd phase of KILL in a TP transaction. In this case si->cr_aray_index
@@ -198,9 +174,16 @@ void wcs_recover(gd_region *reg)
 	/* if the wait loop above hits the limit, or cnl->intent_wtstart goes negative, it is ok to proceed since
 	 * wcs_verify (invoked below) reports and clears cnl->intent_wtstart and cnl->in_wtstart.
 	 */
-	assert(!TREF(donot_write_inctn_in_wcs_recover) || in_mu_rndwn_file UNIX_ONLY(|| jgbl.onlnrlbk) || jgbl.mur_extract);
+	assert(!TREF(donot_write_inctn_in_wcs_recover) || in_mu_rndwn_file || jgbl.onlnrlbk || jgbl.mur_extract);
 	assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
 	assert(!csa->wcs_pidcnt_incremented); /* we should never have come here with a phase2 commit pending for ourself */
+	/* A non-zero value of cnl->wtfini_in_prog implies a process in
+	 * wcs_wtfini() was abnormally terminated (e.g. kill -9). Since we have
+	 * crit here and are about to reinitialize the cache structures, it is
+	 * safe to reset it here
+	 */
+	if (0 != cnl->wtfini_in_prog)
+		cnl->wtfini_in_prog = 0;
 	/* Wait for any pending phase2 commits to finish */
 	if (cnl->wcs_phase2_commit_pidcnt)
 	{
@@ -211,6 +194,9 @@ void wcs_recover(gd_region *reg)
 		 * decrementing cnl->wcs_phase2_commit_pidcnt). Anyways wcs_verify reports and clears this field so no problems.
 		 */
 	}
+	asyncio = csd->asyncio;
+	twinning_on = TWINNING_ON(csd);
+	wip_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_recover_invoked);
 	if (wcs_verify(reg, TRUE, TRUE))	/* expect_damage is TRUE, in_wcs_recover is TRUE */
 	{	/* if it passes verify, then recover can't help ??? what to do */
@@ -219,121 +205,38 @@ void wcs_recover(gd_region *reg)
 	}
 	if (gtmDebugLevel)
 		verifyAllocatedStorage();
-	change_bmm = FALSE;
 	/* Before recovering the cache, set early_tn to curr_tn + 1 to indicate to have_crit that we are in a situation that
 	 * is equivalent to being in the midst of a database commit and therefore defer exit handling in case of a MUPIP STOP.
 	 * wc_blocked is anyways set to TRUE at this point so the next process to grab crit will anyways attempt another recovery.
 	 */
 	if (!TREF(donot_write_inctn_in_wcs_recover))
+	{
 		csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+		/* Take this opportunity to set "cnl->last_wcs_recover_tn" BEFORE cache recover (e.g. "bt_refresh") starts.
+		 * This is relied upon by the out-of-crit validation logic in tp_hist/t_end.
+		 */
+		cnl->last_wcs_recover_tn = csd->trans_hist.curr_tn;
+	}
 	assert(!in_wcs_recover);	/* should not be called if we are already in "wcs_recover" for another region */
 	in_wcs_recover = TRUE;	/* used by bt_put() called below */
 	bt_refresh(csa, TRUE);	/* this resets all bt->cache_index links to CR_NOTVALID */
 	/* the following queue head initializations depend on the wc_blocked mechanism for protection from wcs_wtstart */
-	wip_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	memset(wip_head, 0, SIZEOF(cache_que_head));
 	active_head = &csa->acc_meth.bg.cache_state->cacheq_active;
 	memset(active_head, 0, SIZEOF(cache_que_head));
-	UNIX_ONLY(wip_head = active_head);	/* all inserts into wip_que in VMS should be done in active_que in UNIX */
-	UNIX_ONLY(SET_LATCH_GLOBAL(&active_head->latch, LOCK_AVAILABLE));
+	cnl->cur_lru_cache_rec_off = GDS_ABS2REL(csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets);
 	cnl->wcs_active_lvl = 0;
+	cnl->wcs_wip_lvl = 0;
 	cnl->wc_in_free = 0;
 	bplmap = csd->bplmap;
 	hash_hdr = (cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array;
 	bt_buckets = csd->bt_buckets;
-	for (cr = hash_hdr, cr_top = cr + bt_buckets; cr < cr_top;  cr++)
+	for (cr = hash_hdr, cr_hi = cr + bt_buckets; cr < cr_hi; cr++)
 		cr->blkque.fl = cr->blkque.bl = 0;	/* take no chances that the blkques are messed up */
-	cr_lo = cr_top;
-	cr_top = cr_top + csd->n_bts;
+	cr_lo = cr_hi;
+	cr_hi = cr_lo + csd->n_bts;
 	blk_size = csd->blk_size;
-	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
-	backup_block_saved = FALSE;
-	if (BACKUP_NOT_IN_PROGRESS != cnl->nbb)
-	{	/* Online backup is in progress. Check if secshr_db_clnup has created any cache-records with pointers
-		 * to before-images that need to be backed up. If so take care of that first before doing any cache recovery.
-		 */
-		bp_lo = (INTPTR_T)buffptr;
-		bp_top = bp_lo + ((gtm_uint64_t)csd->n_bts * csd->blk_size);
-		for (cr = cr_lo; cr < cr_top;  cr++)
-		{
-			if (cr->stopped && (0 != cr->twin))
-			{	/* Check if cr->twin points to a valid buffer. Only in that case, do the backup */
-				old_block = (INTPTR_T)GDS_ANY_REL2ABS(csa, cr->twin);
-				if (!IS_PTR_IN_RANGE(old_block, bp_lo, bp_top))
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-						cr, cr->blk, old_block, RTS_ERROR_TEXT("bkup_before_image_range"), bp_lo, bp_top);
-					assert(FALSE);
-					continue;
-				} else if (!IS_PTR_ALIGNED(old_block, bp_lo, csd->blk_size))
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, cr->blk,
-						RTS_ERROR_TEXT("bkup_before_image_align"), old_block, bp_lo, csd->blk_size);
-					assert(FALSE);
-					continue;
-				}
-				bufindx = (int4)((old_block - bp_lo) / csd->blk_size);
-				assert(0 <= bufindx);
-				assert(bufindx < csd->n_bts);
-				cr_alt = &cr_lo[bufindx];
-				assert((sm_uc_ptr_t)old_block == (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr));
-				/* Do other checks to validate before-image buffer */
-				if (cr_alt == cr)
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
-						RTS_ERROR_TEXT("bkup_before_image_cr_same"), cr_alt, FALSE, CALLFROM);
-					assert(FALSE);
-					continue;
-				} else if (cr->blk != cr_alt->blk)
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
-						RTS_ERROR_TEXT("bkup_before_image_blk"), cr_alt->blk, cr->blk, CALLFROM);
-					assert(FALSE);
-					continue;
-				} else if (!cr_alt->in_cw_set)
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt,
-							cr_alt->blk, RTS_ERROR_TEXT("bkup_before_image_in_cw_set"),
-							cr_alt->in_cw_set, TRUE, CALLFROM);
-					assert(FALSE);
-					continue;
-				} else if (cr_alt->stopped)
-				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt,
-							cr_alt->blk, RTS_ERROR_TEXT("bkup_before_image_stopped"),
-							cr_alt->stopped, FALSE, CALLFROM);
-					assert(FALSE);
-					continue;
-				}
-				VMS_ONLY(
-					/* At this point, it is possible cr_alt points to the older twin. In this case though, the
-					 * commit should have errored out BEFORE the newer twin got built. This way we are
-					 * guaranteed that the cache-record holding the proper before-image is indeed the older
-					 * twin. This is asserted below.
-					 */
-					DEBUG_ONLY(
-						cr_alt_new = (cr_alt->twin)
-							? ((cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->twin)) : NULL;
-					)
-					assert(!cr_alt->twin || cr_alt->bt_index
-						|| cr_alt_new->bt_index && cr_alt_new->in_tend && cr_alt_new->in_cw_set);
-				)
-				/* The following check is similar to the one in BG_BACKUP_BLOCK and the one in
-				 * secshr_db_clnup (where backup_block is invoked)
-				 */
-				blk_ptr = (blk_hdr_ptr_t)old_block;
-				if ((cr_alt->blk >= cnl->nbb)
-					&& (0 == csa->shmpool_buffer->failed)
-					&& (blk_ptr->tn < csa->shmpool_buffer->backup_tn)
-					&& (blk_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
-				{
-					cr_alt->buffaddr = cr->twin;	/* reset it to what it should be just to be safe */
-					backup_block(csa, cr_alt->blk, cr_alt, NULL);
-					backup_block_saved = TRUE;
-				}
-			}
-		}
-	}
+	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_hi, OS_PAGE_SIZE);
 	/* After recovering the cache, we normally increment the db curr_tn. But this should not be done if called from
 	 * forward journal recovery, since we want the final database transaction number to match the journal file's
 	 * eov_tn (to avoid JNLDBTNNOMATCH errors). Therefore in this case, make sure all "tn" fields in the bt and cache are set
@@ -345,8 +248,10 @@ void wcs_recover(gd_region *reg)
 		csd->trans_hist.curr_tn--;
 		csd->trans_hist.early_tn--;
 		assert(csd->trans_hist.early_tn == (csd->trans_hist.curr_tn + 1));
+		/* Adjust "cnl->last_wcs_recover_tn" to be in sync with adjusted curr_tn */
+		cnl->last_wcs_recover_tn = csd->trans_hist.curr_tn;
 	}
-	for (cr = cr_lo, wait_in_rip = 0; cr < cr_top;  cr++, buffptr += blk_size)
+	for (cr = cr_lo, total_rip_wait = 0; cr < cr_hi; cr++, buffptr += blk_size)
 	{
 		cr->buffaddr = GDS_ANY_ABS2REL(csa, buffptr);	/* reset it to what it should be just to be safe */
 		if (((int)(cr->blk) != CR_BLKEMPTY) && (((int)(cr->blk) < 0) || ((int)(cr->blk) >= csd->trans_hist.total_blks)))
@@ -362,16 +267,11 @@ void wcs_recover(gd_region *reg)
 			cr->dirty = csd->trans_hist.curr_tn;	/* we assume csd->trans_hist.curr_tn is valid */
 		if (cr->flushed_dirty_tn >= cr->dirty)
 			cr->flushed_dirty_tn = 0;
-		UNIX_ONLY(
-			/* reset all fields that might be corrupt that wcs_verify() cares about */
-			cr->epid = 0;
-			cr->image_count = 0;	/* image_count needs to be reset before its usage below in case it is corrupt */
-		)
 		/* wait for read-in-progress to complete */
-		for (lcnt = 1;  (-1 != cr->read_in_progress);  lcnt++)
+		for (lcnt = 1; (-1 != cr->read_in_progress); lcnt++)
 		{	/* very similar code appears elsewhere and perhaps should be common */
 			/* Since cr->r_epid can be changing concurrently, take a local copy before using it below,
-			 * particularly before calling is_proc_alive as we dont want to call it with a 0 r_epid.
+			 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 			 */
 			r_epid = cr->r_epid;
 			if (cr->read_in_progress < -1)
@@ -383,20 +283,19 @@ void wcs_recover(gd_region *reg)
 				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 				assert(cr->r_epid == 0);
 				assert(0 == cr->dirty);
-			} else  if ((0 != r_epid)
-					&& ((r_epid == process_id) || (FALSE == is_proc_alive(r_epid, cr->image_count))))
+			} else if ((0 != r_epid) && ((r_epid == process_id) || (FALSE == is_proc_alive(r_epid, 0))))
 			{
 				INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
 				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
-	   		} else
+			} else
 			{
 				if (1 == lcnt)
 					epid = r_epid;
-				else  if ((BUF_OWNER_STUCK < lcnt) || (MAX_WAIT_FOR_RIP <= wait_in_rip))
+				else if ((BUF_OWNER_STUCK < lcnt) || (MAX_WAIT_FOR_RIP <= total_rip_wait))
 				{	/* If we have already waited for atleast 4 minutes, no longer wait but fixup
-					 * all following cr's.  If r_epid is 0 and also read in progress, we identify
+					 * all following cr's. If r_epid is 0 and also read in progress, we identify
 					 * this as corruption and fixup up this cr and proceed to the next cr.
 					 */
 					assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number);
@@ -407,118 +306,76 @@ void wcs_recover(gd_region *reg)
 					}
 					/* process still active but not playing fair or cache is corrupted */
 					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, TWICE);
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
-						DB_LEN_STR(reg));
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr,
+						r_epid, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
 					INTERLOCK_INIT(cr);
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
 					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 					if (BUF_OWNER_STUCK < lcnt)
-						wait_in_rip++;
+						total_rip_wait++;
 					break;
 				}
 				DEBUG_ONLY(
-				else if (((BUF_OWNER_STUCK / 2) == lcnt) || ((MAX_WAIT_FOR_RIP / 2) == wait_in_rip))
+				else if (((BUF_OWNER_STUCK / 2) == lcnt) || ((MAX_WAIT_FOR_RIP / 2) == total_rip_wait))
 						GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, ONCE);)
-    				wcs_sleep(lcnt);
+				wcs_sleep(lcnt);
 			}
 		}
 		/* reset cr->rip_latch. it is unused in VMS, but wcs_verify() checks it hence the reset in both Unix and VMS */
-		UNIX_ONLY(SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE));
-		VMS_ONLY(memset((sm_uc_ptr_t)&cr->rip_latch, 0, SIZEOF(global_latch_t)));
+		SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE);
 		cr->r_epid = 0;		/* the processing above should make this appropriate */
-		cr->tn = csd->trans_hist.curr_tn;
 		cr->blkque.fl = cr->blkque.bl = 0;		/* take no chances that the blkques are messed up */
 		cr->state_que.fl = cr->state_que.bl = 0;	/* take no chances that the state_ques are messed up */
 		cr->in_cw_set = 0;	/* this has crit and is here, so in_cw_set must no longer be non-zero */
-		UNIX_ONLY(cr->wip_stopped = FALSE;)
-		VMS_ONLY(
-			if (cr->wip_stopped)
-			{
-				for (lcnt = 1; (0 == cr->iosb.cond) && is_proc_alive(cr->epid, cr->image_count); lcnt++)
-				{
-					if (1 == lcnt)
-						epid = cr->epid;
-					else  if (BUF_OWNER_STUCK < lcnt)
-					{
-						if (!((0 == cr->epid) || (epid == cr->epid)))
-						{
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
-							assert(FALSE);
-						}
-						if (0 != epid)
-						{	/* process still active, but not playing fair */
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_STOPTIMEOUT, 3, cr->epid,
-									DB_LEN_STR(reg));
-							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
-									LEN_AND_LIT("Buffer forcibly seized"));
-							cr->epid = 0;
-						}
-						continue;
-					}
-					wcs_sleep(lcnt);
-				}
-				if (0 == cr->iosb.cond)
-				{	/* if it's abandonned wip_stopped, treat it as a WRT_STRT_PNDNG */
-					cr->iosb.cond = WRT_STRT_PNDNG;
-					cr->epid = 0;
-					cr->image_count = 0;
-				}	/* otherwise the iosb.cond should suffice */
-				cr->wip_stopped = FALSE;
-			}
-		)
+		/* If asyncio is TRUE and cr->epid is non-zero, it is a WIP record. Do not touch it */
+		if (!asyncio)
+			cr->epid = 0;
 		if (0 != cr->twin)
-		{	/* clean up any old twins. in unix twin is unused so reset it without examining its value */
-			VMS_ONLY(
-				cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
-				if (!CR_NOT_ALIGNED(cr_alt, cr_lo) && !CR_NOT_IN_RANGE(cr_alt, cr_lo, cr_top))
-				{
-					assert(((cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->twin)) == cr);
-					assert((0 == cr->bt_index) || (0 == cr_alt->bt_index));		/* at least one zero */
-					assert((0 != cr->bt_index) || (0 != cr_alt->bt_index));		/* at least one non-zero */
-					cr_alt->twin = 0;
-				}
-			)
-			cr->twin = 0;
-		}
+			cr->twin = 0; /* Clean up "twin" link. We will set it afresh further down below */
 		if (JNL_ENABLED(csd) && cr->dirty)
 		{
 			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (cr->jnl_addr > csa->jnl->jnl_buff->freeaddr))
 				cr->jnl_addr = csa->jnl->jnl_buff->freeaddr;
 		} else
 			cr->jnl_addr = 0;	/* just be safe */
+		if (cr->data_invalid)
+		{	/* Some process was shot (kill -9 in Unix) in the middle of an update. So send a DBDANGER warning first.
+			 * If the buffer was dirty at the start of this current update we cannot discard this buffer (since it
+			 * contains updates corresponding to prior transactions) but otherwise we can discard it as a clean
+			 * copy of this block (minus the current update) can be later fetched from disk.
+			 * If cr->tn is 0, it means this buffer was not dirty at the start of this current update. And vice versa.
+			 * So that provides a convenient way to decide.
+			 */
+			if (!jgbl.mur_rollback)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+						DB_LEN_STR(reg), cr->blk);
+			assert(gtm_white_box_test_case_enabled
+				&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
+			cr->data_invalid = 0;
+			if (!cr->tn)
+				cr->dirty = 0;
+		}
+		cr->tn = csd->trans_hist.curr_tn;
 		assert(!cr->stopped || (CR_BLKEMPTY != cr->blk));
+		assert(!cr->stopped || (0 == cr->twin));
 		if (cr->stopped && (CR_BLKEMPTY != cr->blk))
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */
 			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
-			if ((cr->blk / bplmap) * bplmap == cr->blk)
-			{	/* it's a bitmap */
-				if ((csd->trans_hist.total_blks / bplmap) * bplmap == cr->blk)
-					total_blks = csd->trans_hist.total_blks - cr->blk;
-				else
-					total_blks = bplmap;
-				bml_full = bml_find_free(0, (sm_uc_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr)) + SIZEOF(blk_hdr),
-						total_blks);
-				if (NO_FREE_SPACE == bml_full)
-				{
-					bit_clear(cr->blk / bplmap, MM_ADDR(csd));
-					if (cr->blk > cnl->highest_lbm_blk_changed)
-						cnl->highest_lbm_blk_changed = cr->blk;
-					change_bmm = TRUE;
-				} else if (!(bit_set(cr->blk / bplmap, MM_ADDR(csd))))
-				{
-					if (cr->blk > cnl->highest_lbm_blk_changed)
-						cnl->highest_lbm_blk_changed = cr->blk;
-					change_bmm = TRUE;
-				}
-			}	/* end of bitmap processing */
-			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, FALSE))
+			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, FALSE, NULL))
 			{	/* always check the block and return - no assertpro, so last argument is FALSE */
 				if (!jgbl.mur_rollback)
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->stopped, cr->stopped,
 						DB_LEN_STR(reg), cr->blk);
-				assert(gtm_white_box_test_case_enabled);
+				/* The only tests that we know which can produce a DBDANGER are the crash tests (which have
+				 * WBTEST_CRASH_SHUTDOWN_EXPECTED white-box enabled. But there is one exception, the v62000/gtm6348
+				 * subtest, which uses WBTEST_BG_UPDATE_BTPUTNULL & dse to trigger a DBDANGER. So allow that
+				 * additional condition here. Other places where DBDANGER is issued should not have this ||.
+				 */
+				assert(gtm_white_box_test_case_enabled
+					&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)
+						|| (dse_running
+							&& (WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number))));
 			}
 			bt = bt_put(reg, cr->blk);
 			BT_NOT_NULL(bt, cr, csa, reg);
@@ -530,10 +387,11 @@ void wcs_recover(gd_region *reg)
 					>= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 				assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
 				cr_alt->bt_index = 0;				/* cr is more recent */
-				assert(LATCH_CLEAR <= WRITE_LATCH_VAL(cr_alt) && LATCH_CONFLICT >= WRITE_LATCH_VAL(cr_alt));
-				if (UNIX_ONLY(FALSE &&) LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
+				assert((LATCH_CLEAR <= WRITE_LATCH_VAL(cr_alt)) && (LATCH_CONFLICT >= WRITE_LATCH_VAL(cr_alt)));
+				if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
 				{	/* the previous entry is of interest to some process and therefore must be WIP:
-					 * twin and make this (cr->stopped) cache record the active one */
+					 * twin and make this (cr->stopped) cache record the active one.
+					 */
 					assert(0 == cr_alt->twin);
 					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
@@ -547,7 +405,7 @@ void wcs_recover(gd_region *reg)
 						assert((UINTPTR_T)wq + wq->bl == (UINTPTR_T)&cr_alt->state_que);
 						back_link = (que_ent_ptr_t)remqt((que_ent_ptr_t)wq);
 						assert(EMPTY_QUEUE != back_link);
-						SUB_ENT_FROM_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
+						SUB_ENT_FROM_ACTIVE_QUE_CNT(cnl);
 						assert(0 <= cnl->wcs_active_lvl);
 						assert(back_link == (que_ent *)&cr_alt->state_que);
 						/* Now that back_link is out of the active queue, reset its links to 0.
@@ -557,8 +415,6 @@ void wcs_recover(gd_region *reg)
 						back_link->fl = 0;
 						back_link->bl = 0;
 					}
-					UNIX_ONLY(assert(!cr_alt->twin));
-					UNIX_ONLY(cr_alt->twin = 0;)
 					cr->twin = cr_alt->twin;		/* existing cache record may have a twin */
 					cr_alt->cycle++; /* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr_alt->blk = CR_BLKEMPTY;
@@ -567,12 +423,10 @@ void wcs_recover(gd_region *reg)
 					cr_alt->in_tend = 0;
 					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr_alt);
 					WRITE_LATCH_VAL(cr_alt) = LATCH_CLEAR;
-					VMS_ONLY(cr_alt->iosb.cond = 0;)
 					cr_alt->jnl_addr = 0;
 					cr_alt->refer = FALSE;
 					cr_alt->twin = 0;
-					cnl->wc_in_free++;
-					UNIX_ONLY(assert(!cr->twin));
+					ADD_ENT_TO_FREE_QUE_CNT(cnl);
 					if (0 != cr->twin)
 					{	/* inherited a WIP twin from cr_alt, transfer the twin's affections */
 						cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
@@ -589,36 +443,39 @@ void wcs_recover(gd_region *reg)
 			cr->dirty = csd->trans_hist.curr_tn;
 			cr->flushed_dirty_tn = 0;	/* need to be less than cr->dirty. we choose 0. */
 			cr->epid = 0;
-			cr->image_count = 0;
 			cr->in_tend = 0;
 			cr->data_invalid = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(assert(0 == cr->iosb.cond));
-			VMS_ONLY(cr->iosb.cond = 0;)
 			cr->refer = TRUE;
-			cr->stopped = FALSE;
+			cr->stopped = 0;
 			hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 			insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 			insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)active_head);
-			ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
+			ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
 			continue;
 		}
-#if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_DBDANGER == gtm_white_box_test_case_number))
-		{
-			gtm_wbox_input_test_case_count++;
-			/* 50 has no special meaning. Just to trigger this somewhere in the middle once. */
-			if (50 == gtm_wbox_input_test_case_count)
-			{
-				cr->blk = 0;
-				cr->dirty = 1;
-				cr->data_invalid = 1;
+		if (cr->in_tend)
+		{	/* Some process was shot (kill -9 in Unix) in the middle of an update.
+			 * We cannot discard this buffer so send a warning to the user and proceed.
+			 */
+			if (!jgbl.mur_rollback)
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->in_tend, cr->in_tend,
+						DB_LEN_STR(reg), cr->blk);
+			assert(gtm_white_box_test_case_enabled
+				&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
+			cr->in_tend= 0;
+			blk_ptr = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
+			if (!blk_ptr->bsiz)
+			{	/* A new twin was created with an empty buffer and process got shot before it could do
+				 * a gvcst_blk_build. A 0-byte block presents problems with asyncio (since wcs_wtfini
+				 * expects a non-zero return value for # of bytes written by the aio call) so
+				 * just discard this buffer.
+				 */
+				cr->dirty = 0;
 			}
 		}
-#endif
-		if ((CR_BLKEMPTY == cr->blk) || (0 == cr->dirty) VMS_ONLY(|| ((0 != cr->iosb.cond) && (0 == cr->bt_index))))
-		{	/* cache record has no valid buffer attached, or its contents are in the database,
-			 * or it has a more recent twin so we don't even have to care how its write terminated */
+		if ((CR_BLKEMPTY == cr->blk) || (0 == cr->dirty))
+		{	/* cache record has no valid buffer attached, or its contents are in the database */
 			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;
 			cr->bt_index = 0;
@@ -626,78 +483,17 @@ void wcs_recover(gd_region *reg)
 			cr->dirty = 0;
 			cr->flushed_dirty_tn = 0;
 			cr->epid = 0;
-			cr->image_count = 0;
 			cr->in_tend = 0;
 			SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(cr->iosb.cond = 0;)
 			cr->jnl_addr = 0;
 			cr->refer = FALSE;
-			cr->stopped = FALSE;	/* reset cr->stopped just in case it has a corrupt value */
-			cnl->wc_in_free++;
+			cr->stopped = 0;	/* reset cr->stopped just in case it has a corrupt value */
+			ADD_ENT_TO_FREE_QUE_CNT(cnl);
 			continue;
 		}
-		if (cr->data_invalid)
-		{	/* Some process was shot (kill -9 in Unix and STOP/ID in VMS) in the middle of an update.
-			 * In VMS, the kernel extension routine secshr_db_clnup would have rebuilt the block nevertheless.
-			 * In Unix, no rebuild would have been attempted since no kernel extension routine currently available.
-			 * In either case, we do not want to discard this buffer so send a warning to the user and proceed.
-			 */
-			if (!jgbl.mur_rollback)
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
-						DB_LEN_STR(reg), cr->blk);
-			cr->data_invalid = 0;
-		}
-		if (cr->in_tend)
-		{	/* caught by a failure while in bg_update, and less recent than a cache record created by secshr_db_clnup */
-			if (UNIX_ONLY(FALSE &&) (LATCH_CONFLICT == WRITE_LATCH_VAL(cr)) VMS_ONLY( && (0 == cr->iosb.cond)))
-			{	/* must be WIP, with a currently active write */
-				assert(LATCH_CONFLICT >= WRITE_LATCH_VAL(cr));
-				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
-				WRITE_LATCH_VAL(cr) = LATCH_SET;
-				bt = bt_put(reg, cr->blk);
-				BT_NOT_NULL(bt, cr, csa, reg);
-				bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
-				if (CR_NOTVALID == bt->cache_index)
-				{	/* no previous entry for this block; more recent cache record will twin when processed */
-					cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
-					bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
-					insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
-				} else
-				{	/* form the twin with the previous (and more recent) cache record */
-					cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-						< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
-					assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
-					assert(0 == cr_alt->twin);
-					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
-					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
-					cr->bt_index = 0;
-					insqt((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
-				}
-				assert(cr->epid); /* before inserting into WIP queue, ensure there is a writer process for this */
-				insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)wip_head); /* this should be VMS only code */
-			} else
-			{	/* the [current] in_tend cache record is no longer of value and can be discarded */
-				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
-				cr->blk = CR_BLKEMPTY;
-				cr->bt_index = 0;
-				cr->dirty = 0;
-				cr->flushed_dirty_tn = 0;
-				cr->epid = 0;
-				cr->image_count = 0;
-				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
-				WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-				VMS_ONLY(cr->iosb.cond = 0;)
-				cr->jnl_addr = 0;
-				cnl->wc_in_free++;
-			}
-			cr->in_tend = 0;
-			cr->refer = FALSE;
-			continue;
-		}
-		if ((LATCH_SET > WRITE_LATCH_VAL(cr)) VMS_ONLY(|| (WRT_STRT_PNDNG == cr->iosb.cond)))
-		{	/* no process has an interest */
+		if (LATCH_SET > WRITE_LATCH_VAL(cr))
+		{	/* No process has an interest */
 			bt = bt_put(reg, cr->blk);
 			BT_NOT_NULL(bt, cr, csa, reg);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
@@ -709,16 +505,15 @@ void wcs_recover(gd_region *reg)
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 				insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 				insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)active_head);
-				ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
+				ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
 			} else
-			{	/* the bt already has an entry for the block */
+			{	/* The bt already has an entry for the block */
 				cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 				assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
-				if (UNIX_ONLY(FALSE &&) LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
+				if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
 				{	/* the previous cache record is WIP, and the current cache record is the more recent twin */
 					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
 						> ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
-					VMS_ONLY(assert(WRT_STRT_PNDNG != cr->iosb.cond));
 					cr_alt->bt_index = 0;
 					WRITE_LATCH_VAL(cr_alt) = LATCH_CONFLICT;
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
@@ -729,10 +524,11 @@ void wcs_recover(gd_region *reg)
 					hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 					insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 					insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)active_head);
-					ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
+					ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
 				} else
-				{	/* previous cache record is more recent from a cr->stopped record made by sechsr_db_clnup:
-					 * discard this copy as it is old */
+				{	/* Previous cache record is more recent from a cr->stopped record
+					 * made by secshr_db_clnup. Discard this copy as it is old.
+					 */
 					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
 						<= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 					assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr_alt));
@@ -744,20 +540,17 @@ void wcs_recover(gd_region *reg)
 					cr->jnl_addr = 0;
 					cr->refer = FALSE;
 					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
-					cnl->wc_in_free++;
+					ADD_ENT_TO_FREE_QUE_CNT(cnl);
 				}
 			}
 			cr->epid = 0;
-			cr->image_count = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(assert(0 == cr->iosb.cond || WRT_STRT_PNDNG == cr->iosb.cond));
-			VMS_ONLY(cr->iosb.cond = 0;)
 			continue;
 		}
-		/* not in_tend and interlock.semaphore is not LATCH_CLEAR so cache record must be WIP */
+		/* interlock.semaphore is not LATCH_CLEAR so cache record must be WIP in case of no-twinning
+		 * and could be in WIP or Active queue in case of twinning.
+		 */
 		assert(LATCH_CONFLICT >= WRITE_LATCH_VAL(cr));
-		VMS_ONLY(WRITE_LATCH_VAL(cr) = LATCH_SET;)
-		UNIX_ONLY(WRITE_LATCH_VAL(cr) = LATCH_CLEAR;)
 		hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 		bt = bt_put(reg, cr->blk);
 		BT_NOT_NULL(bt, cr, csa, reg);
@@ -769,33 +562,71 @@ void wcs_recover(gd_region *reg)
 			cr->refer = TRUE;
 			insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 		} else
-		{	/* previous cache record must be more recent as this one is WIP */
+		{	/* Whichever cache record (previous or current one) has cr->epid non-zero is the WIP one.
+			 * The other is the more recent one.
+			 */
+			assert(asyncio);
+			assert(twinning_on);
 			cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-			assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-				< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+			/* These two crs should be twins so one of them should have epid set. Only exception is a kill -9
+			 * in a small window in wcs_wtstart after LOCK_BUFF_FOR_WRITE but before csr->epid = process_id.
+			 * In that case, we will not know accurately which is the newer twin (and could even end up adding
+			 * both crs into active queue for the same block) but since kill -9 is not officially supported
+			 * and this is a rare scenario even within that, it is considered okay for now.
+			 */
+			assert(cr_alt->epid || cr->epid || (gtm_white_box_test_case_enabled
+					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)));
+			if (cr_alt->epid)
+			{
+				cr_old = cr_alt;
+				cr_new = cr;
+			} else
+			{
+				cr_old = cr;
+				cr_new = cr_alt;
+			}
+			assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_old->buffaddr))->tn
+				< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_new->buffaddr))->tn);
 			assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
-			VMS_ONLY(
-				assert(WRT_STRT_PNDNG != cr->iosb.cond);
-				assert(FALSE == cr_alt->wip_stopped);
-				WRITE_LATCH_VAL(cr) = LATCH_CONFLICT;
-				cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
-				cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
-			)
-			cr->bt_index = 0;
+			cr_old->bt_index = 0;
+			cr_new->bt_index = GDS_ANY_ABS2REL(csa, bt);
+			cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
+			cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
 			cr->refer = FALSE;
 			insqt((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 		}
-		VMS_ONLY(assert(cr->epid)); /* before inserting into WIP queue, ensure there is a writer process for this */
-		insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)wip_head);
-		UNIX_ONLY(ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock));
+		if (asyncio && cr->epid && cr->aio_issued)
+		{	/* WIP queue is functional AND a process had issued an aio write. Insert cr in WIP queue */
+			WRITE_LATCH_VAL(cr) = LATCH_CONFLICT;
+			insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)wip_head);
+			ADD_ENT_TO_WIP_QUE_CNT(cnl);
+		} else
+		{	/* WIP queue does not exist OR a process had removed it from active queue but got kill -9'ed before
+			 * setting "cr->epid" OR process had readied for write but got kill -9'ed before it issued the aio write.
+			 * Use Active queue in either case.
+			 */
+			cr->epid = 0;
+			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
+			insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)active_head);
+			ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
+		}
 		/* end of processing for a single cache record */
 	}	/* end of processing all cache records */
-	if (change_bmm)
+	assert(0 > GDS_CREATE_BLK_MAX);	/* the minimum block # is 0 which should be greater than the macro.
+					 * this is relied upon by cnl->highest_lbm_blk_changed maintenance code
+					 * in "bm_update" and "sec_shr_map_build".
+					 */
+	if (GDS_CREATE_BLK_MAX != cnl->highest_lbm_blk_changed)
 	{
 		csd->trans_hist.mm_tn++;
-		if (!reg->read_only)
+		if (!reg->read_only && !FROZEN_CHILLED(csd))
 			fileheader_sync(reg);
 	}
+	assert((cnl->wcs_active_lvl + cnl->wcs_wip_lvl + cnl->wc_in_free) == csd->n_bts);
+	assert(cnl->wcs_active_lvl || !active_head->fl);
+	assert(!cnl->wcs_active_lvl || active_head->fl);
+	assert(cnl->wcs_wip_lvl || !wip_head->fl);
+	assert(!cnl->wcs_wip_lvl || wip_head->fl);
 	assertpro(wcs_verify(reg, FALSE, TRUE));	/* expect_damage is FALSE, in_wcs_recover is TRUE */
 	/* skip INCTN processing in case called from mu_rndwn_file().
 	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
@@ -818,7 +649,7 @@ void wcs_recover(gd_region *reg)
 			 * journal records (if it decides to switch to a new journal file).
 			 */
 			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			jnl_status = jnl_ensure_open();
+			jnl_status = jnl_ensure_open(reg, csa);
 			if (0 == jnl_status)
 			{
 				if (0 == jpc->pini_addr)
@@ -836,15 +667,19 @@ void wcs_recover(gd_region *reg)
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	SIGNAL_WRITERS_TO_RESUME(cnl);
 	in_wcs_recover = FALSE;
-	if (!reg->read_only)
+	if (!reg->read_only && !FROZEN_CHILLED(csd))
 	{
-		DCLAST_WCS_WTSTART(reg, 0, dummy_errno);
-		VMS_ONLY(
-			wcs_wtfini(gv_cur_region);	/* try to free as many buffers from the wip queue if write is done */
-		)
+		dummy_errno = wcs_wtstart(reg, 0, NULL, NULL);
+		/* Note: Just like in "db_csh_getn" (see comment there for more details), we do not rely on the call to
+		 * "wcs_wtfini" below succeeding. Therefore we do not check the return value.
+		 */
+		if (asyncio)
+		{
+			DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_recover);	/* used by "wcs_wtfini" */
+			wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_FALSE, NULL);
+				/* try to free as many buffers from the wip queue if write is done */
+		}
 	}
-	if (backup_block_saved)
-		backup_buffer_flush(reg);
 	TP_CHANGE_REG(save_reg);
 	TREF(wcs_recover_done) = TRUE;
 	return;
@@ -856,13 +691,12 @@ void	wcs_mm_recover(gd_region *reg)
 	int			save_errno;
 	gtm_uint64_t		mmap_sz;
 	INTPTR_T		status;
-	struct stat     	stat_buf;
+	struct stat		stat_buf;
 	sm_uc_ptr_t		old_db_addrs[2], mmap_retaddr;
-	boolean_t       	was_crit, read_only;
+	boolean_t		was_crit, read_only;
 	unix_db_info		*udi;
 	const char		*syscall;
 
-	VMS_ONLY(assert(FALSE));
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->hdr == cs_data);
 	assert(!cs_addrs->hdr->clustered);
@@ -884,7 +718,7 @@ void	wcs_mm_recover(gd_region *reg)
 	cs_addrs->db_addrs[0] = NULL;
 	syscall = MEM_UNMAP_SYSCALL;
 #	ifdef _AIX
-	status = shmdt(old_db_addrs[0] - BLK_ZERO_OFF(cs_data));
+	status = shmdt(old_db_addrs[0] - BLK_ZERO_OFF(cs_data->start_vbn));
 #	else
 	status = (INTPTR_T)munmap((caddr_t)old_db_addrs[0], (size_t)(old_db_addrs[1] - old_db_addrs[0]));
 #	endif
@@ -892,15 +726,22 @@ void	wcs_mm_recover(gd_region *reg)
 	{
 		udi = FILE_INFO(gv_cur_region);
 		FSTAT_FILE(udi->fd, &stat_buf, status);
-		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(cs_data);
+		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(cs_data->start_vbn);
 		CHECK_LARGEFILE_MMAP(gv_cur_region, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
-		read_only = gv_cur_region->read_only;
+		/* Note that for a statsdb, gv_cur_region->read_only could be TRUE (and cs_addrs->read_write would be FALSE)
+		 * even though we have write permissions to the statsdb (see "gvcst_init" and "gvcst_init_statsDB"). But in
+		 * that case "cs_addrs->orig_read_write" would have the original permissions when the file got opened. So use
+		 * that for the remap as we want to have read-write permissions on the remap if we had it on the first mmap.
+		 */
+		assert(cs_addrs->orig_read_write || !cs_addrs->read_write);
+		read_only = !cs_addrs->orig_read_write;
 		syscall = MEM_MAP_SYSCALL;
 #		ifdef _AIX
 		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)shmat(udi->fd, (void *)NULL,
 								(read_only ? (SHM_MAP|SHM_RDONLY) : SHM_MAP)));
 		#else
-		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(cs_data), read_only));
+		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz,
+										BLK_ZERO_OFF(cs_data->start_vbn), read_only));
 #		endif
 		GTM_WHITE_BOX_TEST(WBTEST_MEM_MAP_SYSCALL_FAIL, status, -1);
 	}
@@ -915,11 +756,11 @@ void	wcs_mm_recover(gd_region *reg)
 				LEN_AND_STR(syscall), CALLFROM, save_errno);
 	}
 #	if defined(_AIX)
-	mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data);
+	mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data->start_vbn);
 #	endif
 	gds_map_moved(mmap_retaddr, old_db_addrs[0], old_db_addrs[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
 	cs_addrs->db_addrs[0] = mmap_retaddr;
-        cs_addrs->total_blks = cs_addrs->ti->total_blks;
+	cs_addrs->total_blks = cs_addrs->ti->total_blks;
 	if (!was_crit)
 		rel_crit(gv_cur_region);
 	return;

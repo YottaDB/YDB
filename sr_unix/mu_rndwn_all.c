@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,20 +58,18 @@
 #include "do_shmat.h"	/* for do_shmat() prototype */
 #include "shmpool.h" /* Needed for the shmpool structures */
 #include "error.h"
-#ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
-#endif
 
 #define PRINT_AND_SEND_SHMREMOVED_MSG(MSGBUFF, FNAME_LEN, FNAME, SHMID)							\
-{															\
+MBSTART {														\
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), 					\
 			ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);							\
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), 					\
 			ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);							\
-}
+} MBEND
 
 #define PRINT_AND_SEND_REPLPOOL_FAILURE_MSG(MSGBUFF, REPLPOOL_ID, SHMID)						\
-{															\
+MBSTART {														\
 	int		msgid;												\
 	unsigned char	ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;								\
 															\
@@ -82,15 +80,15 @@
 				msgid, 4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(REPLPOOL_ID->instfilename));		\
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), msgid, 4, LEN_AND_STR(ipcs_buff),	\
 			LEN_AND_STR(REPLPOOL_ID->instfilename));							\
-}
+} MBEND
 
 #define PRINT_AND_SEND_DBRNDWN_FAILURE_MSG(MSGBUFF, FNAME, SHMID)							\
-{															\
+MBSTART {														\
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, 		\
 			SHMID, LEN_AND_STR(FNAME));									\
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, 		\
 			SHMID, LEN_AND_STR(FNAME));									\
-}
+} MBEND
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF semid_queue_elem	*keep_semids;
@@ -150,8 +148,13 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 			gv_cur_region->dyn.addr->fname_len = strlen(fname);
 			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
 			if (mu_rndwn_file(gv_cur_region, FALSE))
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
-			else
+			{	/* If this is a statsdb, "mu_rundwn_file" would have invoked rundown on basedb which would
+				 * in turn invoke rundown on the statsdb. The basedb rundown would print the MUFILRNDWNSUC
+				 * message if needed. So skip double-printing it here.
+				 */
+				if (!IS_RDBF_STATSDB(gv_cur_region))
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+			} else
 			{	/* Save semid so that it will not be removed by mu_rndwn_sem_all() */
 				add_to_semids_list(FILE_INFO(gv_cur_region)->semid);
 				*exit_status = ERR_MUNOTALLSEC;
@@ -336,7 +339,8 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 			return FALSE;
 		}
 		udi = FILE_INFO(gv_cur_region);
-		LSEEKREAD(udi->fd, 0, &tsd, SIZEOF(sgmnt_data), status);
+		assert(!udi->fd_opened_with_o_direct);
+		DB_LSEEKREAD(udi, udi->fd, 0, &tsd, SIZEOF(sgmnt_data), status);
 		if (0 != status)
 		{
 			save_errno = errno;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@
 #include "trigger_user_name.h"
 #include "trigger_compare_protos.h"
 #include "trigger_parse_protos.h"
+#include "gtm_trigger_trc.h"
 #include "min_max.h"
 #include "mvalconv.h"			/* Needed for MV_FORCE_* */
 #include "change_reg.h"
@@ -50,6 +51,7 @@
 #include "t_begin.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtm_reservedDB.h"
 
 GBLREF	boolean_t		dollar_ztrigger_invoked;
 GBLREF	gd_addr			*gd_header;
@@ -59,6 +61,8 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 
 LITREF	char 			*trigger_subs[];
 
@@ -73,7 +77,7 @@ error_def(ERR_TRIGNAMBAD);
 /* This error macro is used for all definition errors where the target is ^#t("TRHASH",<HASH>) */
 #define TRHASH_DEFINITION_RETRY_OR_ERROR(HASH, CSA)					\
 {											\
-	if (CDB_STAGNATE > t_tries)							\
+	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))				\
 		t_retry(cdb_sc_triggermod);						\
 	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len,		\
@@ -191,7 +195,7 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
 	if (!gvcst_get(&trig_gbl))
 	{	/* There has to be a #TNAME entry */
-		if (CDB_STAGNATE > t_tries)
+		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
@@ -203,7 +207,7 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 	ptr += len;
 	if ((trig_gbl.str.len == len) || ('\0' != *ptr))
 	{
-		if (CDB_STAGNATE > t_tries)
+		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
@@ -261,7 +265,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		ptr += len;
 		if ((key_val.str.len == len) || ('\0' != *ptr))
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (CDB_STAGNATE > t_tries)
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -297,7 +301,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	ptr += len;
 	if ((key_val.str.len == len) || ('\0' != *ptr))
 	{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-		if (CDB_STAGNATE > t_tries)
+		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 		rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -363,6 +367,12 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		trig_stats[STATS_ERROR_TRIGFILE]++;
 		return TRIG_FAILURE;
 	}
+	if (trig_stats[STATS_ERROR_TRIGFILE])
+	{	/* If an error has occurred during trigger processing the above validity check is all we need */
+		CONV_STR_AND_PRINT("No errors processing trigger delete by name: ", orig_name_len, trigger_name);
+		/* Return success because there was no error with the name to delete */
+		return TRIG_SUCCESS;
+	}
 	name_tail_ptr = trigger_name + trigger_name_len - 1;
 	if ((TRIGNAME_SEQ_DELIM == *name_tail_ptr) || wildcard)
 		trigger_name_len--; /* drop the trailing # sign for wildcard */
@@ -378,6 +388,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	INCR_AND_PUSH_MV_STENT(trigger_count); /* Protect trigger_count from garbage collection */
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 	{
+		if (IS_STATSDB_REGNAME(reg))
+			continue;
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 		csa = cs_addrs;
 		if (NULL == csa)	/* not BG or MM access method */
@@ -397,14 +409,14 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			{
 				if (reg->read_only)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
-				SAVE_TRIGGER_REGION_INFO(save_currkey);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				ptr = trig_gbl.str.addr;
 				trigvn_len = MIN(trig_gbl.str.len, MAX_MIDENT_LEN);
 				STRNLEN(ptr, trigvn_len, trigvn_len);
 				ptr += trigvn_len;
 				if ((trig_gbl.str.len == trigvn_len) || ('\0' != *ptr))
 				{	/* We expect $c(0) in the middle of ptr. If not found, this is a restartable situation */
-					if (CDB_STAGNATE > t_tries)
+					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
@@ -416,7 +428,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 				A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
 				if (1 > trig_indx)
 				{	/* Trigger indexes start from 1 */
-					if (CDB_STAGNATE > t_tries)
+					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
@@ -427,7 +439,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 				BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
 				if (!gvcst_get(trigger_count))
 				{	/* We just looked this up, if it doesn't exist then assume a concurrent update occurred */
-					if (CDB_STAGNATE > t_tries)
+					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 					rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
@@ -457,6 +469,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 						 * for a comment on why it is okay for db_dztrigger_cycle to be incremented
 						 * more than once in the same transaction.
 						 */
+						DBGTRIGR((stderr, "trigger_delete_name: CSA->db_dztrigger_cycle=%d\n",
+									csa->db_dztrigger_cycle));
 						csa->db_dztrigger_cycle++;
 					}
 					trig_stats[STATS_DELETED]++;
@@ -468,7 +482,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					}
 				}
 				trigger_count->mvtype = 0; /* allow stp_gcol to release the current contents if necessary */
-				RESTORE_TRIGGER_REGION_INFO(save_currkey);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
 				triggers_deleted++;
 			}
 			if (!wildcard)
@@ -578,7 +592,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 		{
 			if (((TRIGNAME_SUB == sub_indx) || (CMD_SUB == sub_indx) || (CHSET_SUB == sub_indx)))
 			{ /* CMD, NAME and CHSET cannot be zero length */
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -692,7 +706,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 					if (((TRIGNAME_SUB == sub_indx) || (CMD_SUB == sub_indx) ||
 						 (CHSET_SUB == sub_indx)))
 					{ /* CMD, NAME and CHSET cannot be zero length */
-						if (CDB_STAGNATE > t_tries)
+						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 							t_retry(cdb_sc_triggermod);
 						assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 						rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
@@ -711,7 +725,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 					{
 						if (MAX_BUFF_SIZE <= tmp_len)
 						{ /* Exceeding the temporary buffer is impossible, restart*/
-							if (CDB_STAGNATE > t_tries)
+							if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 								t_retry(cdb_sc_triggermod);
 							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 							rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
@@ -790,6 +804,8 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 	triggers_deleted = 0;
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 	{
+		if (IS_STATSDB_REGNAME(reg))
+			continue;
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
 		csa = cs_addrs;
 		if (NULL == csa)	/* not BG or MM access method */
@@ -834,7 +850,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 				LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
 			if (!gvcst_get(&trigger_cycle))
 			{	/* Found hasht record, there must be #CYCLE */
-				if (CDB_STAGNATE > t_tries)
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
 						curr_gbl_name.str.len, curr_gbl_name.str.addr,
@@ -845,7 +861,8 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 						curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#CYCLE\""),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			} else {
+			} else
+			{
 				mv_cycle_ptr = &trigger_cycle;
 				cycle = MV_FORCE_UINT(mv_cycle_ptr);
 				cycle++;
@@ -860,7 +877,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 				/* quit:$length(after_hash_cycle)=0 */
 				if (0 != after_hash_cycle.str.len)
 				{	/* Found hasht record after #LABEL, but #COUNT is not defined; Force removal */
-					if (CDB_STAGNATE > t_tries)
+					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) MAKE_MSG_WARNING(ERR_TRIGDEFBAD), 6,
 							curr_gbl_name.str.len, curr_gbl_name.str.addr,
@@ -908,6 +925,8 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 				 * on this region, will re-read. See trigger_update.c for a comment on why it is okay
 				 * for db_dztrigger_cycle to be incremented more than once in the same transaction
 				 */
+				DBGTRIGR((stderr, "trigger_delete_all: CSA->db_dztrigger_cycle=%d\n",
+					  csa->db_dztrigger_cycle));
 				csa->db_dztrigger_cycle++;
 			}
 		}

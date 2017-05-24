@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,14 +126,15 @@ void dse_all(void)
 	region_list = NULL;
 	for (i = 0, reg = original_header->regions; i < original_header->n_regions; i++, reg++)
 	{
-		if ((dba_bg != REG_ACC_METH(reg)) && (dba_mm != REG_ACC_METH(reg)))
+		if (!IS_REG_BG_OR_MM(reg))
 		{
 			util_out_print("Skipping region !AD: not BG or MM access", TRUE, REG_LEN_STR(reg));
 			continue;
 		}
 		if (!reg->open)
 		{
-			util_out_print("Skipping region !AD as it is not bound to any namespace.", TRUE, REG_LEN_STR(reg));
+			if (!IS_STATSDB_REG(reg))
+				util_out_print("Skipping region !AD as it is not bound to any namespace.", TRUE, REG_LEN_STR(reg));
 			continue;
 		}
 		if (dump)
@@ -144,17 +145,15 @@ void dse_all(void)
 			dse_dmp_fhead();
 			assert(!dse_all_dump);	/* should have been reset by "dse_dmp_fhead" */
 		} else
-		{	/* put on region list in order of ftok value so processed in same order that crits are obtained */
-			csa = &FILE_INFO(reg)->s_addrs;
+			/* put on region list in order of ftok value so processed in same order that crits are obtained */
 			insert_region(reg, &(region_list), NULL, SIZEOF(tp_region));
-		}
 	}
 	if (!dump)
 	{	/* Now run the list of regions in the sorted ftok order to execute the desired commands */
 		for (rg = region_list; NULL != rg; rg = rg->fPtr)
 		{
 			gv_cur_region = rg->reg;
-			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+			assert(IS_REG_BG_OR_MM(gv_cur_region));
 			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 			csd = cs_addrs->hdr;
 			patch_curr_blk = get_dir_root();
@@ -170,7 +169,7 @@ void dse_all(void)
 				crash_count = cs_addrs->critical->crashcnt;
 			if (freeze)
 			{
-				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE))
+				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE, FALSE, FALSE))
 				{
 					hiber_start(1000);
 					if (util_interrupt)
@@ -179,8 +178,10 @@ void dse_all(void)
                         	                break;
 					}
 				}
-				if (freeze != !(csd->freeze))
+				if (freeze != !(FROZEN(csd)))
+				{
 					util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(gv_cur_region));
+				}
 			}
 			was_crit = cs_addrs->now_crit;
 			if (seize)
@@ -217,7 +218,7 @@ void dse_all(void)
 			}
 			if (nofreeze)
 			{
-				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE))
+				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE, FALSE, FALSE))
 					util_out_print("Region: !AD is frozen by another user, not releasing freeze", TRUE,
 						REG_LEN_STR(gv_cur_region));
 				else

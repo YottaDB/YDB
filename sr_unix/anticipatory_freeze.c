@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -377,7 +377,7 @@ void clear_fake_enospc_if_master_dead(void)
 		{
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 			{
-				if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
+				if (!IS_REG_BG_OR_MM(r_local))
 					continue;
 				csa = REG2CSA(r_local);
 				if ((NULL != csa) && (NULL != csa->nl))

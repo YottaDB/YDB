@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,8 +108,8 @@ error_def(ERR_TEXT);
 	return TRUE;													\
 }
 
-boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t *retstat, boolean_t *bypass,
-			boolean_t *ftok_counter_halted, boolean_t incr_cnt)
+boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *timedout, semwait_status_t *retstat,
+			boolean_t *bypass, boolean_t *ftok_counter_halted, boolean_t incr_cnt)
 {
 	int			status = SS_NORMAL, save_errno;
 	int			ftok_sopcnt, sem_pid;
@@ -145,26 +145,33 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 		{
 			save_errno = errno;
 			if (SEM_REMOVED(save_errno))
+			{
+				*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
 				continue;
+			}
 			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
 		}
 		SEMOP(ftokid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
 		if (-1 != status)
 		{
 			udi->counter_ftok_incremented = (FTOK_SOPCNT_NO_INCR_COUNTER != ftok_sopcnt);
+			/* Input parameter *bypass could be OK_TO_BYPASS_FALSE or OK_TO_BYPASS_TRUE (for "do_blocking_semop" call).
+			 * But if we are returning without going that path, reset "*bypass" to reflect no bypass happened.
+			 */
+			*bypass = FALSE;
 			RETURN_SUCCESS(reg);
 		}
 		assert(EINTR != errno);
 		save_errno = errno;
 		if (EAGAIN == save_errno)
 		{	/* someone else is holding it */
-			if (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_hrtbt_delta))
+			if (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_delta_secs))
 			{
 				sem_pid = semctl(ftokid, 0, GETPID);
 				if (-1 != sem_pid)
 					RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, ERR_SEMWT2LONG, 0, sem_pid);
 				save_errno = errno; /* fall-through */
-			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, start_hrtbt_cntr, retstat, reg, bypass,
+			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, stacktrace_time, timedout, retstat, reg, bypass,
 						     ftok_counter_halted))
 			{
 				if (*ftok_counter_halted)	/* set by "do_blocking_semop" */
@@ -187,7 +194,10 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 			continue;
 		}
 		if (SEM_REMOVED(save_errno))
+		{
+			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
 			continue;
+		}
 		assert(EINTR != save_errno);
 		RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl_or_semop, 0, ERR_CRITSEMFAIL, 0);
 	}
@@ -287,6 +297,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 			save_errno = errno;
 			if (immediate || !SEM_REMOVED(save_errno))
 				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semctl()", save_errno);
+			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
 			continue;
 		}
 		save_errno = errno;
@@ -366,7 +377,10 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 		}
 		assert(0 != save_errno);
 		if (SEM_REMOVED(save_errno))
+		{
+			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
 			continue;
+		}
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()/semctl()", save_errno);
 	} /* end for loop */
 	assert(-1 == status);
@@ -460,7 +474,8 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
  * 	Assumes that ftok semaphore was already locked. Now release it.
  * Parameters:
  *	reg		: Regions structure
- * 	IF decr_cnt == TRUE, it will decrement counter semaphore.
+ * 	IF decr_cnt == DECR_CNT_TRUE (1), it will decrement counter semaphore & remove it if needed.
+ * 	IF decr_cnt == DECR_CNT_SAFE (2), it will decrement counter semaphore but not remove the semaphore.
  * 	IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
@@ -476,6 +491,8 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 
 	SETUP_THREADGBL_ACCESS;
 	assert(NULL != reg);
+	assert(DECR_CNT_SAFE != DECR_CNT_TRUE);
+	assert(DECR_CNT_SAFE != DECR_CNT_FALSE);
 	/* The following assert is to ensure we never hold more than one FTOK semaphore at any point in time.  The only exception is
 	 * if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we came to rundown code that invoked
 	 * ftok_sem_lock() on a different region. Hence the process_exiting check below.
@@ -491,25 +508,29 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 	if (decr_cnt)
 	{
 		assert(udi->counter_ftok_incremented);
-		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
+		if (DECR_CNT_SAFE != decr_cnt)
 		{
-			save_errno = errno;
-			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
-			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
-		}
-		if (DB_COUNTER_SEM_INCR >= ftok_semval)	/* checking against 0, in case already we decremented semaphore number 1 */
-		{
-			if (0 != sem_rmid(udi->ftok_semid))
+			if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
 			{
 				save_errno = errno;
 				GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
-				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "sem_rmid()", save_errno);
+				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 			}
-			udi->ftok_semid = INVALID_SEMID;
-			ftok_sem_reg = NULL;
-			udi->grabbed_ftok_sem = FALSE;
-			udi->counter_ftok_incremented = FALSE;
-			return TRUE;
+			/* Below checks against 0, in case already we decremented semaphore number 1 */
+			if (DB_COUNTER_SEM_INCR >= ftok_semval)
+			{
+				if (0 != sem_rmid(udi->ftok_semid))
+				{
+					save_errno = errno;
+					GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+					ISSUE_CRITSEMFAIL_AND_RETURN(reg, "sem_rmid()", save_errno);
+				}
+				udi->ftok_semid = INVALID_SEMID;
+				ftok_sem_reg = NULL;
+				udi->grabbed_ftok_sem = FALSE;
+				udi->counter_ftok_incremented = FALSE;
+				return TRUE;
+			}
 		}
 		if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, semflag)))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,6 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 #	endif
 		src = ((sm_uc_ptr_t)(rp + 1)) + (match - tmpCmpc);
 		dstTop--;	/* to check for double KEY_DELIMITER byte sequence without exceeding buffer allocation bounds */
-		assert((dstEnd == dstBase) || (KEY_DELIMITER != *(dstEnd - 1)) || ((match == tmpCmpc) && !match_adjusted));
 		for ( ; ; )
 		{
 			if (dstEnd >= dstTop)

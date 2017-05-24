@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,10 +12,12 @@
 
 #include "mdef.h"
 
-#include <sys/types.h>
+#include "gtm_fcntl.h"	/* needed for silly aix's expansion of open to open64 */
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_signal.h"
+
+#include <sys/types.h>
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -39,24 +41,27 @@ GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4	fast_lock_count;
 
-/* Similiar to dsk_write but differs in two important ways:
-   1) We write direct from the given buffer rather than from a cache record's buffer.
-   2) This routine takes care of the maint of blks_to_upgrd in the file-header for
-      these non-cached writes.
-*/
+/*
+ * 1) We write direct from the given buffer to a block in the database file on disk rather than from a cache record's buffer.
+ * 2) This routine takes care of the maint of blks_to_upgrd in the file-header for these non-cached writes.
+ */
 int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ver ondsk_blkver)
 {
 	unix_db_info		*udi;
 	int4			size, save_errno;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	sm_uc_ptr_t		save_buff;
 	int			in_len, this_blk_size, gtmcrypt_errno;
 	char			*in;
 	gd_segment		*seg;
 	boolean_t		use_new_key;
+#	ifdef DEBUG
+	sm_uc_ptr_t		save_buff;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
-	udi = (unix_db_info *)(reg->dyn.addr->file_cntl->file_info);
+	SETUP_THREADGBL_ACCESS;
+	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
 	assert(NULL != csd);
@@ -99,7 +104,15 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		size =(int)ROUND_UP(size, csa->fullblockwrite_len); /* round size up to next full logical filesys block. */
 	assert(size <= csd->blk_size);
 	assert(FALSE == reg->read_only);
-	assert(!csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csd);
+	/* This function is called by "bml_init" which in turn can be called by "mucregini" or "gdsfilext". The former is
+	 * a case where the region is not yet open. csa is usable to a limited extent in the former case but since shared
+	 * memory is not set up yet, most of it (e.g. csa->nl etc.) are not usable in the former case. But it is usable
+	 * completely in the latter case. Therefore take care using "csa" below. Hence the "reg->open" usages before csa access.
+	 * The reg->open check was not necessary until statsdb support because the only caller of "mucregini" was MUPIP CREATE
+	 * which would not anyways open the journal pool. But now that GT.M can call "mucregini" to create a statsdb while
+	 * it has other basedbs open, it could have the jnlpool open which is why we need this safety check.
+	 */
+	assert(!reg->open || !csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csd);
 	assert(size <= csd->blk_size);
 	if (udi->raw)
 		size = ROUND_UP(size, DISK_BLOCK_SIZE);	/* raw I/O must be a multiple of DISK_BLOCK_SIZE */
@@ -124,11 +137,19 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 			}
 		}
 	}
-	DB_LSEEKWRITE(csa, udi->fn, udi->fd,
-		(DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * csd->blk_size),
-		buff,
-		size,
-		save_errno);
+	if (udi->fd_opened_with_o_direct)
+	{
+		assert(reg->open);	/* should be coming in through "gdsfilext" after having done a "gvcst_init" */
+		/* This means dio_buff.aligned would already have been allocated to hold at least one GDS block. Use it. */
+		size = ROUND_UP2(size, DIO_ALIGNSIZE(udi));
+		assert(DIO_BUFF_NO_OVERFLOW((TREF(dio_buff)), size));
+		assert(size <= csd->blk_size);
+		memcpy((TREF(dio_buff)).aligned, buff, size);
+		DEBUG_ONLY(save_buff = buff;)	/* for DBG purposes */
+		buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
+	}
+	DB_LSEEKWRITE(reg->open ? csa : NULL, udi, udi->fn, udi->fd,
+			(BLK_ZERO_OFF(csd->start_vbn) + (off_t)blk * csd->blk_size), buff, size, save_errno);
 	DEBUG_ONLY(reformat_buffer_in_use--;)
 	assert(0 == reformat_buffer_in_use);
 	--fast_lock_count; 		/* reformat buffer is no longer necessary */

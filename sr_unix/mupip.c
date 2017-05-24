@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #include "main_pragma.h"
 
 #include "gtm_inet.h"
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
@@ -78,6 +78,7 @@ GBLREF	global_latch_t		defer_latch;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];
+GBLREF	void			(*mupip_exit_fp)(int errcode);
 
 GBLDEF	CLI_ENTRY		*cmd_ary = &mupip_cmd_ary[0];	/* Define cmd_ary to be the MUPIP specific cmd table */
 
@@ -106,6 +107,7 @@ int main (int argc, char **argv)
 		display_prompt();
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
 	init_gtm();
+	mupip_exit_fp = mupip_exit;	/* Initialize function pointer for use during MUPIP */
 	while (TRUE)
 	{	func = 0;
 		if ((res = parse_cmd()) == EOF)

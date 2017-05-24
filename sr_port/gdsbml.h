@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +65,6 @@
 
 #define NO_FREE_SPACE		-1
 
-/* MAP_RD_FAIL is hard coded into the file BML_GET_FREE.MAR */
 #define MAP_RD_FAIL		-2
 #define EXTEND_SUSPECT		-3
 #define FILE_EXTENDED		-4

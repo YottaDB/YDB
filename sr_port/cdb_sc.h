@@ -42,6 +42,15 @@ GBLREF	boolean_t	is_final_retry_code_lchar[];
 			? is_final_retry_code_uchar[STATUS - 'A']	/* upper case */	\
 			: is_final_retry_code_lchar[STATUS - 'a'])))	/* lower case */
 
+/* This macro is used in places that don't rely on t_retry() to handle the possibility of a retry in the final try.
+ * For example, database trigger handling code assumes that a structural issue with a trigger global is due to a
+ * concurrent update and not a broken entry in the DB. Once the final retry has been exhausted, the trigger code
+ * path issues a TRIGDEFBAD error. IS_FINAL_RETRY_CODE enhances that check against CDB_STAGNATE to ensure that the
+ * final retry has truly been exhausted.
+ */
+#define UPDATE_CAN_RETRY(TRIES, CURRSTATUS)							\
+	((CDB_STAGNATE > TRIES) || (IS_FINAL_RETRY_CODE(CURRSTATUS)))
+
 #define TP_TRACE_HIST_MOD(BLK_NUM, BLK_TARGET, N, CSD, HISTTN, BTTN, LEVEL)						\
 {															\
 	GBLREF	block_id		t_fail_hist_blk[];								\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,8 +248,9 @@ boolean_t mur_close_files(void)
 			}
 			assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit)
 					|| (!murgbl.clean_exit && !rctl->db_updated));
-			if (jgbl.onlnrlbk)
+			if (jgbl.onlnrlbk && (repl_open == rctl->repl_state))
 			{
+				assert(!IS_STATSDB_CSA(csa));
 				if (murgbl.incr_onln_rlbk_cycle)
 				{
 					csa->nl->root_search_cycle++;
@@ -411,7 +412,7 @@ boolean_t mur_close_files(void)
 				if (!was_crit)
 					grab_crit(reg);
 				assert(JNL_ENABLED(csd));
-				jnl_status = jnl_ensure_open();
+				jnl_status = jnl_ensure_open(reg, csa);
 				assert(0 == jnl_status);
 				if (0 == jnl_status)
 				{
@@ -751,6 +752,7 @@ boolean_t mur_close_files(void)
 				 * timeout with a SEQNUMSEARCHTIMEOUT error (if no GT.M processes have any flush timers active and
 				 * if online rollback does not do the flush either) so it is actually necessary.
 				 */
+				assert(!FROZEN_CHILLED(cs_data));
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			}
 			rundown_status = gds_rundown(); /* does the final rel_crit */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -392,8 +392,7 @@
 #define MORE_TO_TRANSFER -99
 #define DUMMY_TCOMMIT_LENGTH 3	/* A dummy commit is 09\n */
 
-#define FILTER_HALF_TIMEOUT	4			/* 4 heartbeats : 32 seconds. */
-#define FILTER_FULL_TIMEOUT	8			/* 4 heartbeats : 64 seconds. */
+#define FILTER_HALF_TIMEOUT_TIME	(32 * MILLISECS_IN_SEC)
 
 /* repl_filter_recv receive state */
 
@@ -449,10 +448,6 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	boolean_t		is_src_server, is_rcvr_server;
 #ifdef UNIX
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
-GBLREF	volatile uint4		heartbeat_counter;
-#ifdef DEBUG
-GBLREF boolean_t		heartbeat_started;
-#endif
 #endif
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		err_same_as_out;
@@ -738,7 +733,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 	struct pollfd	poll_fdlist[1];
 #endif
 	struct timeval	repl_filter_poll_interval;
-	boolean_t	half_timeout_done;
+	boolean_t	half_timeout_done, timedout;
 
 	for (; ;)
 	{
@@ -820,10 +815,9 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			 * which indicates the end of a mini-transaction or a commit record for an actual transaction.
 			 */
 			assert(-1 != repl_filter_pid);
-			assert(heartbeat_started);
 			half_timeout_done = FALSE;
 			if (send_done)
-				orig_heartbeat = heartbeat_counter;
+				TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
 			do
 			{
 				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
@@ -835,20 +829,33 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 				/* EINTR/ENOMEM -- check if it's time to take the stack trace. */
 				if (send_done)
 				{
-					if (!half_timeout_done && ((heartbeat_counter - orig_heartbeat) >= FILTER_HALF_TIMEOUT))
-					{
-						/* Half-timeout : take C-stack of the filter program. */
+					if (!timedout)
+						continue;
+					if (!half_timeout_done)
+					{	/* Half-timeout : take C-stack of the filter program. */
 						half_timeout_done = TRUE;
+						TIMEOUT_DONE(timedout);
+						TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
 						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_HALF_TIME", process_id, repl_filter_pid, 0);
-					} else if ((heartbeat_counter - orig_heartbeat) >= FILTER_FULL_TIMEOUT)
-					{
-						/* Full-timeout : take C-stack of the filter program. */
+					}
+					assert(half_timeout_done);
+					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferredd. If the
+					 * stack trace takes more than 32 seconds, the next timeout interrupt will be deferred
+					 * until gtm_system(BYPASSOK) returns. At which point timedout will be TRUE and there will
+					 * be no signal received by GT.M to interrupt the blocking read() at the begining of the
+					 * loop.  So we handle the timeout now and skip the second stack trace.
+					 */
+					if (half_timeout_done && timedout)
+					{	/* Full-timeout : take C-stack of the filter program. */
 						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_FULL_TIME", process_id, repl_filter_pid, 1);
+						TIMEOUT_DONE(timedout);
 						return (repl_errno = EREPL_FILTERTIMEDOUT);
 					}
 					continue;
 				}
 			} while (TRUE);
+			if (send_done)
+				TIMEOUT_DONE(timedout);
 #			else
 			while (-1 == (r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining))
 					&& (EINTR == errno || ENOMEM == errno))

@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -55,7 +55,7 @@ set dir_structure      = "inc pct src tools log $build_types"
 set gtm_src_types = "c m64 s msg"
 set gtm_inc_types = "h max mac si"
 set gtm_pct_types = "mpt m hlp"
-set gtm_tools_types = "gtc sed awk sh csh list txt exp mk ksh cmake tab in"
+set gtm_tools_types = "gtc sed awk sh csh list txt exp mk ksh cmake tab in xc"
 
 #####################################################################################
 

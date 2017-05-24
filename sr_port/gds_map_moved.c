@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,19 +27,20 @@
 #include "gds_map_moved.h"
 #include "hashtab_mname.h"
 
+GBLREF gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gv_namehead             *gv_target_list;
-
 
 void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top, size_t mmap_sz)
 {
 	int		hist_index;
 	sm_long_t	adj;
 	srch_hist	*hist, *hist1, *hist2;
+	gd_region	*baseDBreg, *reg;
 	gv_namehead	*gvt;
-	sgmnt_addrs	*csa;
-	sm_uc_ptr_t	buffaddr;
+	sgmnt_addrs	*baseDBcsa, *csa;
+	sm_uc_ptr_t	buffaddr, gvstats_rec_p;
 
 	csa = cs_addrs;
 	assert(csa->now_crit);
@@ -77,6 +78,23 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 						hist->h[hist_index].blk_num = HIST_TERMINATOR;
 					}
 				}
+			}
+		}
+	}
+	reg = gv_cur_region;
+	assert(&FILE_INFO(reg)->s_addrs == csa);
+	if (IS_STATSDB_REGNAME(reg))
+	{	/* This is a statsdb. Adjust the baseDB's gvstats_rec_p pointer to the stats record in this statsdb */
+		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+		assert(baseDBreg->open);
+		if (baseDBreg->open)	/* be safe in pro even though we have an assert above */
+		{
+			baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+			gvstats_rec_p = (sm_uc_ptr_t)baseDBcsa->gvstats_rec_p;
+			if ((old_base <= gvstats_rec_p) && (old_top > gvstats_rec_p))
+			{
+				gvstats_rec_p += adj;
+				baseDBcsa->gvstats_rec_p = (gvstats_rec_t *)gvstats_rec_p;
 			}
 		}
 	}

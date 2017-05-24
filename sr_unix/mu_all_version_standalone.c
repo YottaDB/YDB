@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +51,6 @@ error_def(ERR_FTOKKEY);
 error_def(ERR_SEMID);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
-ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /* Aquire semaphores that on on all V4.x releases are the access control semaphores. In pre V4.2 releases
    they were based on an FTOK of the database name with an ID of '1'. In V4.2 and later, they are based on
@@ -145,7 +145,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	shmid = shmget(sem_inf[0].ftok_key, 0, RWDALL);
 	if (-1 == shmid)
 	{	/* That failed, second check is if shmid stored in file-header (if any) exists */
-		fd = OPEN(db_fn, O_RDONLY);
+		fd = OPEN(db_fn, O_RDONLY);	/* udi not available so OPENFILE_DB not used */
 		if (FD_INVALID == fd)
 		{
 			save_errno = errno;

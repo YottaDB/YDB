@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -584,9 +584,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Change log to %s successful\n",gtmrecv_local->log_file);
 		}
-		upd_proc_local->changelog = gtmrecv_local->changelog; /* Pass changelog request to the update process */
 		/* NOTE: update process and receiver each ignore any setting specific to the other (REPLIC_CHANGE_UPD_LOGINTERVAL,
 		 * REPLIC_CHANGE_LOGINTERVAL) */
+		upd_proc_local->changelog = gtmrecv_local->changelog; /* Pass changelog request to the update process */
 		gtmrecv_local->changelog = 0;
 	}
 	if (0 == *pending_data_len && !gtmrecv_logstats && gtmrecv_local->statslog)
