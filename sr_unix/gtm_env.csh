@@ -47,6 +47,11 @@
 # re-initialize them for each subshell (i.e., don't undo any explicit changes that
 # have been made since the last version change).
 
+# customization for non-GG environment
+setenv gtm_version_change 1
+setenv gtm_exe $gtm_dist
+setenv gtm_inc "$gtm_dist:h/inc"
+# customization ends
 if ( $?gtm_version_change == "1" ) then
 
 	# Generic archiver information:
@@ -227,11 +232,33 @@ if ( $?prompt == "1" ) then
 endif
 
 # Platform-specific overrides, if any:
-
+# customization for non-GG environment
+if (! $?gtm_tools) then
+	set gtm_tools = $gtm_dist:h/tools
+	set gtm_tools_set
+endif
+# customization ends
 if ( -f $gtm_tools/gtm_env_sp.csh ) then
 	source $gtm_tools/gtm_env_sp.csh
 endif
+# customization for non-GG environment
+if ($?gtm_tools_set) then
+	unset gtm_tools gtm_tools_set
+endif
+# customization ends
 
 # Allow platform specific gt_ld_ci related symbol changes
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
 setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"
+# customization for non-GG environment
+if !($?gt_as_option_I) then
+        setenv  gt_as_option_I  "-I$gtm_inc"
+else
+        setenv  gt_as_option_I  "$gt_as_option_I -I$gtm_inc"
+endif
+if !($?gt_cc_option_I) then
+        setenv  gt_cc_option_I  "-I$gtm_inc"
+else
+        setenv  gt_cc_option_I  "$gt_cc_option_I -I$gtm_inc"
+endif
+# customization ends
