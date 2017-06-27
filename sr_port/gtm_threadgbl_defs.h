@@ -2,6 +2,9 @@
  *								*
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *                                                              *
+ * Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.    *
+ * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -459,6 +462,10 @@ THREADGBLDEF(ok_to_see_statsdb_regs,		boolean_t)	/* FALSE implies statsdb region
 THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one region with reg->was_open = TRUE */
 /* Debug values */
 #ifdef DEBUG
+THREADGBLDEF(LengthReentCnt,			boolean_t)	/* Reentrancy count for GetPieceCountFromPieceCache() used by 2
+								 * argument $LENGTH() calls */
+THREADGBLDEF(ZLengthReentCnt,			boolean_t)	/* Reentrancy count for ZGetPieceCountFromPieceCache() used by 2
+								 * argument $ZLENGTH() calls */
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to count time
 										 * process was continued. */

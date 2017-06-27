@@ -2,6 +2,9 @@
 !								!
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
+!                                                               !
+! Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.     !
+! All rights reserved.                                          !
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -243,7 +246,7 @@ JNLSUCCESS	<!AD successful>/success/fao=2!/ansi=0
 GBLNAME		<Either an identifier or a left parenthesis is expected after a ^ in this context>/error/fao=0!/ansi=29
 GBLOFLOW	<Database segment is full>/error/fao=0!/ansi=0
 CORRUPT		<Corrupt input in Blk # !UL, Key #!UL; resuming with next global block>/error/fao=2!/ansi=0
-GTMCHECK	<Internal GT.M error--Report to your GT.M Support Channel>/fatal/fao=0!/ansi=0
+GTMCHECK	<Internal YottaDB error--Report to your YottaDB Support Channel>/fatal/fao=0!/ansi=0
 GVDATAFAIL	<Global variable $DATA function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 EORNOTFND	<!_!AD!/!_!_!_End of record not found>/error/fao=2!/ansi=0
 GVGETFAIL	<Global variable retrieval failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -519,7 +522,7 @@ MTINVLAB	<Invalid label type specified in magtape OPEN>/error/fao=0!/ansi=0
 TXTSRCMAT	<M object module and source file do not match>/error/fao=0!/ansi=0
 CCENOGROUP	<CCE does not have GROUP privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
 BADDBVER	<Incorrect database version: !AD>/error/fao=2!/ansi=0
-LINKVERSION	<This image must be relinked with the current version of GT.M>/fatal/fao=0!/ansi=0
+LINKVERSION	<This image must be relinked with the current version of YottaDB>/fatal/fao=0!/ansi=0
 TOTALBLKMAX	<Extension exceeds maximum total blocks.  Not extending.>/error/fao=0!/ansi=0
 LOADCTRLY	<User interrupt encountered during load.  Load halting.>/info/fao=0!/ansi=0
 CLSTCONFLICT	<Cluster conflict opening database file !AD; could not secure access.  Already open on node !AD.>/error/fao=4!/ansi=0
@@ -671,7 +674,7 @@ UNUSEDMSG670	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
-CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.>/info/fao=0!/ansi=0
+CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your YottaDB Support Channel.>/info/fao=0!/ansi=0
 NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
@@ -836,7 +839,7 @@ ASC2EBCDICCONV	<ASCII/EBCDIC conversion failed when calling !AD>/error/fao=2!/an
 GTMSECSHRSTART	<!AD - !UL : gtmsecshr failed to startup>/error/fao=3!/ansi=0
 DBVERPERFWARN1	<Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
 FILEIDGBLSEC	<File ID in global section does not match with the database file !AD>/error/fao=2!/ansi=0
-GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
+GBLSECNOTGDS	<Global Section !AD is not a YottaDB global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
@@ -926,7 +929,7 @@ DBFSTHEAD	<!AD File smaller than database header>/error/fao=2!/ansi=0
 DBCREINCOMP	<!AD Header indicates database file creation was interrupted before completion>/error/fao=2!/ansi=0
 DBFLCORRP	<!AD Header indicates database file is corrupt>/error/fao=2!/ansi=0
 DBHEADINV	<!AD Header size not valid for database>/error/fao=2!/ansi=0
-DBINCRVER	<!AD Incorrect version of GT.M database>/error/fao=2!/ansi=0
+DBINCRVER	<!AD Incorrect version of YottaDB database>/error/fao=2!/ansi=0
 DBINVGBL	<!AD Invalid mixing of global names>/error/fao=2!/ansi=0
 DBKEYGTIND	<!AD Key greater than index key>/error/fao=2!/ansi=0
 DBGTDBMAX	<!AD Key larger than database maximum>/error/fao=2!/ansi=0
@@ -1112,8 +1115,8 @@ GVFAILCORE	<A core file is being created for later analysis if necessary>/error/
 DBCDBNOCERTIFY	<Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN>/error/fao=2!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
-JOBEXAMDONE	<GT.M process !UL completed job examine to !AD>/info/fao=3!/ansi=0
-JOBEXAMFAIL	<GT.M process !UL executing $ZJOBEXAM function failed with the preceding error message>/error/fao=1!/ansi=0
+JOBEXAMDONE	<YottaDB process !UL completed job examine to !AD>/info/fao=3!/ansi=0
+JOBEXAMFAIL	<YottaDB process !UL executing $ZJOBEXAM function failed with the preceding error message>/error/fao=1!/ansi=0
 JOBINTRRQST	<Job interrupt requested>/error/fao=0!/ansi=0
 ERRWZINTR	<Error while processing $ZINTERRUPT>/error/fao=0!/ansi=0
 CLIERR		<!AD>/error/fao=2!/ansi=0
@@ -1157,7 +1160,7 @@ DDPNOSERVER	<DDP Server not running on local node>/error/fao=0!/ansi=0
 MUTEXRELEASED	<Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL>/error/fao=6!/ansi=0
 JNLCRESTATUS	<!AD at line !UL for journal file !AD, database file !AD encountered error>/warning/fao=7!/ansi=0
 ZBREAKFAIL	<Could not set breakpoint at !AD due to insufficient memory>/info/fao=2!/ansi=0
-DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version of GT.M.  Recompile with the current version and re-link.>/error/fao=4!/ansi=0
+DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version of GT.M/YottaDB.  Recompile with the current version of YottaDB and re-link>/error/fao=4!/ansi=0
 INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/ansi=0
 DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
 GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
@@ -1289,9 +1292,9 @@ RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and 
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
-INVMEMRESRV	<Could not allocate GT.M memory reserve (!AD)>/warning/fao=2!/ansi=0
+INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
-COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
+COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
 LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0
@@ -1322,7 +1325,7 @@ BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
 STUCKACT	<Process stuck script invoked: !AD : !AD>/info/fao=4!/ansi=0
-CALLINAFTERXIT	<After a gtm_exit, a process can never create a valid GT.M context>/error/fao=0!/ansi=0
+CALLINAFTERXIT	<After a gtm_exit, a process can never create a valid YottaDB context>/error/fao=0!/ansi=0
 LOCKSPACEFULL	<No more room for LOCK slots on database file !AD>/error/fao=2!/ansi=0
 IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
 MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
@@ -1436,7 +1439,7 @@ ORLBKNOV4BLK	<Region !AD (!AD) has V4 format blocks. Database upgrade required. 
 DBROLLEDBACK	<Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid>/error/fao=0!/ansi=0
 DSEWCREINIT	<Database cache reinitialized by DSE for region !AD>/info/fao=2!/ansi=0
 MURNDWNOVRD	<OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD>/info/fao=2!/ansi=0
-! The following error message is NOT issued to the user and is only internal to GT.M
+! The following error message is NOT issued to the user and is only internal to YottaDB
 REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
 !
 SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting>/error/fao=2!/ansi=0
@@ -1472,7 +1475,7 @@ DSKNOSPCBLOCKED	<Retry of write to file !AD suspended due to new instance freeze
 DSKSPCAVAILABLE	<Write to file !AD succeeded after out-of-space condition cleared>/info/fao=2!/ansi=0
 ENOSPCQIODEFER	<Write to file !AD deferred due to lack of disk space>/info/fao=2!/ansi=0
 CUSTOMFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
-CUSTERRNOTFND	<Error mnemonic !AD specified in custom errors file is not valid for this version of GT.M>/error/fao=2!/ansi=0
+CUSTERRNOTFND	<Error mnemonic !AD specified in custom errors file is not valid for this version of YottaDB>/error/fao=2!/ansi=0
 CUSTERRSYNTAX	<Syntax error in file !AD at line number !UL>/error/fao=3!/ansi=0
 ORLBKINPROG	<Online ROLLBACK in progress by PID !UL in region !AD>/info/fao=3!/ansi=0
 DBSPANGLOINCMP	<!AD Spanning node is missing. Block no !UL of spanning node is missing>/error/fao=3!/ansi=0
@@ -1539,8 +1542,8 @@ TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/err
 UNUSEDMSG1539	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
 ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
-TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
-TLSINIT		<Failed to initialize GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
+TLSDLLNOOPEN	<Failed to load YottaDB TLS/SSL library for secure communication>/error/fao=0!/ansi=0
+TLSINIT		<Failed to initialize YottaDB TLS/SSL library for secure communication>/error/fao=0!/ansi=0
 TLSCONVSOCK	<Failed to convert Unix TCP/IP socket to TLS/SSL aware socket>/error/fao=0!/ansi=0
 TLSHANDSHAKE	<Connection to remote side using TLS/SSL protocol failed>/error/fao=0!/ansi=0
 TLSCONNINFO	<Failed to obtain information on the TLS/SSL connection>/warning/fao=0!/ansi=0

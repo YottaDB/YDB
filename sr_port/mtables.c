@@ -2,6 +2,9 @@
  *								*
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *                                                              *
+ * Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.    *
+ * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -305,6 +308,10 @@ LITDEF char gtm_product[]        = GTM_PRODUCT;
 LITDEF int4 gtm_product_len      = SIZEOF(GTM_PRODUCT) - 1;
 LITDEF char gtm_version[]        = GTM_VERSION;
 LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
+LITDEF char ydb_release_name[]   = YDB_RELEASE_NAME;
+LITDEF int4 ydb_release_name_len = SIZEOF(YDB_RELEASE_NAME) - 1;
+LITDEF char ydb_product[]        = YDB_PRODUCT;
+LITDEF int4 ydb_product_len      = SIZEOF(YDB_PRODUCT) - 1;
 
 /* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
  * the internal context of incremental/stream backup so the value should never appear where

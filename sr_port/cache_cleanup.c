@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2011 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *                                                              *
+ * Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.    *
+ * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +34,7 @@ void cache_cleanup(stack_frame *sf)
 	assert(sf->ctxt);
 	vp = (INTPTR_T *)sf->ctxt;
 	vp--;
-	if ((GTM_OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
+	if ((YDB_OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
 	{	/* Frame is one of ours */
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
