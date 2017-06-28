@@ -15,19 +15,19 @@
 
 #ifdef __CYGWIN__
 #define GTM_RELEASE_NAME 	"GT.M V6.3-001A CYGWIN x86"
-#define YDB_RELEASE_NAME 	"YottaDB r1.0 CYGWIN x86"
+#define YDB_RELEASE_NAME 	"YottaDB r1.00 CYGWIN x86"
 #elif defined(__ia64)
 #define GTM_RELEASE_NAME 	"GT.M V6.3-001A Linux IA64"
-#define YDB_RELEASE_NAME 	"YottaDB r1.0 Linux IA64"
+#define YDB_RELEASE_NAME 	"YottaDB r1.00 Linux IA64"
 #elif defined(__x86_64__)
 #define GTM_RELEASE_NAME 	"GT.M V6.3-001A Linux x86_64"
-#define YDB_RELEASE_NAME 	"YottaDB r1.0 Linux x86_64"
+#define YDB_RELEASE_NAME 	"YottaDB r1.00 Linux x86_64"
 #elif defined(__s390__)
 #define GTM_RELEASE_NAME 	"GT.M V6.3-001A Linux S390X"
-#define YDB_RELEASE_NAME 	"YottaDB r1.0 Linux S390X"
+#define YDB_RELEASE_NAME 	"YottaDB r1.00 Linux S390X"
 #else
 #define GTM_RELEASE_NAME 	"GT.M V6.3-001A Linux x86"
-#define YDB_RELEASE_NAME 	"YottaDB r1.0 Linux x86"
+#define YDB_RELEASE_NAME 	"YottaDB r1.00 Linux x86"
 #endif
 #define GTM_PRODUCT 		"GT.M"
 #define YDB_PRODUCT		"YottaDB"
