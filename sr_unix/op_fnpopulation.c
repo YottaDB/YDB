@@ -178,7 +178,8 @@ STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 		}
 	} else
 	{	/* The cache coherency check failed so rebuild the piece cache for this string */
-		cfnpc->last_str.addr = NULL;			/* Make cache coherency check in op_fnp1() fail quickly */
+		if (FNPC_MAX > fnpc_indx)
+			cfnpc->last_str.addr = NULL;	/* Make cache coherency check in op_fnp1() fail quickly */
 		op_fnp1(src, ldelim.unichar_val, FNPC_ELEM_MAX, &dummy);
 		piececnt = GetPieceCountFromPieceCache(src, del);
 	}
