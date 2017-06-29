@@ -35,9 +35,9 @@ void	op_fnzpopulation(mval *src, mval *del, mval *dst)
 	mval	dummy;
 
 	MV_FORCE_STR(src);
+	MV_FORCE_STR(del);
 	if (0 < src->str.len)
 	{
-		MV_FORCE_STR(del);
 		switch(del->str.len)
 		{
 			case 0:
@@ -57,7 +57,8 @@ void	op_fnzpopulation(mval *src, mval *del, mval *dst)
 				for (charidx = 1, piececnt = 0; charidx ; piececnt++) charidx = op_fnzfind(src, del, charidx, &dummy);
 		}
 	} else
-		piececnt = 1;	/* Returning one more than the count of occurences. No occurrences so return 1 */
+		/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
+		piececnt = (0 < del->str.len) ? 1 : 0;
 	MV_FORCE_MVAL(dst, piececnt);
 }
 

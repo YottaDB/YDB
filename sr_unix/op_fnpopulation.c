@@ -42,9 +42,9 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
 
 	assert(gtm_utf8_mode);
 	MV_FORCE_STR(src);
+	MV_FORCE_STR(del);
 	if (0 < src->str.len)
 	{
-		MV_FORCE_STR(del);
 		MV_FORCE_LEN(del);
 		switch(del->str.char_len)
 		{	/* Processing depends on character length of the delimiter */
@@ -74,7 +74,8 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
 					charidx = op_fnfind(src, del, charidx, &dummy);
 		}
 	} else
-		piececnt = 1;	/* Returning one more than the count of occurences. No occurrences so return 1 */
+		/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
+		piececnt = (0 < del->str.len) ? 1 : 0;
 	MV_FORCE_MVAL(dst, piececnt);
 }
 
