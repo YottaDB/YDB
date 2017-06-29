@@ -74,7 +74,7 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
 					charidx = op_fnfind(src, del, charidx, &dummy);
 		}
 	} else
-		piececnt = 0;	/* No string, no pieces */
+		piececnt = 1;	/* Returning one more than the count of occurences. No occurrences so return 1 */
 	MV_FORCE_MVAL(dst, piececnt);
 }
 

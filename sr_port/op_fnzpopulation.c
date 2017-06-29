@@ -57,7 +57,7 @@ void	op_fnzpopulation(mval *src, mval *del, mval *dst)
 				for (charidx = 1, piececnt = 0; charidx ; piececnt++) charidx = op_fnzfind(src, del, charidx, &dummy);
 		}
 	} else
-		piececnt = 0;	/* No string, no pieces */
+		piececnt = 1;	/* Returning one more than the count of occurences. No occurrences so return 1 */
 	MV_FORCE_MVAL(dst, piececnt);
 }
 
