@@ -37,8 +37,8 @@ STATICFNDCL int GetPieceCountFromPieceCache(mval *src, mval *del);
  */
 void	op_fnpopulation(mval *src, mval *del, mval *dst)
 {
-	int 	charidx, piececnt, delblen;
-	mval	dummy;
+	int 		charidx, piececnt;
+	mval		dummy;
 
 	assert(gtm_utf8_mode);
 	MV_FORCE_STR(src);
@@ -54,19 +54,6 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
 				break;
 			case 1:
 				piececnt = GetPieceCountFromPieceCache(src, del);
-				/* So far, piececnt contains the number of pieces in the cache but if the end of the string is
-				 * a delimiter, we need to return one more so do that check now and bump if appropriate.
-				 */
-				delblen = del->str.len;
-				if (1 == delblen)
-				{	/* Single byte/char delimiter - use simple test */
-					if (*del->str.addr == *(src->str.addr + src->str.len - 1))
-						piececnt++;
-				} else
-				{	/* Delimiter is multi-byte but single char - use more complex comparison */
-					if (0 == memcmp(del->str.addr, src->str.addr + src->str.len - delblen, delblen))
-						piececnt++;
-				}
 				break;
 			default:
 				/* Run a loop of $FIND()s to count the delimiters */
@@ -74,8 +61,9 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
 					charidx = op_fnfind(src, del, charidx, &dummy);
 		}
 	} else
-		/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
+	{	/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
 		piececnt = (0 < del->str.len) ? 1 : 0;
+	}
 	MV_FORCE_MVAL(dst, piececnt);
 }
 
@@ -90,7 +78,8 @@ void	op_fnpopulation(mval *src, mval *del, mval *dst)
  */
 STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 {
-	int		srclen, fnpc_indx, piececnt, dellen, mblen;
+	int		piececnt, mblen;
+	unsigned int	srclen, dellen, fnpc_indx;
 	mval		dummy;
 	fnpc   		*cfnpc;
 	unsigned char	*srcaddr, *last, *end;
@@ -125,6 +114,11 @@ STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 			 * the cache and be (almost) done.
 			 */
 			piececnt = cfnpc->npcs;
+			/* If there's a trailing delimiter, the srclen and last piece offset should be the same. In that
+			 * case, we need to add one to the returned piececnt.
+			 */
+			if (cfnpc->pstart[cfnpc->npcs] == srclen)
+				piececnt++;
 		} else
 		{	/* The cache is not complete - it may just need more scanning (a $piece() left off without
 			 * scanning the entire line) or the piece cache is full and we need to pick up where it
@@ -174,12 +168,16 @@ STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 					last += dellen;		/* Bump past delim to first byte of next piece */
 					piececnt++;
 				}
+				/* Like above, we now have a count of pieces but need to bump by 1 if a delimiter was the last
+				 * scanned. Since we have already incremented last past the delimiter, if it is the same as
+				 * our end address, a trailing delimiter was scanned and piecent should be bumped.
+				 */
+				if (end == last)
+					piececnt++;
 			}
 		}
 	} else
 	{	/* The cache coherency check failed so rebuild the piece cache for this string */
-		if (FNPC_MAX > fnpc_indx)
-			cfnpc->last_str.addr = NULL;	/* Make cache coherency check in op_fnp1() fail quickly */
 		op_fnp1(src, ldelim.unichar_val, FNPC_ELEM_MAX, &dummy);
 		piececnt = GetPieceCountFromPieceCache(src, del);
 	}

@@ -136,6 +136,7 @@ static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
+static readonly char zyrelease_text[] = "$ZYRELEASE";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
 static readonly char zclose_text[] = "$ZCLOSE";
 static readonly char zkey_text[] = "$ZKEY";
@@ -188,6 +189,8 @@ GBLREF mstr		dollar_zpout;
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+LITREF char		ydb_release_name[];
+LITREF int4		ydb_release_name_len;
 
 #define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
 {											\
@@ -879,6 +882,15 @@ void zshow_svn(zshow_out *output, int one_sv)
 			var.mvtype = MV_STR;
 			var.str = dollar_zyerror.str;
 			ZS_VAR_EQU(&x, zyerror_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZYRELEASE:
+			var.mvtype = MV_STR;
+			var.str.addr = (char *)ydb_release_name;
+			var.str.len = ydb_release_name_len;
+			ZS_VAR_EQU(&x, zyrelease_text);
 			mval_write(output, &var, TRUE);
 			break;
 		/* NOTE: fall through ended */
