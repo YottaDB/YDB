@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -122,13 +125,14 @@ LITDEF nametabent svn_names[] =
 	,{ 3, "ZUT" }
 	,{ 2, "ZV*" }
 	,{ 4, "ZYER*" }
+	,{ 4, "ZYRE*" }
 };
 
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 98	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 99	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -209,6 +213,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZUT, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
 	,{ SV_ZYERROR, TRUE, ALL_SYS }
+	,{ SV_ZYRELEASE, FALSE, ALL_SYS }
 };
 
 /* note that fun_index array provides indexes into this array for each letter of the

@@ -2,6 +2,9 @@
 #								#
 # Copyright (c) 2012-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#                                                               #
+#  Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.    #
+#  All rights reserved.                                         #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -27,7 +30,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.3-001A)
+set(version r1.0)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()

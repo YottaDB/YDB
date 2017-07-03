@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,13 +17,13 @@
 #define FNPC_INCLUDED
 
 /* Note, FNPC_MAX should never exceed 254 since the value 255 is used to flag "invalid entry" */
-#define FNPC_STRLEN_MIN 15
 #define FNPC_MAX 50
-#define FNPC_ELEM_MAX 81
+#define FNPC_ELEM_MAX 80
+#define FNPC_RECURR_MAX 2
 
 #ifdef DEBUG
 GBLREF	uint4	process_id;
-/* $[Z]PIECE() statistics */
+/* $[Z]PIECE() statistics (note, 2 argument $LENGTH() may use $[Z]PIECE() to parse the string and fill the piece cache */
 GBLREF	int	c_miss;				/* cache misses (debug) */
 GBLREF	int	c_hit;				/* cache hits (debug) */
 GBLREF	int	c_small;			/* scanned small string brute force */

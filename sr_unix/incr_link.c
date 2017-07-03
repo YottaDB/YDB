@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -378,37 +381,29 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	{
 		if (LINK_SHRLIB == linktyp)
 		{
-			if (MAGIC_COOKIE_V5 > hdr->objlabel)
-			{ 	/* The library was built using a version prior to V50FT01. The routine_name field of the
-				 * pre-V5 routine header was an 8-byte char array, so read the routine name in the old format
+			if (GTM_OMAGIC == (hdr->objlabel >> 16))
+			{
+				if (MAGIC_COOKIE_V5 > hdr->objlabel)
+				{ 	/* The library was built using a version prior to V50FT01. The routine_name field of the
+					 * pre-V5 routine header was an 8-byte char array, so read the routine name in the
+					 * old format.
+					 */
+					int len;
+					pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
+					for (len = 0; len < SIZEOF(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
+						;
+					zl_error(RECENT_ZHIST, linktyp, NULL, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
+						 zro_entry->str.len, zro_entry->str.addr);
+				}
+				/* V52 or later but not current version. Note: routine_name field has not been relocated yet,
+				 * so compute its absolute address in the shared library and use it. This is handled the same
+				 * as YDB_MAGIC so fall into that.
 				 */
-				int len;
-				pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
-				for (len = 0; len < SIZEOF(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
-					;
-				zl_error(RECENT_ZHIST, linktyp, NULL, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
-					 zro_entry->str.len, zro_entry->str.addr);
 			}
-#			if defined(__osf__) || defined(__hppa)
-			else if (MAGIC_COOKIE_V52 > hdr->objlabel)
-			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
-				 * address in the shared library and use it
-				 */
-				v50v51_mstr	*mstr5051;	/* declare here so don't have to conditionally add above */
-				mstr5051 = (v50v51_mstr *)((char *)hdr + V50V51_RTNHDR_RTNMSTR_OFFSET);
-				zl_error(RECENT_ZHIST, linktyp, NULL, ERR_DLLVERSION, mstr5051->len,
-					 ((char *)shdr + *(int4 *)((char *)hdr + V50V51_FTNHDR_LITBASE_OFFSET)
-					  + (int4)mstr5051->addr), zro_entry->str.len, zro_entry->str.addr);
-			}
-#			endif
-			else	/* V52 or later but not current version */
-			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
-				 * address in the shared library and use it
-				 */
-				zl_error(RECENT_ZHIST, linktyp, NULL, ERR_DLLVERSION, hdr->routine_name.len,
-					(char *)shdr + (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
-					 zro_entry->str.len, zro_entry->str.addr);
-			}
+			/* YDB_MAGIC or recent GT.M object */
+			zl_error(RECENT_ZHIST, linktyp, NULL, ERR_DLLVERSION, hdr->routine_name.len,
+				 ((char *)shdr + (UINTPTR_T)hdr->literal_text_adr
+				  + (UINTPTR_T)hdr->routine_name.addr), zro_entry->str.len, zro_entry->str.addr);
 		}
 		ZOS_FREE_TEXT_SECTION;
 		zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);

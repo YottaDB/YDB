@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2013 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -154,7 +158,7 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 				vp = (INTPTR_T *)fp->ctxt;
 				assert(NULL != vp);
 				vp--;
-				assertpro(((GTM_OMAGIC << 16) + OBJ_LABEL) == *vp);	/* Validate backward linkage */
+				assertpro(((YDB_OMAGIC << 16) + OBJ_LABEL) == *vp);	/* Validate backward linkage */
 				vp--;
 				irtnhdr = (ihdtyp *)((char *)vp + *vp);
 				indce = irtnhdr->indce;

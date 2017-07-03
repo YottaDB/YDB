@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -554,12 +557,13 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 		 * the second half on the queue one size smaller than us.
 		 */
 		INCR_CNTR(elemSplits[sizeIndex]);
-			--sizeIndex;					/* Dealing now with smaller element queue */
-			assert(sizeIndex >= 0 && sizeIndex < MAXINDEX);
-			uStor2 = (storElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
-			uStor2->state = Free;
-			uStor2->queueIndex = sizeIndex;
-			assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));		/* Verify alignment */
+		--sizeIndex;					/* Dealing now with smaller element queue */
+		assert(sizeIndex >= 0 && sizeIndex < MAXINDEX);
+		uStor2 = (storElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
+		uStor2->state = Free;
+		uStor2->queueIndex = sizeIndex;
+		DEBUG_ONLY(uStor2->extHdrOffset = 0);					/* So passes verify asserts */
+		assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 #		ifdef DEBUG
 		memcpy(uStor2->headMarker, markerChar, SIZEOF(uStor2->headMarker));	/* Put header tag in place */
 		/* Backfill entire block being freed so usage of it will cause problems */
@@ -722,6 +726,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 					SET_MAX(rmallocMax, totalRmalloc);
 					uStor->queueIndex = REAL_MALLOC;
 					uStor->realLen = tSize;
+					DEBUG_ONLY(uStor->extHdrOffset = 0);
 					DEBUG_ONLY(sizeIndex = MAXINDEX + 1);	/* Just so the ENQUEUE below has a queue since
 										 * we use -1 as the "real" queueindex  for
 										 * malloc'd storage and we don't record allocated
@@ -1256,12 +1261,12 @@ void verifyFreeStorage(void)
 		for (uStor = STE_FP(eHdr); uStor->queueIndex != QUEUE_ANCHOR; uStor = STE_FP(uStor))
 		{
 			assert(((MAXINDEX + 1) >= i));							/* Verify loop limits */
-			assert(((i == uStor->queueIndex) && (MAXINDEX <= MAXINDEX))
+			assert(((i == uStor->queueIndex) && (MAXINDEX >= i))
 			       || (((MAXINDEX + 1) == i) && (REAL_MALLOC == uStor->queueIndex)));	/* Verify queue index */
 			assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));			/* Verify alignment */
 			assert(Free == uStor->state);							/* Verify state */
 			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(uStor->headMarker)));	/* Vfy metadata marker */
-			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
+			assert((MAXINDEX < i) || (extent_used > uStor->extHdrOffset));
 			if (GDL_SmChkFreeBackfill & gtmDebugLevel)
 				/* Use backfill check method for verifying freed storage is untouched */
 				assert(backfillChk((unsigned char *)uStor + hdrSize, TwoTable[i] - hdrSize));
@@ -1287,15 +1292,15 @@ void verifyAllocatedStorage(void)
 		for (uStor = STE_FP(eHdr); uStor->queueIndex != QUEUE_ANCHOR; uStor = STE_FP(uStor))
 		{
 			assert(((MAXINDEX + 1) >= i));						/* Verify loop not going nutz */
-			assert(((i == uStor->queueIndex) && (MAXINDEX <= MAXINDEX))
+			assert(((i == uStor->queueIndex) && (MAXINDEX >= i))
 			       || (((MAXINDEX + 1) == i) && (REAL_MALLOC == uStor->queueIndex)));	/* Verify queue index */
-			if (i != MAXINDEX + 1)							/* If not verifying real mallocs,*/
+			if (i != (MAXINDEX + 1))							/* If not verifying real mallocs,*/
 				assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));	/* .. verify alignment */
 			assert(Allocated == uStor->state);					/* Verify state */
 			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(uStor->headMarker)));	/* Vfy metadata markers */
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart+uStor->allocLen;/* Where  trailer was put */
 			assert(0 == memcmp(trailerMarker, markerChar, SIZEOF(markerChar)));
-			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
+			assert((MAXINDEX < i) || (extent_used > uStor->extHdrOffset));
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 				/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + SIZEOF(markerChar),

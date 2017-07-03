@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -297,6 +300,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	}
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
+	DEBUG_ONLY(TREF(LengthReentCnt) = TREF(ZLengthReentCnt) = 0);
 	preemptive_db_clnup(SEVERITY);
 	assert(NULL == alias_retarg);
 	if (NULL != alias_retarg)

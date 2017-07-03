@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2014 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +17,7 @@
  * IMAGE_TABLE_ENTRY(image_type, image-name)
  */
 IMAGE_TABLE_ENTRY (INVALID_IMAGE,         "INVALID_IMAGE")
-IMAGE_TABLE_ENTRY (GTM_IMAGE,             "GT.M")
+IMAGE_TABLE_ENTRY (GTM_IMAGE,             "YottaDB")
 IMAGE_TABLE_ENTRY (MUPIP_IMAGE,           "MUPIP")
 IMAGE_TABLE_ENTRY (DSE_IMAGE,             "DSE")
 IMAGE_TABLE_ENTRY (LKE_IMAGE,             "LKE")

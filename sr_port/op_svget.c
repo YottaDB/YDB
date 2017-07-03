@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -123,6 +126,8 @@ error_def(ERR_ZDIROUTOFSYNC);
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+LITREF char		ydb_release_name[];
+LITREF int4		ydb_release_name_len;
 
 void op_svget(int varnum, mval *v)
 {
@@ -401,6 +406,11 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)gtm_release_name;
 			v->str.len = gtm_release_name_len;
+			break;
+		case SV_ZYRELEASE:
+			v->mvtype = MV_STR;
+			v->str.addr = (char *)ydb_release_name;
+			v->str.len = ydb_release_name_len;
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);
