@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +83,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLNAME", "Either an identifier or a left parenthesis is expected after a ^ in this context", 0 },
 	{ "GBLOFLOW", "Database segment is full", 0 },
 	{ "CORRUPT", "Corrupt input in Blk # !UL, Key #!UL; resuming with next global block", 2 },
-	{ "GTMCHECK", "Internal GT.M error--Report to your GT.M Support Channel", 0 },
+	{ "GTMCHECK", "Internal YottaDB error--Report to your YottaDB Support Channel", 0 },
 	{ "GVDATAFAIL", "Global variable $DATA function failed.  Failure code: !AD.", 2 },
 	{ "EORNOTFND", "!_!AD!/!_!_!_End of record not found", 2 },
 	{ "GVGETFAIL", "Global variable retrieval failed.  Failure code: !AD.", 2 },
@@ -356,7 +359,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TXTSRCMAT", "M object module and source file do not match", 0 },
 	{ "CCENOGROUP", "CCE does not have GROUP privilege.  Information may be incomplete.", 0 },
 	{ "BADDBVER", "Incorrect database version: !AD", 2 },
-	{ "LINKVERSION", "This image must be relinked with the current version of GT.M", 0 },
+	{ "LINKVERSION", "This image must be relinked with the current version of YottaDB", 0 },
 	{ "TOTALBLKMAX", "Extension exceeds maximum total blocks.  Not extending.", 0 },
 	{ "LOADCTRLY", "User interrupt encountered during load.  Load halting.", 0 },
 	{ "CLSTCONFLICT", "Cluster conflict opening database file !AD; could not secure access.  Already open on node !AD.", 4 },
@@ -508,7 +511,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed (retry = !UL)", 4 },
 	{ "FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0 },
 	{ "JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2 },
-	{ "CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.", 0 },
+	{ "CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your YottaDB Support Channel.", 0 },
 	{ "NOPRINCIO", "Unable to write to principal device", 0 },
 	{ "INVPORTSPEC", "Invalid port specification", 0 },
 	{ "INVADDRSPEC", "Invalid IP address specification", 0 },
@@ -673,7 +676,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSTART", "!AD - !UL : gtmsecshr failed to startup", 3 },
 	{ "DBVERPERFWARN1", "Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance", 2 },
 	{ "FILEIDGBLSEC", "File ID in global section does not match with the database file !AD", 2 },
-	{ "GBLSECNOTGDS", "Global Section !AD is not a GT.M global section", 2 },
+	{ "GBLSECNOTGDS", "Global Section !AD is not a YottaDB global section", 2 },
 	{ "BADGBLSECVER", "Global Section !AD does not match the current database version", 2 },
 	{ "RECSIZENOTEVEN", "RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE", 1 },
 	{ "BUFFLUFAILED", "Error flushing buffers from !AD for database file !AD", 4 },
@@ -763,7 +766,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBCREINCOMP", "!AD Header indicates database file creation was interrupted before completion", 2 },
 	{ "DBFLCORRP", "!AD Header indicates database file is corrupt", 2 },
 	{ "DBHEADINV", "!AD Header size not valid for database", 2 },
-	{ "DBINCRVER", "!AD Incorrect version of GT.M database", 2 },
+	{ "DBINCRVER", "!AD Incorrect version of YottaDB database", 2 },
 	{ "DBINVGBL", "!AD Invalid mixing of global names", 2 },
 	{ "DBKEYGTIND", "!AD Key greater than index key", 2 },
 	{ "DBGTDBMAX", "!AD Key larger than database maximum", 2 },
@@ -949,8 +952,8 @@ LITDEF	err_msg merrors[] = {
 	{ "DBCDBNOCERTIFY", "Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN", 2 },
 	{ "DBFRZRESETSUC", "Freeze released successfully on database file !AD", 2 },
 	{ "JNLFILEXTERR", "Error during extension of journal file !AD", 2 },
-	{ "JOBEXAMDONE", "GT.M process !UL completed job examine to !AD", 3 },
-	{ "JOBEXAMFAIL", "GT.M process !UL executing $ZJOBEXAM function failed with the preceding error message", 1 },
+	{ "JOBEXAMDONE", "YottaDB process !UL completed job examine to !AD", 3 },
+	{ "JOBEXAMFAIL", "YottaDB process !UL executing $ZJOBEXAM function failed with the preceding error message", 1 },
 	{ "JOBINTRRQST", "Job interrupt requested", 0 },
 	{ "ERRWZINTR", "Error while processing $ZINTERRUPT", 0 },
 	{ "CLIERR", "!AD", 2 },
@@ -994,7 +997,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTEXRELEASED", "Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL", 6 },
 	{ "JNLCRESTATUS", "!AD at line !UL for journal file !AD, database file !AD encountered error", 7 },
 	{ "ZBREAKFAIL", "Could not set breakpoint at !AD due to insufficient memory", 2 },
-	{ "DLLVERSION", "Routine !AD in library !AD was compiled with an incompatible version of GT.M.  Recompile with the current version and re-link.", 4 },
+	{ "DLLVERSION", "Routine !AD in library !AD was compiled with an incompatible version of GT.M/YottaDB.  Recompile with the current version of YottaDB and re-link", 4 },
 	{ "INVZROENT", "!AD is neither a directory nor an object library(DLL)", 2 },
 	{ "DDPLOGERR", "!AD: !AD", 4 },
 	{ "GETSOCKNAMERR", "Getting the socket name failed from getsockname(): (errno==!UL) !AD", 3 },
@@ -1126,9 +1129,9 @@ LITDEF	err_msg merrors[] = {
 	{ "KILLBYSIGSINFO3", "!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ", 5 },
 	{ "GTMSECSHRTMPPATH", "gtmsecshr path is !AD", 2 },
 	{ "GTMERREXIT", "GTM image has exited with errors", 0 },
-	{ "INVMEMRESRV", "Could not allocate GT.M memory reserve (!AD)", 2 },
+	{ "INVMEMRESRV", "Could not allocate YottaDB memory reserve (!AD)", 2 },
 	{ "OPCOMMISSED", "!UL errors and !UL MBFULLs sending prior operator messages", 2 },
-	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD", 5 },
+	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD", 5 },
 	{ "COMMITWAITPID", "Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD", 6 },
 	{ "UPDREPLSTATEOFF", "Error replicating global ^!AD as it maps to database !AD which has replication turned OFF", 4 },
 	{ "LITNONGRAPH", "M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)", 2 },
@@ -1159,7 +1162,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ICUVERLT36", "!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used", 4 },
 	{ "ICUSYMNOTFOUND", "Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified", 2 },
 	{ "STUCKACT", "Process stuck script invoked: !AD : !AD", 4 },
-	{ "CALLINAFTERXIT", "After a gtm_exit, a process can never create a valid GT.M context", 0 },
+	{ "CALLINAFTERXIT", "After a gtm_exit, a process can never create a valid YottaDB context", 0 },
 	{ "LOCKSPACEFULL", "No more room for LOCK slots on database file !AD", 2 },
 	{ "IOERROR", "Error occured while doing !AD in !AD operation -- called from module !AD at line !UL", 7 },
 	{ "MAXSSREACHED", "Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.", 3 },
@@ -1307,7 +1310,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DSKSPCAVAILABLE", "Write to file !AD succeeded after out-of-space condition cleared", 2 },
 	{ "ENOSPCQIODEFER", "Write to file !AD deferred due to lack of disk space", 2 },
 	{ "CUSTOMFILOPERR", "Error while doing !AD operation on file !AD", 4 },
-	{ "CUSTERRNOTFND", "Error mnemonic !AD specified in custom errors file is not valid for this version of GT.M", 2 },
+	{ "CUSTERRNOTFND", "Error mnemonic !AD specified in custom errors file is not valid for this version of YottaDB", 2 },
 	{ "CUSTERRSYNTAX", "Syntax error in file !AD at line number !UL", 3 },
 	{ "ORLBKINPROG", "Online ROLLBACK in progress by PID !UL in region !AD", 3 },
 	{ "DBSPANGLOINCMP", "!AD Spanning node is missing. Block no !UL of spanning node is missing", 3 },
@@ -1374,8 +1377,8 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1539", "GVSUBSERR last used in V6.3-000A", 0 },
 	{ "ZATRANSERR", "The input string is too long to convert", 0 },
 	{ "FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1 },
-	{ "TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0 },
-	{ "TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0 },
+	{ "TLSDLLNOOPEN", "Failed to load YottaDB TLS/SSL library for secure communication", 0 },
+	{ "TLSINIT", "Failed to initialize YottaDB TLS/SSL library for secure communication", 0 },
 	{ "TLSCONVSOCK", "Failed to convert Unix TCP/IP socket to TLS/SSL aware socket", 0 },
 	{ "TLSHANDSHAKE", "Connection to remote side using TLS/SSL protocol failed", 0 },
 	{ "TLSCONNINFO", "Failed to obtain information on the TLS/SSL connection", 0 },
