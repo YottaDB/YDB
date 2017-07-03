@@ -54,11 +54,13 @@ void	op_fnzpopulation(mval *src, mval *del, mval *dst)
 				break;
 			default:
 				/* Run a loop of $ZFIND()s to count the delimiters */
-				for (charidx = 1, piececnt = 0; charidx ; piececnt++) charidx = op_fnzfind(src, del, charidx, &dummy);
+				for (charidx = 1, piececnt = 0; charidx ; piececnt++)
+					charidx = op_fnzfind(src, del, charidx, &dummy);
 		}
 	} else
-		/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
+	{	/* If del length is 0, return 0, else a null string with non-null delim returns 1 according to M standard */
 		piececnt = (0 < del->str.len) ? 1 : 0;
+	}
 	MV_FORCE_MVAL(dst, piececnt);
 }
 
@@ -84,7 +86,7 @@ STATICFNDEF int ZGetPieceCountFromPieceCache(mval *src, mval *del)
 	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY((TREF(ZLengthReentCnt))++);
 	assert(TREF(ZLengthReentCnt) <= FNPC_RECURR_MAX);
-	/* Format delimiter as 4 byte "string" in an int as it is used in the piece cache */
+	/* Format delimiter as 4 byte "string" in an int as it is used in the piece cache and calls to "op_fnzp1" */
 	dlmc = *del->str.addr;			/* Extract single char delim from del mval */
 	ldelim.unichar_val = 0;
 	ldelim.unibytes_val[0] = dlmc;		/* Format delimiter is stored in cache */
@@ -96,8 +98,8 @@ STATICFNDEF int ZGetPieceCountFromPieceCache(mval *src, mval *del)
 	 * current cache is usable or needs to be rebuilt.
 	 */
 	if ((FNPC_MAX > fnpc_indx) && (cfnpc->last_str.addr == (char *)srcaddr)
-	    && (cfnpc->last_str.len == srclen) && (cfnpc->delim == ldelim.unichar_val)
-	    && cfnpc->byte_oriented)
+		&& (cfnpc->last_str.len == srclen) && (cfnpc->delim == ldelim.unichar_val)
+		&& cfnpc->byte_oriented)
 	{	/* If here, the cache is at least partially built though may be incomplete */
 		if (cfnpc->pstart[cfnpc->npcs] >= srclen)
 		{	/* The entire string is described in the cache so we can just pick the piece count from

@@ -90,7 +90,7 @@ STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY((TREF(LengthReentCnt))++);
 	assert(TREF(LengthReentCnt) <= FNPC_RECURR_MAX);
-	/* Format delimiter as 4 byte "string" in an int as it is used in the piece cache and calls to op_fnp1() */
+	/* Format delimiter as 4 byte "string" in an int as it is used in the piece cache and calls to "op_fnp1" */
 	ldelim.unichar_val = 0;
 	dellen = del->str.len;
 	assert(SIZEOF(int) >= dellen);
@@ -106,8 +106,8 @@ STATICFNDEF int GetPieceCountFromPieceCache(mval *src, mval *del)
 	 * current cache is usable or needs to be rebuilt.
 	 */
 	if ((FNPC_MAX > fnpc_indx) && (cfnpc->last_str.addr == (char *)srcaddr)
-	    && (cfnpc->last_str.len == srclen) && (cfnpc->delim == ldelim.unichar_val)
-	    && !cfnpc->byte_oriented)
+		&& (cfnpc->last_str.len == srclen) && (cfnpc->delim == ldelim.unichar_val)
+		&& !cfnpc->byte_oriented)
 	{	/* If here, the cache is at least partially built though may be incomplete */
 		if (cfnpc->pstart[cfnpc->npcs] >= srclen)
 		{	/* The entire string is described in the cache so we can just pick the piece count from

@@ -562,7 +562,7 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 		uStor2 = (storElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
 		uStor2->state = Free;
 		uStor2->queueIndex = sizeIndex;
-		uStor2->extHdrOffset = 0;						/* So passes verify asserts */
+		DEBUG_ONLY(uStor2->extHdrOffset = 0);					/* So passes verify asserts */
 		assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 #		ifdef DEBUG
 		memcpy(uStor2->headMarker, markerChar, SIZEOF(uStor2->headMarker));	/* Put header tag in place */
@@ -726,7 +726,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 					SET_MAX(rmallocMax, totalRmalloc);
 					uStor->queueIndex = REAL_MALLOC;
 					uStor->realLen = tSize;
-					DEBUG_ONLY(uStor->extHdrOffset = 0);	
+					DEBUG_ONLY(uStor->extHdrOffset = 0);
 					DEBUG_ONLY(sizeIndex = MAXINDEX + 1);	/* Just so the ENQUEUE below has a queue since
 										 * we use -1 as the "real" queueindex  for
 										 * malloc'd storage and we don't record allocated
