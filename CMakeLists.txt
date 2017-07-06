@@ -145,6 +145,7 @@ endforeach()
 include_directories(${includes})
 # We generate some uniquely-named headers in the top of the build tree.
 include_directories(${GTM_BINARY_DIR})
+include_directories(/usr/include/openssl-1.0)
 
 # Function to select the first instance of a given source file name
 # found in the ordered 'gt_src_list' search path.
