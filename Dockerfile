@@ -56,7 +56,8 @@ RUN apt-get update \
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /opt/yottadb /opt/yottadb
-ENV LANG=en_US.UTF-8 \
+ENV gtmdir=/data \
+    LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8  
 CMD ["/opt/yottadb/current/gtm"]
