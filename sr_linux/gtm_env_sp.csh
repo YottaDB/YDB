@@ -167,6 +167,7 @@ if ( $?gtm_version_change == "1" ) then
             		setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         	endif
 		if ( "x86_64" == $mach_type ) then
+			set nonomatch
 			# Add flags for warnings that we want and don't want.
 			set desired_warnings = ( -Wall )
 			# The following warnings would be desirable, but together can result in megabytes of warning messages. We
@@ -201,6 +202,7 @@ if ( $?gtm_version_change == "1" ) then
 					setenv gt_cc_options_common "$gt_cc_options_common -Wno-${w:s/-W//}"
 				endif
 			end
+			unset nonomatch
 		endif
 	endif
 
