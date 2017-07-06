@@ -1,5 +1,7 @@
-# BUILD : docker build -t ydb-release .
-# TEST  : docker run --rm -e gtm_chset=utf-8 -ti ydb-release
+# Build:
+#   $ docker build -t yottadb:latest .
+# Use with data persistence:
+#   $ docker run --rm -e gtm_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb:latest
 
 # Stage 1: YottaDB build image
 FROM ubuntu as ydb-release-builder
