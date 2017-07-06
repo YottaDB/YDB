@@ -108,6 +108,7 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
 	endif
+	LIBFLAGS += -L/usr/lib/openssl-1.0
 endif
 
 # Solaris
