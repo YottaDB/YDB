@@ -19,7 +19,8 @@ RUN apt-get update \
       libicu-dev \
       libncurses-dev \
       libssl-dev \
-      zlib1g-dev
+      zlib1g-dev \
+ && apt-get clean
 
 ADD . /tmp/yottadb-src
 RUN mkdir -p /tmp/yottadb-build/package \
@@ -52,7 +53,8 @@ FROM ubuntu as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
- && apt-get install -y libelf-dev libicu-dev
+ && apt-get install -y libelf-dev libicu-dev \
+ && apt-get clean
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /opt/yottadb /opt/yottadb
