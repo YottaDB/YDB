@@ -62,5 +62,5 @@ ENV gtmdir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8  
-CMD ["/opt/yottadb/current/gtm"]
+ENTRYPOINT ["/opt/yottadb/current/gtm"]
 
