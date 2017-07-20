@@ -73,3 +73,6 @@ l40:
 done:
 	addq	$FRAME_SIZE, REG_SP			# Remove save area from C stack
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

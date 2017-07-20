@@ -102,11 +102,13 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	# So that we can build shared library.
 	LDSHR = -shared
 	IFLAGS += -I /usr/local/ssl/include
+	IFLAGS += -I /usr/include/openssl-1.0
 	ifeq ($(BIT64),0)
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
 	endif
+	LIBFLAGS += -L/usr/lib/openssl-1.0
 endif
 
 # Solaris

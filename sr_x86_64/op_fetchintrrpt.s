@@ -42,3 +42,6 @@ l1:
 	movq	frame_pointer(REG_IP), REG64_SCRATCH1
 	pushq	msf_mpc_off(REG64_SCRATCH1)		# Push return address for current frame back on stack
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

@@ -36,3 +36,6 @@ ENTRY	mval2bool
 	addq	$8, REG_SP			# Release save area
 	cmpl    $0, mval_l_m1(REG_RET1)		# Set condition of flag register
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

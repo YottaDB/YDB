@@ -37,6 +37,9 @@ endif
 #
 # Once the above changes have been done in place here, comment out the greystone-environment-specific-initialization below.
 #
+if ($?ydb_environment_init) then
+	source $gtm_tools/gtm_env.csh	# Needed for gt_cc_* aliases outside of GG environment
+endif
 switch ($gtm_exe:t)
 	case "[bB]*":
 		alias gtcc "`alias gt_cc_bta`"
@@ -80,9 +83,9 @@ if ($srcfile:e != "c") then
 	exit -1
 endif
 
-(gtcc -E $gtm_src/$srcfile > ${TMPFILE}_$srcfile:r.lis) >& /dev/null
+(gtcc -E $gtm_src/$srcfile > ${TMPFILE}_$srcfile:r.lis) >& ${TMPFILE}_$srcfile:r.err1
 awk -v c_struct=${c_struct} -f $gtm_tools/offset.awk ${TMPFILE}_$srcfile:r.lis > ${TMPFILE}_$srcfile
-gtcc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o >& /dev/null
+gtcc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o >& ${TMPFILE}_$srcfile:r.err2
 
 if ($status != 0) then
 	echo "OFFSET-E-SRCSTRUCTMISMATCH : Very likely that the c-structure isn't used in the c-source-file-name. Please give a valid input."
@@ -95,7 +98,7 @@ if ($status != 0) then
 	exit -1
 endif
 
-gt_ld ${TMPFILE}_$srcfile.o -o ${TMPFILE}_$srcfile:r.out >& /dev/null
+gt_ld ${TMPFILE}_$srcfile.o -o ${TMPFILE}_$srcfile:r.out >& ${TMPFILE}_$srcfile:r.err3
 
 ${TMPFILE}_$srcfile:r.out
 rm -f ${TMPFILE}_$srcfile:r.lis

@@ -36,3 +36,6 @@ ENTRY	op_numcmp
 	addq	$8, REG_SP			# Remove stack alignment bump
 	cmpq	$0, REG64_ACCUM			# Set flags according to result from numcmp
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

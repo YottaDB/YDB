@@ -44,7 +44,7 @@ To build GT.M for Linux, do the following steps:
    #
    # By default the build produces release versions of GT.M. To build a debug
    # version of GT.M supply the following parameter to cmake
-   #     -D CMAKE_BUILD_TYPE=DEBUG
+   #     -D CMAKE_BUILD_TYPE=Debug	# Note: title case is important
    #
    # Note that the cmake install does not create the final installed GT.M.
    # Instead, it stages GT.M for distribution. Change the CMAKE_INSTALL_PREFIX

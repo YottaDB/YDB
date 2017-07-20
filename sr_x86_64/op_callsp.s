@@ -48,3 +48,6 @@ ENTRY	op_callspb
 	movq	msf_temps_ptr_off(REG_FRAME_POINTER), REG_FRAME_TMP_PTR
 	addq	$8, REG_SP				# Remove stack alignment bump
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

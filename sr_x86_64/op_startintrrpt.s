@@ -38,3 +38,6 @@ l1:
 	addq	$16, REG_SP			# Remove alignment stack bump & burn return addr
 	getframe				# Load regs for possible new frame and push return addr
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits
