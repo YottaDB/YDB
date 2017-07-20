@@ -51,3 +51,6 @@ l5:
 	movw	$mval_m_str, mval_w_mvtype(REG64_RET0)
 	movl	$0, mval_l_strlen(REG64_RET0)
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

@@ -34,3 +34,6 @@ ENTRY	op_currtn
 	movq	mrt_rtn_addr(REG64_RET0), REG64_SCRATCH1
 	movq	REG64_SCRATCH1, mval_a_straddr(REG64_RET1)
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

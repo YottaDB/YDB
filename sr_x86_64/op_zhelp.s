@@ -27,3 +27,6 @@ ENTRY	op_zhelp
 	call	op_zhelp_xfr
 	getframe					# Pick up new stack frame regs & push return addr
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits
