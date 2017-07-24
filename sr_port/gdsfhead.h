@@ -3363,6 +3363,58 @@ MBSTART {												\
 	DBG_CHECK_GVTARGET_INTEGRITY(GVT);								\
 } MBEND
 
+/* Need a special value to indicate the prev_rec.match and prev_rec.offset were not initialized in the
+ * index block search history as part of the most recent gvcst_search call. Store an impossible
+ * prev_rec.offset (and in turn prev_rec.match) value. Since they both are unsigned short quantities,
+ * and since sizeof(rec_hdr) is 4 bytes, prev_rec.offset can only be less than 64K-4. And so 64K-1
+ * (i.e. MAXUINT2) serves as a good impossible value for both.
+ */
+#define	PREV_REC_UNINITIALIZED	((unsigned short)MAXUINT2)
+
+/* Note that anytime bh->prev_rec.offset or bh->prev_rec.match is used in the code, one needs to prefix that
+ * usage with either an ASSERT_LEAF_BLK_PREV_REC_INITIALIZED or ASSERT_PREV_REC_INITIALIZED or INITIALIZE_PREV_REC_IF_NEEDED
+ * macro call. This is needed to handle the case where the offset/match could take on the special value PREV_REC_UNINITIALIZED
+ * in case of a special call path through $zprevious(^x("")). If the caller knows for sure it is leaf level block, then it
+ * should use ASSERT_PREV_REC_INITIALIZED. If the caller knows prev_rec is initialized but not guaranteed it is a leaf level
+ * block, it should use ASSERT_PREV_REC_INITIALIZED. If neither, then it needs to use INITIALIZE_PREV_REC_IF_NEEDED.
+ * Currently this neither case is not possible (explanations in respective places where one of the above 2 asserts are used).
+ * So INITIALIZE_PREV_REC_IF_NEEDED macro is unused. Nevertheless, its definition is left alone to help when the first need arises.
+ */
+#define	ASSERT_PREV_REC_INITIALIZED(prevRec)			\
+{								\
+	assert(PREV_REC_UNINITIALIZED != prevRec.offset);	\
+	assert(PREV_REC_UNINITIALIZED != prevRec.match);	\
+}
+
+#define	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(srchBlkStatus)	\
+MBSTART {							\
+	assert(0 == srchBlkStatus->level);			\
+	ASSERT_PREV_REC_INITIALIZED(srchBlkStatus->prev_rec);	\
+} MBEND
+
+/* If prev_rec.match or prev_rec.offset are PREV_REC_UNINITIALIZED, then invoke "gvcst_search_blk" to initialize
+ * that. If failure during that, then invoke code fragment passed in as "sTMT" variable.
+ */
+#define	INITIALIZE_PREV_REC_IF_NEEDED(srchBlkStatus, srchKey, srchStatus, sTMT)			\
+{												\
+	assert((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.match)			\
+		|| (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.offset));			\
+	assert((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.offset)			\
+		|| (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.match));			\
+	if (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.match)				\
+	{											\
+		srchStatus = gvcst_search_blk(srchKey, srchBlkStatus);				\
+		assert((cdb_sc_normal != srchStatus)						\
+			|| ((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.offset)		\
+				&& (PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.match)));	\
+		if (cdb_sc_normal != srchStatus)						\
+		{										\
+			assert(CDB_STAGNATE > t_tries);						\
+			sTMT;									\
+		}										\
+	}											\
+}
+
 /* If SRC_KEY->end == 0, make sure to copy the first byte of SRC_KEY->base */
 #define MEMCPY_KEY(TARG_KEY, SRC_KEY)								\
 MBSTART {											\
@@ -3434,6 +3486,8 @@ MBSTART {														\
 #else
 #define	DEBUG_GVT_CLUE_VALIDATE(GVT)
 #endif
+
+#define	ZPREVIOUS_NULL_SUBS_LEVEL1	2	/* this value should be != FALSE and TRUE and is relied upon by "gvcst_search" */
 
 /* Macro used by $ZPREVIOUS to replace a NULL subscript at the end with the maximum possible subscript
  * that could exist in the database for this global name.

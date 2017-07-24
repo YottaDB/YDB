@@ -2131,6 +2131,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 				return cdb_sc_mkblk;
 			}
 		}
+		ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(bh);	/* Can assert this due to "gvcst_search_blk" call above */
 		if (new_rec)
 		{
 			new_rec_size = SIZEOF(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;

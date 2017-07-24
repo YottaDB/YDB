@@ -48,6 +48,11 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	for (;;)
 	{
 		buffer_address = old->buffaddr;
+		/* Before using "bh->prev_rec", make sure prev_rec.match & prev_rec.offset are initialized if needed.
+		 * If leaf level block, then it is guaranteed to be initialized as part of the "gvcst_search" call above.
+		 * If not a leaf level block, it is guaranteed to be initialized as part of the "gvcst_search_blk" call below.
+		 */
+		ASSERT_PREV_REC_INITIALIZED(old->prev_rec);
 		temp_short = old->prev_rec.offset;
 		if (temp_short > 0)
 			break;
@@ -73,6 +78,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	assert(new->level == old->level);
 	assert(new->blk_target == old->blk_target);
 	new->buffaddr = old->buffaddr;
+	ASSERT_PREV_REC_INITIALIZED(old->prev_rec);
 	new->curr_rec = old->prev_rec;
 	new->cycle = old->cycle;
 	new->cr = old->cr;

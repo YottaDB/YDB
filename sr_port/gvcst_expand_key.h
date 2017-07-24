@@ -41,6 +41,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	unsigned char	*dstBase, *dstEnd, *dstTop;	/* exp_key  related variables */
 	unsigned char	*src;				/* srch_key related variables */
 	unsigned char	ch;
+	enum cdb_sc	cdb_status;
 #	ifdef GVCST_EXPAND_CURR_KEY
 	boolean_t	fullmatch;
 #	endif
@@ -55,6 +56,17 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	 */
 	buffaddr = pStat->buffaddr;
 #	ifdef GVCST_EXPAND_PREV_KEY
+	/* Before using "pStat->prev_rec", make sure prev_rec.match & prev_rec.offset are initialized if needed.
+	 * Since this function is "gvcst_expand_prev_key", the only current caller functions are
+	 *	a) "gvcst_put"
+	 *	b) "gvcst_search" : We come here from that caller only for leaf blocks.
+	 *	c) "gvcst_search_tail_expand_prevkey" : We call this function only for leaf blocks since gvcst_search_tail
+	 *		is currently invoked only for leaf blocks.
+	 * For (a), we already do ASSERT_PREV_REC_INITIALIZED in the caller before passing that bh here.
+	 * For (b) and (c), we are guaranteed that pStat->prev_rec is initialized.
+	 * Therefore we can assert that prev_rec is initialized here irrespective of the caller.
+	 */
+	ASSERT_PREV_REC_INITIALIZED(pStat->prev_rec);
 	offset = pStat->prev_rec.offset;
 	if (SIZEOF(blk_hdr) > offset)
 	{

@@ -84,6 +84,12 @@ GBLREF	uint4			dollar_tlevel;
 #	endif
 #	if defined(GVCST_SEARCH_TAIL) && !defined(GVCST_SEARCH_EXPAND_PREVKEY)
 	assert(0 < memcmp(pKey->base, pOldKey->base, pKey->end + 1));	/* below code assumes this is ensured by caller */
+	/* Before using pStat->prev_rec.offset, we need to make sure it is initialized. i.e. it never holds the value
+	 * PREV_REC_UNINITIALIZED. Thankfully this is guaranteed because "gvcst_search_tail" is currently invoked only for
+	 * leaf blocks. And "gvcst_search" does not currently skip "gvcst_search_blk" for leaf blocks.
+	 * Thankfully the below assert captures all of these so just invoke that.
+	 */
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat);
 	if (0 == pStat->prev_rec.offset)
 		return gvcst_search_blk(pKey, pStat);	/* nice clean start at the begining of a block */
 #	endif
@@ -132,6 +138,7 @@ GBLREF	uint4			dollar_tlevel;
 #	ifdef GVCST_SEARCH_TAIL
 	pRecBase = pBlkBase + pStat->curr_rec.offset;
 	pRec = pRecBase;
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat); /* Purpose is in comment before previous usage of this macro in this module */
 	nMatchCnt = pStat->prev_rec.match;
 	pOldKeyBase = pOldKey->base;
 	pPrevRec = pBlkBase + pStat->prev_rec.offset;
@@ -328,10 +335,15 @@ GBLREF	uint4			dollar_tlevel;
 #	ifdef GVCST_SEARCH_TAIL
 	}
 #	endif
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
+	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
+	pStat->prev_rec.match = (unsigned short)nMatchCnt;
+	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
+	 * for prev_rec.match/prev_rec.offset. Assert that.
+	 */
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
+	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	pStat->curr_rec.match = (unsigned short)nTargLen;
 #	ifdef GVCST_SEARCH_EXPAND_PREVKEY
 	if (NULL != (tmpPtr = prevKeyUnCmp))	/* Note: Assignment */
 	{	/* gv_altkey->base[0] thru gv_altkey->base[prevKeyCmpLen] already holds the compressed portion of prevKey.
