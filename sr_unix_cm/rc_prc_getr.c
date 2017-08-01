@@ -206,7 +206,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 				}
 			} else if (fmode & RC_MODE_PREV)	/* if get previous */
 			{
-				if (bh->prev_rec.offset == 0)
+				if (0 == bh->prev_rec.offset)
 				{
 					two_histories = TRUE;
 					status = gvcst_lftsib(&second_history);
@@ -245,7 +245,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 				}
 				rsp->size_remain.value = rc_overflow->size;
 			}
-			if (0 == (rc_read_stamp = t_end(&gv_target->hist,
+			if (0 == (rc_read_stamp = t_end(&gv_target->hist,	/* Warning: Assignment */
 								two_histories ? &second_history : NULL, TN_NOT_SPECIFIED)))
 				continue;
 			if (bsiz == SIZEOF(blk_hdr) + RC_BLKHD_PAD)	/* Empty block, global does not exist */

@@ -460,7 +460,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		pCurr->blk_num = nBlkId;
 		pCurr->buffaddr = pBlkBase;
 		bsiz = ((blk_hdr_ptr_t)pBlkBase)->bsiz;
-		if (!skip_search_blk || !nLevl)
+		if (!skip_search_blk || (0 == nLevl))
 		{
 			if (cdb_sc_normal != (status = gvcst_search_blk(pKey, pCurr)))
 				return status;
@@ -476,7 +476,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			pCurr->curr_rec.offset = bsiz - BSTAR_REC_SIZE;
 			pCurr->curr_rec.match = 0;
 		}
-		if ((n0 = pCurr->curr_rec.offset) >= bsiz)
+		if ((n0 = pCurr->curr_rec.offset) >= bsiz)	/* Warning: Assignment */
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_blklenerr;

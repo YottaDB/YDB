@@ -85,9 +85,9 @@ GBLREF	uint4			dollar_tlevel;
 #	if defined(GVCST_SEARCH_TAIL) && !defined(GVCST_SEARCH_EXPAND_PREVKEY)
 	assert(0 < memcmp(pKey->base, pOldKey->base, pKey->end + 1));	/* below code assumes this is ensured by caller */
 	/* Before using pStat->prev_rec.offset, we need to make sure it is initialized. i.e. it never holds the value
-	 * PREV_REC_UNINITIALIZED. Thankfully this is guaranteed because "gvcst_search_tail" is currently invoked only for
-	 * leaf blocks. And "gvcst_search" does not currently skip "gvcst_search_blk" for leaf blocks.
-	 * Thankfully the below assert captures all of these so just invoke that.
+	 * PREV_REC_UNINITIALIZED. This is guaranteed because "gvcst_search_tail" is currently invoked only for leaf blocks.
+	 * And "gvcst_search" does not currently skip "gvcst_search_blk" for leaf blocks. The below assert captures all
+	 * of these so just invoke that.
 	 */
 	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat);
 	if (0 == pStat->prev_rec.offset)

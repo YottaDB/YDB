@@ -3375,42 +3375,42 @@ MBSTART {												\
  * usage with either an ASSERT_LEAF_BLK_PREV_REC_INITIALIZED or ASSERT_PREV_REC_INITIALIZED or INITIALIZE_PREV_REC_IF_NEEDED
  * macro call. This is needed to handle the case where the offset/match could take on the special value PREV_REC_UNINITIALIZED
  * in case of a special call path through $zprevious(^x("")). If the caller knows for sure it is leaf level block, then it
- * should use ASSERT_PREV_REC_INITIALIZED. If the caller knows prev_rec is initialized but not guaranteed it is a leaf level
- * block, it should use ASSERT_PREV_REC_INITIALIZED. If neither, then it needs to use INITIALIZE_PREV_REC_IF_NEEDED.
+ * should use ASSERT_LEAF_BLK_PREV_REC_INITIALIZED. If the caller knows prev_rec is initialized but not guaranteed it is a
+ * leaf level block, it should use ASSERT_PREV_REC_INITIALIZED. If neither, then it needs to use INITIALIZE_PREV_REC_IF_NEEDED.
  * Currently this neither case is not possible (explanations in respective places where one of the above 2 asserts are used).
  * So INITIALIZE_PREV_REC_IF_NEEDED macro is unused. Nevertheless, its definition is left alone to help when the first need arises.
  */
-#define	ASSERT_PREV_REC_INITIALIZED(prevRec)			\
+#define	ASSERT_PREV_REC_INITIALIZED(PREVREC)			\
 {								\
-	assert(PREV_REC_UNINITIALIZED != prevRec.offset);	\
-	assert(PREV_REC_UNINITIALIZED != prevRec.match);	\
+	assert(PREV_REC_UNINITIALIZED != PREVREC.offset);	\
+	assert(PREV_REC_UNINITIALIZED != PREVREC.match);	\
 }
 
-#define	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(srchBlkStatus)	\
+#define	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(SRCHBLKSTATUS)	\
 MBSTART {							\
-	assert(0 == srchBlkStatus->level);			\
-	ASSERT_PREV_REC_INITIALIZED(srchBlkStatus->prev_rec);	\
+	assert(0 == SRCHBLKSTATUS->level);			\
+	ASSERT_PREV_REC_INITIALIZED(SRCHBLKSTATUS->prev_rec);	\
 } MBEND
 
 /* If prev_rec.match or prev_rec.offset are PREV_REC_UNINITIALIZED, then invoke "gvcst_search_blk" to initialize
- * that. If failure during that, then invoke code fragment passed in as "sTMT" variable.
+ * that. If failure during that, then invoke code fragment passed in as "STMT" variable.
  */
-#define	INITIALIZE_PREV_REC_IF_NEEDED(srchBlkStatus, srchKey, srchStatus, sTMT)			\
+#define	INITIALIZE_PREV_REC_IF_NEEDED(SRCHBLKSTATUS, SRCHKEY, SRCHSTATUS, STMT)			\
 {												\
-	assert((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.match)			\
-		|| (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.offset));			\
-	assert((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.offset)			\
-		|| (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.match));			\
-	if (PREV_REC_UNINITIALIZED == srchBlkStatus->prev_rec.match)				\
+	assert((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.match)			\
+		|| (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.offset));			\
+	assert((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.offset)			\
+		|| (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.match));			\
+	if (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.match)				\
 	{											\
-		srchStatus = gvcst_search_blk(srchKey, srchBlkStatus);				\
-		assert((cdb_sc_normal != srchStatus)						\
-			|| ((PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.offset)		\
-				&& (PREV_REC_UNINITIALIZED != srchBlkStatus->prev_rec.match)));	\
-		if (cdb_sc_normal != srchStatus)						\
+		SRCHSTATUS = gvcst_search_blk(SRCHKEY, SRCHBLKSTATUS);				\
+		assert((cdb_sc_normal != SRCHSTATUS)						\
+			|| ((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.offset)		\
+				&& (PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.match)));	\
+		if (cdb_sc_normal != SRCHSTATUS)						\
 		{										\
 			assert(CDB_STAGNATE > t_tries);						\
-			sTMT;									\
+			STMT;									\
 		}										\
 	}											\
 }
