@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -376,7 +376,7 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst)
 STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
     struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
 {
-	boolean_t	error_in_xc = FALSE;
+	boolean_t	error_in_xc = FALSE, save_in_ext_call;
 	char		*free_string_pointer, *free_string_pointer_start, jtype_char;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *jni_err_buf;
 	char		*types_descr_ptr, *types_descr_dptr, *xtrnl_table_name;
@@ -611,9 +611,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	verifyAllocatedStorage();		/* GTM-8669 verify that argument placement did not trash allocated memory */
 #endif
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
+	save_in_ext_call = TREF(in_ext_call);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = FALSE;
+	TREF(in_ext_call) = save_in_ext_call;
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -703,7 +704,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 
 void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
-	boolean_t	java = FALSE;
+	boolean_t	java = FALSE, save_in_ext_call;
 	char		*free_string_pointer, *free_string_pointer_start;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *xtrnl_table_name;
 	int		i, pre_alloc_size, rslt, save_mumps_status;
@@ -992,9 +993,10 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	param_list->n = argcnt;
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
+	save_in_ext_call = TREF(in_ext_call);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = FALSE;
+	TREF(in_ext_call) = save_in_ext_call;
 	mumps_status = save_mumps_status;
 
 	/* Exit from the residual call-in environment(SFT_CI base frame) which might
