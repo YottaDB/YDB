@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +37,6 @@ lv_val *push_lvval(mval *arg1)
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
-	/* Note that since this is only (currently) used by call-ins and no TP
-	   transaction can be (currently) be active during a call-in, we do not
-	   worry about setting up tp_var structures as is done in lv_newname().
-	   The assert below will catch if this condition changes.
-	*/
-	assert(!dollar_tlevel);
 	PUSH_MV_STENT(MVST_LVAL);
 	mv_chain->mv_st_cont.mvs_lvval = lvp = lv_getslot(curr_symval);
 	LVVAL_INIT(lvp, curr_symval);
