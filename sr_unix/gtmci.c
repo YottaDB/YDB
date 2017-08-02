@@ -1113,12 +1113,6 @@ int ydb_init()
 		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
 		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
-		/* Disallow call-ins within a TP boundary since TP restarts are not supported
-		 * currently across nested call-ins. When we implement TP restarts across call-ins,
-		 * this error needs be changed to a Warning or Notification
-		 */
-		if (dollar_tlevel)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
 		base_addr = make_dmode();
 		base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
 		SET_CI_ENV(gtm_levl_ret_code);
