@@ -406,9 +406,20 @@ THREADGBLDEF(no_spangbls,			boolean_t)	/* This process does not need to worry ab
 								 */
 THREADGBLDEF(max_fid_index,			int)		/* maximum value of csa->fid_index across all open csa's */
 THREADGBLDEF(is_mu_rndwn_rlnkctl,		int)		/* this process is MUPIP RUNDOWN -RELINKCTL */
-THREADGBLDEF(expand_prev_key,			boolean_t)	/* Want gvcst_search_blk/gvcst_search_tail to expand prev_key
-								 * as they do the search. This avoids a later call to
-								 * "gvcst_expand_key" to determine prev_key after the search.
+THREADGBLDEF(expand_prev_key,			int)		/* Can hold one of 3 values.
+								 * TRUE implies we are inside a $zprevious call. It kicks in an
+								 *	optimization where "gvcst_search_blk"/"gvcst_search_tail"
+								 *	will expand prev_key as they do the search. This avoids a
+								 *	later call to "gvcst_expand_key" to determine prev_key
+								 *	after the search.
+								 * ZPREVIOUS_NULL_SUBS_LEVEL1 also implies we are inside a
+								 *	$zprevious call and that we are inside a $zprevious(gvn)
+								 *	where gvn is of the form ^gblname("") i.e. there is only
+								 *	one subscript and that is the null subscript. This kicks in
+								 *	in a "gvcst_search" optimization in addition to the above
+								 *	prev_key optimization for the TRUE value.
+								 * FALSE implies we are not inside a $zprevious call. None of the
+								 *	above two optimizations kick in.
 								 */
 THREADGBLDEF(gtm_autorelink_ctlmax,		uint4)		/* Maximum number of routines allowed for auterelink */
 /* Each process that opens a database file with O_DIRECT (which happens if asyncio=TRUE) needs to do

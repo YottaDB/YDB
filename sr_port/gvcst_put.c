@@ -1109,6 +1109,11 @@ tn_restart:
 				GOTO_RETRY;
 			}
 		}
+		/* Before using "bh->prev_rec", make sure prev_rec.match & prev_rec.offset are initialized if needed.
+		 * If leaf level block, then it is guaranteed to be initialized as part of the "gvcst_search" call above.
+		 * If not a leaf level block, it is guaranteed to be initialized as part of the "gvcst_search_blk" call below.
+		 */
+		ASSERT_PREV_REC_INITIALIZED(bh->prev_rec);
 		prev_rec_match = bh->prev_rec.match;
 		if (new_rec)
 		{
@@ -1474,6 +1479,7 @@ tn_restart:
 						- curr_rec_offset - (new_rec ? next_rec_shrink : rec_size);
 			assert(new_blk_size_single <= blk_reserved_size);
 			assert(blk_reserved_size >= blk_fill_size);
+			ASSERT_PREV_REC_INITIALIZED(bh->prev_rec);
 			prev_rec_offset = bh->prev_rec.offset;
 			/* Decide which side (left or right) the new record goes. Ensure either side has at least one record.
 			 * This means we might not honor the desired FillFactor if the only record in a block exceeds the

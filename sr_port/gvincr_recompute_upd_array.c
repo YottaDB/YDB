@@ -152,6 +152,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
 	BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 	curr_rec_hdr->rsiz = new_rec_size;
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(bh);	/* Can assert this due to "gvcst_search_blk" call above */
 	SET_CMPC(curr_rec_hdr, bh->prev_rec.match);
 	BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
 	BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);

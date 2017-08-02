@@ -555,9 +555,21 @@ research:
 				left = &gvt_hist->h[lev];
 				right = &alt_hist->h[lev];
 				assert(0 != right->blk_num);
-				left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
+				/* Before using "left->prev_rec", ensure prev_rec.match & prev_rec.offset are initialized if needed.
+				 * If leaf level block, then it is guaranteed to be initialized as part of the "gvcst_search"
+				 * call above using "gv_currkey". If not a leaf level block, then the same "gvcst_search" call
+				 * above could have either used a clue or no clue. If no clue, then left->prev_rec would have been
+				 * initialized for sure. If using a clue, it is possible the clue came from a previous
+				 * $zprevious(^x("")) like call which skipped doing "gvcst_search_blk" on index blocks. If so
+				 * "left->prev_rec" would be uninitialized. But in that case, we would first descend into the
+				 * "else" block below and the "if (clue)" check there would succeed resulting in us restarting the
+				 * transaction which will discard the clue and search afresh thereby initializing "left->prev_rec".
+				 * Hence the ASSERT_PREV_REC_INITIALIZED usages below.
+				 */
 				if (left->blk_num == right->blk_num)
 				{
+					ASSERT_PREV_REC_INITIALIZED(left->prev_rec);
+					left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
 					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
 									right_extra, &tp_cse);
 					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
@@ -588,6 +600,8 @@ research:
 					}
 					local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
 					local_srch_rec.match = 0;
+					ASSERT_PREV_REC_INITIALIZED(left->prev_rec);
+					left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
 					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat,
 										local_srch_rec, FALSE, &tp_cse);
 					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
