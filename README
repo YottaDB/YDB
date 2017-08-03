@@ -1,72 +1,66 @@
-All software in this package is part of FIS GT.M (http://fis-gtm.com)
-which is Copyright 2017 Fidelity Information Services, Inc., and
-provided to you under the terms of a license. If there is a COPYING
-file included in this package, it contains the terms of the license under
-which the package is provided to you. If there is not a COPYING file in
-the package, you must ensure that your use of FIS GT.M complies with the
-license under which it is provided. If you are unsure as to the terms of
-your license, please consult with the entity that provided you with the
-package.
+All software in this package is part of YottaDB (http://yottadb.com) each
+file of which identifies its copyright holders. The software is made available
+to you under the terms of a license. Refer to the LICENSE file for details.
 
-GT.M relies on CMake to generate the Makefiles to build GT.M from source. The
-prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
-(either x86 or x86_64), libraries and development files for libz, Unicode,
-OpenSSL and GPG. Debian 7, Ubuntu 12.04/14.04 LTS and RHEL 6.0 were used to do
-the test builds for this distribution. The default ICU and GPG packages were
-taken from the distribution repositories.
+YottaDB relies on CMake to generate the Makefiles to build binaries from source.
+The prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
+(x86_64), libraries and development files for libz, Unicode, OpenSSL and GPG.
+Ubuntu 16.04 LTS was used to test the builds for this distribution, with default
+versions of packages from the distribution repositories.
 
-To build GT.M for Linux, do the following steps:
+To build YottaDB, do the following steps:
 
 1. Fulfill the pre-requisites
    Install developement libraries
    cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
-   There may be other library dependencies or the packages may have different names
+   There may be other library dependencies or the packages may have different names.
    If CMake issues a NOTFOUND error, please see the FAQ below.
 
-2. Unpack the GT.M sources
-   The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.3-001A
-   $ tar xfz fis-gtm-V6.3-001A.tar.gz
-   $ cd fis-gtm-V6.3-001A
+2. Unpack the YottaDB sources
+   The YottaDB source tarball extracts to a directory with the version number in
+   the name, e.g., YottaDB-r1.00
+   $ tar xfz r1.00.tar.gz
+   $ cd YottaDB-r1.00
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
-3. Building GT.M -
-   <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.3-001A, or any other valid path.
+3. Building YottaDB -
+   <build> can be a sub directory of the source directory,
+   YottaDB-r1.00, or any other valid path.
 
-   $ mkdir <fis-gtm-build>
-   $ cd <fis-gtm-build>
+   $ mkdir <build>
+   $ cd <build>
 
-   # [optional] If you installed GT.M, provide the directory path to cmake
+   # [optional] If you installed a YottaDB binary distribution, provide the directory path to cmake
    #   -D GTM_DIST:PATH=$gtm_dist
    #
-   # By default the build produces release versions of GT.M. To build a debug
-   # version of GT.M supply the following parameter to cmake
+   # By default the script creates production (pro) builds of YottaDB. To create
+   # a debug (dbg) build of YottaDB supply the following parameter to cmake
    #     -D CMAKE_BUILD_TYPE=Debug	# Note: title case is important
    #
-   # Note that the cmake install does not create the final installed GT.M.
-   # Instead, it stages GT.M for distribution. Change the CMAKE_INSTALL_PREFIX
-   # to place the staged files in a local directory. To install GT.M, you must
+   # Note that the cmake install does not create the final installed YottaDB.
+   # Instead, it stages YottaDB for distribution. Change the CMAKE_INSTALL_PREFIX
+   # to place the staged files in a local directory. To install YottaDB, you must
    # cd to that installed directory and execute the configure script.
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-001A
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package ../
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.3-001A_x86_64
+   $ cd pro/lib/fis-gtm/V6.3-001A_R100_x86_64 # or dbg for debug builds
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
    # The recommended installation path is /opt/fis-gtm/V6.3-001A_x86_64
 
-   $ sudo ./configure
+   $ sudo ./gtminstall # to install the version you just built
+   # ./gtminstall --help # get installation options
 
-   $ make clean
+   $ cd - ; make clean
 
 4. Packaging GT.M -
    Create a tar file from the installed directory
