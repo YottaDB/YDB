@@ -2,6 +2,9 @@
 #								#
 # Copyright (c) 2012-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #                                                               #
 #  Copyright (c) 2017 Finxact, LLC. and/or its subsidiaries.    #
 #  All rights reserved.                                         #
