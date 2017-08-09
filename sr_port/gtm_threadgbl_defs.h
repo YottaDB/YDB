@@ -414,12 +414,12 @@ THREADGBLDEF(no_spangbls,			boolean_t)	/* This process does not need to worry ab
 THREADGBLDEF(max_fid_index,			int)		/* maximum value of csa->fid_index across all open csa's */
 THREADGBLDEF(is_mu_rndwn_rlnkctl,		int)		/* this process is MUPIP RUNDOWN -RELINKCTL */
 THREADGBLDEF(expand_prev_key,			int)		/* Can hold one of 3 values.
-								 * TRUE implies we are inside a $zprevious call. It kicks in an
-								 *	optimization where "gvcst_search_blk"/"gvcst_search_tail"
-								 *	will expand prev_key as they do the search. This avoids a
-								 *	later call to "gvcst_expand_key" to determine prev_key
-								 *	after the search.
-								 * ZPREVIOUS_NULL_SUBS_LEVEL1 also implies we are inside a
+								 * TRUE implies we are inside a $zprevious or reverse $query call.
+								 *	It kicks in an optimization where "gvcst_search_blk" and
+								 *	"gvcst_search_tail" will expand prev_key as they do the
+								 *	search. This avoids a later call to "gvcst_expand_key" to
+								 *	determine prev_key after the search.
+								 * ZPREVIOUS_NULL_SUBS_LEVEL1 implies we are inside a
 								 *	$zprevious call and that we are inside a $zprevious(gvn)
 								 *	where gvn is of the form ^gblname("") i.e. there is only
 								 *	one subscript and that is the null subscript. This kicks in
@@ -480,6 +480,10 @@ THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one re
 THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure corresponding to reservations
 									 * on the journal buffer for current non-TP transaction.
 									 */
+THREADGBLDEF(last_gvquery_key,			gv_key *)	/* Last key returned by $query(gvn). Note: Only one value
+								 * maintained for both forward and reverse $query(gvn)
+								 * This is the gv equivalent of last_fnquery_return_varname et al.
+								 */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(LengthReentCnt,			boolean_t)	/* Reentrancy count for GetPieceCountFromPieceCache() used by 2

@@ -436,14 +436,14 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	assert(TRUE != ZPREVIOUS_NULL_SUBS_LEVEL1);
 	assert((FALSE == expand_prev_key) || (TRUE == expand_prev_key) || (ZPREVIOUS_NULL_SUBS_LEVEL1 == expand_prev_key));
 	/* If we are inside a $zprevious(^gblname("")) operation, gv_currkey has already been set to correspond to the highest
-	 * key in the GVT and therefore we are guaranteed the search will take us through the rightmost path in the GVT.
-	 * This means we are guaranteed to descend down the *-records (last record) of index blocks. And so we can go directly
-	 * to the last record (*-record) in each index block as we descend down the tree and do a "gvcst_search_blk" only for
-	 * the leaf block. Set "skip_search_blk" accordingly. Note that this optimization means pCurr->prev_rec.offset and
-	 * pCurr->prev_rec.match would be set to a special value PREV_REC_UNINITIALIZED for index blocks (i.e. pCurr->level > 0).
-	 * If a caller of this function later needs to access prev_rec.match or prev_rec.offset for an index block
-	 * (e.g. gvcst_put as part of a block-split operation), they need to do the "gvcst_search_blk" call then.
-	 * This basically defers the call as much as possible and therefore can perform better in case the caller does not
+	 * first subscript in the GVT. Therefore we are guaranteed that the highest existing first subscript can be found by
+	 * traversing down the rightmost path in the GVT i.e. descending down the *-records (last record) of index blocks.
+	 * And so we can go directly to the last record (*-record) in each index block as we descend down the tree and do a
+	 * "gvcst_search_blk" only for the leaf block. Set "skip_search_blk" accordingly. Note that this optimization means
+	 * pCurr->prev_rec.offset and pCurr->prev_rec.match would be set to a special value PREV_REC_UNINITIALIZED for index
+	 * blocks (i.e. pCurr->level > 0). If a caller of this function later needs to access prev_rec.match or prev_rec.offset
+	 * for an index block (e.g. gvcst_put as part of a block-split operation), they need to do the "gvcst_search_blk" call
+	 * then. This basically defers the call as much as possible and therefore can perform better in case the caller does not
 	 * need prev_rec for index blocks.
 	 */
 	skip_search_blk = (ZPREVIOUS_NULL_SUBS_LEVEL1 == expand_prev_key);

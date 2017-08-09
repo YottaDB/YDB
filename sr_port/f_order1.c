@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,6 +23,9 @@
 
 error_def(ERR_VAREXPECTED);
 
+/* Note: The below code is similar to f_query1.c and f_reversequery1.c.
+ * Any changes here might need to be made there and vice versa.
+ */
 int f_order1(oprtype *a, opctype op)
 {
 	triple		*oldchain, *r;

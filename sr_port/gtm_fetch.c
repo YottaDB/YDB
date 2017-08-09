@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -59,7 +62,9 @@ void gtm_fetch(unsigned int indxarg, ...)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!process_exiting);	/* Verify that no process unwound the exit frame and continued */
-	assert(!TREF(expand_prev_key));	/* Verify that this global variable never stays TRUE outside of a $zprevious action */
+	assert(!TREF(expand_prev_key));	/* Verify that this global variable never stays TRUE
+					 * outside of a $zprevious or reverse $query action.
+					 */
 	DEBUG_ONLY(DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);) /* surrounding DEBUG_ONLY needed because gdsfhead.h is
 									   * not included for pro builds and so the macro and its
 									   * parameters would be undefined in that case causing a

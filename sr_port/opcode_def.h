@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -10,9 +13,6 @@
  *								*
  ****************************************************************/
 /* defines opcodes and their associated octypes */
-
-
-
 
 
 
@@ -348,5 +348,10 @@ OPCODE_DEF(OC_ZRUPDATE, (OCT_NULL))
 OPCODE_DEF(OC_CDIDX, (OCT_MINT | OCT_CGSKIP | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZCOLLATE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_GVREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNQ2, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_GVQ2, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_INDQ2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

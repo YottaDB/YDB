@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -382,6 +385,31 @@ lvTreeNode *lvAvlTreeLast(lvTree *lvt)
 	return avl_last;
 }
 
+/* Like "lvAvlTreeLast" except it takes into account the currently effective null collation scheme.
+ * That is, if stdnullcoll is in effect, it will return the highest non-null string subscript if one exists.
+ *	and if none exists, it will return the highest numeric subscript if one exists
+ *	and if none exists, it will return NULL.
+ */
+lvTreeNode *lvAvlTreeCollatedLast(lvTree *lvt)
+{
+	lvTreeNode	*node, *prevNode;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	node = lvAvlTreeLast(lvt);
+	if (TREF(local_collseq_stdnull))
+	{
+		if ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
+		{
+			assert(LVNULLSUBS_OK == TREF(lv_null_subs));
+			prevNode = lvAvlTreePrev(node);	/* Need to hop over the null subscript */
+			if (NULL != prevNode)
+				node = prevNode; /* If null subscript is the only one existing, return that */
+		}
+	}
+	return node;
+}
+
 /* Returns the in-order predecessor of the input "node".
  * Assumes input is in the avl tree  and operates within the avl tree only.
  */
@@ -590,7 +618,7 @@ lvTreeNode *lvAvlTreeKeyCollatedNext(lvTree *lvt, treeKeySubscr *key)
 			node = lvAvlTreeKeyNext(lvt, key);
 		}
 		/* If "node" holds the NULL subscript, then hop over to the next one.  */
-		if ((NULL != node) && MVTYPE_IS_STRING(node->key_mvtype) && (0 == node->key_len))
+		if ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
 			node = lvAvlTreeNext(node);	/* Need to hop over the null subscript */
 	} else
 		node = lvAvlTreeKeyNext(lvt, key);
@@ -616,18 +644,92 @@ lvTreeNode *lvAvlTreeNodeCollatedNext(lvTreeNode *node)
 		 * subscript as the next subscript in collation order. In that case, we need to hop over
 		 * it as that collates before the current numeric subscript.
 		 */
-		if ((NULL != node) && MVTYPE_IS_STRING(node->key_mvtype) && (0 == node->key_len))
+		if ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
 		{
 			lvt = LV_GET_PARENT_TREE(node);
 			node = lvAvlTreeFirst(lvt);
 			assert(NULL != node);
 		} else
 			node = lvAvlTreeNext(node);
-		get_next = ((NULL != node) && MVTYPE_IS_STRING(node->key_mvtype) && (0 == node->key_len));
+		get_next = ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node));
 	} else
 		get_next = TRUE;
 	if (get_next)
 		node = lvAvlTreeNext(node);
+	return node;
+}
+
+/* Returns the collated predecessor of the input "node" taking into account the currently effective null collation scheme */
+lvTreeNode *lvAvlTreeNodeCollatedPrev(lvTreeNode *node)
+{
+	boolean_t	get_prev;
+	lvTree		*lvt;
+	lvTreeNode	*nullsubsparent;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(NULL != node);
+	if (TREF(local_collseq_stdnull))
+	{	/* If standard null collation, then null subscript needs special handling.
+		 *
+		 * If current subscript is a null subscript, this is the first subscript in collation order and so there is
+		 * no previous subscript.
+		 *
+		 * If current subscript is NOT a null subscript, it is possible we encounter the null
+		 * subscript as the previous subscript in collation order. In that case, we need to hop over
+		 * it as that collates before the current numeric subscript.
+		 */
+		if (LV_NODE_KEY_IS_NULL_SUBS(node))
+			node = NULL;
+		else
+		{
+			lvt = LV_GET_PARENT_TREE(node);
+			node = lvAvlTreePrev(node);
+			if ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
+				node = lvAvlTreePrev(node);
+			if (NULL == node)
+			{	/* If we have reached the end, then check if the null subscript is there.
+				 * If so return it as that is the earliest subscript in stdnullcoll scheme.
+				 */
+				node = lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent);
+			}
+		}
+	} else
+		node = lvAvlTreePrev(node);
+	return node;
+}
+
+/* Returns the collated predecessor of the input "key" taking into account the currently effective null collation scheme */
+lvTreeNode *lvAvlTreeKeyCollatedPrev(lvTree *lvt, treeKeySubscr *key)
+{
+	lvTreeNode	*node;
+	lvTreeNode	*nullsubsparent;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(local_collseq_stdnull))
+	{	/* Needs special handling like is done in "lvAvlTreeNodeCollatedPrev" */
+		if (MV_IS_STRING(key) && (0 == key->str.len))
+		{	/* Input key is null subscript. This is the earliest subscript in standard null collation order */
+			return NULL;
+		}
+		/* Want the subscript BEFORE a numeric or string subscript. It could end up resulting
+		 * in the null subscript in case "key" is the first string subscript after "" in the tree.
+		 * In that case, hop over the null subscript as that comes first in the collation order
+		 * even though it comes in between numbers and strings in the tree node storage order.
+		 */
+		node = lvAvlTreeKeyPrev(lvt, key);
+		/* If "node" holds the NULL subscript, then hop over to the previous one */
+		if ((NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
+			node = lvAvlTreePrev(node);	/* Need to hop over the null subscript */
+		if (NULL == node)
+		{	/* If we have reached the end, then check if the null subscript is there.
+			 * If so return it as that is the earliest subscript in stdnullcoll scheme.
+			 */
+			node = lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent);
+		}
+	} else
+		node = lvAvlTreeKeyPrev(lvt, key);
 	return node;
 }
 

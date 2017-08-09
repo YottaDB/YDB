@@ -3529,10 +3529,10 @@ MBSTART {														\
 
 #define	ZPREVIOUS_NULL_SUBS_LEVEL1	2	/* this value should be != FALSE and TRUE and is relied upon by "gvcst_search" */
 
-/* Macro used by $ZPREVIOUS to replace a NULL subscript at the end with the maximum possible subscript
- * that could exist in the database for this global name.
+/* Macro to replace a NULL subscript at the end with the maximum possible subscript that could exist in the
+ * database for this global name. Used by $ZPREVIOUS, $QUERY(gvn,-1) etc.
  */
-#define GVZPREVIOUS_APPEND_MAX_SUBS_KEY(GVKEY, GVT)						\
+#define GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT)							\
 MBSTART {											\
 	int		lastsubslen, keysize;							\
 	unsigned char	*ptr;									\
@@ -3558,6 +3558,52 @@ MBSTART {											\
 	assert(GVKEY->end == (ptr - &GVKEY->base[0]));						\
 	if (NULL != gv_target->gd_csa)								\
 		DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
+} MBEND
+
+#define	GTCMTR_SUBS2STR_XFORM_IF_NEEDED(GVT, GVKEY, KEY_TOP)						\
+{													\
+	unsigned char	*kprev, *kcur, *ktop;								\
+	boolean_t	last_sub_is_null;								\
+													\
+	if (GVT->collseq || GVT->nct)									\
+	{	/* Need to convert subscript representation from client side to string representation	\
+		 * so any collation transformations can happen on server side.				\
+		 * First check if last subscript of incoming key is a NULL subscript.			\
+		 * If so, client would have represented it using a sequence of FF, FF, FF, ...		\
+		 * Remove the representation temporarily before doing the gv_xform_key.			\
+		 * Introduce the NULL subscript after the transformation.				\
+		 * This is because we do NOT allow a null subsc to be transformed to a non null subsc	\
+		 * 	so no need for that be part of the transformation.				\
+		 */											\
+		last_sub_is_null = TRUE;								\
+		kprev = &GVKEY->base[GVKEY->prev];							\
+		for (kcur = kprev, ktop = &GVKEY->base[KEY_TOP] - 1; kcur < ktop; kcur++)		\
+		{											\
+			if (STR_SUB_MAXVAL != *kcur)							\
+			{										\
+				last_sub_is_null = FALSE;						\
+				break;									\
+			}										\
+		}											\
+		if (last_sub_is_null)									\
+		{											\
+			*kprev = KEY_DELIMITER;	/* remove the null subscript temporarily */		\
+			GVKEY->end = GVKEY->prev;							\
+		}											\
+		gv_xform_key(GVKEY, FALSE);	/* do collation transform on server side */		\
+		if (last_sub_is_null)									\
+			GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT); /* Insert the NULL subscript back */	\
+	}												\
+}
+
+#define	GV_UNDO_APPEND_MAX_SUBS_KEY(GVKEY, REG)						\
+MBSTART {										\
+	assert(REG->std_null_coll || (STR_SUB_PREFIX == GVKEY->base[GVKEY->prev]));	\
+	if (REG->std_null_coll)								\
+		GVKEY->base[GVKEY->prev] = SUBSCRIPT_STDCOL_NULL;			\
+	GVKEY->base[GVKEY->prev + 1] = KEY_DELIMITER;					\
+	GVKEY->end = GVKEY->prev + 2;							\
+	GVKEY->base[GVKEY->end] = KEY_DELIMITER;					\
 } MBEND
 
 /* Bit masks for the update_trans & si->update_trans variables */

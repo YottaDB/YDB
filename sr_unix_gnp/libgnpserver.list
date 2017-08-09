@@ -62,6 +62,7 @@ gtcmtr_lksuspend
 gtcmtr_order
 gtcmtr_put
 gtcmtr_query
+gtcmtr_reversequery
 gtcmtr_terminate
 gtcmtr_terminate_free
 gtcmtr_zprevious

@@ -4,12 +4,17 @@
 # Copyright (c) 2009-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
+
+set -e		# exit right where an error occurs
 
 . ./arch.gtc
 
@@ -44,7 +49,9 @@ fi
 # which exist in both directories.
 
 if [ -d utf8 ]; then
-	(cd utf8; ln -s ../* . 2> /dev/null)
+	set +e		# Do not let potential "file exists" error cause script to exit so temporarily suspend set -e
+	(cd utf8; ln -s ../* . 2> /dev/null; exit 0)
+	set -e
 fi
 
 # Native shared library extension.
@@ -96,6 +103,8 @@ fi
 $echo "                     GT.M Configuration Script"
 $echo "Copyright 2009, 2014 Fidelity Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
+$echo "Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries."
+$echo "All rights reserved."
 $echo ""
 
 # Native super user and group
@@ -390,19 +399,23 @@ if [ -f $file ]; then
 	fi
 fi
 # Install the .cshrc and .profile files
-cp -p gdedefaults gtmgblstat.xc gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
-chmod 0444 $gtmdist/gdedefaults
-chown $owner $gtmdist/gdedefaults
-chmod 0444 $gtmdist/gtmgblstat.xc
-chown $owner $gtmdist/gtmgblstat.xc
-chmod 0755 $gtmdist/gtmprofile
-chown $owner $gtmdist/gtmprofile
-chmod 0755 $gtmdist/gtmprofile_preV54000
-chown $owner $gtmdist/gtmprofile_preV54000
-chmod 0755 $gtmdist/gtm
-chown $owner $gtmdist/gtm
-chmod 0755 $gtmdist/gtmcshrc
-chown $owner $gtmdist/gtmcshrc
+for i in gdedefaults gtmgblstat.xc
+do
+	if [ -e $i ]; then
+		cp -p $i $gtmdist
+		chmod 0444 $gtmdist/$i
+		chown $owner $gtmdist/$i
+	fi
+done
+
+for i in gtmprofile gtmprofile_preV54000 gtm gtmcshrc
+do
+	if [ -e $i ]; then
+		cp -p $i $gtmdist
+		chmod 0755 $gtmdist/$i
+		chown $owner $gtmdist/$i
+	fi
+done
 
 # Install the normal scripts
 for i in $nscripts
@@ -446,7 +459,9 @@ done
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
-	chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext > /dev/null 2>&1
+	set +e		# Do not let potential "chcon" error cause script to exit so temporarily suspend set -e
+	(chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext; exit 0)
+	set -e
 fi
 
 # Create $gtmdist/plugin/gtmcrypt directory if this platform supports encryption
@@ -770,7 +785,7 @@ fi
 # this could include compile and/or library load errors
 if [ 0 != `grep -c '[1-9]' $gtm_dist/compstat` ]; then
 	$echo ""
-	$echo "GT.M installation FAILED – please review error messages"
+	$echo "GT.M installation FAILED -- please review error messages"
 	$echo ""
 	chmod -R a-x $gtmdist
 	exit 1

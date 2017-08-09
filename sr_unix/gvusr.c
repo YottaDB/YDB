@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,6 +45,11 @@ int gvusr_order(void)
 }
 
 int gvusr_query(mval *v)
+{
+	return 1;
+}
+
+int gvusr_reversequery(mval *v)
 {
 	return 1;
 }

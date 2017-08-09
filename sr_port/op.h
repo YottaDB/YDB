@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -72,6 +75,9 @@ void	op_fnpopulation(mval *arg1, mval *arg2, mval *dst);
 void	op_fnqlength(mval *name, mval *subscripts);
 void	op_fnqsubscript(mval *name, int seq, mval *subscript);
 void	op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
+void	op_fnquery_va(int sbscnt, mval *dst, va_list var);
+void	op_fnreversequery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
+void	op_fnreversequery_va(int sbscnt, mval *dst, va_list var);
 void	op_fnrandom(int4 interval, mval *ret);
 void	op_fnreverse(mval *src, mval *dst);
 void	op_fnstack1(int level, mval *result);
@@ -148,7 +154,9 @@ void	op_gvo2(mval *dst, mval *direct);
 void	op_gvorder(mval *v);
 void	op_gvput(mval *var);
 void	op_gvquery(mval *v);
+void	op_gvreversequery(mval *v);
 boolean_t op_gvqueryget(mval *key, mval *val);
+void	op_gvq2(mval *dst, mval *direct);
 void	op_gvrectarg(mval *v);
 void	op_gvsavtarg(mval *v);
 void	op_gvzwithdraw(void);
@@ -177,6 +185,7 @@ void	op_indmerge2(uint4 indx);
 void	op_indname(mval *dst, mval *target, mval *subs);
 void	op_indo2(mval *dst, uint4 indx, mval *value);
 void	op_indpat(mval *v, mval *dst);
+void	op_indq2(mval *dst, uint4 indx, mval *value);
 void	op_indrzshow(mval *s1, mval *s2);
 void	op_indset(mval *target, mval *value);
 void	op_indtext(mval *lab, mint offset, mval *rtn, mval *dst);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -12,22 +12,23 @@
  *								*
  ****************************************************************/
 
-#ifndef _FNORDER_H_INC_
-#define _FNORDER_H_INC_
+#include "mdef.h"
+#include "op.h"
+#include "mvalconv.h"
 
-enum order_obj {
-	GLOBAL = 0,
-	LOCAL,
-	LOCAL_NAME,
-	INDIRECT,
-	LAST_OBJECT
-};
+error_def(ERR_QUERY2);
 
-enum order_dir {
-	FORWARD = 0,
-	BACKWARD,
-	TBD,
-	LAST_DIRECTION
-};
+void op_gvq2(mval *dst,mval *direct)
+{
+	int4	dummy_intval;
 
-#endif
+	MV_FORCE_NUM(direct);
+	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
+		rts_error(VARLSTCNT(1) ERR_QUERY2);
+	else
+	{	if (direct->m[1] == 1*MV_BIAS)
+			op_gvquery(dst);
+		else
+			op_gvreversequery(dst);
+	}
+}

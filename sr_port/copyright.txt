@@ -1,5 +1,5 @@
 								
- Copyright (c) XXXX-YYYY Fidelity National Information		
+ Copyright (c) XXXX-YYYY Fidelity National Information	
  Services, Inc. and/or its subsidiaries. All rights reserved.	
 								
  Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	
