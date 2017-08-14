@@ -123,6 +123,7 @@ err_exit()
     m1="$m1""UTF-8 support using specified  major.minor ICU version; specify default to use default version"
     echo "$m1"
     echo "--verbose - * output diagnostic information as the script executes; default is to run quietly"
+    echo "--gtm - Install GT.M instead of YottaDB"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to GT.M developers"
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
