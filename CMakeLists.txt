@@ -403,6 +403,10 @@ if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
 
+function(add_executable target)
+  _add_executable(${target} ${ARGN})
+  set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+endfunction()
 add_executable(mumps			${mumps_SOURCES})
 target_link_libraries(mumps		libmumps)
 
@@ -465,7 +469,7 @@ add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
 target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
 set_target_properties(libgtmshr PROPERTIES
-  LINK_FLAGS "${libgtmshr_link}"
+  LINK_FLAGS "${libgtmshr_link} -Wl,-Map=libgtmshr.map"
   LINK_DEPENDS "${libgtmshr_dep}"
   )
 add_dependencies(libgtmshr gen_export)
