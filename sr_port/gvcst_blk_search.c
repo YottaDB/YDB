@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -71,8 +74,8 @@
  *				PREVIOUS REC	CURRENT REC
  * CONDITION			MATCH	OFFSET	MATCH	OFFSET
  * ---------			----	------	-----	------
- * Buffer empty			0	0	0	7
- * Hit first key in block	0	0	a	7
+ * Buffer empty			0	0	0	f
+ * Hit first key in block	0	0	a	f
  * Hit star key			b	c	0	x
  * Hit last key (leaf)		b	c	a	x
  * Went past last key (leaf)	b	x	0	y
@@ -82,6 +85,7 @@
  *	b = number of characters which match on the previous
  *	    key (including those which have been compressed away)
  *	c = offset of previous record
+ *	f = offset of first record in the block (i.e. SIZEOF(blk_hdr))
  *	x = offset for last record in the block
  *	y = top of buffer (same as block bsize)
  *

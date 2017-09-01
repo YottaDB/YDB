@@ -518,44 +518,50 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	}
 	if (NULL == pHist)
 	{
-		if ((pCurr->curr_rec.offset < SIZEOF(blk_hdr)) ||
-			((pCurr->curr_rec.offset == SIZEOF(blk_hdr)) && (pCurr->curr_rec.match < nKeyLen)))
-		{	/* Clue less than first rec, invalidate */
-			pTarg->clue.end = 0;
-			return cdb_sc_normal;
-		}
-		pRec = pBlkBase + SIZEOF(blk_hdr);
-		GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
-		if (FALSE == CHKRECLEN(pRec, pBlkBase, n0))
+		assert(pCurr->curr_rec.offset >= SIZEOF(blk_hdr));
+		if ((pCurr->curr_rec.offset > SIZEOF(blk_hdr)) || (pCurr->curr_rec.match >= nKeyLen))
 		{
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_rmisalign;
-		}
-		c1 = pRec + SIZEOF(rec_hdr);
-		c2 = pTarg->first_rec->base;
-		if (n0 > (pTarg->first_rec->top))
-		{
-			n0 = pTarg->first_rec->top;
-			status = cdb_sc_keyoflow;
-		} else
-			status = cdb_sc_rmisalign;
-		if (0 != n0)
-		{
-			do
+			pRec = pBlkBase + SIZEOF(blk_hdr);
+			GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
+			if (FALSE == CHKRECLEN(pRec, pBlkBase, n0))
 			{
-				--n0;
-				if ((0 == (*c2++ = *c1++)) && (0 == *c1))
-					break;
-			} while (n0);
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_rmisalign;
+			}
+			c1 = pRec + SIZEOF(rec_hdr);
+			c2 = pTarg->first_rec->base;
+			if (n0 > (pTarg->first_rec->top))
+			{
+				n0 = pTarg->first_rec->top;
+				status = cdb_sc_keyoflow;
+			} else
+				status = cdb_sc_rmisalign;
+			if (0 != n0)
+			{
+				do
+				{
+					--n0;
+					if ((0 == (*c2++ = *c1++)) && (0 == *c1))
+						break;
+				} while (n0);
+			}
+			if (0 == n0)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return status;
+			}
+			assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]); /* ensure we don't exceed allocated bounds */
+			*c2 = *c1;
+			DEBUG_ONLY(pTarg->first_rec->end = c2 - pTarg->first_rec->base;)
+		} else
+		{	/* Clue less than first rec, invalidate first_rec */
+			DEBUG_ONLY(pTarg->clue.end = pKey->end);	/* needed by an assert in GVT_CLUE_INVALIDATE_FIRST_REC.
+									 * in pro, this will be done later as part of the
+									 * COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE call.
+									 */
+			GVT_CLUE_INVALIDATE_FIRST_REC(pTarg);
+			/* Note that even though first rec is invalidated, last_rec is still usable so continue with setting it */
 		}
-		if (0 == n0)
-		{
-			assert(CDB_STAGNATE > t_tries);
-			return status;
-		}
-		assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]);	/* make sure we don't exceed allocated bounds */
-		*c2 = *c1;
-		DEBUG_ONLY(pTarg->first_rec->end = c2 - pTarg->first_rec->base;)
 		if (NULL == pNonStar)
 		{
 			*((short *)pTarg->last_rec->base) = GVT_CLUE_LAST_REC_MAXKEY;

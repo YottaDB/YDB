@@ -3482,8 +3482,19 @@ MBSTART {															\
  */
 #define	GVT_CLUE_INVALIDATE_FIRST_REC(GVT)						\
 MBSTART {										\
+	gv_key *firstRec;								\
+											\
 	assert(GVT->clue.end);								\
-	*((short *)GVT->first_rec->base) = GVT_CLUE_FIRST_REC_UNRELIABLE;		\
+	firstRec = GVT->first_rec;							\
+	*((short *)firstRec->base) = GVT_CLUE_FIRST_REC_UNRELIABLE;			\
+	/* The below lines are needed by an assert in DEBUG_GVT_CLUE_VALIDATE macro	\
+	 * In pro, we only use first_rec->base and don't use first_rec->end and since	\
+	 * the first byte is 0xff (greater than first valid mname which is an alphabet)	\
+	 * we are guaranteed the memcmp will stop right after the first byte.		\
+	 */										\
+	DEBUG_ONLY(firstRec->base[2] = KEY_DELIMITER);					\
+	DEBUG_ONLY(firstRec->base[3] = KEY_DELIMITER);					\
+	DEBUG_ONLY(firstRec->end = 3);							\
 } MBEND
 
 #ifdef DEBUG
