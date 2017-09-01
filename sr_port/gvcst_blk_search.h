@@ -346,6 +346,7 @@ GBLREF	uint4			dollar_tlevel;
 	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
 	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
 	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
 	pStat->curr_rec.match = (unsigned short)nTargLen;
 #	ifdef GVCST_SEARCH_EXPAND_PREVKEY
 	if (NULL != (tmpPtr = prevKeyUnCmp))	/* Note: Assignment */

@@ -814,8 +814,14 @@ research:
 		if (!killing_chunks)
 			INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
 		if (gvt_root && (0 != gv_target->clue.end))
-		{	/* If clue is still valid, then the deletion was confined to a single block */
-			assert(gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num);
+		{	/* If clue is still valid, then the deletion was confined to a single block. Assert that the block
+			 * numbers are identical. The only exception is if a GVTR_OP_TCOMMIT happened above causing
+			 * the blk_num in gvt_hist->h[0] to be assigned a valid block while alt_hist->h[0].blk_num stayed
+			 * an invalid block (the # that gets assigned to to-be-created block numbers while inside a TP fence).
+			 */
+			assert((gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num)
+				|| (lcl_implicit_tstart && ((off_chain *)&alt_hist->h[0].blk_num)->flag
+					&& !((off_chain *)&gvt_hist->h[0].blk_num)->flag));
 			/* In this case, the "right hand" key (which was searched via gv_altkey) was the last search
 			 * and should become the clue.  Furthermore, the curr.match from this last search should be
 			 * the history's curr.match.  However, this record will have been shuffled to the position of
