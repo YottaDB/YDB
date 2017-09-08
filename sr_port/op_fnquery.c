@@ -37,9 +37,10 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
 
-error_def(ERR_STACKOFLOW);
-error_def(ERR_STACKCRIT);
 error_def(ERR_LVNULLSUBS);
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
 void op_fnquery(int sbscnt, mval *dst, ...)
 {
@@ -51,7 +52,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 
 void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 {
-	int			length;
+	int			length, dstlen;
 	mval			tmp_sbs, *last_fnquery_ret;
 	mval			*varname, *v1, *v2, *mv, tmpmv;
 	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
@@ -371,9 +372,21 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		}
 		*stringpool.free++ = (h2 < h1 ? ',' : ')');
 	}
-	dst->mvtype = MV_STR;
-	dst->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-	dst->str.addr = v1->str.addr;
 	POP_MV_STENT();	/* v2 */
 	POP_MV_STENT();	/* v1 */
+	dstlen = INTCAST((char *)stringpool.free - v1->str.addr);
+	if (MAX_STRLEN < dstlen)
+	{	/* Result of $query would be greater than maximum string length allowed. Error out but cleanup before that. */
+		stringpool.free = (unsigned char *)v1->str.addr; /* Remove the incomplete $query result from stringpool */
+		if (last_sub_null)
+		{	/* If TREF(last_fnquery_return_subcnt) was being maintained above, reset it too */
+			TREF(last_fnquery_return_subcnt) = 0;
+			(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
+			(TREF(last_fnquery_return_varname)).str.len = 0;
+		}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+	}
+	dst->mvtype = MV_STR;
+	dst->str.len = dstlen;
+	dst->str.addr = v1->str.addr;
 }
