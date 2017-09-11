@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,7 +113,7 @@ struct msgdata
 #define	MSG_MAGIC		1431655765
 #define	MSG_PROTO_VERSION	1
 
-void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_list args)
+void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt, va_list args)
 {
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr, *psocketptr;
@@ -130,7 +130,6 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 	int			*fds;
 	pid_t			peerpid;
 	TID			timer_id;
-	int4			msec_timeout;
 	char			complete_buf[STR_LIT_LEN(ACCEPT_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
@@ -188,10 +187,8 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		}
 	}
 #	endif
-
 	/* pass fds */
 	fds = (int *)CMSG_DATA((struct cmsghdr *)cmsg_buffer);
-
 	for (argn = 0; argn < argcnt; argn++)
 	{
 		handle = va_arg(args, mval *);
@@ -211,7 +208,6 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		psocketptr = socket_pool->socket[index];
 		fds[argn] = psocketptr->sd;
 	}
-
 	/* send argcnt with fds */
 	mdata.magic = MSG_MAGIC;
 	mdata.proto_version = MSG_PROTO_VERSION;
@@ -229,26 +225,20 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 	cmsg->cmsg_len = CMSG_LEN(argcnt * SIZEOF(int));
 	cmsg->cmsg_level = SOL_SOCKET;
 	cmsg->cmsg_type = SCM_RIGHTS;
-
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
-
-	if (NO_M_TIMEOUT != timeout)
+	if (NO_M_TIMEOUT != msec_timeout)
 	{
 		timer_id = (TID)iosocket_pass_local;
-		msec_timeout = timeout2msec(timeout);
 		start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
 	}
-
 	do
 	{
 		rval = sendmsg(socketptr->sd, &msg, 0);
 	}
 	while (!outofband && !out_of_time && (-1 == rval) && (EINTR == errno));
-
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == iov.iov_len);
-
 	for (argn = 0; argn < argcnt; argn++)
 	{
 		if (0 > (index = iosocket_handle(handles[argn].addr, &handles[argn].len, FALSE, socket_pool)))
@@ -257,25 +247,21 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 			return;
 		}
 		psocketptr = socket_pool->socket[index];
-
 		/* send handle length */
 		SENDALL(socketptr->sd, &handles[argn].len, SIZEOF(handles[argn].len), rval);
 		if (-1 == rval)
 			goto ioerr;
 		assert(rval == SIZEOF(handles[argn].len));
-
 		/* send handle */
 		SENDALL(socketptr->sd, handles[argn].addr, handles[argn].len, rval);
 		if (-1 == rval)
 			goto ioerr;
 		assert(rval == handles[argn].len);
-
 		/* send buffer length */
 		SENDALL(socketptr->sd, &psocketptr->buffered_length, SIZEOF(psocketptr->buffered_length), rval);
 		if (-1 == rval)
 			goto ioerr;
 		assert(rval == SIZEOF(psocketptr->buffered_length));
-
 		/* send buffer */
 		SENDALL(socketptr->sd, psocketptr->buffer + psocketptr->buffered_offset, psocketptr->buffered_length, rval);
 		if (-1 == rval)
@@ -292,7 +278,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 	assert(rval == STR_LIT_LEN(ACCEPT_COMPLETE));
 	if (0 != STRNCMP_LIT(complete_buf, ACCEPT_COMPLETE))
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		iod->dollar.za = 9;
 		errptr = PROTOCOL_ERROR;
@@ -304,18 +290,15 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
-
-	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
-
 	for (argn = 0; argn < argcnt; argn++)
 	{
 		handlestr = handles[argn];
 		if (-1 != (index = iosocket_handle(handlestr.addr, &handlestr.len, FALSE, socket_pool)))
 			iosocket_close_one(socket_pool, index);
 	}
-
-	if (NO_M_TIMEOUT != timeout)
+	if (NO_M_TIMEOUT != msec_timeout)
 		dollar_truth = TRUE;
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
@@ -328,7 +311,7 @@ ioerr:
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
-	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
 	iod->dollar.za = 9;
 	errptr = (char *)STRERROR(save_errno);
@@ -341,7 +324,7 @@ ioerr:
 	return;
 }
 
-void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeout, int argcnt, va_list args)
+void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_timeout, int argcnt, va_list args)
 {
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr, *psocketptr;
@@ -361,7 +344,6 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	size_t			tmpbuflen;
 	pid_t			peerpid;
 	TID			timer_id;
-	int4			msec_timeout;
 	char			complete_buf[STR_LIT_LEN(PASS_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
@@ -398,7 +380,6 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
-
 #	if PID_CHECKING_SUPPORTED
 	if (-1 != pid)
 	{
@@ -415,11 +396,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		}
 	}
 #	endif
-
 	/* accept fds */
 	if (NULL == socket_pool)
 		iosocket_poolinit();
-
 	for (argn = 0; argn < argcnt; argn++)
 	{
 		handle = va_arg(args, mval *);
@@ -431,16 +410,12 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		else
 			handles[argn] = handle->str;
 	}
-
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
-
-	if (NO_M_TIMEOUT != timeout)
+	if (NO_M_TIMEOUT != msec_timeout)
 	{
 		timer_id = (TID)iosocket_accept_local;
-		msec_timeout = timeout2msec(timeout);
 		start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
 	}
-
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
 	/* read fd count first */
@@ -450,13 +425,11 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	msg.msg_iovlen = 1;
 	msg.msg_control = (struct cmsghdr *)cmsg_buffer;
 	msg.msg_controllen = CMSG_SPACE(MAX_PASS_FDS * SIZEOF(int));
-
 	do
 	{
 		rval = recvmsg(socketptr->sd, &msg, 0);
 	}
 	while (!outofband && !out_of_time && (-1 == rval) && (EINTR == errno));
-
 	if (0 == rval)
 	{
 		rval = -1;
@@ -466,13 +439,12 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		goto ioerr;
 	if (SIZEOF(mdata) != rval)
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
 	assert(rval == iov.iov_len);
-
 	if ((MSG_MAGIC != mdata.magic) || (MSG_PROTO_VERSION != mdata.proto_version))
 	{
 		iod->dollar.za = 9;
@@ -483,34 +455,29 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
 	}
-
 	cmsg = CMSG_FIRSTHDR(&msg);
 	while((cmsg != NULL) && ((SOL_SOCKET != cmsg->cmsg_level) || (SCM_RIGHTS != cmsg->cmsg_type)))
 		cmsg = CMSG_NXTHDR(&msg, cmsg);
-
 	if (NULL == cmsg)
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
-
 	fdcount = mdata.fdcount;
 	fds = (int *)CMSG_DATA(cmsg);
 	assert(((cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg) - (char *)cmsg)) / SIZEOF(int)) == fdcount);
-
 	if (0 == fdcount)
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
-
 	if (gtm_max_sockets <= (socket_pool->n_socket + fdcount))
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		for (fdn = 0; fdn < fdcount; fdn++)
 		{
@@ -519,7 +486,6 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
 		return;
 	}
-
 	for (fdn=0; fdn < fdcount; fdn++)
 	{
 		/* read handle length */
@@ -527,16 +493,13 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		if (-1 == rval)
 			goto ioerr;
 		assertpro(SIZEOF(handlestr.len) == rval);
-
 		/* read handle */
 		ENSURE_STP_FREE_SPACE(MAX_HANDLE_LEN);
 		handlestr.addr = (char *)stringpool.free;
-
 		RECVALL(socketptr->sd, handlestr.addr, handlestr.len, rval);
 		if (-1 == rval)
 			goto ioerr;
 		assertpro(handlestr.len == rval);
-
 		if ((fdn >= argcnt) || (NULL == handles[fdn].addr))
 		{
 			/* If the passed handle name already exists in the socket pool, create a new one */
@@ -547,13 +510,11 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		}
 		else
 			handlestr = handles[fdn];	/* Use the handle from the argument list */
-
 		/* read socket buffer length */
 		RECVALL(socketptr->sd, &tmpbuflen, SIZEOF(tmpbuflen), rval);
 		if (-1 == rval)
 			goto ioerr;
 		assertpro(SIZEOF(tmpbuflen) == rval);
-
 		psocketptr = iosocket_create(NULL,
 					((tmpbuflen > DEFAULT_SOCKET_BUFFER_SIZE) ? tmpbuflen : DEFAULT_SOCKET_BUFFER_SIZE),
 					fds[fdn], FALSE);
@@ -564,7 +525,6 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		socket_pool->socket[socket_pool->n_socket++] = psocketptr;
 		socket_pool->current_socket = socket_pool->n_socket - 1;
 		scnt++;
-
 		if (0 < tmpbuflen)
 		{
 			/* read socket buffer */
@@ -575,7 +535,6 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 			assertpro(psocketptr->buffered_length == rval);
 		}
 		psocketptr->buffered_offset = 0;
-
 		handleslen += handlestr.len;
 	}
 	RECVALL(socketptr->sd, complete_buf, STR_LIT_LEN(PASS_COMPLETE), rval);
@@ -584,7 +543,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	assert(rval == STR_LIT_LEN(PASS_COMPLETE));
 	if (0 != STRNCMP_LIT(complete_buf, PASS_COMPLETE))
 	{
-		if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
 		for (fdn = scnt - 1; fdn >= 0; fdn--)
 		{
@@ -609,10 +568,8 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == STR_LIT_LEN(ACCEPT_COMPLETE));
-
-	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
-
 	if (NULL != handlesvar)
 	{
 		handleslen += (fdcount > 1) ? (fdcount - 1) : 0;		/* space for delimiters */
@@ -622,10 +579,8 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		handlesvar->mvtype = MV_STR;
 		handlesvar->str.addr = hptr;
 		handlesvar->str.len = handleslen;
-
 		memcpy(hptr, handles[0].addr, handles[0].len);
 		hptr += handles[0].len;
-
 		for (fdn=1; fdn < fdcount; fdn++)
 		{
 			*hptr++ = '|';
@@ -633,8 +588,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 			hptr += handles[fdn].len;
 		}
 	}
-
-	if (NO_M_TIMEOUT != timeout)
+	if (NO_M_TIMEOUT != msec_timeout)
 		dollar_truth = TRUE;
 	return;
 
@@ -644,7 +598,7 @@ ioerr:
 	{
 		dollar_truth = FALSE;
 	}
-	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
+	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
 	for (fdn = scnt - 1; fdn >= 0; fdn--)
 	{

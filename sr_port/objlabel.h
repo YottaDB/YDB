@@ -20,7 +20,7 @@
 #define	YDB_OMAGIC	0411
 #define	GTM_OMAGIC	0407	/* old impure format */
 
-#define	OBJ_UNIX_LABEL	1	/* Increment each binary version change */
+#define	OBJ_UNIX_LABEL	2	/* Increment each binary version change */
 #ifdef USHBIN_SUPPORTED
 #  define MAGIC_COOKIE_V5	((GTM_OMAGIC << 16) + (8 << 4) + 0) /* A version stake for V5. Should never change. */
 #  define OBJ_LABEL	OBJ_UNIX_LABEL

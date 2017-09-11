@@ -54,7 +54,6 @@
 #include "ctrlc_handler.h"
 #include "get_page_size.h"
 #include "generic_signal_handler.h"
-#include "init_secshr_addrs.h"
 #include "zcall_package.h"
 #include "getzdir.h"
 #include "getzmode.h"
@@ -142,11 +141,12 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
-	unsigned char	*mstack_ptr;
-	void		gtm_ret_code();
-	static char 	other_mode_buf[] = "OTHER";
+	char		*temp;
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
+	static char 	other_mode_buf[] = "OTHER";
+	unsigned char	*mstack_ptr;
+	void		gtm_ret_code();
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -184,6 +184,12 @@ void gtm_startup(struct startup_vector *svec)
 		svec->user_strpl_size = STP_MAXINITSIZE;
 	stp_init(svec->user_strpl_size);
 	rts_stringpool = stringpool;
+	(TREF(tpnotacidtime)).mvtype = MV_NM | MV_INT;	/* gtm_env_init set up a numeric value, now there's a stp: string it */
+	MV_FORCE_STRD(&(TREF(tpnotacidtime)));
+	assert(6 >= (TREF(tpnotacidtime)).str.len);
+	temp = malloc((TREF(tpnotacidtime)).str.len);
+	memcpy(temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
+	(TREF(tpnotacidtime)).str.addr = temp;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
 #	ifdef DEBUG
@@ -206,7 +212,6 @@ void gtm_startup(struct startup_vector *svec)
 	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 	getjobname();
-	INVOKE_INIT_SECSHR_ADDRS;
 	getzprocess();
 	getzmode();
 	zcall_init();

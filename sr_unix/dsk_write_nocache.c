@@ -100,8 +100,9 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	else
 		assert(GDSV6 == ondsk_blkver);
 #	endif
-	if (csa->do_fullblockwrites)
-		size =(int)ROUND_UP(size, csa->fullblockwrite_len); /* round size up to next full logical filesys block. */
+	if (csa->do_fullblockwrites) /* See similiar lobic in wcs_wtstart.c */
+		size = (int)ROUND_UP(size, (FULL_DATABASE_WRITE == csa->do_fullblockwrites)
+				? csd->blk_size : csa->fullblockwrite_len);
 	assert(size <= csd->blk_size);
 	assert(FALSE == reg->read_only);
 	/* This function is called by "bml_init" which in turn can be called by "mucregini" or "gdsfilext". The former is

@@ -42,7 +42,7 @@ GBLREF	volatile int4		fast_lock_count;
 
 void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 {
-	boolean_t	was_crit;
+	boolean_t		was_crit;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

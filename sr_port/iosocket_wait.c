@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-boolean_t iosocket_wait(io_desc *iod, int4 timepar)
+boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 {
 	struct 	timeval  	utimeout, *utimeoutptr;
 	ABS_TIME		cur_time, end_time;
@@ -88,7 +88,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	socket_struct   	*socketptr;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
-	int4            	errlen, ii, jj, msec_timeout;
+	int4            	errlen, ii, jj;
 	int4			nselect, nlisten, nconnected, rlisten, rconnected;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestlistencycle, oldestlistenindex;
@@ -212,11 +212,10 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		}
 		if (nselect)
 		{
-			if (NO_M_TIMEOUT != timepar)
+			if (NO_M_TIMEOUT != msec_timeout)
 			{
-				utimeout.tv_sec = timepar;
-				utimeout.tv_usec = 0;
-				msec_timeout = timeout2msec(timepar);
+				utimeout.tv_sec = msec_timeout / MILLISECS_IN_SEC;
+				utimeout.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
 				sys_get_curr_time(&cur_time);
 				if (!retry_accept && (!zint_restart || !sockintr->end_time_valid))
 					add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -226,15 +225,16 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 					*/
 					DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 > cur_time.at_sec)
+					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+						/* Round up in order to prevent premature timeouts */
+						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+					if (0 > msec_timeout)
 					{
 						msec_timeout = -1;
 						utimeout.tv_sec = 0;
 						utimeout.tv_usec = 0;
 					} else
 					{
-						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-								      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 						utimeout.tv_sec = cur_time.at_sec;
 						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 					}
@@ -246,7 +246,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 #ifdef USE_POLL
 				if ((0 < rconnected) || (0 <rlisten))
 					poll_timeout = 0;
-				else if (NO_M_TIMEOUT == timepar)
+				else if (NO_M_TIMEOUT == msec_timeout)
 					poll_timeout = -1;
 				else
 					poll_timeout = (utimeout.tv_sec * MILLISECS_IN_SEC) +
@@ -258,7 +258,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				utimeoutptr = &utimeout;
 				if ((0 < rconnected) || (0 <rlisten))
 					utimeout.tv_sec = utimeout.tv_usec = 0;
-				else if (NO_M_TIMEOUT == timepar)
+				else if (NO_M_TIMEOUT == msec_timeout)
 					utimeoutptr = (struct timeval *)NULL;
 				rv = select(select_max_fd + 1, (void *)&select_fdset, (void *)0, (void *)0, utimeoutptr);
 #endif
@@ -274,7 +274,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 							mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 							sockintr->who_saved = sockwhich_wait;
-							if (NO_M_TIMEOUT != timepar)
+							if (NO_M_TIMEOUT != msec_timeout)
 							{
 								sockintr->end_time = end_time;
 								sockintr->end_time_valid = TRUE;
@@ -291,11 +291,14 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 						assertpro(FALSE);      /* Should *never* return from outofband_action */
 						return FALSE;   /* For the compiler.. */
 					}
-					if (NO_M_TIMEOUT != timepar)
+					if (NO_M_TIMEOUT != msec_timeout)
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						if (0 > cur_time.at_sec)
+						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+							/* Round up in order to prevent premature timeouts */
+							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+						if (0 >msec_timeout)
 						{
 							rv = 0;		/* time out */
 							break;
@@ -309,7 +312,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			if ((rv == 0) && (0 == rconnected) && (0 == rlisten))
 			{	/* none selected or prior pending event */
 				iod->dollar.key[0] = '\0';
-				if (NO_M_TIMEOUT != timepar)
+				if (NO_M_TIMEOUT != msec_timeout)
 				{
 					dollar_truth = FALSE;
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -326,7 +329,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		} else if ((0 == rlisten) && (0 == rconnected))
 		{	/* nothing to select and no pending events */
 			iod->dollar.key[0] = '\0';
-			if (NO_M_TIMEOUT != timepar)
+			if (NO_M_TIMEOUT != msec_timeout)
 			{
 				dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -402,7 +405,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		{	/* unexpected nothing to do */
 			assert((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
 			iod->dollar.key[0] = '\0';
-			if (NO_M_TIMEOUT != timepar)
+			if (NO_M_TIMEOUT != msec_timeout)
 			{
 				dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -437,7 +440,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			if (NULL != socketptr->remote.saddr_ip)
 			{
 				strncpy(&iod->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
-#			ifndef VMS
 			} else
 			{
 				assertpro(socket_local == socketptr->protocol);
@@ -448,13 +450,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				else
 					charptr = (char *)"";
 				strncpy(&dsocketptr->iod->dollar.key[len], charptr, DD_BUFLEN - len - 1);
-#			endif
 			}
 			iod->dollar.key[DD_BUFLEN - 1] = '\0';
 		}
 		break;
 	}
-	if (NO_M_TIMEOUT != timepar)
+	if (NO_M_TIMEOUT != msec_timeout)
 		dollar_truth = TRUE;
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return TRUE;
@@ -518,9 +519,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 			case ETIMEDOUT:
 			case ECONNRESET:
 			case ENOTCONN:
-#			ifndef VMS
 			case ENOSR:
-#			endif
 				return errno;	/* pending connection gone so retry */
 			default:
 				errptr = (char *)STRERROR(errno);
@@ -604,7 +603,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	dsocketptr->iod->dollar.key[len++] = '|';
 	if (socket_local != newsocketptr->protocol)
 		strncpy(&dsocketptr->iod->dollar.key[len], newsocketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
-#	ifndef VMS
 	else
 	{ /* get path from listening socket local side */
 		assert(NULL != socketptr->local.sa);
@@ -613,7 +611,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		SOCKET_ADDR_COPY(newsocketptr->remote, socketptr->local.sa, SIZEOF(struct sockaddr_un));
 		newsocketptr->remote.ai.ai_addrlen = socketptr->local.ai.ai_addrlen;
 	}
-#	endif
 	dsocketptr->iod->dollar.key[DD_BUFLEN - 1] = '\0';		/* In case we fill the buffer */
 	newsocketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(newsocketptr)->sa_family;
 	return 0;

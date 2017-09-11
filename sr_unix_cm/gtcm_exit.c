@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,6 @@ GBLREF int4	 gtcm_exi_condition;
 
 void gtcm_exit()
 {
-	op_lkinit();
 	op_unlock();
 	SET_PROCESS_EXITING_TRUE;
 	gv_rundown();

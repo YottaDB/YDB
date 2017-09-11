@@ -55,7 +55,7 @@ error_def(ERR_TEXT);
 
 #define ENABLE_FREEZE_ON_ERROR											\
 {														\
-	if (INST_FREEZE_ON_ERROR_POLICY)									\
+	if (!IS_GTMSECSHR_IMAGE)					\
 	{	/* Set anticipatory freeze function pointers to be used later (in send_msg and rts_error) */	\
 		is_anticipatory_freeze_needed_fnptr = &is_anticipatory_freeze_needed;				\
 		set_anticipatory_freeze_fnptr = &set_anticipatory_freeze;					\

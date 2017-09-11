@@ -21,10 +21,6 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#ifdef VMS
-#include <ssdef.h>
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "cdb_sc.h"
 #include "gtm_string.h"
@@ -55,11 +51,9 @@
 #include "repl_shutdcode.h"
 #include "repl_sp.h"
 #include "jnl_write.h"
-#ifdef UNIX
 #include "repl_instance.h"
 #include "gtmio.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
-#endif
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
@@ -70,17 +64,6 @@
 #include "io.h"
 #include "trigger_update_protos.h"
 #include "util.h"
-#endif
-#ifdef VMS
-#include <fab.h>
-#include <rms.h>
-#include <iodef.h>
-#include <secdef.h>
-#include <psldef.h>
-#include <lckdef.h>
-#include <syidef.h>
-#include <xab.h>
-#include <prtdef.h>
 #endif
 #include "op.h"
 #include "svnames.h"		/* for SV_ZTWORMHOLE */
@@ -136,11 +119,6 @@ GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	gv_namehead		*reset_gv_target;
-#ifdef VMS
-GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t		tp_restart_fail_sig_used;
-GBLREF	boolean_t		secondary_side_std_null_coll;
-#endif
 GBLREF	boolean_t		is_replicator;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		disk_blk_read;
@@ -157,10 +135,8 @@ GBLREF	stack_frame		*frame_pointer;	/* needed by TRIGGER_BASE_FRAME_UNWIND_IF_NO
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		gv_play_duplicate_kills;
-#ifdef UNIX
 GBLREF		int4		strm_index;
 STATICDEF	boolean_t	set_onln_rlbk_flg;
-#endif
 
 static	boolean_t		updproc_continue = TRUE;
 
@@ -187,7 +163,7 @@ error_def(ERR_UPDREPLSTATEOFF);
 														\
 	assert(CSA = &FILE_INFO(gv_cur_region)->s_addrs);	/* so we can use gv_cur_region below */		\
 	assert(JPC == CSA->jnl);										\
-	SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */						\
+	SET_GBL_JREC_TIME;	/* needed for "jnl_write_pini"/"jnl_write_epoch" done later in "wcs_flu" */	\
 	jbp = JPC->jnl_buff;											\
 	/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order		\
 	 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write			\
@@ -208,7 +184,7 @@ error_def(ERR_UPDREPLSTATEOFF);
 		if (0 == jnl_status)										\
 		{												\
 			if (0 == JPC->pini_addr)								\
-				jnl_put_jrt_pini(CSA);								\
+				jnl_write_pini(CSA);								\
 		} else												\
 		{												\
 			if (SS_NORMAL != JPC->status)								\
@@ -308,7 +284,6 @@ CONDITION_HANDLER(updproc_ch)
 		 */
 		if (first_sgm_info GTMTRIG_ONLY( || (TPRESTART_STATE_NORMAL != tprestart_state)))
 		{
-			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 #			ifdef GTM_TRIGGER
 			/* Note: Below GTM_TRIGGER-only code is similar to mdb_condition_handler. But unlike there,
 			 * where MUM_TSTART is done inside the condition handler to transfer control, we do an UNWIND
@@ -319,7 +294,7 @@ CONDITION_HANDLER(updproc_ch)
 			 * that by saving and restoring active_ch after the macro call so UNWIND is fine. But what this
 			 * means is that for a short code window (from when unw_mv_ent sets active_ch to when we reset it
 			 * after the macro call below), active_ch would be incorrectly set to updproc_ch (instead of
-			 * util_base_ch which START_CH would have set it to above). But that is okay since we dont expect
+			 * util_base_ch which START_CH would have set it to above). But that is okay since we don't expect
 			 * any TPRETRY errors in this short window and updproc_ch would anyways transfer control to
 			 * util_base_ch (through NEXTCH) for all non-TPRETRY errors.
 			 */
@@ -332,15 +307,9 @@ CONDITION_HANDLER(updproc_ch)
 			GTMTRIG_ONLY(assert(TPRESTART_STATE_NORMAL == tprestart_state));
 			NON_GTMTRIG_ONLY(assert(INVALID_GV_TARGET == reset_gv_target);)
 			reset_gv_target = INVALID_GV_TARGET; /* see "trigger_item_tpwrap_ch" similar code for why this is needed */
-#			ifdef UNIX
 			if (ERR_REPLONLNRLBK == SIGNAL) /* tp_restart did rts_error_csa(ERR_REPLONLNRLBK) */
 				set_onln_rlbk_flg = TRUE;
 			if ((ERR_TPRETRY == SIGNAL) || (ERR_REPLONLNRLBK == SIGNAL))
-#			elif defined VMS
-			if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
-#			else
-#			  error unsupported platform
-#			endif
 			{
 				/* It is possible that dollar_tlevel at the time of the ESTABLISH of updproc_ch was 0
 				 * and the op_tstart happened inside updproc_actions and later as part of op_tcommit a
@@ -352,21 +321,10 @@ CONDITION_HANDLER(updproc_ch)
 				 * an assert failure in UNWIND. START_CH would have done a active_ch-- so we need a
 				 * active_ch[1] to get at the desired active_ch.
 				 */
-				UNIX_ONLY(assert(active_ch[1].dollar_tlevel <= dollar_tlevel);)
-				UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
+				assert(active_ch[1].dollar_tlevel <= dollar_tlevel);
+				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
 				UNWIND(NULL, NULL);
 			}
-#			ifdef VMS
-			else
-			{	/* Otherwise tp_restart had a signal that we must now deal with.
-				 * replace the TPRETRY information with that saved from tp_restart.
-				 * first assert that we have room for these arguments and proper setup
-				 */
-				assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
-				tp_restart_fail_sig_used = FALSE;
-			}
-#			endif
 		} else
 		{
 			UNWIND(NULL, NULL);
@@ -376,7 +334,6 @@ CONDITION_HANDLER(updproc_ch)
 	else if (ERR_REPEATERROR == SIGNAL)
 		SIGNAL = dollar_ecode.error_last_ecode;	/* Error rethrown from a trigger */
 #	endif
-#	ifdef UNIX
 	else if (ERR_REPLONLNRLBK == SIGNAL)
 	{
 		preemptive_db_clnup(SEVERITY);
@@ -392,10 +349,9 @@ CONDITION_HANDLER(updproc_ch)
 		 * be 0 or non-zero and has no relation to the dollar_tlevel currently. So just fix active_ch->dollar_tlevel
 		 * before the UNWIND call to avoid any dollar_tlevel related assert failures.
 		 */
-		UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
+		DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
 		UNWIND(NULL, NULL);
 	}
-#	endif
 	/* Assumes we don't fall through and unlock the mutex later
 	 * We don't care if it fails, so ignore the status.
 	 */
@@ -415,10 +371,6 @@ int updproc(void)
 	uint4			status;
 	gld_dbname_list 	*gld_db_files, *curr;
 	recvpool_ctl_ptr_t	recvpool_ctl;
-#	ifdef VMS
-	char			proc_name[PROC_NAME_MAXLEN + 1];
-	struct dsc$descriptor_s proc_name_desc;
-#	endif
 	upd_proc_local_ptr_t	upd_proc_local;
 	sgmnt_addrs		*repl_csa;
 	DCL_THREADGBL_ACCESS;
@@ -426,19 +378,9 @@ int updproc(void)
 	SETUP_THREADGBL_ACCESS;
 	call_on_signal = updproc_sigstop;
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &updproc_ch);
-#	ifdef VMS
-	/* Get a meaningful process name */
-	proc_name_desc.dsc$w_length = get_proc_name(LIT_AND_LEN("GTMUPD"), getpid(), proc_name);
-	proc_name_desc.dsc$a_pointer = proc_name;
-	proc_name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
-	proc_name_desc.dsc$b_class = DSC$K_CLASS_S;
-	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Unable to change update process name"), status);
-#	else
 	/* In the update process, we want every replicated update from an originating instances to end up in a replicated region
 	 * on this (the receiving) instance. If not, we will issue a UPDREPLSTATEOFF error. But it is possible that replication
-	 * was turned ON at that time (since we dont hold crit at the time we do the UPDREPLSTATEOFF check) but later got turned
+	 * was turned ON at that time (since we don't hold crit at the time we do the UPDREPLSTATEOFF check) but later got turned
 	 * OFF (for example due to no disk space for journal files etc.) just before the actual application of the update.
 	 * In that case, the UPDREPLSTATEOFF error would not have been issued but there is still an issue in that an update from
 	 * the primary got applied to a non-replicated database on the secondary. We prevent this out-of-sync situation from
@@ -446,7 +388,6 @@ int updproc(void)
 	 * a runtime error and does not turn journaling off.
 	 */
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS;
-#	endif
 	is_updproc = TRUE;
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
 	TREF(ok_to_see_statsdb_regs) = TRUE;
@@ -477,7 +418,6 @@ int updproc(void)
 						 * and not the other way around.
 						 */
 		recvpool_ctl->jnl_seqno = jnl_seqno;
-#		ifdef UNIX
 		/* At this point, the receiver server will see the non-zero jnl_seqno and start communicating with a source server.
 		 * But if this is a supplementary root primary instance, the current instance jnl_seqno is not what the receiver
 		 * will ask the source to start sending transactions from. It has to first figure out what non-supplementary
@@ -534,21 +474,8 @@ int updproc(void)
 			start_jnl_seqno = jnl_seqno;
 			strm_index = recvpool.gtmrecv_local->strm_index;
 		}
-#		endif
 		upd_proc_local->read_jnl_seqno = jnl_seqno;
 		/* Check if the secondary is ahead of the primary */
-#		ifdef VMS
-		if ((jnlpool_ctl->jnl_seqno > start_jnl_seqno) && jnlpool_ctl->upd_disabled)
-		{
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX"\n",
-				INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX"\n",
-				INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SECONDAHEAD);
-		}
-#		else
 		/* The SECONDAHEAD check is performed in the receiver server after it has connected with the source
 		 * server. This is because the check is relevant only if the source server is dualsite. That is
 		 * not known now but instead at connection time. Hence the deferred check.
@@ -559,20 +486,18 @@ int updproc(void)
 		 */
 		assert((jnlpool_ctl->jnl_seqno == start_jnl_seqno)
 			|| (jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled));
-#		endif
-		UNIX_ONLY(assert(updproc_continue && !set_onln_rlbk_flg));
+		assert(updproc_continue && !set_onln_rlbk_flg);
 		/* We should be the only one acquiring the lock, so a single try should be sufficient. */
 		status = pthread_mutex_trylock(&recvpool.recvpool_ctl->write_updated_ctl);
 		if (0 != status)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutex_trylock"), CALLFROM, status, 0);
-		while (updproc_continue UNIX_ONLY(&& !set_onln_rlbk_flg))
+		while (updproc_continue && !set_onln_rlbk_flg)
 			updproc_actions(gld_db_files);
 		status = pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
 		if (0 != status)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
-#		ifdef UNIX
 		if (set_onln_rlbk_flg)
 		{	/* A concurrent online rollback happened which drove the updproc_ch and called us. Need to let the receiver
 			 * server know about it and set up the sequence numbers
@@ -591,9 +516,7 @@ int updproc(void)
 				assert(!dollar_trestart);
 			}
 			start_jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno; /* needed when we go back to the beginning of the loop */
-		} else
-#		endif
-		if (!updproc_continue)
+		} else if (!updproc_continue)
 			break;
 	}
 	updproc_end();
@@ -632,7 +555,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	char	           	gv_mname[MAX_KEY_SZ];
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, scan_char, next_char;
 	boolean_t		log_switched = FALSE;
-#	ifdef UNIX
 	boolean_t		suppl_root_primary, suppl_propagate_primary;
 	repl_histinfo		histinfo;
 	repl_old_triple_jnl_t	*input_old_triple;
@@ -640,7 +562,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	uint4			expected_rec_len;
 	int			status;
 	struct timespec		waketime;
-#	endif
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg, *dummy_reg;
@@ -654,14 +575,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	ifdef UNIX
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	DEBUG_ONLY(
 		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock below */
 		ASSERT_VALID_JNLPOOL(repl_csa);
 	)
-#	endif
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
@@ -674,7 +593,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_seqno = upd_proc_local->read_jnl_seqno;
 	log_interval = upd_proc_local->log_interval;
 	lastlog_seqno = jnl_seqno - log_interval; /* to ensure we log the first transaction */
-#	ifdef UNIX
 	if (jnlpool.repl_inst_filehdr->is_supplementary)
 	{
 		if (!jnlpool.jnlpool_ctl->upd_disabled)
@@ -691,7 +609,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		suppl_root_primary = FALSE;
 		suppl_propagate_primary = FALSE;
 	}
-#	endif
 	/* Since update process does not invoke op_gvname but directly invokes op_gvput/kill etc. we set TREF(gd_targ_addr)
 	 * here (this is normally set by op_gvname in mumps).
 	 */
@@ -699,7 +616,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	while (TRUE)
 	{
 		incr_seqno = FALSE;
-		UNIX_ONLY(assert(0 == GET_STRM_INDEX(jnl_seqno));)
+		assert(0 == GET_STRM_INDEX(jnl_seqno));
 		if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
 			break;
 		if (GTMRECV_NO_RESTART != gtmrecv_local->restart)
@@ -749,7 +666,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		 * is non-zero, it is possible tupd_num is 0 in case we come here after a TP restart.
 		 */
 		assert((dollar_tlevel && (tupd_num || dollar_trestart)) || !dollar_tlevel && !tupd_num);
-		if (upd_proc_local->bad_trans UNIX_ONLY(|| upd_proc_local->onln_rlbk_flg)
+		if (upd_proc_local->bad_trans || upd_proc_local->onln_rlbk_flg
 			|| (!dollar_tlevel && (FALSE == recvpool.recvpool_ctl->wrapped)
 				&& (temp_write = recvpool.recvpool_ctl->write) == upd_proc_local->read))
 		{	/* bad-trans OR online rollback OR nothing to process. In case of bad_trans or online rollback, wait for
@@ -775,13 +692,11 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			if ((0 != status) && (ETIMEDOUT != status))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("pthread_mutex_timedwait"), CALLFROM, status, 0);
-#			ifdef UNIX
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
 				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 			} /* else onln_rlbk_flag is already set and the receiver should take the next appropriate action */
-#			endif
 			continue;
 		}
 		/* The update process reads "recvpool_ctl->write" first and assumes that all data in the receive pool
@@ -841,7 +756,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 		rec_len = rec->prefix.forwptr;
 		assert(IS_REPLICATED(rectype));
-#		ifdef UNIX
 		if ((JRT_TRIPLE == rectype) || (JRT_HISTREC == rectype))
 		{	/* Source server has sent a REPL_TRIPLE or REPL_HISTREC message in the middle of logical journal
 			 * records. Construct the repl_histrec structure from the input message and add this history
@@ -959,7 +873,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						 */
 						jpc = cs_addrs->jnl;
 						DO_JNL_ENSURE_OPEN(cs_addrs, jpc); /* does "jnl_ensure_open" and pre-requisites */
-						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
+						/* Note: WCSFLU_FORCE_EPOCH needed to ensure an EPOCH is written always even if
+						 * the most recent record in the journal file is an EPOCH. This is because we
+						 * are writing a new strm_seqno and want this to show.
+						 */
+						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR			\
+								| WCSFLU_WRITE_EPOCH | WCSFLU_FORCE_EPOCH);
 						rel_crit(gv_cur_region);
 					}
 					TP_CHANGE_REG(save_reg);
@@ -994,7 +913,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			upd_proc_local->read = temp_read;
 			continue;
 		}
-#		endif
 		/* NOTE: All journal sequence number fields are at same offset */
 		if (ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) != rec_len)
 		{	/* We need that so REC_LEN_FROM_SUFFIX does not access unaligned int */
@@ -1085,7 +1003,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		}
 		if (upd_good_record == bad_trans_type)
 		{
-#			ifdef UNIX
 			if (suppl_propagate_primary)
 			{
 				rec_strm_seqno = GET_STRM_SEQNO(rec);
@@ -1104,7 +1021,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							strm_index, &rec_strm_seqno, &strm_seqno);
 				}
 			}
-#			endif
 			if (JRT_NULL == rectype)
 			{	/* Play the NULL transaction into the database and journal files */
 				save_reg = gv_cur_region;
@@ -1242,14 +1158,11 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							{
 								if (STR_SUB_PREFIX == scan_char)
 								{
-									VMS_ONLY(assert(!secondary_side_std_null_coll);)
-									UNIX_ONLY(
-										assert(!recvpool_ctl->this_side.is_std_null_coll);)
+									assert(!recvpool_ctl->this_side.is_std_null_coll);
 									last_nullsubs = cntr;
 								} else if (SUBSCRIPT_STDCOL_NULL == scan_char)
 								{
-									VMS_ONLY(assert(secondary_side_std_null_coll);)
-									UNIX_ONLY(assert(recvpool_ctl->this_side.is_std_null_coll);)
+									assert(recvpool_ctl->this_side.is_std_null_coll);
 									last_nullsubs = cntr;
 								}
 							}
@@ -1279,8 +1192,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					else
 					{
 						assert(IS_SET(rectype));
-						if (VMS_ONLY(keystr->length + 1 + SIZEOF(rec_hdr) +) val_mv.str.len >
-										gv_cur_region->max_rec_size)
+						if (val_mv.str.len > gv_cur_region->max_rec_size)
 						{
 							bad_trans_type = upd_bad_val_size;
 							tmpcsa = csa;
@@ -1366,7 +1278,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = %llu "
 				"[0x%llx]\n", bad_trans_type, rectype, rec_len, backptr, tmpseqno, tmpseqno);
 			upd_proc_local->bad_trans = TRUE;
-			/* We dont expect to be holding crit on any region in case of a bad_trans.
+			/* We don't expect to be holding crit on any region in case of a bad_trans.
 			 * Nevertheless release crit in PRO just in case we hold it.
 			 */
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
@@ -1428,8 +1340,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
 						assert(NULL != tmpcsa);
-						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(10) ERR_REC2BIG, 4,
-							VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) val_mv.str.len,
+						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(10) ERR_REC2BIG, 4, val_mv.str.len,
 							(int4)(tmpcsa->region)->max_rec_size, REG_LEN_STR(tmpcsa->region),
 							ERR_GVIS, 2, end - buff, buff);
 						break;
@@ -1460,12 +1371,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 * journal pool. In case of a root primary supplementary instance, we need to do this check only for the
 			 * non-supplementary stream of interest (strm_index) that this update process is processing.
 			 */
-			UNIX_ONLY(
-				assert(!suppl_root_primary || ((0 < strm_index) && (MAX_SUPPL_STRMS > strm_index)));
-				jnlpool_ctl_seqno = (!suppl_root_primary ? jnlpool_ctl->jnl_seqno
-										: jnlpool_ctl->strm_seqno[strm_index]);
-			)
-			VMS_ONLY(jnlpool_ctl_seqno = jnlpool_ctl->jnl_seqno;)
+			assert(!suppl_root_primary || ((0 < strm_index) && (MAX_SUPPL_STRMS > strm_index)));
+			jnlpool_ctl_seqno = (!suppl_root_primary ? jnlpool_ctl->jnl_seqno : jnlpool_ctl->strm_seqno[strm_index]);
 			if (jnlpool_ctl_seqno)
 			{	/* Now that the update process has played an incoming seqno, we expect it to have incremented
 				 * the corresponding jnl_seqno and strm_seqno fields in the current instance's journal pool
@@ -1482,7 +1389,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				 * before that in the idle wait loop) and take appropriate action.
 				 */
 				if ((upd_proc_local->read_jnl_seqno != jnlpool_ctl_seqno)
-					UNIX_ONLY(&& (repl_csa->onln_rlbk_cycle == jnlpool_ctl->onln_rlbk_cycle)))
+					&& (repl_csa->onln_rlbk_cycle == jnlpool_ctl->onln_rlbk_cycle))
 				{
 					repl_log(updproc_log_fp, TRUE, TRUE,
 						"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX"\n",

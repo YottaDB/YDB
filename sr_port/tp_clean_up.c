@@ -58,9 +58,6 @@ GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	uint4			update_trans;
-#ifdef VMS
-GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
-#endif
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 #endif
@@ -121,8 +118,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 		 * update_arrays each x-bytes in size and we freed them up and requested 2x-bytes of contiguous storage
 		 * and we might error out on that malloc attempt (though this is very improbable).
 		 */
-		if ((NULL != first_ua) && (NULL != first_ua->next_ua)
-		    && !process_exiting && (UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY) != error_condition))
+		if ((NULL != first_ua) && (NULL != first_ua->next_ua) && !process_exiting && (ERR_MEMORY != error_condition))
 		{	/* if the original update array was too small, make a new larger one */
 			/* tmp_update_array_size is used below instead of the global variables (update_array_size,
 			 * first_ua->update_array_size or cumul_update_array_size) to handle error returns from	malloc()
@@ -184,7 +180,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 #			ifdef DEBUG
 			if (!process_exiting)
 			{	/* Ensure that we did not miss out on resetting clue for any gvtarget.
-				 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
+				 * Don't do this if the process is cleaning up the TP transaction as part of exit handling
 				 * as the tp_clean_up invocation could be due to an interrupt (MUPIP STOP etc.) and we cannot
 				 * be sure what state the mainline code was when it was interrupted. Thankfully, the clue
 				 * will be used only as part of the next transaction. Since the process is in the process of
@@ -289,7 +285,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 							{
 								cr = cse->cr;
 								assert(NULL != cr);
-								UNIX_ONLY(assert((NULL == t1->cr) || (t1->cr == cr)));
+								assert((NULL == t1->cr) || (t1->cr == cr));
 								if (cr != t1->cr)
 								{
 									t1->cr = cr;
@@ -382,7 +378,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 #		ifdef DEBUG
 		if (!process_exiting)
 		{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
-			 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
+			 * Don't do this if the process is cleaning up the TP transaction as part of exit handling
 			 * Also use this opportunity to check that non-zero clues for BG contain non-null cr in histories.
 			 */
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
@@ -427,14 +423,12 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 		gvt_tp_list = NULL;
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
-	VMS_ONLY(tp_has_kill_t_cse = FALSE;)
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP). The only exception
 	 * is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 	 */
-	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG))
-						UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_trigger_upgrade)));
+	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)) || jgbl.onlnrlbk || TREF(in_trigger_upgrade));
 	/* Now that this transaction try is done (need to start a fresh try in case of a restart; in case of commit the entire
 	 * transaction is done) ensure first_tp_si_by_ftok is NULL at end of tp_clean_up as this field is relied upon by
 	 * secshr_db_clnup and t_commit_cleanup to determine if we have an ongoing transaction. In case of a successfully

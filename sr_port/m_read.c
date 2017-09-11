@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,8 @@
 #include "advancewindow.h"
 #include "cmd.h"
 #include "rwformat.h"
+
+LITREF	mval		literal_notimeout;
 
 error_def(ERR_RWARG);
 
@@ -168,12 +170,12 @@ int m_read(void)
 	}
 	if (TK_COLON != TREF(window_token))
 	{
-		*timeout = put_ilit(NO_M_TIMEOUT);
+		*timeout = put_lit((mval *)&literal_notimeout);
 		ins_triple(ref);
 	} else
 	{
 		advancewindow();
-		if (EXPR_FAIL == expr(timeout, MUMPS_INT))
+		if (EXPR_FAIL == expr(timeout, MUMPS_EXPR))
 			return FALSE;
 		ins_triple(ref);
 		newtriple(OC_TIMTRU);

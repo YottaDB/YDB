@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,11 +72,11 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 			return;
 		}
 	}
-	PRO_ONLY(
-		/* A single region TP transaction is always sorted. So, for pro, return without addition sorting */
-		if (1 == participants)
-			return;
-	)
+#	ifndef DEBUG
+	/* A single region TP transaction is always sorted. So, for pro, return without addition sorting */
+	if (1 == participants)
+		return;
+#	endif
 	already_sorted = TRUE;
 	num_records = cur_rec_idx = reg_idx = balanced = 0;
 	if (max_participants < participants)
@@ -85,7 +86,7 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 		max_participants = participants;
 		reg_jrec_info_array = malloc(SIZEOF(reg_jrec_info_t) * max_participants);
 	}
-	while(JREC_PREFIX_SIZE <= tlen)
+	while (JREC_PREFIX_SIZE <= tlen)
 	{
 		assert(0 == ((UINTPTR_T)tb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)tb;
@@ -118,11 +119,9 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 					reg_jrec_info_array[reg_idx - 1].end = (long)(tb - tr_buff);
 				reg_idx++;
 			}
-			DEBUG_ONLY(
-				/* update_num within a region SHOULD be sorted */
-				assert(prev_updnum_this_reg <= cur_updnum);
-				prev_updnum_this_reg = cur_updnum;
-			)
+			/* update_num within a region SHOULD be sorted */
+			assert(prev_updnum_this_reg <= cur_updnum);
+			DEBUG_ONLY(prev_updnum_this_reg = cur_updnum;)
 			prev_updnum = cur_updnum;
 		} else
 		{	/* TCOM records does not have update_num. */

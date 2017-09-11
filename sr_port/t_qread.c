@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,7 @@
 #include "process_reorg_encrypt_restart.h"
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
+#include "wcs_recover.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -655,7 +656,24 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							return (sm_uc_ptr_t)NULL;
 						}
 						if (!wcs_phase2_commit_wait(csa, cr))
-						{	/* Timed out waiting for cr->in_tend to become non-zero. Restart. */
+						{	/* Timed out waiting for cr->in_tend to become non-zero. Restart.
+							 * But before that, if not holding crit, do a "wcs_recover" to fix
+							 * the problem before starting the next try. Check if "cr->in_tend"
+							 * is still non-zero after getting crit to avoid lots of unnecessary
+							 * calls to "wcs_recover".
+							 */
+							assert(was_crit == csa->now_crit);
+							if (!was_crit)
+							{
+								assert(!hold_onto_crit);
+								grab_crit_encr_cycle_sync(gv_cur_region);
+								if (blocking_pid == cr->in_tend)
+								{
+									wcs_recover(gv_cur_region);
+									assert(!cr->in_tend);
+								}
+								rel_crit(gv_cur_region);
+							}
 							rdfail_detail = cdb_sc_phase2waitfail;
 							return (sm_uc_ptr_t)NULL;
 						}
@@ -684,8 +702,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				break;
 			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
 			{
-				if (!csa->now_crit && !hold_onto_crit)
+				if (!csa->now_crit)
+				{
+					assert(!hold_onto_crit);
 					grab_crit_encr_cycle_sync(gv_cur_region);
+				}
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
 					BG_TRACE_PRO(t_qread_out_of_design);

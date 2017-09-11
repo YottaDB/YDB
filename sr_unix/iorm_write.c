@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -249,7 +249,7 @@ void iorm_write_utf(mstr *v)
 					out_ptr = pvt_crypt_buf.addr;
 				} else
 					out_ptr = (char *)outstart;
-				if (rm_ptr->fifo || rm_ptr->pipe)
+				if (rm_ptr->fifo || rm_ptr->is_pipe)
 				{
 					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, outbytes, status);
 				} else
@@ -374,7 +374,7 @@ void iorm_write(mstr *v)
 
 	if (rm_ptr->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
-	if ((!rm_ptr->fifo) && (!rm_ptr->pipe) && rm_ptr->output_encrypted)
+	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
 		{
@@ -421,7 +421,7 @@ void iorm_write(mstr *v)
 		}
 	}
 
-	if (!rm_ptr->fifo && !rm_ptr->pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
+	if (!rm_ptr->fifo && !rm_ptr->is_pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do an lseek to set current location in file */
 		if ((off_t)-1 == (lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET)))
@@ -434,7 +434,7 @@ void iorm_write(mstr *v)
 
 	/* if current file position is less than bom_num_bytes and it is a disk in utf mode and last op not a WRITE
 	   skip past the BOM */
-	if (!rm_ptr->fifo && !rm_ptr->pipe && IS_UTF_CHSET(iod->ochset) && (rm_ptr->file_pos < rm_ptr->bom_num_bytes) &&
+	if (!rm_ptr->fifo && !rm_ptr->is_pipe && IS_UTF_CHSET(iod->ochset) && (rm_ptr->file_pos < rm_ptr->bom_num_bytes) &&
 	    (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do lseek to skip the BOM before writing*/
@@ -483,7 +483,7 @@ void iorm_write(mstr *v)
 			out_ptr = pvt_crypt_buf.addr;
 		} else
 			out_ptr = out;
-		if (rm_ptr->fifo || rm_ptr->pipe)
+		if (rm_ptr->fifo || rm_ptr->is_pipe)
 		{
 			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, len, status);
 		} else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "gtm_un.h"
 
 #include <errno.h>
-#if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
+#if defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
 #include "gtm_limits.h"
 #else
 #include <sys/limits.h>
@@ -66,21 +66,6 @@
 #ifdef MUTEX_MSEM_WAKE
 #define MUTEX_MAX_WAIT        		(MUTEX_CONST_TIMEOUT_VAL * MILLISECS_IN_SEC)
 #endif
-
-/* The following PROBE_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
- * This is possible if the csa corresponds to the journal pool where there is no notion of a db hdr.
- * In that case, we skip invoking the * macros.
- */
-#define	PROBE_SET_TRACEABLE_VAR(CSA, VALUE)					\
-{										\
-	sgmnt_data_ptr_t	lcl_csd;					\
-										\
-	lcl_csd = CSA->hdr;							\
-	assert((NULL != lcl_csd)						\
-		|| (CSA == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));	\
-	if (NULL != lcl_csd)							\
-		SET_TRACEABLE_VAR(CSA->nl->wc_blocked, TRUE);			\
-}
 
 #define	PROBE_BG_TRACE_PRO_ANY(CSA, EVENT)					\
 {										\
@@ -971,45 +956,226 @@ void mutex_seed_init(void)
 
 void mutex_salvage(gd_region *reg)
 {
-	sgmnt_addrs	*csa;
-	int		salvage_status;
-	uint4		holder_pid, onln_rlbk_pid;
-	boolean_t	mutex_salvaged;
-	VMS_ONLY(uint4	holder_imgcnt;)
+	sgmnt_addrs		*csa;
+	int			index1, index2, orig_index2, salvage_status;
+	uint4			holder_pid, onln_rlbk_pid, start_freeaddr, orig_freeaddr;
+	boolean_t		mutex_salvaged;
+	sgmnt_data_ptr_t	csd;
+	jnlpool_ctl_ptr_t	jpl;
+	jpl_phase2_in_prog_t	*lastJplCmt;
+	jbuf_phase2_in_prog_t	*lastJbufCmt;
+	node_local		*cnl;
+	seq_num			jnl_seqno, strm_seqno, strmSeqno60;
+	int			strmIndex;
+	jnl_buffer_ptr_t	jbp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
+	cnl = csa->nl;
 	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
 	{
 		mutex_salvaged = FALSE;
-		if (holder_pid == process_id)
-		{	/* We were trying to obtain a lock we already held -- very odd */
-			RELEASE_SWAPLOCK(&csa->critical->semaphore);
-			csa->nl->in_crit = 0;
-			/* Mutex crash repaired, want to do write cache recovery, just in case.
-			 * Take care not to do it for jnlpool which has no concept of a db cache.
-			 * In that case csa->hdr is NULL so use PROBE_SET_TRACEABLE_VAR macro.
-			 */
-			PROBE_SET_TRACEABLE_VAR(csa, TRUE);
-			mutex_salvaged = TRUE;
-			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
-		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
-		{	/* Release the COMPSWAP lock AFTER setting csa->nl->in_crit to 0 as an assert in
-			 * grab_crit (checking that csa->nl->in_crit is 0) relies on this order.
+		/* If we were trying to obtain a lock we already held, it is an out-of-design situation. We cannot safely
+		 * release the lock in that case so create a core file even in pro.
+		 */
+		assertpro(holder_pid != process_id);
+		if (!is_proc_alive(holder_pid, 0))
+		{	/* Release the COMPSWAP lock AFTER setting cnl->in_crit to 0 as an assert in
+			 * grab_crit (checking that cnl->in_crit is 0) relies on this order.
 			 */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
-			csa->nl->in_crit = 0;
+			cnl->in_crit = 0;
 			/* Mutex crash repaired, want to do write cache recovery, in case previous holder of crit had set
 			 * some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect
 			 * GTMASSERTs in PIN_CACHE_RECORD macro in t_end/tp_tend.				BYPASSOK(GTMASSERT)
-			 * Take care not to do it for jnlpool which has no concept of a db cache.
-			 * In that case csa->hdr is NULL so use PROBE_SET_TRACEABLE_VAR macro.
+			 * Take care not to do it for jnlpool (csa->hdr is NULL in that case) which has no concept of a db cache.
 			 */
-			PROBE_SET_TRACEABLE_VAR(csa, TRUE);
+			csd = csa->hdr;
+			assert((NULL != csd) || (csa == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));
+			if (NULL == csd)
+			{	/* This is a jnlpool. Check if a process in t_end/tp_tend was killed BEFORE
+				 * it incremented jpl->jnl_seqno. If so, undo any changes done in UPDATE_JPL_RSRV_WRITE_ADDR.
+				 */
+				jpl = jnlpool.jnlpool_ctl;
+				assert(NULL != jpl);
+				index1 = jpl->phase2_commit_index1;
+				index2 = jpl->phase2_commit_index2;
+				orig_index2 = index2;
+				assert(jpl->write_addr <= jpl->rsrv_write_addr);
+				DECR_PHASE2_COMMIT_INDEX(index2, JPL_PHASE2_COMMIT_ARRAY_SIZE);
+				lastJplCmt = &jpl->phase2_commit_array[index2];
+				/* This process could have been killed during a commit in t_end/tp_tend.
+				 *	a) In the middle of Step CMT03 (see secshr_db_clnup.c for CMTxx steps)
+				 *		UPDATE_JPL_RSRV_WRITE_ADDR macro OR
+				 *	b) After Step CMT03 but before Step CMT07 finished.
+				 * In either case, we need to reset jpl to what it was BEFORE Step CMT03 began i.e. roll back.
+				 * If the process gets killed AFTER CMT07 finishes, the transaction is rolled forward even
+				 *	if it means writing JRT_NULL and/or JRT_INCTN records in jnlpool and/or jnlbuff.
+				 * Note that there is still a small window of instructions after CMT07 is done but before
+				 *	CMT08 is done (for the first region in case of a multi-region TP transaction) if
+				 *	a process gets killed, we will roll forward the jnlpool but roll back the jnlbuff
+				 *	and so there would be a seqno with no corresponding journal records in the journal
+				 *	files. This is not easily handled so is left as a todo for the future.
+				 */
+				if ((index1 == orig_index2) || (lastJplCmt->process_id != holder_pid))
+				{	/* CMT02 < killed <= CMT03.
+					 * Kill could have happened before CMT03 finished so reset things.
+					 * This reset is a no-op if the kill happened even before CMT03 started.
+					 * This is Case (a).
+					 */
+					jpl->rsrv_write_addr = lastJplCmt->start_write_addr + lastJplCmt->tot_jrec_len;
+					assert(((lastJplCmt->jnl_seqno + 1) == jpl->jnl_seqno) || !lastJplCmt->jnl_seqno);
+					jpl->lastwrite_len = lastJplCmt->tot_jrec_len;
+				} else
+				{
+					assert((lastJplCmt->jnl_seqno == jpl->jnl_seqno)
+						|| ((lastJplCmt->jnl_seqno + 1) == jpl->jnl_seqno));
+					if (lastJplCmt->jnl_seqno == jpl->jnl_seqno)
+					{	/* CMT03 < killed < CMT07 */
+						jpl->rsrv_write_addr = lastJplCmt->start_write_addr;
+						jpl->lastwrite_len = lastJplCmt->prev_jrec_len;
+						SHM_WRITE_MEMORY_BARRIER; /* similar layout as UPDATE_JPL_RSRV_WRITE_ADDR */
+						jpl->phase2_commit_index2 = index2;	/* remove last commit entry */
+					}
+					/* else : CMT07 < killed and so no rollback needed */
+				}
+			} else
+			{	/* This is a database shm. Check if a process in t_end/tp_tend was killed BEFORE
+				 * Step CMT08 (see secshr_db_clnup.c) when it would have set cnl->update_underway_tn.
+				 * If so, undo any changes done in Step CMT06 (UPDATE_JBP_RSRV_FREEADDR).
+				 * Effectively rolling back the aborted commit in this region.
+				 */
+				assert((csd->trans_hist.early_tn == csd->trans_hist.curr_tn)
+					|| (csd->trans_hist.early_tn == (csd->trans_hist.curr_tn + 1)));
+				assert(cnl->update_underway_tn <= csd->trans_hist.curr_tn);
+				assert(csd->trans_hist.early_tn >= cnl->update_underway_tn);
+				if (JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn))
+				{	/* i.e. Process was killed after CMT04 but before CMT12. It is represented as
+					 *	CMT04 < killed < CMT12
+					 */
+					assert(NULL != csa->jnl);
+					assert(NULL != csa->jnl->jnl_buff);
+					jbp = csa->jnl->jnl_buff;
+					index1 = jbp->phase2_commit_index1;
+					index2 = jbp->phase2_commit_index2;
+					orig_index2 = index2;
+					assert(jbp->freeaddr <= jbp->rsrv_freeaddr);
+					DECR_PHASE2_COMMIT_INDEX(index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);
+					lastJbufCmt = &jbp->phase2_commit_array[index2];
+					if (cnl->update_underway_tn != csd->trans_hist.curr_tn)
+					{	/* CMT04 < killed < CMT08.
+						 * ----------------------------------------------------------------
+						 * Roll-back the entire transaction's effect on this database file
+						 * ----------------------------------------------------------------
+						 */
+						start_freeaddr = lastJbufCmt->start_freeaddr;
+						if ((index1 == orig_index2) || (lastJbufCmt->process_id != holder_pid))
+						{	/* CMT04 < KILLED <= CMT06.
+							 * Kill could have happened before CMT06 finished so reset things.
+							 * This reset is a no-op if the kill happened even before CMT06 started.
+							 */
+							SET_JBP_RSRV_FREEADDR(jbp, start_freeaddr + lastJbufCmt->tot_jrec_len);
+						} else
+						{	/* CMTO6 < killed < CMT08 */
+							assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);
+							/* CMT06 finished. So undo it as a whole */
+							assert(lastJbufCmt->process_id == holder_pid);
+							/* If CMT06a was in progress when the process was KILLED, then it is
+							 * possible jbp->freeaddr was updated as CMT16 (which is what CMT06a
+							 * executes) progressed. So undo that too. Likewise for dskaddr,
+							 * fsync_dskaddr etc. And finally reset rsrv_freeaddr.
+							 */
+							assert(jbp->fsync_dskaddr <= jbp->dskaddr);
+							orig_freeaddr = jbp->freeaddr;
+							if (orig_freeaddr > start_freeaddr)
+							{
+								jbp->freeaddr = start_freeaddr;
+								jbp->free = start_freeaddr % jbp->size;
+							} else
+								assert(jbp->free == (orig_freeaddr % jbp->size));
+							if (jbp->dskaddr > start_freeaddr)
+							{
+								assert(!GLOBAL_LATCH_HELD_BY_US(&jbp->io_in_prog_latch));
+								grab_latch(&jbp->io_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT);
+								/* Fix jbp->dskaddr & jbp->dsk while holding io latch */
+								assert(orig_freeaddr > start_freeaddr);
+								jbp->dskaddr = start_freeaddr;
+								jbp->dsk = start_freeaddr % jbp->size;
+								/* Setting jbp->dskaddr to start_freeaddr is not enough.
+								 * We also need to re-read the partial filesystem-block-size
+								 * aligned block of data that precedes the new jbp->dskaddr
+								 * since that part is most likely no longer in the jnl buffer
+								 * (have been overwritten by the current aborted tn's jnl records).
+								 * We can try and optimize this by avoiding setting
+								 * jbp->re_read_dskaddr in case no overwrite happened. But it is
+								 * not straightforward to detect that and the risk is journal
+								 * file corruption. Given "mutex_salvage" is a rare occurrence,
+								 * it is safer to re-read unconditionally.
+								 */
+								jbp->re_read_dskaddr = start_freeaddr;
+								rel_latch(&jbp->io_in_prog_latch);
+								if (jbp->fsync_dskaddr > start_freeaddr)
+								{	/* Fix jbp->fsync_dskaddr while holding fsync io latch */
+									assert(!GLOBAL_LATCH_HELD_BY_US(&jbp->fsync_in_prog_latch));
+									grab_latch(&jbp->fsync_in_prog_latch,
+											GRAB_LATCH_INDEFINITE_WAIT);
+									jbp->fsync_dskaddr = start_freeaddr;
+									rel_latch(&jbp->fsync_in_prog_latch);
+								}
+							} else
+								assert(jbp->dsk == (jbp->dskaddr % jbp->size));
+							/* "jnl_write_phase2" is never called with JRT_EPOCH (see assert there
+							 * at function entry of possible rectype values and EPOCH is not in that
+							 * list). Therefore we are guaranteed a "jnl_write_epoch_rec" call never
+							 * happened since the first call to "jnl_write_reserve" happened in this
+							 * transaction. Therefore no UNDO of the effects of "jnl_write_epoch_rec"
+							 * needed here (e.g. jbp->post_epoch_freeaddr).
+							 */
+							assert(jbp->post_epoch_freeaddr <= start_freeaddr);
+							SET_JBP_RSRV_FREEADDR(jbp, start_freeaddr);
+							SHM_WRITE_MEMORY_BARRIER;	/* see corresponding
+											 * SHM_READ_MEMORY_BARRIER in
+											 * "jnl_phase2_cleanup".
+											 */
+							jbp->phase2_commit_index2 = index2; /* remove last commit entry */
+						}
+						csd->trans_hist.early_tn = csd->trans_hist.curr_tn;	/* Undo CMT04 */
+						/* CMT07 is jnlpool related, so no undo done here (in db mutex_salvage) for that */
+					} else
+					{	/* CMT08 < killed < CMT12.
+						 * -------------------------------------------------------------------
+						 * Roll-forward the entire transaction's effect on this database file
+						 * -------------------------------------------------------------------
+						 * In case process got killed before CMT09 occurred, redo it.
+						 * If the process got killed after CMT09, the below redo is a no-op.
+						 */
+						/* CMT09 redo : start */
+						jnl_seqno = lastJbufCmt->jnl_seqno + 1;
+						strm_seqno = lastJbufCmt->strm_seqno;
+						/* If "strm_seqno" is 0, we are guaranteed this is not a supplementary
+						 * instance (i.e. "supplementary" variable in t_end/tp_tend is FALSE).
+						 */
+						if (strm_seqno)
+						{
+							strmIndex = GET_STRM_INDEX(strm_seqno);
+							strmSeqno60 = GET_STRM_SEQ60(strm_seqno) + 1;
+						}
+						SET_REG_SEQNO(csa, jnl_seqno, strm_seqno, strmIndex, strmSeqno60, SKIP_ASSERT_TRUE);
+						/* CMT09 redo : end */
+						csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* Redo CMT12 */
+					}
+				}
+				/* else: Step CMT04 did not happen OR Database is not journaled.
+				 *	 Nothing to undo in this db for Steps CMT01, CMT02 and CMT03.
+				 */
+				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE); /* This will ensure we call "wcs_recover" which
+									   * will recover CMT04 and other CMTxx steps.
+									   */
+			}
 			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			mutex_salvaged = TRUE;
-			/* Reset jb->blocked as well if the holder_pid had it set */
+			/* Reset jbp->blocked as well if the holder_pid had it set */
 			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (csa->jnl->jnl_buff->blocked == holder_pid))
 				csa->jnl->jnl_buff->blocked = 0;
 			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
@@ -1028,7 +1194,7 @@ void mutex_salvage(gd_region *reg)
 		assert((NULL != csa->hdr) || (csa == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));
 		if (mutex_salvaged && (NULL != csa->hdr))
 		{
-			SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
 								   * since we already checked for csa->hdr non-NULL.
 								   */
@@ -1052,7 +1218,7 @@ void	mutex_per_process_init(void)
 	mutex_seed_init();
 #	ifndef MUTEX_MSEM_WAKE
 	if (mutex_per_process_init_pid)
-	{	/* Close socket opened by the first call. But dont delete the socket file as the parent process will do that. */
+	{	/* Close socket opened by the first call. But don't delete the socket file as the parent process will do that. */
 		assert(FD_INVALID != mutex_sock_fd);
 		if (FD_INVALID != mutex_sock_fd)
 			CLOSEFILE_RESET(mutex_sock_fd, status);	/* resets "mutex_sock_fd" to FD_INVALID */

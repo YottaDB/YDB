@@ -35,17 +35,9 @@
 #include "gtm_limits.h"
 #include "gtm_un.h"
 #include "gtm_signal.h"
-
 #include <sys/time.h>
-#ifdef VMS
-# include <descrip.h>		/* Required for gtmsource.h */
-# include <ssdef.h>
-# include <fab.h>
-# include "desblk.h"
-#endif
-#ifdef UNIX
-# include <glob.h>
-#endif
+#include <glob.h>
+
 #include "cache.h"
 #include "gtm_multi_thread.h"
 #include "hashtab_addr.h"
@@ -89,9 +81,6 @@
 #include "zbreak.h"
 #include "fnpc.h"
 #include "mmseg.h"
-#ifndef VMS
-# include "gtmsiginfo.h"
-#endif
 #include "gtmimagename.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS*/
@@ -112,6 +101,7 @@
 #include "util.h"		/* for util_outbuff manipulations */
 #include "nametabtyp.h"
 #include "gtm_reservedDB.h"
+#include "localvarmonitor.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -124,22 +114,14 @@
 #include "gvname_info.h"
 #include "op_merge.h"
 
-#ifdef UNIX
-# include "cli.h"
-# include "invocation_mode.h"
-# include "fgncal.h"
-# include "parse_file.h"	/* for MAX_FBUFF */
-# include "repl_sem.h"
-# include "gtm_zlib.h"
-# include "zro_shlibs.h"
-#endif
-
+#include "cli.h"
+#include "invocation_mode.h"
+#include "fgncal.h"
+#include "parse_file.h"	/* for MAX_FBUFF */
+#include "repl_sem.h"
+#include "gtm_zlib.h"
+#include "zro_shlibs.h"
 #include "jnl_typedef.h"
-
-#ifdef VMS
-# include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
-#endif
-
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 

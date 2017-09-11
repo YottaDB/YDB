@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,8 +88,6 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
 	assert(((1 & sense) == sense) && ((1 & jmp_to_next) == jmp_to_next) && ((1 & jmp_type_one) == jmp_type_one));
 	assert((TRIP_REF == t->operand[0].oprclass) && (TRIP_REF == t->operand[1].oprclass));
-	if ((OC_JMPTRUE == t->opcode) || (OC_JMPFALSE == t->opcode))
-		return;
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
 	assert((TRIP_REF == t->operand[0].oprclass) && (TRIP_REF == t->operand[1].oprclass));
 	if (jmp_to_next)
@@ -102,7 +100,9 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	{	/* nice simple short circuit */
 		assert(NULL == TREF(boolchain_ptr));
 		bx_tail(t->operand[0].oprval.tref, jmp_type_one, p);
+		RETURN_IF_RTS_ERROR;
 		bx_tail(t->operand[1].oprval.tref, sense, addr);
+		RETURN_IF_RTS_ERROR;
 		t->opcode = OC_NOOP;				/* must not delete as this can be a jmp target */
 		t->operand[0].oprclass = t->operand[1].oprclass = NO_REF;
 		return;
@@ -134,10 +134,13 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		assert(NULL != TREF(boolchain_ptr));
 		tb = i->oprval.tref;
 		if (&(t->operand[0]) == i)
+		{
 			bx_tail(tb, jmp_type_one, p);				/* do normal transform */
-		else
+			RETURN_IF_RTS_ERROR;
+		} else
 		{	/* operand[1] */
 			bx_tail(tb, sense, addr);				/* do normal transform */
+			RETURN_IF_RTS_ERROR;
 			if (!expr_fini)						/* leaving ref0 same as for operand 0 */
 				break;						/* only need to relocate last operand[1] */
 		}
@@ -155,8 +158,6 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				case OC_JMP:
 				case OC_JMPTCLR:
 				case OC_JMPTSET:
-				case OC_JMPFALSE:
-				case OC_JMPTRUE:
 					break;
 				default:
 					tb = tb->exorder.bl;
@@ -171,6 +172,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		}
 		assert(OC_NOOP != tb->opcode);
 		ref0 = maketriple(tb->opcode);					/* copy operation for place in new ladder */
+		DEBUG_ONLY(ref0->src = tb->src);
 		ref1 = (TREF(boolchain_ptr))->exorder.bl;			/* common setup for coming copy of this op */
 		switch (tb->opcode)
 		{								/* time to subvert original jump ladder entry */
@@ -189,6 +191,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				t1 = tb->exorder.fl;
 				assert(OCT_JUMP & oc_tab[t1->opcode].octype);
 				tj = maketriple(t1->opcode);			/* create new jmp on result of coerce */
+				DEBUG_ONLY(tj->src = t1->src);
 				tj->operand[0] = t1->operand[0];
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
 				t1->operand[0].oprclass = NO_REF;
@@ -207,20 +210,20 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				t1 = tb->exorder.fl;
 				assert(OCT_JUMP & oc_tab[t1->opcode].octype);
 				tj = maketriple(t1->opcode);			/* copy jmp */
+				DEBUG_ONLY(tj->src = t1->src);
 				tj->operand[0] = t1->operand[0];
 				STOTEMP_IF_NEEDED(ref0, 1, t1, tb->operand[1]);
 				if (OC_NOOP == tb->opcode)			/* does op[0] need cleanup? */
 					tb->operand[0].oprclass = tb->operand[1].oprclass = NO_REF;
 				break;
-			case OC_JMPFALSE:
 			case OC_JMPTCLR:
 			case OC_JMPTSET:
-			case OC_JMPTRUE:
 				t1 = tb;					/* move copy of jmp to boolchain and NOOP it */
 				tj = ref0;
 				tj->operand[0] = t1->operand[0];		/* new jmp gets old target */
 				assert(INDR_REF == tj->operand[0].oprclass);
 				ref2 = maketriple(OC_NOOP);			/* insert NOOP rather than COBOOL in new chain */
+				DEBUG_ONLY(ref2->src = tj->src);
 				dqins(ref1, exorder, ref2);
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
 				t1->operand[0].oprclass = NO_REF;
@@ -260,14 +263,6 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		adj_addr = &t0->operand[0];
 		switch (t0->opcode)
 		{
-		case OC_JMPTRUE:
-			t0->opcode = OC_NOOP;							/* TRUE item: NOOP it */
-			t0->operand[0].oprclass = NO_REF;
-			t0->operand[0].oprval.tref = (triple *)-1;				/* with a flag */
-			break;
-		case OC_JMPFALSE:								/* FALSE item: unconditional JMP */
-			t0->opcode = OC_JMP;
-			t0->operand[0].oprclass = INDR_REF;					/* WARNING fallthrough */
 		default:
 			if (NULL != (t1 = (adj_addr = adj_addr->oprval.indr)->oprval.tref))	/* WARNING assignment */
 			{								/*  need to adjust target */
@@ -313,7 +308,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 							|| (OC_BOOLFINI == c)
 								|| ((OC_NOOP == c) && ((TREF(curtchain) == ref1->exorder.fl)
 								|| ((OC_JMP == (c = ref1->exorder.fl->opcode)) || (OC_JMPTCLR == c)
-								|| (OC_JMPTSET == c) || (OC_JMPFALSE == c) || (OC_JMPTRUE == c))
+								|| (OC_JMPTSET == c))
 								&& (INDR_REF == ref1->exorder.fl->operand[0].oprclass))));
 					}
 				}
@@ -324,7 +319,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		if ((OC_BOOLFINI == t0->opcode) || (TREF(curtchain) == t0->exorder.fl))
 			break;
 		assert((OCT_BOOL & oc_tab[t0->opcode].octype) || (OC_JMP == (c = t0->exorder.fl->opcode)) || (OC_JMPTSET == c)
-			|| (OC_JMPTCLR == c) || (OC_JMPFALSE == c) || (OC_JMPTRUE == c));		/* WARNING assignment */
+			|| (OC_JMPTCLR == c));					/* WARNING assignment */
 	}
 	dqloop(TREF(bool_targ_ptr), que, tripbp)				/* clean up borrowed jmplist entries */
 	{
@@ -337,6 +332,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	if (TREF(expr_start) != TREF(expr_start_orig))
 	{									/* inocculate against an unwanted GVRECTARG */
 		ref0 = maketriple(OC_NOOP);
+		DEBUG_ONLY(ref0->src = t->src);
 		dqins(TREF(expr_start), exorder, ref0);
 		TREF(expr_start) = ref0;
 	}

@@ -33,6 +33,7 @@
  *      cdb_sc_lostbmlhist,
  *      cdb_sc_lostbmlcr,
  *      cdb_sc_crbtmismatch,
+ *      cdb_sc_phase2waitfail,
  * cdb_sc_bmlmod and cdb_sc_blkmod need to be added here, but they present an interesting problem. This is because
  * if the database has an integrity error, we will get a cdb_sc_blkmod/bmlmod error for every transaction that reads
  * the block with the BLKTNTOOLG integrity error in which case we do not want to set wc_blocked and cause indefinite
@@ -52,6 +53,7 @@
  *	cdb_sc_gvtrootnonzero
  *	cdb_sc_reorg_encrypt
  *	cdb_sc_optrestart
+ *	cdb_sc_phase2waitfail
  */
 
 CDB_SC_NUM_ENTRY(  cdb_sc_normal,           FALSE,          0) /*  0   success */
@@ -104,7 +106,7 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_jnlstatemod,      TRUE,  FALSE, 'h') /* 'h'  csd->jnl_
 CDB_SC_LCHAR_ENTRY(cdb_sc_needlock,         FALSE, FALSE, 'i') /* 'i'  on final retry and need to wait for M-lock - restart transaction - allow for max of 16 such restarts */
 CDB_SC_LCHAR_ENTRY(cdb_sc_bkupss_statemod,  FALSE, FALSE, 'j') /* 'j'  t_end/tp_tend found that either online-backup-in-progress or snapshot state changed since start of transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_crbtmismatch,     FALSE, TRUE,  'k') /* 'k'  cr->blk and bt->blk does not match */
-CDB_SC_LCHAR_ENTRY(cdb_sc_phase2waitfail,   FALSE, TRUE,  'l') /* 'l'  wcs_phase2_commit_wait timed out when called from t_qread */
+CDB_SC_LCHAR_ENTRY(cdb_sc_phase2waitfail,   TRUE,  TRUE,  'l') /* 'l'  wcs_phase2_commit_wait timed out when called from t_qread */
 CDB_SC_LCHAR_ENTRY(cdb_sc_inhibitkills,     FALSE, FALSE, 'm') /* 'm'  t_end/tp_tend found inhibit_kills counter greater than zero */
 CDB_SC_LCHAR_ENTRY(cdb_sc_triggermod,       FALSE, FALSE, 'n') /* 'n'  csd->db_trigger_cycle changed since start of of transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_onln_rlbk1,       TRUE,  FALSE, 'o') /* 'o'  csa->onln_rlbk_cycle changed since start of transaction */

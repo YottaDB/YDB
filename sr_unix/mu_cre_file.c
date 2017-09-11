@@ -48,38 +48,57 @@
 #include "db_write_eof_block.h"
 #include "get_fs_block_size.h"
 #include "gtm_permissions.h"
+#include "getzposition.h"
+#include "error.h"
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
-#define CLEANUP(XX)								\
-MBSTART {									\
-	int	rc;								\
-										\
-	if (cs_data)								\
-		free(cs_data);							\
-	if (FD_INVALID != fd)							\
-		CLOSEFILE_RESET(fd, rc); /* resets "fd" to FD_INVALID */	\
-	if (EXIT_ERR == XX)							\
-		UNLINK(path);							\
+/* Note: CLEANUP macro is invoked by "mu_cre_file_ch" and "mu_cre_file" and hence needs to use "static" variables
+ * (mu_cre_file_fd & mu_cre_file_path) instead of "local" variables.
+ */
+#define CLEANUP(XX)											\
+MBSTART {												\
+	int	rc;											\
+													\
+	if (cs_data)											\
+		free(cs_data);										\
+	if (FD_INVALID != mu_cre_file_fd)								\
+		CLOSEFILE_RESET(mu_cre_file_fd, rc); /* resets "mu_cre_file_fd" to FD_INVALID */	\
+	assert(NULL != mu_cre_file_path);								\
+	if (EXIT_ERR == XX)										\
+		UNLINK(mu_cre_file_path);								\
 } MBEND
 
-#define PUTMSG_ERROR_CSA(MSGPARMS)			\
-MBSTART {						\
-	if (cleanup_needed)				\
-		CLEANUP(EXIT_ERR);			\
-	if (IS_MUPIP_IMAGE)				\
-		gtm_putmsg_csa MSGPARMS;		\
-	else						\
-		send_msg_csa MSGPARMS;			\
+/* Macros to send warning or error messages to the correct destination:
+ *  - If MUPIP image, message goes to stderr of the process.
+ *  - Else MUMPS image captures the error message and wraps it with MUCREFILERR and sends it to the system log.
+ * In addition, some messages require cleanup if they are emitted past a certain point in the processing (said point
+ * setting the 'cleanup_needed' flag to TRUE.
+ */
+#define PUTMSG_MSG_ROUTER_CSA(CSAARG, VARCNT, ERRORID, ...)								\
+MBSTART {														\
+	mval		zpos;												\
+															\
+	if (IS_MUPIP_IMAGE)												\
+		gtm_putmsg_csa(CSA_ARG(CSAARG) VARLSTCNT(VARCNT) ERRORID, __VA_ARGS__);					\
+	else														\
+	{														\
+		/* Need to reflect the current error to the syslog - find entry ref to add to error. The VARLSTCNT	\
+		 * computation is 8 for the prefix message, plus the VARLSTCNT() that would apply to the actual error	\
+		 * message that got us here.										\
+		 */													\
+		getzposition(&zpos);											\
+		send_msg_csa(CSA_ARG(CSAARG) VARLSTCNT((8 + VARCNT)) ERR_MUCREFILERR, 6, zpos.str.len, zpos.str.addr,	\
+			     DB_LEN_STR(gv_cur_region), REG_LEN_STR(gv_cur_region), ERRORID, __VA_ARGS__);		\
+	}														\
 } MBEND
-
-#define PUTMSG_WARN_CSA(MSGPARMS)			\
-MBSTART {						\
-	if (IS_MUPIP_IMAGE)				\
-		gtm_putmsg_csa MSGPARMS;		\
-	else						\
-		send_msg_csa MSGPARMS;			\
+#define PUTMSG_ERROR_CSA(CSAARG, VARCNT, ERRORID, ...)									\
+MBSTART {														\
+	if (cleanup_needed)												\
+		CLEANUP(EXIT_ERR);											\
+	PUTMSG_MSG_ROUTER_CSA(CSAARG, VARCNT, ERRORID, __VA_ARGS__);							\
 } MBEND
+#define PUTMSG_WARN_CSA(CSAARG, VARCNT, ERRORID, ...) PUTMSG_MSG_ROUTER_CSA(CSAARG, VARCNT, ERRORID, __VA_ARGS__)
 
 /* zOS is a currently unsupported platform so this macro remains unconverted but with an assertpro(FALSE) should
  * the zOS port ever be resurrected. In that case, uses of this macro need to be converted to PUTMSG_ERROR_CSA
@@ -103,6 +122,9 @@ GBLREF	uint4			gtmDebugLevel;
 GBLREF	boolean_t		in_mu_cre_file;
 #endif
 
+STATICDEF	int	mu_cre_file_fd;		/* needed for "mu_cre_file_ch" */
+STATICDEF	char	*mu_cre_file_path;	/* needed for "mu_cre_file_ch" */
+
 error_def(ERR_DBBLKSIZEALIGN);
 error_def(ERR_DBFILECREATED);
 error_def(ERR_DBOPNERR);
@@ -110,6 +132,7 @@ error_def(ERR_DSKSPCCHK);
 error_def(ERR_FILECREERR);
 error_def(ERR_FNTRANSERROR);
 error_def(ERR_LOWSPACECRE);
+error_def(ERR_MUCREFILERR);
 error_def(ERR_MUNOSTRMBKUP);
 error_def(ERR_NOCREMMBIJ);
 error_def(ERR_NOCRENETFILE);
@@ -118,11 +141,26 @@ error_def(ERR_PARNORMAL);
 error_def(ERR_PREALLOCATEFAIL);
 error_def(ERR_RAWDEVUNSUP);
 
+/* Condition handler primarily to handle ERR_MEMORY errors by cleaning up the file that we created
+ * before passing on control to higher level condition handlers.
+ */
+CONDITION_HANDLER(mu_cre_file_ch)
+{
+	START_CH(TRUE);
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	{
+		assert(FALSE);	/* don't know of any possible INFO/SUCCESS errors */
+		CONTINUE;			/* Keep going for non-error issues */
+	}
+	CLEANUP(EXIT_ERR);
+	NEXTCH;
+}
+
 unsigned char mu_cre_file(void)
 {
 	char		path[MAX_FBUFF + 1], errbuff[512];
 	unsigned char	buff[DISK_BLOCK_SIZE];
-	int		fd = FD_INVALID, i, lower, upper, norm_vbn;
+	int		i, lower, upper, norm_vbn;
         ssize_t         status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		save_errno;
@@ -146,6 +184,8 @@ unsigned char mu_cre_file(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DEBUG_ONLY(mu_cre_file_fd = FD_INVALID);
+	DEBUG_ONLY(mu_cre_file_path = NULL);
 	cleanup_needed = FALSE;
 	DEBUG_ONLY(in_mu_cre_file = TRUE;)
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
@@ -161,21 +201,21 @@ unsigned char mu_cre_file(void)
 	*(path + file.len) = '\0';
 	if (is_raw_dev(path))
 	{
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_RAWDEVUNSUP, 2, REG_LEN_STR(gv_cur_region)));
+		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_RAWDEVUNSUP, 2, REG_LEN_STR(gv_cur_region));
 		return EXIT_ERR;
 	}
 	pblk.def1_buf = DEF_DBEXT;
 	pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
 	if (ERR_PARNORMAL != (retcode = parse_file(&file, &pblk)))	/* Note assignment */
 	{
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FNTRANSERROR, 2, REG_LEN_STR(gv_cur_region)));
+		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_FNTRANSERROR, 2, REG_LEN_STR(gv_cur_region));
 		return EXIT_ERR;
 	}
 	path[pblk.b_esl] = 0;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node);
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NOCRENETFILE, 2, LEN_AND_STR(path)));
+		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_NOCRENETFILE, 2, LEN_AND_STR(path));
 		return EXIT_WRN;
 	}
 	udi = &udi_struct;
@@ -191,8 +231,8 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	}
-	fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
-	if (FD_INVALID == fd)
+	mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
+	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also
 		 * STATSDBs.
 		 */
@@ -205,28 +245,33 @@ unsigned char mu_cre_file(void)
 			return EXIT_NRM;
 		/* Suppress EEXIST messages for statsDBs */
 		if (!IS_STATSDB_REG(gv_cur_region) || (EEXIST != errno))
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBOPNERR, 2, LEN_AND_STR(path), save_errno));
+			PUTMSG_ERROR_CSA(cs_addrs, 5, ERR_DBOPNERR, 2, LEN_AND_STR(path), save_errno);
 		return EXIT_ERR;
 	}
 	cleanup_needed = TRUE;			/* File open now so cleanup needed */
+	mu_cre_file_path = &path[0];	/* needed by "mu_cre_file_ch" */
+	/* mu_cre_file_fd is also needed by "mu_cre_file_ch" but that is already set */
+	ESTABLISH_RET(mu_cre_file_ch, EXIT_ERR);
 #	ifdef __MVS__
-	if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+	if (-1 == gtm_zos_set_tag(mu_cre_file_fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 		SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
 #	endif
-	if (0 != (save_errno = disk_block_available(fd, &avail_blocks, FALSE)))
+	if (0 != (save_errno = disk_block_available(mu_cre_file_fd, &avail_blocks, FALSE)))
 	{
 		errno = save_errno;
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DSKSPCCHK, 2, LEN_AND_STR(path), errno));
+		PUTMSG_ERROR_CSA(cs_addrs, 5, ERR_DSKSPCCHK, 2, LEN_AND_STR(path), errno); /* Note: Internally invokes CLEANUP */
+		REVERT;
 		return EXIT_ERR;
 	}
 	seg = gv_cur_region->dyn.addr;
 	if (seg->asyncio)
 	{	/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
-		fsb_size = get_fs_block_size(fd);
+		fsb_size = get_fs_block_size(mu_cre_file_fd);
 		if (0 != (seg->blk_size % fsb_size))
 		{
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_DBBLKSIZEALIGN, 4,
-					  LEN_AND_STR(path), seg->blk_size, fsb_size));
+			PUTMSG_ERROR_CSA(cs_addrs, 6, ERR_DBBLKSIZEALIGN, 4, LEN_AND_STR(path), seg->blk_size, fsb_size);
+				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+			REVERT;
 			return EXIT_ERR;
 		}
 	}
@@ -249,21 +294,22 @@ unsigned char mu_cre_file(void)
 		 * to do the warning transformation in this case. The only exception to this is a statsdb
 		 * which is anyways not journaled so need not worry about INST_FREEZE_ON_ERROR_ENABLED.
 		 */
-		assert((NULL == jnlpool.jnlpool_ctl) || IS_STATSDB_REG(gv_cur_region));
+		assert((NULL == jnlpool.jnlpool_ctl) || IS_AUTODB_REG(gv_cur_region));
 		if (avail_blocks < blocks_for_create)
 		{
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
-					  &blocks_for_create, &avail_blocks));
+			PUTMSG_ERROR_CSA(cs_addrs, 6, ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create, &avail_blocks);
+				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
 			if (IS_MUPIP_IMAGE)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
 					     &blocks_for_create, &avail_blocks);
+			REVERT;
 			return EXIT_ERR;
 		}
 		delta_blocks = avail_blocks - blocks_for_create;
 		if (delta_blocks < blocks_for_extension)
 		{
-			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
-					 EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks));
+			PUTMSG_WARN_CSA(cs_addrs,8, ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR,
+					&blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
 			if (IS_MUPIP_IMAGE)	/* Is not mupip, msg already went to operator log */
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
 					     EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
@@ -272,7 +318,7 @@ unsigned char mu_cre_file(void)
 	gv_cur_region->dyn.addr->file_cntl = &fc;
 	memset(&fc, 0, SIZEOF(file_control));
 	fc.file_info = (void*)&udi_struct;
-	udi->fd = fd;
+	udi->fd = mu_cre_file_fd;
 	cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF_FILE_HDR_DFLT);
 	memset(cs_data, 0, SIZEOF_FILE_HDR_DFLT);
 	cs_data->createinprogress = TRUE;
@@ -288,7 +334,9 @@ unsigned char mu_cre_file(void)
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if ((dba_mm == cs_data->acc_meth) && (gv_cur_region->jnl_before_image))
 	{
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NOCREMMBIJ, 2, LEN_AND_STR(path)));
+		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_NOCREMMBIJ, 2, LEN_AND_STR(path));
+			/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+		REVERT;
 		return EXIT_ERR;
 	}
 	cs_data->trans_hist.total_blks = gv_cur_region->dyn.addr->allocation;
@@ -305,6 +353,7 @@ unsigned char mu_cre_file(void)
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
+			REVERT;
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}
@@ -314,6 +363,7 @@ unsigned char mu_cre_file(void)
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
+			REVERT;
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}
@@ -330,16 +380,18 @@ unsigned char mu_cre_file(void)
 	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
 	if (0 != status)
 	{
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"),
-				  LEN_AND_LIT(path), status));
+		PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"), LEN_AND_LIT(path), status);
+			/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+		REVERT;
 		return EXIT_ERR;
 	}
 	new_eof = (off_t)BLK_ZERO_OFF(cs_data->start_vbn) + (off_t)cs_data->trans_hist.total_blks * cs_data->blk_size;
 	status = db_write_eof_block(udi, udi->fd, cs_data->blk_size, new_eof, &(TREF(dio_buff)));
 	if (0 != status)
 	{
-		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out end-of-file marker"),
-				  LEN_AND_LIT(path), status));
+		PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4, LEN_AND_LIT("writing out end-of-file marker"), LEN_AND_LIT(path),
+				 status); /* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+		REVERT;
 		return EXIT_ERR;
 	}
 	if (!cs_data->defer_allocate)
@@ -349,8 +401,9 @@ unsigned char mu_cre_file(void)
 		if (0 != status)
 		{
 			assert(ENOSPC == status);
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
-					  status));
+			PUTMSG_ERROR_CSA(cs_addrs, 5, ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region), status);
+				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+			REVERT;
 			return EXIT_ERR;
 		}
 	}
@@ -364,16 +417,20 @@ unsigned char mu_cre_file(void)
 		if (0 > retcode)
 		{	/* Should be rare-if-ever message as we just opened the baseDB so it should be there */
 			save_errno = errno;
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4,
-					  LEN_AND_LIT("getting base file information"), LEN_AND_STR(path), save_errno));
+			PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4,
+					 LEN_AND_LIT("getting base file information"), LEN_AND_STR(path), save_errno);
+				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+			REVERT;
 			return EXIT_ERR;
 		}
 		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perms, PERM_IPC, &pdd))
 		{	/* Not sure what could cause this as we would have done the same call when opening the baseDB but
 			 * make sure it is present just in case.
 			 */
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4,
-					  LEN_AND_LIT("obtaining permissions from base DB"),  LEN_AND_STR(path), EPERM));
+			PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4,
+					 LEN_AND_LIT("obtaining permissions from base DB"),  LEN_AND_STR(path), EPERM);
+				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
+			REVERT;
 			return EXIT_ERR;
 		}
 	} else
@@ -381,15 +438,17 @@ unsigned char mu_cre_file(void)
 	if (-1 == CHMOD(pblk.l_dir, perms))
 	{
 		save_errno = errno;
-		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) MAKE_MSG_WARNING(ERR_FILECREERR), 4,
-				 LEN_AND_LIT("changing file mode"), LEN_AND_LIT(path), save_errno));
+		PUTMSG_WARN_CSA(cs_addrs, 7, MAKE_MSG_WARNING(ERR_FILECREERR), 4, LEN_AND_LIT("changing file mode"),
+				LEN_AND_LIT(path), save_errno);
+		REVERT;
+		CLEANUP(EXIT_WRN);
 		return EXIT_WRN;
 	}
 	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
-		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path),
-				 32 * 1024 - DISK_BLOCK_SIZE));
+		PUTMSG_WARN_CSA(cs_addrs, 5, ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
 	if (!(RDBF_AUTODB & gv_cur_region->reservedDBFlags))
-		PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBFILECREATED, 2, LEN_AND_STR(path)));
+		PUTMSG_WARN_CSA(cs_addrs, 4, ERR_DBFILECREATED, 2, LEN_AND_STR(path));
+	REVERT;
 	CLEANUP(EXIT_NRM);
 	return EXIT_NRM;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #define GTM_IPCH
 
 #include <sys/ipc.h>
+#include "gtm_fcntl.h"  /* Needed for AIX's silly open to open64 translations (open used in JNLPOOL_CLEAR_FIELDS macro) */
 
 #ifdef __MVS__
 /* For shmget with __IPC_MEGA or _LP64 */
@@ -24,18 +25,32 @@
 #define FTOK		gtm_ftok
 #define FTOK_OLD	ftok
 
-#define JNLPOOL_SHMDT(RC, SAVE_ERRNO)				\
+#define	JNLPOOL_CLEAR_FIELDS(JNLPOOL)				\
+{								\
+	GBLREF	boolean_t	pool_init;			\
+								\
+	jnlpool_ctl = JNLPOOL.jnlpool_ctl = NULL;		\
+	JNLPOOL.gtmsrc_lcl_array = NULL;			\
+	JNLPOOL.gtmsource_local_array = NULL;			\
+	JNLPOOL.jnldata_base = NULL;				\
+	JNLPOOL.repl_inst_filehdr = NULL;			\
+	JNLPOOL.jnlpool_dummy_reg->open = FALSE;		\
+	pool_init = FALSE;					\
+}
+
+#define JNLPOOL_SHMDT(JNLPOOL, RC, SAVE_ERRNO)			\
 {								\
 	jnlpool_ctl_ptr_t	save_jnlpool_ctl;		\
 	intrpt_state_t		prev_intrpt_state;		\
 								\
 	SAVE_ERRNO = 0; /* clear any left-over value */		\
 	assert(NULL != jnlpool_ctl);				\
+	assert(jnlpool_ctl == JNLPOOL.jnlpool_ctl);		\
 	DEFER_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);	\
-	save_jnlpool_ctl = jnlpool.jnlpool_ctl;			\
-	jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;		\
+	save_jnlpool_ctl = JNLPOOL.jnlpool_ctl;			\
 	RC = SHMDT(save_jnlpool_ctl);				\
 	SAVE_ERRNO = errno;					\
+	JNLPOOL_CLEAR_FIELDS(JNLPOOL);				\
 	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);	\
 }
 

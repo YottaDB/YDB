@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,6 +127,7 @@ typedef struct unix_file_info_struct
 } unix_file_info;
 
 #define	FC2UDI(FILE_CNTL)	((unix_db_info *)(FILE_CNTL->file_info))
+#define	FILE_CNTL(reg)		(reg)->dyn.addr->file_cntl
 #define	FILE_INFO(reg)		((unix_db_info *)(reg)->dyn.addr->file_cntl->file_info)
 #define	FILE_ID(reg)		((unix_db_info *)(reg)->dyn.addr->file_cntl->file_info)->fileid
 #define	GDS_INFO		unix_db_info

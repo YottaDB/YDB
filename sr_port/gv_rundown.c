@@ -133,7 +133,7 @@ void gv_rundown(void)
 	 * to be safe.
 	 * Note that we use FALSE for the decr_cnt parameter (2nd parameter) to "ftok_sem_release". This is to avoid incorrect
 	 * removal of the ftok semaphore in case the counter is down to 1 but there are processes which did not bump the counter
-	 * (due to the counter overflowing) that are still accessing the semaphore. Even though we dont decrement the counter,
+	 * (due to the counter overflowing) that are still accessing the semaphore. Even though we don't decrement the counter,
 	 * the SEM_UNDO will take care of doing the actual decrement when this process terminates. The only consequence is
 	 * we will not be removing the ftok semaphore when the last process to use it dies (requiring a mupip rundown to clean
 	 * it up). But that is considered okay since these are abnormal exit conditions anyways and hopefully unlikely in practice.

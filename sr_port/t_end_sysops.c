@@ -290,9 +290,17 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
+#	ifdef DEBUG
+	jbuf_rsrv_struct_t	*jrs;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
+	/* Assert that we never start db commit until all journal records have been written out in phase2 */
+	jrs = dollar_tlevel ? cs_addrs->sgm_info_ptr->jbuf_rsrv_ptr : TREF(nontp_jbuf_rsrv);
+	assert((NULL == jrs) || !jrs->tot_jrec_len);
+#	endif
 	assert(cs_addrs->now_crit);
 	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bgmm_updates, 1);
@@ -934,6 +942,12 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	}
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
+	/* If this is the first time the the database block has been written, we must write
+	 * the entire database block if gtm_fullblockwrites = 2 */
+	/* Note that the check for gtm_fullblockwrites happens when we decide to write the block,
+	 * not here; so if the block is new, mark as needing first write */
+	if (WAS_FREE(cs->blk_prior_state))
+		cs->cr->needs_first_write = TRUE;
 	cs->cycle = cr->cycle;	/* update "cycle" as well (used later in tp_clean_up to update cycle in history) */
 	cs->old_mode = -cs->old_mode;	/* negate it to indicate phase1 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 > cs->old_mode);
@@ -970,6 +984,9 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	cache_que_heads_ptr_t	cache_state;
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
+#	ifdef DEBUG
+	jbuf_rsrv_struct_t	*jrs;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -989,6 +1006,11 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	assert(-1 == cr->read_in_progress);
 	assert(LATCH_SET <= WRITE_LATCH_VAL(cr));	/* Assert that we hold the update lock on the cache-record */
 	csa = cs_addrs;		/* Local access copies */
+#	ifdef DEBUG
+	/* Assert that we never start phase2 of db commit until all journal records have been written out in phase2 */
+	jrs = dollar_tlevel ? csa->sgm_info_ptr->jbuf_rsrv_ptr : TREF(nontp_jbuf_rsrv);
+	assert((NULL == jrs) || !jrs->tot_jrec_len);
+#	endif
 	csd = csa->hdr;
 	cnl = csa->nl;
 	blkid = cs->blk;

@@ -106,12 +106,12 @@
  * the compiler happy) thus the construct (assertpro, 0) which returns a zero (see usage with assert() on UNIX).
  */
 #define RELEASE_SWAPLOCK(X)		(COMPSWAP_UNLOCK((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (assertpro(FALSE), 0))
+#define	GRAB_LATCH_INDEFINITE_WAIT	-1	/* special value indicating infinite timeout input to "grab_latch" */
 
 /* Function prototypes */
 boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs);
 void		rel_latch(sm_global_latch_ptr_t latch);
 
-#define LOCK_HARD_SPIN_TIME 		60	/* in seconds */
 /* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
 #define GRAB_LOCK_CRIT(CSA, REGION, RET_WAS_CRIT)						\
 MBSTART {											\
@@ -122,9 +122,10 @@ MBSTART {											\
 		if (!(RET_WAS_CRIT = CSA->now_crit))		/* WARNING assignment */	\
 			grab_crit(REGION);							\
 	} else											\
-	{											\
-		while (!grab_latch(&CSA->nl->lock_crit, LOCK_HARD_SPIN_TIME))			\
-			rel_quant();								\
+	{	/* Return value of "grab_latch" does not need to be checked because we pass	\
+		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.				\
+		 */										\
+		grab_latch(&CSA->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT);			\
 	}											\
 } MBEND
 #define REL_LOCK_CRIT(CSA, REGION, WAS_CRIT)							\

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,27 +28,29 @@
 #endif
 
 GBLREF	pid_t	process_id;
-GBLREF	uint4	image_count;
 GBLREF 	int4 	exi_condition;
 
-void performCASLatchCheck(sm_global_latch_ptr_t latch, boolean_t cont_proc)
+/* Returns TRUE if latch was held by a dead pid and was made available inside this function.
+ * Returns FALSE otherwise.
+ * TRUE return enables callers to invoke some latch-specific recovery action.
+ */
+boolean_t performCASLatchCheck(sm_global_latch_ptr_t latch, boolean_t cont_proc)
 {
-	pid_t	holder_pid;
-	VMS_ONLY(uint4 holder_imgcnt;)
+	pid_t		holder_pid;
+	boolean_t	ret;
 
 	holder_pid = latch->u.parts.latch_pid;
-	VMS_ONLY(holder_imgcnt = latch->u.parts.latch_image_count);
+	ret = FALSE;
 	if (LOCK_AVAILABLE != holder_pid)
 	{ 	/* should never be done recursively - but signal case is permitted for now as it will never return */
 		/* remove 0 == exi_condition below when fixed */
-		if ((process_id == holder_pid) && (0 == exi_condition) VMS_ONLY(&& image_count == holder_imgcnt))
-			GTMASSERT;
-		if ((process_id == holder_pid VMS_ONLY(&& image_count == holder_imgcnt))
-		    || (FALSE == is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt))))
-		{ /* remove (processe_id == holder && image_count == holder_pid) when fixed */
-			COMPSWAP_UNLOCK(latch, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
-		}
-		UNIX_ONLY(else if (cont_proc)
-		                    continue_proc(holder_pid);)	/* Attempt wakeup in case process is stuck */
+		assertpro((process_id != holder_pid) || (0 != exi_condition));
+		if ((process_id == holder_pid) || (FALSE == is_proc_alive(holder_pid, 0)))
+		{	/* remove (processe_id == holder) when fixed */
+			COMPSWAP_UNLOCK(latch, holder_pid, 0, LOCK_AVAILABLE, 0);
+			ret = TRUE;
+		} else if (cont_proc)
+			continue_proc(holder_pid);	/* Attempt wakeup in case process is stuck */
 	}
+	return ret;
 }

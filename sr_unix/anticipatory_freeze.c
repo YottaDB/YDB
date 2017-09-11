@@ -120,7 +120,8 @@ STATICFNDEF int		get_mnemonic_offset(hash_table_str **err_hashtab, char *mnemoni
 	{	/* create and populate hash-table for future lookups */
 		tmp_err_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
 		DEBUG_ONLY(tmp_err_hashtab->base = NULL);
-		init_hashtab_str(tmp_err_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+		init_hashtab_str(tmp_err_hashtab, (msg_top - msg_beg) * (100.0 / HT_LOAD_FACTOR),
+				HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 		assert(tmp_err_hashtab->base);
 		for (msg_info = (err_msg *)msg_beg; msg_info < msg_top; msg_info++)
 		{
@@ -183,17 +184,8 @@ void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 	boolean_t			was_crit;
 	sgmnt_addrs			*repl_csa;
 	const err_msg			*msginfo;
-#	ifdef DEBUG
-	qw_off_t			write_addr;
-	uint4				write;
-#	endif
 
 	assert(is_anticipatory_freeze_needed(csa, msg_id));
-	DEBUG_ONLY(
-		write_addr = jnlpool_ctl->write_addr;
-		write = jnlpool_ctl->write;
-	)
-	assert(write == write_addr % jnlpool_ctl->jnlpool_size);
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	assert(NULL != repl_csa);
 	was_crit = repl_csa->now_crit;
@@ -234,7 +226,7 @@ boolean_t		init_anticipatory_freeze_errors()
 	 * to check if cmerrors/cmierrors also need to be included in this list or not.
 	 */
 	assert(IS_MUPIP_IMAGE); 				/* is_src_server is not initialized at this point */
-	assert(jnlpool_ctl && !jnlpool_ctl->pool_initialized);	/* should be invoked BEFORE the journal pool is fully-initialized */
+	assert(jnlpool_ctl && !jnlpool_ctl->instfreeze_environ_inited);	/* invoke when not previously initialized */
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		/* should hold journal pool access control semaphore */
 	/* Now, read the custom errors file and populate the journal pool */
 	custom_err_file = TREF(gtm_custom_errors);

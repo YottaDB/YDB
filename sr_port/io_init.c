@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@ GBLREF io_pair		io_std_device;		/* standard device	*/
 GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
 GBLREF bool		prin_in_dev_failure;
 GBLREF bool		prin_out_dev_failure;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
 
 GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
 GBLREF mstr		sys_input;
@@ -38,6 +39,8 @@ GBLREF mstr		gtm_principal;
 #ifdef UNIX
 GBLREF boolean_t	err_same_as_out;
 #endif
+
+LITREF	mval	literal_zero;
 
 error_def(ERR_FILEOPENFAIL);
 error_def(ERR_LOGTOOLONG);
@@ -172,7 +175,7 @@ void io_init(boolean_t term_ctrl)
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	ESTABLISH(io_init_ch);
-	(*op_open_ptr)(&val, &pars, 0, 0);
+	(*op_open_ptr)(&val, &pars, (mval *)&literal_zero, 0);
 	io_curr_device.in  = io_std_device.in  = inp->iod;
 	val.str = sys_output;
 	if ((SS_NORMAL == TRANS_LOG_NAME(&gtm_netout, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long))
@@ -211,7 +214,7 @@ void io_init(boolean_t term_ctrl)
 			pars.str.len = SIZEOF(open_params_list);
 			pars.str.addr = (char *)open_params_list;
 		}
-		(*op_open_ptr)(&val, &pars, 0, 0);
+		(*op_open_ptr)(&val, &pars, (mval *)&literal_zero, 0);
 	}
 	io_curr_device.out = io_std_device.out = outp->iod;
 	term_setup(term_ctrl);

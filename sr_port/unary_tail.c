@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,13 +28,16 @@ void unary_tail(oprtype *opr)
 	 */
 	int		com, comval, drop, neg, num;
 	mval		*mv, *v;
-	opctype		c, c1, c2;
+	opctype		c, c1, c2, pending_coerce;
 	oprtype		*p;
-	triple		*t, *t1, *t2, *ta;
+	triple		*t, *t1, *t2, *ta, *ref0;
 	uint4		w;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(TRIP_REF == opr->oprclass);
 	t = ta = t2 = opr->oprval.tref;
+	pending_coerce = OC_NOOP;
 	assert(OCT_UNARY & oc_tab[t->opcode].octype);
 	assert((TRIP_REF == t->operand[0].oprclass) && (NO_REF == t->operand[1].oprclass));
 	com = comval = drop = neg = num = 0;
@@ -48,11 +51,6 @@ void unary_tail(oprtype *opr)
 		c2 = t2->opcode;
 		switch (c2)	/* this switch is on the opcode of the operand triple */
 		{
-			case OC_JMPFALSE:
-			case OC_JMPTRUE:
-				t2->operand[1] = t2->operand[0];			/* track info as we switch opcode */
-				PUT_LITERAL_TRUTH(OC_JMPTRUE == c2, t2);
-				c2 = t2->opcode = OC_LIT;				/* WARNING fallthrough */
 			case OC_COM:
 			case OC_COBOOL:
 			case OC_COMVAL:
@@ -67,6 +65,9 @@ void unary_tail(oprtype *opr)
 				{
 					num++;		/* num indicates a coerce if the target is not a literal */
 					neg = com ? neg : !neg;		/* a complement makes any right-hand negation irrelevant */
+				} else if (OC_NOOP == pending_coerce && ((OC_COMVAL == c1) || (OC_COBOOL == c1)))
+				{	/* Delete this coercion; we may add it back later */
+					pending_coerce = c1;
 				} else if ((OC_NOOP != c1) && !(OCT_UNARY & oc_tab[c1].octype))
 					break;
 				assert((NO_REF == t1->operand[1].oprclass) && ((NO_REF == t2->operand[1].oprclass)
@@ -74,11 +75,6 @@ void unary_tail(oprtype *opr)
 				drop++;			/* use a count of potential "extra" operands */
 				if (OC_LIT != c2)
 					continue;	/* this keeps the loop going */
-				if (OC_COBOOL == t->opcode)
-				{	/* keep Boolean processing happy by leaving one of these alone/behind */
-					t = t->operand[0].oprval.tref;
-					drop--;
-				}
 				for (t1 = t, c = t1->opcode; 0 < drop; drop--)	/* reached a literal - time to stop */
 				{	/* if it's a literal, delete all but one leading unary op and operate on the literal now */
 					assert(OCT_UNARY & oc_tab[c].octype);
@@ -90,6 +86,17 @@ void unary_tail(oprtype *opr)
 				assert(OC_LIT == c);
 				t = ta;
 				v = &t1->operand[0].oprval.mlit->v;
+				if (OC_NOOP != pending_coerce && OC_COMVAL != pending_coerce)
+				{	/* add back a coercion if we need it;
+					 * a COMVAL preceding a LIT is unneeded (and will cause an error).
+					 * this leaves a COBOOL but removing earier and readding here is easier to follow & cleaner
+					 */
+					ref0 = maketriple(pending_coerce);
+					dqins(t, exorder, ref0);
+					ref0->operand[0].oprclass = TRIP_REF;
+					ref0->operand[0].oprval.tref = t;
+					opr->oprval.tref = ref0;
+				}
 				if (num || com)
 				{	/* num includes both OC_NEG and OC_FORCENUM */
 					unuse_literal(v);
@@ -125,10 +132,18 @@ void unary_tail(oprtype *opr)
 				}
 				assert((MV_NM & v->mvtype) && (MV_STR & v->mvtype));
 				break;
+			case OC_NOOP:
+				if (OC_COMVAL == t->opcode)
+				{
+					t->opcode = OC_NOOP;
+					t->operand[0].oprclass = NO_REF;
+					break;
+				}
 			default:	/* something other than a unary operator or a literal - stop and do what can be done */
 				if (OCT_ARITH & oc_tab[c2].octype)
 				{	/* some arithmetic */
 					ex_tail(&t1->operand[0]);
+					RETURN_IF_RTS_ERROR;
 					if (OC_LIT == t2->opcode)
 					{
 						c2 = t2->opcode;

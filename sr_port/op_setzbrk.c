@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 #include "compiler.h"
 #include "min_max.h"
 #include "dm_setup.h"
+#include "restrict.h"
 #ifdef GTM_TRIGGER
 # include "gdsroot.h"			/* for gdsfhead.h */
 # include "gdsbt.h"			/* for gdsfhead.h */
@@ -55,6 +56,7 @@ error_def(ERR_INVZBREAK);
 error_def(ERR_MEMORY);
 error_def(ERR_NOPLACE);
 error_def(ERR_NOZBRK);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TRIGNAMENF);
 error_def(ERR_VMSMEMORY);
 error_def(ERR_ZBREAKFAIL);
@@ -80,6 +82,9 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	icode_str	indir_src;
 	boolean_t	deleted;
 	GTMTRIG_ONLY(boolean_t	is_trigger);
+
+	if (RESTRICTED(zbreak_op))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 
 	MV_FORCE_STR(rtn);
 	MV_FORCE_STR(lab);

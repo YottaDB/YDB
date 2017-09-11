@@ -38,6 +38,8 @@
 #include "io.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
+#include "job.h"
+#include "restrict.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -85,6 +87,7 @@ error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);
 error_def(ERR_CRYPTINIT);
 error_def(ERR_CRYPTINIT2);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TLSINIT);
@@ -144,7 +147,14 @@ int gtm_main (int argc, char **argv, char **envp)
 	if (parse_ret && (EOF != parse_ret))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	if (cli_present("DIRECT_MODE"))
+	{
+		if (!((ptr = GETENV(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
+		{	/* first tell them it's a no-no without engaging the condition handling so we keep control */
+			dec_err(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, "mumps -direct");
+			stop_image_no_core();		/* then kill them off without further delay */
+		}
 		invocation_mode = MUMPS_DIRECT;
+	}
 	else if (cli_present("RUN"))
 		invocation_mode = MUMPS_RUN;
 	gtm_chk_dist(argv[0]);

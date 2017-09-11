@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -378,7 +378,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 		else
 		{
 			if (0 == jpc->pini_addr)
-				jnl_put_jrt_pini(csa);
+				jnl_write_pini(csa);
 			jnl_write_trunc_rec(csa, old_total, csa->ti->free_blocks, new_total);
 			inctn_opcode = inctn_mu_reorg;
 			jnl_write_inctn_rec(csa);

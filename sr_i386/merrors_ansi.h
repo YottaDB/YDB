@@ -402,7 +402,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CCECLSTPRCS */
 	   0,	/* ZSHOWBADFUNC */
 	   0,	/* NOTALLJNLEN */
-	   0,	/* UNUSEDMSG570 */
+	   0,	/* BADLOCKNEST */
 	   0,	/* NOLBRSRC */
 	   0,	/* INVZSTEP */
 	   0,	/* ZSTEPARG */
@@ -502,7 +502,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CETOOLONG */
 	   0,	/* CENOINDIR */
 	   0,	/* COLLATIONUNDEF */
-	   0,	/* UNUSEDMSG670 */
+	   0,	/* UNUSEDMSG673 */
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */
@@ -608,7 +608,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
-	   0,	/* UNUSEDMSG776 */
+	   0,	/* UNUSEDMSG779 */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
@@ -1148,7 +1148,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTDLNOOPEN */
 	   0,	/* CRYPTNOV4 */
 	   0,	/* CRYPTNOMM */
-	   0,	/* UNUSEDMSG1316 */
+	   0,	/* UNUSEDMSG1319 */
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
@@ -1206,7 +1206,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
-	   0,	/* UNUSEDMSG1374 */
+	   0,	/* UNUSEDMSG1377 */
 	   0,	/* BOOLSIDEFFECT */
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
@@ -1218,7 +1218,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
-	   0,	/* UNUSEDMSG1386 */
+	   0,	/* UNUSEDMSG1389 */
 	   0,	/* DBSHMNAMEDIFF */
 	   0,	/* SHMREMOVED */
 	   0,	/* DEVICEWRITEONLY */
@@ -1359,7 +1359,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* UNUSEDMSG1529 */
+	   0,	/* UNUSEDMSG1532 */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */
@@ -1369,7 +1369,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-	   0,	/* UNUSEDMSG1539 */
+	   0,	/* UNUSEDMSG1542 */
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
@@ -1491,4 +1491,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLSWITCHRETRY */
 	   0,	/* JNLSWITCHFAIL */
 	   0,	/* CLISTRTOOLONG */
+	   0,	/* LVMONBADVAL */
+	   0,	/* RESTRICTEDOP */
+	   0,	/* RESTRICTSYNTAX */
+	   0,	/* MUCREFILERR */
+	   0,	/* JNLBUFFPHS2SALVAGE */
+	   0,	/* JNLPOOLPHS2SALVAGE */
+	   0,	/* MURNDWNARGLESS */
 	};

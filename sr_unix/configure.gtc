@@ -218,8 +218,15 @@ if [ -d "utf8" ]; then
 		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
 			read gtm_icu_version
-			icu_ver=`$echo $gtm_icu_version | sed 's/\.//'`
-			majmin=`$echo $icu_ver | cut -f 1 -d "."`
+			maj=`$echo $gtm_icu_version | cut -f 1 -d "."`
+			if [ "$maj" -ge "49" ] ; then
+				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
+				# the version reported by icu-config --version is <major><minor>.<milli> and not <major>.<minor>
+				majmin=$maj
+			else
+				# Assuming the input is of the form 4.2.1
+				majmin=`$echo $gtm_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
+			fi
 			if [ "$majmin" -lt "36" ] ; then
 				$echo "WARNING: ICU version $gtm_icu_version is less than 3.6. \c"
 				$echo "UTF-8 support will not be installed"
@@ -246,7 +253,9 @@ if [ -d "utf8" ]; then
 				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
 				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
 				# Find out vital parameters
-				if [ $arch = "ibm" ]; then
+				if [ "$libpath/libicuio$icu_ext" = "$icu_versioned_lib" ]; then
+					majmin=""
+				elif [ $arch = "ibm" ]; then
 					# From the version'ed library(eg. libicuio36.0.a) extract out
 					# 36.0.a
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
@@ -274,6 +283,7 @@ if [ -d "utf8" ]; then
 					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
+					icu_full_ver_lib=`basename $icu_full_ver_lib`
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
 				fi
 				# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
@@ -284,6 +294,8 @@ if [ -d "utf8" ]; then
 				else
 					found_icu=0
 				fi
+				# The default ICU library on AIX is unversioned
+				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
 				# If we have everything we want, then save the libpath that contains the proper ICU library and
 				# set the gtm_icu_version
 				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then

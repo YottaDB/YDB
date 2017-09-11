@@ -180,7 +180,7 @@ void	gtm_env_init_sp(void)
 	/* Validate $gtm_tmp if specified, else that default is available */
 	val.addr = GTM_TMP_ENV;
 	val.len = SIZEOF(GTM_TMP_ENV) - 1;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) || (0 == trans.len))
 	{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
 		trans.addr = buf;
@@ -209,7 +209,7 @@ void	gtm_env_init_sp(void)
 #	ifdef GTM_TRIGGER
 	val.addr = GTM_TRIGGER_ETRAP;
 	val.len = SIZEOF(GTM_TRIGGER_ETRAP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
 		gtm_trigger_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		memcpy(gtm_trigger_etrap.str.addr, trans.addr, trans.len);
@@ -341,7 +341,7 @@ void	gtm_env_init_sp(void)
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	val.addr = GTM_CUSTOM_ERRORS;
 	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
 		assert(GTM_PATH_MAX > trans.len);
 		(TREF(gtm_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
@@ -356,7 +356,7 @@ void	gtm_env_init_sp(void)
 	/* Initialize which ever error trap we are using (ignored in the utilities except the update process) */
 	val.addr = GTM_ETRAP;
 	val.len = SIZEOF(GTM_ETRAP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
 		dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
@@ -372,7 +372,7 @@ void	gtm_env_init_sp(void)
 	/* Initiaalize $ZSTEP fro $gtm_zstep enviroment variable. Default value is initailzed in gbldefs.c */
 	val.addr = GTM_ZSTEP;
 	val.len = SIZEOF(GTM_ZSTEP) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
 		dollar_zstep.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		memcpy(dollar_zstep.str.addr, trans.addr, trans.len);
@@ -397,7 +397,8 @@ void	gtm_env_init_sp(void)
 		{	/* Else use default $gtm_tmp value or its default */
 			val.addr = GTM_TMP_ENV;
 			val.len = SIZEOF(GTM_TMP_ENV) - 1;
-			if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+			if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+					|| (0 < trans.len))
 			{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
@@ -572,14 +573,16 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_STATSDIR;
 	val.len = SIZEOF(GTM_STATSDIR) - 1;
 	/* Using MAX_FN_LEN below instead of GTM_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+			|| (0 == trans.len))
 	{	/* Either no translation for $gtm_statsdir or the current and/or expanded value of $gtm_statsdir exceeds the
 		 * max path length. For either case $gtm_statsdir needs to be (re)set so try to use $gtm_tmp instead - note
 		 * from here down we'll (re)set $gtm_statsdir so it ALWAYS has a (valid) value for mu_cre_file() to later use.
 		 */
 		val.addr = GTM_TMP_ENV;
 		val.len = SIZEOF(GTM_TMP_ENV) - 1;
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+		if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
+				|| (0 == trans.len))
 		{	/* Nothing for $gtm_tmp - use DEFAULT_GTM_TMP instead */
 			trans.addr = DEFAULT_GTM_TMP;
 			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;

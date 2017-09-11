@@ -85,7 +85,12 @@ void fake_enospc(void)
 		syslog_deferred = 0;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAKENOSPCLEARED, 1, deferred_count);
 	}
-	if (syslog_deferred || (!ok_to_interrupt && !IS_REPL_INST_FROZEN) || !CUSTOM_ERRORS_LOADED)
+	/* If ok_to_interrupt is FALSE and intrpt_ok_state == INTRPT_IN_SHMDT, it is possible we have detached
+	 * from the shared memory (i.e. in the middle of the shmdt()) when the timer interrupt occurs and so
+	 * we cannot do a IS_REPL_INST_FROZEN check which looks at a field inside jnlpool_ctl. Account for that below.
+	 */
+	if (syslog_deferred
+		|| (!ok_to_interrupt && ((INTRPT_IN_SHMDT == intrpt_ok_state) || !IS_REPL_INST_FROZEN)) || !CUSTOM_ERRORS_LOADED)
 	{	/* We have to skip this because we have just fallen into deferred zone or we are currently in it */
 		/* Try again in a second */
 		start_timer((TID)fake_enospc, ENOSPC_RETRY_INTERVAL, fake_enospc, 0, NULL);

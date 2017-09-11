@@ -318,7 +318,7 @@ GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec) = tp_start_timer_dum
 GBLDEF	void			(*tp_timeout_clear_ptr)(void) = tp_clear_timeout_dummy;
 GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
-GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
+GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
 /* Initialized only in gtm_startup() */
 GBLDEF	void			(*jnl_file_close_timer_ptr)(void);
@@ -717,7 +717,7 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * incremented and logical SET journal records will be written. By default, this
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
-GBLDEF boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLDEF  int4		gtm_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
 GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -738,7 +738,6 @@ GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
 GBLDEF	mlabel		*mlabtab;
 GBLDEF	mline		mline_root;
 GBLDEF	mline		*mline_tail;
-GBLDEF	short int	block_level;
 GBLDEF	triple		t_orig;
 GBLDEF	int		mvmax, mlmax, mlitmax;
 static	char		routine_name_buff[SIZEOF(mident_fixed)], module_name_buff[SIZEOF(mident_fixed)];

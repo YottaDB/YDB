@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "gtm_utf8.h"
 #include "have_crit.h"
 
+GBLREF	boolean_t	badchar_inhibit;
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	spdesc 		stringpool;
 GBLREF	casemap_t	casemaps[];
@@ -78,7 +79,10 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		(*casemaps[index].m)((unsigned char *)dstbase, (unsigned char *)src->str.addr, dstlen);
 	} else if (0 != src->str.len)
 	{
-		MV_FORCE_LEN_STRICT(src);
+		if (!badchar_inhibit)
+			MV_FORCE_LEN_STRICT(src);
+		else
+			MV_FORCE_LEN(src);
 		if (2 * src->str.char_len <= MAX_ZCONVBUFF)
 		{ /* Check if the stack buffer is sufficient considering the worst case where all
 		     characters are surrogate pairs, each of which needs 2 UChars */
@@ -93,7 +97,14 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		/* Convert UTF-8 src to UTF-16 (UChar*) representation */
 		status = U_ZERO_ERROR;
 		u_strFromUTF8(src_ustr_ptr, src_ustr_len, &src_chlen, src->str.addr, src->str.len, &status);
-		if (U_FAILURE(status))
+		if ((U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status) && badchar_inhibit)
+		{	/* VIEW "NOBADCHAR" in effect, use the M mode conversion only on error */
+			dstlen = src->str.len;
+			ENSURE_STP_FREE_SPACE(dstlen);
+			dstbase = (char *)stringpool.free;
+			assert(NULL != casemaps[index].m);
+			(*casemaps[index].m)((unsigned char *)dstbase, (unsigned char *)src->str.addr, dstlen);
+		} else if (U_FAILURE(status))
 		{
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
@@ -102,48 +113,51 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
 						1, status); /* ICU said bad, we say good or don't recognize error*/
 		}
-		status = U_ZERO_ERROR;
-		dst_ustr_ptr = dst_ustr;
-		dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, MAX_ZCONVBUFF, src_ustr_ptr, src_chlen, NULL, &status);
-		if ( U_BUFFER_OVERFLOW_ERROR == status )
-		{
+		else
+		{	/* BADCHAR should not be possible after the above validations */
 			status = U_ZERO_ERROR;
-			dst_ustr_ptr = (UChar*)malloc(dst_chlen * SIZEOF(UChar));
-			/* Now, perform the real conversion with sufficient buffers */
-			dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, dst_chlen, src_ustr_ptr, src_chlen, NULL, &status);
-		} else if ( U_FILE_ACCESS_ERROR == status )
-		{
+			dst_ustr_ptr = dst_ustr;
+			dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, MAX_ZCONVBUFF, src_ustr_ptr, src_chlen, NULL, &status);
+			if (U_BUFFER_OVERFLOW_ERROR == status)
+			{
+				status = U_ZERO_ERROR;
+				dst_ustr_ptr = (UChar*)malloc(dst_chlen * SIZEOF(UChar));
+				/* Now, perform the real conversion with sufficient buffers */
+				dst_chlen = (*casemaps[index].u)(dst_ustr_ptr, dst_chlen, src_ustr_ptr, src_chlen, NULL, &status);
+			} else if (U_FILE_ACCESS_ERROR == status)
+			{
+				RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
+					      1, status);
+			}
+			/* Fake the conversion from UTF-16 to UTF-8 to compute the required buffer size */
+			status = U_ZERO_ERROR;
+			dstlen = 0;
+			u_strToUTF8(NULL, 0, &dstlen, dst_ustr_ptr, dst_chlen, &status);
+			assert(U_BUFFER_OVERFLOW_ERROR == status || U_SUCCESS(status));
+			if (MAX_STRLEN < dstlen)
+			{
+				RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+			}
+			ENSURE_STP_FREE_SPACE(dstlen);
+			dstbase = (char *)stringpool.free;
+			status = U_ZERO_ERROR;
+			u_strToUTF8(dstbase, dstlen, &ulen, dst_ustr_ptr, dst_chlen, &status);
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
-					1, status);
-		}
-		RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
-		/* Fake the conversion from UTF-16 to UTF-8 to compute the required buffer size */
-		status = U_ZERO_ERROR;
-		dstlen = 0;
-		u_strToUTF8(NULL, 0, &dstlen, dst_ustr_ptr, dst_chlen, &status);
-		assert(U_BUFFER_OVERFLOW_ERROR == status || U_SUCCESS(status));
-		if (MAX_STRLEN < dstlen)
-		{
+			if (U_FAILURE(status))
+			{
+				RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
+				RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
+					      1, status); /* ICU said bad, but same call above just returned OK */
+			}
+			assertpro(ulen == dstlen);
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
-		ENSURE_STP_FREE_SPACE(dstlen);
-		dstbase = (char *)stringpool.free;
-		status = U_ZERO_ERROR;
-		u_strToUTF8(dstbase, dstlen, &ulen, dst_ustr_ptr, dst_chlen, &status);
-		if (U_FAILURE(status))
-		{
-			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
-			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
-					1, status); /* ICU said bad, but same call above just returned OK */
-		}
-		assertpro(ulen == dstlen);
-		RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 	}
 	MV_INIT_STRING(dst, dstlen, dstbase);
 	stringpool.free += dstlen;

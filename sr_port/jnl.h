@@ -15,12 +15,14 @@
 
 #ifdef DEBUG
 #include <stddef.h>           /* for offsetof macro (see OFFSETOF usage in assert below) */
+#include "wbox_test_init.h"
 #endif
 
 #ifndef JNLSP_H_INCLUDED
 #include "jnlsp.h"
 #endif
 #include "gtmcrypt.h"
+#include "sleep.h"
 
 error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLENDIANBIG);
@@ -38,14 +40,18 @@ error_def(ERR_JNLENDIANLITTLE);
  * 	3) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
  *	4) Bump JNL_EXTR_LABEL and JNL_DET_EXTR_LABEL as appropriate in muprec.h.
  *		This is not needed if for example the newly added jnl record types don't get extracted at all.
+ *	5) Add a line in the big comment block just before "repl_filter_t" is typedefed in repl_filter.h
+ *		to update the "Filter format", "Journal format" and "GT.M version" columns.
+ *	6) Add Vxx_JNL_VER to repl_filter.h and examine usages of Vxx_JNL_VER where xx corresponds to older
+ *		journal version to see if those need to be replaced with the newer version macro.
  * If the FILTER format is also changing, then do the following as well
- * 	4) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
- * 	5) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
+ * 	7) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
+ * 	8) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
  * 		Remove all entries that don't have the new jnl format in either the from or to part of the conversion.
- * 	6) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
- * 	7) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
+ * 	9) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
+ * 	10) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
  * 		This is similar to the jnl_xTOy() filter conversion functions except that lot of byte-swaps are needed.
- * 	8) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
+ * 	11) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
  * 		rolling upgrade (using replication internal filters) for older GT.M versions/jnl-formats.
  * 		This would mean bumping the macro JNL_VER_EARLIEST_REPL and examining all arrays that are defined
  * 		using this macro and changing the entries in all those arrays accordingly (e.g. repl_filter_old2cur
@@ -53,8 +59,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL26"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		26
+#define JNL_LABEL_TEXT		"GDSJNL27"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		27
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -96,9 +102,7 @@ error_def(ERR_JNLENDIANLITTLE);
  * Also a research in ELWOOD journal file showed that "EB" was one of the few patterns that had the least occurrences */
 #define JNL_REC_SUFFIX_CODE	0xEB
 
-/* In Unix, with sync_io, we do journal writes to disk at filesystem block size boundaries.
- * In VMS, the writes are at 512-byte boundaries only.
- */
+/* With sync_io, we do journal writes to disk at filesystem block size boundaries. */
 #define JNL_WRT_START_MODULUS(jb)	jb->fs_block_size
 #define JNL_WRT_START_MASK(jb)	~(JNL_WRT_START_MODULUS(jb) - 1)	/* mask defining where the next physical write needs to
 									 * happen as follows from the size of JNL_WRT_START_MODULUS
@@ -158,10 +162,13 @@ error_def(ERR_JNLENDIANLITTLE);
 #define	WCSFLU_IN_COMMIT	16	/* Set if caller is t_end or tp_tend. See wcs_flu for explanation of when this is set */
 #define	WCSFLU_MSYNC_DB		32	/* Force a full msync if NO_MSYNC is defined. Currently used only in Unix wcs_flu(). */
 #define	WCSFLU_SPEEDUP_NOBEFORE	64	/* Do not flush dirty db buffers. Just write an epoch record.
-					 * Used to speedup nobefore jnl for Unix. Flag ignored in VMS.
+					 * Used to speedup nobefore jnl.
 					 */
 #define	WCSFLU_CLEAN_DBSYNC    128	/* wcs_flu invoked by wcs_clean_dbsync (as opposed to t_end/tp_tend invocation) */
-
+#define	WCSFLU_FORCE_EPOCH     256	/* skip the optimization that writes epoch only if an epoch is not the most recently
+					 * written record. This is necessary for some callers (e.g. update process writing
+					 * an epoch for the -noresync startup case).
+					 */
 /* options for error_on_jnl_file_lost */
 #define JNL_FILE_LOST_TURN_OFF	0	/* Turn off journaling. */
 #define JNL_FILE_LOST_ERRORS	1	/* Throw an rts_error. */
@@ -194,18 +201,23 @@ error_def(ERR_JNLENDIANLITTLE);
 #define	JNL_WRITE_LOGICAL_RECS(X)	(JNL_ENABLED(X) || REPL_WAS_ENABLED(X))
 
 /* The following macro should be used to invoke the function "jnl_write" for any logical record. This macro
- * checks if journaling is enabled and if so invokes "jnl_write" else it invokes "jnl_write_poolonly" which
+ * checks if journaling is enabled and if so invokes "jnl_write" else it invokes "jnl_pool_write" which
  * writes only to the journal pool.
  */
-#define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, BLKPTR, JFB, JPLCTX)							\
-{															\
+#define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, JFB)								\
+MBSTART {														\
+	GBLREF	boolean_t		is_replicator;									\
+															\
 	assert(JNL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));								\
 	assert((NULL == JFB) || (RECTYPE == ((jnl_record *)(((jnl_format_buffer *)JFB)->buff))->prefix.jrec_type));	\
 	if (JNL_ENABLED(CSA))												\
-		jnl_write(JPC, RECTYPE, JREC, BLKPTR, JFB, JPLCTX); /* write to jnlbuffer, jnlfile, jnlpool */			\
-	else														\
-		jnl_write_poolonly(JPC, RECTYPE, JREC, JFB, JPLCTX);	/* write to jnlpool only */				\
-}
+		jnl_write(JPC, RECTYPE, JREC, JFB); 	/* write to jnlbuffer */					\
+	if (REPL_ALLOWED(CSA) && is_replicator)										\
+	{														\
+		assert(REPL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));							\
+		jnl_pool_write(CSA, RECTYPE, JREC, JFB);	/* write to jnlpool */					\
+	}														\
+} MBEND
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
 
@@ -258,7 +270,7 @@ MBSTART {						\
  * ALL replicated regions in a replicated environment. In VMS, we don't maintain this prev_jnlseqno_time
  * field.
  */
-#	define	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl)		\
+#define	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl)			\
 {								\
 	if (jgbl.gbl_jrec_time < jpl->prev_jnlseqno_time)	\
 	{							\
@@ -393,6 +405,38 @@ enum repl_state_codes
 	repl_was_open	/* region is currently not replicated, but it was earlier; jnl_file_lost() changes open to was_open */
 };
 
+#define	JNL_PHASE2_COMMIT_ARRAY_SIZE	4096	/* Max # of jnl commits that can still be in phase2.
+						 * Note that even if a phase2 commit is complete, the slot it occupies
+						 * cannot be reused by anyone else until all phase2 commit slots that
+						 * started before this slot are also done.
+						 */
+/* Individual structure describing an active phase2 jnl commit in jnl_buffer shared memory */
+typedef struct
+{
+	trans_num	curr_tn;
+	seq_num		jnl_seqno;
+	seq_num		strm_seqno;
+	uint4		process_id;
+	uint4		start_freeaddr;		/* jb->rsrv_freeaddr at start of this commit */
+	uint4		tot_jrec_len;		/* total length of jnl records in jnl buffer corresponding to this tn */
+	uint4		pini_addr;		/* jpc->pini_addr when this phase2 commit entry was allocated */
+	uint4		jrec_time;		/* time corresponding to this transaction */
+	bool		in_phase2;		/* TRUE if the UPDATE_JBP_RSRV_FREEADDR call for this phas2 commit entry happened
+						 *	through UPDATE_JRS_RSRV_FREEADDR in t_end/tp_tend.
+						 * FALSE if the call happened directly in "jnl_write" (e.g. PFIN/INCTN etc.).
+						 * This distinction helps cleanup orphaned slots (owning pid is killed prematurely).
+						 */
+	bool		replication;		/* TRUE if this transaction bumped the jnl_seqno. Note that even though a
+						 * region might have replication turned on, there are some transactions
+						 * (e.g. inctn operations from reorg, file extensions, 2nd phase of kill etc.)
+						 * which will not bump the jnl_seqno. Those will have this set to FALSE.
+						 * This is needed by "jnl_write_salvage" to know if a JRT_INCTN or JRT_NULL needs
+						 * to be written.
+						 */
+	bool		write_complete;		/* TRUE if this pid is done writing jnl records to jnlbuff */
+	bool		filler_8byte_align[1];
+} jbuf_phase2_in_prog_t;
+
 typedef struct
 {
  	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
@@ -408,14 +452,21 @@ typedef struct
 	boolean_t		before_images;	/* If TRUE, before-image processing is enabled */
 						/* end not volatile QUAD */
 	uintszofptr_t		buff_off;	/* relative offset to filesystem-block-size aligned buffer start */
-	volatile int4		free;		/* relative index of first byte to write in buffer */
+	volatile int4		free,		/* relative index of first byte to write in buffer */
+				rsrv_free;	/* relative index corresponding to jb->rsrv_freeaddr */
 	volatile uint4		freeaddr,	/* virtual on-disk address which will correspond to free, when it is written */
+				rsrv_freeaddr,	/* freeaddr when all in-progress phase2 jnl commits are complete.
+						 * rsrv_freeaddr >= freeaddr at all times.
+						 */
+				next_align_addr,/* rsrv_freeaddr BEFORE which next JRT_ALIGN record needs to be written */
 				end_of_data,	/* Synched offset updated by jnl_write_epoch. Used by recover/rollback */
 				filesize;	/* highest virtual address available in the file (units in disk-blocks)
 						 * file size in bytes limited to 4GB by autoswitchlimit, so 'filesize' <= 8MB
 						 * so filesize cannot overflow the four bytes of a uint4
 						 */
-						/* end mainline QUAD */
+	uint4			phase2_commit_index1;
+	uint4			phase2_commit_index2;
+	jbuf_phase2_in_prog_t	phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE];
 	volatile int4		blocked;
 	volatile uint4	 	fsync_dskaddr;  /* dskaddr upto which fsync is done */
 	volatile int4		dsk;		/* relative index of 1st byte to write to disk;
@@ -430,20 +481,18 @@ typedef struct
 		unsigned short	length;
 		int4		dev_specific;
 	}			iosb;
-	/* alignsize is removed and log2_of_alignsize introduced */
-	uint4         		log2_of_alignsize;      /* Ceiling of log2(alignsize) */
+	uint4         		alignsize;      	/* current alignsize (max value possible is 2Gb, not 4Gb) */
 	jnl_tm_t		eov_timestamp;		/* jgbl.gbl_jrec_time saved by jnl_write_epoch. Used by recover/rollback */
 	uint4			cycle;			/* shared copy of the number of the current journal file generation */
 	volatile int4		qiocnt,			/* Number of qio's issued */
 				bytcnt,			/* Number of bytes written */
 				errcnt,			/* Number of errors during writing */
 				reccnt[JRT_RECTYPES];	/* Number of records written per opcode */
-	int			filler_align[37 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
-	/* Note the above filler will fail if JRT_RECTYPES grows beyond 37 elements and give compiler warning in VMS
-	 * if JRT_RECTYPES equals 37. In that case, change the start num to the next odd number above MAX(37,JRT_RECTYPES).
+	int			filler_align[42 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
+	/* Note the above filler will fail if JRT_RECTYPES grows beyond 42 elements
+	 * In that case, change the start num to the next even number.
 	 */
 	volatile jnl_tm_t	prev_jrec_time;		/* to ensure that time never decreases across successive jnl records */
-	volatile int4		free_update_pid;	/* pid that is updating jb->free and jb->freeaddr */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
 	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
@@ -451,45 +500,59 @@ typedef struct
 	uint4			enospc_errcnt;		/* number of times jb->errcnt was last incremented due to ENOSPC error
 							 * when writing to this journal file */
 	uint4			max_jrec_len;		/* copy of max_jrec_len from journal file header */
-	uint4			fs_block_size;		/* underlying journal file system block size;
-							 * primarily used in Unix, 512 in VMS */
+	uint4			fs_block_size;		/* underlying journal file system block size */
 	volatile uint4		post_epoch_freeaddr;	/* virtual on-disk address after last epoch */
 	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
 	uint4			end_of_data_at_open;	/* Offset of EOF record when jnl file is first opened in shm */
+	uint4			re_read_dskaddr;	/* If non-zero, "jnl_qio_start" will read a filesystem-block of data
+							 * corresponding to jbp->dskaddr before initiating any new writes
+							 * to the journal file.
+							 */
 	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.
 	*/
 	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		io_in_prog_latch;	/* UNIX only: write in progress indicator */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* pad enough space so next latch falls in different cacheline */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		fsync_in_prog_latch;	/* fsync in progress indicator */
-        CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* pad enough space so next non-filler byte falls in different cacheline */
+        CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* start next latch at a different cacheline than previous fields */
+	global_latch_t		phase2_commit_latch;	/* Used by "jnl_phase2_cleanup" to update "phase2_commit_index1" */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 3)	/* pad enough space so next non-filler byte falls in different cacheline */
 	/**********************************************************************************************/
 	/* Important: must keep header structure quadword (8 byte)  aligned for buffers used in QIO's */
 	/**********************************************************************************************/
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
 
-#define	FIX_NONZERO_FREE_UPDATE_PID(csa, jbp)										\
-{															\
-	assert(csa->now_crit);	/* hold crit before manipulating freeaddr/free */					\
-	assert(jbp->free_update_pid);											\
-	UNIX_ONLY(assert(!is_proc_alive(jbp->free_update_pid, 0));)							\
-	VMS_ONLY(assert(FALSE);) /* secshr_db_clnup should have cleaned up this field even in case of STOP/ID */	\
-	if ((jbp->freeaddr % jbp->size) != jbp->free)									\
-	{	/* Previous process in jnl_write got killed after incrementing freeaddr but before incrementing		\
-		 * free. Recalculate jbp->free based on current value of jbp->freeaddr. */				\
-		jbp->free = jbp->freeaddr % jbp->size;									\
-		jbp->free_update_pid = 0;										\
-	}														\
-	DBG_CHECK_JNL_BUFF_FREEADDR(jbp);										\
+/* Sets jbp->freeaddr & jbp->free. They need to be kept in sync at all times */
+#define	SET_JBP_FREEADDR(JBP, FREEADDR)										\
+{														\
+	DEBUG_ONLY(uint4 jbp_freeaddr;)										\
+	DEBUG_ONLY(uint4 jbp_rsrv_freeaddr;)									\
+														\
+	assert(JBP->phase2_commit_latch.u.parts.latch_pid == process_id);					\
+	DEBUG_ONLY(jbp_freeaddr = JBP->freeaddr;)								\
+	assert(FREEADDR >= jbp_freeaddr);									\
+	DEBUG_ONLY(jbp_rsrv_freeaddr = JBP->rsrv_freeaddr;)							\
+	assert(FREEADDR <= jbp_rsrv_freeaddr);									\
+	JBP->freeaddr = FREEADDR;										\
+	/* Write memory barrier here to enforce the fact that freeaddr *must* be seen to be updated before	\
+	 * free is updated. It is less important if free is stale so we do not require a 2nd barrier for that	\
+	 * and will let the lock release (crit lock required since clustering not currently supported) do the	\
+	 * 2nd memory barrier for us. This barrier takes care of this process's responsibility to broadcast	\
+	 * cache changes. It is up to readers to also specify a read memory barrier if necessary to receive	\
+	 * this broadcast.											\
+	 */													\
+	SHM_WRITE_MEMORY_BARRIER;										\
+	JBP->free = (FREEADDR) % JBP->size;									\
+	DBG_CHECK_JNL_BUFF_FREEADDR(JBP);									\
 }
 
-#define	DBG_CHECK_JNL_BUFF_FREEADDR(jbp)							\
+#define	DBG_CHECK_JNL_BUFF_FREEADDR(JBP)							\
 {												\
-	assert((jbp->freeaddr % jbp->size) == jbp->free);					\
-	assert((jbp->freeaddr >= jbp->dskaddr)							\
+	assert((JBP->freeaddr % JBP->size) == JBP->free);					\
+	assert((JBP->freeaddr >= JBP->dskaddr)							\
 		|| (gtm_white_box_test_case_enabled						\
 			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));	\
 }
@@ -519,15 +582,18 @@ typedef struct jnl_private_control_struct
 	fd_type			channel,		/* output channel, aka fd in UNIX */
 				old_channel;		/* VMS only - for dealing with deferred deassign */
 	gd_id			fileid;			/* currently initialized and used only by source-server */
-	vms_lock_sb		*jnllsb;		/* VMS only */
 	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				new_freeaddr;
-	int4			temp_free;		/* M Temp copy of free relative index until full write done */
-	double			filler_q0;		/* reset QUAD end mainline */
-	int4			new_dsk;		/* A VMS only */
-	uint4			new_dskaddr;		/* A VMS only */
+	uint4			phase2_freeaddr;	/* Used by "jnl_write_reserve" in phase1 to denote freeaddr
+							 * that takes into account the cumulative length of journal records
+							 * already reserved till now in phase1.
+							 * Used by JB_FREEADDR_APPROPRIATE macro in phase2 to indicate the
+							 * freeaddr corresponding to the journal record about to be written
+							 * by this process.
+							 */
+	uint4			phase2_free;		/* jb->free     to use in "jnl_write_phase2" */
+	boolean_t		in_jnl_phase2_salvage;	/* in "jnl_phase2_salvage" */
 	int4			status;			/* A for error reporting */
-	volatile boolean_t	dsk_update_inprog;	/* A VMS only */
 	volatile boolean_t	qio_active;		/* jnl buffer write in progress in THIS process (recursion indicator) */
 	boolean_t		fd_mismatch;		/* TRUE when jpc->channel does not point to the active journal */
 	volatile boolean_t	sync_io;		/* TRUE if the process is using O_SYNC/O_DSYNC for this jnl (UNIX) */
@@ -536,6 +602,7 @@ typedef struct jnl_private_control_struct
 	uint4			status2;		/* for secondary error status, currently used only in VMS */
 	uint4			cycle;			/* private copy of the number of this journal file generation */
 	char			*err_str;		/* pointer to an extended error message */
+	trans_num		curr_tn;		/* db tn used by callees of "jnl_write_phase2" */
 } jnl_private_control;
 
 typedef enum
@@ -572,6 +639,7 @@ typedef struct
 {
 	sgmnt_addrs		*fence_list;
 	int			level;
+	boolean_t		replication;
 	token_num		token;
 	seq_num			strm_seqno;	/* valid only in case of replication. uninitialized in case of ZTP */
 } jnl_fence_control;
@@ -654,7 +722,6 @@ typedef struct
 	block_id		encryption_hash_cutoff;
 	trans_num		encryption_hash2_start_tn;
 	char			encr_filler[80];
-	/* The below two arrays are unused in VMS but defined there to keep the layout similar between Unix & VMS */
 	seq_num			strm_start_seqno[MAX_SUPPL_STRMS];
 	seq_num			strm_end_seqno[MAX_SUPPL_STRMS];
 	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
@@ -846,11 +913,25 @@ typedef struct	/* variable length */
 	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
 } struct_jrec_blk;
 
+/* Note: A JRT_ALIGN is the ONLY journal record which does not have the full "jrec_prefix" prefix. This is because
+ * we need it to be as small as 16-bytes in size (See "jnl_phase2_salvage" for a discussion on WHY). Hence the below
+ * special definition which takes in a minimal set of fields from jrec_prefix to keep the smallest size (including
+ * the 4-byte suffix) at 16 bytes. The "time" member is kept at the same offset as other jnl records. This lets us
+ * use jnlrec->prefix.time to access the time even for JRT_ALIGN records. But the "checksum" member is at a
+ * different offset since it is at offset 12 bytes in other records which is not possible for JRT_ALIGN given it
+ * needs to be 16-bytes in size including a 4-byte suffix. A design choice was to move the checksum to offset 4 bytes
+ * in all the other records but that meant changes to various stuff (like replication filters to transform from the new
+ * format to old format etc.) and was not considered worth the effort. Instead we will need to ensure all code that
+ * needs to access the checksum field uses "prefix.checksum" only if it is sure the input record type is not JRT_ALIGN.
+ * If the caller code is not sure, it needs to use the GET_JREC_CHECKSUM macro.
+ */
 typedef struct	/* variable length */
 {
-	jrec_prefix		prefix;
-	jnl_string		align_str;
-	/* Note: Actual string (potentially 0-length too) follows the align_string and then jrec_suffix */
+	uint4			jrec_type : 8;		/* Offset:0 :: Actually, enum jnl_record_type */
+	uint4			forwptr : 24;		/* Offset:1 :: Offset to beginning of next record */
+	uint4			checksum;		/* Offset:4 :: Generated from journal record */
+	jnl_tm_t		time;			/* Offset:8 :: 4-byte time stamp */
+	/* Note: Actual string (potentially 0-length too) follows "forwptr" and then "jrec_suffix" */
 } struct_jrec_align;
 
 /* Please change the "GBLDEF struct_jrec_tcom" initialization, if below is changed */
@@ -1011,8 +1092,8 @@ typedef union
 #define FIXED_ZTWORM_RECLEN	OFFSETOF(struct_jrec_ztworm, ztworm_str)
 #define FIXED_LGTRIG_RECLEN	OFFSETOF(struct_jrec_lgtrig, lgtrig_str)
 #define FIXED_UPD_RECLEN	OFFSETOF(struct_jrec_upd, mumps_node)
-#define MIN_ALIGN_RECLEN	(OFFSETOF(struct_jrec_align, align_str.text[0]) + JREC_SUFFIX_SIZE)
-#define FIXED_ALIGN_RECLEN	OFFSETOF(struct_jrec_align, align_str.text[0])
+#define FIXED_ALIGN_RECLEN	SIZEOF(struct_jrec_align)
+#define MIN_ALIGN_RECLEN	(FIXED_ALIGN_RECLEN + JREC_SUFFIX_SIZE)
 #define FIXED_BLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
 #define FIXED_PBLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
 #define FIXED_AIMG_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
@@ -1021,8 +1102,8 @@ typedef union
 
 #define JREC_PREFIX_SIZE	SIZEOF(jrec_prefix)
 #define JREC_SUFFIX_SIZE	SIZEOF(jrec_suffix)
-#define MIN_JNLREC_SIZE		(JREC_PREFIX_SIZE + JREC_SUFFIX_SIZE)
-#define JREC_PREFIX_UPTO_LEN_SIZE	(offsetof(jrec_prefix, pini_addr))
+#define MIN_JNLREC_SIZE		(FIXED_ALIGN_RECLEN + JREC_SUFFIX_SIZE)	/* An ALIGN record is the smallest possible record */
+#define JREC_PREFIX_UPTO_LEN_SIZE	(OFFSETOF(jrec_prefix, pini_addr))
 
 /* JNL_FILE_TAIL_PRESERVE macro indicates maximum number of bytes to ensure allocated at the end of the journal file
  * 	 to store the journal records that will be written whenever the journal file gets closed.
@@ -1092,7 +1173,6 @@ typedef struct
 	token_num			mur_jrec_strm_seqno;	/* This is the strm_seqno of the current record that backward
 								 * recovery/rollback is playing in its forward phase.
 								 */
-	VMS_ONLY(seq_num		max_resync_seqno;)	/* for update process and rollback fetchresync */
 	unsigned short			filler_short;
 	unsigned short			mur_jrec_participants;
 	jnl_tm_t			gbl_jrec_time;
@@ -1144,12 +1224,242 @@ typedef struct
 	boolean_t			mur_update;		/* a copy of mur_options.update to be accessible to GTM runtime */
 } jnl_gbls_t;
 
-/* Include this here as it is needed for the interface to jnl_write() and jnl_write_poolonly() */
+#define	IN_PHASE2_JNL_COMMIT(CSA)	(CSA->t_commit_crit)
+
+/* If a transaction's total journal record size exceeds the journal buffer size (minus one filesystem-block-size
+ * just to be safe) we might have to flush a part of the transaction's journal records before writing the remaining
+ * part. For this reason, we write the entire transaction's journal records while holding crit as otherwise it gets
+ * tricky to handle process kills after it has written a part of the journal records but not all.
+ */
+#define	IS_PHASE2_JNL_COMMIT_NEEDED_IN_CRIT(JBP, JREC_LEN)	((JREC_LEN + (JBP)->fs_block_size) > (JBP)->size)
+
+#define	JB_FREEADDR_APPROPRIATE(IN_PHASE2, JPC, JB)	(IN_PHASE2 ? JPC->phase2_freeaddr : JB->rsrv_freeaddr)
+#define	JB_FREE_APPROPRIATE(IN_PHASE2, JPC, JB)		(IN_PHASE2 ? JPC->phase2_free : JB->rsrv_free)
+#define	JB_CURR_TN_APPROPRIATE(IN_PHASE2, JPC, CSA)	(IN_PHASE2 ? JPC->curr_tn : CSA->ti->curr_tn)
+
+#define	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(IDX, MAX_INDEX)	assert((0 <= IDX) && (MAX_INDEX > IDX))
+
+#define	INCR_PHASE2_COMMIT_INDEX(IDX, PHASE2_COMMIT_ARRAY_SIZE)	\
+MBSTART {							\
+	if (PHASE2_COMMIT_ARRAY_SIZE == ++IDX)			\
+		IDX = 0;					\
+} MBEND								\
+
+#define	DECR_PHASE2_COMMIT_INDEX(IDX, PHASE2_COMMIT_ARRAY_SIZE)	\
+MBSTART {							\
+	if (0 == IDX--)						\
+		IDX = PHASE2_COMMIT_ARRAY_SIZE - 1;		\
+} MBEND								\
+
+/* Sets jbp->rsrv_freeaddr & jbp->rsrv_free. They need to be kept in sync at all times */
+#define	SET_JBP_RSRV_FREEADDR(JBP, RSRV_FREEADDR)	\
+{							\
+	assert(JBP->freeaddr <= RSRV_FREEADDR);		\
+	JBP->rsrv_freeaddr = RSRV_FREEADDR;		\
+	JBP->rsrv_free = (RSRV_FREEADDR) % JBP->size;	\
+}
+
+#define SET_JPC_PHASE2_FREEADDR(JPC, JBP, FREEADDR)	\
+{							\
+	JPC->phase2_freeaddr = FREEADDR;		\
+	JPC->phase2_free = (FREEADDR) % JBP->size;	\
+}
+
+#define	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, RLEN, INDEX, IN_PHASE2, JNL_SEQNO, STRM_SEQNO, REPLICATION)	\
+MBSTART {														\
+	uint4			rsrv_freeaddr;										\
+	int			nextIndex, endIndex;									\
+	jbuf_phase2_in_prog_t	*phs2cmt;										\
+															\
+	GBLREF	uint4		process_id;										\
+	GBLREF	uint4		dollar_tlevel;										\
+															\
+	assert(CSA->now_crit);												\
+	/* Allocate a slot. But before that, check if the slot array is full.						\
+	 * endIndex + 1 == first_index implies full.	Note: INCR_PHASE2_COMMIT_INDEX macro does the + 1		\
+	 * endIndex     == first_index implies empty.									\
+	 */														\
+	endIndex = JBP->phase2_commit_index2;										\
+	nextIndex = endIndex;												\
+	INCR_PHASE2_COMMIT_INDEX(nextIndex, JNL_PHASE2_COMMIT_ARRAY_SIZE);						\
+	while (nextIndex == JBP->phase2_commit_index1)									\
+	{	/* Slot array is full. Wait for phase2 to finish. */							\
+		jnl_phase2_cleanup(CSA, JBP);										\
+		if (nextIndex != JBP->phase2_commit_index1)								\
+			break;												\
+		BG_TRACE_PRO_ANY(CSA, jnlbuff_phs2cmt_array_full);							\
+		SLEEP_USEC(1, FALSE);											\
+	}														\
+	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(endIndex, JNL_PHASE2_COMMIT_ARRAY_SIZE);				\
+	phs2cmt = &JBP->phase2_commit_array[endIndex];									\
+	phs2cmt->process_id = process_id;										\
+	assert(JPC->curr_tn == CSA->ti->curr_tn);									\
+	phs2cmt->curr_tn = JPC->curr_tn;										\
+	assert(!REPLICATION || JNL_SEQNO);										\
+	phs2cmt->jnl_seqno = JNL_SEQNO;											\
+	assert(!REPLICATION												\
+		|| !((repl_inst_hdr_ptr_t)((sm_uc_ptr_t)JPL + ((jnlpool_ctl_ptr_t)JPL)->filehdr_off))->is_supplementary	\
+		|| STRM_SEQNO);												\
+	phs2cmt->strm_seqno = STRM_SEQNO;										\
+	rsrv_freeaddr = JBP->rsrv_freeaddr;										\
+	phs2cmt->start_freeaddr = rsrv_freeaddr;									\
+	phs2cmt->tot_jrec_len = RLEN;											\
+	/* The below assert ensures "jnl_phase2_salvage" can definitely replace this transaction's journal		\
+	 * records with a combination of JRT_NULL/JRT_INCTN/JRT_ALIGN records. See comment there for why		\
+	 * this is necessary and how this assert achieves that.								\
+	 * In case of the forward phase of MUPIP JOURNAL RECOVER or ROLLBACK, replication would be turned off		\
+	 * but it is possible it plays forward a pre-existing NULL record. Account for that below.			\
+	 */														\
+	assert(!IN_PHASE2												\
+		|| (!REPLICATION && ((RLEN == INCTN_RECLEN) || (RLEN >= (INCTN_RECLEN + MIN_ALIGN_RECLEN))))		\
+		|| ((REPLICATION || jgbl.forw_phase_recovery)								\
+				&& ((RLEN == NULL_RECLEN) || (RLEN >= (NULL_RECLEN + MIN_ALIGN_RECLEN)))));		\
+	phs2cmt->pini_addr = JPC->pini_addr;										\
+	phs2cmt->jrec_time = jgbl.gbl_jrec_time;									\
+	phs2cmt->in_phase2 = IN_PHASE2;											\
+	phs2cmt->replication = REPLICATION;										\
+	phs2cmt->write_complete = FALSE;										\
+	rsrv_freeaddr += RLEN;												\
+	assert(rsrv_freeaddr <= JBP->next_align_addr);									\
+	assert(rsrv_freeaddr > JBP->freeaddr);										\
+	INDEX = endIndex;												\
+	SET_JBP_RSRV_FREEADDR(JBP, rsrv_freeaddr);									\
+	SHM_WRITE_MEMORY_BARRIER; /* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */		\
+	JBP->phase2_commit_index2 = nextIndex;										\
+} MBEND
+
+#define	JNL_PHASE2_WRITE_COMPLETE(CSA, JBP, INDEX, NEW_FREEADDR)				\
+MBSTART {											\
+	jbuf_phase2_in_prog_t	*phs2cmt;							\
+												\
+	GBLREF	uint4		process_id;							\
+												\
+	phs2cmt = &JBP->phase2_commit_array[INDEX];						\
+	assert(phs2cmt->process_id == process_id);						\
+	assert(FALSE == phs2cmt->write_complete);						\
+	assert(((phs2cmt->start_freeaddr + phs2cmt->tot_jrec_len) == NEW_FREEADDR)		\
+		|| (gtm_white_box_test_case_enabled						\
+			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));	\
+	phs2cmt->write_complete = TRUE;								\
+	/* Invoke "jnl_phase2_cleanup" sparingly as it calls "grab_latch". So we do it twice.	\
+	 * Once at half-way mark and once when a wrap occurs.					\
+	 */											\
+	if (!INDEX || ((JNL_PHASE2_COMMIT_ARRAY_SIZE / 2) == INDEX))				\
+		jnl_phase2_cleanup(CSA, JBP);							\
+} MBEND
+
+#define	JNL_PHASE2_CLEANUP_IF_POSSIBLE(CSA, JBP)						\
+MBSTART {											\
+	if (JBP->phase2_commit_index1 != JBP->phase2_commit_index2)				\
+		jnl_phase2_cleanup(CSA, JBP);	/* There is something to be cleaned up */	\
+} MBEND
+
+#define	NEED_TO_FINISH_JNL_PHASE2(JRS)	((NULL != JRS) && JRS->tot_jrec_len)
+
+#define	FINISH_JNL_PHASE2_IN_JNLBUFF(CSA, JRS)										\
+MBSTART {														\
+	assert(NEED_TO_FINISH_JNL_PHASE2(JRS));										\
+	jnl_write_phase2(CSA, JRS);			/* Mark jnl record writing into jnlbuffer as complete */	\
+	assert(!NEED_TO_FINISH_JNL_PHASE2(JRS));									\
+} MBEND
+
+#define	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(REPLICATION, JNLPOOL)							\
+MBSTART {														\
+	if (REPLICATION && JNLPOOL.jrs.tot_jrec_len)									\
+	{														\
+		JPL_PHASE2_WRITE_COMPLETE(JNLPOOL);	/* Mark jnl record writing into jnlpool   as complete */	\
+		assert(0 == JNLPOOL.jrs.tot_jrec_len);									\
+	}														\
+} MBEND
+
+#define	NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(CSA, JRS, REPLICATION, JNLPOOL)					\
+MBSTART {														\
+	FINISH_JNL_PHASE2_IN_JNLBUFF(CSA, JRS);				/* Step CMT16 (if BG), Step CMT06a (if MM) */	\
+	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(REPLICATION, JNLPOOL);	/* Step CMT17 (if BG), Step CMT06b (if MM) */	\
+} MBEND
+
+#define	TP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(JNL_FENCE_CTL, REPLICATION, JNLPOOL)				\
+MBSTART {														\
+	sgmnt_addrs	*csa;												\
+	sgm_info	*si;												\
+															\
+	for (csa = JNL_FENCE_CTL.fence_list;  JNL_FENCE_LIST_END != csa;  csa = csa->next_fenced)			\
+	{														\
+		si = csa->sgm_info_ptr;											\
+		assert(si->update_trans);										\
+		jrs = si->jbuf_rsrv_ptr;										\
+		assert(JNL_ALLOWED(csa));										\
+		if (NEED_TO_FINISH_JNL_PHASE2(jrs))									\
+			FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);		/* Step CMT16 (if BG), Step CMT06a (if MM) */	\
+	}														\
+	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(replication, jnlpool);	/* Step CMT17 (if BG), Step CMT06b (if MM) */	\
+} MBEND
+
+/* BEGIN : Structures used by "jnl_write_reserve" */
 typedef struct
 {
-	uint4			write;			/* Incrementally changing version of jnlpool_ctl_struct::write */
-	uint4			write_total;		/* Total bytes written */
-} jnlpool_write_ctx_t;
+	enum jnl_record_type	rectype;	/* equivalent to jrec_prefix.jrec_type */
+	uint4			reclen;		/* equivalent to jrec_prefix.forwptr */
+	void			*param1;
+} jrec_rsrv_elem_t;
+
+typedef struct
+{
+	uint4			alloclen;	/* # of "jrec_rsrv_elem_t" structures allocated in "jrs_array" array */
+	uint4			usedlen;	/* # of "jrec_rsrv_elem_t" structures currently used in "jrs_array" array */
+	uint4			tot_jrec_len;	/* Total length (in bytes) of jnl records that will be used up by this array */
+	uint4			phase2_commit_index;	/* index into corresponding jb->phase2_commit_array entry */
+	jrec_rsrv_elem_t	*jrs_array;	/* Pointer to array of "jrec_rsrv_elem_t" structures currently allocated */
+} jbuf_rsrv_struct_t;
+
+#define	ALLOC_JBUF_RSRV_STRUCT(JRS, CSA)								\
+MBSTART {												\
+	JRS = (jbuf_rsrv_struct_t *)malloc(SIZEOF(jbuf_rsrv_struct_t));					\
+	(JRS)->alloclen = 0;			/* initialize "alloclen" */				\
+	(JRS)->jrs_array = NULL;									\
+	REINIT_JBUF_RSRV_STRUCT(JRS, CSA, CSA->jnl, NULL);/* initialize "usedlen" and "tot_jrec_len" */	\
+} MBEND
+
+#define	REINIT_JBUF_RSRV_STRUCT(JRS, CSA, JPC, JBP)				\
+MBSTART {									\
+	uint4	freeaddr;							\
+										\
+	(JRS)->usedlen = 0;							\
+	(JRS)->tot_jrec_len = 0;						\
+	(JPC)->curr_tn = CSA->ti->curr_tn;					\
+	if (NULL != JBP)							\
+	{									\
+		freeaddr = ((jnl_buffer_ptr_t)JBP)->rsrv_freeaddr;		\
+		JPC->phase2_freeaddr = freeaddr;				\
+	}									\
+} MBEND
+
+#define	UPDATE_JRS_RSRV_FREEADDR(CSA, JPC, JBP, JRS, JPL, JNL_FENCE_CTL, REPLICATION)			\
+MBSTART {												\
+	SET_JNLBUFF_PREV_JREC_TIME(JBP, jgbl.gbl_jrec_time, DO_GBL_JREC_TIME_CHECK_TRUE);		\
+		/* Keep jb->prev_jrec_time up to date */						\
+	assert(JNL_ENABLED(CSA));									\
+	assert(JBP->rsrv_freeaddr >= JBP->freeaddr);							\
+	assert(0 < JRS->tot_jrec_len);									\
+	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, JRS->tot_jrec_len, JRS->phase2_commit_index, TRUE,	\
+					JNL_FENCE_CTL.token, JNL_FENCE_CTL.strm_seqno, REPLICATION);	\
+} MBEND
+
+#define	FREE_JBUF_RSRV_STRUCT(JRS)		\
+MBSTART {					\
+	assert(NULL != JRS);			\
+	if (NULL != JRS)			\
+	{					\
+		if (NULL != JRS->jrs_array)	\
+			free(JRS->jrs_array);	\
+		free(JRS);			\
+		JRS = NULL;			\
+	}					\
+} MBEND
+
+#define	INIT_NUM_JREC_RSRV_ELEMS	4
+
+/* END  : Structures used by "jnl_write_reserve" */
 
 #define JNL_SHARE_SIZE(X)	(JNL_ALLOWED(X) ? 							\
 				(ROUND_UP(JNL_NAME_EXP_SIZE + SIZEOF(jnl_buffer), OS_PAGE_SIZE)		\
@@ -1157,13 +1467,16 @@ typedef struct
 					OS_PAGE_SIZE) + OS_PAGE_SIZE) : 0)
 
 /* pass address of jnl_buffer to get address of expanded jnl file name */
-#define JNL_GDID_PVT(CSA)        ((CSA)->jnl->fileid)
+#define JNL_GDID_PVT(CSA)	((CSA)->jnl->fileid)
 #define JNL_GDID_PTR(CSA)	((gd_id_ptr_t)(&((CSA)->nl->jnl_file.u)))
 
 /* Note that since "cycle" (in jpc and jb below) can rollover the 4G limit back to 0, it should
  * only be used to do "!=" checks and never to do ordered checks like "<", ">", "<=" or ">=".
+ * Use JNL_FILE_SWITCHED when only JPC is available. Use JNL_FILE_SWITCHED2 when JPC and JB (i.e. JPC->jnl_buff)
+ * are both available. The latter saves a dereference in t_end/tp_tend (every drop helps while inside crit).
  */
-#define JNL_FILE_SWITCHED(JPC) 	((JPC)->cycle != (JPC)->jnl_buff->cycle)
+#define JNL_FILE_SWITCHED(JPC) 		((JPC)->cycle != (JPC)->jnl_buff->cycle)
+#define JNL_FILE_SWITCHED2(JPC, JB) 	((JPC)->cycle != (JB)->cycle)
 
 /* The jrec_len of 0 causes a switch. */
 #define SWITCH_JNL_FILE(JPC)	jnl_file_extend(JPC, 0)
@@ -1178,6 +1491,26 @@ typedef struct
 #define GET_JNL_SEQNO(j)	(((jnl_record *)(j))->jrec_null.jnl_seqno)
 #define GET_STRM_SEQNO(j)	(((jnl_record *)(j))->jrec_null.strm_seqno)
 #define GET_REPL_JNL_SEQNO(j)	(IS_REPLICATED(((jrec_prefix *)j)->jrec_type) ? GET_JNL_SEQNO(j) : 0)
+
+/* Note: JRT_ALIGN record does not have a "prefix.tn" or "prefix.pini_addr" field (all other jnl records have it)
+ * and has "prefix.checksum" at a different offset. Hence the below GET_JREC* and SET_JREC* macros. IF the caller knows
+ * for sure that "RECTYPE" is not a JRT_ALIGN, then it can directly use "prefix.tn" etc. ELSE it has to use the below macros.
+ */
+#define GET_JREC_TN(JNLREC, RECTYPE)	((JRT_ALIGN != RECTYPE)									\
+						? (DBG_ASSERT(TN_INVALID != JNLREC->prefix.tn) JNLREC->prefix.tn) : TN_INVALID)
+/* A JRT_ALIGN record does not have a "pini_addr" field so treat it as pointing to the first PINI record in the journal file
+ * for the purposes of a journal extract etc.
+ */
+#define GET_JREC_PINI_ADDR(JNLREC, RECTYPE) ((JRT_ALIGN != RECTYPE) ? JNLREC->prefix.pini_addr : JNL_FILE_FIRST_RECORD)
+#define GET_JREC_CHECKSUM(JNLREC, RECTYPE) ((JRT_ALIGN != RECTYPE)							\
+						? JNLREC->prefix.checksum : ((struct_jrec_align *)JNLREC)->checksum)
+#define	SET_JREC_CHECKSUM(JNLREC, RECTYPE, CHECKSUM)			\
+MBSTART {								\
+	if (JRT_ALIGN != RECTYPE)					\
+		JNLREC->prefix.checksum = CHECKSUM;			\
+	else								\
+		((struct_jrec_align *)JNLREC)->checksum = CHECKSUM;	\
+} MBEND
 
 /* For MUPIP JOURNAL -ROLLBACK, getting the strm_reg_seqno from the file header is not as straightforward
  * as accessing csd->strm_reg_seqno[idx]. This is because it increments this field in mur_output_record even
@@ -1206,7 +1539,6 @@ typedef struct
 		 * and that is not possible in case of a FORWARD rollback. Assert that.			\
 		 */											\
 		assert(!jgbl.mur_options_forward);							\
-		VMS_ONLY(assert(FALSE);)								\
 		strm_seqno = jgbl.mur_jrec_strm_seqno;							\
 		strm_num = GET_STRM_INDEX(strm_seqno);							\
 		strm_seqno = GET_STRM_SEQ60(strm_seqno);						\
@@ -1217,10 +1549,6 @@ typedef struct
 		}											\
 	}												\
 }
-
-/* Given a journal record, GET_TN returns the tn field
- */
-#define GET_TN(j)		(((*jrec_prefix)(j))->prefix.tn)
 
 /* In t_end(), we need to write the after-image if DSE or mupip recover/rollback is playing it.
  * But to write it out, we should have it already built before bg_update().
@@ -1333,7 +1661,7 @@ typedef struct
  * MAX_STRLEN for the actual database record. But that only takes care of the value part of the record.
  * The key can still be MAX_KEY_SZ long. So take that into account as well.
  */
-#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2((FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE)			\
+#define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2((FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE)				\
 						+ MAX_KEY_SZ + MAX_STRLEN						\
 						+ SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)
 
@@ -1413,10 +1741,10 @@ typedef struct
 #define JNLBUFFUPDAPNDX_SIZE	(SIZEOF(JNLBUFFUPDAPNDX) - 4 + (2 * 6))
 
 /* Yields a portable value for the minimum journal buffer size */
-#define JNL_BUFF_PORT_MIN(CSD)		(UNIX_ONLY(JNL_BUFFER_MIN) VMS_ONLY(CSD->blk_size / DISK_BLOCK_SIZE + 1))
+#define JNL_BUFF_PORT_MIN(CSD)		(JNL_BUFFER_MIN)
 
 /* Defines the increment value for journal buffer size's rounding-up */
-#define JNL_BUFF_ROUND_UP_STEP(CSD)	(UNIX_ONLY(MIN(MAX_IO_BLOCK_SIZE, CSD->blk_size)) VMS_ONLY(CSD->blk_size) / DISK_BLOCK_SIZE)
+#define JNL_BUFF_ROUND_UP_STEP(CSD)	(MIN(MAX_IO_BLOCK_SIZE, CSD->blk_size) / DISK_BLOCK_SIZE)
 
 /* Rounds up the passed journal buffer value and assigns it to the specified variable */
 #define ROUND_UP_JNL_BUFF_SIZE(DEST, VALUE, CSD)							\
@@ -1442,8 +1770,8 @@ typedef struct
 	DEST = jnl_buffer_adj_value;									\
 }
 
-# define CURRENT_JNL_IO_WRITER(JB)	JB->io_in_prog_latch.u.parts.latch_pid
-# define CURRENT_JNL_FSYNC_WRITER(JB)	JB->fsync_in_prog_latch.u.parts.latch_pid
+#define CURRENT_JNL_IO_WRITER(JB)	JB->io_in_prog_latch.u.parts.latch_pid
+#define CURRENT_JNL_FSYNC_WRITER(JB)	JB->fsync_in_prog_latch.u.parts.latch_pid
 
 /* This macro is invoked by callers just before grabbing crit to check if a db fsync is needed and if so do it.
  * Note that we can do the db fsync only if we already have the journal file open. If we do not, we will end
@@ -1463,42 +1791,43 @@ MBSTART {									\
  * For the caller's benefit, this macro also returns whether a jnl_flush happened (in FLUSH_DONE)
  * and the value of jbp->dskaddr & jbp->freeaddr before the flush (in DSKADDR & FREEADDR variables).
  */
-#define	DO_JNL_FLUSH_IF_POSSIBLE(REG, CSA, FLUSH_DONE, DSKADDR, FREEADDR)	\
-MBSTART {									\
-	jnl_private_control	*jpc;						\
-	jnl_buffer_ptr_t	jbp;						\
-	boolean_t		was_crit;					\
-	uint4			jnl_status;					\
-										\
-	assert(JNL_ENABLED(CSA));						\
-	assert(CSA == &FILE_INFO(REG)->s_addrs);				\
-	jpc = CSA->jnl;								\
-	assert(NULL != jpc);							\
-	jbp = jpc->jnl_buff;							\
-	assert(NULL != jbp);							\
-	FLUSH_DONE = FALSE;							\
-	if (jbp->dskaddr != jbp->freeaddr)					\
-	{									\
-		was_crit = CSA->now_crit;					\
-		if (!was_crit)							\
-			grab_crit(REG);						\
-		DSKADDR = jbp->dskaddr;						\
-		FREEADDR = jbp->freeaddr;					\
-		if (JNL_ENABLED(CSA->hdr) && (DSKADDR != FREEADDR))		\
-		{								\
-			jnl_status = jnl_ensure_open(REG, CSA);			\
-			assert(0 == jnl_status);				\
-			if (0 == jnl_status)					\
-			{							\
-				FLUSH_DONE = TRUE;				\
-				jnl_status = jnl_flush(REG);			\
-				assert(SS_NORMAL == jnl_status);		\
-			}							\
-			/* In case of error, silently return for now. */	\
-		}								\
-		if (!was_crit)							\
-			rel_crit(REG);						\
-	}									\
+#define	DO_JNL_FLUSH_IF_POSSIBLE(REG, CSA, FLUSH_DONE, DSKADDR, FREEADDR, RSRV_FREEADDR)	\
+MBSTART {											\
+	jnl_private_control	*jpc;								\
+	jnl_buffer_ptr_t	jbp;								\
+	boolean_t		was_crit;							\
+	uint4			jnl_status;							\
+												\
+	assert(JNL_ENABLED(CSA));								\
+	assert(CSA == &FILE_INFO(REG)->s_addrs);						\
+	jpc = CSA->jnl;										\
+	assert(NULL != jpc);									\
+	jbp = jpc->jnl_buff;									\
+	assert(NULL != jbp);									\
+	FLUSH_DONE = FALSE;									\
+	if (jbp->dskaddr != jbp->rsrv_freeaddr)							\
+	{											\
+		was_crit = CSA->now_crit;							\
+		if (!was_crit)									\
+			grab_crit(REG);								\
+		DSKADDR = jbp->dskaddr;								\
+		FREEADDR = jbp->freeaddr;							\
+		RSRV_FREEADDR = jbp->rsrv_freeaddr;						\
+		if (JNL_ENABLED(CSA->hdr) && (DSKADDR != RSRV_FREEADDR))			\
+		{										\
+			jnl_status = jnl_ensure_open(REG, CSA);					\
+			assert(0 == jnl_status);						\
+			if (0 == jnl_status)							\
+			{									\
+				FLUSH_DONE = TRUE;						\
+				jnl_status = jnl_flush(REG);					\
+				assert(SS_NORMAL == jnl_status);				\
+			}									\
+			/* In case of error, silently return for now. */			\
+		}										\
+		if (!was_crit)									\
+			rel_crit(REG);								\
+	}											\
 } MBEND
 
 /* jnl_ prototypes */
@@ -1516,13 +1845,18 @@ uint4	jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
 void	jnl_write_epoch_rec(sgmnt_addrs *csa);
 void	jnl_write_inctn_rec(sgmnt_addrs *csa);
-void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, jnlpool_write_ctx_t *jplctx);
-void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, seq_num jnl_seqno,
-				jnlpool_write_ctx_t *jplctx);
+void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum);
+void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, seq_num jnl_seqno);
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record);
 void	jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_free_blocks, uint4 total_blks_after_trunc);
-void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb,
-				jnlpool_write_ctx_t *jplctx);
+void	jnl_write_reserve(sgmnt_addrs *csa, jbuf_rsrv_struct_t *nontp_jbuf_rsrv,
+					enum jnl_record_type rectype, uint4 reclen, void *param1);
+void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jbuf_rsrv_ptr);
+void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp);
+void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_prog_t *deadCmt);
+void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb);
+void	jnl_write_align_rec(sgmnt_addrs *csa, uint4 align_filler_len, jnl_tm_t time);
+void	jnl_write_multi_align_rec(sgmnt_addrs *csa, uint4 align_filler_len, jnl_tm_t time);
 
 jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, uint4 nodeflags);
 

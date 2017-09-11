@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +43,7 @@ boolean_t repl_tr_good(uchar_ptr_t tr, int tr_len, seq_num seqno)
 		reclen  = jrec->prefix.forwptr;
 		if (  !IS_VALID_RECTYPE(jrec)
 		    || !IS_REPLICATED(rectype)
-		    || (reclen < MIN_JNLREC_SIZE || reclen > tr_len)
+		    || ((MIN_JNLREC_SIZE > reclen) || reclen > tr_len)
 		    || !IS_VALID_LINKS(jrec)
 		    || !IS_VALID_SUFFIX(jrec))
 		{

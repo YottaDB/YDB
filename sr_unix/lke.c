@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "gtm_inet.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
@@ -48,7 +49,6 @@
 #include "lke_fileio.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
-#include "init_secshr_addrs.h"
 #include "cli_parse.h"
 #include "getzdir.h"
 #include "getjobname.h"
@@ -77,6 +77,7 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
+GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 
 GBLDEF CLI_ENTRY		*cmd_ary = &lke_cmd_ary[0];	/* Define cmd_ary to be the LKE specific cmd table */
 
@@ -99,9 +100,9 @@ int main (int argc, char *argv[])
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
+	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;
 	getjobname();
-	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
 	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();

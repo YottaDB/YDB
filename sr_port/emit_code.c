@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -196,7 +196,6 @@ void trip_gen(triple *ct)
 			assert(CGP_APPROX_ADDR == cg_phase);
 		} else
 			jmp_offset = ct->operand[0].oprval.tref->rtaddr - ct->rtaddr;
-
 		switch(ct->opcode)
 		{
 			case OC_CALL:
@@ -430,7 +429,6 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * which will be in EAX.
 					 */
 					X86_64_ONLY(GEN_CMP_EAX_IMM32(0));
-
 					if (VXI_BLBC == sav_in)
 					{
 						X86_64_ONLY(emit_jmp(GENERIC_OPCODE_BEQ, &inst, 0));
@@ -684,7 +682,6 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						} else
 						{
 							boolean_t addr;
-
 							assert(0x50 == *inst);  /* register mode: (from) r0 */
 							inst++;
 							if ((VXT_VAL == *inst) || (VXT_ADDR == *inst))
@@ -696,7 +693,6 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							} else if (VXT_REG == *inst)
 							{
 								inst++;
-
 #								ifdef TRUTH_IN_REG
 								if (0x5a == *inst)	/* to VAX r10 or $TEST */
 								{
@@ -858,7 +854,6 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 	/* assert(jmp_offset != 0); */
 	/* assert commented since jmp_offset could be zero in CGP_ADDR_OPT phase after a jump to the immediately following
 	 * instruction is nullified (as described below) */
-
 	/* size of this particular instruction */
 	jmp_offset -= (int)((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
 #	if !(defined(__MVS__) || defined(Linux390))
@@ -987,7 +982,6 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 					 */
 					branch_offset = BRANCH_OFFSET_FROM_IDX(skip_idx, code_idx);
 					RISC_ONLY(code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset));
-
 					NON_RISC_ONLY(
 						tmp_code_idx = code_idx;
 						code_idx = skip_idx;
@@ -1093,7 +1087,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								emit_base_offset(reg, LONG_JUMP_OFFSET);
 								X86_64_ONLY(force_32 = FALSE);
 							}
-
 							X86_64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
 #							if !(defined(__MVS__) || defined(Linux390))
 							NON_X86_64_ONLY(code_idx++);
@@ -1164,7 +1157,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset)));
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
-
 				case TCAD_REF:
 				case TVAD_REF:
 				case TVAR_REF:
@@ -1402,7 +1394,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					emit_base_offset(reg, offset);
 					if (val_output)	/* indirection */
 					{
-
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
@@ -1432,7 +1423,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					ocnt_ref_seen = TRUE;
 					ocnt_ref_opr = opr;
 					break;
-
 				default:
 					assertpro(FALSE && opr->oprclass);
 					break;
@@ -1477,7 +1467,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								inst_emitted = TRUE;
 							} else
 							{
-	 							RISC_ONLY(code_buf[code_idx++]
+								RISC_ONLY(code_buf[code_idx++]
 										|= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP));
 								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP));
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
@@ -1849,12 +1839,10 @@ void emit_call_xfer(int xfer)
         } else
         {
                 GEN_XFER_TBL_CALL_DIRECT(xfer);
-
         }
 #	else
 	GEN_XFER_TBL_CALL(xfer);
 #	endif /* __ia64 */
-
 	/* In the normal case we will return */
 	if (!ocnt_ref_seen)
 		return;		/* fast test for return .. we hope */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -742,15 +742,16 @@ uint4 mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off
 /* #GTM_THREAD_SAFE : The below function (mur_valrec_prev) is thread-safe */
 uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 {
-	off_jnl_t	mid_off, new_mid_off, rec_offset, mid_further;
-	boolean_t	this_rec_valid;
-	jnl_file_header	*jfh;
-	jrec_prefix	*prefix;
-	uint4		status, rec_len, blen;
-	jnl_record	*rec;
-	trans_num	rec_tn;
-	seq_num		rec_seqno;
-	mur_read_desc_t	*mur_desc;
+	off_jnl_t		mid_off, new_mid_off, rec_offset, mid_further;
+	boolean_t		this_rec_valid;
+	jnl_file_header		*jfh;
+	jrec_prefix		*prefix;
+	uint4			status, rec_len, blen;
+	jnl_record		*rec;
+	trans_num		prev_tn, rec_tn;
+	seq_num			rec_seqno;
+	mur_read_desc_t		*mur_desc;
+	enum jnl_record_type	rectype;
 
 	jfh = jctl->jfh;
 	assert(jctl->tail_analysis || jctl->after_end_of_data);
@@ -841,20 +842,27 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 		return status;
 	}
 	/* Note: though currently it is required not to change system time when journaling is on,
-	 *       we do not check time continuity here. We hope that in future we will remove the restriction */
-	rec_len = mur_desc->jnlrec->prefix.forwptr;
-	rec_tn = mur_desc->jnlrec->prefix.tn;
+	 * we do not check time continuity here. We hope that in future we will remove the restriction.
+	 */
+	rec = mur_desc->jnlrec;
+	rec_len = rec->prefix.forwptr;
+	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
+	/* Note: JRT_ALIGN does not have a "prefix.tn" field so need to use GET_JREC_TN macro which handles that case */
+	rec_tn = GET_JREC_TN(rec, rectype);
 	rec_seqno = 0;
 	assert(rec_offset + rec_len <= hi_off);	/* We get inside for loop below at least once */
-	for ( ; jctl->rec_offset + rec_len <= hi_off;
-				rec_len = mur_desc->jnlrec->prefix.forwptr, rec_tn = mur_desc->jnlrec->prefix.tn)
+	for ( ; jctl->rec_offset + rec_len <= hi_off; rec_len = rec->prefix.forwptr)
 	{
 		rec_offset = jctl->rec_offset;
-		if ((SS_NORMAL != mur_next(jctl, 0))
-				|| ((mur_desc->jnlrec->prefix.tn != rec_tn) && (mur_desc->jnlrec->prefix.tn != (rec_tn + 1))))
+		if (SS_NORMAL != mur_next(jctl, 0))
 			break;
+		prev_tn = rec_tn;
 		rec = mur_desc->jnlrec;
-		if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rec->prefix.jrec_type))
+		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
+		rec_tn = GET_JREC_TN(rec, rectype);
+		if ((TN_INVALID != rec_tn) && (TN_INVALID != prev_tn) && (rec_tn != prev_tn) && (rec_tn != (prev_tn + 1)))
+			break;
+		if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype))
 		{
 			if (GET_JNL_SEQNO(rec) < rec_seqno) /* if jnl seqno is not in sequence */
 				break;

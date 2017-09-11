@@ -206,9 +206,10 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			break;		/* empty queue */
 		assert(!multi_proc_in_use);	/* wcs_wtstart uses syncio for online/offline rollback/recover forward phase */
 		/* wcs_get_space relies on the fact that a cache-record that is out of either active or wip queue has its
-		 * fl and bl fields set to 0. Initialize those fields now that this cache-record is out of the wip queue.
+		 * fl and bl fields set to 0. REMQHI would have already set them to 0. Assert that.
 		 */
-		csr->state_que.fl = csr->state_que.bl = 0;
+		assert(0 == csr->state_que.fl);
+		assert(0 == csr->state_que.bl);
 		if (csr == start_csr)
 		{
 			status = INSQHI((que_ent_ptr_t)csr, (que_head_ptr_t)whead);
@@ -306,6 +307,8 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			if (0 < aio_retval)
 			{	/* async IO completed successfully with no errors */
 				assert(0 == aio_errno);
+				/* Mark this block as written */
+				csr->needs_first_write = FALSE;
 				/* We can move this csr from the WIP queue to the FREE queue now that the write is complete.
 				 * There is one exception though. If the write of an OLDER twin completes fine (0 == csr->bt_index)
 				 * AND if csr->in_cw_set is still non-zero, it implies PHASE2 commit is in progress for this csr

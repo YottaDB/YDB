@@ -62,6 +62,7 @@
 #include "opcode.h"
 #include "glvn_pool.h"
 #include "iormdef.h"
+#include "localvarmonitor.h"
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
@@ -103,9 +104,10 @@ GBLREF int4			LVGC_interval;				/* dead data GC done every LVGC_interval stringp
 GBLREF boolean_t		suspend_lvgcol;
 GBLREF hash_table_str		*complits_hashtab;
 GBLREF mval			*alias_retarg;
+GBLREF io_pair			*io_std_device;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
 DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
-UNIX_ONLY(GBLREF io_pair	*io_std_device;)
+
 
 OS_PAGE_SIZE_DECLARE
 
@@ -114,25 +116,17 @@ static mstr			**topstr, **array, **arraytop;
 error_def(ERR_STPEXPFAIL);
 
 /* See comment inside LV_NODE_KEY_STPG_ADD macro for why the ASSERT_LV_NODE_MSTR_EQUIVALENCE macro does what it does */
-#ifdef UNIX
-# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE									\
-{														\
+#define ASSERT_LV_NODE_MSTR_EQUIVALENCE										\
+MBSTART {													\
 	assert(OFFSETOF(lvTreeNode, key_len) - OFFSETOF(lvTreeNode, key_mvtype) == OFFSETOF(mstr, len));	\
 	assert(SIZEOF(((lvTreeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));				\
 	assert(OFFSETOF(lvTreeNode, key_addr) - OFFSETOF(lvTreeNode, key_mvtype) == OFFSETOF(mstr, addr));	\
 	assert(SIZEOF(((lvTreeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));				\
-}
-#elif defined(VMS)
-# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE									\
-{														\
-	assert(SIZEOF(((lvTreeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));				\
-	assert(OFFSETOF(lvTreeNode, key_addr) - OFFSETOF(lvTreeNode, key_len) == OFFSETOF(mstr, addr));		\
-	assert(SIZEOF(((lvTreeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));				\
-}
-#endif
+} MBEND
 
 #define	LV_NODE_KEY_STPG_ADD(NODE)											\
-{	/* NODE is of type "lvTreeNode *" or "lvTreeNodeNum *".								\
+MBSTART {														\
+	/* NODE is of type "lvTreeNode *" or "lvTreeNodeNum *".								\
 	 * Only if it is a "lvTreeNode *" (MV_STR bit is set in this case only)						\
 	 * should we go ahead with the STPG_ADD.									\
 	 */														\
@@ -157,7 +151,7 @@ error_def(ERR_STPEXPFAIL);
 		UNIX_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_mvtype));						\
 		VMS_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_len));						\
 	}														\
-}
+} MBEND
 
 #define	MVAL_STPG_ADD(MVAL1)							\
 {										\
@@ -538,6 +532,8 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		DBGRFCT((stderr, "stp_gcol: lvgcol check bypassed for lack of aliasness\n"));
 	}
 #	endif	/* DEBUG_REFCNT */
+	if (IS_LVMON_ACTIVE && (stringpool.base == rts_stringpool.base))
+		lvmon_pull_values(1);			/* Pull set of values into index 1 if rts stringpool */
 #	endif	/* !STP_MOVE */
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -658,15 +654,6 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			for (xnewvar = symtab->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
 				MSTR_STPG_ADD(&xnewvar->key.var_name);
 		}
-#		ifdef VMS
-		if (NULL != (TREF(rt_name_tbl)).base)
-		{	/* Keys for $TEXT source hash table can live in stringpool */
-			for (tabent_mname = (TREF(rt_name_tbl)).base, topent_mname = (TREF(rt_name_tbl)).top;
-			    tabent_mname < topent_mname; tabent_mname++)
-				if (HTENT_VALID_MNAME(tabent_mname, routine_source, rsptr))
-					MSTR_STPG_ADD(&tabent_mname->key.var_name);
-		}
-#		endif
 		if (x = comline_base)
 			for (index = MAX_RECALL; index > 0 && x->len; index--, x++)
 			{	/* These strings are guaranteed to be in the stringpool so use MSTR_STPG_PUT macro directly
@@ -682,7 +669,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		ZWRHTAB_GC(zwrhtab);
 		for (l = io_root_log_name; NULL != l; l = l->next)
 		{
-			if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+			if ((NULL == l->iod) || (n_io_dev_types == l->iod->type))
 			{
 				assert(FALSE);
 				continue;       /* skip it on pro */
@@ -690,14 +677,10 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			if ((IO_ESC != l->dollar_io[0]) && (l->iod->trans_name == l))
 			{
 				MSTR_STPG_ADD(&l->iod->error_handler);
-#				ifdef UNIX
-				/* if this is on UNIX and it is a split $principal, protect
-				 * error_handler defined on the output side
-				 */
+				/* If this is a split $principal, protect error_handler defined on the output side */
 				if ((l->iod->pair.in != l->iod->pair.out)
 				    && (l->iod->pair.out == io_std_device->out))
 					MSTR_STPG_ADD(&l->iod->pair.out->error_handler);
-#				endif
 				rm_ptr = (rm == l->iod->type) ? (d_rm_struct *)l->iod->dev_sp : NULL;
 				if (NULL != rm_ptr)
 				{	/* Protect the IVs and KEYs as needed. */
@@ -1102,6 +1085,11 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	assert(stringpool.invokestpgcollevel <= stringpool.top);
 #	ifndef STP_MOVE
 	assert(stringpool.top - stringpool.free >= space_asked);
-#	endif
+	if (IS_LVMON_ACTIVE && (stringpool.base == rts_stringpool.base))
+	{	/* Do monitoring only for runtime stringpool */
+		lvmon_pull_values(2);				/* Pull values of monitored vars into index 2 */
+		lvmon_compare_value_slots(1, 2);		/* Make sure they are the same */
+	}
+#	endif	/* !STP_MOVE */
 	return;
 }

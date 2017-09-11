@@ -162,6 +162,9 @@ typedef struct sgm_info_struct
 	sgmnt_addrs		*kip_csa;
 	int			tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in "tp_tend" */
 	uint4			tot_jrec_size;		/* maximum journal space needs for this transaction */
+	jbuf_rsrv_struct_t	*jbuf_rsrv_ptr;		/* Pointer to structure corresponding to reservations on the journal
+							 * buffer for this region in current TP transaction.
+							 */
 } sgm_info;
 
 /* Define macros to reflect the size of cw_index and next_off in the off_chain structure.
@@ -205,7 +208,7 @@ typedef struct tp_region_struct
 						 */
 	union					/* we will either use file_id or index */
 	{
-		gd_id		file_id; 	/* both for VMS and UNIX */
+		gd_id		file_id;
 		int4		fid_index;	/* copy of csa->fid_index for this region */
 	} file;
 } tp_region;
@@ -243,11 +246,13 @@ typedef struct tp_region_struct
 		VERIFY_LIST_IS_REINITIALIZED(si->jnl_list);				\
 		VERIFY_LIST_IS_REINITIALIZED(si->format_buff_list);			\
 		assert(si->jnl_tail == &si->jnl_head);					\
+		assert(NULL != si->jbuf_rsrv_ptr);					\
 	} else										\
 	{										\
 		assert(NULL == si->jnl_list);						\
 		assert(NULL == si->format_buff_list);					\
 		assert(NULL == si->jnl_tail);						\
+		assert(NULL == si->jbuf_rsrv_ptr);					\
 	}										\
 	VERIFY_LIST_IS_REINITIALIZED(si->recompute_list);				\
 	VERIFY_LIST_IS_REINITIALIZED(si->cw_set_list);					\
@@ -306,7 +311,6 @@ typedef struct tp_region_struct
 	}													\
 }
 
-#ifdef UNIX
 /* Following macro resets clues and root block number of all the gv_targets accessed in the life-time of this process. This is
  * needed whenever a process during its transaction (TP or Non-TP) validation phase detects that a concurrent Online Rollback
  * started and completed in the meantime, the transaction should NOT go for commit, but should restart to ensure the clues and
@@ -350,7 +354,6 @@ typedef struct tp_region_struct
 		}												\
 	}													\
 }
-#endif
 
 typedef struct ua_list_struct
 {
@@ -829,18 +832,7 @@ typedef enum
 # endif	/* #ifdef DEBUG */
 #endif	/* #ifdef GTM_TRIGGER */
 
-#ifdef VMS
-/* The error below has special handling in a few condition handlers because it not so much signals an error
-   as it does drive the necessary mechanisms to invoke a restart. Consequently this error can be
-   overridden by a "real" error. For VMS, the extra parameters are specified to provide "placeholders" on
-   the stack in the signal array if a real error needs to be overlayed in place of this one (see example
-   code in mdb_condition_handler). The number of extra parameters need to be 2 more than the largest
-   number of parameters for an rts_error in tp_restart().
-*/
-#define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0, 0, 0, 0, 0);
-#else
 #define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
-#endif
 
 /* the following macros T_BEGIN_READ_NONTP_OR_TP and T_BEGIN_SETORKILL_NONTP_OR_TP are similar except for one difference
  * which is that for the SETORKILL case, sgm_info_ptr->update_trans needs to be set. They need to be maintained
@@ -913,12 +905,11 @@ GBLREF	unsigned int	t_tries;
 	assert(dollar_tlevel);											\
 	assert(CDB_STAGNATE == t_tries);									\
 	/* mupip_jnl_recovery operates with t_tries=CDB_STAGNATE so we should not adjust t_tries		\
-	 * In that case, because we have standalone access, we dont expect anyone else to interfere with us 	\
+	 * In that case, because we have standalone access, we don't expect anyone else to interfere with us 	\
 	 * and cause a restart, but if they do, TPNOTACID_CHECK (below) gives a TPNOTACID message.		\
 	 */													\
 	if (!mupip_jnl_recover)											\
 	{													\
-		assert(CDB_STAGNATE <= dollar_trestart);							\
 		assert(dollar_trestart >= TREF(tp_restart_dont_counts));					\
 		t_tries = CDB_STAGNATE - 1;									\
 		DEBUG_ONLY(if (0 == TREF(tp_restart_dont_counts)))						\
@@ -928,24 +919,24 @@ GBLREF	unsigned int	t_tries;
 	}													\
 }
 
-#define TPNOTACID_DEFAULT_TIME	2	/* default (in seconds)for tpnotacidtime */
+#define TPNOTACID_DEFAULT_TIME	2 * MILLISECS_IN_SEC	/* default for tpnotacidtime */
 #define TPNOTACID_MAX_TIME	30	/* maximum (in seconds)for tpnotacidtime */
-#define TPTIMEOUT_MAX_TIME	60	/* maximum (inseconds) for dollar_zmaxtptime - enforced in gtm_env_init, not in op_svput */
+#define TPTIMEOUT_MAX_TIME	60	/* maximum (in seconds) for dollar_zmaxtptime - enforced in gtm_env_init, not in op_svput */
 
-#define	TPNOTACID_CHECK(CALLER_STR)											\
-{															\
-	GBLREF	boolean_t	mupip_jnl_recover;									\
-	mval		zpos;												\
-															\
-	if (IS_TP_AND_FINAL_RETRY)											\
-	{														\
-		TP_REL_CRIT_ALL_REG;											\
-		assert(!mupip_jnl_recover);										\
-		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;									\
-		getzposition(&zpos);											\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len,	\
-				zpos.str.addr);										\
-	}														\
+#define	TPNOTACID_CHECK(CALLER_STR)												\
+{																\
+	GBLREF	boolean_t	mupip_jnl_recover;										\
+	mval		zpos;													\
+																\
+	if (IS_TP_AND_FINAL_RETRY)												\
+	{															\
+		TP_REL_CRIT_ALL_REG;												\
+		assert(!mupip_jnl_recover);											\
+		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;										\
+		getzposition(&zpos);												\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TPNOTACID, 7, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr, \
+			 (TREF(tpnotacidtime)).str.len, (TREF(tpnotacidtime)).str.addr, dollar_trestart);			\
+	}															\
 }
 
 #define SAVE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR)	\
@@ -978,8 +969,7 @@ MBSTART {									\
 /* Any retry transition where the destination state is the 3rd retry, we don't want to release crit, i.e. for 2nd to 3rd retry
  * transition or 3rd to 3rd retry transition. Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries.
  */
-#define NEED_TO_RELEASE_CRIT(T_TRIES, STATUS)		(((CDB_STAGNATE - 1) > T_TRIES)					\
-							 UNIX_ONLY(|| cdb_sc_instancefreeze == STATUS))
+#define NEED_TO_RELEASE_CRIT(T_TRIES, STATUS)		(((CDB_STAGNATE - 1) > T_TRIES)	|| (cdb_sc_instancefreeze == STATUS))
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(tp_cleanup_state clnup_state);

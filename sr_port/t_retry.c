@@ -299,6 +299,8 @@ void t_retry(enum cdb_sc failure)
 			 * (i) cdb_sc_gvtrootnonzero : It is possible that a GVT gets created just before we get crit in the
 			 *	final retry inside "gvcst_put2". In that case a cdb_sc_gvtrootnonzero restart is possible while in
 			 *	the final retry.
+			 * (j) cdb_sc_phase2waitfail : We notice a block with a non-zero cr->in_tend in "t_qread" for the first
+			 *	time in the final retry.
 			 */
 			assert(cdb_sc_optrestart != failure);
 			if (IS_FINAL_RETRY_CODE(failure))
@@ -543,6 +545,13 @@ void t_retry(enum cdb_sc failure)
 					 */
 					gvcst_redo_root_search();
 				}
+				break;
+			case cdb_sc_phase2waitfail:
+				/* No action needed since if we are in the final retry, we would have set wc_blocked (as part of
+				 * the SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED call above) and the "grab_crit_encr_cycle_sync" call
+				 * done a few lines later would have called "grab_crit" & "wcs_recover" which would have
+				 * fixed the phase2-commit/non-zero-"cr->in_tend" issue.
+				 */
 				break;
 			default:
 				break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -420,8 +420,13 @@ bool	mubfilcpy (backup_reg_list *list)
 				CLEANUP_AND_RETURN_FALSE;
 			}
 			if (counter & 0xF)
+			{
+#				ifdef DEBUG
+				if (WBTEST_ENABLED(WBTEST_FORCE_SHMPLRECOV)) /* Fake shmpool_blocked */
+					cs_addrs->shmpool_buffer->shmpool_blocked = TRUE;
+#				endif
 				wcs_sleep(counter);
-			else
+			} else
 			{	/* Force recovery every few retries - this should not be happening */
 				if (FALSE == shmpool_lock_hdr(gv_cur_region))
 				{

@@ -38,6 +38,7 @@
 THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit in (if any) */
 
 /* Compiler */
+THREADGBLDEF(block_level,			int4)				/* used to check embedded subroutine levels */
 THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
 THREADGBLDEF(boolchain_ptr,			triple *)			/* pointer to anchor for chain used by bx_boolop  */
 THREADGBLDEF(bool_targ_anchor,			tbp)				/* anchor of targ chain for bool relocation */
@@ -69,6 +70,7 @@ THREADGBLDEF(linkage_last,			struct linkage_entry *)		/* Last added entry */
 THREADGBLDEF(objhash_state,			hash128_state_t)		/* Seed value - progressive hash of object file */
 #endif
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
+THREADGBLDEF(rts_error_in_parse,		boolean_t)			/* flag to stop parsing current line */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */
 THREADGBLDEF(routine_source_offset,		uint4)				/* offset of M source within literal text pool */
 THREADGBLDEF(saw_side_effect,			boolean_t)			/* need side effect handling other than naked */
@@ -86,6 +88,7 @@ THREADGBLDEF(trigger_compile_and_link,		boolean_t)			/* A trigger compilation/li
 THREADGBLDEF(window_ident,			mstr)				/* current scanner mident from advancewindow */
 THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow */
 THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindow */
+THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what its name says */
 
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
@@ -173,7 +176,7 @@ THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be sav
 										 * gvcst_redo_root_search */
 THREADGBLDEF(semwait2long,			volatile boolean_t)		/* Waited too long for a semaphore */
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
-THREADGBLDEF(tpnotacidtime,			int4)				/* limit for long non-ACID ops in transactions */
+THREADGBLDEF(tpnotacidtime,			mval)				/* limit for long non-ACID ops in transactions */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
 THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */
@@ -185,6 +188,7 @@ THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever in
 										 * process. */
 
 /* Local variables */
+THREADGBLDEF(curr_symval_cycle,			unsigned int)			/* When curr_symval is changed, counter is bumped */
 THREADGBLDEF(in_op_fnnext,			boolean_t)			/* set TRUE by op_fnnext; FALSE by op_fnorder */
 THREADGBLDEF(local_collseq,			collseq *)			/* pointer to collation algorithm for lvns */
 THREADGBLDEF(local_collseq_stdnull,		boolean_t)			/* flag temp controlling empty-string subscript
@@ -194,6 +198,9 @@ THREADGBLDEF(local_coll_nums_as_strings,	boolean_t)			/* flag controlling whethe
 										 * evaluate to numbers are treated like numbers
 										 * (collating before strings) or like strings in
 										 * local collations */
+THREADGBLDEF(lvmon_active,			boolean_t)			/* TRUE when local var monitoring is active */
+THREADGBLDEF(lvmon_vars_anchor,			lvmon_var *)			/* Anchor for lv monitoring structure */
+THREADGBLDEF(lvmon_vars_count,			int)				/* Count of lvmon_vars at lvmon_vars_anchor */
 THREADGBLDEF(lv_null_subs,			int)				/* set in gtm_env_init_sp() */
 THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation buffer,which extends
 										 * from 32K each time the buffer overflows */
@@ -225,7 +232,7 @@ THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* op_fnzsearch subscript constuctor 
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* op_fnzsearch temp for null subs control */
 THREADGBLDEF(fnzsearch_globbuf_ptr,		glob_t *)			/* op_fnzsearch temp for pointing to glob results */
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
-#if defined(GTMDBGFLAGS_ENABLED)
+#ifdef GTMDBGFLAGS_ENABLED
 THREADGBLDEF(gtmdbgflags,			int)
 THREADGBLDEF(gtmdbgflags_freq,			int)
 THREADGBLDEF(gtmdbgflags_freq_cntr,		int)
@@ -465,12 +472,14 @@ THREADGBLDEF(gtm_aio_nr_events,			uint4)		/* Indicates the value of the nr_event
 								 * use by io_setup().
 								 */
 #endif
-
 THREADGBLDEF(crit_reg_count,			int4)		/* A count of the number of regions/jnlpools where this process
 								 * has crit
 								 */
 THREADGBLDEF(ok_to_see_statsdb_regs,		boolean_t)	/* FALSE implies statsdb regions are hidden at "gd_load" time */
 THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one region with reg->was_open = TRUE */
+THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure corresponding to reservations
+									 * on the journal buffer for current non-TP transaction.
+									 */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(LengthReentCnt,			boolean_t)	/* Reentrancy count for GetPieceCountFromPieceCache() used by 2
@@ -516,7 +525,6 @@ THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not 
 								 *  inherited shm so shm_nattch could be higher than we expect.
 								 */
 #endif	/* #ifdef DEBUG */
-
 /* (DEBUG_ONLY relevant points reproduced from the comment at the top of this file)
  *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.
  *   6. If a DEBUG_ONLY array is declared whose dimension is a macro, then it is necessary, for gtmpcat to work,

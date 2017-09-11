@@ -67,9 +67,9 @@ enum
 #define	ZERO_TIME_LITERAL	"                   0"
 
 static	const	char proc_header[] =
-	"PID        NODE         USER     TERM JPV_TIME           ";
+	"PID        NODE             USER         TERM JPV_TIME           ";
 static	const	char proc_fao[] =
-	"!10ZL !12AD !8AD !4AD !38AD";
+	"!10ZL !16AD !12AD !4AD !19AD";
 
 #define	TIME_DISPLAY_FAO	" !19AD"
 

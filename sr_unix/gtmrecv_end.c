@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,6 @@ GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	boolean_t		pool_init;
 
 error_def(ERR_SYSCALL);
 
@@ -163,15 +162,9 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		 */
 		if (!auto_shutdown && !INST_FREEZE_ON_ERROR_POLICY)
 		{
-			JNLPOOL_SHMDT(status, save_errno);
+			JNLPOOL_SHMDT(jnlpool, status, save_errno);
 			if (0 > status)
 				repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", STRERROR(save_errno));
-			jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
-			jnlpool.repl_inst_filehdr = NULL;
-			jnlpool.gtmsrc_lcl_array = NULL;
-			jnlpool.gtmsource_local_array = NULL;
-			jnlpool.jnldata_base = NULL;
-			pool_init = FALSE;
 		}
 	} else
 		jnlpool_seqno = 0;

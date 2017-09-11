@@ -31,7 +31,7 @@
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int op_lock(int timeout)
+int op_lock(mval *timeout)
 {
 	return (op_lock2(timeout, CM_LOCKS));
 }

@@ -58,7 +58,8 @@ GBLREF boolean_t	dont_want_core;
 GBLREF gd_addr		*gd_header;
 DEBUG_ONLY(GBLREF boolean_t    ok_to_UNWIND_in_exit_handling;)
 
-static gd_region	*save_statsDBreg;	/* For use in condition handler */
+STATICDEF intrpt_state_t	gvcst_statsDB_open_ch_intrpt_ok_state;
+STATICDEF gd_region		*save_statsDBreg;	/* For use in condition handler */
 
 /* Macro to restore the values that were saved at the start of the routine */
 #define RESTORE_SAVED_VALUES					\
@@ -77,7 +78,9 @@ MBSTART {							\
 } MBEND
 
 error_def(ERR_DBPRIVERR);
+error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
 error_def(ERR_RNDWNSTATSDBFAIL);
+error_def(ERR_STATSDBERR);
 
 /* This routine is a wrapper for mu_cre_file() when called from GTM. The issue is mu_cre_file() was written to run
  * largely stand-alone and then quit. So it uses stack vars for all the needed database structures and initializes only
@@ -169,7 +172,9 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 				 * initialized even if we break out of the for loop due to an error even before
 				 * this variable got initialized as part of the second ESTABLISH_NORET below.
 				 */
+	gvcst_statsDB_open_ch_intrpt_ok_state = intrpt_ok_state;	/* needed by "gvcst_statsDB_open_ch" */
 	ESTABLISH_NORET(gvcst_statsDB_open_ch, longjmp_done1);
+
 	for ( ; !longjmp_done1; )	/* have a dummy for loop to be able to use "break" for various codepaths below */
 	{
 		if (!do_statsdb_init)
@@ -403,6 +408,36 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
 	}
 	return;
+}
+
+/* Simplistic handler for when errors occur during open of statsDB. The ESTABLISH_NORET is a place-holder for the
+ * setjmp/longjmp sequence used to recover quietly from errors opening* the statsDB. So if the error is the magic
+ * ERR_DRVLONGJMP, do just that (longjmp() via the UNWIND() macro). If the error is otherwise, capture the error
+ * and where it was raised and send the STATSDBERR to the syslog before we unwind back to the ESTABLISH_NORET.
+ */
+CONDITION_HANDLER(gvcst_statsDB_open_ch)
+{
+	char	buffer[OUT_BUFF_SIZE];
+	int	msglen;
+	mval	zpos;
+
+	START_CH(TRUE);
+	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
+	if (DUMPABLE)
+		NEXTCH;				/* Bubble down till handled properly in mdb_condition_handler() */
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+		CONTINUE;			/* Keep going for non-error issues */
+	if (ERR_DRVLONGJMP != arg)
+	{	/* Need to reflect the current error to the syslog - First save message that got us here */
+		msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
+		assert(OUT_BUFF_SIZE > msglen);
+		memcpy(buffer, TREF(util_outbuff_ptr), msglen);
+		getzposition(&zpos);
+		/* Send whole thing to syslog */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
+	}
+	intrpt_ok_state = gvcst_statsDB_open_ch_intrpt_ok_state;
+	UNWIND(NULL, NULL);			/* Return back to where ESTABLISH_NORET was done */
 }
 
 /* Condition handler for gvcst_statsDB_init() - all we need to do is unwind back to where the ESTABLISH_NORET() is done
@@ -680,12 +715,6 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 	mval	zpos;
 
 	START_CH(TRUE);
-	PRN_ERROR;
-	if (DUMPABLE && !SUPPRESS_DUMP)
-	{
-		need_core = TRUE;
-		gtm_fork_n_core();
-	}
 	/* Save error that brought us here */
 	msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
 	assert(OUT_BUFF_SIZE > msglen);
@@ -694,6 +723,11 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 	/* Send whole thing to syslog */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RNDWNSTATSDBFAIL, 10, REG_LEN_STR(save_statsDBreg),
 		     DB_LEN_STR(save_statsDBreg), zpos.str.len, zpos.str.addr, msglen, buffer);
+	if (DUMPABLE && !SUPPRESS_DUMP)
+	{
+		need_core = TRUE;
+		gtm_fork_n_core();
+	}
 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 	UNWIND(NULL, NULL);		/* This returns back to gvcst_remove_statsDB_linkage_all() to do next region */
 }

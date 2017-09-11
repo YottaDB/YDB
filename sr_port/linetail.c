@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +25,7 @@ int linetail(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	TREF(rts_error_in_parse) = FALSE;
 	for (;;)
 	{
 		while (TK_SPACE == TREF(window_token))
@@ -32,10 +34,8 @@ int linetail(void)
 			return TRUE;
 		if (!cmd())
 		{
-			if (OC_RTERROR != (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode)
-			{	/* If rterror is last triple generated (has two args), then error already raised */
+			if (!ALREADY_RTERROR)
 				TREF(source_error_found) ? stx_error(TREF(source_error_found)) : stx_error(ERR_CMD);
-			}
 			assert((TREF(curtchain))->exorder.bl->exorder.fl == TREF(curtchain));
 			assert(TREF(source_error_found));
 			return FALSE;

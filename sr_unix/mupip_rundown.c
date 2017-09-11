@@ -15,6 +15,7 @@
 #include <sys/shm.h>
 #include "gtm_string.h"
 #include "gtm_inet.h"
+#include "gtm_ipc.h"
 
 #include "stp_parms.h"
 #include "gdsroot.h"
@@ -52,7 +53,6 @@
 #include "mu_rndwn_repl_instance.h"
 #include "util.h"
 #include "anticipatory_freeze.h"
-#include "gtm_ipc.h"
 #include "repl_sem.h"
 #include "ftok_sems.h"
 #include "ipcrmid.h"
@@ -164,11 +164,7 @@ void mupip_rundown(void)
 					if ((NULL != jnlpool_ctl) && !anticipatory_freeze_available)
 					{
 						shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
-						JNLPOOL_SHMDT(status, save_errno);
-						jnlpool.gtmsrc_lcl_array = NULL;
-						jnlpool.repl_inst_filehdr = NULL;
-						jnlpool.gtmsource_local_array = NULL;
-						jnlpool.jnldata_base = NULL;
+						JNLPOOL_SHMDT(jnlpool, status, save_errno);
 						if (0 > status)
 						{
 							ISSUE_REPLPOOLINST(save_errno, shmid, instfilename, "shmdt()");
@@ -216,11 +212,7 @@ void mupip_rundown(void)
 			semid = jnlpool.repl_inst_filehdr->jnlpool_semid;
 			shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
 			/* Detach from the journal pool */
-			JNLPOOL_SHMDT(status, save_errno);
-			jnlpool.gtmsrc_lcl_array = NULL;
-			jnlpool.repl_inst_filehdr = NULL;
-			jnlpool.gtmsource_local_array = NULL;
-			jnlpool.jnldata_base = NULL;
+			JNLPOOL_SHMDT(jnlpool, status, save_errno);
 			if (0 > status)
 			{
 				ISSUE_REPLPOOLINST(save_errno, shmid, instfilename, "shmdt()");

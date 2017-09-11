@@ -68,7 +68,7 @@ GBLREF	gv_key			*gv_altkey;
 GBLREF	io_pair			io_curr_device;
 GBLREF	io_pair			io_std_device;			/* standard device */
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 #ifdef DEBUG
@@ -620,7 +620,7 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 		op_pars.str.addr = (char *)open_params_list;
 		op_val.str.len = file_name_len;
 		op_val.str.addr = (char *)file_name;
-		(*op_open_ptr)(&op_val, &op_pars, 0, 0);
+		(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, NULL);
 	}
 	save_io_curr_device = io_curr_device;
 	op_use(&op_val, &op_pars);

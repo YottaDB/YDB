@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +17,7 @@
 
 #include "stringpool.h"
 #include "get_command_line.h"
+#include "restrict.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int 		cmd_cnt;
@@ -36,6 +38,12 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	int		first_item, len, word_cnt;
 	unsigned char	*cp;
 
+	if (RESTRICTED(zcmdline))
+	{
+		result->mvtype = MV_STR;
+		result->str.len = result->str.char_len = 0;
+		return;
+	}
 	result->mvtype = 0; /* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
 	len = -1;							/* to compensate for no space at the end */
 	if (cmd_cnt > 1)

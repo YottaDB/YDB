@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -523,7 +523,7 @@ MBSTART {													\
 						   loaded systems but timeout on incomplete reads.  		\
 						   Any characters						\
 						   read to this point will be returned. */ 			\
-						*MSEC_TIMEOUT = timeout2msec(1);				\
+						*MSEC_TIMEOUT = 1 * MILLISECS_IN_SEC;				\
 						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL);	\
 					}									\
 					gtmioBuffLen -= gtmioStatus;						\

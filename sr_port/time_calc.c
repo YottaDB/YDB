@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,7 @@
 
 #include "gt_timer.h"
 
+error_def(ERR_TIMEROVFL);
 
 /*
  * ----------------------------------
@@ -59,7 +61,6 @@ int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
 void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 {
 	int4	ival_sec, ival_usec;
-	error_def (ERR_TIMEROVFL);
 
 	if (ival < 0)
 	{
@@ -68,17 +69,15 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 		 * multiplying by 1000 to convert from seconds to
 		 * milliseconds.
 		 */
-		rts_error(VARLSTCNT(1) ERR_TIMEROVFL);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEROVFL);
 	}
-
-	ival_sec  = ival / 1000;			/* milliseconds -> seconds */
-	ival_usec = (ival - (ival_sec * 1000)) * 1000;	/* microsecond remainder */
-
+	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
+	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */
 	atpd->at_sec = atps->at_sec + ival_sec;
-	if ((atpd->at_usec = atps->at_usec + ival_usec) >= 1000000)
+	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSEC_IN_SEC)
 	{
 		/* microsecond overflow */
-		atpd->at_usec -= 1000000;
+		atpd->at_usec -= MICROSEC_IN_SEC;
 		atpd->at_sec  += 1;		/* carry */
 	}
 }
@@ -108,7 +107,7 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
 
 	if (atp2->at_usec > atp1->at_usec)
 	{
-		dat.at_usec += 1000000;
+		dat.at_usec += MICROSEC_IN_SEC;
 		dat.at_sec--;
 	}
 	return (dat);

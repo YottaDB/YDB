@@ -47,28 +47,24 @@
 #include "anticipatory_freeze.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
-#define STATUS_MSG(info)										\
+#define STATUS_MSG(INFO, FROMLEN, FROM, TOLEN, TO)							\
 {													\
-	if (SS_NORMAL != info->status2)									\
+	if (SS_NORMAL != INFO->status2)									\
 	{												\
-		if (IS_GTM_IMAGE)									\
-			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM,	\
-					info->jnl_len, info->jnl, info->fn_len, info->fn, info->status,	\
-					0, info->status2);						\
-		else											\
-			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT1(11) ERR_JNLCRESTATUS, 7, CALLFROM,	\
-					info->jnl_len, info->jnl, info->fn_len, info->fn, info->status,	\
-					PUT_SYS_ERRNO(info->status2));					\
-	} else if (SS_NORMAL != info->status)								\
+		send_msg_csa(CSA_ARG(INFO->csa) VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM,		\
+				FROMLEN, FROM, TOLEN, TO, INFO->status,					\
+				PUT_SYS_ERRNO(INFO->status2));						\
+		if (!IS_GTM_IMAGE)									\
+			gtm_putmsg_csa(CSA_ARG(INFO->csa) VARLSTCNT1(11) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					FROMLEN, FROM, TOLEN, TO, INFO->status,				\
+					PUT_SYS_ERRNO(INFO->status2));					\
+	} else if (SS_NORMAL != INFO->status)								\
 	{												\
-		if (IS_GTM_IMAGE)									\
-			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,	\
-					info->jnl_len, info->jnl, info->fn_len, info->fn,		\
-					info->status);							\
-		else											\
-			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,	\
-					info->jnl_len, info->jnl, info->fn_len, info->fn,		\
-					info->status);							\
+		send_msg_csa(CSA_ARG(INFO->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,		\
+				FROMLEN, FROM, TOLEN, TO, INFO->status);				\
+		if (!IS_GTM_IMAGE)									\
+			gtm_putmsg_csa(CSA_ARG(INFO->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					FROMLEN, FROM, TOLEN, TO, INFO->status);			\
 	}												\
 }
 #define RETURN_ON_ERROR(info)						\
@@ -125,12 +121,11 @@ uint4	cre_jnl_file(jnl_create_info *info)
 			{
 				if (FILE_NOT_FOUND != fstat)
 				{
-					STATUS_MSG(info);
+					STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 					return EXIT_ERR;
 				}
-				if (IS_GTM_IMAGE)
-					send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
-				else
+				send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
+				if (!(IS_GTM_IMAGE))
 					gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
 				no_rename = TRUE;
 			}
@@ -144,7 +139,7 @@ uint4	cre_jnl_file(jnl_create_info *info)
 		}
 		if (no_rename)
 		{
-			STATUS_MSG(info);
+			STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 			if (ERR_FILENAMETOOLONG == info->status)
 				return EXIT_ERR;
 			/* Else it is an error from "gtm_file_stat" (invoked from "prepare_unique_name" above).
@@ -210,7 +205,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
 								     (char *)create_fn, &create_fn_len, 0, &info->status2)))
 		{
-			STATUS_MSG(info);
+			STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 			return EXIT_ERR;
 		}
 	}
@@ -218,7 +213,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (-1 == channel)
 	{
 		info->status = errno;
-		STATUS_MSG(info);
+		STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 		return EXIT_ERR;
 	}
 #	ifdef __MVS__
@@ -229,7 +224,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (-1 == fstat_res)
 	{
 		info->status = errno;
-		STATUS_MSG(info);
+		STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
@@ -238,7 +233,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (-1 == stat_res)
 	{
 		info->status = errno;
-		STATUS_MSG(info);
+		STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
@@ -265,14 +260,14 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		&& (-1 == fchown(channel, user_id, group_id)))
 	{
 		info->status = errno;
-		STATUS_MSG(info);
+		STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
 	if (-1 == FCHMOD(channel, perm))
 	{
 		info->status = errno;
-		STATUS_MSG(info);
+		STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 		F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 		return EXIT_ERR;
 	}
@@ -305,7 +300,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * file header write only the real file header and not the 0-padding.
 	 */
 	JNL_DO_FILE_WRITE(csa, create_fn, channel, 0, header, JNL_HDR_LEN, info->status, info->status2);
-	STATUS_MSG(info);
+	STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 	RETURN_ON_ERROR(info);
 	assert(DISK_BLOCK_SIZE >= EPOCH_RECLEN + EOF_RECLEN + PFIN_RECLEN + PINI_RECLEN);
 	pini_record = (struct_jrec_pini *)&jrecbuf[0];
@@ -395,7 +390,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	assert(ROUND_UP2(header->virtual_size, jnl_fs_block_size/DISK_BLOCK_SIZE)
 			> DIVIDE_ROUND_UP(JNL_HDR_LEN + write_size, DISK_BLOCK_SIZE));
 	JNL_DO_FILE_WRITE(csa, create_fn, channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
-	STATUS_MSG(info);
+	STATUS_MSG(info, info->jnl_len, info->jnl, info->fn_len, info->fn);
 	RETURN_ON_ERROR(info);
 	GTM_JNL_FSYNC(csa, channel, status);
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
@@ -425,13 +420,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
-		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
-					rename_fn);
-		else
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
-					rename_fn);
-		STATUS_MSG(info);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+		if (!(IS_GTM_IMAGE))
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
+					rename_fn_len, rename_fn);
+		STATUS_MSG(info, info->jnl_len, info->jnl, rename_fn, rename_fn_len);
 		return EXIT_ERR;
 	}
 	/* Following does rename of a.mjl_new to a.mjl.
@@ -441,21 +434,16 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
-		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
-					rename_fn);
-		else
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
-					rename_fn);
-		STATUS_MSG(info);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, create_fn_len, create_fn, info->jnl_len, info->jnl);
+		if (!(IS_GTM_IMAGE))
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
+					rename_fn_len, rename_fn);
+		STATUS_MSG(info, create_fn_len, create_fn, info->jnl_len, info->jnl);
 		return EXIT_ERR;
 	}
-	if (IS_GTM_IMAGE)
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
-				rename_fn);
-	else
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
-				rename_fn);
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+	if (!(IS_GTM_IMAGE))
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 #	ifdef DEBUG
 	if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
 	{

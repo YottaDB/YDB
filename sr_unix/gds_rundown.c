@@ -165,6 +165,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
+	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
 
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
@@ -484,8 +485,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (!was_crit)
 				grab_crit(reg);
 			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown);
-                        send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown"),
+			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown1);
+                        send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown1"),
 				     process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 			csa->wbuf_dqd = 0;
 			wcs_recover(reg);
@@ -519,17 +520,34 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			}
 			/* Note WCSFLU_SYNC_EPOCH ensures the epoch is synced to the journal and indirectly
 			 * also ensures that the db is fsynced. We don't want to use it in the calls to
-			 * wcs_flu() from t_end() and tp_tend() since we can defer it to out-of-crit there.
+			 * "wcs_flu" from "t_end" and "tp_tend" since we can defer it to out-of-crit there.
 			 * In this case, since we are running down, we don't have any such option.
 			 * If we are in safe_mode, we won't get here, so no need to check for online freeze.
 			 */
 			cnl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-			/* wcs_flu() performs writes asynchronously, which might spawn up a thread. We close it here. Since
+			if (!cnl->remove_shm)
+			{	/* If "wcs_flu" call fails, then we should not remove shm or reset anything in the db fileheader.
+				 * So reset "we_are_last_writer" variable itself as that makes it more safer to fall through to
+				 * the cleanup code below. Before doing so, take a copy for debugging purposes.
+				 */
+				DEBUG_ONLY(orig_we_are_last_writer = TRUE;)
+				we_are_last_writer = FALSE;
+				/* Since "wcs_flu" failed, set wc_blocked to TRUE if not already set. */
+				if (!cnl->wc_blocked)
+				{
+					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					BG_TRACE_PRO_ANY(csa, wcb_gds_rundown2);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_gds_rundown2"), process_id, &csa->ti->curr_tn,
+							DB_LEN_STR(reg));
+				}
+			}
+			/* "wcs_flu" performs writes asynchronously, which might spawn up a thread. We close it here. Since
 			 * the thread belongs to the global directory, we assume no one else is doing the same for this global
 			 * directory.
 			 */
 			IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
-			/* Since we_are_last_writer, we should be guaranteed that wcs_flu() did not change csd, (in
+			/* Since we_are_last_writer, we should be guaranteed that "wcs_flu" did not change csd, (in
 			 * case of MM for potential file extension), even if it did a grab_crit().  Therefore, make
 			 * sure that's true.
 			 */
@@ -546,10 +564,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			db_needs_flushing = (cnl->last_wcsflu_tn < csa->ti->curr_tn);
 			if (db_needs_flushing)
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-			/* Same as above wcs_flu() */
+			/* Same as above "wcs_flu" */
 			IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
 			assert(is_mm || (csd == cs_data));
-			csd = cs_data;	/* In case this is MM and wcs_flu() remapped an extended database, reset csd */
+			csd = cs_data;	/* In case this is MM and "wcs_flu" remapped an extended database, reset csd */
 		}
 		/* Do rundown journal processing after buffer flushes since they require jnl to be open */
 		if (JNL_ENABLED(csd))
@@ -566,6 +584,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
                                 assert(FALSE);
                                 COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
                         }
+			/* If we are last writer, it is possible cnl->remove_shm is set to FALSE from the "wcs_flu" call
+			 * above (e.g. we are source server and "wcs_flu" noticed a phase2 commit that need to be cleaned up
+			 * which needs a "wcs_recover" call but that is a no-op for the source server). So check that
+			 * additionally. Thankfully "we_are_last_writer" would have already factored that into account above
+			 * ("we_are_last_writer && cnl->remove_shm" code block above). So no additional check needed below.
+			 */
 			if ((((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 			     || we_are_last_writer && (0 != cnl->jnl_file.u.inode)) && ok_to_write_pfin)
 			{	/* We need to close the journal file cleanly if we have the latest generation journal file open
@@ -579,7 +603,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 					grab_crit(reg);
 				if (JNL_ENABLED(csd))
 				{
-					SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pini/pfin/jnl_file_close all need it */
+					SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_write_pini/pfin/jnl_file_close all need it */
 					/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
 					 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
 					 * journal records (if it decides to switch to a new journal file).
@@ -587,19 +611,20 @@ int4 gds_rundown(boolean_t cleanup_udi)
 					ADJUST_GBL_JREC_TIME(jgbl, jbp);
 					jnl_status = jnl_ensure_open(reg, csa);
 					if (0 == jnl_status)
-					{	/* If we_are_last_writer, we would have already done a wcs_flu() which would
+					{	/* If we_are_last_writer, we would have already done a "wcs_flu" which would
 						 * have written an epoch record and we are guaranteed no further updates
 						 * since we are the last writer. So, just close the journal.
 						 * If the freeaddr == post_epoch_freeaddr, wcs_flu may have skipped writing
 						 * a pini, so allow for that.
 						 */
 						assert(!jbp->before_images || is_mm
-						       || !we_are_last_writer || (0 != jpc->pini_addr) || jgbl.mur_extract
-						       || (jpc->jnl_buff->freeaddr == jpc->jnl_buff->post_epoch_freeaddr));
+							|| !we_are_last_writer || (0 != jpc->pini_addr) || jgbl.mur_extract
+							|| ((jbp->freeaddr == jbp->post_epoch_freeaddr)
+								&& (jbp->freeaddr == jbp->rsrv_freeaddr)));
 						/* If we haven't written a pini, let jnl_file_close write the pini/pfin. */
 						if (!jgbl.mur_extract && (0 != jpc->pini_addr))
 						{
-							jnl_put_jrt_pfin(csa);
+							jnl_write_pfin(csa);
 							wrote_pfin = TRUE;
 						} else
 							wrote_pfin = FALSE;
@@ -614,6 +639,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 							else if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
 							{
 								assert(jbp->freeaddr == jbp->dskaddr);
+								assert(jbp->freeaddr == jbp->rsrv_freeaddr);
 								jnl_fsync(reg, jbp->dskaddr);
 								assert(jbp->fsync_dskaddr == jbp->dskaddr);
 							} else
@@ -650,12 +676,15 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (!was_crit)
 				grab_crit(reg);			/* To satisfy crit requirement in fileheader_sync() */
 			memset(csd->machine_name, 0, MAX_MCNAMELEN); /* clear the machine_name field */
-			if (!have_standalone_access && we_are_last_user)
-			{	/* mupip_exit_handler will do this after mur_close_file */
-				csd->semid = INVALID_SEMID;
+			if (we_are_last_user)
+			{
 				csd->shmid = INVALID_SHMID;
-				csd->gt_sem_ctime.ctime = 0;
 				csd->gt_shm_ctime.ctime = 0;
+				if (!have_standalone_access)
+				{	/* "mupip_exit_handler" will delete semid later in "mur_close_file"-->"db_ipcs_reset" */
+					csd->semid = INVALID_SEMID;
+					csd->gt_sem_ctime.ctime = 0;
+				}
 			}
 			fileheader_sync(reg);
 			if (!was_crit)
@@ -693,13 +722,16 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * any timers, cancel them BEFORE setting reg->open to FALSE (assert in wcs_clean_dbsync relies on this).
 	 */
 	CANCEL_DB_TIMERS(reg, csa, canceled_dbsync_timer);
-	if (reg->read_only && we_are_last_user && !have_standalone_access && cnl->remove_shm)
+	if (reg->read_only && we_are_last_user && cnl->remove_shm)
 	{	/* mupip_exit_handler will do this after mur_close_file */
 		db_ipcs.open_fd_with_o_direct = udi->fd_opened_with_o_direct;
-		db_ipcs.semid = INVALID_SEMID;
 		db_ipcs.shmid = INVALID_SHMID;
-		db_ipcs.gt_sem_ctime = 0;
 		db_ipcs.gt_shm_ctime = 0;
+		if (!have_standalone_access)
+		{	/* "mupip_exit_handler" will delete semid later in "mur_close_file"-->"db_ipcs_reset" */
+			db_ipcs.semid = INVALID_SEMID;
+			db_ipcs.gt_sem_ctime = 0;
+		}
 		db_ipcs.fn_len = seg->fname_len;
 		memcpy(db_ipcs.fn, seg->fname, seg->fname_len);
 		db_ipcs.fn[seg->fname_len] = 0;
@@ -728,7 +760,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 * CLOSEFILE_RESET().
 		 *
 		 * IOs canceled for subsequent regions will be reissued when we go to "gds_rundown" next and the
-		 * wcs_flu()/wcs_wtstart()/aio_shim_write() happens, which will reopen the kernel context and multiplexing thread
+		 * "wcs_flu"/wcs_wtstart()/aio_shim_write() happens, which will reopen the kernel context and multiplexing thread
 		 * as necessary.
 		 */
 		aio_shim_destroy(udi->owning_gd);
@@ -812,7 +844,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	ipc_deleted = FALSE;
 	/* If we are the very last user, remove shared storage id and the semaphores */
 	if (we_are_last_user)
-	{	/* remove shared storage, only if last writer to rundown did a successful wcs_flu() */
+	{	/* remove shared storage, only if last writer to rundown did a successful "wcs_flu" */
 		assert(!vermismatch);
 		if (remove_shm)
 		{
@@ -822,8 +854,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 					      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
 			/* Note that this process deleted shared memory. Currently only used by rollback. */
 			udi->shm_deleted = TRUE;
-			/* mupip recover/rollback don't release the semaphore here, but do it later in db_ipcs_reset (invoked from
-			 * mur_close_files())
+			/* mupip recover/rollback don't release the semaphore here, but do it later in "db_ipcs_reset"
+			 * (invoked from "mur_close_files")
 			 */
 			if (!have_standalone_access)
 			{
@@ -929,6 +961,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			{
 				PROBE_FREEUP_BUDDY_LIST(si->format_buff_list);
 				PROBE_FREEUP_BUDDY_LIST(si->jnl_list);
+				FREE_JBUF_RSRV_STRUCT(si->jbuf_rsrv_ptr);
 			}
 			PROBE_FREEUP_BUDDY_LIST(si->recompute_list);
 			PROBE_FREEUP_BUDDY_LIST(si->new_buff_list);
@@ -954,11 +987,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		if (csa->jnl)
 		{
 			assert(&FILE_INFO(csa->jnl->region)->s_addrs == csa);
-			if (csa->jnl->jnllsb)
-			{
-				assert(FALSE);
-				free(csa->jnl->jnllsb);
-			}
 			free(csa->jnl);
 		}
 		assert(seg->file_cntl->file_info);

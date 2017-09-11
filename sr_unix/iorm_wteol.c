@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 	}
 	if (rm_ptr->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
-	if ((!rm_ptr->fifo) && (!rm_ptr->pipe) && rm_ptr->output_encrypted)
+	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
 		{

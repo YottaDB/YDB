@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,11 @@ GBLREF gv_key		*gv_currkey;
 GBLREF connection_struct *curr_entry;
 GBLREF jnl_process_vector *originator_prc_vec;
 
+error_def(ERR_KEY2BIG);
+error_def(ERR_REC2BIG);
+error_def(ERR_GVIS);
+error_def(ERR_DBPRIVERR);
+
 bool gtcmtr_put(void)
 {
 	cm_region_list	*reg_ref;
@@ -45,11 +51,6 @@ bool gtcmtr_put(void)
 	short		n;
 	unsigned short	top, len;
 	static readonly gds_file_id file;
-
-	error_def(ERR_KEY2BIG);
-	error_def(ERR_REC2BIG);
-	error_def(ERR_GVIS);
-	error_def(ERR_DBPRIVERR);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_PUT);
@@ -62,7 +63,7 @@ bool gtcmtr_put(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (JNL_ALLOWED(cs_addrs))
 	{	/* we need to copy client's specific prc_vec into the global variable in order that the gvcst* routines
 		 *	do the right job. actually we need to do this only if JNL_ENABLED(cs_addrs), but since it is not
@@ -71,7 +72,7 @@ bool gtcmtr_put(void)
 		 *	if JNL_ALLOWED(cs_addrs) is TRUE instead of checking for JNL_ENABLED(cs_addrs) to be TRUE.
 		 * this approach has the overhead that we will be doing the following assignments even though JNL_ENABLED
 		 * 	might not be TRUE but since the following two are just pointer copies, it is not considered a big overhead.
-		 * this approach ensures that the jnl_put_jrt_pini() gets the appropriate prc_vec for writing into the
+		 * this approach ensures that the jnl_write_pini() gets the appropriate prc_vec for writing into the
 		 * 	journal record in case JNL_ENABLED turns out to be TRUE in t_end() time.
 		 * note that the value of JNL_ALLOWED(cs_addrs) cannot be changed on the fly without obtaining standalone access
 		 * 	and hence the correctness of prc_vec (whenever it turns out necessary) is guaranteed.
@@ -88,14 +89,14 @@ bool gtcmtr_put(void)
 	{
 		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 			REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 	}
 	if (n + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
 	{
 		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr),
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr),
 			(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
 			ERR_GVIS, 2, end - buff, buff);
 	}

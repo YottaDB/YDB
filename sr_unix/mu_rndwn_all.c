@@ -90,8 +90,11 @@ MBSTART {														\
 			SHMID, LEN_AND_STR(FNAME));									\
 } MBEND
 
-GBLREF gd_region        *gv_cur_region;
-GBLREF semid_queue_elem	*keep_semids;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	mval			dollar_zdir;
+GBLREF	semid_queue_elem	*keep_semids;
+GBLREF	uid_t			user_id;
+GBLREF	uint4			process_id;
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -102,6 +105,7 @@ error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
 error_def(ERR_MUJPOOLRNDWNSUC);
 error_def(ERR_MUNOTALLSEC);
+error_def(ERR_MURNDWNARGLESS);
 error_def(ERR_MURPOOLRNDWNFL);
 error_def(ERR_MURPOOLRNDWNSUC);
 error_def(ERR_SEMREMOVED);
@@ -197,6 +201,9 @@ int mu_rndwn_all(void)
 	char			*fname, *fgets_res;
 	shm_parms		*parm_buff;
 
+	/* Record the start of an argumentless MUPIP RUNDOWN with current directory info. Useful for debugging purposes */
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURNDWNARGLESS, 4, process_id, user_id,
+									dollar_zdir.str.len, dollar_zdir.str.addr);
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
         {
 		save_errno = errno;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +38,10 @@
 #include "trigger_update_protos.h"
 #include "trigger_select_protos.h"
 #include "trigger_trgfile_protos.h"
+#include "restrict.h"
+#include "xfer_enum.h"
+#include "code_address_type.h"
+#include "fix_xfer_entry.h"
 
 GBLREF	sgmnt_data_ptr_t cs_data;
 GBLREF  uint4		dollar_tlevel;
@@ -66,6 +71,7 @@ STATICDEF boolean_t	in_op_fnztrigger;
 
 error_def(ERR_DZTRIGINTRIG);
 error_def(ERR_FILENAMETOOLONG);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_ZTRIGINVACT);
 
 
@@ -211,6 +217,8 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	switch(ztrprm_data[index])
 	{
 		case ZTRP_FILE:
+			if (RESTRICTED(trigger_mod))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(FILE)");
 			/* If 2nd parameter is empty, do nothing (but dont issue error) */
 			if (arg1->str.len)
 			{
@@ -225,6 +233,8 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 				failed = FALSE;
 			break;
 		case ZTRP_ITEM:
+			if (RESTRICTED(trigger_mod))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(ITEM)");
 			/* If 2nd parameter is empty, do nothing (but dont issue error) */
 			failed = (arg1->str.len) ? trigger_update(arg1->str.addr, arg1->str.len) : FALSE;
 			break;

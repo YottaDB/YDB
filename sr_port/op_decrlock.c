@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,12 +29,13 @@ GBLREF bool		remlkreq;
 GBLREF unsigned char	cm_action;
 GBLREF tp_frame		*tp_pointer;
 
-int	op_decrlock(int timeout)
+error_def(ERR_TPLOCK);
+
+int	op_decrlock(mval *timeout)
 {
 	int		count;
 	mlk_pvtblk	**prior;
 	void		lckclr(void);
-	error_def(ERR_TPLOCK);
 
 	lckclr();
 	if (tp_pointer)
@@ -44,11 +46,10 @@ int	op_decrlock(int timeout)
 			/* if there were any old locks before TSTART, they can't be  unlocked */
 			if ((*prior)->granted && (*prior)->tp &&
 				(*prior)->tp->level > (*prior)->level - (*prior)->translev)
-				rts_error(VARLSTCNT(1) ERR_TPLOCK);
+				rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
 			prior = &((*prior)->next);
 		}
 	}
-
 	prior = &mlk_pvt_root;
 	for (count = 0; count < lks_this_cmd; count++)
 	{
@@ -61,7 +62,6 @@ int	op_decrlock(int timeout)
 			else
 			{
 				(*prior)->level -= (*prior)->translev > (*prior)->level ? (*prior)->level : (*prior)->translev;
-
 				if (!(*prior)->zalloc && (0 == (*prior)->level))
 				{
 					mlk_unlock(*prior);
@@ -72,12 +72,12 @@ int	op_decrlock(int timeout)
 			}
 		}
 	}
-
 	if (gtcm_connection && remlkreq)
 	{
 		cm_action = INCREMENTAL;
 		gvcmx_unlock(0, TRUE, INCREMENTAL);
 		remlkreq = FALSE;
 	}
+	lks_this_cmd = 0;	/* reset so we can check whether an extrinsic is trying to nest a LOCK operation */
 	return TRUE;	/* return TRUE unconditionally (since this is a timed unlock) so $TEST gets set to 1 as per M-standard */
 }

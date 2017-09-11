@@ -27,21 +27,7 @@
 
 LITREF octabstruct	oc_tab[];
 
-STATICFNDEF void bx_boollit_tail(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
-
-void bx_boollit(triple *t, boolean_t sense, oprtype *addr)
-{	/* an interface hybrid of bx_tail and bx_boolop that allows calls in and recursive calls */
-	opctype		c;
-
-	if (OCT_NEGATED & oc_tab[(c = t->opcode)].octype)				/* WARNING assignment */
-		sense ^= 1;
-	if ((OC_OR == c) || (OC_NOR == c))
-		bx_boollit_tail(t, TRUE, !sense, sense, addr);
-	else
-		bx_boollit_tail(t, FALSE, sense, sense, addr);
-}
-
-void bx_boollit_tail(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr)
+void bx_boollit(triple *t)
 /* search the Boolean in t (recursively) for literal leaves; the logic is similar to bx_tail
  * the rest of the arguments parallel those in bx_boolop and used primarily handling basic Boolean operations (ON, NOR, AND, NAND)
  * to get the jump target and sense right for the left-hand operand of the operation
@@ -51,136 +37,111 @@ void bx_boollit_tail(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, b
  * *addr points the operand for the jump and is eventually used by logic back in the invocation stack to fill in a target location
  */
 {
-	boolean_t	sin[ARRAYSIZE(t->operand)], tv[ARRAYSIZE(t->operand)];
-	int		com, comval, dummy, j, neg, num, tvr;
+	boolean_t	tv[ARRAYSIZE(t->operand)];
+	int		dummy, j, neg, num, tvr;
 	mval		*mv, *v[ARRAYSIZE(t->operand)];
 	opctype		c;
-	oprtype		*i, *p;
-	triple		*cob[ARRAYSIZE(t->operand)], *ref0, *tl[ARRAYSIZE(t->operand)];
+	oprtype		*opr, *p;
+	triple		*ref0, *optrip[ARRAYSIZE(t->operand)];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
 	assert(TRIP_REF == t->operand[0].oprclass);
 	assert((OC_COBOOL != t->opcode) && (OC_COM != t->opcode) || (TRIP_REF == t->operand[1].oprclass));
-	for (i = t->operand, j = 0; i < ARRAYTOP(t->operand); i++, j++)
+	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
 	{	/* checkout an operand to see if we can simplify it */
-		p = i;
-		com = 0;
-		for (tl[j] = i->oprval.tref; OCT_UNARY & oc_tab[(c = tl[j]->opcode)].octype; tl[j] = p->oprval.tref)
+		p = opr;
+		for (optrip[j] = opr->oprval.tref; OCT_UNARY & oc_tab[(c = optrip[j]->opcode)].octype; optrip[j] = p->oprval.tref)
 		{	/* find the real object of affection; WARNING assignment above */
-			assert((TRIP_REF == tl[j]->operand[0].oprclass) && (NO_REF == tl[j]->operand[1].oprclass));
-			com ^= (OC_COM == c);	/* if we make a recursive call below, COM matters, but NEG and FORCENUM don't */
-			p = &tl[j]->operand[0];
+			assert((TRIP_REF == optrip[j]->operand[0].oprclass) && (NO_REF == optrip[j]->operand[1].oprclass));
+			p = &optrip[j]->operand[0];
 		}
 		if (OCT_ARITH & oc_tab[c].octype)
 			ex_tail(p);								/* chained arithmetic */
 		else if (OCT_BOOL & oc_tab[c].octype)
-		{	/* recursively check an operand */
-			sin[j] = sense;
-			p = addr;
-			if (!j && !(OCT_REL & oc_tab[t->opcode].octype))
-			{	/* left hand operand of parent */
-				sin[j] = jmp_type_one;
-				if (jmp_to_next)
-				{	/* left operands need extra attention to decide between jump next or to the end */
-					p = (oprtype *)mcalloc(SIZEOF(oprtype));
-					*p = put_tjmp(t);
-				}
-			}
-			bx_boollit(tl[j], sin[j] ^ com, p);
-		}
-		if ((OC_JMPTRUE != tl[j]->opcode) && (OC_JMPFALSE != tl[j]->opcode) && (OC_LIT != tl[j]->opcode))
-			return;									/* this operation doesn't qualify */
-		com = comval = neg = num = 0;
-		cob[j] = NULL;
-		for (ref0 = i->oprval.tref; OCT_UNARY & oc_tab[(c = ref0->opcode)].octype; ref0 = ref0->operand[0].oprval.tref)
-		{       /* we may be able to clean up this operand; WARNING assignment above */
-			assert((TRIP_REF == ref0->operand[0].oprclass) && (NO_REF == ref0->operand[1].oprclass));
-			num += (OC_FORCENUM == c);
-			com += (OC_COM == c);
-			if (!com)								/* "outside" com renders neg mute */
-				neg ^= (OC_NEG == c);
-			if (!comval && (NULL == cob[j]))
-			{
-				if (comval = (OC_COMVAL == c))					/* WARNING assignment */
-				{
-					if (ref0 != t->operand[j].oprval.tref)
-						dqdel(t->operand[j].oprval.tref, exorder);
-					t->operand[j].oprval.tref = tl[j];			/* need mval: no COBOOL needed */
-				}
-				else if (OC_COBOOL == c)
-				{	/* the operand needs a COBOOL in case its operator remains unresolved */
-					cob[j] = t->operand[j].oprval.tref;
-					if (ref0 == cob[j])
-						continue;					/* already where it belongs */
-					cob[j]->opcode = OC_COBOOL;
-					cob[j]->operand[0].oprval.tref = tl[j];
-				} else if (ref0 == t->operand[j].oprval.tref)
-					continue;
-			}
-			dqdel(ref0, exorder);
-		}
-		assert(ref0 == tl[j]);
-		if (!comval && (NULL == cob[j]) && (tl[j] != t->operand[j].oprval.tref))
-		{	/* left room for a COBOOL, but there's no need */
-			dqdel(t->operand[j].oprval.tref, exorder);
-			t->operand[j].oprval.tref = tl[j];
-		}
-		if ((OC_JMPTRUE == ref0->opcode) || (OC_JMPFALSE == ref0->opcode))
-		{	/* switch to a literal representation of TRUE / FALSE */
-			assert(INDR_REF == ref0->operand[0].oprclass);
-			ref0->operand[1] = ref0->operand[0];					/* track info as we switch opcode */
-			PUT_LITERAL_TRUTH((sin[j] ? OC_JMPFALSE : OC_JMPTRUE) == ref0->opcode, ref0);
-			ref0->opcode = OC_LIT;
-			com = 0;								/* already accounted for by sin */
-		}
-		assert((OC_LIT == ref0->opcode) && (MLIT_REF == ref0->operand[0].oprclass));
-		v[j] = &ref0->operand[0].oprval.mlit->v;
-		if (com)
-		{       /* any complement reduces the literal value to [unsigned] 1 or 0 */
-			unuse_literal(v[j]);
-			tv[j] = (0 == v[j]->m[1]);
-			assert(ref0 == tl[j]);
-			PUT_LITERAL_TRUTH(tv[j], ref0);
+			bx_boollit(optrip[j]);
+		assert(OC_COMVAL != optrip[j]->opcode);
+		neg = num = 0;
+		UNARY_TAIL(opr);
+		for (ref0 = t->operand[j].oprval.tref; OCT_UNARY & oc_tab[ref0->opcode].octype; ref0 = ref0->operand[0].oprval.tref)
+			;
+		optrip[j] = ref0;
+		if (OC_LIT == ref0->opcode)
+		{
 			v[j] = &ref0->operand[0].oprval.mlit->v;
-			num = 0;								/* any complement trumps num */
-		}
-		if (neg || num)
-		{	/* get literal into uniform state */
-			unuse_literal(v[j]);
-			mv = (mval *)mcalloc(SIZEOF(mval));
-			*mv = *v[j];
-			if (neg)
-			{
-				if (MV_INT & mv->mvtype)
+			if (OC_COM == t->operand[j].oprval.tref->opcode)
+			{       /* any complement reduces the literal value to [unsigned] 1 or 0 */
+				unuse_literal(v[j]);
+				tv[j] = (0 == v[j]->m[1]);
+				assert(ref0 == optrip[j]);
+				PUT_LITERAL_TRUTH(tv[j], ref0);
+				v[j] = &ref0->operand[0].oprval.mlit->v;
+				num = 0;							/* any complement trumps num */
+			}
+			neg = OC_NEG == t->operand[j].oprval.tref->opcode;
+			num = OC_FORCENUM == t->operand[j].oprval.tref->opcode;
+			if (neg || num)
+			{	/* get literal into uniform state */
+				unuse_literal(v[j]);
+				mv = (mval *)mcalloc(SIZEOF(mval));
+				*mv = *v[j];
+				if (neg)
 				{
-					if (0 != mv->m[1])
-						mv->m[1] = -mv->m[1];
-					else
-						mv->sgn = 0;
-				} else if (MV_NM & mv->mvtype)
-					mv->sgn = !mv->sgn;
-			} else
-				s2n(mv);
-			n2s(mv);
-			v[j] = mv;
-			assert(ref0 == tl[j]);
-			put_lit_s(v[j], ref0);
+					if (MV_INT & mv->mvtype)
+					{
+						if (0 != mv->m[1])
+							mv->m[1] = -mv->m[1];
+						else
+							mv->sgn = 0;
+					} else if (MV_NM & mv->mvtype)
+						mv->sgn = !mv->sgn;
+				} else
+					s2n(mv);
+				n2s(mv);
+				v[j] = mv;
+				assert(ref0 == optrip[j]);
+				put_lit_s(v[j], ref0);
+			}
+			/* In the case of this one optimized but not other, remove all unary's except the first
+			 * If the first is a COMVAL, remove it.
+			 */
+			if (OC_COMVAL == t->operand[j].oprval.tref->opcode)
+			{
+				dqdel(t->operand[j].oprval.tref, exorder);
+				t->operand[j].oprval.tref = t->operand[j].oprval.tref->operand[0].oprval.tref;
+			}
 		}
 	}
-	assert(tl[0] != tl[1]);									/* start processing a live one */
-	for (tvr = j, j = 0;  j < tvr; j++)
-	{	/* both arguments are literals, so do the operation at compile time */
-		if (NULL != cob[j])
-			dqdel(cob[j], exorder);
-		v[j] = &tl[j]->operand[0].oprval.mlit->v;
-		tv[j] = (0 != v[j]->m[1]);
-		unuse_literal(v[j]);
-		tl[j]->opcode = OC_NOOP;
-		tl[j]->operand[0].oprclass = NO_REF;
-	}
-	t->operand[1].oprclass = NO_REF;
-	switch (c = t->opcode)									/* WARNING assignment */
-	{	/* optimize the Boolean operations here */
+	assert(optrip[0] != optrip[1]);
+	j = -1;
+	if (OC_LIT == optrip[0]->opcode)						/* make j identify what literal if any */
+	{       /* operand[0] (left) has been evaluated to a literal */
+		j = 0;
+		if (OC_LIT == optrip[1]->opcode)
+			j = 2;
+	} else if (OC_LIT == optrip[1]->opcode)
+		j = 1;
+	if (2 == j)
+	{	/* Both sides are literals; remove them */
+		for (j = 0;  j < ARRAYSIZE(v); j++)
+		{	/* both arguments are literals, so do the operation at compile time */
+			/* We don't need any COBOOLs, and all the negatives/coms should be out */
+			for (ref0 = t->operand[j].oprval.tref; ref0 != optrip[j]; ref0 = ref0->operand[0].oprval.tref)
+			{
+				assert((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode));
+				dqdel(ref0, exorder);
+				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
+			}
+			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
+			tv[j] = (0 != v[j]->m[1]);
+			unuse_literal(v[j]);
+			optrip[j]->opcode = OC_NOOP;	/* shouldn't dqdel be safe? */
+			optrip[j]->operand[0].oprclass = NO_REF;
+		}
+		t->operand[1].oprclass = NO_REF;
+		switch (t->opcode)
+		{	/* optimize the Boolean operations here */
 		case OC_NAND:
 		case OC_AND:
 			tvr = (tv[0] && tv[1]);
@@ -222,9 +183,14 @@ void bx_boollit_tail(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, b
 			break;
 		default:
 			assertpro(FALSE);
+		}
+		if (OCT_NEGATED & oc_tab[t->opcode].octype)
+			tvr = !tvr;
+		ref0 = maketriple(OC_LIT);
+		t->opcode = OC_COBOOL;
+		t->operand[0] = put_tref(ref0);
+		PUT_LITERAL_TRUTH(tvr, ref0);
+		dqrins(t, exorder, ref0);
 	}
-	tvr ^= !sense;
-	t->operand[0] = put_indr(addr);
-	t->opcode = tvr ? OC_JMPFALSE : OC_JMPTRUE;
 	return;
 }

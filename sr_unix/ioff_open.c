@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,7 @@
 
 GBLREF io_pair io_curr_device;
 
-short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
 {
 	io_desc		*iod;
  	d_rm_struct	*d_rm;
@@ -52,5 +53,5 @@ short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	}
 	d_rm->fifo = TRUE;
 	iod->type = rm;
-	return iorm_open(dev_name, pp, fd, mspace, timeout);
+	return iorm_open(dev_name, pp, fd, mspace, msec_timeout);
 }

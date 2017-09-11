@@ -20,8 +20,6 @@ thirdparty = gcrypt
 algo = AES256CFB
 # If the machine has a libgcrypt version <= 1.4.1, then FIPS mode cannot be turned on.
 gcrypt_nofips = 0
-# Default HP-UX OpenSSL include/lib base directory.
-HPUX_OPENSSL_ROOT = /opt/openssl/1.0.1e/
 
 # Verify that $gtm_dist is defined
 ifndef gtm_dist
@@ -61,6 +59,8 @@ ifeq ($(HAVE_GPG21),1)
 	USE_LOOPBACK = "-DUSE_GPGME_PINENTRY_MODE_LOOPBACK"
 endif
 
+# Determine if libgcrypt is installed.
+HAVE_GPGCRYPT = $(shell which libgcrypt-config 2> /dev/null)
 
 # Default installation target. This allows for the build system to randomize `thirdparty' and `algo' thereby changing the default
 # gtmcrypt install link.
@@ -114,29 +114,6 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	LIBFLAGS += -L/usr/lib/openssl-1.0
 endif
 
-# Solaris
-ifneq (,$(findstring Solaris,$(UNAMESTR)))
-	# -fPIC for Position Independent Code; -m64 for 64-bit
-	CFLAGS += -fPIC -m64
-	LDFLAGS = -Wl,-64 -m64
-	# So that dependent libraries are loaded from the parent library's load path at runtime
-	RPATHFLAGS = -Wl,-R,'$$ORIGIN'
-	LDSHR = -G
-endif
-
-# HP-UX
-ifneq (,$(findstring HP-UX,$(UNAMESTR)))
-	# +Z is for Position Independent Code; -Ae for Extended ANSI mode and +DD64 for 64-bit
-	CFLAGS += +Z -Ae  +DD64
-	LDFLAGS = +DD64
-	# So that dependent libraries are loaded from the parent library's load path at runtime
-	RPATHFLAGS = -Wl,+b,\$$ORIGIN
-	# -b for shared library and -B,symbolic for assigning protected export calls to symbols.
-	LDSHR = -Wl,-b,-B,symbolic
-	LIBFLAGS = -L $(HPUX_OPENSSL_ROOT)/lib
-	IFLAGS = -I $(HPUX_OPENSSL_ROOT)/include
-endif
-
 # AIX
 ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -qchars=signed forces `char' type to be treated as signed chars.
@@ -162,6 +139,9 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# On AIX, build maskpass and libgtmcryptutil.so with OpenSSL's libcrypto instead of libgcrypt.
 	default_thirdparty_CFLAGS = -DUSE_OPENSSL
 	default_thirdparty_LDFLAGS = -lcrypto
+	# Set the default library
+	thirdparty = openssl
+	install_targ = libgtmcrypt_$(thirdparty)_$(algo).so
 endif
 
 # Common header and library paths
@@ -201,12 +181,16 @@ maskpass: maskpass.c $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
 	$(CC) $(CFLAGS) -DUSE_SYSLIB_FUNCS $(default_thirdparty_CFLAGS) maskpass.c $(crypt_util_srcfiles)	\
 		$(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
 
+ifneq ($(HAVE_GPGCRYPT),)
 gcrypt: libgtmcrypt_gcrypt_AES256CFB.so
 
 libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
 		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
+else
+gcrypt:
+endif
 
 openssl: libgtmcrypt_openssl_AES256CFB.so
 

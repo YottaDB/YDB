@@ -532,7 +532,12 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			 * otherwise.
 			 */
 			need_statsdb_rundown = statsDBudi->grabbed_ftok_sem;
-			assert(!need_statsdb_rundown || !baseDBrundown_status);
+			/* Note: It is possible that need_statsdb_rundown is TRUE and baseDBrundown_status is also TRUE
+			 * in case the baseDB has already been run down but statsDB has not been rundown and
+			 * the gtm_statsdir env var used to create this statsDB is different from the current value of
+			 * the gtm_statsdir env var. Therefore continue running down the statsDB as long as that is
+			 * needed, irrespective of the rundown status of the baseDB.
+			 */
 			if (!need_statsdb_rundown)
 			{
 				mu_gv_cur_reg_free();

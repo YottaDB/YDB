@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,6 @@
 #define GTM_PERMISSIONS
 
 #include <mdefsp.h>
-
 
 enum perm_target_types
 {
@@ -51,9 +50,16 @@ error_def(ERR_PERMGENDIAG);
 		(pdd).lib_gid, RTS_ERROR_STRING((pdd).lib_perm)
 #define PERMGENDIAG_ARG_COUNT	(13)
 
-gid_t gtm_get_group_id(struct stat *stat_buff);
-boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd);
-boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type,
-			struct perm_diag_data *pdd);
+GBLREF	gid_t		*gid_list;
+GBLREF	int		gid_list_len;
+
+#define GID_IN_GID_LIST(GID)	((NULL == gid_list) ? (gtm_init_gid_list(), gtm_gid_in_gid_list(GID)) : gtm_gid_in_gid_list(GID))
+
+void		gtm_init_gid_list(void);
+boolean_t	gtm_gid_in_gid_list(gid_t);
+gid_t		gtm_get_group_id(struct stat *stat_buff);
+boolean_t	gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd);
+boolean_t	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type,
+				struct perm_diag_data *pdd);
 
 #endif /* GTM_PERMISSIONS */

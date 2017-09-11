@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,7 @@
 #include "gtm_tputs.h"
 #include "gtm_tparm.h"
 #include "outofband.h"
+#include "restrict.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -138,7 +139,7 @@ void iott_use(io_desc *iod, mval *pp)
 					tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
-					if (!ctrlc_on)
+					if (!ctrlc_on && !RESTRICTED(cenable))
 					{	/* if it's already cenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
@@ -152,7 +153,7 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_nocenable:
-					if (ctrlc_on)
+					if (ctrlc_on && !RESTRICTED(cenable))
 					{	/* if it's already nocenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)

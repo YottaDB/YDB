@@ -57,10 +57,10 @@ error_def(ERR_SYSCALL);
 LITREF mstr			chset_names[];
 LITREF	unsigned char		io_params_size[];
 
-static bool mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
+static boolean_t mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
 
 /*	The third parameter is dummy to keep the inteface same as op_open	*/
-int mu_op_open(mval *v, mval *p, int t, mval *mspace)
+int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 {
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	int4		stat;		/* status */
@@ -106,7 +106,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 	return (stat);
 }
 
-static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
+static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
 {
 	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 	char		*buf, namebuf[LOGNAME_LEN + 1];

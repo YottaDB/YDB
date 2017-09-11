@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,7 @@
 #include "replgbl.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #include "gtmdbgflags.h"
+#include "lockconst.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -513,7 +514,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		}
 		assert(msg.type == REPL_START_JNL_SEQNO || msg.type == REPL_FETCH_RESYNC || msg.type == REPL_XOFF_ACK_ME);
 		assert(MIN_REPL_MSGLEN == msg.len);
-		/* If we dont yet know the endianness of the other side and the input message is not a REPL_XOFF_ACK_ME
+		/* If we don't yet know the endianness of the other side and the input message is not a REPL_XOFF_ACK_ME
 		 * we can decide the endianness of the receiver side by the endianness of the input message.
 		 * REPL_XOFF_ACK_ME is an exception due to its handling by pre-V5500 versions (described in comments above).
 		 */
@@ -528,7 +529,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source and Receiver sides have same endianness\n");
 		}
 		/* We only expect REPL_START_JNL_SEQNO, REPL_LOGFILE_INFO and REPL_XOFF_ACK_ME messages to be sent once the
-		 * endianness of the remote side has been determined. We dont expect the REPL_FETCH_RESYNC message to be
+		 * endianness of the remote side has been determined. We don't expect the REPL_FETCH_RESYNC message to be
 		 * ever sent in the middle of a handshake (i.e. after the remote side endianness has been determined).
 		 * Assert that. The logic that sets "msg_is_cross_endian" relies on this. If this assert fails, the logic
 		 * has to change.
@@ -607,7 +608,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			 * not timeout before receiving a response. */
 			remote_side->proto_ver = (RECAST(repl_resync_msg_ptr_t)&msg)->proto_ver;
 			remote_side->is_supplementary = (RECAST(repl_resync_msg_ptr_t)&msg)->is_supplementary;
-			/* The following fields dont need to be initialized since they are needed (for internal filter
+			/* The following fields don't need to be initialized since they are needed (for internal filter
 			 * transformations) only if we send journal records across. REPL_FETCH_RESYNC causes only
 			 * protocol messages to be exchanged (no journal records).
 			 *	remote_side->jnl_ver = ...
@@ -683,7 +684,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		 * gtmsource_local->read_jnl_seqno as 30, but recvd_jnl_seqno as 60. This means that we are going to bump
 		 * "gtmsource_local->read_jnl_seqno" up to the received seqno (in the later call to "gtmsource_flush_fh") without
 		 * knowing how many bytes of transaction data that meant (to correspondingly bump up "gtmsource_local->read_addr").
-		 * The only case where we dont care to maintain "read_addr" is if we are in READ_FILE mode AND the current
+		 * The only case where we don't care to maintain "read_addr" is if we are in READ_FILE mode AND the current
 		 * read_jnl_seqno and the received seqno is both lesser than or equal to "gtmsource_save_read_jnl_seqno". Except
 		 * for that case, we need to reset "gtmsource_save_read_jnl_seqno" to correspond to the current jnl seqno.
 		 */
@@ -692,8 +693,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			gtmsource_local->read_state = READ_FILE;
 			gtmsource_save_read_jnl_seqno = jctl->jnl_seqno;
-			gtmsource_local->read_addr = jnlpool.jnlpool_ctl->write_addr;
-			gtmsource_local->read = jnlpool.jnlpool_ctl->write;
+			GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
 	} else if (READ_POOL == gtmsource_local->read_state)
@@ -710,17 +710,17 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 			 QWGT(cur_read_jnl_seqno, recvd_jnl_seqno) &&
 			 QWGT(cur_read_jnl_seqno, jctl->start_jnl_seqno))
 		{
-			if (QWGE(jctl->early_write_addr, cur_read_addr))
+			if (QWGE(jctl->rsrv_write_addr, cur_read_addr))
 			{	/* If there is no more input to be read, the previous transaction size should not be read from the
 				 * journal pool since the read pointers point to the next read. In such a case, we can find the
 				 * size of the transcation cur_read_jnl_seqno from jctl->lastwrite_len. We should access
 				 * lastwrite_len after a memory barrier to avoid reading a stale value. We rely on the memory
 				 * barrier done in jnlpool_hasnt_overflowed */
 				save_lastwrite_len = jctl->lastwrite_len;
-				if (QWEQ(jctl->early_write_addr, cur_read_addr))
+				if (QWEQ(jctl->rsrv_write_addr, cur_read_addr))
 				{	/* GT.M is not writing any transaction, safe to rely on jctl->lastwrite_len. Note,
 					 * GT.M could not have been writing transaction cur_read_jnl_seqno if we are here. Also,
-					 * lastwrite_len cannot be in the future w.r.t early_write_addr because of the memory
+					 * lastwrite_len cannot be in the future w.r.t rsrv_write_addr because of the memory
 					 * barriers we do in t{p}_{t}end.c. It can be behind by atmost one transaction
 					 * (cur_read_jnl_seqno). Well, we want the length of transaction cur_read_jnl_seqno,
 					 * not cur_read_jnl_seqno + 1.
@@ -743,17 +743,31 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 				}
 			}
 			if (QWEQ(cur_read_addr, jctl->write_addr))
-			{ /* we caught a GTM process writing cur_read_jnl_seqno + 1, we cannot rely on lastwrite_len as it
-				* may or may not have changed. Wait until the GTM process finishes writing this transaction */
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "SEARCHING RESYNC POINT IN POOL : Waiting for GTM process "
-										 "to finish writing journal records to the pool\n");
-				while (QWEQ(cur_read_addr, jctl->write_addr))
-				{
-					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-					gtmsource_poll_actions(FALSE);
+			{	/* Check if there are any pending phase2 commits that can be cleaned up.
+				 * That will bring jctl->write_addr more uptodate. And then redo the read_addr/write_addr check.
+				 */
+				if (jctl->write_addr != jctl->rsrv_write_addr)
+					repl_phase2_cleanup(&jnlpool);
+				if (QWEQ(cur_read_addr, jctl->write_addr))
+				{	/* We caught a GTM process writing cur_read_jnl_seqno + 1,
+					 * we cannot rely on lastwrite_len as it may or may not have changed.
+					 * Wait until the GTM process finishes writing this transaction.
+					 */
+					repl_log(gtmsource_log_fp, TRUE, FALSE, "SEARCHING RESYNC POINT IN POOL : "
+						"Waiting for GTM process to finish writing journal records to the pool\n");
+					while (QWEQ(cur_read_addr, jctl->write_addr))
+					{
+						SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
+						gtmsource_poll_actions(FALSE);
+						/* Check if there are any pending phase2 commits that can be cleaned up.
+						 * That will bring jctl->write_addr more uptodate.
+						 */
+						if (jctl->write_addr != jctl->rsrv_write_addr)
+							repl_phase2_cleanup(&jnlpool);
+					}
+					repl_log(gtmsource_log_fp, TRUE, FALSE, "SEARCHING RESYNC POINT IN POOL : "
+						"GTM process finished writing journal records to the pool\n");
 				}
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "SEARCHING RESYNC POINT IN POOL : GTM process finished "
-										 "writing journal records to the pool\n");
 			}
 		}
 		while (jnlpool_hasnt_overflowed(jctl, jnlpool_size, cur_read_addr) &&
@@ -853,19 +867,33 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 	seq_num			jnl_seqno, read_jnl_seqno;
 	qw_num			write_addr, read_addr;
 	gtmsource_state_t	gtmsource_state_sav;
+	int			index1;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
-	write_addr = jctl->write_addr;
 	jnl_seqno = jctl->jnl_seqno;
 	read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 	read_addr = gtmsource_local->read_addr;
-	assert(read_addr <= write_addr);
-	assert((0 != write_addr) || (read_jnl_seqno <= jctl->start_jnl_seqno));
 	GTMDBGFLAGS_NOFREQ_ONLY(GTMSOURCE_FORCE_READ_FILE_MODE, gtmsource_local->read_state = READ_FILE);
 	switch(gtmsource_local->read_state)
 	{
 		case READ_POOL:
+			/* Check if there are any pending phase2 commits that can be cleaned up.
+			 * That will bring jctl->write_addr more uptodate.
+			 */
+			index1 = jctl->phase2_commit_index1;
+			assert((0 <= index1) && (JPL_PHASE2_COMMIT_ARRAY_SIZE > index1));
+			if ((index1 != jctl->phase2_commit_index2) && jctl->phase2_commit_array[index1].write_complete
+					&& (LOCK_AVAILABLE == jctl->phase2_commit_latch.u.parts.latch_pid))
+				repl_phase2_cleanup(&jnlpool);
+			/* Now that write_addr is uptodate, go ahead and read jnl records */
+			write_addr = jctl->write_addr;
+			assert((0 != write_addr) || (read_jnl_seqno <= jctl->start_jnl_seqno));
+			assert(read_addr <= write_addr);
 			if (read_addr == write_addr)
 			{	/* Nothing to read. While reading pool, the comparison of read_addr against write_addr is
 				 * the only reliable indicator if there are any transactions to be read. This is due to
@@ -883,7 +911,16 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				return (0);	/* Connection got reset in call to "gtmsource_readpool" */
 			if (0 < total_tr_len)
-				return (total_tr_len);
+			{	/* Found the entire seqno in the jnlpool. Check if the first journal record of this seqno
+				 * is of type JRT_BAD. This indicates a ERR_JNLPOOLRECOVERY situation (see
+				 * JPL_PHASE2_WRITE_COMPLETE macro for details). If so, switch to reading from files.
+				 */
+				assert(total_tr_len >= (SIZEOF(jnldata_hdr_struct) + SIZEOF(jrec_prefix)));
+				if (JRT_BAD != ((jrec_prefix *)buff)->jrec_type)
+					return (total_tr_len);
+				assert((0 != TREF(gtm_test_jnlpool_sync)) && (0 == (read_jnl_seqno % TREF(gtm_test_jnlpool_sync))));
+				*data_len = -1;	/* so we do fall through to READ_FILE code below */
+			}
 			if (0 < *data_len)
 				return (-1);
 			/* Overflow, switch to READ_FILE */
@@ -896,6 +933,14 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 			/* CAUTION : FALL THROUGH */
 
 		case READ_FILE:
+			/* Note that while reading from journal files, it is possible the source server sees the journal records
+			 * for a transaction in the journal files BEFORE the transaction is marked as complete in the journal
+			 * pool (because FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED is called AFTER FINISH_JNL_PHASE2_IN_JNLBUFF
+			 * in NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL and TP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL).
+			 * Therefore it is possible read_addr (which is derived from the journal file records) could be greater
+			 * than write_addr (which is derived from the journal pool). And so "assert(read_addr <= write_addr)"
+			 * cannot be done here like is done for the READ_POOL case.
+			 */
 			if (read_jnl_seqno >= jnl_seqno)
 			{	/* Nothing to read. While reading from files, source server does not use write_addr to decide
 				 * how much to read. Also, it is possible that read_addr and write_addr are the same if the
@@ -1045,7 +1090,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 				return FALSE;
 			/* Check if we received an XOFF_ACK_ME message completely. If yes, we can safely break out of the
 			 * loop without receiving the originally intended message (as the receiver is going to drain away all
-			 * the stuff in the replication pipe anyways and reinitiate a fresh handshake). This way we dont hang
+			 * the stuff in the replication pipe anyways and reinitiate a fresh handshake). This way we don't hang
 			 * eternally waiting for a never-arriving originally intended message.
 			 */
 			if ((MIN_REPL_MSGLEN <= recvd_len) && (REPL_XOFF_ACK_ME == msg->type))
@@ -1881,7 +1926,7 @@ void	gtmsource_send_new_histrec()
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 				return; /* send did not succeed */
 			/* If we have a non-zero stream history record, then check if its "start_seqno" is lesser than
-			 * gtmsource_local->read_jnl_seqno. If so, we dont even need to send this history record. If it is
+			 * gtmsource_local->read_jnl_seqno. If so, we don't even need to send this history record. If it is
 			 * equal though, we do need to send this across.
 			 */
 			assert(gtmsource_local->read_jnl_seqno >= histinfo.start_seqno);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,9 +109,12 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
 #define	IS_INSERT		0
 #define	IS_DELETE		1
 
-#define ISSUE_REQRLNKCTLRNDWN_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_REQRLNKCTLRNDWN, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),	\
-		      ERR_SYSCALL, 5, LEN_AND_STR(ERRSTR), CALLFROM, DEBUG_ONLY(saved_errno = )ERRNO)
+error_def(ERR_REQRLNKCTLRNDWN);	/* needed for the ISSUE_REQRLNKCTLRNDWN_SYSCALL macro */
+
+#define ISSUE_REQRLNKCTLRNDWN_SYSCALL(LINKCTL, ERRSTR, ERRNO)							\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13)								\
+		ERR_REQRLNKCTLRNDWN, 3, LINKCTL->relinkctl_path, RTS_ERROR_MSTR(&LINKCTL->zro_entry_name), 	\
+		ERR_SYSCALL, 5, LEN_AND_STR(ERRSTR), CALLFROM, DEBUG_ONLY(saved_errno = )ERRNO)
 
 #define ISSUE_RELINKCTLERR_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),		\

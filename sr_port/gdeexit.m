@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2016 Fidelity National Information		;
+; Copyright (c) 2001-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,7 +12,8 @@
 exit:	;implement the verb: EXIT
 EXIT
 	i 'update d QUIT^GDEQUIT
-	i '$$ALL^GDEVERIF  zm gdeerr("NOEXIT")  q
+	; At $zlevel 1 and 2 the EXIT command is implied and therefore must exit
+	i '$$ALL^GDEVERIF  s $zstatus=gdeerr("NOEXIT") zm gdeerr("NOEXIT") d:3>$zlevel GETOUT^GDEEXIT q
 	i '$$GDEPUT^GDEPUT  q	 ; zm is issued in GDEPUT.m
 	d GETOUT^GDEEXIT
 	h
@@ -36,6 +37,6 @@ GETOUT	; Routine executed just before exiting from GDE. This tries to restore th
 	k (gdeEntryStateZlvl,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct)
 	i $$set^%LCLCOL(gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct) ; restores local variable collation characteristics
 	; If GDE was invoked from the shell, exit to shell with proper exit status else use ZGOTO to go to parent mumps invocation
-	if gdeEntryStateZlvl=0 zhalt $select($ecode'="":+$zstatus,1:0)
+	if gdeEntryStateZlvl=0 zhalt +$zstatus
 	zg gdeEntryStateZlvl ; this should exit GDE and return control to parent mumps process invocation
 	h  ; to be safe in case control ever reaches here

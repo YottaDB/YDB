@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,9 +17,25 @@
  */
 #if defined(__linux__) && defined(__x86_64__)
 #define USE_LIBAIO
+#elif defined(__CYGWIN__)
+#define USE_NOAIO
 #endif
 
-#ifndef USE_LIBAIO
+#ifdef USE_NOAIO
+      /* AIO NOT SUPPORTED */
+/* minimal just to satisfy mur_init.c and mur_read_file.h.
+ * More would be needed if MUR_USE_AIO were defined */
+struct aiocb {
+	int		aio_fildes;
+	volatile void	*aio_buf;
+	size_t		aio_nbytes;
+	off_t		aio_offset;
+	size_t		aio_bytesread;
+	int		aio_errno;
+};
+#define IF_LIBAIO(x) /* NONE */
+#define IF_LIBAIO_ELSE(x, y) y
+#elif !defined(USE_LIBAIO)
 #include <aio.h>
 #define IF_LIBAIO(x) /* NONE */
 #define IF_LIBAIO_ELSE(x, y) y

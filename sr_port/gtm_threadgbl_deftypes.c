@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,7 @@
 #include "parm_pool.h"
 #include "util.h"		/* for util_outbuff manipulations */
 #include "nametabtyp.h"
+#include "localvarmonitor.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"

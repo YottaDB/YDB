@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@ GBLREF hash_table_str	*complits_hashtab;
 
 LITREF octabstruct	oc_tab[];
 
-void coerce(oprtype *a,unsigned short new_type)
+void coerce(oprtype *a, unsigned short new_type)
 /* ensure operand (*a) is of the desired type new_type */
 {
 
@@ -33,8 +33,8 @@ void coerce(oprtype *a,unsigned short new_type)
 	stringkey	litkey;
 	triple		*coerc, *ref;
 
-	assert (new_type == OCT_MVAL || new_type == OCT_MINT || new_type == OCT_BOOL);
-	assert (a->oprclass == TRIP_REF);
+	assert ((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
+	assert (TRIP_REF == a->oprclass);
 	ref = a->oprval.tref;
 	old_op = ref->opcode;
 	if (new_type & oc_tab[old_op].octype)
@@ -52,7 +52,7 @@ void coerce(oprtype *a,unsigned short new_type)
 			if (new_type & oc_tab[old_op].octype)
 				return;
 		}
-	} else if (OC_LIT == old_op && OCT_MINT == new_type)
+	} else if ((OC_LIT == old_op) && (OCT_MINT == new_type))
 	{
 		lit = ref->operand[0].oprval.mlit;
 		if (!(++lit->rt_addr))
@@ -74,9 +74,9 @@ void coerce(oprtype *a,unsigned short new_type)
 		ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
 		return;
 	}
-	if (new_type == OCT_BOOL)
+	if (OCT_BOOL == new_type)
 		conv = OC_COBOOL;
-	else if (new_type == OCT_MINT)
+	else if (OCT_MINT == new_type)
 		conv = OC_COMINT;
 	else
 		conv = OC_COMVAL;
