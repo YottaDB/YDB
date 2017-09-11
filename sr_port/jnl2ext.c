@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,12 +46,10 @@
 									\
 	DELIMIT_CURR;							\
 	lcl_strm_seqno = STRM_SEQNO;					\
-	UNIX_ONLY(lcl_strm_num = GET_STRM_INDEX(lcl_strm_seqno);)	\
-	VMS_ONLY(lcl_strm_num = 0;)					\
+	lcl_strm_num = GET_STRM_INDEX(lcl_strm_seqno);			\
 	CURR = (char *)i2ascl((uchar_ptr_t)CURR, lcl_strm_num);		\
 	DELIMIT_CURR;							\
-	UNIX_ONLY(lcl_strm_seqno = GET_STRM_SEQ60(lcl_strm_seqno);)	\
-	VMS_ONLY(lcl_strm_seqno = 0;)					\
+	lcl_strm_seqno = GET_STRM_SEQ60(lcl_strm_seqno);		\
 	CURR = (char *)i2ascl((uchar_ptr_t)CURR, lcl_strm_seqno);	\
 }
 
@@ -77,7 +76,7 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 
 	extbuf = *ext_buff;
 	exttop = extbuf + *extract_bufsiz;
-	for ( ; jnl_len > JREC_PREFIX_UPTO_LEN_SIZE && jnl_len >= (rec_len = rec->prefix.forwptr) && rec_len > MIN_JNLREC_SIZE; )
+	for ( ; jnl_len > JREC_PREFIX_UPTO_LEN_SIZE && jnl_len >= (rec_len = rec->prefix.forwptr) && (MIN_JNLREC_SIZE <= rec_len); )
 	{
 		if (MAX_ONE_JREC_EXTRACT_BUFSIZ > (exttop - extbuf))
 		{	/* Remaining space not enough to hold the worst-case journal extract of ONE jnl record. Expand linearly */
@@ -101,12 +100,6 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 	return extbuf;
 }
 
-/* This was earlier declared as a local variable, but was moved up, because the HPIA compiler for some reason seems to
- * optimize things, and thus not update the buffer correctly. Problem shows up only in optimized builds. Moving it to
- * global status fixed the issue
- */
-GBLDEF char key_buff[SIZEOF(gv_key) + MAX_KEY_SZ + 7];
-
 char	*jnl2ext(char *jnl_buff, char *ext_buff)
 {
   	char		*curr, *val_ptr, rectype;
@@ -115,6 +108,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	gv_key		*key;
 	jnl_string	*keystr, *ztwormstr;
 	int		val_extr_len, val_len, rec_len, tid_len;
+	char		key_buff[SIZEOF(gv_key) + MAX_KEY_SZ + 7];
 
 	rec = (jnl_record *)jnl_buff;
 	rectype = rec->prefix.jrec_type;

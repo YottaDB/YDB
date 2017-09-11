@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -528,12 +528,12 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
-	if (rm_ptr->pipe || rm_ptr->fifo)
+	if (rm_ptr->is_pipe || rm_ptr->fifo)
 		pipe_or_fifo = TRUE;
 	/* If it is a pipe and it's the stdout returned then we need to get the read file descriptor from rm_ptr->read_fildes.
 	 * Additionally, z/OS saves its FIFO read file descriptors in read_fildes, so retrieve it.
 	 */
-	if ((rm_ptr->pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
+	if ((rm_ptr->is_pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
 		fildes = rm_ptr->read_fildes;
 	else
 		fildes = rm_ptr->fildes;
@@ -658,12 +658,12 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
-	if (rm_ptr->pipe || rm_ptr->fifo)
+	if (rm_ptr->is_pipe || rm_ptr->fifo)
 		pipe_or_fifo = TRUE;
 	/* If it is a pipe and it's the stdout returned then we need to get the read file descriptor from rm_ptr->read_fildes.
 	 * Additionally, z/OS saves its FIFO read file descriptors in read_fildes, so retrieve it.
 	 */
-	if ((rm_ptr->pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
+	if ((rm_ptr->is_pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
 		fildes = rm_ptr->read_fildes;
 	else
 		fildes = rm_ptr->fildes;

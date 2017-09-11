@@ -47,7 +47,6 @@
 #include "lke.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
-#include "init_secshr_addrs.h"
 #include "mu_op_open.h"
 #include "cli_parse.h"
 #include "getzdir.h"
@@ -70,7 +69,7 @@
 GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
 GBLREF	int			(*func)();

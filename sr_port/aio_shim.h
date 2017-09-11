@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,13 @@
 
 #include "gtm_libaio.h"
 
-#ifndef USE_LIBAIO
+#ifdef USE_NOAIO
+#define AIO_SHIM_WRITE(UNUSED, AIOCBP, RET)   /* no-op, N/A */
+#define AIO_SHIM_RETURN(AIOCBP, RET)          /* no-op, N/A */
+#define AIO_SHIM_ERROR(AIOCBP, RET)           /* no-op, N/A */
+#define SIGNAL_ERROR_IN_WORKER_THREAD(gdi, err_str, errno)    /* no-op, N/A */
+#define CHECK_ERROR_IN_WORKER_THREAD(reg, udi)                        /* no-op, N/A */
+#elif !defined(USE_LIBAIO)    /* USE_NOAIO */
 #define AIO_SHIM_WRITE(UNUSED, AIOCBP, RET)	MBSTART { RET = aio_write(AIOCBP); } MBEND
 #define AIO_SHIM_RETURN(AIOCBP, RET)	 	MBSTART { RET = aio_return(AIOCBP);} MBEND
 #define AIO_SHIM_ERROR(AIOCBP, RET)		MBSTART { RET = aio_error(AIOCBP); } MBEND

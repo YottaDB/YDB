@@ -58,7 +58,6 @@
 #include "ftok_sem_incrcnt.h"
 #include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) and add_safe_timer_handler */
 #include "gtmsource_heartbeat.h" /* for gtmsource_heartbeat_timer */
-#include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "gtm_zlib.h"
 #include "fork_init.h"
@@ -180,7 +179,7 @@ int gtmsource()
 	{	/* MUPIP REPLIC -SOURCE -ACTIVATE -UPDOK has been specified. We need to open the gld and db regions now
 		 * in case this is a secondary -> primary transition. This is so we can later switch journal files in all
 		 * journaled regions when the transition actually happens inside "gtmsource_rootprimary_init". But since
-		 * we have not yet done a "jnlpool_init", we dont know if updates are disabled in it or not. Although we
+		 * we have not yet done a "jnlpool_init", we don't know if updates are disabled in it or not. Although we
 		 * need to do the gld/db open only if updates are currently disabled in the jnlpool, we do this always
 		 * because once we do a jnlpool_init, we will come back with the ftok on the jnlpool held and that has
 		 * issues with later db open since we will try to hold the db ftok as part of db open and the ftok logic
@@ -305,8 +304,6 @@ int gtmsource()
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
 	process_id = getpid();
-	/* Reinvoke secshr related initialization with the child's pid */
-	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.
@@ -485,8 +482,7 @@ int gtmsource()
 					jnlpool.jnlpool_ctl->jnl_seqno);
 			continue;
 		}
-		QWASSIGN(gtmsource_local->read_addr, jnlpool.jnlpool_ctl->write_addr);
-		gtmsource_local->read = jnlpool.jnlpool_ctl->write;
+		GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
 		gtmsource_local->read_state = gtmsource_local->jnlfileonly ? READ_FILE : READ_POOL;
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 		assert(read_jnl_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);

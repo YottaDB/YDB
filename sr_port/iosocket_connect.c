@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,14 +35,14 @@
 
 #define	ESTABLISHED	"ESTABLISHED"
 
-GBLREF	volatile int4           outofband;
-GBLREF	boolean_t               dollar_zininterrupt;
-GBLREF	stack_frame             *frame_pointer;
-GBLREF	unsigned char           *stackbase, *stacktop, *msp, *stackwarn;
-GBLREF	mv_stent                *mv_chain;
-GBLREF	int			socketus_interruptus;
+GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
+GBLREF	int			socketus_interruptus;
 GBLREF	int4			gtm_max_sockets;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
+GBLREF	volatile int4		outofband;
 
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKNAMERR);
@@ -54,11 +55,11 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
 
-boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t update_bufsiz)
+boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
 {
 	int		temp_1;
 	char		*errptr;
-	int4            errlen, msec_timeout, save_errno, last_errno;
+	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
 	fd_set		writefds;
 	boolean_t	no_time_left = FALSE;
@@ -66,65 +67,61 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 	short		len;
 	io_desc		*iod;
 	d_socket_struct *dsocketptr, *real_dsocketptr;
-        socket_interrupt *sockintr, *real_sockintr;
-	ABS_TIME        cur_time, end_time;
+	socket_interrupt *sockintr, *real_sockintr;
+	ABS_TIME	cur_time, end_time;
 	struct timeval	*sel_time;
-        mv_stent        *mv_zintdev;
+	mv_stent	*mv_zintdev;
 	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
 	int		errcode, real_errno;
 	char		ipaddr[SA_MAXLEN + 1];
 	char		port_buffer[NI_MAXSERV];
 	GTM_SOCKLEN_TYPE	sockbuflen, tmp_addrlen;
 
-	DBGSOCK((stdout, "socconn: ************* Entering socconn - timepar: %d\n",timepar));
-        /* check for validity */
+	DBGSOCK((stdout, "socconn: ************* Entering socconn - msec_timeout: %d\n",msec_timeout));
+	/* check for validity */
 	dsocketptr = sockptr->dev;
-        assert(NULL != dsocketptr);
-        sockintr = &dsocketptr->sock_save_state;
+	assert(NULL != dsocketptr);
+	sockintr = &dsocketptr->sock_save_state;
 	iod = dsocketptr->iod;
 	real_dsocketptr = (d_socket_struct *)iod->dev_sp;	/* not newdsocket which is not saved on error */
-        real_sockintr = &real_dsocketptr->sock_save_state;
-
-        iod->dollar.key[0] = '\0';
+	real_sockintr = &real_dsocketptr->sock_save_state;
+	iod->dollar.key[0] = '\0';
 	need_socket = need_connect = TRUE;
 	need_select = FALSE;
-
-        /* Check for restart */
-        if (dsocketptr->mupintr)
-        {       /* We have a pending read restart of some sort - check we aren't recursing on this device */
-                assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
-                if (dollar_zininterrupt)
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
-                assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
-                DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
-                mv_zintdev = io_find_mvstent(iod, FALSE);
-                if (mv_zintdev)
-                {
-                        if (sockintr->end_time_valid)
-                                /* Restore end_time for timeout */
-                                end_time = sockintr->end_time;
+	/* Check for restart */
+	if (dsocketptr->mupintr)
+	{       /* We have a pending read restart of some sort - check we aren't recursing on this device */
+		assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
+		if (dollar_zininterrupt)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
+		DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
+		mv_zintdev = io_find_mvstent(iod, FALSE);
+		if (mv_zintdev)
+		{
+			if (sockintr->end_time_valid)
+				/* Restore end_time for timeout */
+				end_time = sockintr->end_time;
 			if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
 			{
 				need_select = TRUE;
 				need_socket = need_connect = FALSE;	/* sd still good */
 			}
-
-                        /* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
-                        if (mv_chain == mv_zintdev)
-                                POP_MV_STENT();         /* pop if top of stack */
-                        else
-                        {       /* else mark it unused, see iosocket_open for use */
-                                mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-                                mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-                        }
-                        DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
-                } else
-                        DBGSOCK((stdout, "socconn: no mv_stent found !!\n"));
-                real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
-                real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
-        } else if (timepar != NO_M_TIMEOUT)
+			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
+			if (mv_chain == mv_zintdev)
+				POP_MV_STENT();	 /* pop if top of stack */
+			else
+			{       /* else mark it unused, see iosocket_open for use */
+				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			}
+			DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
+		} else
+			DBGSOCK((stdout, "socconn: no mv_stent found !!\n"));
+		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
+		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
+	} else if (NO_M_TIMEOUT != msec_timeout)
 	{
-		msec_timeout = timeout2msec(timepar);
 		sys_get_curr_time(&cur_time);
 		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 	}
@@ -189,10 +186,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 				remote_ai_ptr->ai_next = NULL;
 				if (-1 == setsockopt(sockptr->sd, SOL_SOCKET, SO_REUSEADDR,
 					&temp_1, SIZEOF(temp_1)))
-        			{
+				{
 					save_errno = errno;
-                			errptr = (char *)STRERROR(save_errno);
-                			errlen = STRLEN(errptr);
+					errptr = (char *)STRERROR(save_errno);
+					errlen = STRLEN(errptr);
 					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
@@ -200,10 +197,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 						freeaddrinfo(sockptr->remote.ai_head);
 						sockptr->remote.ai_head = NULL;
 					}
-                			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 						  RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
-                			return FALSE;
-        			}
+					return FALSE;
+				}
 #				ifdef TCP_NODELAY
 				temp_1 = sockptr->nodelay ? 1 : 0;
 				if (-1 == setsockopt(sockptr->sd,
@@ -285,7 +282,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 						need_connect = FALSE;
 						break;
 					case EINTR:
-						if (outofband && 0 != timepar)
+						if (outofband && 0 != msec_timeout)
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
 							need_socket = need_connect = FALSE;
@@ -297,7 +294,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 					case EWOULDBLOCK:
 #					endif
 						need_socket = need_connect = FALSE;
-						if (0 != timepar)
+						if (0 != msec_timeout)
 							need_select = TRUE;
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
@@ -305,14 +302,17 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 #					ifndef VMS
 					case ENOENT:	/* LOCAL socket not there */
 #					endif
-						if (!no_time_left && 0 != timepar && NO_M_TIMEOUT != timepar)
+						if (!no_time_left && (0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
 						{
 							sys_get_curr_time(&cur_time);
 							cur_time = sub_abs_time(&end_time, &cur_time);
-							if (cur_time.at_sec <= 0)
-								no_time_left = TRUE;
+							msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+								/* Round up in order to prevent premature timeouts */
+								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+							if (0 >= msec_timeout)
+								msec_timeout = 0;
 						}
-						if (0 == timepar)
+						if (0 == msec_timeout)
 							no_time_left = TRUE;
 						else if (!no_time_left)
 						{
@@ -335,13 +335,16 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 			sockerror = 0;
 			do
 			{ /* unless outofband loop on select if connection continuing */
-				if (NO_M_TIMEOUT == timepar)
+				if (NO_M_TIMEOUT == msec_timeout)
 					sel_time = NULL;
 				else
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (cur_time.at_sec > 0)
+					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+						/* Round up in order to prevent premature timeouts */
+						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+					if (0 < msec_timeout)
 						sel_time = (struct timeval *)&cur_time;
 					else
 					{	/* timed out so done */
@@ -462,10 +465,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 			} else
 				sockptr->state = socket_connect_inprogress;
 			real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
-			if (NO_M_TIMEOUT != timepar)
+			if (NO_M_TIMEOUT != msec_timeout)
 			{
 				real_sockintr->end_time = sockintr->end_time = end_time;
-                               	real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
+				real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
 			} else
 				real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
 			real_sockintr->newdsocket = sockintr->newdsocket = newdsocket;
@@ -496,12 +499,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 	sockptr->state = socket_connected;
 	sockptr->first_read = sockptr->first_write = TRUE;
 	/* update dollar_key */
-        len = SIZEOF(ESTABLISHED) - 1;
-        memcpy(&iod->dollar.key[0], ESTABLISHED, len);
-        iod->dollar.key[len++] = '|';
-        memcpy(&iod->dollar.key[len], sockptr->handle, sockptr->handle_len);
-        len += sockptr->handle_len;
-        iod->dollar.key[len++] = '|';
+	len = SIZEOF(ESTABLISHED) - 1;
+	memcpy(&iod->dollar.key[0], ESTABLISHED, len);
+	iod->dollar.key[len++] = '|';
+	memcpy(&iod->dollar.key[len], sockptr->handle, sockptr->handle_len);
+	len += sockptr->handle_len;
+	iod->dollar.key[len++] = '|';
 	/* translate internal address to numeric ip address */
 	assert(FALSE == need_socket);
 	if (NULL != sockptr->remote.ai_head)
@@ -559,7 +562,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		}
 		STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
 		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
-#	ifndef VMS
 	} else
 	{	/* getsockname does not return info for AF_UNIX connected socket so copy from remote side */
 		local_ai_ptr->ai_socktype = sockptr->remote.ai.ai_socktype;
@@ -567,9 +569,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		local_ai_ptr->ai_protocol = sockptr->remote.ai.ai_protocol;
 		SOCKET_ADDR_COPY(sockptr->local, sockptr->remote.sa, sockptr->remote.ai.ai_addrlen);
 		STRNCPY_STR(&iod->dollar.key[len], ((struct sockaddr_un *)(sockptr->remote.sa))->sun_path, DD_BUFLEN - len - 1);
-#	endif
 	}
 	iod->dollar.key[DD_BUFLEN - 1] = '\0';			/* In case we fill the buffer */
-
 	return TRUE;
 }

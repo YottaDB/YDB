@@ -31,6 +31,7 @@
 #include "send_msg.h"
 #include "gtm_c_stack_trace.h"
 #include "wbox_test_init.h"
+#include "is_proc_alive.h"
 
 error_def(ERR_COMMITWAITPID);
 error_def(ERR_COMMITWAITSTUCK);
@@ -63,14 +64,11 @@ error_def(ERR_COMMITWAITSTUCK);
 }
 
 GBLREF	uint4		process_id;
-GBLREF	int		process_exiting;
 #ifdef DEBUG
 GBLREF	boolean_t	in_mu_rndwn_file;
 #endif
 
-#ifdef UNIX
-GBLREF	volatile int4		timer_stack_count;
-#endif
+#define	PROC_ALIVE_CHECK_FACTOR	32	/* Do "is_proc_alive" check 32 times during the total wait period */
 
 /* if cr == NULL, wait a maximum of 1 minute for ALL processes actively in bg_update_phase2 to finish.
  * if cr != NULL, wait a maximum of 1 minute for the particular cache-record to be done with phase2 commit.
@@ -85,13 +83,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 {
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
-	uint4			lcnt, blocking_pid, start_in_tend, spincnt, maxspincnt;
+	uint4			lcnt, lcnt_isprcalv_freq, lcnt_isprcalv_next, blocking_pid, start_in_tend;
 	int4			value;
-	boolean_t		was_crit;
-	boolean_t		use_timer;
+	boolean_t		is_alive, was_crit;
 	boolean_t		timedout;
 	block_id		blk;
-	int4			index, crarray_size, crarray_index;
+	int4			index, crarray_index;
 	cache_rec_ptr_t		cr_lo, cr_top, curcr;
 	phase2_wait_trace_t	crarray[MAX_PHASE2_WAIT_CR_TRACE_SIZE];
 #	ifdef DEBUG
@@ -100,39 +97,16 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	int4			waitarray_size;
 	boolean_t		half_time = FALSE;
 #	endif
-	static uint4		stuck_cnt = 0; /* stuck_cnt signifies the number of times the same process
-						has called gtmstuckexec for the same condition*/
+	static uint4		stuck_cnt = 0;	/* stuck_cnt signifies the number of times the same process
+						 * has called gtmstuckexec for the same condition.
+						 */
+
 	DEBUG_ONLY(cr_lo = cr_top = NULL;)
-	crarray_size = SIZEOF(crarray) / SIZEOF(crarray[0]);
 	DEBUG_ONLY(waitarray_size = SIZEOF(waitarray) / SIZEOF(waitarray[0]);)
 
 	assert(!in_mu_rndwn_file);
 	csd = csa->hdr;
-	/* To avoid unnecessary time spent waiting, we would like to do rel_quants instead of wcs_sleep. But this means
-	 * we need to have some other scheme for limiting the total time slept. We use the heartbeat scheme which currently is
-	 * available only in Unix. Every 8 seconds or so, the heartbeat timer increments a counter. But the heartbeat_timer
-	 * will not pop if we are are already in timer_handler. This is possible if the flush timer pops and we end up invoking
-	 * wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. But since the heartbeat timer cannot pop as long as
-	 * timer_in_handler is TRUE (which it will be until at least we exit this function), we cannot use the heartbeat scheme
-	 * and so fall back on rel_quants. If not, use wcs_sleep.
-	 * We have found that doing rel_quants (instead of sleeps) causes huge CPU usage in Tru64 even if the default spincnt is
-	 * set to 0 and ALL processes are only waiting for one process to finish its phase2 commit. Therefore we choose
-	 * the sleep approach for Tru64. Choosing a spincnt of 0 would choose the sleep approach (versus rel_quant).
-	 */
-#	if (defined(UNIX) && !defined(__osf__))
-	use_timer = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && (1 > timer_stack_count));
-#	else
-	use_timer = FALSE;
-#	endif
-	if (use_timer)
-	{
-		maxspincnt = csd->wcs_phase2_commit_wait_spincnt;
-		assert(maxspincnt);
-		if (!maxspincnt)
-			maxspincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
-		TIMEOUT_INIT(timedout, PHASE2_COMMIT_WAIT_MS DEBUG_ONLY(/ 2));
-	} else
-		DEBUG_ONLY(phase2_commit_half_wait = (PHASE2_COMMIT_WAIT >> 1));
+	DEBUG_ONLY(phase2_commit_half_wait = (PHASE2_COMMIT_WAIT / 2));
 	assert(dba_bg == csd->acc_meth);
 	if (dba_bg != csd->acc_meth)	/* in pro, be safe and return */
 		return TRUE;
@@ -156,59 +130,93 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		/* we better not deadlock wait for ourself */
 		if (!was_crit && (process_id == start_in_tend))
 		{
-			if (use_timer)
-				TIMEOUT_DONE(timedout);
 			assert(gtm_white_box_test_case_enabled);
 			return TRUE;
 		}
 		assertpro(process_id != start_in_tend);	/* should not deadlock on our self */
 		if (!start_in_tend)
-		{
-			if (use_timer)
-				TIMEOUT_DONE(timedout);
 			return TRUE;
-		}
 	} else
 	{	/* initialize the beginning and the end of cache-records to be used later (only in case of cr == NULL) */
 		cr_lo = ((cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array) + csd->bt_buckets;
 		cr_top = cr_lo + csd->n_bts;
 	}
-	/* Spin & sleep/yield alternately for the phase2 commit to complete */
-	for (spincnt = 0, lcnt = 0; ; spincnt++)
+	/* Check/Sleep alternately for the phase2 commit to complete */
+	lcnt_isprcalv_freq = PHASE2_COMMIT_WAIT / PROC_ALIVE_CHECK_FACTOR;
+	lcnt_isprcalv_next = lcnt_isprcalv_freq - 1;
+	for (lcnt = 0; ; )
 	{
 		SHM_READ_MEMORY_BARRIER; /* read memory barrier done to minimize time spent spinning waiting for value to change */
 		if (NULL == cr)
 		{
 			value = cnl->wcs_phase2_commit_pidcnt;
 			if (!value)
-			{
-				if (use_timer)
-					TIMEOUT_DONE(timedout);
 				return TRUE;
+			if (lcnt == lcnt_isprcalv_next)
+			{	/* Do "is_proc_alive" check. This section is very similar to the "NULL == cr" section
+				 * at the end of this module in terms of book-keeping array maintenance.
+				 */
+				crarray_index = 0;
+				for (curcr = cr_lo; curcr < cr_top;  curcr++)
+				{
+					blocking_pid = curcr->in_tend;
+					if (!blocking_pid || (blocking_pid == process_id))
+						continue;
+					/* If we do not hold crit, the existence of one dead pid is enough for us to know we
+					 * cannot return TRUE (because we are waiting for all phase2 commits to finish and one
+					 * dead pid means all commits will never complete on its own) so return FALSE right away
+					 * that way caller can invoke "wcs_recover" and try to fix the situation.
+					 * If we hold crit though, we cannot return FALSE right away in this situation. Only if
+					 * we examine all non-zero "cr->in_tend" entries and confirm all of them are dead can
+					 * we return FALSE. If at least one process is still alive, we have to wait for the
+					 * timeout period (1-minute or so) before returning FALSE.
+					 * We use "crarray" to hold the list of alive pids in the !was_crit case and to hold
+					 * the list of dead pids in the was_crit case.
+					 */
+					for (index = 0; index < crarray_index; ++index)
+						if (crarray[index].blocking_pid == blocking_pid)
+							break;
+					if (index == crarray_index)
+					{	/* cache-record with PID different from what we have seen till now */
+						is_alive = is_proc_alive(blocking_pid, 0);
+						if (!is_alive && !was_crit)
+							return FALSE;	/* Process is not alive. We can return
+									 * right away with failure.
+									 */
+						if (is_alive && was_crit)
+						{	/* We found one pid that is still alive and has phase2 commit in
+							 * progress. Stop the search of the cache-array to find if all
+							 * phase2 commit pids are dead. We will anyways have to continue
+							 * waiting (for this alive pid to finish its phase2 commit).
+							 */
+							break;
+						}
+						/* Process is alive (if "!was_crit") or dead (if "was_crit"). Add it to array to
+						 * avoid "is_proc_alive" check on other "cr"s which point to this same pid.
+						 */
+						assert(ARRAYSIZE(crarray) >= crarray_index);
+						if (ARRAYSIZE(crarray) > crarray_index)
+						{
+							crarray[crarray_index].blocking_pid = blocking_pid;
+							crarray[crarray_index].cr = curcr;
+							crarray_index++;
+						}
+					}
+				}
+				if (was_crit && crarray_index && (curcr == cr_top))
+				{	/* We hold crit and found at least one dead pid and found no alive pids in phase2 commit.
+					 * No need to wait any more. Return FALSE right away. Caller will invoke "wcs_recover"
+					 * to fix the situation.
+					 */
+					return FALSE;
+				}
+				lcnt_isprcalv_next += lcnt_isprcalv_freq;
 			}
 		} else
-		{	/* If we dont hold crit and are sleep looping waiting for cr->in_tend to become 0, it is
-			 * theoretically possible (though very remote) that every one of the 1000s of iterations we look
-			 * at the cache-record, cr->in_tend is set to the same pid even though the block could have
-			 * been updated as part of multiple transactions. But we could have stopped the wait the moment the
-			 * same buffer gets updated for the next transaction (even if by the same pid). To recognize that
-			 * we note down the current db tn at the start of the wait and check if the block header tn
-			 * throughout the wait gets higher than this. If so, we return right away even though cr->in_tend
-			 * is non-zero. But since this comparison is done outside of crit it is possible that the block
-			 * header tn could be temporarily GREATER than the db tn because of concurrent updates AND because
-			 * an update to the 8-byte transaction number is not necessarily atomic AND because the block's tn
-			 * that we read could be a mish-mash of low-order and high-order bytes taken from BEFORE and AFTER
-			 * an update. Doing less than checks with these bad values is considered risky as a false return
-			 * means a GTMASSERT (BYPASSOK) in "t_end" or "tp_tend" in the PIN_CACHE_RECORD macro. Since this
-			 * situation is almost an impossibility in practice, we handle this by returning FALSE after timing
-			 * out and requiring the caller (t_qread) to restart. Eventually we will get crit (in the final retry)
-			 * where we are guaranteed not to end up in this situation.
-			 */
+		{
 			value = cr->in_tend;
 			if (value != start_in_tend)
 			{
-				if (use_timer)
-					TIMEOUT_DONE(timedout);
 				assert(!was_crit || !value);
 				return TRUE;
 			}
@@ -217,18 +225,15 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				 * a minute, we will time out for no reason. No point proceeding with this transaction
 				 * anyway as we are bound to restart. Do that right away. Caller knows to restart.
 				 */
-				if (use_timer)
-					TIMEOUT_DONE(timedout);
 				return FALSE;
 			}
+			if (lcnt == lcnt_isprcalv_next)
+			{	/* Do "is_proc_alive" check */
+				if (!is_proc_alive(value, 0))
+					return FALSE;	/* Process is not alive. We can return right away with failure. */
+				lcnt_isprcalv_next += lcnt_isprcalv_freq;
+			}
 		}
-		if (use_timer)
-		{
-			if (spincnt < maxspincnt)
-				continue;
-			assert(spincnt == maxspincnt);
-		}
-		spincnt = 0;
 		lcnt++;
 		DEBUG_ONLY(waitarray[lcnt % waitarray_size] = value;)
 		if (NULL != cr)
@@ -237,40 +242,13 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			{
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_in_crit);
 			} else
-			{
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_no_crit);
-			}
 		} else
-		{
 			BG_TRACE_PRO_ANY(csa, phase2_commit_wait_pidcnt);
-		}
-		if (use_timer)
-		{	/* this seems like a nanosleep would be better than a rel_quant,
-			 * but a wake mechanism, perhaps using a queue shared by all phase 2 blockers might be better still
-			 */
-			if (timedout)
-			{
-#				ifdef DEBUG
-				if(!half_time)
-				{
-					half_time = TRUE;
-					TIMEOUT_DONE(timedout);
-					TIMEOUT_INIT(timedout, PHASE2_COMMIT_WAIT_MS / 2);
-				}
-				else
-					break;
-#				else
-				break;
-#				endif
-			}
-			rel_quant();
-		} else
-		{
-			if (lcnt >= PHASE2_COMMIT_WAIT)
-				break;
-			DEBUG_ONLY(half_time = (phase2_commit_half_wait == lcnt));
-			wcs_sleep(PHASE2_COMMIT_SLEEP);
-		}
+		if (lcnt >= PHASE2_COMMIT_WAIT)
+			break;
+		DEBUG_ONLY(half_time = (phase2_commit_half_wait == lcnt));
+		wcs_sleep(lcnt);
 #		ifdef DEBUG
 		if (half_time)
 		{
@@ -289,15 +267,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			}
 		}
 #		endif
-
 	}
-	if (use_timer)
-		TIMEOUT_DONE(timedout);
 	if (NULL == cr)
 	{	/* This is the case where we wait for all the phase2 commits to complete. Note down the cache records that
 		 * are still not done with the commits. Since there can be multiple cache records held by the same PID, note
 		 * down one cache record for each representative PID. We don't expect the list of distinct PIDs to be large.
-		 * In any case, note down only as many as we can
+		 * In any case, note down only as many as we have space allocated.
 		 */
 		crarray_index = 0;
 		for (curcr = cr_lo; curcr < cr_top;  curcr++)
@@ -318,8 +293,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 						break;
 				if (index == crarray_index)
 				{	/* cache-record with distinct PID */
-					assert(crarray_size >= crarray_index);
-					if (crarray_size <= crarray_index)
+					assert(ARRAYSIZE(crarray) >= crarray_index);
+					if (ARRAYSIZE(crarray) <= crarray_index)
 						break;
 					crarray[crarray_index].blocking_pid = blocking_pid;
 					crarray[crarray_index].cr = curcr;
@@ -337,8 +312,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, curcr, csa);
 		}
 	} else
-	{	/* This is the case where we wait for a particular cache-record. Take the c-stack of the PID that is still
-		 * holding this cr
+	{	/* This is the case where we wait for a particular cache-record.
+		 * Take the c-stack of the PID that is still holding this cr.
 		 */
 		blocking_pid = cr->in_tend;
 		SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, cr, csa);

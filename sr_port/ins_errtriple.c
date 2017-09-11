@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,13 @@
 
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLREF	triple		t_orig;
+
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_DIVZERO);
+error_def(ERR_NEGFRACPWR);
+error_def(ERR_NUMOFLOW);
+error_def(ERR_PATNOTFOUND);
 
 void ins_errtriple(int4 in_error)
 {
@@ -50,14 +57,19 @@ void ins_errtriple(int4 in_error)
 			x = x->exorder.fl;
 			assert(OC_ILIT == x->opcode);	/* corresponds to put_ilit(FALSE) in previous ins_errtriple */
 		}
+		/* delete all trailing triples and if the first, replace them below with an OC_RTERROR triple */
 		dqdelchain(x, TREF(curtchain), exorder);
+		CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain)));
 		assert(!add_rterror_triple || ((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
+		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error)
+				|| (ERR_NUMOFLOW == in_error) || (ERR_PATNOTFOUND == in_error))
+			TREF(rts_error_in_parse) = TRUE;	/* WARNING: fallthrough */
 	} else
 		/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
 		add_rterror_triple = TRUE;
 	if (add_rterror_triple)
-	{
+	{	/* WARN error or first error in the current line */
 		triptr = newtriple(OC_RTERROR);
 		triptr->operand[0] = put_ilit(in_error);
 		triptr->operand[1] = put_ilit(FALSE);	/* not a subroutine reference */

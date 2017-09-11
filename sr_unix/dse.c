@@ -53,7 +53,6 @@
 #include "lke.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
-#include "init_secshr_addrs.h"
 #include "cli_parse.h"
 #include "getzdir.h"
 #include "dse_exit.h"
@@ -68,6 +67,7 @@
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
+#include "restrict.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -82,7 +82,7 @@ GBLREF gd_addr			*original_header;
 GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF gv_namehead		*gv_target;
-GBLREF int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF boolean_t		dse_running;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
@@ -90,6 +90,7 @@ GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
 GBLREF CLI_ENTRY		dse_cmd_ary[];
+GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 
 GBLDEF block_id			patch_curr_blk;
 GBLDEF CLI_ENTRY		*cmd_ary = &dse_cmd_ary[0];	/* Define cmd_ary to be the DSE specific cmd table */
@@ -99,6 +100,8 @@ static void 		display_prompt(void);
 static readonly char	prompt[]="DSE> ";
 
 error_def(ERR_CTRLC);
+error_def(ERR_RESTRICTEDOP);
+
 int main(int argc, char *argv[])
 {
 	DCL_THREADGBL_ACCESS;
@@ -119,15 +122,17 @@ int main(int argc, char *argv[])
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
+	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;
 	getjobname();
-	INVOKE_INIT_SECSHR_ADDRS;
 	io_init(TRUE);
 	getzdir();
 	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
+	if (RESTRICTED(dse))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "DSE");
 	gvinit();
 	region_init(FALSE);
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));

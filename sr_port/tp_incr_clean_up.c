@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@ void tp_incr_clean_up(uint4 newlevel)
 			 * of this structure to point to the new cse for this block. Note that if cse->mode is gds_t_create,
 			 * there will be no tp_srch_status entry allotted for cse->blk (one will be there only for the chain.flag
 			 * representation of this to-be-created block). Same case with mode of kill_t_create as it also corresponds
-			 * to a non-existent block#. Therefore dont try looking up the hashtable for this block in those cases.
+			 * to a non-existent block#. Therefore don't try looking up the hashtable for this block in those cases.
 			 */
 			tp_srch_status = NULL;
 			assert((gds_t_create == cse->mode) || (kill_t_create == cse->mode)
@@ -188,7 +188,7 @@ void tp_incr_clean_up(uint4 newlevel)
 		freed = free_last_n_elements(si->cw_set_list, num_free);
 		assert(freed);
 		if (upd_trans && !si->update_trans)
-		{	/* si had updates before the rollback but none after. Do buddylist cleanup so tp_clean_up dont need to */
+		{	/* si had updates before the rollback but none after. Do buddylist cleanup so tp_clean_up don't need to */
 			csa = si->tp_csa;
 			if (JNL_ALLOWED(csa))
 			{

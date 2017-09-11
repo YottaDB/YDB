@@ -61,6 +61,7 @@ uint4 mur_process_intrpt_recov()
 	jnl_create_info			jnl_info;
 	uint4				status, status2;
 	uint4				max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
+	sgmnt_addrs			*csa;
 	sgmnt_data_ptr_t		csd;
 	jnl_private_control		*jpc;
 	jnl_buffer_ptr_t		jbp;
@@ -72,8 +73,10 @@ uint4 mur_process_intrpt_recov()
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		TP_CHANGE_REG(rctl->gd);
+		csa = cs_addrs;
+		assert(csa == rctl->csa);
 		csd = cs_data;	/* MM logic after wcs_flu call requires this to be set */
-		assert(csd == rctl->csa->hdr);
+		assert(csd == csa->hdr);
 		jctl = rctl->jctl_turn_around;
 		max_jnl_alq = max_jnl_deq = max_autoswitchlimit = 0;
 		for (last_jctl = NULL ; (NULL != jctl); last_jctl = jctl, jctl = jctl->next_gen)
@@ -156,6 +159,15 @@ uint4 mur_process_intrpt_recov()
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
 									 * to identify all places that set curr_tn */
 		csd->jnl_eovtn = csd->trans_hist.curr_tn;
+		/* If online rollback, adjust "tn" related fields in shared memory which might be in the future relative to
+		 * the newly adjusted db curr_tn.
+		 */
+		if (jgbl.onlnrlbk)
+		{
+			if (csa->nl->last_wcs_recover_tn >= csd->trans_hist.curr_tn)
+				csa->nl->last_wcs_recover_tn = csd->trans_hist.curr_tn - 1;
+			csa->nl->update_underway_tn = csd->trans_hist.curr_tn;
+		}
 		csd->turn_around_point = TRUE;
 		/* MUPIP REORG UPGRADE/DOWNGRADE stores its partially processed state in the database file header.
 		 * It is difficult for recovery to restore those fields to a correct partial value.
@@ -197,19 +209,19 @@ uint4 mur_process_intrpt_recov()
 		}
 		assert(!FROZEN_CHILLED(csd));
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
-		assert(cs_addrs->ti->curr_tn == jctl->turn_around_tn);
+		assert(csa->ti->curr_tn == jctl->turn_around_tn);
 		if (jgbl.onlnrlbk)
 		{
-			if (dba_bg == cs_addrs->hdr->acc_meth)
+			if (dba_bg == csd->acc_meth)
 			{	/* dryclean the cache (basically reset the cycle fields in all teh cache records) so as to make
 				 * GT.M processes that only does 'reads' to require crit and hence realize that online rollback
 				 * is in progress
 				 */
-				bt_refresh(cs_addrs, FALSE); /* sets earliest bt TN to be the turn around TN */
+				bt_refresh(csa, FALSE); /* sets earliest bt TN to be the turn around TN */
 			}
-			db_csh_ref(cs_addrs, FALSE);
-			assert(NULL != cs_addrs->jnl);
-			jpc = cs_addrs->jnl;
+			db_csh_ref(csa, FALSE);
+			assert(NULL != csa->jnl);
+			jpc = csa->jnl;
 			assert(NULL != jpc->jnl_buff);
 			jbp = jpc->jnl_buff;
 			/* Since Rollback simulates the journal record along with the timestamp at which the update was made, it
@@ -226,10 +238,10 @@ uint4 mur_process_intrpt_recov()
 			SET_JNLBUFF_PREV_JREC_TIME(jbp, jctl->turn_around_time, DO_GBL_JREC_TIME_CHECK_FALSE);
 		} else if (dba_bg == csd->acc_meth)
 		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
-			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
+			SET_OLDEST_HIST_TN(csa, csa->ti->curr_tn - 1);
 		}
 		csd->turn_around_point = FALSE;
-		assert(OLDEST_HIST_TN(cs_addrs) == (cs_addrs->ti->curr_tn - 1));
+		assert(OLDEST_HIST_TN(csa) == (csa->ti->curr_tn - 1));
 		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;
@@ -365,10 +377,10 @@ uint4 mur_process_intrpt_recov()
 		}
 		if (jgbl.onlnrlbk)
 		{
-			cs_addrs = rctl->csa;
+			csa = rctl->csa;
 			/* Mimic what jnl_file_close in case of cleanly a closed journal file */
-			jpc = cs_addrs->jnl; /* the previous loop makes sure cs_addrs->jnl->jnl_buff is valid*/
-			NULLIFY_JNL_FILE_ID(cs_addrs);
+			jpc = csa->jnl; /* the previous loop makes sure csa->jnl->jnl_buff is valid */
+			NULLIFY_JNL_FILE_ID(csa);
 			jpc->jnl_buff->cycle++; /* so that, all other processes knows to switch to newer journal file */
 			jpc->cycle--; /* decrement cycle so "jnl_ensure_open" knows to reopen the journal */
 		}
@@ -377,8 +389,8 @@ uint4 mur_process_intrpt_recov()
 			mur_rem_jctls(rctl);
 			rctl->jctl_alt_head = NULL;
 		}
-		/* From this point on, journal records are written into the newly created journal file. However, we still read
-		 * from old journal files.
+		/* From this point on, journal records are written into the newly created journal file.
+		 * However, we still read from old journal files.
 		 */
 	}
 	jgbl.gbl_jrec_time = 0;	/* set to a safe value */

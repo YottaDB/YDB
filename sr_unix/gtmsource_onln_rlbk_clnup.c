@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,13 +63,13 @@ void	gtmsource_onln_rlbk_clnup()
 		 * entirety. To illustrate this -- consider that the journal pool contains the data from 1-100 and the source server
 		 * is currently sending sequence number 30 and is reading from the pool. Assume an online rollback happens that
 		 * takes the instance from sequence number 100 to sequence number 80 and leaves the journal pool write_addr and
-		 * early_write_addr untouched. Now, lets say GT.M process comes in after this and does a few more updates. All of
+		 * rsrv_write_addr untouched. Now, lets say GT.M process comes in after this and does a few more updates. All of
 		 * these updates will be written in the journal pool right after the "old-rolled-back" sequence number 100. If the
 		 * source server continues to read from the pool, it will send the valid data until sequence number 80. After that,
 		 * it will start sending the "old-rolled-back" sequence numbers 81-100 which is not right. To avoid this, rollback
-		 * should set the write_addr and early_write_addr by searching in the journal pool for sequence number 81. This is
+		 * should set the write_addr and rsrv_write_addr by searching in the journal pool for sequence number 81. This is
 		 * currently not done, but is something that we can think about when it comes to optimization. Until then, force
-		 * rollback to reset jnlpool's write_addr, write and early_write_addr to 0 and let source server be forced into
+		 * rollback to read only from the file until the current seqno (using gtmsource_save_read_jnl_seqno).
 		 * READ_FILE mode.
 		 */
 		gtmsource_local->read_state = READ_FILE;
@@ -83,8 +84,7 @@ void	gtmsource_onln_rlbk_clnup()
 		 * variable
 		 */
 		gtmsource_save_read_jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
-		gtmsource_local->read = jnlpool.jnlpool_ctl->write;
-		gtmsource_local->read_addr = jnlpool.jnlpool_ctl->write_addr;
+		GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
 		if (!was_crit)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 	}

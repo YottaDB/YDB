@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@ TAB_BG_TRC_REC("  Writes by wcs_wtstart ", wrt_count)			/* # of writes done in w
 TAB_BG_TRC_REC("  Writes were blocked   ", wrt_blocked)			/* # of times wc_blocked was on in wcs_wtstart */
 TAB_BG_TRC_REC("  Writer was busy       ", wrt_busy)			/* Encountered wcs_wtstart lock */
 TAB_BG_TRC_REC("  Writer fnd no writes  ", wrt_noblks_wrtn)		/* Times wcs_wtstart ran queues but nothing written */
-TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec1)		/* Reserved filler to match length of VMS section */
+TAB_BG_TRC_REC("  WcBlocked gds_rundown2", wcb_gds_rundown2)
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec2)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec3)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Lost block recovery   ", lost_block_recovery)		/* Performing lost block recovery in gds_rundown  */
@@ -79,12 +79,12 @@ TAB_BG_TRC_REC("  Epoch Timer Writes    ", n_dbsync_writes)		/* no. of dbsyncs a
 TAB_BG_TRC_REC("  Mutex Queue full      ", mutex_queue_full)		/* number of times the mutex queue overflowed */
 TAB_BG_TRC_REC("  WcBlocked from bt_put ", wcb_bt_put)
 TAB_BG_TRC_REC("  WcBlocked mutexsalvage", wcb_mutex_salvage)
-TAB_BG_TRC_REC("  WcBlocked tp_grab_crit", wcb_tp_grab_crit)		/* currently unused */
+TAB_BG_TRC_REC("  WcBlocked wcs_flu0    ", wcb_wcs_flu0)
 TAB_BG_TRC_REC("  WcBlocked nocr_invcr  ", wcb_t_end_sysops_nocr_invcr)
 TAB_BG_TRC_REC("  WcBlocked cr_invcr    ", wcb_t_end_sysops_cr_invcr)
 TAB_BG_TRC_REC("  WcBlocked rip_wait    ", wcb_t_end_sysops_rip_wait)
 TAB_BG_TRC_REC("  WcBlocked dirtyripwait", wcb_t_end_sysops_dirtyripwait)
-TAB_BG_TRC_REC("  WcBlocked gds_rundown ", wcb_gds_rundown)
+TAB_BG_TRC_REC("  WcBlocked gds_rundown1", wcb_gds_rundown1)
 TAB_BG_TRC_REC("  WcBlocked wcs_flu1    ", wcb_wcs_flu1)
 TAB_BG_TRC_REC("  WcBlocked mu_backup   ", wcb_mu_back)
 TAB_BG_TRC_REC("  WcBlocked dirty_invcr ", wcb_t_end_sysops_dirty_invcr)
@@ -156,3 +156,6 @@ TAB_BG_TRC_REC("  Wcs_wt_restart reinsrt", wcs_wt_restart_reinsert)
 TAB_BG_TRC_REC("  Wcs_wtstart EAGAIN    ", wcs_wtstart_eagain)
 TAB_BG_TRC_REC("  Wcs_wtstart EAGAINcrit", wcs_wtstart_eagain_incrit)
 TAB_BG_TRC_REC("  LseekAIORestart EAGAIN", async_restart_eagain)
+TAB_BG_TRC_REC("  JnlBuff Phs2Cmt Full  ", jnlbuff_phs2cmt_array_full)
+TAB_BG_TRC_REC("  JnlPhs2ClnupIfPossible", jnl_phase2_cleanup_if_possible)
+TAB_BG_TRC_REC("  JnlBuff Phs2Cmt PrcAlv", jnlbuff_phs2cmt_isprcalv)

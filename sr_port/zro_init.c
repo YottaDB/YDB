@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,20 +39,19 @@ void zro_init(void)
 	status = TRANS_LOG_NAME(&val, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
 	{
-#		ifdef UNIX
 		if (SS_LOG2LONG == status)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
 		else
-#		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
-	if (status == SS_NOLOGNAM)
-		(TREF(dollar_zroutines)).len = 0;
-	else
+	if ((0 == tn.len) || (SS_NOLOGNAM == status))
 	{
-		(TREF(dollar_zroutines)).len = tn.len;
-		(TREF(dollar_zroutines)).addr = (char *)malloc (tn.len);
-		memcpy ((TREF(dollar_zroutines)).addr, buf1, tn.len);
+		tn.len = 1;
+		tn.addr = buf1;
+		buf1[0] = '.';
 	}
+	(TREF(dollar_zroutines)).len = tn.len;
+	(TREF(dollar_zroutines)).addr = (char *)malloc (tn.len);
+	memcpy ((TREF(dollar_zroutines)).addr, buf1, tn.len);
 	zro_load(TADR(dollar_zroutines));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,7 @@
 #include "getzposition.h"
 #include "lockdefs.h"
 #include "is_proc_alive.h"
+#include "mvalconv.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -81,8 +82,8 @@ error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
 error_def(ERR_LOCKTIMINGINTP);
 
-#define LOCKTIMESTR "LOCK time too long"
-#define ZALLOCTIMESTR "ZALLOCATE time too long"
+#define LOCKTIMESTR "LOCK"
+#define ZALLOCTIMESTR "ZALLOCATE"
 #define MAX_WARN_STR_ARG_LEN 256
 
 /* We made these messages seperate functions because we did not want to do the MAXSTR_BUFF_DECL(buff) declaration in op_lock2,
@@ -94,6 +95,7 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr); /* put these prototypes. These
 						   */
 STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 {
+	lks_this_cmd = 0;
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
@@ -129,7 +131,7 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
+int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds */
 {
 	boolean_t		blocked, timer_on;
 	signed char		gotit;
@@ -148,26 +150,16 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = laflag;
-	out_of_time = FALSE;
-	if (timeout < 0)
-		timeout = 0;
-	else if (TREF(tpnotacidtime) < timeout)
-	{
-		if (CM_ZALLOCATES == cm_action)
-			TPNOTACID_CHECK(ZALLOCTIMESTR)
-		else
-			TPNOTACID_CHECK(LOCKTIMESTR)
-	}
-	if (!(timer_on = (NO_M_TIMEOUT != timeout)))	/* NOTE assignment */
-		msec_timeout = NO_M_TIMEOUT;
+	out_of_time = timer_on = FALSE;
+	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
+		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
 	else
+		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, LOCKTIMESTR);
+	if (NO_M_TIMEOUT != msec_timeout)
 	{
-		msec_timeout = timeout2msec(timeout);
 		if (0 == msec_timeout)
-		{
 			out_of_time = TRUE;
-			timer_on = FALSE;
-		} else
+		else
 		{
 			sys_get_curr_time(&cur_time);
 			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, restart_pc, restart_ctxt, FALSE);
@@ -176,9 +168,9 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 				end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
 				remain_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
 				if (0 <= remain_time.at_sec)
-					msec_timeout = (int4)(remain_time.at_sec * MILLISECS_IN_SEC +
-							      /* Round up in order to prevent premautre timeouts */
-							      DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
+					msec_timeout = (int4)((remain_time.at_sec * MILLISECS_IN_SEC) +
+						/* Round up in order to prevent premature timeouts */
+						DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
 				else
 					msec_timeout = 0;
 				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
@@ -197,11 +189,13 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			} else
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 			if (0 < msec_timeout)
-				start_timer((TID)&timer_on, msec_timeout, wake_alarm, 0, NULL);
-			else
 			{
+				start_timer((TID)mlk_lock, msec_timeout, wake_alarm, 0, NULL);
+				timer_on = TRUE;
+			} else
+			{
+				cancel_timer((TID)mlk_lock);
 				out_of_time = TRUE;
-				timer_on = FALSE;
 			}
 		}
 	}
@@ -283,7 +277,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			mlk_bckout(pvt_ptr2, action);
 		}
 		assert(!pvt_ptr2->granted && (pvt_ptr2 == pvt_ptr1));
-		if (dollar_tlevel && timeout && (CDB_STAGNATE <= t_tries))
+		if (dollar_tlevel && msec_timeout && (CDB_STAGNATE <= t_tries))
 		{
 			assert(have_crit(CRIT_HAVE_ANY_REG));
 			tp_warning(pvt_ptr2);
@@ -307,22 +301,19 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 					{
 						if (timer_on)
 						{
-							cancel_timer((TID)&timer_on);
+							cancel_timer((TID)mlk_lock);
 							timer_on = FALSE;
 						}
-						if (NO_M_TIMEOUT != timeout)
+						if (NO_M_TIMEOUT != msec_timeout)
 						{	/* get remain = end_time - cur_time */
 							sys_get_curr_time(&cur_time);
 							remain_time = sub_abs_time(&end_time, &cur_time);
-							if (0 <= remain_time.at_sec)
-								msec_timeout = (int4)(remain_time.at_sec * 1000
-									+ remain_time.at_usec / 1000);
-							else
-								msec_timeout = 0;	/* treat as out_of_time */
+							msec_timeout = (int4)(remain_time.at_sec * MILLISECS_IN_SEC +
+								/* Round up in order to prevent premature timeouts */
+								DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
 							if (0 >= msec_timeout)
 							{
 								out_of_time = TRUE;
-								timer_on = FALSE;	/* as if LOCK :0 */
 								break;
 							}
 							if ((tptimeout != outofband) && (ctrlc != outofband))
@@ -342,9 +333,9 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 								TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
 								mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
 							}
-							outofband_action(FALSE);	/* no return */
-						} else
-							outofband_action(FALSE);	/* no return */
+						}
+						lks_this_cmd = 0;	/* no return - clear flag that we're in LOCK processing */
+						outofband_action(FALSE);
 					}
 					break;
 				}
@@ -398,10 +389,11 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 		gvcmz_clrlkreq();
 		remlkreq = FALSE;
 	}
-	if (NO_M_TIMEOUT != timeout)
+	lks_this_cmd = 0;	/* reset so we can check whether an extrinsic is trying to nest a LOCK operation */
+	if (NO_M_TIMEOUT != msec_timeout)
 	{	/* was timed or immediate */
-		if (timer_on && !out_of_time)
-			cancel_timer((TID)&timer_on);
+		if (timer_on)
+			cancel_timer((TID)mlk_lock);
 		if (blocked)
 		{
 			for (prior = &mlk_pvt_root;  *prior;)

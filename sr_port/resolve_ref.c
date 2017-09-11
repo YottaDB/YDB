@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,11 +62,6 @@ int resolve_ref(int errknt)
 		{	/* OC_LIT --> OC_LITC wherever OC_LIT is actually used, i.e. not a dead end */
 			dqloop(&t_orig, exorder, curtrip)
 			{
-				if ((OC_FNTEXT == curtrip->opcode) && (resolve_optimize(curtrip)))
-				{ /* resolve_optimize now only deals with $TEXT(), but could do more by removing 1st term below */
-					curtrip = curtrip->exorder.bl;	/* Backup to rescan after changing curtrip */
-					continue;
-				}
 				switch (curtrip->opcode)
 				{	/* Do a few literal optimizations typically done later in alloc_reg. It's convenient to
 					 * check for OC_LIT parameters here, before we start sliding OC_LITC opcodes in the way.
@@ -101,6 +96,14 @@ int resolve_ref(int errknt)
 							curtrip->opcode = OC_EQUNUL;
 							continue;
 						}
+						break;
+					case OC_FNTEXT:
+						if (resolve_optimize(curtrip))	/* only deals with $TEXT(), but could do more */
+						{
+							curtrip = curtrip->exorder.bl;	/* Backup to rescan change to curtrip */
+							continue;
+						}	/* WARNING fallthrough*/
+					default:
 						break;
 				}
 				for (j = curtrip->operand, ref = curtrip; j < ARRAYTOP(ref->operand); )

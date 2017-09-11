@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information 	#
+# Copyright (c) 2010-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -78,6 +78,12 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     if [ -z "$gtm_icu_version" -a -n "`which icu-config`" ] ; then
 	gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $FNumber(x*$Select(+x>5:.1,1:1),"",1)'`
         export gtm_icu_version
+	# Add library path to LD_LIBRARY_PATH
+	extendlibpath=`icu-config --libdir`
+	if [ "" = "$LD_LIBRARY_PATH" ]; then LD_LIBRARY_PATH="$extendlibpath"; else LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$extendlibpath";fi; export LD_LIBRARY_PATH
+	if [ "ibm" = "$arch" ]; then
+		if [ "" = "$LIBPATH" ]; then LIBPATH="$extendlibpath"; else LIBPATH="$LIBPATH:$extendlibpath";fi; export LIBPATH;
+	fi
     fi
 
     # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory

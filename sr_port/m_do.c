@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "cmd.h"
 
 GBLREF	boolean_t	run_time;
+GBLREF mline		*mline_tail;
 
 error_def(ERR_ACTOFFSET);
 
@@ -42,6 +43,7 @@ int m_do(void)
 		{
 			calltrip = newtriple(OC_CALLSP);
 			calltrip->operand[0] = put_mnxl();
+			mline_tail->block_ok = TRUE;
 #			ifndef __i386
 			calltrip->operand[1] = put_ocnt();
 #			endif

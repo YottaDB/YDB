@@ -211,23 +211,33 @@ MBSTART {														\
 		fn_len = REG->dyn.addr->fname_len;									\
 		if (0 == INIT_STATUS)											\
 			INIT_DB_OR_JNL_ENCRYPTION(CSA, TSD, fn_len, fn, INIT_STATUS);					\
-		if (0 != INIT_STATUS)											\
-		{													\
-			if (IS_GTM_IMAGE || mu_reorg_encrypt_in_prog)							\
-			{												\
-				GTMCRYPT_REPORT_ERROR(INIT_STATUS, rts_error, fn_len, fn);				\
-			} else												\
-			{												\
-				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(INIT_STATUS), gtm_putmsg, fn_len, fn);		\
-				CRYPT_WARNING = TRUE;									\
-			}												\
-		}													\
 	}														\
+	DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING);				\
 } MBEND
 #define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)							\
 MBSTART {														\
 	if (DO_CRYPT_INIT)												\
 		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);									\
+} MBEND
+
+#define DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING)				\
+MBSTART {														\
+	int	fn_len;													\
+	char	*fn;													\
+															\
+	if (DO_CRYPT_INIT && (0 != INIT_STATUS) && !(CRYPT_WARNING))							\
+	{														\
+		fn = (char *)(REG->dyn.addr->fname);									\
+		fn_len = REG->dyn.addr->fname_len;									\
+		if (IS_GTM_IMAGE || mu_reorg_encrypt_in_prog)								\
+		{													\
+			GTMCRYPT_REPORT_ERROR(INIT_STATUS, rts_error, fn_len, fn);					\
+		} else													\
+		{													\
+			GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(INIT_STATUS), gtm_putmsg, fn_len, fn);			\
+			CRYPT_WARNING = TRUE;										\
+		}													\
+	}														\
 } MBEND
 
 #define READ_DB_FILE_HEADER(REG, TSD, ERR_RET)								\
@@ -346,7 +356,7 @@ MBSTART {											\
 	gv_cur_region = SAVE_REG;			\
 }
 
-GBLREF	boolean_t		gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLREF	int4			gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t		is_src_server;
 GBLREF  boolean_t               mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
@@ -690,6 +700,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	gd_region		*baseDBreg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
+	DEBUG_ONLY(int		i);
+	DEBUG_ONLY(char 	*ptr);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -814,8 +826,10 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			   * before is discarded
 			   */
 		}
-		if (!bypassed_ftok)
+		if (mu_reorg_encrypt_in_prog)
 			INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
+		else
+			DO_ERR_PROC_ENCRYPTION_IF_NEEDED(reg, db_do_crypt_init, init_status, crypt_warning);
 		if (WBTEST_ENABLED(WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT))
 		{
 			DBGFPF((stderr, "Holding the ftok semaphore.. Sleeping for 30 seconds\n"));
@@ -845,6 +859,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 				 * then return (sem/shm can only be created by someone with the ftok lock).
 				 */
 				RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time, sem_timedout);
+				if (!bypassed_ftok)
+					INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
 				if (0 != udi->gt_sem_ctime || INVALID_SHMID != udi->shmid || 0 != udi->gt_shm_ctime)
 				{	/* We must have somthing wrong in protocol or, code, if this happens. */
 					assert(FALSE);
@@ -912,8 +928,15 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					{
 						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
 													sem_timedout);
-						PRINT_CRASH_MESSAGE(1, tsd, ERR_TEXT, 2,
-								    LEN_AND_LIT("Error with database control shmctl"), errno);
+						if (((MAX_ACCESS_SEM_RETRIES - 1) == loopcnt) || !(SHM_REMOVED(errno)))
+							PRINT_CRASH_MESSAGE(1, tsd, ERR_TEXT, 2,
+									    LEN_AND_LIT("Error with database control shmctl"),
+									    errno);
+						/* else */
+						READ_DB_FILE_HEADER(reg, tsd, err_ret);
+						RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait,
+								sem_stacktrace_time, sem_timedout);
+						continue;
 					} else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
 					{
 						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
@@ -999,7 +1022,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					bypassed_access = ok_to_bypass;
 					semop_success = do_blocking_semop(udi->semid, gtm_access_sem, sem_stacktrace_timep,
 										sem_timedoutp, &retstat, reg,
-										&bypassed_access, &access_counter_halted);
+										&bypassed_access, &access_counter_halted, TRUE);
 					assert(ok_to_bypass || !bypassed_access);
 					if (!semop_success)
 					{
@@ -1203,7 +1226,12 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	cnl = csa->nl;
 	if (new_shm_ipc)
 	{
-		memset(cnl, 0, SIZEOF(*cnl));			/* We allocated shared storage -- we have to init it */
+#		ifdef DEBUG
+		/* We allocated shared storage -- "shmget" ensures it is null initialized. Assert that. */
+		ptr = (char *)cnl;
+		for (i = 0; i < SIZEOF(*cnl); i++)
+			assert('\0' == ptr[i]);
+#		endif
 		cnl->sec_size = sec_size;			/* Set the shared memory size 			     */
 		if (JNL_ALLOWED(csa))
 		{	/* initialize jb->cycle to a value different from initial value of jpc->cycle (0). although this is not
@@ -1618,7 +1646,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		fbwsize = get_fs_block_size(udi->fd);
 		dblksize = csd->blk_size;
 		if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == (BLK_ZERO_OFF(csd->start_vbn)) % fbwsize))
-			csa->do_fullblockwrites = TRUE;		/* This region is fullblockwrite enabled */
+			csa->do_fullblockwrites = gtm_fullblockwrites;		/* This region is fullblockwrite enabled */
 		/* Report this length in DSE even if not enabled */
 		csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
 	}

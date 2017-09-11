@@ -738,6 +738,23 @@ if (-e GTMDefinedTypesInit.m) then
 	endif
 endif
 
+echo "Generating gtmpcat field build"
+set old_gtmroutines = "$gtmroutines"
+setenv gtmroutines "$gtm_obj($gtm_tools)"
+pushd $gtm_tools
+chmod +w .
+rm -f gtmpcat*On*.m gtm_threadgbl_undefs.h
+$gtm_exe/mumps -r gtmpcatfldbld gtmpcat_field_def.txt ${gtm_verno}
+if ($status) then
+	set errmsg = "COMLIST-E-FAIL Failed to generate gtmpcat field build"
+	@ comlist_status++
+	echo "${errmsg}" >> $errorlog
+endif
+ls -l gtmpcat*
+popd
+setenv gtmroutines "$old_gtmroutines"
+rm $gtm_obj/gtmpcatfldbld.o
+
 # Create the GT.M/GDE/MUPIP/DSE/LKE help databases
 $gtm_tools/generate_help.csh $gtm_pct $errorlog
 if ($status) then

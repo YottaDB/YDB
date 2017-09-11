@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,7 +176,11 @@ typedef enum {
 	WBTEST_SECSHRWRAP_NOTZREC_EOF,		/* 129 : gtmsecshr_wrapper no TZ record found in environment file */
 	WBTEST_SECSHRWRAP_SETENVFAIL1,		/* 130 : gtmsecshr_wrapper pretend setenv failed (before clearenv) */
 	WBTEST_SECSHRWRAP_SETENVFAIL2,		/* 131 : gtmsecshr_wrapper pretend setenv failed (after clearenv) */
-	WBTEST_HELPOUT_FAILGROUPCHECK		/* 132 : Create GTM-8654 : EUID and file owners are not group members */
+	WBTEST_HELPOUT_FAILGROUPCHECK,		/* 132 : Create GTM-8654 : EUID and file owners are not group members */
+	WBTEST_LVMON_PSEUDO_FAIL,		/* 133 : Create condition to cause lvmonitor to fail a comparison and report it */
+	WBTEST_REPLINSTSTNDALN,			/* 134 : Expected case of REPLINSTSTNDALN error */
+	WBTEST_FORCE_SHMPLRECOV,		/* 135 : Always invoke SHMPLRECOV abandoned block processing */
+	WBTEST_GETPWUID_CHECK_OVERWRITE		/* 136 : Check for getpwuid_struct variable overwrite condition */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

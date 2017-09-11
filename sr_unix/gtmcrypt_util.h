@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -210,7 +210,8 @@
 	SNPRINTF(errptr, end - errptr, "%s", gcry_strerror(ERR));							\
 }
 
-#ifndef USE_SYSLIB_FUNCS
+/* CYGWIN TODO: This is to fix a linker error. Undo when it is fixed. */
+#if !defined(USE_SYSLIB_FUNCS) && !defined(__CYGWIN__)
 #define	MALLOC			(*gtm_malloc_fnptr)
 #define FREE			(*gtm_free_fnptr)
 #else

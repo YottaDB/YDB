@@ -384,7 +384,7 @@ boolean_t mur_open_files()
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
 	DEBUG_ONLY(curr = gld_db_files;)
-	assert(!jgbl.onlnrlbk || (0 != max_epoch_interval));
+	assert(!jgbl.onlnrlbk || (0 != max_epoch_interval) || (NULL == jnlpool_ctl));
 	if (jgbl.onlnrlbk)
 	{
 		inst_requires_rlbk = FALSE;
@@ -489,6 +489,15 @@ boolean_t mur_open_files()
 			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			csa->hold_onto_crit = TRUE;	/* No more unconditional rel_lock() */
 			assert(jnlpool.repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
+			/* Wait for any pending phase2 commits in jnlpool to finish */
+			while (jnlpool_ctl->phase2_commit_index1 != jnlpool_ctl->phase2_commit_index2)
+			{
+				repl_phase2_cleanup(&jnlpool);
+				if (jnlpool_ctl->phase2_commit_index1 == jnlpool_ctl->phase2_commit_index2)
+					break;
+				JPL_TRACE_PRO(jnlpool_ctl, jnl_pool_write_sleep);
+				SLEEP_USEC(1, FALSE);
+			}
 			repl_inst_flush_jnlpool(FALSE, FALSE);
 			assert((0 == jnlpool_ctl->onln_rlbk_pid) || !is_proc_alive(jnlpool_ctl->onln_rlbk_pid, 0));
 			jnlpool_ctl->onln_rlbk_pid = process_id;
@@ -544,7 +553,8 @@ boolean_t mur_open_files()
 			if (NULL != cs_addrs->jnl)
 			{
 				jb = cs_addrs->jnl->jnl_buff;
-				assert((jb->freeaddr == jb->dskaddr) && (jb->dskaddr == jb->fsync_dskaddr));
+				assert((jb->freeaddr == jb->dskaddr) && (jb->dskaddr == jb->fsync_dskaddr)
+						&& (jb->rsrv_freeaddr == jb->rsrv_freeaddr));
 			}
 #			endif
 			if (cs_data->kill_in_prog)
@@ -578,7 +588,7 @@ boolean_t mur_open_files()
 									   * this shared memory until recover/rlbk cleanly exits */
 				}
 				assert(!JNL_ENABLED(csd) || 0 == csd->jnl_file_name[csd->jnl_file_len]);
-				rctl->db_ctl->file_info = rctl->gd->dyn.addr->file_cntl->file_info;
+				rctl->db_ctl->file_info = FILE_CNTL(rctl->gd)->file_info;
 				rctl->recov_interrupted = csd->recov_interrupted;
 				if (mur_options.update && rctl->recov_interrupted)
 				{	/* interrupted recovery might have changed current csd's jnl_state/repl_state.
@@ -710,7 +720,7 @@ boolean_t mur_open_files()
 					csd->repl_state = repl_closed;
 					csd->file_corrupt = TRUE;
 					/* flush the changed csd to disk */
-					fc = rctl->gd->dyn.addr->file_cntl;
+					fc = FILE_CNTL(rctl->gd);
 					fc->op = FC_WRITE;
 					/* Note: csd points to shared memory and is already aligned
 					 * appropriately even if db was opened using O_DIRECT.
@@ -990,7 +1000,7 @@ boolean_t mur_open_files()
 	{
 		jctl = rctl->jctl_head;
 		if (rctl->db_present && (mur_options.update || mur_options.extr[GOOD_TN]))
-			rctl->csa->miscptr = (void *)rctl; /* needed by gdsfilext_nojnl/jnl_put_jrt_pini/mur_pini_addr_reset */
+			rctl->csa->miscptr = (void *)rctl; /* needed by gdsfilext_nojnl/jnl_write_pini/mur_pini_addr_reset */
 		if (mur_options.update)
 		{
 			csd = rctl->csd;

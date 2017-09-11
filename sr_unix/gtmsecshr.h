@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 # define DBGGSSHR(x)
 #endif
 #define ABSOLUTE_PATH(X)	('/' == X[0])
-#define GTMSECSHR_MESG_TIMEOUT  30
+#define GTMSECSHR_MESG_TIMEOUT  30 * MILLISECS_IN_SEC
 #define GTMSECSHR_PERMS		0666
 
 /* Exit codes from gtmsecshr - note matching text entries are in message table in secshr_client.c */

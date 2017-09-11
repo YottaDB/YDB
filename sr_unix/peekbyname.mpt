@@ -136,6 +136,11 @@ listiterate(out)
 	. . if 'write set out(fieldname)=^gtmtypes(struct,j,"type")_","_^gtmtypes(struct,j,"len")
 	. . else  write fieldname,!
 	quit
+
+data(field)
+	new $etrap set $etrap="set $ecode="""" quit:$quit 0 quit"
+	quit $data(^|"$gtm_dist/gtmhelp.gld"|gtmtypfldindx($piece(field,"."),$piece(field,".",2,$length(field,".")))) quit
+
 ; the below error definitions derived from merrors.msg are relatively complete so older version where they weren't defined get info
 ERRPBNPARMREQ		;150383746;"A first parameter value "_first_" requires a second parameter specified containing "_args
 ERRPBNNOPARM		;150383754;"First parameter "_first_" does not support a second parameter"

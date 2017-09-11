@@ -205,7 +205,7 @@ GDEINIT
 	m maxseg("BG")=maxsegcommon	; copy over all common stuff into BG access method first
 	; now add BG specific overrides
 	s minseg("BG","GLOBAL_BUFFER_COUNT")=64
-	i (gtm64=TRUE) s maxseg("BG","GLOBAL_BUFFER_COUNT")=2147483647 ; 2G-1
+	i (gtm64=TRUE) s maxseg("BG","GLOBAL_BUFFER_COUNT")=2097151 ; GTM64_WC_MAX_BUFFS defined in gdsbt.h
 	e  s maxseg("BG","GLOBAL_BUFFER_COUNT")=65536
 ; mm
 	m minseg("MM")=minsegcommon	; copy over all common stuff into MM access method first

@@ -43,6 +43,7 @@
 #endif
 #include "gtm_reservedDB.h"
 #include "mtables.h"
+#include "iotimer.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -202,7 +203,7 @@ LITDEF boolean_t mvs_save[] =
 /* The address of this literal is assigned to mval pointers for arguments which are deliberately skipped in label invocations. */
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
-static readonly unsigned char localpool[8] = {'-', '1', '1', '1', '0', '1', '0', '0'};
+static readonly unsigned char localpool[15] = {'-', '1', '1', '1', '0', '1', '0', '0', '5', '2', '4', '2', '8', '6'};
 LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
 LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
 LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,   1 * MV_BIAS);
@@ -212,6 +213,7 @@ LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0,
 LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0, 101 * MV_BIAS);
 LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 110 * MV_BIAS);
 LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 111 * MV_BIAS);
+LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 6, (char *)&localpool[8], 0, NO_M_TIMEOUT);
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval

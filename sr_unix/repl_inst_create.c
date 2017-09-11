@@ -133,8 +133,8 @@ void repl_inst_create(void)
 		if ((INVALID_SEMID != repl_instance->jnlpool_semid) || (INVALID_SHMID != repl_instance->jnlpool_shmid)
 			|| (INVALID_SEMID != repl_instance->recvpool_semid) || (INVALID_SHMID != repl_instance->recvpool_shmid))
 		{
+			assert(FALSE || WBTEST_ENABLED(WBTEST_REPLINSTSTNDALN));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
-			assert(FALSE);
 		}
 		JNL_SHORT_TIME(now);
 		rename_fn_len = ARRAYSIZE(rename_fn);

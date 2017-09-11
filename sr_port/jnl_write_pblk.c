@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,44 +34,64 @@
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 
-void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer, uint4 com_csum)
+void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 {
-	struct_jrec_blk		pblk_record;
-	int			tmp_jrec_size, jrec_size, zero_len;
-	jnl_format_buffer 	blk_trailer;
-	char			local_buff[JNL_REC_START_BNDRY + JREC_SUFFIX_SIZE];
-	jrec_suffix		*suffix;
+	blk_hdr_ptr_t		old_block;
+	int			tmp_jrec_size;
+	jnl_buffer_ptr_t	jbp;
 	jnl_private_control	*jpc;
+	sgmnt_data_ptr_t	csd;
+	struct_jrec_blk		pblk_record;
+	unsigned int		bsiz;
+#	ifdef DEBUG
+	blk_hdr_ptr_t		save_old_block;
+#	endif
 
-	assert(csa->now_crit);
+	csd = csa->hdr;
+	assert(IN_PHASE2_JNL_COMMIT(csa));
+	old_block = (blk_hdr_ptr_t)cse->old_block;
+	ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)old_block, csa);
+	/* Assert that cr corresponding to old_block is pinned in shared memory */
+	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, (dba_mm == csd->acc_meth), csa, csd);
+	bsiz = old_block->bsiz;
+	bsiz = MIN(bsiz, csd->blk_size);	/* be safe in PRO */
+	if (!cse->blk_checksum)
+		cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
+	else
+		assert(cse->blk_checksum == jnl_get_checksum(old_block, csa, bsiz));
+	if (NEEDS_ANY_KEY(csd, old_block->tn))
+	{
+		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
+		DEBUG_ONLY(save_old_block = old_block;)
+		old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block, csa);
+		/* Ensure that unencrypted block and its twin counterpart are in sync. */
+		assert(save_old_block->tn == old_block->tn);
+		assert(save_old_block->bsiz == old_block->bsiz);
+		assert(save_old_block->levl == old_block->levl);
+		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
+	}
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
 	pblk_record.prefix.jrec_type = JRT_PBLK;
 	pblk_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
-	pblk_record.prefix.tn = csa->ti->curr_tn;
+	pblk_record.prefix.tn = JB_CURR_TN_APPROPRIATE(TRUE, jpc, csa);
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	pblk_record.prefix.time = jgbl.gbl_jrec_time;
 	pblk_record.blknum = cse->blk;
-	/* in case we have a bad block-size, we dont want to write a PBLK larger than the GDS block size (maximum block size).
+	/* in case we have a bad block-size, we don't want to write a PBLK larger than the GDS block size (maximum block size).
 	 * in addition, check that checksum computed in t_end/tp_tend did take the adjusted bsiz into consideration.
 	 */
-	assert(buffer->bsiz <= csa->hdr->blk_size || dse_running);
-	pblk_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
-	assert((pblk_record.bsiz == buffer->bsiz) ||
-	       (cse->blk_checksum == jnl_get_checksum(buffer, NULL, pblk_record.bsiz)));
+	assert(old_block->bsiz <= csd->blk_size || dse_running);
+	pblk_record.bsiz = bsiz;
+	assert((pblk_record.bsiz == old_block->bsiz) || (cse->blk_checksum == jnl_get_checksum(old_block, NULL, pblk_record.bsiz)));
 	assert(pblk_record.bsiz >= SIZEOF(blk_hdr) || dse_running);
 	pblk_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = (int)FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
-	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
-	zero_len = jrec_size - tmp_jrec_size;
-	blk_trailer.buff = local_buff + (JNL_REC_START_BNDRY - zero_len);
-	memset(blk_trailer.buff, 0, zero_len);
-	blk_trailer.record_size = zero_len + JREC_SUFFIX_SIZE;
-	suffix = (jrec_suffix *)&local_buff[JNL_REC_START_BNDRY];
-	pblk_record.prefix.forwptr = suffix->backptr = jrec_size;
+	pblk_record.prefix.forwptr = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	COMPUTE_PBLK_CHECKSUM(cse->blk_checksum, &pblk_record, com_csum, pblk_record.prefix.checksum);
-	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
-	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer, NULL);
+	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, old_block);
+	jbp = jpc->jnl_buff;
+	cse->jnl_freeaddr = JB_FREEADDR_APPROPRIATE(TRUE, jpc, jbp);
 }

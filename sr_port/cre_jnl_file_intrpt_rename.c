@@ -63,9 +63,8 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 	status1 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status1)
 	{
-		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
-		else
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
+		if (!(IS_GTM_IMAGE))
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
 		return;
 	}
@@ -74,9 +73,8 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 	status2 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status2)
 	{
-		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
-		else
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
+		if (!(IS_GTM_IMAGE))
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
 		return;
 	}
@@ -87,18 +85,16 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 			status = gtm_rename(filestr.addr, (int)filestr.len, (char *)fn, fn_len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
-				if (IS_GTM_IMAGE)
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
-								filestr.addr, fn_len, fn, status);
-				else
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len,
-									filestr.addr, fn_len, fn, status);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len, filestr.addr,
+						fn_len, fn, status);
+				if (!(IS_GTM_IMAGE))
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_RENAMEFAIL, 4, filestr.len, filestr.addr,
+							fn_len, fn, status);
 			} else
 			{
-				if (IS_GTM_IMAGE)
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FILERENAME, 4, (int)filestr.len, filestr.addr,
-							fn_len, fn);
-				else
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FILERENAME, 4, (int)filestr.len, filestr.addr,
+						fn_len, fn);
+				if (!(IS_GTM_IMAGE))
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FILERENAME, 4, filestr.len, filestr.addr,
 							fn_len, fn);
 			}
@@ -110,17 +106,14 @@ void cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 			status = gtm_file_remove(filestr.addr, (int)filestr.len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
-				if (IS_GTM_IMAGE)
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
-							filestr.addr, status);
-				else
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len, filestr.addr, status);
+				if (!(IS_GTM_IMAGE))
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEDELFAIL, 2, filestr.len,
 								filestr.addr, status);
 			} else
 			{
-				if (IS_GTM_IMAGE)
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_FILEDEL, 2, filestr.len, filestr.addr);
-				else
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_FILEDEL, 2, filestr.len, filestr.addr);
+				if (!(IS_GTM_IMAGE))
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_FILEDEL, 2, filestr.len, filestr.addr);
 			}
 		}

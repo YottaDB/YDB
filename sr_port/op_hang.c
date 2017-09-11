@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ GBLREF	stack_frame	*frame_pointer;
 
 error_def(ERR_SYSCALL);
 
-#define HANGSTR "HANG time too long"
+#define HANGSTR "HANG"
 
 /*
  * ------------------------------------------
@@ -108,10 +108,6 @@ void op_hang(mval* num)
 		{
 			assert(MV_BIAS >= 1000);	/* if formats change overflow may need attention */
 			ms = num->m[1] * (1000 / MV_BIAS);
-#			ifdef _AIX	/* AIX times are a bit waobbly, so nudge any 1sec. hang aiming to landing in the next sec */
-			if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
-				ms +=2;		/* push a bit (in milliseconds) */
-#			endif
 		}
 	} else if (0 == num->sgn) 		/* if sign is not 0 it means num is negative */
 	{
@@ -120,8 +116,12 @@ void op_hang(mval* num)
 	}
 	if (ms)
 	{
-		if (TREF(tpnotacidtime) * 1000 < ms)
+		if ((TREF(tpnotacidtime)).m[1] < ms)
 			TPNOTACID_CHECK(HANGSTR);
+#		ifdef _AIX	/* AIX times are a bit wobbly, so nudge any 1sec. hang aiming to landing in the next sec */
+		if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
+			ms +=2;		/* push a bit (in milliseconds) */
+#		endif
 #		if defined(DEBUG)
 		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > gtm_white_box_test_case_count) && (123000 == ms))
 		{	/* LONG_SLEEP messes with signals */

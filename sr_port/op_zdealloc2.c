@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,8 @@ GBLREF mlk_pvtblk	*mlk_pvt_root;
 GBLREF unsigned char	cm_action;
 GBLREF tp_frame		*tp_pointer;
 
+error_def(ERR_TPLOCK);
+
 /*
  * -----------------------------------------------
  * Arguments:
@@ -39,15 +42,13 @@ GBLREF tp_frame		*tp_pointer;
  * -----------------------------------------------
  */
 
-void op_zdealloc2(int4 timeout, UINTPTR_T auxown)
+void op_zdealloc2(mval *timeout, UINTPTR_T auxown)
 {
 	unsigned short	count;
 	mlk_pvtblk	**prior;
 	bool		specific;
 
-	error_def(ERR_TPLOCK);
-
-	assert(NO_M_TIMEOUT == timeout);
+	assert(NO_M_TIMEOUT == timeout->m[1]);
 	if (lks_this_cmd)
 	{
 		specific = TRUE;
@@ -59,7 +60,10 @@ void op_zdealloc2(int4 timeout, UINTPTR_T auxown)
 			{
 				/* if there were any old locks before TSTART, they can't be  unlocked */
 				if ((*prior)->granted && (*prior)->zalloc && (*prior)->tp && (*prior)->tp->zalloc)
-					rts_error(VARLSTCNT(1) ERR_TPLOCK);
+				{
+					lks_this_cmd = 0;
+					rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
+				}
 				prior = &((*prior)->next);
 			}
 		}
@@ -87,7 +91,10 @@ void op_zdealloc2(int4 timeout, UINTPTR_T auxown)
 	{
 		/* if there were any old locks before TSTART, they can't be  unlocked */
 		if (mlk_pvt_root && tp_pointer && tp_pointer->old_locks)
-			rts_error(VARLSTCNT(1) ERR_TPLOCK);
+		{
+			lks_this_cmd = 0;
+			rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
+		}
 		specific = FALSE;
 		for (prior = &mlk_pvt_root;  *prior;)
 		{
@@ -109,6 +116,7 @@ void op_zdealloc2(int4 timeout, UINTPTR_T auxown)
 			}
 		}
 	}
+	lks_this_cmd = 0;	/* reset so we can check whether an extrinsic is trying to nest a LOCK operation */
 	if (gtcm_connection)
 	{
 		cm_action = CM_ZALLOCATES;

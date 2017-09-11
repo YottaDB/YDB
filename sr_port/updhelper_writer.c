@@ -158,6 +158,7 @@ int updhelper_writer(void)
 								wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH
 												| WCSFLU_SPEEDUP_NOBEFORE);
 								assert(NULL == reorg_encrypt_restart_csa);
+								assert(jbp->next_epoch_time > jgbl.gbl_jrec_time);
 							}
 							rel_crit(reg);
 							/* Do equivalent of WCSFLU_SYNC_EPOCH now out of crit */

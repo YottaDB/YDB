@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 #include "gtm_string.h"
 
 #include "stringpool.h"
+#include "min_max.h"
 #include "op.h"
 
 GBLREF spdesc stringpool;
@@ -70,11 +72,13 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 {
 	unsigned char	*inptr, *intop, *outptr, *outbase, *outtop, *dstbase, *nextptr, *chptr;
 	int4		xlate[256]; /* translation table to hold all single-byte character mappings */
-	hash_table_int4	xlate_hash;  /* translation table to hold all multi-byte character mappings */
+	static hash_table_int4	xlate_hash;  /* translation table to hold all multi-byte character mappings */
+	static int hash_table_size = 0;
 	INTPTR_T	choff;	/* byte offset of the character within out_str */
 	ht_ent_int4	*tabent;
 	unsigned char 	ch, drop;
 	int 		n, max_len_incr, size, inlen, outlen, char_len, chlen, dstlen;
+	int		max_length_string = 0;
 	uint4		code;
 	boolean_t	hashtab_created, char_already_seen;
 
@@ -92,7 +96,19 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	memset(xlate, 0, SIZEOF(xlate));
 	if (!MV_IS_SINGLEBYTE(in_str))
 	{ /* hash table not needed if input is entirely single byte */
-		init_hashtab_int4(&xlate_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
+		max_length_string = MAX(in_str->str.len, out_str->str.len);
+		if (NULL == xlate_hash.base)
+			init_hashtab_int4(&xlate_hash, max_length_string * (100.0 / HT_LOAD_FACTOR),
+					HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
+		else
+		{
+			reinitialize_hashtab_int4(&xlate_hash);
+			if (max_length_string > hash_table_size)
+			{
+				hash_table_size = max_length_string;
+				expand_hashtab_int4(&xlate_hash, max_length_string * (100.0 / HT_LOAD_FACTOR));
+			}
+		}
 		hashtab_created = TRUE;
 	} else
 		hashtab_created = FALSE;
@@ -184,7 +200,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 		if (MAXPOSINT4 != choff)
 		{ /* add a new character into the result based on the translation above */
 			if (dstlen + chlen > MAX_STRLEN)
-			 	rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			 	rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 			if (1 == chlen)
 				dstbase[dstlen] = *chptr;
 			else
@@ -193,8 +209,6 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 			++char_len;
 		}
 	}
-	if (hashtab_created)
-		free_hashtab_int4(&xlate_hash);
 	MV_INIT_STRING(dst, dstlen, (char *)dstbase);
 	assert(dst->str.len <= size);
 	dst->mvtype |= MV_UTF_LEN; /* set character length since we know it */

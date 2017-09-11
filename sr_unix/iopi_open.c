@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "jobsp.h"
 #include "have_crit.h"
 #include "fork_init.h"
+#include "restrict.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
@@ -50,6 +51,7 @@ GBLREF	boolean_t		gtm_dist_ok_to_use;
 GBLREF  volatile boolean_t      timer_in_handler;
 
 error_def(ERR_DEVOPENFAIL);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 ZOS_ONLY(error_def(ERR_BADTAG);)
@@ -405,6 +407,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 	}
 
+	/* The above code is just syntax checking. Any actual operation should be below here. */
+	if (RESTRICTED(pipe_open))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE");
+
 	/* check the shell device parameter before the fork/exec
 	   It is not required, but must not be null if entered */
 	if (sparams[PSHELL] && (0 == slen[PSHELL]))
@@ -703,7 +709,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				free(pstderr);
 		}
 	}
-	d_rm->pipe = TRUE;
+	d_rm->is_pipe = TRUE;
 	iod->type = rm;
 
 	if (return_stderr)
@@ -752,7 +758,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				in_d_rm->stderr_parent = iod;
 				in_d_rm->read_fildes = FD_INVALID; /* checked in iorm_get_bom to get correct file descriptor */
 			}
-			in_d_rm->pipe = TRUE;
+			in_d_rm->is_pipe = TRUE;
 			io_ptr->type = rm;
 			status_read = iorm_open(stderr_naml, pp, file_des_read_stderr, mspace, timeout);
 			if (TRUE == status_read)

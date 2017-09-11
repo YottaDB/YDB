@@ -631,7 +631,7 @@ OC_JMPTSET-WORD:	blbc	r10,#3
 			brw	jmp.1
 OC_JOB:		jsb 	xfer.xf_restartpc
 		irepab	val.7
-		pushl	val.6
+		pushab	val.6
 		pushab	val.5
 		pushab	val.4
 		pushl	val.3
@@ -648,9 +648,9 @@ OC_LABADDR:	pushl	val.2
 		pushab	val.3
 		calls	#3,xfer.xf_labaddr
 		movl	r0,addr.0
-OC_LCKDECR:	pushl	val.1
+OC_LCKDECR:	pushab	val.1
 		calls	#1,xfer.xf_lckdecr
-OC_LCKINCR:	pushl	val.1
+OC_LCKINCR:	pushab	val.1
 		calls	#1,xfer.xf_lckincr
 OC_LDADDR-BYTE:	movab	jmp.1,addr.0
 OC_LDADDR-LONG:	movab	jmp.1,addr.0
@@ -668,7 +668,7 @@ OC_LKNAME:	irepab	val.4
 		pushab	val.3
 		pushl	val.2
 		calls	val.1,xfer.xf_lkname
-OC_LOCK:	pushl	val.1
+OC_LOCK:	pushab	val.1
 		calls	#1,xfer.xf_lock
 OC_LVPATWRITE:	jsb 	xfer.xf_restartpc
 		irepab	val.3
@@ -701,7 +701,7 @@ OC_NUMCMP:	movab	val.1,r0
 		jsb	xfer.xf_numcmp
 OC_OPEN:	jsb 	xfer.xf_restartpc
 		pushab	val.4
-		pushl	val.3
+		pushab	val.3
 		pushab	val.2
 		pushab	val.1
 		calls	#4,xfer.xf_open
@@ -720,15 +720,15 @@ OC_PUTINDX:	irepab	val.2
 		calls	val.1,xfer.xf_putindx
 		movl	r0,addr.0
 OC_RDONE:	jsb 	xfer.xf_restartpc
-		pushl	val.1
+		pushab	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_rdone
 OC_READ:	jsb 	xfer.xf_restartpc
-		pushl	val.1
+		pushab	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_read
 OC_READFL:	jsb 	xfer.xf_restartpc
-		pushl	val.2
+		pushab	val.2
 		pushl	val.1
 		pushab	val.0
 		calls	#3,xfer.xf_readfl
@@ -874,7 +874,7 @@ OC_XKILL:	irepab	val.2
 OC_XNEW:	irepab	val.2
 		pushl	val.1
 		jsb	xfer.xf_xnew
-OC_ZALLOCATE:	pushl	val.1
+OC_ZALLOCATE:	pushab	val.1
 		calls	#1,xfer.xf_zallocate
 OC_ZATTACH:	jsb 	xfer.xf_restartpc
 		pushab	val.1
@@ -883,7 +883,7 @@ OC_ZCOMPILE:	pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_zcompile
 OC_ZCONT:	jsb	xfer.xf_zcont
-OC_ZDEALLOCATE:	pushl	val.1
+OC_ZDEALLOCATE:	pushab	val.1
 		calls	#1,xfer.xf_zdeallocate
 OC_ZEDIT:	jsb 	xfer.xf_restartpc
 		pushab	val.2

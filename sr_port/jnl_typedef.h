@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +78,6 @@ LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 								&& !IS_LGTRIG(rectype) && !IS_ZTRIG(rectype))
 #endif
 
-#define GET_REC_FENCE_TYPE(rectype)		(!IS_FENCED(rectype)) ? NOFENCE : (IS_TP(rectype)) ? TPFENCE : ZTPFENCE
 #define REC_HAS_TOKEN_SEQ(rectype)		(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || IS_COM(rectype)	\
 							|| (JRT_EPOCH == (rectype)) || (JRT_EOF == (rectype))		\
 							|| (JRT_NULL == (rectype)))

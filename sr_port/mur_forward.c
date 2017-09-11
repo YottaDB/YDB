@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -399,9 +399,10 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 		CHECK_IF_EOF_REACHED(rctl, status); /* sets rctl->forw_eof_seen if needed; resets "status" to SS_NORMAL */
 		if (SS_NORMAL != status)
 		{	/* ERR_FILENOTCREATE is possible from "mur_cre_file_extfmt" OR	ERR_FORCEDHALT is possible
-			 * from "mur_forward_play_cur_jrec". No other errors are known to occur here. Assert accordingly.
+			 * from "mur_forward_play_cur_jrec" OR SYSTEM-E-ENO2 from a ERR_RENAMEFAIL is possible from
+			 * a "rename_file_if_exists" call. No other errors are known to occur here. Assert accordingly.
 			 */
-			assert((ERR_FILENOTCREATE == status) || (ERR_FORCEDHALT == status));
+			assert((ERR_FILENOTCREATE == status) || (ERR_FORCEDHALT == status) || (ENOENT == status));
 			goto finish;
 		}
 		if (rctl->forw_eof_seen)

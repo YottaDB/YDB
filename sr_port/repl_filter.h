@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,12 +23,8 @@
 /* Define the maximum jnl extract byte length of ONE line of journal extract.
  * Note that for a TP transaction that has N updates, the journal extract length needed at most is N times this value.
  */
-#ifdef UNIX
-#  define MAX_ONE_JREC_EXTRACT_BUFSIZ		10 * MAX_LOGI_JNL_REC_SIZE	/* Since we might need up to 9X + 11
-										 * of MAX_LOGI_JNL_REC_SIZE */
-#else
-#  define MAX_ONE_JREC_EXTRACT_BUFSIZ		1 * 1024 * 1024
-#endif
+#define MAX_ONE_JREC_EXTRACT_BUFSIZ	10 * MAX_LOGI_JNL_REC_SIZE	/* Since we might need up to 9X + 11
+									 * of MAX_LOGI_JNL_REC_SIZE */
 
 #define	JNL2EXTCVT_EXPAND_FACTOR	2  /* # of max-sized journal records by which jnl2extcvt expands buffer if not enough */
 #define	EXT2JNLCVT_EXPAND_FACTOR	8  /* # of max-sized journal records by which ext2jnlcvt expands buffer if not enough */
@@ -72,6 +68,9 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
  *	V24	V25	GT.M V6.2-001	No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
  *	V24	V26	GT.M V6.2-002	No new jnl record but bump needed because of different encryption method
+ *	V24	V27	GT.M V6.3-001	JRT_ALIGN record size reduced from min of 32 bytes to min of 16 bytes.
+ *					The extract format though did not change as we extract a 0 tn now in -detial extract.
+ *					The filter format did not change because ALIGN record is not replicated.
  */
 
 typedef enum
@@ -97,6 +96,7 @@ typedef enum
 	REPL_JNL_V24,		/* enum corresponding to journal format V24 */
 	REPL_JNL_V25,		/* enum corresponding to journal format V25 */
 	REPL_JNL_V26,		/* enum corresponding to journal format V26 */
+	REPL_JNL_V27,		/* enum corresponding to journal format V27 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -122,7 +122,7 @@ extern int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_b
 extern int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 extern int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 
-extern void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness));
+extern void repl_check_jnlver_compat(boolean_t same_endianness);
 
 GBLREF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
@@ -165,6 +165,7 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V24_JNL_VER		24
 #define V25_JNL_VER		25
 #define V26_JNL_VER		26
+#define V27_JNL_VER		27
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */
@@ -195,23 +196,12 @@ STATICFNDCL int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 int repl_stop_filter(void);
 void repl_filter_error(seq_num filter_seqno, int why);
 
-# ifdef UNIX
-#	define	LOCAL_JNL_VER		this_side->jnl_ver
-#	define	LOCAL_TRIGGER_SUPPORT	this_side->trigger_supported
-#	define	REMOTE_JNL_VER		remote_side->jnl_ver
-#	define	REMOTE_TRIGGER_SUPPORT	remote_side->trigger_supported
-#	define	REMOTE_NULL_SUBS_XFORM	remote_side->null_subs_xform
-#	define	REMOTE_IS_CROSS_ENDIAN	remote_side->cross_endian
-# else
-	GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
-	GBLREF	boolean_t		secondary_side_trigger_support;
-#	define	LOCAL_JNL_VER		jnl_ver
-#	define	LOCAL_TRIGGER_SUPPORT	secondary_side_trigger_support
-#	define	REMOTE_JNL_VER		remote_jnl_ver
-#	define	REMOTE_TRIGGER_SUPPORT	secondary_side_trigger_support
-#	define	REMOTE_NULL_SUBS_XFORM	(TREF(replgbl)).null_subs_xform
-#	define	REMOTE_IS_CROSS_ENDIAN	FALSE
-# endif
+#define	LOCAL_JNL_VER		this_side->jnl_ver
+#define	LOCAL_TRIGGER_SUPPORT	this_side->trigger_supported
+#define	REMOTE_JNL_VER		remote_side->jnl_ver
+#define	REMOTE_TRIGGER_SUPPORT	remote_side->trigger_supported
+#define	REMOTE_NULL_SUBS_XFORM	remote_side->null_subs_xform
+#define	REMOTE_IS_CROSS_ENDIAN	remote_side->cross_endian
 
 /* Helper macros for internal and external filters */
 #define APPLY_EXT_FILTER_IF_NEEDED(GTMSOURCE_FILTER, GTMSOURCE_MSGP, DATA_LEN, TOT_TR_LEN)					\
@@ -266,7 +256,6 @@ error_def(ERR_REPLRECFMT);
 error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLNOHASHTREC);
 
-#ifdef UNIX
 # define INT_FILTER_RTS_ERROR(FILTER_SEQNO, REPL_ERRNO)										\
 {																\
 	assert((EREPL_INTLFILTER_BADREC == REPL_ERRNO)										\
@@ -284,15 +273,4 @@ error_def(ERR_REPLNOHASHTREC);
 	else	/* (EREPL_INTLFILTER_INCMPLREC == REPL_ERRNO) */								\
 		assertpro(FALSE);												\
 }
-#else
-# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)					\
-{										\
-	if (EREPL_INTLFILTER_BADREC == repl_errno)				\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);	\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)			\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);	\
-	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */		\
-		assertpro(FALSE);						\
-}
-#endif
 #endif

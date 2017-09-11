@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 
 #include "gtm_termios.h"
 #include "gtm_stdio.h"
+#include "compiler.h"
 
 #define TERM_MSK	0x08002400	/* CR LF ESC */
 #define TERM_MSK_UTF8_0	0x08003400	/* add FF */
@@ -24,7 +25,7 @@
 
 #define NUM_BITS_IN_INT4	(SIZEOF(int4) * 8)
 
-#define TTDEF_BUF_SZ 		1024
+#define TTDEF_BUF_SZ 		MAX_SRCLINE
 #define TTDEF_PG_WIDTH 		255
 
 #define IOTT_FLUSH_WAIT		300

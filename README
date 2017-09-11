@@ -18,16 +18,16 @@ To build YottaDB, do the following steps:
 
 2. Unpack the YottaDB sources
    The YottaDB source tarball extracts to a directory with the version number in
-   the name, e.g., YottaDB-r1.00
-   $ tar xfz r1.00.tar.gz
-   $ cd YottaDB-r1.00
+   the name, e.g., YottaDB-r1.10
+   $ tar xfz r1.10.tar.gz
+   $ cd YottaDB-r1.10
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building YottaDB -
    <build> can be a sub directory of the source directory,
-   YottaDB-r1.00, or any other valid path.
+   YottaDB-r1.10, or any other valid path.
 
    $ mkdir <build>
    $ cd <build>
@@ -52,10 +52,10 @@ To build YottaDB, do the following steps:
 
    $ make install
 
-   $ cd pro/lib/fis-gtm/V6.3-001A_R100_x86_64 # or dbg for debug builds
+   $ cd pro/lib/fis-gtm/V6.3-002_R100_x86_64 # or dbg for debug builds
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.3-001A_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.3-002_x86_64
 
    $ sudo ./gtminstall # to install the version you just built
    # ./gtminstall --help # get installation options

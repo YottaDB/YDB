@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,11 +11,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_time.h"
 #include "gtm_inet.h"
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -160,14 +158,14 @@ void    op_ztcommit(int4 n)
 		jpc = csa->jnl;
 		assert(csa->now_crit);
 		if (0 == jpc->pini_addr)
-			jnl_put_jrt_pini(csa);
+			jnl_write_pini(csa);
 		ztcom_record.prefix.pini_addr = jpc->pini_addr;
 		ztcom_record.prefix.tn = csa->ti->curr_tn;
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
 		ztcom_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
 									(unsigned char *)&ztcom_record, SIZEOF(struct_jrec_ztcom));
-		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL, NULL);
+		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL);
 		if (!csa->hold_onto_crit)
 			rel_crit(jpc->region);
 	}

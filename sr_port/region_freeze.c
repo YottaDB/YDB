@@ -52,7 +52,6 @@ GBLREF	gd_region	*gv_cur_region;
 # define FREEZE_ID	((0 == user_id) ? FROZEN_BY_ROOT : user_id)
 # define FREEZE_MATCH	process_id
 # define OWNERSHIP	(in_mupip_freeze ? (csd->freeze == freeze_id) : (csd->image_count == FREEZE_MATCH))
-# define LATCH_WAIT_SEC	(5 * 60)
 
 #ifdef DEBUG_FREEZE
 #define SEND_FREEZEID(STATE, CSA)							\
@@ -181,8 +180,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			 */
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
 		}
-		while (!grab_latch(&cnl->freeze_latch, LATCH_WAIT_SEC))
-			assert(FREEZE_LATCH_HELD(csa));
+		/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
+		grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
 		rval = REG_FREEZE_SUCCESS;
 		jnl_switch_done = FALSE;
 		jpc = csa->jnl;
@@ -248,8 +247,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		return rval;
 	}
 	/* !freeze */
-	while (!grab_latch(&cnl->freeze_latch, LATCH_WAIT_SEC))
-		assert(FREEZE_LATCH_HELD(csa));
+	/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
+	grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
 	/* If there is no freeze, but there is a freeze_online, then there was an autorelease, which needs to be cleaned up
 	 * by the normal unfreeze procedure. However, we only do it in MUPIP FREEZE -OFF to ensure that the user gets a warning.
 	 */

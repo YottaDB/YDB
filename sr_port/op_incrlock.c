@@ -29,7 +29,7 @@
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int op_incrlock(int timeout)
+int op_incrlock(mval *timeout)
 {
 	return (op_lock2(timeout, INCREMENTAL));
 }

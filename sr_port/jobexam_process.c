@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,8 @@ GBLREF unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF boolean_t        created_core;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
 DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
+
+LITREF	mval		literal_zero;
 
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
@@ -221,7 +223,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	parms.str.addr = (char *)dumpable_error_dump_file_parms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_parms);
 	/* Open, use, and zshow into new file, then close and reset current io device */
-	op_open(dump_file_spec, &parms, 0, 0);
+	op_open(dump_file_spec, &parms, (mval *)&literal_zero, 0);
 	op_use(dump_file_spec, &parms);
 	zshowall.mvtype = MV_STR;
 	zshowall.str.addr = "*";

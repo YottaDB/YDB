@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,33 +15,16 @@
  *
  * Following definitions have a pattern that most of the routines follow. Only exceptions is:
  *      1. ioff_open() is an extra routine
- *
- * VMS can have addresses in literal constants while most Unix platforms cannot
  */
-UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch_mupip[] =
+GBLDEF dev_dispatch_struct io_dev_dispatch_mupip[] =
 {
-#	ifdef UNIX
 	iotype(iott, iott, iott, nil),
-#	else
 	ionil_dev,
-#	endif
-	ionil_dev,
-#	ifdef UNIX
 	iotype(iorm, iorm, iopi, iopi),
-#	else
-	iotype(iorm, iorm, nil, nil),
-#	endif
 	ionil_dev,
 	ionil_dev,
 	ionil_dev,
-#	ifdef UNIX
 	iotype(ioff, iorm, iopi, nil),
-#	else
-	iotype(ioff, iorm, nil, nil),
-#	endif
 	ionil_dev,
 	ionil_dev
-#	ifdef UNIX
-	,ionil_dev
-#	endif
 };

@@ -175,7 +175,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("EXTENSION COUNT"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("EXTENSION COUNT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -197,7 +197,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("GLOBAL_BUFFERS"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("GLOBAL_BUFFERS"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -221,7 +221,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("KEY_SIZE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("KEY_SIZE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -246,7 +246,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("LOCK_SPACE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("LOCK_SPACE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -268,7 +268,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("MUTEX_SLOTS"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("MUTEX_SLOTS"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -287,7 +287,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RECORD_SIZE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("RECORD_SIZE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -296,7 +296,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	{
 		if (!cli_get_int("RESERVED_BYTES", &reserved_bytes))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RESERVED_BYTES"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("RESERVED_BYTES"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -314,7 +314,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SLEEP_SPIN_COUNT"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SLEEP_SPIN_COUNT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -327,8 +327,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_spin_sleep,
 					LEN_AND_LIT("SPIN_SLEEP_LIMIT"), MAX_SPIN_SLEEP);
 				exit_stat |= EXIT_ERR;
-			}
-			if (new_spin_sleep)
+			} else if (new_spin_sleep)
 			{	/* find the power of 2 equal to or greater than the value */
 				for (spin_sleep_status = 2; spin_sleep_status < new_spin_sleep; spin_sleep_status <<= 1)
 					;
@@ -336,7 +335,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SPIN_SLEEP_LIMIT"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SPIN_SLEEP_LIMIT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -367,7 +366,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			need_standalone = TRUE;
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("WAIT_DISK"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("WAIT_DISK"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -492,7 +491,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						pvt_csd->defer_time = defer_time;
 					} else
 					{
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2,
 							LEN_AND_LIT("DEFER_TIME"));
 						reg_exit_stat |= EXIT_WRN;
 					}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,10 +21,8 @@
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
-#ifdef UNIX
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
-#endif
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
@@ -49,10 +47,8 @@ GBLREF	stack_frame      	*frame_pointer;
 GBLREF	unsigned char    	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	mv_stent         	*mv_chain;
 GBLREF	io_pair 		io_curr_device;
-#ifdef UNIX
 GBLREF	io_pair			io_std_device;
 GBLREF	bool			prin_in_dev_failure;
-#endif
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
 GBLREF	volatile int4		outofband;
@@ -74,7 +70,7 @@ error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
-UNIX_ONLY(error_def(ERR_NOPRINCIO);)
+error_def(ERR_NOPRINCIO);
 
 #ifdef UNICODE_SUPPORTED
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
@@ -124,9 +120,9 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 #endif
 
 /* VMS uses the UCX interface; should support others that emulate it
- * width == 0 is a flag for non-fixed length read. timeout is in seconds
+ * width == 0 is a flag for non-fixed length read. timeout is in milliseconds
  */
-int	iosocket_readfl(mval *v, int4 width, int4 timeout)
+int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 {
 	int		ret, byteperchar;
 	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, do_delim_conv, need_get_chset;
@@ -136,7 +132,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
-	int4		msec_timeout; /* timeout in milliseconds */
 	TID		timer_id;
 	ABS_TIME	cur_time, end_time, time_for_read, zero;
 	char		*errptr;
@@ -161,21 +156,17 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	if (0 >= dsocketptr->n_socket)
 	{
-#		ifndef VMS
 		if (iod == io_std_device.in)
 		{
-			result = ionl_readfl(v, width, timeout);
+			result = ionl_readfl(v, width, msec_timeout);
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return result;
 		} else
 		{
-#		endif
 			iod->dollar.za = 9;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 			return 0;
-#		ifndef VMS
 		}
-#		endif
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
@@ -276,7 +267,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		assert(chars_read <= bytes_read);
 		DBGSOCK((stdout, "socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
 			 "  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus));
-		DBGSOCK((stdout, "socrfl: .. timeout: %d\n", timeout));
+		DBGSOCK((stdout, "socrfl: .. msec_timeout: %d\n", msec_timeout));
 		DBGSOCK_ONLY2(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d\n", end_time.at_sec,
 								     end_time.at_usec)));
 		DBGSOCK((stdout, "socrfl: .. buffer address: 0x"lvaddr"  stringpool: 0x"lvaddr"\n",
@@ -339,28 +330,24 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	}
 	need_get_chset = FALSE;		/* if we change ichset, make sure converter available */
 	time_for_read.at_sec  = 0;
-	if (0 == timeout)
+	if (0 == msec_timeout)
 		time_for_read.at_usec = 0;
-	else if (socketptr->def_moreread_timeout)
-		time_for_read.at_usec = socketptr->moreread_timeout * 1000;
 	else
-		time_for_read.at_usec = INITIAL_MOREREAD_TIMEOUT * 1000;
+		time_for_read.at_usec = (socketptr->def_moreread_timeout ? socketptr->moreread_timeout : INITIAL_MOREREAD_TIMEOUT)
+					* MICROSECS_IN_MSEC;
 	DBGSOCK((stdout, "socrfl: moreread_timeout = %d def_moreread_timeout= %d time = %d \n",
 		 socketptr->moreread_timeout, socketptr->def_moreread_timeout, time_for_read.at_usec));
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
-	if (NO_M_TIMEOUT == timeout)
+	if (NO_M_TIMEOUT == msec_timeout)
 	{
 		timed = FALSE;
-		msec_timeout = NO_M_TIMEOUT;
 		assert(!sockintr->end_time_valid);
 	} else
 	{
 		timed = TRUE;
-		msec_timeout = timeout2msec(timeout);
-		if (msec_timeout > 0)
+		if (0 < msec_timeout)
 		{	/* There is time to wait */
-#			ifdef UNIX
 			/* Set blocking I/O */
 			FCNTL2(socketptr->sd, F_GETFL, flags);
 			if (flags < 0)
@@ -382,7 +369,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
 						save_errno, LEN_AND_STR(errptr));
 			}
-#			endif
 			sys_get_curr_time(&cur_time);
 			if (!sockintr->end_time_valid)
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -392,13 +378,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				 */
 			 	end_time = sockintr->end_time;	 /* Restore end_time for timeout */
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (0 > cur_time.at_sec)
+				msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+				if (0 >= msec_timeout)
 				{
 					msec_timeout = -1;
 					out_of_time = TRUE;
-				} else
-					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-							      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+				}
 				DBGSOCK((stdout, "socrfl: Taking timeout end time from read restart data - "
 					 "computed msec_timeout: %d\n", msec_timeout));
 			}
@@ -519,7 +505,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				{	/* Something bad happened. Feed the error to the lower levels for proper handling */
 					DBGSOCK((stdout, "socrfl: Read error: status: %d  errno: %d\n", charlen, errno));
 					status = charlen;
-                                        DEBUG_ONLY(bufflen = 0);  /* Triggers assert in iosocket_snr if we end up there anyway */
+					DEBUG_ONLY(bufflen = 0);  /* Triggers assert in iosocket_snr if we end up there anyway */
 				}
 			}
 		} else
@@ -545,18 +531,18 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			status = 0;			/* Consistent treatment of no more data */
 		} else if (0 < status)
 		{
-			if (timeout && !socketptr->def_moreread_timeout && !one_read_done)
+			if (timed && !socketptr->def_moreread_timeout && !one_read_done)
 			{
 				one_read_done = TRUE;
 				DBGSOCK((stdout, "socrfl: before moreread_timeout = %d timeout = %d \n",
-					 socketptr->moreread_timeout,time_for_read.at_usec));
-				time_for_read.at_usec = DEFAULT_MOREREAD_TIMEOUT * 1000;
-				DBGSOCK((stdout, "socrfl: after timeout = %d \n",time_for_read.at_usec));
+					 socketptr->moreread_timeout, time_for_read.at_usec));
+				time_for_read.at_usec = DEFAULT_MOREREAD_TIMEOUT * MICROSECS_IN_MSEC;
+				DBGSOCK((stdout, "socrfl: after timeout = %d \n", time_for_read.at_usec));
 			}
 			DBGSOCK((stdout, "socrfl: Bytes read: %d\n", status));
 			bytes_read += (int)status;
-			UNIX_ONLY(if (iod == io_std_device.out)
-					  prin_in_dev_failure = FALSE);
+			if (iod == io_std_device.out)
+				prin_in_dev_failure = FALSE;
 			/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done, there's no way to
 			 * read the BOM bytes & to determine the variant. So default to UTF-16BE, if not already determined.
 			 */
@@ -596,23 +582,23 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM detected\n"));
 							}
 						} else if (0 == memcmp(buffptr, UTF16LE_BOM, UTF16LE_BOM_LEN))
-                                                {
-                                                        if (CHSET_UTF16BE == ichset)
+						{
+							if (CHSET_UTF16BE == ichset)
 							{
 								iod->dollar.za = 9;
-                                                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
-                                                                          chset_names[CHSET_UTF16LE].len,
-                                                                          chset_names[CHSET_UTF16LE].addr,
-                                                                          chset_names[CHSET_UTF16BE].len,
-                                                                          chset_names[CHSET_UTF16BE].addr);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+									chset_names[CHSET_UTF16LE].len,
+									chset_names[CHSET_UTF16LE].addr,
+									chset_names[CHSET_UTF16BE].len,
+									chset_names[CHSET_UTF16BE].addr);
 							} else
 							{
-                                                                iod->ichset = ichset = CHSET_UTF16LE;
+								iod->ichset = ichset = CHSET_UTF16LE;
 								dsocketptr->ichset_utf16_variant = CHSET_UTF16LE;
 								need_get_chset = TRUE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw away BOM */
-                                                                DBGSOCK2((stdout, "socrfl: UTF16LE BOM detected\n"));
-                                                        }
+								DBGSOCK2((stdout, "socrfl: UTF16LE BOM detected\n"));
+							}
 						} else
 						{	/* No BOM specified. If UTF16, default BOM to UTF16BE per Unicode
 							 * standard
@@ -638,7 +624,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					}
 				} else
 				{	/* Check for UTF8 BOM. If found, just eliminate it. */
-                                        if ((UTF8_BOM_LEN <= bytes_read) && (0 == memcmp(buffptr, UTF8_BOM, UTF8_BOM_LEN)))
+					if ((UTF8_BOM_LEN <= bytes_read) && (0 == memcmp(buffptr, UTF8_BOM, UTF8_BOM_LEN)))
 					{
 						bytes_read -= UTF8_BOM_LEN;        /* Throw way BOM */
 						DBGSOCK2((stdout, "socrfl: UTF8 BOM detected/ignored\n"));
@@ -755,7 +741,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				if ((c_ptr + mb_len) > c_top)	/* Verify entire char is in buffer */
 					break;
 			}
-                        DBGSOCK((stdout, "socrfl: End char scan - c_ptr: 0x"lvaddr"  c_top: 0x"lvaddr"\n", c_ptr, c_top));
+			DBGSOCK((stdout, "socrfl: End char scan - c_ptr: 0x"lvaddr"  c_top: 0x"lvaddr"\n", c_ptr, c_top));
 			if (c_ptr < c_top) /* Width size READ completed OR partial last char, push back bytes into input buffer */
 			{
 				iosocket_unsnr(socketptr, c_ptr, c_top - c_ptr);
@@ -815,7 +801,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	{
 		if (0 < msec_timeout)
 		{
-#			ifdef UNIX
 			FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
 			if (fcntl_res < 0)
 			{
@@ -826,7 +811,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
 						save_errno, LEN_AND_STR(errptr));
 			}
-#			endif
 			if (out_of_time)
 			{
 				ret = FALSE;
@@ -869,9 +853,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		DBGSOCK((stdout, "socrfl: .. mv_stent: bytes_read: %d  chars_read: %d  max_bufflen: %d  "
 			 "interrupts: %d  buffer_start: 0x"lvaddr"\n",
 			 bytes_read, chars_read, max_bufflen, socketus_interruptus, stringpool.free));
-		DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  timeout: %d  "
-								    "msec_timeout: %d\n", end_time.at_sec, end_time.at_usec,
-								    timeout, msec_timeout)));
+		DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  msec_timeout: %d\n",
+								    end_time.at_sec, end_time.at_usec, msec_timeout)));
 		TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL);	/* BYPASSOK */
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		outofband_action(FALSE);
@@ -903,7 +886,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free += v->str.len;
 		}
-
 	} else
 	{
 		v->str.len = 0;
@@ -922,18 +904,17 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		iod->dollar.za = 9;
 		len = SIZEOF(ONE_COMMA) - 1;
 		memcpy(iod->dollar.device, ONE_COMMA, len);
-#ifdef		GTM_TLS
+#		ifdef GTM_TLS
 		if (socketptr->tlsenabled && (0 > real_errno))
 			errptr = (char *)gtm_tls_get_error();
 		else	/* TLS not enabled or system call error */
-#endif
+#		endif
 			errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);
-                devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-                memcpy(&iod->dollar.device[len], errptr, devlen + 1);
-                if (devlen < errlen)
-                        iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
-#		ifdef UNIX
+		devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+		memcpy(&iod->dollar.device[len], errptr, devlen + 1);
+		if (devlen < errlen)
+			iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
 		if (io_curr_device.in == io_std_device.in)
 		{
 			if (!prin_in_dev_failure)
@@ -944,7 +925,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				stop_image_no_core();
 			}
 		}
-#		endif
 		if (iod->dollar.zeof || -1 == status || 0 < iod->error_handler.len)
 		{
 			iod->dollar.zeof = TRUE;

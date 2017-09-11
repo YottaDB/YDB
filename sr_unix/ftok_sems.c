@@ -59,15 +59,11 @@
 #include "ftok_sems.h"
 #include "wbox_test_init.h"
 
-GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
 GBLREF	gd_region		*ftok_sem_reg;
-GBLREF	int4			exi_condition;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnl_gbls_t		jgbl;
-DEBUG_ONLY(GBLREF boolean_t	mupip_jnl_recover;)
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_FTOKERR);
@@ -75,7 +71,6 @@ error_def(ERR_MAXSEMGETRETRY);
 error_def(ERR_SEMKEYINUSE);
 error_def(ERR_SEMWT2LONG);
 error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
 
 #define	MAX_SEM_DSE_WT	(MILLISECS_IN_SEC * (30 / 2)) /* Actually 30 seconds before giving up - two semops with 15 second */
 #define	MAX_SEM_WT	(MILLISECS_IN_SEC * (60 / 2)) /* Actually 60 seconds before giving up - two semops with 30 second */
@@ -102,107 +97,20 @@ error_def(ERR_TEXT);
 }
 
 #define RETURN_SUCCESS(REG)												\
-{															\
+MBSTART {														\
 	ftok_sem_reg = REG;												\
 	udi->grabbed_ftok_sem = TRUE;											\
 	return TRUE;													\
-}
+} MBEND
 
 boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *timedout, semwait_status_t *retstat,
 			boolean_t *bypass, boolean_t *ftok_counter_halted, boolean_t incr_cnt)
 {
-	int			status = SS_NORMAL, save_errno;
-	int			ftok_sopcnt, sem_pid;
-	uint4			lcnt, loopcnt;
-	unix_db_info		*udi;
-	key_t			ftokid;
-	struct sembuf		ftok_sop[3];
+	boolean_t	immediate = FALSE;
+	int		project_id = GTM_ID;
 
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	udi = FILE_INFO(reg);
-	assert(!udi->grabbed_ftok_sem && !udi->grabbed_access_sem);
-	assert(NULL == ftok_sem_reg);
-	if (-1 == (udi->key = FTOK(udi->fn, GTM_ID)))
-		RETURN_SEMWAIT_FAILURE(retstat, errno, op_ftok, 0, ERR_FTOKERR, 0);
-	/* First try is always IPC_NOWAIT */
-	SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-	/* The following loop deals with the possibility that the semaphores can be deleted by someone else AFTER a successful
-	 * semget but BEFORE semop locks it, in which case we should retry.
-	 */
-	*ftok_counter_halted = FALSE;
-	for (lcnt = 0; MAX_SEMGET_RETRIES > lcnt; lcnt++)
-	{
-		if (INVALID_SEMID == (udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
-		{
-			save_errno = errno;
-			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semget, 0, ERR_CRITSEMFAIL, 0);
-		}
-		ftokid = udi->ftok_semid;
-		SET_GTM_ID_SEM(ftokid, status); /* Set 3rd semaphore's value to GTM_ID = 43 */
-		if (-1 == status)
-		{
-			save_errno = errno;
-			if (SEM_REMOVED(save_errno))
-			{
-				*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
-				continue;
-			}
-			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
-		}
-		SEMOP(ftokid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
-		if (-1 != status)
-		{
-			udi->counter_ftok_incremented = (FTOK_SOPCNT_NO_INCR_COUNTER != ftok_sopcnt);
-			/* Input parameter *bypass could be OK_TO_BYPASS_FALSE or OK_TO_BYPASS_TRUE (for "do_blocking_semop" call).
-			 * But if we are returning without going that path, reset "*bypass" to reflect no bypass happened.
-			 */
-			*bypass = FALSE;
-			RETURN_SUCCESS(reg);
-		}
-		assert(EINTR != errno);
-		save_errno = errno;
-		if (EAGAIN == save_errno)
-		{	/* someone else is holding it */
-			if (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_delta_secs))
-			{
-				sem_pid = semctl(ftokid, 0, GETPID);
-				if (-1 != sem_pid)
-					RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, ERR_SEMWT2LONG, 0, sem_pid);
-				save_errno = errno; /* fall-through */
-			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, stacktrace_time, timedout, retstat, reg, bypass,
-						     ftok_counter_halted))
-			{
-				if (*ftok_counter_halted)	/* set by "do_blocking_semop" */
-					ftok_sopcnt = FTOK_SOPCNT_NO_INCR_COUNTER;
-				udi->counter_ftok_incremented = (FTOK_SOPCNT_NO_INCR_COUNTER != ftok_sopcnt);
-				if (*bypass)
-					return TRUE;
-				else
-					RETURN_SUCCESS(reg);
-			} else if (!SEM_REMOVED(retstat->save_errno))
-				return FALSE; /* retstat will already have the necessary error information */
-			save_errno = retstat->save_errno; /* some other error. Fall-through */
-		} else if (ERANGE == save_errno)
-		{	/* We have no access to file header to check so just assume qdbrundown is set in the file header.
-			 * If it turns out to be FALSE, after we read the file header, we will issue an error
-			 */
-			*ftok_counter_halted = TRUE;
-			ftok_sopcnt = FTOK_SOPCNT_NO_INCR_COUNTER; /* Ignore increment operation */
-			lcnt--; /* Do not count this attempt */
-			continue;
-		}
-		if (SEM_REMOVED(save_errno))
-		{
-			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
-			continue;
-		}
-		assert(EINTR != save_errno);
-		RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl_or_semop, 0, ERR_CRITSEMFAIL, 0);
-	}
-	assert(FALSE);
-	RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, 0, ERR_MAXSEMGETRETRY, 0);
+	return ftok_sem_get_common(reg, incr_cnt, project_id, immediate, stacktrace_time, timedout, retstat, bypass,
+					ftok_counter_halted);
 }
 
 /*
@@ -220,18 +128,10 @@ boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *t
  */
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate, boolean_t *ftok_counter_halted)
 {
-	int			sem_pid, save_errno, ftok_sopcnt, stuck_cnt = 0;
-	int4			status;
-	uint4			semop_wait_time, lcnt, semop_trycnt, max_semop_trycnt, tot_wait_time;
+	uint4			semop_wait_time;
 	unix_db_info		*udi;
-	union semun		semarg;
-	sgmnt_addrs             *csa;
-	node_local_ptr_t        cnl;
-	boolean_t		shared_mem_available;
-	int4			lcl_ftok_ops_index;
-	struct sembuf		ftok_sop[3];
-	char			*msgstr;
-	boolean_t		stacktrace_issued = FALSE;
+	boolean_t		stacktrace_time = FALSE, sem_timeout, bypass = FALSE, result;
+	semwait_status_t	retstat;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -245,150 +145,21 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	assert((reg != jnlpool.jnlpool_dummy_reg)
 		|| (jgbl.mur_rollback && !jgbl.mur_options_forward) || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	udi = FILE_INFO(reg);
-	csa = &udi->s_addrs;
 	assert(!udi->grabbed_ftok_sem && !udi->grabbed_access_sem);
 	assert(NULL == ftok_sem_reg);
-	if (-1 == (udi->key = FTOK(udi->fn, project_id)))
+	semop_wait_time = !IS_DSE_IMAGE ? MAX_SEM_WT : MAX_SEM_DSE_WT;
+	TIMEOUT_INIT(sem_timeout, semop_wait_time);
+	result = ftok_sem_get_common(reg, incr_cnt, project_id, immediate, &stacktrace_time, &sem_timeout, &retstat, &bypass,
+						ftok_counter_halted);
+	TIMEOUT_DONE(sem_timeout);
+	assert(!bypass);
+	if (!result)
 	{
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
+		PRINT_SEMWAIT_ERROR(&retstat, reg, udi, "ftok");
 		return FALSE;
 	}
-	/* The following loop deals with the possibility that the semaphores can be deleted by someone else AFTER a successful
-	 * semget but BEFORE semop locks it, in which case we should retry.
-	 */
-	for (lcnt = 0; MAX_SEMGET_RETRIES > lcnt; lcnt++)
-	{
-		if (-1 == (udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
-		{
-			udi->ftok_semid = INVALID_SEMID;
-			save_errno = errno;
-			if (EINVAL == save_errno)
-			{
-				/* Possibly the key is in use by older GTM version */
-				if (-1 != semget(udi->key, OLD_VERSION_SEM_PER_SET, RALL))
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SEMKEYINUSE, 1, udi->key, errno);
-			}
-			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semget()", save_errno);
-		}
-		SET_GTM_ID_SEM(udi->ftok_semid, status); /* sets 3rd semaphore's value to GTM_ID = 43 */
-		if (-1 != status)
-		{
-			SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-			/* First try is always non-blocking */
-			SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
-			if (-1 != status)
-			{
-				SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
-				udi->counter_ftok_incremented = incr_cnt;
-				RETURN_SUCCESS(reg);
-			}
-			assert(-1 == status);
-			if ((ERANGE == errno) && (!*ftok_counter_halted))
-			{	/* We have no access to file header to check so just assume qdbrundown is set in the file header.
-				 * If it turns out to be FALSE, after we read the file header, we will issue an error.
-				 */
-				*ftok_counter_halted = TRUE;
-				incr_cnt = FALSE; /* Ignore increment operation */
-				lcnt--; /* Do not count this attempt */
-				continue;
-			}
-		} else
-		{
-			save_errno = errno;
-			if (immediate || !SEM_REMOVED(save_errno))
-				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semctl()", save_errno);
-			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
-			continue;
-		}
-		save_errno = errno;
-		if (immediate)
-			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
-		if (EAGAIN == save_errno)
-		{	/* Someone else is holding it */
-			sem_pid = semctl(udi->ftok_semid, DB_CONTROL_SEM, GETPID);
-			if (-1 != sem_pid)
-			{
-				ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO; /* blocking calls */
-				semop_wait_time = !IS_DSE_IMAGE ? MAX_SEM_WT : MAX_SEM_DSE_WT;
-				max_semop_trycnt = !(TREF(gtm_environment_init)) ? MAX_SEMOP_TRYCNT : MAX_SEMOP_DBG_TRYCNT;
-				for (semop_trycnt = 0; max_semop_trycnt > semop_trycnt; ++semop_trycnt)
-				{
-					TREF(semwait2long) = FALSE;
-					start_timer((TID)semwt2long_handler, semop_wait_time, semwt2long_handler, 0, NULL);
-					do
-					{
-						status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt); /* blocking semop */
-						if ((-1 == status) && (ERANGE == errno))
-                                                {
-                                                        if (!*ftok_counter_halted)
-							{	/* We have no access to file header to check so just assume
-								 * qdbrundown is set in the file header. If it turns out to be
-								 * FALSE, after we read the file header, we will issue an error
-								 */
-								*ftok_counter_halted = TRUE;
-								ftok_sopcnt = FTOK_SOPCNT_NO_INCR_COUNTER; /* Skip increment */
-								assert(incr_cnt);
-								incr_cnt = FALSE;
-								continue;
-							}
-                                                }
-					} while ((-1 == status) && ((EINTR == errno) || (ERANGE == errno))
-						 && !(TREF(semwait2long)));
-					if (-1 != status) /* success ? */
-					{
-						SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
-						udi->counter_ftok_incremented = incr_cnt;
-						CANCEL_TIMER_AND_RETURN_SUCCESS(reg);
-					}
-					save_errno = errno;
-					if (EINTR == save_errno)
-					{	/* Timer popped. If not, we would have continued in the do..while loop */
-						assert(TREF(semwait2long));
-						sem_pid = semctl(udi->ftok_semid, DB_CONTROL_SEM, GETPID);
-						if (-1 != sem_pid)
-						{
-							stuck_cnt++;
-							msgstr = (1 == stuck_cnt) ? "SEMWT2LONG_FTOK_INFO" : "SEMWT2LONG_FTOK";
-							if ((0 != sem_pid) && (sem_pid != process_id))
-							{
-								GET_C_STACK_FROM_SCRIPT(msgstr, process_id, sem_pid, stuck_cnt);
-								if (TREF(gtm_environment_init))
-									stacktrace_issued = TRUE;
-							}
-							continue;
-						} else
-							save_errno = errno; /* for the failed semctl */
-					}
-					cancel_timer((TID)semwt2long_handler);
-					break; /* semop/semctl failed for some other reason (for instance, EIDRM/EINVAL) */
-				}
-				if (max_semop_trycnt <= semop_trycnt)
-				{	/* we exhausted maximum attempts to do blocking semop. Issue SEMWT2LONG error and return */
-					assert(-1 != sem_pid);
-					tot_wait_time = (semop_wait_time * max_semop_trycnt) / MILLISECS_IN_SEC;
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_SEMWT2LONG, 7, process_id, tot_wait_time,
-						       LEN_AND_LIT("ftok"), DB_LEN_STR(reg), sem_pid);
-					return FALSE;
-				}
-				/* fall-through */
-			} else
-				save_errno = errno; /* for the failed semctl */
-			/* fall-through */
-		}
-		assert(0 != save_errno);
-		if (SEM_REMOVED(save_errno))
-		{
-			*ftok_counter_halted = FALSE;	/* start afresh for next iteration of for loop with new semid */
-			continue;
-		}
-		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()/semctl()", save_errno);
-	} /* end for loop */
-	assert(-1 == status);
-	assert(MAX_SEMGET_RETRIES < lcnt);
-	assert(FALSE);
-	gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("failed to obtain ftok semaphore after maximum retries"));
-	return FALSE;
+	else
+		RETURN_SUCCESS(reg);
 }
 
 /*
@@ -535,7 +306,10 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 				return TRUE;
 			}
 		}
-		if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, semflag)))
+		/* Always set IPC_NOWAIT for counter decrement. In the rare case where the counter is already zero, is it better
+		 * to handle the error than it is to wait indefinitely for another process to wake us up.
+		 */
+		if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, (SEM_UNDO | IPC_NOWAIT))))
 		{
 			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,10 +55,10 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	assert(mur_options.selection);
 	rec = jctl->reg_ctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-	pini_addr = rec->prefix.pini_addr;
 	key = NULL;
-	if (JRT_NULL == rectype || JRT_ALIGN == rectype)
+	if ((JRT_NULL == rectype) || (JRT_ALIGN == rectype))
 		return TRUE;
+	pini_addr = rec->prefix.pini_addr;	/* Since rectype != JRT_ALIGN, we can safely use "prefix.pini_addr" */
 	status = mur_get_pini(jctl, pini_addr, &plst);
 	if (SS_NORMAL != status)
 		return TRUE;

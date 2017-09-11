@@ -85,7 +85,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	unsigned char		*eof_rec_buffer;
 	unsigned char		eof_rec[(DISK_BLOCK_SIZE * 2) + MAX_IO_BLOCK_SIZE];
 	off_jnl_t		adjust;
-	uint4			jnl_fs_block_size, read_write_size, read_size;
+	uint4			end_of_data, jnl_fs_block_size, read_write_size, read_size;
 	int4			status;
 	gtm_uint64_t		header_virtual_size;
 
@@ -127,15 +127,16 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, jpc->status, buff);
 	}
-	adjust = header->end_of_data & (jnl_fs_block_size - 1);
-	/* Read the journal JRT_EOF at header->end_of_data offset.
+	end_of_data = header->end_of_data;
+	adjust = end_of_data & (jnl_fs_block_size - 1);
+	/* Read the journal JRT_EOF at end_of_data offset.
 	 * Make sure the buffer being read to is big enough and that as part of the read,
 	 * we never touch touch the journal file header territory.
 	 */
 	read_size = ROUND_UP2((EOF_RECLEN + adjust), jnl_fs_block_size);
 	assert(eof_rec_buffer + read_size <= ARRAYTOP(eof_rec));
-	assert(header->end_of_data - adjust >= JNL_HDR_LEN);
-	DO_FILE_READ(jpc->channel, header->end_of_data - adjust, eof_rec_buffer, read_size, jpc->status, jpc->status2);
+	assert(end_of_data - adjust >= JNL_HDR_LEN);
+	DO_FILE_READ(jpc->channel, end_of_data - adjust, eof_rec_buffer, read_size, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
 		return ERR_JNLRDERR; /* Has one !AD parameter, the journal file, which jnl_send_oper() provides */
 	if (header->prev_recov_end_of_data)
@@ -147,7 +148,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	if (!is_gdid_file_identical(&FILE_ID(reg), (char *)header->data_file_name, header->data_file_name_length))
 	{
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_FILEIDMATCH);
-		assert(FALSE);	/* we dont expect the rts_error in the line above to return */
+		assert(FALSE);	/* we don't expect the rts_error in the line above to return */
 		return ERR_JNLOPNERR;
 	}
 	memcpy(&eof_record, (unsigned char *)eof_rec_buffer + adjust, EOF_RECLEN);
@@ -210,7 +211,8 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 											+ JNL_SHARE_SIZE(csd)));
 	assert((sm_uc_ptr_t)jb == ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE(csd) + JNL_NAME_EXP_SIZE));
 	jb->last_eof_written = header->last_eof_written;
-	jb->freeaddr = jb->dskaddr = jb->fsync_dskaddr = header->end_of_data;
+	jb->freeaddr = jb->dskaddr = jb->fsync_dskaddr = end_of_data;
+	SET_JBP_RSRV_FREEADDR(jb, end_of_data);	/* sets both jb->rsrv_freeaddr & jb->rsrv_free */
 	jb->post_epoch_freeaddr = jb->end_of_data_at_open = jb->freeaddr;
 	jb->fs_block_size = jnl_fs_block_size;
 	/* The following is to make sure that the data in jnl_buffer is aligned with the data in the
@@ -218,7 +220,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	 * alignment with respect to jb->size implies alignment with jnl_fs_block_size.
 	 */
 	assert(0 == (jb->size % jnl_fs_block_size));
-	jb->free = jb->dsk = header->end_of_data % jb->size;
+	jb->free = jb->dsk = end_of_data % jb->size;
 	SET_LATCH_GLOBAL(&jb->fsync_in_prog_latch, LOCK_AVAILABLE);
 	SET_LATCH_GLOBAL(&jb->io_in_prog_latch, LOCK_AVAILABLE);
 	assert(0 == (jnl_fs_block_size % DISK_BLOCK_SIZE));
@@ -235,8 +237,17 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	jb->before_images = header->before_images;
 	jb->epoch_tn = eof_record.prefix.tn;
 	csd->jnl_checksum = header->checksum;
-	assert(4 == SIZEOF(header->alignsize));	/* so we can use the 32bit version of ceil_log2 */
-	jb->log2_of_alignsize = ceil_log2_32bit(header->alignsize);
+	assert(4 == SIZEOF(header->alignsize));
+	assert(((gtm_uint64_t)JNL_MAX_ALIGNSIZE * 512) < (gtm_uint64_t)MAXUINT4); /* ensure 4-byte "alignsize" will not overflow */
+	jb->alignsize = header->alignsize;
+	/* Use "gtm_uint64_t" typecast below to avoid 4G overflow issues with the ROUND_UP2 */
+	jb->next_align_addr = (uint4)(ROUND_UP2(((gtm_uint64_t)jb->freeaddr + MIN_ALIGN_RECLEN), header->alignsize)
+													- MIN_ALIGN_RECLEN);
+	SET_LATCH_GLOBAL(&jb->phase2_commit_latch, LOCK_AVAILABLE);
+	jb->phase2_commit_index1 = jb->phase2_commit_index2 = 0;
+	/* The below 2 lines are relied upon by "mutex_salvage" */
+	jb->phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE - 1].start_freeaddr = jb->end_of_data_at_open;
+	jb->phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE - 1].tot_jrec_len = 0;
 	assert(header->autoswitchlimit == csd->autoswitchlimit);
 	assert(header->jnl_alq == csd->jnl_alq);
 	assert(header->jnl_deq == csd->jnl_deq);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,9 +168,9 @@
 	} else															\
 		gtmsource_local->num_renegotiations++;										\
 }
-#else
 #endif
 
+#define	PHASE2_COMMIT_WAIT_CNT	8	/* 8 iterations of each 1 msec sleep before we decide to invoke "repl_phase2_cleanup" */
 
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
@@ -683,6 +683,8 @@ int gtmsource_process(void)
 	char				histdetail[256];
 	sm_global_latch_ptr_t		gtmsource_srv_latch;
 	gtmsource_state_t		gtmsource_state_sav;
+	uint4				phase2_commit_index1;
+	int				phase2_commit_wait_cnt;
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
@@ -966,7 +968,7 @@ int gtmsource_process(void)
 		 *		file name as the value which would be used towards history record verification.
 		 *	3) If receiver server was started with -UPDATERESYNC and receiver is >= V55000 and at a seqno
 		 *		which is EQUAL to the earliest seqno for which we have a history record on the primary.
-		 *		We have	no way of verifying histories since we definitely dont have the history record
+		 *		We have	no way of verifying histories since we definitely don't have the history record
 		 *		for the receiver side seqno. Since -updateresync was used, assume they are in sync and
 		 *		start replicating from the earliest seqno for which we have a history record on the primary.
 		 *	4) If recvd_seqno is 1. In this case, the receiver instance has been created afresh so its instance
@@ -1298,7 +1300,7 @@ int gtmsource_process(void)
 		 	continue;
 		}
 		/* Now that REPL_WILL_RESTART_WITH_INFO message has been sent, if compression of the replication stream is
-		 * requested, check if the receiver server supports ability to decompress. Dont do this if this receiver has
+		 * requested, check if the receiver server supports ability to decompress. Don't do this if this receiver has
 		 * previously sent a REPL_CMP2UNCMP message.
 		 */
 		gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression by default */
@@ -1420,6 +1422,8 @@ int gtmsource_process(void)
 		gtmsource_local->next_histinfo_seqno = MAX_SEQNO; /* Initial value. Reset by "gtmsource_send_new_histrec" below */
 		assert(-1 == gtmsource_local->next_histinfo_num);
 		prev_now = gtmsource_now;
+		phase2_commit_index1 = 0;
+		phase2_commit_wait_cnt = 0;
 		while (TRUE)
 		{
 			gtmsource_poll_actions(TRUE);
@@ -1498,7 +1502,7 @@ int gtmsource_process(void)
 				continue;
 			}
 			if ((GTMSOURCE_SEARCHING_FOR_RESTART  == gtmsource_state)
-				|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
+					|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 				break;
 			assert(gtmsource_state == GTMSOURCE_SENDING_JNLRECS);
 			pre_read_seqno = gtmsource_local->read_jnl_seqno;
@@ -1809,6 +1813,37 @@ int gtmsource_process(void)
 					gtmsource_flush_fh(post_read_seqno);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						break; /* the outerloop will continue */
+					if ((READ_POOL == gtmsource_local->read_state)
+						&& (jctl->write_addr != jctl->rsrv_write_addr))
+					{	/* We found nothing to send in the journal pool but there is some phase2 commit
+						 * in progress. Check if it is dead and needs to be cleaned up by noting its
+						 * progress across various iterations of this "while" loop.
+						 */
+						if (phase2_commit_index1 == jctl->phase2_commit_index1)
+						{	/* We have been through one iteration of this "while" loop with
+							 * an intervening sleep and no changes happening. Do check.
+							 */
+							phase2_commit_wait_cnt++;
+							if (PHASE2_COMMIT_WAIT_CNT <= phase2_commit_wait_cnt)
+							{	/* Need to get "grab_lock" in order for "repl_phase2_cleanup"
+								 * to invoke "repl_phase2_salvage" logic. So try getting it
+								 * in immediate mode (second parameter FALSE below). If not
+								 * available, then try again next iteration.
+								 */
+								if (grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+								{
+									repl_phase2_cleanup(&jnlpool);
+									rel_lock(jnlpool.jnlpool_dummy_reg);
+									phase2_commit_wait_cnt = 0;
+								} else
+									phase2_commit_wait_cnt--; /* Try again next iteration */
+							}
+						} else
+						{
+							phase2_commit_wait_cnt = 0; /* there is progress since we last took note */
+							phase2_commit_index1 = jctl->phase2_commit_index1;
+						}
+					}
 					/* Sleep for a while (as part of the next REPL_RECV_LOOP) to avoid spinning when there is no
 					 * data to be sent
 					 */

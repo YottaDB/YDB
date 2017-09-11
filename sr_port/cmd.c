@@ -279,7 +279,7 @@ LITDEF struct
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
 		}
 		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
-		{	/* NOTE - assignent above */
+		{	/* NOTE - assignment above */
 			temp_expr_start = TREF(expr_start);
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(temp_expr_start);

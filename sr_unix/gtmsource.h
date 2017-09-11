@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "mdef.h"
 #include "gt_timer.h"
 #include "gtm_ipv6.h" /* for union gtm_sockaddr_in46 */
+#include "sleep.h"
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
@@ -115,6 +116,41 @@ typedef enum
 
 #define GTMSOURCE_FH_FLUSH_INTERVAL	60 /* seconds, if required, flush file header(s) every these many seconds */
 
+#define	JPL_PHASE2_COMMIT_ARRAY_SIZE	16384	/* Max # of jnlpool commits that can still be in phase2.
+						 * Note that even if a phase2 commit is complete, the slot it occupies
+						 * cannot be reused by anyone else until all phase2 commit slots that
+						 * started before this slot are also done.
+						 */
+/* Individual structure describing an active phase2 jnlpool commit in jnlpool shared memory */
+typedef struct
+{
+	seq_num		jnl_seqno;
+	seq_num		strm_seqno;
+	qw_off_t	start_write_addr;	/* jpl->rsrv_write_addr at start of this commit */
+	uint4		process_id;
+	uint4		tot_jrec_len;		/* total length of jnl records corresponding to this seqno */
+	uint4		prev_jrec_len;		/* total length of jnl records corresponding to the previous seqno */
+	boolean_t	write_complete;		/* TRUE if this pid is done writing jnl records to jnlbuff */
+} jpl_phase2_in_prog_t;
+
+/* Structure recording a particular type of event in this jnlpool */
+typedef struct
+{
+	gtm_uint64_t	cntr;	/* # of times this event was encountered in the life of this jnlpool */
+	seq_num		seqno;	/* seqno when this event was last encountered */
+} jpl_trc_rec_t;
+
+
+#define	JPL_TRACE_PRO(JPL, TRC)		{ JPL->TRC.cntr++; JPL->TRC.seqno = JPL->jnl_seqno; }
+
+#define TAB_JPL_TRC_REC(A,B)	B,
+enum jpl_trc_rec_type
+{
+#include "tab_jpl_trc_rec.h"
+n_jpl_trc_rec_types
+};
+#undef TAB_JPL_TRC_REC
+
 typedef struct
 { 	/* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid
 	 * compiler optimization, forcing fresh load on every access.
@@ -143,14 +179,17 @@ typedef struct
 							 * fetchresync rollback message.  This field is always updated while
 							 * holding the journal pool lock
 							 */
-	volatile qw_off_t	early_write_addr;	/* Virtual address assuming the to-be-written jnl records are already
-							 * written into the journal pool. Is equal to write_addr except in the
-							 * window when the actual write takes place. */
+	seq_num			strm_seqno[MAX_SUPPL_STRMS];		/* the current jnl seqno of each stream */
+	repl_conn_info_t	this_side;		/* Replication connection details of this side/instance */
 	volatile qw_off_t	write_addr;		/* Virtual address of the next journal record to be written in the merged
 							 * journal file.  Note that the merged journal may not exist.
-							 * Updated by GTM process */
-	uint4			write;			/* Relative offset from jnldata_base_off for the next journal record to
-							 * be written. Updated by GTM process. */
+							 * Updated by GTM process.
+							 */
+	volatile qw_off_t	rsrv_write_addr;	/* Similar to "write_addr" but space is reserved in phase1 of commit
+							 * and actual copy to jnlpool happens in phase2 outside of jnlpool crit.
+							 * If no commits are active, "rsrv_write_addr == write_addr". Else
+							 * "rsrv_write_addr > write_addr".
+							 */
 	boolean_t		upd_disabled;		/* Identify whether updates are disabled or not  on the secondary */
 	volatile uint4		lastwrite_len;		/* The length of the last transaction written into the journal pool.
 							 * Copied to jnldata_hdr.prev_jnldata_len before writing into the pool.
@@ -177,20 +216,24 @@ typedef struct
 							 * Anyone who does a "jnlpool_init" before this will issue a error.
 							 */
 	uint4			jnlpool_creator_pid;	/* DEBUG-ONLY field used for fake ENOSPC testing */
-	repl_conn_info_t	this_side;		/* Replication connection details of this side/instance */
-	seq_num			strm_seqno[MAX_SUPPL_STRMS];		/* the current jnl seqno of each stream */
 	volatile uint4		onln_rlbk_pid;		/* process ID of currently running ONLINE ROLLBACK. 0 if none. */
 	volatile uint4		onln_rlbk_cycle;	/* incremented everytime an ONLINE ROLLBACK ends */
 	boolean_t		freeze;			/* Freeze all regions in this instance. */
 	char			freeze_comment[MAX_FREEZE_COMMENT_LEN];	/* Text explaining reason for freeze */
 	boolean_t		instfreeze_environ_inited;
 	unsigned char		merrors_array[MERRORS_ARRAY_SZ];
-	boolean_t		outofsync_core_generated;
 	boolean_t		ftok_counter_halted;
-	/* Note: while adding fields to this structure, keep in mind that it needs to be 16-byte aligned so add filler bytes
-	 * as necessary
-	 */
-	char			filler_16bytealign[8];
+	uint4			phase2_commit_index1;
+	uint4			phase2_commit_index2;
+	char			filler_16bytealign1[8];
+	/************* JPL_TRC_REC RELATED FIELDS -- begin -- ***********/
+#	define TAB_JPL_TRC_REC(A,B)	jpl_trc_rec_t	B;
+#	include "tab_jpl_trc_rec.h"
+#	undef TAB_JPL_TRC_REC
+	/************* JPL_TRC_REC RELATED FIELDS -- end -- ***********/
+	jpl_phase2_in_prog_t	phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE];
+	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
+	global_latch_t		phase2_commit_latch;	/* Used by "repl_phase2_complete" to update "phase2_commit_index1" */
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -323,10 +366,49 @@ MBSTART {										\
 		((GTMSOURCE_CHANGING_MODE == gtmsource_state) 						\
 			|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)			\
 			|| (GTMSOURCE_WAITING_FOR_XON == gtmsource_state))
+
 #define GTMSOURCE_NOW_TRANSITIONAL(STATEVAR)								\
 		((GTMSOURCE_CHANGED_STATE(STATEVAR) && GTMSOURCE_IS_TRANSITIONAL_STATE())		\
 			GTMTLS_ONLY(|| (REPLTLS_WAITING_FOR_RENEG_ACK == repl_tls.renegotiate_state))	\
 		 	|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+
+#define	GTMSOURCE_SET_READ_ADDR(GTMSOURCE_LOCAL, JNLPOOL)						\
+MBSTART {												\
+	qw_off_t	rsrv_write_addr;								\
+													\
+	assert((&FILE_INFO(JNLPOOL.jnlpool_dummy_reg)->s_addrs)->now_crit);          			\
+	rsrv_write_addr = JNLPOOL.jnlpool_ctl->rsrv_write_addr;						\
+	GTMSOURCE_LOCAL->read_addr = rsrv_write_addr;							\
+	GTMSOURCE_LOCAL->read = rsrv_write_addr % JNLPOOL.jnlpool_ctl->jnlpool_size;			\
+} MBEND
+
+#define	SET_JPL_WRITE_ADDR(JPL, NEW_WRITE_ADDR)										\
+{															\
+	/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a				\
+	 * multi processor system, it is possible that the source server notices the change in				\
+	 * rsrv_write_addr before seeing the change to jnlheader->jnldata_len, leading it to read an			\
+	 * invalid transaction length. To avoid such conditions, we should commit the order of				\
+	 * shared memory updates before we update rsrv_write_addr. This ensures that the source server			\
+	 * sees all shared memory updates related to a transaction before the change in rsrv_write_addr			\
+	 */														\
+	SHM_WRITE_MEMORY_BARRIER;											\
+	JPL->write_addr = NEW_WRITE_ADDR;										\
+}
+
+#define	SET_JNL_SEQNO(JPL, TEMP_JNL_SEQNO, SUPPLEMENTARY, STRM_SEQNO, STRM_INDEX, NEXT_STRM_SEQNO)	\
+{													\
+	GBLREF	jnl_gbls_t	jgbl;									\
+													\
+	assert(!jgbl.forw_phase_recovery);								\
+	TEMP_JNL_SEQNO++;										\
+	JPL->jnl_seqno = TEMP_JNL_SEQNO;								\
+	if (SUPPLEMENTARY)										\
+	{												\
+		NEXT_STRM_SEQNO = STRM_SEQNO + 1;							\
+		JPL->strm_seqno[STRM_INDEX] = NEXT_STRM_SEQNO;						\
+	}												\
+}
+
 /* The following structure contains data items local to one Source Server.
  * It is maintained in the journal pool to provide for persistence across
  * instantiations of the Source Server (due to crashes).
@@ -398,7 +480,7 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
-	int4			padding;		/* Keep size % 8 == 0 */
+	int4			filler_8byte_align;	/* Keep size % 8 == 0 */
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -431,8 +513,30 @@ typedef gtmsource_local_struct *gtmsource_local_ptr_t;
 #define JNLPOOL_CTL_SIZE	ROUND_UP(SIZEOF(jnlpool_ctl_struct), CACHELINE_SIZE)	/* align crit semaphore at cache line */
 #define	JNLPOOL_CRIT_SIZE	(JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct) + SIZEOF(node_local))
 #define JNLDATA_BASE_OFF	(JNLPOOL_CTL_SIZE + JNLPOOL_CRIT_SIZE + REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + GTMSOURCE_LOCAL_SIZE)
+#define	REPLCSA2JPL(CSA)	(jnlpool_ctl_ptr_t)((sm_uc_ptr_t)CSA->critical - JNLPOOL_CTL_SIZE) /* see "jnlpool_init" for
+										 * relationship between critical and jpl.
+										 */
+/* The below is a structure capturing the details of space reserved in the journal pool corresponding to a transaction.
+ * Space for the transaction in the jnlpool is reserved in phase1 ("jnl_write_reserve"0 while holding crit and actual
+ * memcpy of journal records into jnlpool happens in phase2 outside of crit ("jnl_write_phase2").
+ */
+typedef struct
+{
+	qw_off_t	start_write_addr;	/* jpl->write_addr at which this transaction started */
+	qw_off_t	cur_write_addr;		/* current value of jpl->write_addr as we progress writing journal records
+						 * into jnlpool in phase2 of commit.
+						 */
+	uint4		tot_jrec_len;		/* Total length (in bytes) of jnl records we expect to be written for this seqno */
+	uint4		write_total;		/* Total length of jnl records actually used up for this seqno */
+	boolean_t	memcpy_skipped;		/* we skipped "memcpy" at least once in "jnl_pool_write" */
+	uint4		phase2_commit_index;	/* index into jpl->phase2_commit_array[] corresponding to this commit */
+	uint4		num_tcoms;		/* If curr tn is a TP tn, then # of tcom records seen till now */
+	char		filler_8byte_align[4];
+} jpl_rsrv_struct_t;
 
-/* the below structure has various fields that point to different sections of the journal pool */
+/* The below structure has various fields that point to different sections of the journal pool
+ * and a few fields that point to private memory.
+ */
 typedef struct
 {
 	jnlpool_ctl_ptr_t	jnlpool_ctl;		/* pointer to the journal pool control structure */
@@ -442,7 +546,149 @@ typedef struct
 	repl_inst_hdr_ptr_t	repl_inst_filehdr;	/* pointer to the instance file header section in the journal pool */
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;	/* pointer to the gtmsrc_lcl array section in the journal pool */
 	sm_uc_ptr_t		jnldata_base;		/* pointer to the start of the actual journal record data */
+	jpl_rsrv_struct_t	jrs;
 } jnlpool_addrs;
+
+#define	UPDATE_JPL_RSRV_WRITE_ADDR(JPL, JNLPOOL, TN_JRECLEN)							\
+MBSTART {													\
+	qw_off_t		rsrv_write_addr;								\
+	int			nextIndex, endIndex;								\
+	jpl_phase2_in_prog_t	*phs2cmt;									\
+														\
+	GBLREF	uint4		process_id;									\
+														\
+	assert(JPL == JNLPOOL.jnlpool_ctl);									\
+	assert((&FILE_INFO(JNLPOOL.jnlpool_dummy_reg)->s_addrs)->now_crit);					\
+	/* Allocate a slot. But before that, check if the slot array is full.					\
+	 * endIndex + 1 == first_index implies full.								\
+	 * endIndex     == first_index implies empty.								\
+	 */													\
+	endIndex = JPL->phase2_commit_index2;									\
+	nextIndex = endIndex;											\
+	INCR_PHASE2_COMMIT_INDEX(nextIndex, JPL_PHASE2_COMMIT_ARRAY_SIZE);					\
+	if (nextIndex == JPL->phase2_commit_index1)								\
+	{	/* Slot array is full. Wait for phase2 to finish. */						\
+		do												\
+		{												\
+			repl_phase2_cleanup(&JNLPOOL);								\
+			if (nextIndex != JPL->phase2_commit_index1)						\
+				break;										\
+			JPL_TRACE_PRO(JPL, jnl_pool_write_sleep);						\
+			SLEEP_USEC(1, FALSE);									\
+		} while (nextIndex == JPL->phase2_commit_index1);						\
+	}													\
+	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(endIndex, JPL_PHASE2_COMMIT_ARRAY_SIZE);			\
+	phs2cmt = &JPL->phase2_commit_array[endIndex];								\
+	assert(JPL->jnl_seqno == jnl_fence_ctl.token);								\
+	phs2cmt->jnl_seqno = jnl_fence_ctl.token;								\
+	phs2cmt->strm_seqno = jnl_fence_ctl.strm_seqno;								\
+	phs2cmt->process_id = process_id;									\
+	rsrv_write_addr = JPL->rsrv_write_addr;									\
+	phs2cmt->start_write_addr = rsrv_write_addr;								\
+	assert(TN_JRECLEN);											\
+	assert(0 == (TN_JRECLEN % JNL_REC_START_BNDRY));							\
+	assert(NULL_RECLEN <= TN_JRECLEN);	/* see "repl_phase2_salvage" for why this is needed */		\
+	phs2cmt->tot_jrec_len = TN_JRECLEN;									\
+	phs2cmt->prev_jrec_len = JPL->lastwrite_len;								\
+	phs2cmt->write_complete = FALSE;									\
+	JNLPOOL.jrs.start_write_addr = rsrv_write_addr;								\
+	JNLPOOL.jrs.cur_write_addr = rsrv_write_addr + SIZEOF(jnldata_hdr_struct);				\
+	JNLPOOL.jrs.tot_jrec_len = TN_JRECLEN;									\
+	JNLPOOL.jrs.write_total = SIZEOF(jnldata_hdr_struct);	/* will be incremented as we copy		\
+								 * each jnlrec into jnlpool in phase2		\
+								 */						\
+	JNLPOOL.jrs.memcpy_skipped = FALSE;									\
+	JNLPOOL.jrs.phase2_commit_index = endIndex;								\
+	JNLPOOL.jrs.num_tcoms = 0;										\
+	/* Note: "mutex_salvage" and "repl_phase2_cleanup" rely on the below order of sets */			\
+	JPL->lastwrite_len = TN_JRECLEN;									\
+	JPL->rsrv_write_addr = rsrv_write_addr + TN_JRECLEN;							\
+	SHM_WRITE_MEMORY_BARRIER; /* see corresponding SHM_READ_MEMORY_BARRIER in "repl_phase2_cleanup" */	\
+	JPL->phase2_commit_index2 = nextIndex;									\
+} MBEND
+
+error_def(ERR_JNLPOOLRECOVERY);
+
+#define	JPL_PHASE2_WRITE_COMPLETE(JNLPOOL)									\
+MBSTART {													\
+	int			index;										\
+	jpl_phase2_in_prog_t	*phs2cmt;									\
+	jnldata_hdr_ptr_t	jnl_header;									\
+	jrec_prefix		*prefix;									\
+	uint4			tot_jrec_len;									\
+														\
+	GBLREF	uint4		process_id;									\
+	GBLREF	jnl_gbls_t	jgbl;										\
+														\
+	tot_jrec_len = JNLPOOL.jrs.tot_jrec_len;								\
+	assert(tot_jrec_len);											\
+	index = JNLPOOL.jrs.phase2_commit_index;								\
+	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(index, JPL_PHASE2_COMMIT_ARRAY_SIZE);				\
+	phs2cmt = &JNLPOOL.jnlpool_ctl->phase2_commit_array[index];						\
+	assert(phs2cmt->process_id == process_id);								\
+	assert(FALSE == phs2cmt->write_complete);								\
+	assert(phs2cmt->tot_jrec_len == tot_jrec_len);								\
+	assert(jgbl.cumul_index == jgbl.cu_jnl_index);								\
+	if (!JNLPOOL.jrs.memcpy_skipped)									\
+	{													\
+		assert(JNLPOOL.jrs.start_write_addr >= JNLPOOL.jnlpool_ctl->write_addr);			\
+		assert(JNLPOOL.jrs.start_write_addr < JNLPOOL.jnlpool_ctl->rsrv_write_addr);			\
+		jnl_header = (jnldata_hdr_ptr_t)(JNLPOOL.jnldata_base						\
+				+ (JNLPOOL.jrs.start_write_addr % JNLPOOL.jnlpool_ctl->jnlpool_size));		\
+		jnl_header->jnldata_len = tot_jrec_len;								\
+		assert(0 == (phs2cmt->prev_jrec_len % JNL_REC_START_BNDRY));					\
+		jnl_header->prev_jnldata_len = phs2cmt->prev_jrec_len;						\
+		DEBUG_ONLY(prefix = (jrec_prefix *)(JNLPOOL.jnldata_base					\
+					+ (JNLPOOL.jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
+							% JNLPOOL.jnlpool_ctl->jnlpool_size));			\
+		assert(JRT_BAD != prefix->jrec_type);								\
+		if ((JNLPOOL.jrs.write_total != tot_jrec_len)							\
+			DEBUG_ONLY(|| ((0 != TREF(gtm_test_jnlpool_sync))					\
+					&& (0 == (phs2cmt->jnl_seqno % TREF(gtm_test_jnlpool_sync))))))		\
+		{	/* This is an out-of-sync situation. "tot_jrec_len" (computed in phase1) is not equal	\
+			 * to "write_total" (computed in phase2). Not sure how this can happen but recover	\
+			 * from this situation by replacing the first record in the reserved space with a	\
+			 * JRT_BAD rectype. That way the source server knows this is a transaction that it	\
+			 * has to read from the jnlfiles and not the jnlpool.					\
+			 */											\
+			assert((0 != TREF(gtm_test_jnlpool_sync))						\
+					&& (0 == (phs2cmt->jnl_seqno % TREF(gtm_test_jnlpool_sync))));		\
+			assert(tot_jrec_len >= (SIZEOF(jnldata_hdr_struct) + SIZEOF(jrec_prefix)));		\
+			/* Note that it is possible jnl_header is 8 bytes shy of the jnlpool end in which case	\
+			 * "prefix" below would end up going outside the jnlpool range hence a simple		\
+			 * (jnl_header + 1) would not work to set prefix (and instead the % needed below).	\
+			 */											\
+			prefix = (jrec_prefix *)(JNLPOOL.jnldata_base						\
+					+ (JNLPOOL.jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
+							% JNLPOOL.jnlpool_ctl->jnlpool_size);			\
+			prefix->jrec_type = JRT_BAD;								\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLRECOVERY, 4,				\
+				tot_jrec_len, JNLPOOL.jrs.write_total,						\
+				&phs2cmt->jnl_seqno, JNLPOOL.jnlpool_ctl->jnlpool_id.instfilename);		\
+			/* Now that JRT_BAD is set, fix cur_write_addr so it is set back in sync		\
+			 * (so later assert can succeed).							\
+			 */											\
+			DEBUG_ONLY(JNLPOOL.jrs.cur_write_addr = (JNLPOOL.jrs.start_write_addr + tot_jrec_len));	\
+		}												\
+		/* Need to make sure the writes of jnl_header->jnldata_len & jnl_header->prev_jnldata_len	\
+		 * happen BEFORE the write of phs2cmt->write_complete in that order. Hence need the write	\
+		 * memory barrier. Not doing this could cause another process in "repl_phase2_cleanup" to	\
+		 * see phs2cmt->write_complete as TRUE and update jnlpool_ctl->write_addr to reflect this	\
+		 * particular seqno even though the jnl_header write has not still happened. This could cause	\
+		 * a concurrently running source server to decide to read this seqno in "gtmsource_readpool"	\
+		 * and read garbage lengths in the jnl_header section.						\
+		 */												\
+		SHM_WRITE_MEMORY_BARRIER;									\
+	}													\
+	assert((JNLPOOL.jrs.start_write_addr + tot_jrec_len) == JNLPOOL.jrs.cur_write_addr);			\
+	phs2cmt->write_complete = TRUE;										\
+	JNLPOOL.jrs.tot_jrec_len = 0;	/* reset needed to prevent duplicate calls (e.g. "secshr_db_clnup") */	\
+	/* Invoke "repl_phase2_cleanup" sparingly as it calls "grab_latch". So we do it twice.			\
+	 * Once at half-way mark and once when a wrap occurs.							\
+	 */													\
+	if (!index || ((JPL_PHASE2_COMMIT_ARRAY_SIZE / 2) == index))						\
+		repl_phase2_cleanup(&JNLPOOL);									\
+} MBEND
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)
@@ -573,5 +819,9 @@ seq_num 	gtmsource_checkforbacklog(void);
 #ifdef GTM_TLS
 boolean_t	gtmsource_exchange_tls_info(void);
 #endif
+
+/********** Miscellaneous prototypes **********/
+void		repl_phase2_cleanup(jnlpool_addrs *jpa);
+void		repl_phase2_salvage(jnlpool_addrs *jpa, jnlpool_ctl_ptr_t jpl, jpl_phase2_in_prog_t *deadCmt);
 
 #endif /* GTMSOURCE_H */

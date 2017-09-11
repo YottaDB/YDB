@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +46,9 @@ int4 symbinit(void)
 	stack_frame	*fp, *fp_prev, *fp_fix;
 	symval		*ptr;
 	unsigned char	*l_syms, *msp_save, *old_sp, *top;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (frame_pointer->type & SFT_COUNT)
 	{
 		temp_size = frame_pointer->rvector->temp_size;
@@ -172,6 +175,7 @@ int4 symbinit(void)
 	DBGRFCT((stderr,"symbinit: Allocated new symbol table at 0x"lvaddr" pushing old symbol table on M stack (0x"lvaddr")\n",
 		 ptr, curr_symval));
 	curr_symval = ptr;
+	(TREF(curr_symval_cycle))++;				/* curr_symval is changing - update cycle */
 	mv_st_ent->mv_st_cont.mvs_stab = ptr;
 	return shift_size;
 }

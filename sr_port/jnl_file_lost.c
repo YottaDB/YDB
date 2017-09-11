@@ -57,7 +57,7 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 		/* no break */
 	}
 	assert(csa->now_crit);
-	/* We issue an rts_error (instead of shutting off journaling) in the following cases :				{BYPASSOK}
+	/* We issue an rts_error (instead of shutting off journaling) in the following cases :			{BYPASSOK}
 	 * 1) $gtm_error_on_jnl_file_lost is set to issue runtime error (if not already issued) in case of journaling issues.
 	 * 2) The process has the given message set in $gtm_custom_errors (indicative of instance freeze on error setup)
 	 *    in which case the goal is to never shut-off journaling

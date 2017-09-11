@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,6 @@ boolean_t mur_report_error(jnl_ctl_list *jctl, enum mur_error code)
 		break;
 
 	case MUR_DUPTOKEN:
-		assert(FALSE);
  		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(7) ERR_DUPTOKEN, 5,
 				&((struct_jrec_tcom *)jctl->reg_ctl->mur_desc->jnlrec)->token_seq.token,
  				jctl->jnl_fn_len, jctl->jnl_fn, DB_LEN_STR(jctl->reg_ctl->gd));

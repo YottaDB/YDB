@@ -795,7 +795,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		{	/* Journaling is to be disabled for this region. */
 			/* Mark the current journal as switched, if possible. */
 			if (jnl_open == csd->jnl_state)
-				jnl_set_cur_prior(gv_cur_region, NULL, csd);
+				jnl_set_cur_prior(gv_cur_region, cs_addrs, csd);
 			/* Reset all fields */
 			csd->jnl_before_image = FALSE;
 			csd->jnl_state = jnl_notallowed;

@@ -96,7 +96,7 @@
 # include "gtm_trigger.h"
 #endif
 
-GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, pool_init;
+GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, pool_init, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;
@@ -556,6 +556,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	ifdef GTM_TRIGGER
 	assertpro(TPRESTART_STATE_NORMAL == tprestart_state);	/* Can't leave half-restarted transaction around - out of design */
 #	endif
+	if (TREF(xecute_literal_parse))
+	{	/* This is not expected but protect against it */
+		assert(!TREF(xecute_literal_parse));
+		run_time = TREF(xecute_literal_parse) = FALSE;
+	}
 	UNDO_ACTIVE_LV(actlv_mdb_condition_handler);
 	/*
 	 * If error is at least severity "WARNING", do some cleanups. Note: crit is no longer unconditionally

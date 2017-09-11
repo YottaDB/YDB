@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2016 Fidelity National Information	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 	ABS_TIME	cur_time, end_time, remain_time;
 	int		maxspins, retries, spins;
 	int4		max_sleep_mask;
+	boolean_t	skip_time_calc;
 
 	assert(process_id == getpid());	/* Make sure "process_id" global variable is reliable (used below in an assert) */
 	if (process_id == latch->u.parts.latch_pid)
@@ -48,12 +49,16 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 		assert(FALSE);	/* Don't expect caller to call us if we hold the lock already. in pro be safe and return */
 		return TRUE;
 	}
-	sys_get_curr_time(&cur_time);
-	add_int_to_abs_time(&cur_time, max_timeout_in_secs * 1000, &end_time);
-	remain_time.at_sec = 0;		/* ensure one try */
+	skip_time_calc = !max_timeout_in_secs || (GRAB_LATCH_INDEFINITE_WAIT == max_timeout_in_secs);
+	if (!skip_time_calc)
+	{
+		sys_get_curr_time(&cur_time);
+		add_int_to_abs_time(&cur_time, max_timeout_in_secs * 1000, &end_time);
+		remain_time.at_sec = 0;		/* ensure one try */
+	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = 1; 0 <= remain_time.at_sec ; retries++)
+	for (retries = 1; ; retries++)
 	{
 		++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */
 		for (spins = maxspins; spins > 0 ; spins--)
@@ -67,9 +72,19 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 			}
 		}
 		--fast_lock_count;
-		REST_FOR_LATCH(latch, USEC_IN_NSEC_MASK, retries);
-		sys_get_curr_time(&cur_time);
-		remain_time = sub_abs_time(&end_time, &cur_time);
+		if (!max_timeout_in_secs)
+			break;
+		if (!skip_time_calc)
+		{
+			REST_FOR_LATCH(latch, USEC_IN_NSEC_MASK, retries);
+			sys_get_curr_time(&cur_time);
+			remain_time = sub_abs_time(&end_time, &cur_time);
+			if (0 > remain_time.at_sec)
+				break;
+		} else
+		{	/* Indefinite wait for lock. Periodically check if latch is held by dead pid. If so get it back. */
+			SLEEP_FOR_LATCH(latch, retries);
+		}
 	}
 	assert(0 <= fast_lock_count);
 	assert(FALSE);

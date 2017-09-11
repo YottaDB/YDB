@@ -83,6 +83,12 @@ void stx_error_va(int in_error, va_list args)
 	 *	b) shift_side_effects
 	 *	c) source_error_found
 	 */
+	if (TREF(xecute_literal_parse))
+	{
+		ins_errtriple(in_error);
+		TREF(source_error_found) = TRUE;
+		return;
+	}
 	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile_and_link));
 	if (!is_stx_warn)	/* is current error not of type warning or are we not in CGP_PARSE phase? */
 		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;

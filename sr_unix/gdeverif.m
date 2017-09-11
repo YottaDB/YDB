@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2016 Fidelity National Information		;
+; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -17,6 +17,7 @@ ALL()	;external
 	s gqual="REGION" d ALLREG,usereg
 	s gqual="SEGMENT" d ALLSEG,useseg
 	d ALLTEM
+	s:('verified)&('$zstatus) $zstatus=gdeerr("VERIFY")
 	zm gdeerr("VERIFY"):$s(verified:"OK",1:"FAILED") w !
 	q verified
 

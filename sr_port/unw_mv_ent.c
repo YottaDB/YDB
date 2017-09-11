@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,10 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef VMS
-#include <fab.h>		/* needed for dbgbldir_sysops.h */
-#endif
 
 #include "gtm_string.h"
 #include "gtm_unistd.h"
@@ -47,13 +43,12 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "have_crit.h"
-#ifdef UNIX
 #include "iormdef.h"
 #include "iottdef.h"
-#endif
 #include "stack_frame.h"
 #include "alias.h"
 #include "tp_timeout.h"
+#include "localvarmonitor.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -181,6 +176,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				assert(mv_st_ent->mv_st_cont.mvs_stab == curr_symval);
 				symval_ptr = curr_symval;
 				curr_symval = symval_ptr->last_tab;
+				(TREF(curr_symval_cycle))++;
 				DBGRFCT((stderr, "\n\n***** unw_mv_ent-STAB: ** Symtab pop with 0x"lvaddr" replacing 0x"
 					 lvaddr"\n\n", curr_symval, symval_ptr));
 #				ifdef GTM_TRIGGER
@@ -346,7 +342,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				return;	/* already processed */
 			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
 			{
-#				ifdef UNIX
 				case tt:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -361,14 +356,13 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
 						rm_ptr = (d_rm_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
-						assert(rm_ptr->pipe || rm_ptr->fifo || rm_ptr->follow);
+						assert(rm_ptr->is_pipe || rm_ptr->fifo || rm_ptr->follow);
 						rm_ptr->mupintr = FALSE;
 						rm_ptr->pipe_save_state.who_saved = pipewhich_invalid;
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
 					return;
-#				endif
 				case gtmsocket:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */

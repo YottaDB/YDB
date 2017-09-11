@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,10 +25,11 @@
 #include "gvcmx.h"
 
 GBLREF	boolean_t	gtcm_connection;
-GBLREF	unsigned char	cm_action;
+GBLREF	int		process_exiting;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	tp_frame	*tp_pointer;
-GBLREF	int		process_exiting;
+GBLREF	unsigned char	cm_action;
+GBLREF	unsigned short	lks_this_cmd;
 
 error_def(ERR_TPLOCK);
 
@@ -40,6 +41,8 @@ void op_unlock(void)
 	/* if there were any old locks before TSTART, they can't be  unlocked */
 	if (mlk_pvt_root && tp_pointer && tp_pointer->old_locks)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPLOCK);
+	lks_this_cmd = 0;
+	op_lkinit();
 	/* must deal with cm */
 	if (gtcm_connection)
 	{

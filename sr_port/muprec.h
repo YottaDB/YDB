@@ -93,16 +93,6 @@ error_def(ERR_SYSCALL);
 	murgbl.extr_buff[extract_len++] = '\\';				\
 }
 
-/* extract jnl record "rec" using extraction routine "extract" into file "file_info" (extract/lost/broken transaction files) */
-#define EXTRACT_JNLREC(jctl, rec, extract, file_info, status)		\
-{									\
-	pini_list_struct	*plst;					\
-									\
-	status = mur_get_pini(jctl, (rec)->prefix.pini_addr, &plst);	\
-	if (SS_NORMAL == status)					\
-		(*extract)(jctl, (file_info), (rec), plst);		\
-}
-
 #define	EXTPID(plst)					\
 {							\
 	EXTINT(plst->jpv.jpv_pid);			\
@@ -174,16 +164,16 @@ error_def(ERR_SYSCALL);
 
 #define IS_VALID_LEN_FROM_PREFIX(JREC, JFH)							\
 (	/* length within range */								\
-	(ROUND_DOWN2((JREC)->prefix.forwptr, JNL_REC_START_BNDRY) == (JREC)->prefix.forwptr) &&	\
-	(JREC)->prefix.forwptr > MIN_JNLREC_SIZE  &&						\
-	(JREC)->prefix.forwptr <= (JFH)->max_jrec_len						\
+	(ROUND_DOWN2((JREC)->prefix.forwptr, JNL_REC_START_BNDRY) == (JREC)->prefix.forwptr)	\
+		&& (MIN_JNLREC_SIZE <= (JREC)->prefix.forwptr)					\
+		&& ((JREC)->prefix.forwptr <= (JFH)->max_jrec_len)				\
 )
 
 #define IS_VALID_LEN_FROM_SUFFIX(SUFFIX, JFH)							\
 ( /* length within range */									\
-	(ROUND_DOWN2((SUFFIX)->backptr, JNL_REC_START_BNDRY) == (SUFFIX)->backptr) &&		\
-  	(SUFFIX)->backptr > MIN_JNLREC_SIZE &&							\
-	(SUFFIX)->backptr <= (JFH)->max_jrec_len						\
+	(ROUND_DOWN2((SUFFIX)->backptr, JNL_REC_START_BNDRY) == (SUFFIX)->backptr)		\
+  		&& (MIN_JNLREC_SIZE <= (SUFFIX)->backptr)					\
+		&& ((SUFFIX)->backptr <= (JFH)->max_jrec_len)					\
 )
 
 #define IS_VALID_LINKS(JREC)													\
@@ -348,7 +338,10 @@ enum rec_fence_type
 {
 	NOFENCE = 0,
 	TPFENCE = 1,
-	ZTPFENCE = 2
+	ZTPFENCE = 2,
+	NULLFENCE = 3	/* i.e. a multi-region TP transaction whose TSET/TKILL/USET/UKILL journal records got replaced
+			 * as NULL records by "jnl_phase2_salvage" due to kill9 of process before jnl records were written.
+			 */
 };
 
 enum broken_type
@@ -426,7 +419,7 @@ typedef struct multi_element_struct
 	jnl_tm_t			time;
 	uint4				partner;	/* # of unmatched regions involved in TP/ZTP */
 	uint4				tot_partner;	/* Total # of regions originally involved in TP/ZTP */
-	enum rec_fence_type 		fence;		/* NOFENCE or TPFENCE or ZTPFENCE */
+	enum rec_fence_type 		fence;		/* NOFENCE or TPFENCE or ZTPFENCE or NULLFENCE */
 	struct multi_element_struct	*next;
 } multi_struct;
 

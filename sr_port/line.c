@@ -18,13 +18,15 @@
 #include "mdq.h"
 #include "mmemory.h"
 #include "advancewindow.h"
+#include "show_source_line.h"
 
-GBLREF short int		source_line;
-GBLREF int			mlmax;
-GBLREF mline			*mline_tail;
-GBLREF short int		block_level;
-GBLREF mlabel			*mlabtab;
 GBLREF command_qualifier	cmd_qlf;
+GBLREF int			mlmax;
+GBLREF mlabel			*mlabtab;
+GBLREF mline			mline_root;
+GBLREF mline			*mline_tail;
+GBLREF short int		source_line;
+GBLREF triple			t_orig;		/* head of triples */
 
 error_def(ERR_BLKTOODEEP);
 error_def(ERR_COMMAORRPAREXP);
@@ -54,6 +56,10 @@ boolean_t line(uint4 *lnc)
 	curlin->line_number = 0;
 	curlin->table = FALSE;
 	assert(0 == TREF(expr_depth));
+	curlin->line_number = *lnc;
+	*lnc = *lnc + 1;
+	curlin->table = TRUE;
+	curlin->block_ok = FALSE;
 	(TREF(side_effect_base))[0] = FALSE;
 	TREF(last_source_column) = 0;
 	if (TK_INTLIT == TREF(window_token))
@@ -62,10 +68,8 @@ boolean_t line(uint4 *lnc)
 		start_fetches(OC_LINEFETCH);
 	else
 		newtriple(OC_LINESTART);
-	curlin->line_number = *lnc;
-	*lnc = *lnc + 1;
-	curlin->table = TRUE;
 	CHKTCHAIN(TREF(curtchain), exorder, FALSE);
+	assert(&t_orig == TREF(curtchain));
 	TREF(pos_in_chain) = *(TREF(curtchain));
 	if (TK_IDENT == TREF(window_token))
 	{
@@ -183,28 +187,29 @@ boolean_t line(uint4 *lnc)
 					break;
 			}
 		}
-		if ((block_level + 1) < dot_count)
+		if ((NULL != parmbase) && dot_count)
 		{
-			dot_count = (block_level > 0) ? block_level : 0;
-			stx_error(ERR_BLKTOODEEP);
+			dot_count = TREF(block_level);
+			stx_error(ERR_NESTFORMP);	/* Should be warning */
 			success = FALSE;
 		}
+		if ((TREF(block_level) + (int4)(mline_tail->block_ok)) < dot_count)
+		{
+			dot_count = TREF(block_level);
+			show_source_line(TRUE);
+			dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
+		}
 	}
-	if ((0 != parmbase) && (0 != dot_count))
-	{
-		stx_error(ERR_NESTFORMP);	/* Should be warning */
-		success = FALSE;
-		dot_count = (block_level > 0 ? block_level : 0);
-	}
-	if ((block_level + 1) <= dot_count)
+	if ((TREF(block_level) < dot_count) || (mline_tail == &mline_root))
 	{
 		mline_tail->child = curlin;
 		curlin->parent = mline_tail;
-		block_level = dot_count;
+		TREF(block_level) = dot_count;
 	} else
 	{
-		for (; dot_count < block_level; block_level--)
-			mline_tail = mline_tail->parent;
+		for (; dot_count < TREF(block_level); (TREF(block_level))--)
+			if (NULL != mline_tail->parent)
+				mline_tail = mline_tail->parent;
 		mline_tail->sibling = curlin;
 		curlin->parent = mline_tail->parent;
 	}

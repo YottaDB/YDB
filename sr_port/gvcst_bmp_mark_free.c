@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,6 +90,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	enum db_ver		ondsk_blkver;
 	enum cdb_sc		status;
 	boolean_t		mark_level_as_special;
+	inctn_opcode_t          saved_inctn_opcode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -115,7 +116,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
 		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		/* If any of the mini transaction below restarts because of an online rollback, we don't want the application
-		 * refresh to happen (like $ZONLNRLBK++ or rts_error(DBROLLEDBACK). This is because, although we are currently in	{BYPASSOK}
+		 * refresh to happen (like $ZONLNRLBK++ or rts error(DBROLLEDBACK). This is because, although we are currently in
 		 * non-tp (dollar_tleve = 0), we could actually be in a TP transaction and have actually faked dollar_tlevel. In
 		 * such a case, we should NOT * be issuing a DBROLLEDBACK error as TP transactions are supposed to just restart in
 		 * case of an online rollback. So, set the global variable that gtm_onln_rlbk_clnup can check and skip doing the
@@ -233,7 +234,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			if (0 == ret_tn) /* db format change occurred. Fall through to below for loop to visit each block */
 			{
 				/* Abort any active transaction to get rid of lingering Non-TP artifacts */
+				saved_inctn_opcode = inctn_opcode; /* t_abort() may change inctn_opcode so save and restore it */
 				t_abort(gv_cur_region, cs_addrs);
+				inctn_opcode = saved_inctn_opcode;
 				break;
 			}
 		}

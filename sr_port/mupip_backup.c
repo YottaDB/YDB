@@ -1390,7 +1390,7 @@ repl_inst_bkup_done2:
 			rptr->backup_hdr->shmid = INVALID_SHMID;
 			rptr->backup_hdr->gt_sem_ctime.ctime = 0;
 			rptr->backup_hdr->gt_shm_ctime.ctime = 0;
-			if (jnl_options[jnl_off] || bkdbjnl_off_specified)
+			if ((jnl_options[jnl_off] || bkdbjnl_off_specified) && (jnl_notallowed != gv_cur_region->jnl_state))
 				rptr->backup_hdr->jnl_state = jnl_closed;
 			if (jnl_options[jnl_disable] || bkdbjnl_disable_specified)
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,11 +23,22 @@ void bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr)
  * *addr points the operand for the jump and is eventually used by logic back in the invocation stack to fill in a target location
  */
 {
-	triple *ref;
+	oprtype	*p;
+	triple	*ref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ref = maketriple(tst);
 	ref->operand[0] = put_indr(addr);
 	dqins(t, exorder, ref);
 	t->opcode = cmp;
+	for (p = t->operand ; p < ARRAYTOP(t->operand); p++)
+	{	/* Some day investigate whether this is still needed */
+		if (TRIP_REF == p->oprclass)
+		{
+			ex_tail(p);
+			RETURN_IF_RTS_ERROR;
+		}
+	}
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,10 +27,11 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 
+GBLDEF		gid_t		*gid_list = NULL;
+GBLDEF		int		gid_list_len = 0;
+
 GBLREF		char		gtm_dist[GTM_PATH_MAX];
 GBLREF		boolean_t	gtm_dist_ok_to_use;
-STATICDEF	gid_t		*gid_list = NULL;
-STATICDEF	int		gid_list_len = 0;
 
 #if defined(__MVS__)
 #	define LIBGTMSHR "%s/libgtmshr.dll"
@@ -39,28 +40,40 @@ STATICDEF	int		gid_list_len = 0;
 #endif
 
 /* Get the process's group list and stash the information to avoid repeated calls */
-#define GETGROUPS								\
-MBSTART {									\
-	int	tmp_gid_list_len;						\
-	if (NULL == gid_list)							\
-	{	/* Obtain the supplementary gid list */				\
-		tmp_gid_list_len = getgroups(0, NULL);				\
-		assert(0 <= tmp_gid_list_len);					\
-		if (0 < tmp_gid_list_len)					\
-		{								\
-			gid_list = malloc(tmp_gid_list_len * SIZEOF(gid_t));	\
-			gid_list_len = getgroups(tmp_gid_list_len, gid_list);	\
-			assert(gid_list_len == tmp_gid_list_len);		\
-			if (gid_list_len != tmp_gid_list_len)			\
-			{							\
-				gid_list_len = 0;				\
-				free(gid_list);					\
-				gid_list = NULL;				\
-			}							\
-		}								\
-	}									\
-} MBEND
+void gtm_init_gid_list(void)
+{
+	int	tmp_gid_list_len;
 
+	assert(NULL == gid_list);
+	tmp_gid_list_len = getgroups(0, NULL);
+	assert(0 <= tmp_gid_list_len);
+	if (0 < tmp_gid_list_len)
+	{
+		gid_list = malloc(tmp_gid_list_len * SIZEOF(gid_t));
+		gid_list_len = getgroups(tmp_gid_list_len, gid_list);
+		assert(gid_list_len == tmp_gid_list_len);
+		if (gid_list_len != tmp_gid_list_len)
+		{
+			gid_list_len = 0;
+			free(gid_list);
+			gid_list = NULL;
+		}
+	}
+}
+
+/* Search through the supplementary gid list for a match */
+boolean_t	gtm_gid_in_gid_list(gid_t gid)
+{
+	int	i;
+
+	assert(NULL != gid_list);
+	if (NULL == gid_list)
+		return FALSE;
+	for (i = 0; i < gid_list_len; i++)
+		if (gid == gid_list[i])
+			return TRUE;
+	return FALSE;
+}
 /* Return the group id of the distribution based on libgtmshr.xx[x]. If there is some
  * problem accessing that file then return INVALID_GID which signals no change to group.  Otherwise,
  * the pointer to the stat buffer will contain the result of the call to STAT_FILE.
@@ -100,12 +113,12 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 {
 	struct group	*grp;
 	struct passwd	*pwd;
-	int		i;
 
 #	ifdef DEBUG
 	if (WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
 	{
-		GETGROUPS;
+		if (NULL == gid_list)
+			gtm_init_gid_list();
 		return FALSE;
 	}
 #	endif
@@ -114,13 +127,8 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 	{	/* Effective group is gid? */
 		if (GETEGID() == gid)
 			return(TRUE);
-		GETGROUPS;
-		/* Search through the supplementary gid list for a match */
-		for (i = 0; i < gid_list_len; i++)
-			if (gid == gid_list[i])
-				return (TRUE);
-		/* EUID == uid but gid is not in any groups associated with the process */
-		return FALSE;
+		/* EUID == uid but check if gid is in any groups associated with the process */
+		return GID_IN_GID_LIST(gid);
 	}
 	/* Get "uid" details */
 	pwd = getpwuid(uid);

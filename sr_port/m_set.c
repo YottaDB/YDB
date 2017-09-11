@@ -325,21 +325,15 @@ int m_set(void)
 				put->operand[1] = put_ilit(indir_set);
 				return TRUE;
 			}
-			if (TREF(side_effect_handling))
-			{	/* save and restore the variable lookup for true left-to-right evaluation */
-				INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);	/* 0 flag to defer global reference */
-				if (!used_glvn_slot)
-				{
-					used_glvn_slot = TRUE;
-					first_control_slot = control_slot;
-				}
-				put = maketriple(OC_STOGLVN);
-				put->operand[0] = control_slot;
-			} else
-			{	/* quick and dirty old way */
-				put = maketriple(OC_INDSET);
-				put->operand[0] = v;
+			/* save and restore the variable lookup for true left-to-right evaluation */
+			INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);	/* 0 flag to defer global reference */
+			if (!used_glvn_slot)
+			{
+				used_glvn_slot = TRUE;
+				first_control_slot = control_slot;
 			}
+			put = maketriple(OC_STOGLVN);
+			put->operand[0] = control_slot;
 			put->operand[1] = resptr;
 			dqins(targchain.exorder.bl, exorder, put);
 			break;

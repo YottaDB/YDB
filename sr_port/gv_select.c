@@ -229,8 +229,10 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	}
 	if (freeze)
 	{
-		GTM64_ONLY(init_hashtab_int8(&ext_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
-		NON_GTM64_ONLY(init_hashtab_int4(&ext_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
+		GTM64_ONLY(init_hashtab_int8(&ext_hash, gmap_size * (100.0 / HT_LOAD_FACTOR),
+					HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
+		NON_GTM64_ONLY(init_hashtab_int4(&ext_hash, gmap_size * (100.0 / HT_LOAD_FACTOR),
+					HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
 	}
 	gl_head->next = NULL;
 	gl_tail = gl_head;

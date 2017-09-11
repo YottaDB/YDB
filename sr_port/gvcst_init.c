@@ -17,6 +17,7 @@
 #include "gtm_time.h"
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
+#include "gtm_unistd.h"
 
 #include "cdb_sc.h"
 #include "gdsroot.h"
@@ -73,12 +74,46 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #endif
 
+/* Deferred database encryption initialization. Check the key handle and skip if already initialized  */
+#define INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(REG, CSA, CSD)								\
+MBSTART {														\
+	int		init_status;											\
+	int		fn_len;												\
+	char		*fn;												\
+	boolean_t	do_crypt_init;											\
+	DEBUG_ONLY(boolean_t	was_gtmcrypt_initialized = gtmcrypt_initialized);					\
+															\
+	do_crypt_init = ((USES_ENCRYPTION(CSD->is_encrypted)) && !IS_LKE_IMAGE && CSA->encr_ptr				\
+				&& (GTMCRYPT_INVALID_KEY_HANDLE == (CSA)->encr_key_handle)				\
+				&& !(CSA->encr_ptr->issued_db_init_crypt_warning)					\
+				&& (CSA->encr_ptr->reorg_encrypt_cycle == CSA->nl->reorg_encrypt_cycle));		\
+	if (do_crypt_init)												\
+	{														\
+		assert(was_gtmcrypt_initialized);									\
+		fn = (char *)(REG->dyn.addr->fname);									\
+		fn_len = REG->dyn.addr->fname_len;									\
+		INIT_DB_OR_JNL_ENCRYPTION(CSA, CSD, fn_len, fn, init_status);						\
+		if ((0 != init_status) && (CSA->encr_ptr->reorg_encrypt_cycle == CSA->nl->reorg_encrypt_cycle))		\
+		{													\
+			if (IS_GTM_IMAGE || mu_reorg_encrypt_in_prog)							\
+			{												\
+				GTMCRYPT_REPORT_ERROR(init_status, rts_error, fn_len, fn);				\
+			} else												\
+			{												\
+				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(init_status), gtm_putmsg, fn_len, fn);		\
+				CSA->encr_ptr->issued_db_init_crypt_warning = TRUE;					\
+			}												\
+		}													\
+	}														\
+} MBEND
+
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		created_core, dont_want_core;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
+GBLREF	boolean_t		gtmcrypt_initialized;
 GBLREF	boolean_t		gtcm_connection;
 GBLREF	bool			licensed;
 GBLREF	int4			lkid;
@@ -88,8 +123,9 @@ GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
-GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
+GBLREF	uint4			mu_reorg_encrypt_in_prog;
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
@@ -143,7 +179,6 @@ error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump
 error_def(ERR_INVSTATSDB);
 error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_REGOPENFAIL);
-error_def(ERR_STATSDBERR);
 error_def(ERR_STATSDBFNERR);
 error_def(ERR_STATSDBINUSE);
 
@@ -233,6 +268,23 @@ void	assert_jrec_member_offsets(void)
 	assert(SIZEOF(token_split_t) == SIZEOF(token_build));   /* Required for TOKEN_SET macro */
 }
 
+CONDITION_HANDLER(gvcst_init_autoDB_ch)
+{
+	START_CH(TRUE);
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	{
+		assert(FALSE);  /* don't know of any possible INFO/SUCCESS errors */
+		CONTINUE;                       /* Keep going for non-error issues */
+	}
+	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
+	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
+	 * the corresponding DEFER_INTERRUPTS happened in "gvcst_init" (a different function) so we have an assert
+	 * there that the previous state was INTRPT_OK_TO_INTERRUPT and use that instead of prev_intrpt_state here.
+	 */
+	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
+	NEXTCH;
+}
+
 void gvcst_init(gd_region *reg)
 {
 	gd_segment		*seg;
@@ -264,12 +316,13 @@ void gvcst_init(gd_region *reg)
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	int4			db_init_retry;
-	intrpt_state_t		prev_intrpt_state;
 	srch_blk_status		*bh;
 	mstr			*gld_str;
 	node_local_ptr_t	baseDBnl;
 	unsigned char		cstatus;
 	statsdb_recreate_errors	statsdb_rcerr;
+	jbuf_rsrv_struct_t	*nontp_jbuf_rsrv_lcl;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -409,9 +462,12 @@ void gvcst_init(gd_region *reg)
 				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
 			}
 			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+			assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS
+										 * in "gvcst_init_autoDB_ch".
+										 */
+			ESTABLISH(gvcst_init_autoDB_ch);
 			if (!ftok_sem_lock(baseDBreg, FALSE))
 			{
-				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
@@ -473,7 +529,7 @@ void gvcst_init(gd_region *reg)
 #									ifdef BYPASS_UNLINK_RECREATE_STATSDB
 									baseDBnl->statsdb_created = TRUE;
 #									else
-									rc = unlink(statsdb_path);
+									rc = UNLINK(statsdb_path);
 									if (0 > rc)
 									{	/* Unlink failed - may not have permissions */
 										statsdb_rcerr = STATSDB_UNLINKERR;
@@ -509,7 +565,6 @@ void gvcst_init(gd_region *reg)
 						if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 						{	/* Release the lock before unwinding back */
 							assert(FALSE);
-							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 							rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2,
 								      DB_LEN_STR(baseDBreg));
 						}
@@ -524,7 +579,6 @@ void gvcst_init(gd_region *reg)
 								/* We are trying to attach a statsDB to our baseDB should not be
 								 * associated with that baseDB. First check if this IS a statsdb.
 								 */
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								if (IS_RDBF_STATSDB(&statsDBcsd))
 									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_STATSDBINUSE,
 										      6, DB_LEN_STR(reg),
@@ -536,32 +590,26 @@ void gvcst_init(gd_region *reg)
 										      4, DB_LEN_STR(reg), REG_LEN_STR(reg));
 								break;			/* For the compiler */
 							case STATSDB_OPNERR:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
 									      DB_LEN_STR(reg), save_errno);
 								break;			/* For the compiler */
 							case STATSDB_READERR:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2,
 									      DB_LEN_STR(reg), save_errno);
 								break;			/* For the compiler */
 							case STATSDB_NOTSTATSDB:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB, 4,
 									      DB_LEN_STR(reg), REG_LEN_STR(reg));
 								break;			/* For the compiler */
 							case STATSDB_UNLINKERR:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 									      LEN_AND_LIT("unlink()"), CALLFROM, save_errno);
 								break;			/* For the compiler */
 							case STATSDB_RECREATEERR:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
 									      DB_LEN_STR(reg), save_errno);
 								break;			/* For the compiler */
 							case STATSDB_CLOSEERR:
-								ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 									      LEN_AND_LIT("close()"), CALLFROM, save_errno);
 								break;			/* For the compiler */
@@ -572,11 +620,9 @@ void gvcst_init(gd_region *reg)
 						{	/* Unwind back to ESTABLISH_NORET where did gvcst_init() call to open this
 							 * statsDB which now won't open.
 							 */
-							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DRVLONGJMP);
 						} else
 						{	/* We are not nested so can give the appropriate error ourselves */
-							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2,
 								      DB_LEN_STR(reg), ERR_TEXT, 2,
 								      RTS_ERROR_TEXT("See preceding errors written to syserr"
@@ -588,10 +634,10 @@ void gvcst_init(gd_region *reg)
 			}
 			if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 			{
-				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
+			REVERT;
 			ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 		}
 	}
@@ -697,7 +743,7 @@ void gvcst_init(gd_region *reg)
 			if (NULL == prev_reg || (gd_region *)-1L == prev_reg)
 				return;
 			/* Found same database already open - prev_reg contains addr of originally opened region */
-			reg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
+			FILE_CNTL(reg) = FILE_CNTL(prev_reg);
 			memcpy(reg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 			reg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
 			csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
@@ -771,7 +817,9 @@ void gvcst_init(gd_region *reg)
 		 * thus would be left over in the system.
 		 */
 		DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
-		assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS in dbinit_ch */
+		assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS
+									 * in dbinit_ch and gvcst_init_autoDB_ch
+									 */
 		/* Do a loop of "db_init". This is to account for the fact that "db_init" can return an error in some cases.
 		 * e.g. If DSE does "db_init" first time with OK_TO_BYPASS_TRUE and somewhere in the middle of "db_init" it
 		 * notices that a concurrent mumps process has deleted the semid/shmid since it was the last process attached
@@ -883,6 +931,8 @@ void gvcst_init(gd_region *reg)
 	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
 	DBG_MARK_RTS_ERROR_USABLE;
+	/* Do the deferred encryption initialization now in case it needs to issue an rts_error */
+	INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(reg, csa, csd);
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state), can do mallocs which in turn
 	 * can issue a GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
@@ -937,6 +987,9 @@ void gvcst_init(gd_region *reg)
 			non_tp_jfb_ptr->buff = (char *)malloc(MAX_NONTP_JNL_REC_SIZE(bsize));
 			non_tp_jfb_ptr->record_size = 0;	/* initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 			non_tp_jfb_ptr->alt_buff = NULL;
+			assert(NULL == TREF(nontp_jbuf_rsrv));
+			ALLOC_JBUF_RSRV_STRUCT(nontp_jbuf_rsrv_lcl, csa);
+			TREF(nontp_jbuf_rsrv) = nontp_jbuf_rsrv_lcl;
 		} else if (bsize > non_tp_jfb_ptr->hi_water_bsize)
 		{	/* Need a larger buffer to accommodate larger non-TP journal records */
 			non_tp_jfb_ptr->hi_water_bsize = bsize;
@@ -947,6 +1000,7 @@ void gvcst_init(gd_region *reg)
 				free(non_tp_jfb_ptr->alt_buff);
 				realloc_alt_buff = TRUE;
 			}
+			assert(NULL != TREF(nontp_jbuf_rsrv));
 		}
 		/* If the journal records need to be encrypted in the journal file and if replication is in use, we will need access
 		 * to both the encrypted (for the journal file) and unencrypted (for the journal pool) journal record contents.
@@ -1147,33 +1201,4 @@ void gvcst_init(gd_region *reg)
 		}
 	}
 	return;
-}
-
-/* Simplistic handler for when errors occur during open of statsDB. The ESTABLISH_NORET is a place-holder for the
- * setjmp/longjmp sequence used to recover quietly from errors opening* the statsDB. So if the error is the magic
- * ERR_DRVLONGJMP, do just that (longjmp() via the UNWIND() macro). If the error is otherwise, capture the error
- * and where it was raised and send the STATSDBERR to the syslog before we unwind back to the ESTABLISH_NORET.
- */
-CONDITION_HANDLER(gvcst_statsDB_open_ch)
-{
-	char	buffer[OUT_BUFF_SIZE];
-	int	msglen;
-	mval	zpos;
-
-	START_CH(TRUE);
-	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
-	if (DUMPABLE)
-		NEXTCH;				/* Bubble down till handled properly in mdb_condition_handler() */
-	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
-		CONTINUE;			/* Keep going for non-error issues */
-	if (ERR_DRVLONGJMP != arg)
-	{	/* Need to reflect the current error to the syslog - First save message that got us here */
-		msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
-		assert(OUT_BUFF_SIZE > msglen);
-		memcpy(buffer, TREF(util_outbuff_ptr), msglen);
-		getzposition(&zpos);
-		/* Send whole thing to syslog */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
-	}
-	UNWIND(NULL, NULL);			/* Return back to where ESTABLISH_NORET was done */
 }

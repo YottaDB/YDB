@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2016 Fidelity National Information	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@
 					if (!SHM_REMOVED(save_errno))								\
 						ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
 					else											\
-						ISSUE_REQRLNKCTLRNDWN_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
+						ISSUE_REQRLNKCTLRNDWN_SYSCALL(LINKCTL, errstr, save_errno);			\
 				}												\
 				assert(0 == ((UINTPTR_T)shm_base % 8));								\
 				LINKCTL->rtnobj_shmid[i] = shr_shmid;								\
@@ -120,7 +120,6 @@
 #ifdef AUTORELINK_SUPPORTED
 
 error_def(ERR_RELINKCTLERR);
-error_def(ERR_REQRLNKCTLRNDWN);
 error_def(ERR_RLNKRECLATCH);
 error_def(ERR_RLNKSHMLATCH);
 error_def(ERR_SYSCALL);

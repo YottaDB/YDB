@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ void	iopi_iocontrol(mstr *mn, int4 argcnt, va_list args)
 
 	d_rm = (d_rm_struct *) io_curr_device.out->dev_sp;
 	/* WRITE /EOF only applies to PIPE devices.  Sequential file and FIFO devices should be closed with CLOSE.*/
-	if (!d_rm->pipe)
+	if (!d_rm->is_pipe)
 		return;
 	/* we should not get here unless there is some string length after write / */
 	assertpro((int)mn->len);
@@ -120,7 +120,7 @@ void	iopi_dlr_zkey(mstr *d)
 
 	iod = io_curr_device.in;
 	d_rm = (d_rm_struct *)(iod->dev_sp);
-	if (d_rm->fifo || d_rm->pipe || (2 >= d_rm->fildes))
+	if (d_rm->fifo || d_rm->is_pipe || (2 >= d_rm->fildes))
 		d->len = 0;
 	else
 	{

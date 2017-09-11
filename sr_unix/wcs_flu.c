@@ -59,6 +59,7 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	bool			in_mupip_freeze;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_rndwn_file;
+GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
@@ -173,30 +174,30 @@ MBSTART {					\
 #define	FLUSH_NOT_COMPLETE(CNL, CRQ, CRWIPQ, N_BTS) (CNL->wcs_active_lvl || CRQ->fl || CRWIPQ->fl || (N_BTS != CNL->wc_in_free))
 
 /* Sets RET to FALSE if the caller needs to do a "return FALSE" after macro returns. Sets RET to TRUE otherwise. */
-#define	CLEAR_WIP_QUEUE_IF_NEEDED(ASYNCIO, WTSTART_OR_WTFINI_ERRNO, CNL, CRWIPQ, REG, RET)	\
-MBSTART {											\
-	int	wtfini_errno;									\
-												\
-	RET = TRUE;										\
-	if (ASYNCIO)										\
-	{											\
-		assert(ENOSPC != WTSTART_OR_WTFINI_ERRNO);					\
-		WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, ((cache_rec_ptr_t) NULL), REG, wtfini_errno);		\
-		if (wtfini_errno)								\
-		{										\
-			if (ENOSPC != wtfini_errno)						\
-			{									\
-				assert(FALSE);							\
-				REL_CRIT_BEFORE_RETURN(CNL, REG);				\
-				RET = FALSE;							\
-			} else									\
-			{									\
-				assert(!WTSTART_OR_WTFINI_ERRNO);				\
-				if (!WTSTART_OR_WTFINI_ERRNO)					\
-					WTSTART_OR_WTFINI_ERRNO = wtfini_errno;			\
-			}									\
-		}										\
-	}											\
+#define	CLEAR_WIP_QUEUE_IF_NEEDED(ASYNCIO, WTSTART_OR_WTFINI_ERRNO, CNL, CRWIPQ, REG, RET)		\
+MBSTART {												\
+	int	wtfini_errno;										\
+													\
+	RET = TRUE;											\
+	if (ASYNCIO)											\
+	{												\
+		assert(ENOSPC != WTSTART_OR_WTFINI_ERRNO);						\
+		WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, ((cache_rec_ptr_t) NULL), REG, wtfini_errno);	\
+		if (wtfini_errno)									\
+		{											\
+			if (ENOSPC != wtfini_errno)							\
+			{										\
+				assert(FALSE);								\
+				REL_CRIT_BEFORE_RETURN(CNL, REG);					\
+				RET = FALSE;								\
+			} else										\
+			{										\
+				assert(!WTSTART_OR_WTFINI_ERRNO);					\
+				if (!WTSTART_OR_WTFINI_ERRNO)						\
+					WTSTART_OR_WTFINI_ERRNO = wtfini_errno;				\
+			}										\
+		}											\
+	}												\
 } MBEND
 
 boolean_t wcs_flu(uint4 options)
@@ -204,12 +205,14 @@ boolean_t wcs_flu(uint4 options)
 	boolean_t		was_crit, ret;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
 	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current, asyncio;
+	boolean_t		force_epoch;
+	boolean_t		latch_salvaged;
 	unsigned int		lcnt, pass;
 	int			n_bts, save_errno, wtstart_or_wtfini_errno;
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
 	uint4			jnl_status, to_wait, to_msg;
-        unix_db_info    	*udi;
+	unix_db_info    	*udi;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -219,7 +222,6 @@ boolean_t wcs_flu(uint4 options)
 	int4			rc;
 	gd_region		*reg;
 #	ifdef DEBUG
-	boolean_t		writers_active;
 	int			wcs_wip_lvl, wcs_active_lvl, wc_in_free; /* copy of cnl noted down for debugging purposes */
 #	endif
 
@@ -231,12 +233,15 @@ boolean_t wcs_flu(uint4 options)
 	flush_msync = options & WCSFLU_MSYNC_DB;
 	speedup_nobefore = options & WCSFLU_SPEEDUP_NOBEFORE;
 	clean_dbsync = options & WCSFLU_CLEAN_DBSYNC;
-	/* WCSFLU_IN_COMMIT bit is set if caller is t_end or tp_tend. In that case, we should NOT invoke wcs_recover if we
-	 * encounter an error. Instead we should return the error as such so they can trigger appropriate error handling.
-	 * This is necessary because t_end and tp_tend could have pinned one or more cache-records (cr->in_cw_set non-zero)
-	 * BEFORE invoking wcs_flu. And code AFTER the wcs_flu in them relies on the fact that those cache records stay
-	 * pinned. If wcs_flu invokes wcs_recover, it will reset cr->in_cw_set to 0 for ALL cache-records so code AFTER
-	 * the wcs_flu in the caller will fail because no buffer is pinned at that point.
+	force_epoch = options & WCSFLU_FORCE_EPOCH;
+	/* WCSFLU_IN_COMMIT bit is set if caller is "t_end" or "tp_tend" or a few other functions (currently only "view_dbop").
+	 * This flag is an indication that we should NOT invoke "wcs_recover" if we enter this function while already holding
+	 * crit (because the caller will otherwise get confused by the persistent effects of "wcs_recover")). Instead we should
+	 * return the error as such so they can trigger appropriate error handling. This is necessary because t_end and tp_tend
+	 * could have pinned one or more cache-records (cr->in_cw_set non-zero) BEFORE invoking wcs_flu. And code AFTER the
+	 * wcs_flu in them relies on the fact that those cache records stay pinned. If wcs_flu invokes wcs_recover, it will
+	 * reset cr->in_cw_set to 0 for ALL cache-records so code AFTER the wcs_flu in the caller will fail because no buffer
+	 * is pinned at that point. As for "view_dbop", the reason is captured in a comment in the caller.
 	 */
 	in_commit = options & WCSFLU_IN_COMMIT;
 	reg = gv_cur_region;
@@ -261,6 +266,32 @@ boolean_t wcs_flu(uint4 options)
 	{
 		DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jpc->jnl_buff);
 		grab_crit_encr_cycle_sync(reg);
+		/* If it is safe to invoke "wcs_recover" (indicated by the in_commit variable being 0), do that right away
+		 * to fix any dead phase2 commits if needed.
+		 */
+		if (!in_commit && cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
+		{	/* Since phase2-commit-wait failed, set wc_blocked to TRUE if not already set.
+			 * Since we hold crit and know it is safe to invoke "wcs_recover", do invoke it.
+			 * But it is possible it returns right away (e.g. "is_src_server" is TRUE). But that
+			 * is okay since "cnl->wc_blocked" would stay set so someone else who gets crit
+			 * (other than the source server) would do the "wcs_recover" call.
+			 */
+			if (!cnl->wc_blocked)
+			{
+				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				BG_TRACE_PRO_ANY(csa, wcb_wcs_flu0);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+						LEN_AND_LIT("wcb_wcs_flu0"), process_id, &csa->ti->curr_tn,
+						DB_LEN_STR(reg));
+			}
+			wcs_recover(reg);
+			assert(!cnl->wcs_phase2_commit_pidcnt || is_src_server); /* source server does not do "wcs_recover" */
+			if (cnl->wcs_phase2_commit_pidcnt)
+			{
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				return FALSE;
+			}
+		}
 	}
 	if (!FREEZE_LATCH_HELD(csa))
 		WAIT_FOR_REGION_TO_UNCHILL(csa, csd);
@@ -276,6 +307,7 @@ boolean_t wcs_flu(uint4 options)
 		if (jb->last_eof_written)
 		{
 			assert(jb->fsync_dskaddr == jb->freeaddr);
+			assert(jb->rsrv_freeaddr == jb->freeaddr);
 			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
 				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
@@ -311,7 +343,7 @@ boolean_t wcs_flu(uint4 options)
 	{
 		assert(SS_NORMAL == jnl_status);
 		cnl->doing_epoch = sync_epoch || write_epoch;
-		epoch_already_current = (jb->post_epoch_freeaddr == jb->freeaddr);	/* crit held, so this stays valid */
+		epoch_already_current = (!force_epoch && (jb->post_epoch_freeaddr == jb->rsrv_freeaddr));
 		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
 		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
 			 * processing to be speeded up in that case. Write only an epoch record, don't do heavyweight flush or fsync
@@ -321,7 +353,7 @@ boolean_t wcs_flu(uint4 options)
 			 * image journaling, we skip this portion of code and follow through to the rest of wcs_flu as if
 			 * WCSFLU_SPEEDUP_NOBEFORE was not specified.
 			 */
-			assert(!jgbl.mur_extract); /* Dont know of a case where journal extract calls us with skip_db_flush set */
+			assert(!jgbl.mur_extract); /* Don't know of a case where journal extract calls us with skip_db_flush set */
 			assert(write_epoch);
 			assert(flush_hdr);
 			/* For Recovery/Rollback logic (even in case of NOBEFORE image journaling) to work correctly, the TN values
@@ -335,14 +367,15 @@ boolean_t wcs_flu(uint4 options)
 			if (!jgbl.mur_extract && !epoch_already_current)
 			{
 				if (0 == jpc->pini_addr)
-					jnl_put_jrt_pini(csa);
+					jnl_write_pini(csa);
 				JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
-			}
+			} else if (epoch_already_current)
+				jb->next_epoch_time = MAXUINT4;
 		}
 		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
-		if (fsync_dskaddr != jb->freeaddr)
+		if (fsync_dskaddr != jb->rsrv_freeaddr)
 		{
-			assert(fsync_dskaddr <= jb->dskaddr);
+			assert((fsync_dskaddr <= jb->dskaddr) || WBTEST_ENABLED(WBTEST_JNL_FILE_LOST_DSKADDR));
 			if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
@@ -351,7 +384,13 @@ boolean_t wcs_flu(uint4 options)
 					RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
 				return FALSE;
 			}
-			assert(jb->freeaddr == jb->dskaddr);
+#			ifdef DEBUG
+			if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+			{
+				assert(jb->rsrv_freeaddr == jb->dskaddr);
+				assert(jb->rsrv_freeaddr == jb->freeaddr);
+			}
+#			endif
 			jnl_fsync(reg, jb->dskaddr);
 			assert(jb->fsync_dskaddr == jb->dskaddr);
 		}
@@ -391,10 +430,12 @@ boolean_t wcs_flu(uint4 options)
 		 */
 		asyncio = csd->asyncio;
 		assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
+		/* We already did "wcs_phase2_commit_wait" for !was_crit && !in_commit case. Assert that below. */
+		assert(was_crit || in_commit || !cnl->wcs_phase2_commit_pidcnt);
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL) || (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL)))
 		{
 			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
-				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number));
+					|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number));
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
@@ -405,9 +446,6 @@ boolean_t wcs_flu(uint4 options)
 		 * "wcs_wtstart" again down below.
 		 */
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu1, 0, 0, 0, 0, 0);
-		DEBUG_ONLY(writers_active = WRITERS_ACTIVE(cnl);) /* Note down any concurrent writers BEFORE "wcs_wtstart" call.
-								   * This is needed by a later assert.
-								   */
 		n_bts = csd->n_bts;
 		wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);		/* Flush it all */
 		/* At this point the cache should have been flushed except if some other process is in wcs_wtstart waiting
@@ -439,11 +477,11 @@ boolean_t wcs_flu(uint4 options)
 		 *		(e.g. cr->jnl_addr > jb->fsync_dskaddr) and so reinserted it back in the active queue.
 		 *	c) ENOSPC errors
 		 *	d) white-box cases which induce error codepaths.
-		 * Take this into account in the below assert.
-		 * The check for whether the cache has been flushed is multi-pronged. See FLUSH_NOT_COMPLETE macro definition.
+		 * All above exceptions except (b) can be accurately characterized. As for (b), we tried capturing "writers_active"
+		 *	just before the wcs_wtstart above but it is possible that when we noted "writes_active", there were
+		 *	no concurrent writers but one started soon afterwards and before we did our "wcs_wtstart".
+		 *	Because of this, we do not assert anything below for any of the above 4 exceptions.
 		 */
-		assert(!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts) || TWINNING_ON(csd) || writers_active
-			|| (ENOSPC == wtstart_or_wtfini_errno) || gtm_white_box_test_case_enabled);
 #		ifdef DEBUG
 		/* White-box code to exercise error codepaths */
 		if (in_commit)
@@ -557,17 +595,17 @@ boolean_t wcs_flu(uint4 options)
 						cnl->wcsflu_pid = 0;
 						return FALSE;
 					}
-					assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
+					assert(!jnl_enabled || jb->fsync_dskaddr == jb->rsrv_freeaddr);
 					assert(0 == wtstart_or_wtfini_errno);
 					wcs_recover(reg);
 					if (jnl_enabled)
 					{
 						fsync_dskaddr = jb->fsync_dskaddr;
 							/* take a local copy as it could change concurrently */
-						if (fsync_dskaddr != jb->freeaddr)
+						if (fsync_dskaddr != jb->rsrv_freeaddr)
 						{	/* an INCTN record should have been written above */
 							assert(fsync_dskaddr <= jb->dskaddr);
-							assert((jb->freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
+							assert((jb->rsrv_freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
 							/* above assert has a >= instead of == due to possible
 							 * ALIGN record in between */
 							if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
@@ -581,6 +619,7 @@ boolean_t wcs_flu(uint4 options)
 								return FALSE;
 							}
 							assert(jb->freeaddr == jb->dskaddr);
+							assert(jb->freeaddr == jb->rsrv_freeaddr);
 							jnl_fsync(reg, jb->dskaddr);
 							/* Use jb->fsync_dskaddr (instead of "fsync_dskaddr") below as the
 							 * shared memory copy is more uptodate (could have been updated by
@@ -629,12 +668,18 @@ boolean_t wcs_flu(uint4 options)
 		 * The next call to jnl_qio_start will do the fsync of the db before doing any jnl qio.
 		 * The basic requirement is that we shouldn't write the epoch out until we have synced the database.
 		 */
-		assert(jb->fsync_dskaddr == jb->freeaddr);
+#		ifdef DEBUG
+		if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+		{
+			assert(jb->rsrv_freeaddr == jb->fsync_dskaddr);
+			assert(jb->rsrv_freeaddr == jb->freeaddr);
+		}
+#		endif
 		/* If jb->need_db_fsync is TRUE at this point of time, it means we already have a db_fsync waiting
 		 * to happen. This means the epoch due to the earlier need_db_fsync hasn't yet been written out to
 		 * the journal file. But that means we haven't yet flushed the journal buffer which leads to a
 		 * contradiction. (since we have called jnl_flush earlier in this routine and also assert to the
-		 * effect jb->fsync_dskaddr == jb->freeaddr a few lines above).
+		 * effect jb->fsync_dskaddr == jb->rsrv_freeaddr a few lines above).
 		 */
 		assert(!jb->need_db_fsync);
 		for (lcnt = 1; FALSE == (GET_SWAPLOCK(&jb->io_in_prog_latch)); lcnt++)
@@ -648,7 +693,17 @@ boolean_t wcs_flu(uint4 options)
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
 			if ((MAXJNLQIOLOCKWAIT / 2 == lcnt) || (MAXJNLQIOLOCKWAIT == lcnt))
-				performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
+			{
+				latch_salvaged = performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
+				if (latch_salvaged)
+				{	/* jb->dskaddr & jb->dsk are updated while holding the io_in_prog_latch.
+					 * Since the latch was salvaged, the holder pid could have been killed
+					 * after jb->dskaddr has been updated but before jb->dsk has been updated
+					 * (in "jnl_sub_qio_start"). Fix the discrepancy if any.
+					 */
+					jb->dsk = (jb->dskaddr % jb->size);
+				}
+			}
 		}
 		if (csd->jnl_before_image && !epoch_already_current)
 			jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
@@ -662,9 +717,10 @@ boolean_t wcs_flu(uint4 options)
 		if (!jgbl.mur_extract && !epoch_already_current)
 		{
 			if (0 == jpc->pini_addr)
-				jnl_put_jrt_pini(csa);
+				jnl_write_pini(csa);
 			JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
-		}
+		} else if (epoch_already_current)
+			jb->next_epoch_time = MAXUINT4;
 	}
 	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
 	REL_CRIT_BEFORE_RETURN(cnl, reg);

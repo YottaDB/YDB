@@ -19,3 +19,7 @@ gtm_is_main_thread
 accumulate
 to_ulong
 is_big_endian
+op_read
+dm_read
+io_curr_device
+io_std_device

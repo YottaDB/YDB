@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,7 @@ const static char readonly *secshrstart_error_code[] = {
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */
-#define CLIENT_ACK_TIMER		5
+#define CLIENT_ACK_TIMER		5 * MILLISECS_IN_SEC
 
 #define START_SERVER										\
 {												\
@@ -141,8 +141,8 @@ const static char readonly *secshrstart_error_code[] = {
 	client_timer_popped = FALSE;								\
 	recv_complete = FALSE;									\
 	save_errno = 0;										\
-	msec_timeout = timeout2msec(CLIENT_ACK_TIMER);						\
-	start_timer(timer_id, msec_timeout, client_timer_handler, 0, NULL);			\
+	assert(MAXPOSINT4 >= CLIENT_ACK_TIMER);						\
+	start_timer(timer_id, CLIENT_ACK_TIMER, client_timer_handler, 0, NULL);			\
 }
 
 error_def(ERR_GTMDISTUNVERIF);

@@ -270,6 +270,18 @@ foreach ref_library ( $ref_libs )
 end
 cp sr_unix_cm/makefile* $gtm_ver/tools
 
+########### Copy files from tools repo or $cms_tools to $dst_dir/tools ############
+
+if (-d $cms_dir/../tools/cms_tools/gtmpcat) then
+	set gtmpcat_dir=$cms_dir/../tools/cms_tools/gtmpcat
+else if (-d $cms_tools/gtmpcat) then
+	set gtmpcat_dir=$cms_tools/gtmpcat
+endif
+
+if ($?gtmpcat_dir) then
+	cp $gtmpcat_dir/gtmpcat{{,fldbld}.m,_{field_def,sh}.txt} ${gtm_root}/${dst_ver}/tools
+endif
+
 ######################## Rename .mpt files to _*.m files #######################
 
 if ($mods_only == 0) then

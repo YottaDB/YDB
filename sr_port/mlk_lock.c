@@ -45,10 +45,6 @@
 #include "interlock.h"
 #include "rel_quant.h"
 
-#ifdef VMS
-GBLREF uint4	image_count;
-#endif
-
 GBLREF	int4		process_id;
 GBLREF	short		crash_count;
 GBLREF	uint4		dollar_tlevel;
@@ -90,7 +86,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		ctl = p->ctlptr;
 		if (dollar_tlevel)
 		{
-			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}

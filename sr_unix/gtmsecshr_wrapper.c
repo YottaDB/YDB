@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -341,7 +341,7 @@ int main()
 	}
 	if (!ret)
 	{	/* clear all */
-#		ifdef SUNOS
+#		if defined(SUNOS) || defined(__CYGWIN__)
 		environ = NULL;
           	status = 0;
 #		else

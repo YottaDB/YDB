@@ -26,7 +26,6 @@
 #include "gbldirnam.h"
 #include "hashtab_mname.h"
 #include "iosize.h"
-#include "probe.h"
 #include "dpgbldir.h"
 #include "filestruct.h"
 #include "aio_shim.h"
@@ -396,15 +395,9 @@ gd_addr *get_next_gdr(gd_addr *prev)
 {
 	gd_addr	*ptr;
 
-	if (!prev)
+	if (NULL == prev)
 		return gd_addr_head;
-
-	for (ptr = gd_addr_head;  ptr && ptr != prev;  ptr = ptr->link)
-		if (!GTM_PROBE(SIZEOF(*ptr), ptr, READ)) /* Called from secshr, have to check access to memory */
-			return NULL;
-	if (ptr && GTM_PROBE(SIZEOF(*ptr), ptr, READ))
-		return ptr->link;
-	return NULL;
+	return prev->link;
 }
 
 /* Maintain list of regions for GTCM_SERVER */

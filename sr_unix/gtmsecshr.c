@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,7 +214,6 @@ int main(int argc, char_ptr_t argv[])
 	int			save_errno;
 	int			recv_complete, send_complete;
 	int			num_chars_recd, num_chars_sent, rundir_len;
-	int4			msec_timeout;			/* timeout in milliseconds */
 	TID			timer_id;
 	GTM_SOCKLEN_TYPE	client_addr_len;
 	char			*recv_ptr, *send_ptr, *rundir;
@@ -225,6 +224,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
 	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);
@@ -249,9 +249,8 @@ int main(int argc, char_ptr_t argv[])
 		}
 		recv_ptr = (char *)&mesg;
 		client_addr_len = SIZEOF(struct sockaddr_un);
-		msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, msec_timeout));
-		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, GTMSECSHR_MESG_TIMEOUT));
+		start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 		recv_complete = FALSE;
 		do
 		{	/* Note RECVFROM does not loop on EINTR return codes so must be handled */
@@ -274,8 +273,7 @@ int main(int argc, char_ptr_t argv[])
 		if (INVALID_COMMAND != mesg.code)
 		{	/* Reply if code not overridden to mean no acknowledgement required */
 			send_ptr = (char *)&mesg;
-			msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-			start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+			start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 			send_complete = FALSE;
 			do
 			{

@@ -37,19 +37,21 @@
 #include "util.h"
 #include "op_fnzsearch.h"
 
-GBLREF unsigned short	source_name_len;
-GBLREF unsigned char	source_file_name[];
-GBLREF char		rev_time_buf[];
-GBLREF mident		routine_name, module_name, int_module_name;
-GBLREF int4		dollar_zcstatus;
-GBLREF io_pair          io_curr_device, io_std_device;
-GBLREF char		object_file_name[];
-GBLREF short		object_name_len;
-GBLREF int		object_file_des;
-GBLREF command_qualifier cmd_qlf;
-GBLREF stack_frame	*frame_pointer;
+GBLREF char			object_file_name[], rev_time_buf[];
+GBLREF command_qualifier	cmd_qlf;
+GBLREF int			object_file_des;
+GBLREF int4			dollar_zcstatus;
+GBLREF io_pair			io_curr_device, io_std_device;
+GBLREF mident			routine_name, module_name, int_module_name;
+GBLREF short			object_name_len;
+GBLREF stack_frame		*frame_pointer;
+GBLREF uint4			dollar_tlevel;
+GBLREF unsigned char		source_file_name[];
+GBLREF unsigned short		source_name_len;
 
-LITREF mval		literal_null;
+LITREF	mval		literal_null;
+LITREF	mval		literal_notimeout;
+LITREF	mval		literal_zero;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -183,7 +185,7 @@ bool	open_source_file (void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
-	op_open(&val, &pars, 0, 0);
+	op_open(&val, &pars, (mval *)&literal_zero, 0);
 	dev_in_use = io_curr_device;	/*	save list file info in use if it is opened	*/
 	op_use(&val, &pars);
 	compile_src_dev = io_curr_device;
@@ -248,7 +250,7 @@ int4	read_source_file (void)
 	tmp_list_dev = io_curr_device;
 	io_curr_device = compile_src_dev;
 	ESTABLISH_RET(read_source_ch, -1);
-	op_readfl(&val, MAX_SRCLINE, NO_M_TIMEOUT);
+	op_readfl(&val, MAX_SRCLINE, (mval *)(dollar_tlevel ? &literal_zero : &literal_notimeout));
 	REVERT;
 	memcpy((TREF(source_buffer)).addr, val.str.addr, val.str.len);
 	cp = (unsigned char *)((TREF(source_buffer)).addr + val.str.len);

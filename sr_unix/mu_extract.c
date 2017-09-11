@@ -65,7 +65,7 @@
 #include "is_proc_alive.h"
 #include "gtm_reservedDB.h"
 
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gd_region		*gv_cur_region;
@@ -94,6 +94,7 @@ error_def(ERR_TEXT);
 
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1,
 						      BIN_HEADER_DATEFMT, 0, 0);
+LITREF	mval	literal_zero;
 
 LITREF mstr	chset_names[];
 
@@ -435,7 +436,7 @@ void mu_extract(void)
 	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
-	(*op_open_ptr)(&op_val, &op_pars, 0, 0);
+	(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, 0);
 	ESTABLISH(mu_extract_handler1);
 	op_pars.str.len = SIZEOF(use_params);
 	op_pars.str.addr = (char *)&use_params;

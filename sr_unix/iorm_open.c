@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->fixed = FALSE;
 		d_rm->read_only = FALSE;
 		d_rm->fifo = FALSE;
-		d_rm->pipe = FALSE;
+		d_rm->is_pipe = FALSE;
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
@@ -127,7 +127,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm = (d_rm_struct *)iod->dev_sp;
 		/* remember if device closed by nodestroy in case the no_destroy flag was cleared in io_open_try()
 		   due to a deviceparameter other than SEEK on reopen */
-		if ((dev_closed == iod->state) && !d_rm->no_destroy && !d_rm->fifo && !d_rm->pipe && (2 < fd))
+		if ((dev_closed == iod->state) && !d_rm->no_destroy && !d_rm->fifo && !d_rm->is_pipe && (2 < fd))
 			closed_nodestroy = TRUE;
 	}
 	if (dev_closed == iod->state)
@@ -151,7 +151,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
-				if (!d_rm->fifo && !d_rm->pipe && (off_t)-1 == (size = lseek(fd, 0, SEEK_END)))
+				if (!d_rm->fifo && !d_rm->is_pipe && (off_t)-1 == (size = lseek(fd, 0, SEEK_END)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 						      dev_name->dollar_io,
 						      ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
@@ -169,7 +169,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ? (unsigned char)*(pp->str.addr + p_offset) + 1 :
 					io_params_size[ch]);
 		}
-		if (!d_rm->fifo && !d_rm->pipe && (2 < fd))
+		if (!d_rm->fifo && !d_rm->is_pipe && (2 < fd))
 		{
 			if (d_rm->no_destroy)
 			{
@@ -256,7 +256,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				      2, LEN_AND_LIT("Error in check_tag fstat"), errno);
 		SET_CHSET_FROM_TAG(file_tag, iod->file_chset);
 		iod->text_flag = text_tag;
-		if (!d_rm->pipe && 2 < fd)
+		if (!d_rm->is_pipe && 2 < fd)
 		{	/* not for stdin, stdout, stderr or pipes */
 			if (iod->newly_created || newversion)
 			{	/* tag the file.  The macros also modify text_tag and file_tag. */
@@ -318,7 +318,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOAPPEND, 2, dev_name->len, dev_name->dollar_io);
 	}
 
-	if (!d_rm->bom_checked && !d_rm->fifo && !d_rm->pipe && (2 < fd) && IS_UTF_CHSET(iod->ochset))
+	if (!d_rm->bom_checked && !d_rm->fifo && !d_rm->is_pipe && (2 < fd) && IS_UTF_CHSET(iod->ochset))
 	{
 		/* if file opened with WRITEONLY */
 		if (d_rm->write_only)

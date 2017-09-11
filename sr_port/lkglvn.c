@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,21 +17,28 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
+#include "mdq.h"
 #include "subscript.h"
 #include "advancewindow.h"
+#include "fullbool.h"
+#include "show_source_line.h"
 
-error_def(ERR_COMMA);
+GBLREF	boolean_t	run_time;
+
+error_def(ERR_EXPR);
 error_def(ERR_EXTGBLDEL);
 error_def(ERR_LKNAMEXPECTED);
 error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_SIDEEFFECTEVAL);
 
 int lkglvn(boolean_t gblvn)
 {
-	boolean_t	vbar;
+	boolean_t	shifting, vbar;
 	char		*lknam, lkname_buf[MAX_MIDENT_LEN + 1], x;
 	opctype		ox;
-	oprtype		*sb1, *sb2, subscripts[MAX_LVSUBSCRIPTS];
-	triple		*ref, *t1;
+	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
+	triple		*oldchain, *ref, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -39,22 +47,40 @@ int lkglvn(boolean_t gblvn)
 	lknam = lkname_buf;
 	if (gblvn)
 		*lknam++ = '^';
+	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)
+		&& (OLD_SE == TREF(side_effect_handling))))))
+	{	/* NOTE assignment above */
+		dqinit(&tmpchain, exorder);
+		oldchain = setcurtchain(&tmpchain);
+	}
 	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
 	{
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
 		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+		{
+			stx_error(ERR_EXPR);
+			if (shifting)
+				setcurtchain(oldchain);
 			return FALSE;
+		}
 		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
 			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+			{
+				stx_error(ERR_EXPR);
+				if (shifting)
+					setcurtchain(oldchain);
 				return FALSE;
+			}
 		} else
 			*sb1++ = put_str(0, 0);
 		if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))
 		{
 			stx_error(ERR_EXTGBLDEL);
+			if (shifting)
+				setcurtchain(oldchain);
 			return FALSE;
 		}
 		advancewindow();
@@ -78,11 +104,17 @@ int lkglvn(boolean_t gblvn)
 			if (ARRAYTOP(subscripts) <= sb1)
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
+				if (shifting)
+					setcurtchain(oldchain);
 				return FALSE;
 			}
 			advancewindow();
 			if (EXPR_FAIL == expr(sb1, MUMPS_EXPR))
+			{
+				if (shifting)
+					setcurtchain(oldchain);
 				return FALSE;
+			}
 			sb1++;
 			if (TK_RPAREN == (x = TREF(window_token)))	/* NOTE assignment */
 			{
@@ -91,19 +123,32 @@ int lkglvn(boolean_t gblvn)
 			}
 			if (TK_COMMA != x)
 			{
-				stx_error(ERR_COMMA);
+				stx_error(ERR_RPARENMISSING);
+				if (shifting)
+					setcurtchain(oldchain);
 				return FALSE;
 			}
 		}
 	}
 	ref = newtriple(ox);
 	ref->operand[0] = put_ilit((mint)(sb1 - sb2));
-	for ( ; sb2 < sb1 ; sb2++)
+	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
+	if (shifting)
 	{
-		t1 = newtriple(OC_PARAMETER);
-		ref->operand[1] = put_tref(t1);
-		ref = t1;
-		ref->operand[0] = *sb2;
+		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
+		{	/* saw a side effect in a subscript - time to stop shifting */
+			setcurtchain(oldchain);
+			triptr = (TREF(curtchain))->exorder.bl;
+			dqadd(triptr, &tmpchain, exorder);
+		} else
+		{
+			newtriple(OC_GVSAVTARG);
+			setcurtchain(oldchain);
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		}
 	}
 	return TRUE;
 }

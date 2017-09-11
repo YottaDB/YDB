@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -299,9 +299,7 @@ void	mupip_recover(void)
 			 * If so we have to increment cycles in mur_close_files.
 			 */
 			assert(NULL != jnlpool.repl_inst_filehdr);
-			murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk
-							? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
-							: FALSE;
+			murgbl.incr_db_rlbkd_cycle = FALSE;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLBKJNSEQ, 2,
 					&murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
 		}
@@ -553,8 +551,10 @@ void	mupip_recover(void)
 	{
 		/* Determine if any of the databases are taken back in time. If so we have to increment cycles in mur_close_files */
 		assert(NULL != jnlpool.repl_inst_filehdr);
-		murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk ? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
-							   : FALSE;
+		assert(!jnlpool.repl_inst_filehdr->jnl_seqno || (jnlpool.repl_inst_filehdr->jnl_seqno >= murgbl.consist_jnl_seqno));
+		murgbl.incr_db_rlbkd_cycle = (jnlpool.repl_inst_filehdr->jnl_seqno)
+						? (jnlpool.repl_inst_filehdr->jnl_seqno != murgbl.consist_jnl_seqno)
+						: FALSE;
 	}
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;

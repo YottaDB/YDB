@@ -46,7 +46,7 @@ int indirection(oprtype *a)
 	concat_athashes = (2 == source_column);
 	INCREMENT_EXPR_DEPTH;
 	advancewindow();
-	if (!expratom(a))
+	if (TREF(xecute_literal_parse) || !expratom(a))
 	{
 		DECREMENT_EXPR_DEPTH;
 		stx_error(ERR_EXPR);

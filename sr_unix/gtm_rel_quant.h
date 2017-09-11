@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,13 +56,26 @@ MBSTART {												\
 		RELQUANT;										\
 } MBEND
 
+/* Sleep/rel_quant <= 1 micro-second every 4 iterations and also perform caslatch check every ~4 seconds */
 #define	REST_FOR_LATCH(LATCH, MAX_SLEEP_MASK, RETRIES)									\
 MBSTART {														\
 	if (0 == (RETRIES & LOCK_SPIN_HARD_MASK))	/* On every so many passes, sleep rather than spinning */	\
 	{														\
 		GTM_REL_QUANT((MAX_SLEEP_MASK));	/* Release processor to holder of lock (hopefully) */		\
 		/* Check if we're due to check for lock abandonment check or holder wakeup */				\
-		if (0 == (RETRIES & (LOCK_CASLATCH_CHKINTVL - 1)))							\
+		if (0 == (RETRIES & (LOCK_CASLATCH_CHKINTVL_USEC - 1)))							\
+			performCASLatchCheck(LATCH, TRUE);								\
+	}														\
+} MBEND
+
+/* Sleep 1 micro-second every 4 iterations and also perform caslatch check every ~4 seconds */
+#define	SLEEP_FOR_LATCH(LATCH, RETRIES)										\
+MBSTART {														\
+	if (0 == (RETRIES & LOCK_SPIN_HARD_MASK))	/* On every so many passes, sleep rather than spinning */	\
+	{														\
+		SLEEP_USEC(1, FALSE);	/* Release processor to holder of lock (hopefully) */				\
+		/* Check if we're due to check for lock abandonment check or holder wakeup */				\
+		if (0 == (RETRIES & (LOCK_CASLATCH_CHKINTVL_USEC - 1)))							\
 			performCASLatchCheck(LATCH, TRUE);								\
 	}														\
 } MBEND

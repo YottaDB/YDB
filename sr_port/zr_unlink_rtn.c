@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,7 +83,7 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 			 */
 			zlmov_lnames(old_rhead); 	/* Copy the label names from literal pool to malloc'd area */
 #		ifdef AUTORELINK_SUPPORTED
-		if (old_rhead->shared_object)
+		if (TRUE == old_rhead->shared_object)
 			rtnobj_shm_free(old_rhead, LATCH_GRABBED_FALSE); /* Object is shared via rtnobj shared memory */
 		else
 #		endif
@@ -103,7 +103,7 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 	free(old_rhead->linkage_adr);		/* Release the old linkage section */
 	old_rhead->linkage_adr = NULL;
 #	ifdef AUTORELINK_SUPPORTED
-	if (old_rhead->shared_object)		/* If this is a shared object (not shared library), release rtn name/path text */
+	if (TRUE == old_rhead->shared_object)	/* If this is a shared object (not shared library), release rtn name/path text */
 	{	/* After freeing, these names should be reset by incr_link() but in case not - set them to NULL */
 		free(old_rhead->src_full_name.addr);
 		old_rhead->src_full_name.addr = old_rhead->routine_name.addr = NULL;
