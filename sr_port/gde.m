@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2016 Fidelity National Information		;
+; Copyright (c) 2001-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -33,14 +33,15 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	s gdeEntryState("zlevel")=$zlevel-1
 	s gdeEntryState("io")=$io
 	s $et=$s(debug:"b:$zs'[""%GDE""!allerrs  ",1:"")_"g:(""%GDE%NONAME""[$p($p($zs,"","",3),""-"")) SHOERR^GDE d ABORT^GDE"
-	s io=$io,useio="io",comlevel=0,combase=$zl,resume(0)=$zl_":INTERACT"
+	s io=$io,useio="io",comlevel=0,combase=$zl,resume(comlevel)=$zl_":INTERACT"
 	i $$set^%PATCODE("M")
 	d GDEINIT^GDEINIT,GDEMSGIN^GDEMSGIN,GDFIND^GDESETGD,CREATE^GDEGET:create,LOAD^GDEGET:'create
 	i debug s prompt="DEBUGDE>",uself="logfile"
 	e  s prompt="GDE>",uself="logfile:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
 	e  s useio="io:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
 	u @useio
-	i $l(comline) d comline,EXIT^GDEEXIT
+	; comline is set to $ZCMDLINE on entry. If the entry zlevel is 0, set the resume point to exit
+	i $l(comline) s:'gdeEntryState("zlevel") resume(comlevel)=$zl_":EXIT^GDEEXIT" d comline,EXIT^GDEEXIT
 	i runtime s prompt="GD_SHOW>",verb="SHOW",x="" f  s x=$o(syntab(x)) q:'$l(x)  i x'="SHOW" k syntab(x)
 INTERACT
 	f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
@@ -67,7 +68,7 @@ CTRL
 	d ABORT
 	;
 comexit: i 'update d QUIT^GDEQUIT
-	i $$ALL^GDEVERIF,$$GDEPUT^GDEPUT
+	i $$ALL^GDEVERIF,$$GDEPUT^GDEPUT s $zstatus=""
 	e  w $p($zm(gdeerr("VERIFY")\2*2),"!AD")_"FAILED" w !
 	d GETOUT^GDEEXIT
 	h
@@ -89,7 +90,7 @@ comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
 	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
-	e  s $ecode=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
+	e  s ($ecode,$zstatus)=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
 	q
 SCRIPT:
 	s comlevel=comlevel+1

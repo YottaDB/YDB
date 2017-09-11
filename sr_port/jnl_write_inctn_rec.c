@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,9 +12,6 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 #include "gtm_inet.h"
 
 #include "gtm_time.h"
@@ -40,12 +37,11 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 {
 	struct_jrec_inctn	inctn_record;
 	jnl_private_control	*jpc;
+	boolean_t		in_phase2;
 	DEBUG_ONLY(int		inctn_detail_size;)
 
-	assert(csa->now_crit);
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
-	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	inctn_record.prefix.jrec_type = JRT_INCTN;
 	inctn_record.prefix.forwptr = INCTN_RECLEN;
 	assert(&inctn_detail.blknum_struct.suffix == &inctn_detail.blks2upgrd_struct.suffix);
@@ -58,7 +54,9 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	inctn_record.prefix.time = jgbl.gbl_jrec_time;
-	inctn_record.prefix.tn = csa->ti->curr_tn;
+	in_phase2 = IN_PHASE2_JNL_COMMIT(csa);
+	assert(in_phase2 || (csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
+	inctn_record.prefix.tn = JB_CURR_TN_APPROPRIATE(in_phase2, jpc, csa);
 	inctn_record.prefix.checksum = INIT_CHECKSUM_SEED;
 	assert((inctn_opcode_total > inctn_opcode) && (inctn_invalid_op < inctn_opcode));
 	/* Assert that the maximum inctn opcode # will fit in the "opcode" field in the inctn jnl record.
@@ -76,5 +74,5 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 	inctn_record.detail = inctn_detail;
 	inctn_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
 								(unsigned char *)&inctn_record, SIZEOF(struct_jrec_inctn));
-	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL, NULL);
+	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL);
 }

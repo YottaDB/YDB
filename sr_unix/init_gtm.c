@@ -56,7 +56,7 @@ GBLREF pattern		*pattern_list;
 GBLREF pattern		*curr_pattern;
 GBLREF pattern		mumps_pattern;
 GBLREF uint4		*pattern_typemask;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);

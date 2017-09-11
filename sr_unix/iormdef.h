@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,7 +223,7 @@ typedef struct
 	boolean_t	write_only;	/* WRITEONLY specified */
 	boolean_t	stream;
 	boolean_t	fifo;
-	boolean_t	pipe;		/* True if pipe device */
+	boolean_t	is_pipe;	/* True if pipe device */
 	boolean_t	independent; 	/* True if pipe process to live after pipe is closed */
 	boolean_t	parse;		/* True if pipe command is to be parsed */
 	boolean_t	done_1st_read;	/* If UTF16, we need to know if this is the first read or not to check for BOM */

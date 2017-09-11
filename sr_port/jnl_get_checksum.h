@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,64 +23,64 @@ GBLREF uint4 csum_table[SLICE_BY][TABLE_SIZE];
 #ifdef  BIGENDIAN
 #define LOBYTE	0
 #define ADJUST_CHECKSUM(cursum, num4, newsum)										\
-{															\
+MBSTART {														\
 	uint4 tmpsum = csum_table[LOBYTE + 0][(cursum ^ num4) & BYTEMASK] ^ 						\
 			csum_table[LOBYTE + 1][((cursum ^ num4) >> (1 * BITS_PER_UCHAR)) & BYTEMASK] ^			\
 			csum_table[LOBYTE + 2][((cursum ^ num4) >> (2 * BITS_PER_UCHAR)) & BYTEMASK] ^ 			\
 			csum_table[LOBYTE + 3][((cursum ^ num4) >> (3 * BITS_PER_UCHAR)) & BYTEMASK]; 			\
 	newsum = tmpsum ? tmpsum : INIT_CHECKSUM_SEED;									\
-}
+} MBEND
 #else
 #define HIBYTE	3
 #define ADJUST_CHECKSUM(cursum, num4, newsum)										\
-{															\
+MBSTART {														\
 	uint4 tmpsum = csum_table[HIBYTE - 0][(cursum ^ num4) & BYTEMASK] ^ 						\
 			csum_table[HIBYTE - 1][((cursum ^ num4) >> (1 * BITS_PER_UCHAR)) & BYTEMASK] ^			\
 			csum_table[HIBYTE - 2][((cursum ^ num4) >> (2 * BITS_PER_UCHAR)) & BYTEMASK] ^ 			\
 			csum_table[HIBYTE - 3][((cursum ^ num4) >> (3 * BITS_PER_UCHAR)) & BYTEMASK]; 			\
 	newsum = tmpsum ? tmpsum : INIT_CHECKSUM_SEED;									\
-}
+} MBEND
 #endif
 
 #define ADJUST_CHECKSUM_TN(cursum, tn, newsum)										\
-{															\
+MBSTART {														\
 	uint4 tmpsum_tn;												\
 	ADJUST_CHECKSUM(cursum, *(uint4 *)tn, tmpsum_tn);								\
 	ADJUST_CHECKSUM(tmpsum_tn, *(uint4 *)((char *)tn + SIZEOF(uint4)), newsum);					\
-}
+} MBEND
 
 #define COMPUTE_COMMON_CHECKSUM(common_cksum, prefix)									\
-{															\
+MBSTART {														\
 	ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, &(prefix.tn), common_cksum);						\
 	ADJUST_CHECKSUM(common_cksum, prefix.pini_addr, common_cksum);							\
 	ADJUST_CHECKSUM(common_cksum, prefix.time, common_cksum);							\
-}
+} MBEND
 
 #define COMPUTE_PBLK_CHECKSUM(blk_checksum, pblk_rec, common_cksum, jrec_checksum)					\
-{															\
+MBSTART {														\
 	ADJUST_CHECKSUM(blk_checksum, (pblk_rec)->prefix.jrec_type, jrec_checksum);					\
 	ADJUST_CHECKSUM(jrec_checksum, (pblk_rec)->blknum, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (pblk_rec)->bsiz, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (pblk_rec)->ondsk_blkver, jrec_checksum);					\
 	ADJUST_CHECKSUM(jrec_checksum, common_cksum, jrec_checksum);							\
-}
+} MBEND
 
 #define COMPUTE_AIMG_CHECKSUM(blk_checksum, aimg_rec, common_cksum, jrec_checksum)					\
 					COMPUTE_PBLK_CHECKSUM(blk_checksum, aimg_rec, common_cksum, jrec_checksum);
 
 #define COMPUTE_LOGICAL_REC_CHECKSUM(jfb_checksum, jrec, common_cksum, jrec_checksum)					\
-{															\
+MBSTART {														\
 	ADJUST_CHECKSUM(jfb_checksum, (jrec)->prefix.jrec_type, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (jrec)->update_num, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (jrec)->token_seq.token, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (jrec)->strm_seqno, jrec_checksum);						\
 	ADJUST_CHECKSUM(jrec_checksum, (jrec)->num_participants, jrec_checksum);					\
 	ADJUST_CHECKSUM(jrec_checksum, common_cksum, jrec_checksum);							\
-}
+} MBEND
 
 /* This macro is to be used whenever we are computing the checksum of a block that has been acquired. */
 #define	JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_blk, bsize)							\
-{															\
+MBSTART {														\
 	cache_rec_ptr_t	cr;												\
 	boolean_t	cr_is_null;											\
 															\
@@ -123,7 +123,7 @@ GBLREF uint4 csum_table[SLICE_BY][TABLE_SIZE];
 	 * necessary to avoid computing checksums if cr is NULL.							\
 	 */														\
 	cse->blk_checksum = !cr_is_null ? jnl_get_checksum((blk_hdr_ptr_t)old_blk, csa, (bsize)) : 0;			\
-}
+} MBEND
 
 #include "gdsblk.h"
 

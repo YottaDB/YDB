@@ -39,7 +39,7 @@ void remove_rms (io_desc *ciod)
 	SETUP_THREADGBL_ACCESS;
 #	endif
 	/* The routine is also called now when there's an open error and ciod->type == n_io_dev_types. */
-	assert((rm == ciod->type) || (n_io_dev_types == ciod->type));
+	assert((rm == ciod->type) || (n_io_dev_types == ciod->type) || (NULL == ciod->dev_sp));
 	assert(ciod->state == dev_closed || ciod->state == dev_never_opened);
 	/* When we get here after an open error with n_io_dev_types == ciod->type, the ciod->dev_sp should be NULL. Assert it */
 	assert((n_io_dev_types != ciod->type) || (NULL == ciod->dev_sp));
@@ -74,7 +74,7 @@ void remove_rms (io_desc *ciod)
 		free(rm_ptr->fsblock_buffer);
 	if ((n_io_dev_types != ciod->type) && ciod->newly_created)
 	{
-		assert((NULL == rm_ptr) || !rm_ptr->pipe);
+		assert((NULL == rm_ptr) || !rm_ptr->is_pipe);
 		UNLINK(ciod->trans_name->dollar_io);
 	}
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
@@ -116,7 +116,7 @@ void remove_rms (io_desc *ciod)
 	}
 	if (rm_ptr)
 	{
-		if (rm_ptr->pipe)
+		if (rm_ptr->is_pipe)
 		{	/* free up dev_param_pairs if defined */
 			for ( i = 0; i < rm_ptr->dev_param_pairs.num_pairs; i++ )
 			{

@@ -319,7 +319,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	sgm_info		*save_sgm_info_ptr;
 	sgmnt_addrs		*csa, *regcsa;
 	sgmnt_data_ptr_t	csd;
-	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload;
+	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -458,7 +458,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		 * TP that detects and reloads newer triggers (e.g. trigger invocation) restarts the entire TP transaction.
 		 */
 		gvt->trig_local_tn = local_tn;
-		/* If this trigger is already compiled, we are done */
+		/* If this trigger is already compiled, we are done since they are compiled with embed_source */
 		if (NULL != trigdsc->rtn_desc.rt_adr)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: trigger already compiled, all done\n"));
@@ -466,8 +466,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			*rtn_vec = rtn_vector;
 			return 0;
 		}
-		/* Else load the trigger source as needed */
-		if (NULL == rtn_vector->source_code)
+		/* Else load the trigger source as needed. If needs_reload is true then the source was loaded above */
+		if ((NULL == rtn_vector->source_code) && (!needs_reload))
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: get the source\n"));
 			SET_GVTARGET_TO_HASHT_GBL(csa);

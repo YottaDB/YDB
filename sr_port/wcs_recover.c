@@ -121,7 +121,7 @@ void wcs_recover(gd_region *reg)
 	inctn_opcode_t		save_inctn_opcode;
 	unsigned int		bplmap, lcnt, total_rip_wait;
 	sm_uc_ptr_t		buffptr;
-	blk_hdr_ptr_t		blk_ptr;
+	blk_hdr_ptr_t		blk_ptr, cr_buff, cr_alt_buff;
 	INTPTR_T		bp_lo, bp_top;
 	boolean_t		asyncio, twinning_on, wcs_wtfini_ret;
 	jnl_private_control	*jpc;
@@ -194,6 +194,18 @@ void wcs_recover(gd_region *reg)
 		 * decrementing cnl->wcs_phase2_commit_pidcnt). Anyways wcs_verify reports and clears this field so no problems.
 		 */
 	}
+	if (JNL_ENABLED(csd))
+	{
+		jpc = csa->jnl;
+		assert(NULL != jpc);
+		jbp = jpc->jnl_buff;
+		assert(NULL != jbp);
+		/* Since we have already done a "wcs_phase2_commit_wait" above, we do not need to do a
+		 * "jnl_phase2_commit_wait" call separately here. But we might need to do a "jnl_phase2_cleanup"
+		 * in case there are orphaned phase2 jnl writes still lying around. Take this opportunity to do that.
+		 */
+		jnl_phase2_cleanup(csa, jbp);
+	}
 	asyncio = csd->asyncio;
 	twinning_on = TWINNING_ON(csd);
 	wip_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
@@ -237,17 +249,18 @@ void wcs_recover(gd_region *reg)
 	cr_hi = cr_lo + csd->n_bts;
 	blk_size = csd->blk_size;
 	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_hi, OS_PAGE_SIZE);
-	/* After recovering the cache, we normally increment the db curr_tn. But this should not be done if called from
-	 * forward journal recovery, since we want the final database transaction number to match the journal file's
-	 * eov_tn (to avoid JNLDBTNNOMATCH errors). Therefore in this case, make sure all "tn" fields in the bt and cache are set
-	 * to one less than the final db tn. This is done by decrementing the database current transaction number at the
-	 * start of the recovery and incrementing it at the end. To keep early_tn and curr_tn in sync, decrement early_tn as well.
+	/* After recovering the cache, we normally increment the db curr_tn. But this should not be done if
+	 * 	a) Caller is forward journal recovery, since we want the final database transaction number to match
+	 *		the journal file's eov_tn (to avoid JNLDBTNNOMATCH errors) OR
+	 *	b) TREF(donot_write_inctn_in_wcs_recover) is TRUE.
+	 * Therefore in this case, make sure all "tn" fields in the bt and cache are set to one less than the final db tn.
+	 * This is done by decrementing the database current transaction number at the start of the recovery and incrementing
+	 * it at the end. To keep early_tn and curr_tn in sync, decrement early_tn as well.
 	 */
-	if (!TREF(donot_write_inctn_in_wcs_recover) && mupip_jnl_recover && !JNL_ENABLED(csd))
+	if (TREF(donot_write_inctn_in_wcs_recover) || (mupip_jnl_recover && !JNL_ENABLED(csd)))
 	{
 		csd->trans_hist.curr_tn--;
-		csd->trans_hist.early_tn--;
-		assert(csd->trans_hist.early_tn == (csd->trans_hist.curr_tn + 1));
+		csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 		/* Adjust "cnl->last_wcs_recover_tn" to be in sync with adjusted curr_tn */
 		cnl->last_wcs_recover_tn = csd->trans_hist.curr_tn;
 	}
@@ -335,8 +348,8 @@ void wcs_recover(gd_region *reg)
 			cr->twin = 0; /* Clean up "twin" link. We will set it afresh further down below */
 		if (JNL_ENABLED(csd) && cr->dirty)
 		{
-			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (cr->jnl_addr > csa->jnl->jnl_buff->freeaddr))
-				cr->jnl_addr = csa->jnl->jnl_buff->freeaddr;
+			if (cr->jnl_addr > jbp->rsrv_freeaddr)
+				cr->jnl_addr = jbp->rsrv_freeaddr;
 		} else
 			cr->jnl_addr = 0;	/* just be safe */
 		if (cr->data_invalid)
@@ -509,13 +522,17 @@ void wcs_recover(gd_region *reg)
 			} else
 			{	/* The bt already has an entry for the block */
 				cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
+				cr_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr));
+				cr_alt_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr));
 				assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
-				if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
-				{	/* the previous cache record is WIP, and the current cache record is the more recent twin */
-					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-						> ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+				if ((LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt)) || (cr_buff->tn > cr_alt_buff->tn))
+				{	/* The previous cache record is WIP or not-WIP (possible if process in "wcs_wtstart" got
+					 * killed older twin write was issued), but the current cache record is the more
+					 * recent twin.
+					 */
 					cr_alt->bt_index = 0;
-					WRITE_LATCH_VAL(cr_alt) = LATCH_CONFLICT;
+					if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
+						WRITE_LATCH_VAL(cr_alt) = LATCH_CONFLICT;
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
 					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
 					bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
@@ -529,8 +546,6 @@ void wcs_recover(gd_region *reg)
 				{	/* Previous cache record is more recent from a cr->stopped record
 					 * made by secshr_db_clnup. Discard this copy as it is old.
 					 */
-					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-						<= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 					assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr_alt));
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
@@ -632,38 +647,33 @@ void wcs_recover(gd_region *reg)
 	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
 	 * or write inctn (since no concurrent GT.M process is present in order to restart because of this curr_tn change)
 	 */
-	if (!TREF(donot_write_inctn_in_wcs_recover))
+	if (!TREF(donot_write_inctn_in_wcs_recover) && JNL_ENABLED(csd))
 	{
-		jpc = csa->jnl;
-		if (JNL_ENABLED(csd) && (NULL != jpc) && (NULL != jpc->jnl_buff))
+		assert(&FILE_INFO(jpc->region)->s_addrs == csa);
+		if (!jgbl.dont_reset_gbl_jrec_time)
 		{
-			assert(&FILE_INFO(jpc->region)->s_addrs == csa);
-			if (!jgbl.dont_reset_gbl_jrec_time)
-			{
-				SET_GBL_JREC_TIME; /* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_inctn_rec */
-			}
-			assert(jgbl.gbl_jrec_time);
-			jbp = jpc->jnl_buff;
-			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
-			 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
-			 * journal records (if it decides to switch to a new journal file).
-			 */
-			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			jnl_status = jnl_ensure_open(reg, csa);
-			if (0 == jnl_status)
-			{
-				if (0 == jpc->pini_addr)
-					jnl_put_jrt_pini(csa);
-				save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode
-												to be changed here */
-				inctn_opcode = inctn_wcs_recover;
-				jnl_write_inctn_rec(csa);
-				inctn_opcode = save_inctn_opcode;
-			} else
-				jnl_file_lost(jpc, jnl_status);
+			SET_GBL_JREC_TIME; /* needed for jnl_ensure_open, jnl_write_pini and jnl_write_inctn_rec */
 		}
-		INCREMENT_CURR_TN(csd);
+		assert(jgbl.gbl_jrec_time);
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+		 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
+		 * journal records (if it decides to switch to a new journal file).
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);
+		jnl_status = jnl_ensure_open(reg, csa);
+		if (0 == jnl_status)
+		{
+			if (0 == jpc->pini_addr)
+				jnl_write_pini(csa);
+			save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode
+											to be changed here */
+			inctn_opcode = inctn_wcs_recover;
+			jnl_write_inctn_rec(csa);
+			inctn_opcode = save_inctn_opcode;
+		} else
+			jnl_file_lost(jpc, jnl_status);
 	}
+	INCREMENT_CURR_TN(csd);
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	SIGNAL_WRITERS_TO_RESUME(cnl);
 	in_wcs_recover = FALSE;

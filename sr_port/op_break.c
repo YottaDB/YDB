@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@
 #include "op.h"
 #include "dm_setup.h"
 #include "min_max.h"
+#include "restrict.h"
 
 GBLREF io_pair	io_curr_device;
 GBLREF io_pair	io_std_device;
@@ -27,6 +29,14 @@ GBLREF stack_frame *frame_pointer;
 GBLREF mval	dollar_zstatus;
 GBLREF int4 	break_message_mask;
 GBLREF bool	dec_nofac;
+
+error_def(ERR_RTSLOC);
+error_def(ERR_BREAK);
+error_def(ERR_BREAKDEA);
+error_def(ERR_BREAKZBA);
+error_def(ERR_BREAKZST);
+error_def(ERR_NOTPRINCIO);
+error_def(ERR_TEXT);
 
 void op_break(void)
 {
@@ -36,14 +46,8 @@ void op_break(void)
 	int		line_length;
 	int		em;
 
-	error_def(ERR_RTSLOC);
-	error_def(ERR_BREAK);
-	error_def(ERR_BREAKDEA);
-	error_def(ERR_BREAKZBA);
-	error_def(ERR_BREAKZST);
-	error_def(ERR_NOTPRINCIO);
-	error_def(ERR_TEXT);
-
+	if (RESTRICTED(break_op))
+		return;
 	flush_pio();
 	line_length = 0;
 	if (frame_pointer->type & SFT_ZTRAP)

@@ -215,17 +215,21 @@ cp ../test_gtm/sim.m .
 setenv gtmdir $save_gtm_dist/test_gtm_utf8
 # make gtm set the utf locale
 unsetenv LC_CTYPE
-# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
-setenv save_icu $gtm_icu_version
-unsetenv gtm_icu_version
+if ($?gtm_icu_version) then
+	# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
+	setenv save_icu $gtm_icu_version
+	unsetenv gtm_icu_version
+endif
 # NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
 ../gtm -r sim >& gtm.out
 
 # get $ZCHSET
 echo ""						>>&! $save_gtm_dist/gtm_test_install.out
 grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
-# restore saved gtm_icu_version
-setenv gtm_icu_version $save_icu
+if ($?save_icu) then
+	# restore saved gtm_icu_version
+	setenv gtm_icu_version $save_icu
+endif
 # test gtmsecshr with an alternate user
 set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
 su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH

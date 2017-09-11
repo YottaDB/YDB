@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +24,9 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <signal.h>
 #include <stddef.h>
 #include <errno.h>
+#include "gtm_signal.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
@@ -162,10 +163,10 @@ void *gtm_text_alloc(size_t size)
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, tSize, CALLERID, save_errno);
 	}
-	/* On non-allocate related error, give more general error and GTMASSERT */
+	/* On non-allocate related error, give more general error and assertpro(FALSE) */
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_text_alloc()"), CALLFROM,
 		       save_errno, 0, ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);
-	GTMASSERT;
+	assertpro(FALSE);
 }
 
 void gtm_text_free(void *addr)
@@ -209,13 +210,13 @@ void gtm_text_free(void *addr)
 		save_errno = errno;										\
 	        if (ENOMEM == save_errno)									\
 		{												\
-			assert(FALSE);										\
+			assert(WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR));				\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, rsize, CALLERID, save_errno);  	\
 		}												\
-		/* On non-allocate related error, give more general error and GTMASSERT */			\
+		/* On non-allocate related error, give more general error and assertpro(FALSE) */			\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM,	\
 			       save_errno, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_ALLOC"), CALLERID);		\
-		GTMASSERT;											\
+		assertpro(FALSE);											\
 	}													\
 }
 #define TEXT_FREE(addr, rsize) 											\
@@ -229,7 +230,7 @@ void gtm_text_free(void *addr)
 		save_errno = errno;										\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("munmap"), CALLFROM,	\
 			       save_errno, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_FREE"), CALLERID);		\
-		GTMASSERT;											\
+		assertpro(FALSE);											\
 	}													\
 }
 #define STE_FP(p) p->userStorage.links.fPtr
@@ -433,8 +434,8 @@ void *gtm_text_alloc(size_t size)
 	if (gtaSmInitialized)
 	{
 		hdrSize = OFFSETOF(textElem, userStorage);		/* Size of textElem header */
-		GTM64_ONLY(if (MAXUINT4 < (size + hdrSize)) GTMASSERT); /* Only deal with < 4GB requests */
-		NON_GTM64_ONLY(if ((size + hdrSize) < size) GTMASSERT); /* Check for wrap with 32 bit platforms */
+		GTM64_ONLY(if (MAXUINT4 < (size + hdrSize)) assertpro(FALSE)); /* Only deal with < 4GB requests */
+		NON_GTM64_ONLY(if ((size + hdrSize) < size) assertpro(FALSE)); /* Check for wrap with 32 bit platforms */
 		assert(hdrSize < MINTWO);
 
 		fast_lock_count++;
@@ -496,7 +497,7 @@ void gtm_text_free(void *addr)
 	if (process_exiting)	/* If we are exiting, don't bother with frees. Process destruction can do it */
 		return;
 	if (!gtaSmInitialized)	/* Storage must be init'd before can free anything */
-		GTMASSERT;
+		assertpro(FALSE);
 	++fast_lock_count;
 	++gtaSmDepth;	/* Recursion indicator */
 	if (1 < gtaSmDepth)

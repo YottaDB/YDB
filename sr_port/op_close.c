@@ -50,9 +50,12 @@ void op_close(mval *v, mval *p)
 	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))
 			return;
 		ciod = tl->iod;
-		if ((NULL == ciod) || (TRUE == ciod->perm) ||
-		    (ciod->state != dev_open))
+		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
+		{
+			if (dev_never_opened == ciod->state)
+				remove_rms(ciod);
 			return;
+		}
 
 		for (prev = io_root_log_name, l = prev->next; NULL != l;  prev = l, l = l->next)
 		{
@@ -72,9 +75,13 @@ void op_close(mval *v, mval *p)
 	{
 	        if (0 == (l = get_log_name(&v->str, NO_INSERT)))
 			return;
-		else if (0 == (ciod = l->iod) || TRUE == ciod->perm
-			 || (dev_open != ciod->state))
+		ciod = l->iod;
+		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
+		{
+			if (dev_never_opened == ciod->state)
+				remove_rms(ciod);
 			return;
+		}
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == stat)

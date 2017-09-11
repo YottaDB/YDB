@@ -1,0 +1,88 @@
+#!/bin/sh
+#################################################################
+#								#
+# Copyright (c) 2017 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+# Check installing as root
+
+uid=`id -u`
+
+if [ "$uid" -ne 0 ]; then
+	echo "$0 must be run as root"
+	exit 1
+fi
+
+# Check valid package
+
+package_dir=`dirname $0`
+if [ "$package_dir" = "" ]; then
+	package_dir="."
+fi
+
+if [ ! -f "${package_dir}/gtmpcat.m" ]; then
+	echo "gtmpcat.m missing from package directory (${package_dir})"
+	exit 1
+fi
+
+# Check valid $gtm_dist
+
+if [ ! -d "$gtm_dist" ]; then
+	echo "gtm_dist ($gtm_dist) is not a valid directory"
+	exit 1
+fi
+if [ ! -x "$gtm_dist/mumps" ]; then
+	echo "gtm_dist ($gtm_dist) is not a GT.M installation"
+	exit 1
+fi
+
+gtmroutines=". $gtm_dist"
+export gtmroutines
+
+# Note owner and group of mumps executable for later use as the owner and group of the installed files
+
+eval $(/bin/ls -l $gtm_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
+
+# Check matching version
+
+req_zver="#ZVERSION#"
+cur_zver="$($gtm_dist/mumps -r %XCMD 'write $zversion')"
+
+if [ "$req_zver" != "$cur_zver" -a "$req_zver" != "ANY" ]; then
+	echo "Version to install ($req_zver) does not match \$gtm_dist/mumps version ($cur_zver)"
+	exit 1
+fi
+
+# Confirm installation
+
+echo ""
+echo "Installing gtmpcat files to $gtm_dist/tools/gtmpcat"
+echo ""
+printf "Proceed? > "
+read resp
+response=$(echo "$resp" | tr '[a-z]' '[A-Z]')
+if [ "Y" != "$response" -a "YES" != "$response" ] ; then
+	exit 1
+fi
+
+# Do the copy
+
+if [ ! -d "$gtm_dist/tools" ]; then
+	mkdir $gtm_dist/tools
+	chown ${owner}:${group} $gtm_dist/tools
+fi
+mkdir -p $gtm_dist/tools/gtmpcat
+cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $gtm_dist/tools/gtmpcat
+cp ${package_dir}/gtmpcat.sh $gtm_dist/gtmpcat
+(cd $gtm_dist/tools/gtmpcat && gtmroutines="." $gtm_dist/mumps *.m)
+chown -R ${owner}:${group} $gtm_dist/gtmpcat $gtm_dist/tools/gtmpcat
+ls -ald $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*
+echo ""
+echo "Done. Please check the permissions on the listed files and directories and change them as appropriate."

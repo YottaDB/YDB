@@ -144,7 +144,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	}
 	if (JNL_ENABLED(csd))
 	{
-		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
+		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_write_pini and jnl_write_aimg_rec */
 		jpc = csa->jnl;
 		jbp = jpc->jnl_buff;
 		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
@@ -159,7 +159,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 			inctn_opcode = inctn_db_format_change;
 			inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta = csd->blks_to_upgrd;
 			if (0 == jpc->pini_addr)
-				jnl_put_jrt_pini(csa);
+				jnl_write_pini(csa);
 			jnl_write_inctn_rec(csa);
 			inctn_opcode = save_inctn_opcode;
 		} else

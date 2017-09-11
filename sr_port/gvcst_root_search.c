@@ -41,9 +41,7 @@
 #include "get_spec.h"
 #include "collseq.h"
 #include "gtmimagename.h"
-#ifdef UNIX
 #include "error.h"
-#endif
 #include "io.h"
 
 GBLREF	gv_key		*gv_currkey, *gv_altkey;
@@ -57,7 +55,6 @@ GBLREF	unsigned int	t_tries;
 GBLREF	gv_namehead	*reset_gv_target;
 GBLREF	boolean_t	mu_reorg_process;
 GBLREF	boolean_t	mupip_jnl_recover;
-#ifdef UNIX
 # ifdef DEBUG
 GBLREF	boolean_t	is_rcvr_server;
 GBLREF	boolean_t	is_src_server;
@@ -70,7 +67,6 @@ GBLREF	trans_num	start_tn;
 GBLREF	uint4		update_trans;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	uint4		t_err;
-#endif
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
@@ -107,7 +103,6 @@ static	mstr	global_collation_mstr;
 	TRIG_TP_SET_SGM;									\
 }
 
-#ifdef UNIX
 #define SAVE_ROOTSRCH_ENTRY_STATE								\
 {												\
 	int				idx;							\
@@ -132,7 +127,7 @@ static	mstr	global_collation_mstr;
 	 * t_begin that it is 0.								\
 	 */											\
 	update_trans = 0;									\
-	inctn_opcode = 0;									\
+	inctn_opcode = inctn_invalid_op;							\
 	rootsrch_ctxt_ptr->t_err = t_err;							\
 	rootsrch_ctxt_ptr->hold_onto_crit = cs_addrs->hold_onto_crit;				\
 	if (CDB_STAGNATE <= t_tries)								\
@@ -214,7 +209,6 @@ void gvcst_redo_root_search()
 	RESTORE_ROOTSRCH_ENTRY_STATE;
 	REVERT;
 }
-#endif
 
 enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 {

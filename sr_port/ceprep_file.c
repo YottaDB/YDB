@@ -26,11 +26,11 @@ static struct RAB	ceprep_rab;	/* record access block for compiler escape preproc
 #include "op.h"
 #include "comp_esc.h"
 
-#define CEPREP_OPEN_TIMEOUT 30
-
 GBLREF mident			module_name;
 GBLREF io_pair			io_curr_device;
 GBLREF command_qualifier	cmd_qlf;
+
+LITREF	mval		literal_zero;
 
 static io_pair	dev_in_use;
 
@@ -92,7 +92,7 @@ void open_ceprep_file(void)
 	file.str.addr = fname;
 	params.str.len = SIZEOF(open_params_list);
 	params.str.addr = &open_params_list;
-	op_open(&file, &params, CEPREP_OPEN_TIMEOUT, 0);
+	op_open(&file, &params, (mval *)&literal_zero, 0);
 	params.str.len = 1;
 	charspace = (char)iop_eol;
 	params.str.addr = &charspace;

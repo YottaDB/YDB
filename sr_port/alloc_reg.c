@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,8 @@ void alloc_reg(void)
 				{
 					x->operand[1].oprclass = NO_REF;
 					opc = x->opcode = OC_EQUNUL;
-				}
+				}	/* WARNING fallthrough */
+			default:
 				break;
 		}
 		if (OC_PASSTHRU == x->opcode)

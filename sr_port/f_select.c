@@ -21,6 +21,8 @@
 #include "fullbool.h"
 #include "stringpool.h"
 
+GBLREF	triple		t_orig;
+
 error_def(ERR_COLON);
 error_def(ERR_SELECTFALSE);
 
@@ -44,7 +46,8 @@ int f_select(oprtype *a, opctype op)
 	boolean_t	first_time, got_true, save_saw_side, saw_se_in_select, *save_se_base, save_shift, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
-	triple		dmpchain, *oldchain, *r, *ref, *savechain, *save_start, *save_start_orig, tmpchain, *triptr;
+	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
+			*save_start_orig, tmpchain, *triptr;
 	uint4		save_expr_depth, save_se_depth;
 	DCL_THREADGBL_ACCESS;
 
@@ -78,9 +81,17 @@ int f_select(oprtype *a, opctype op)
 	first_time = TRUE;
 	got_true = throwing = FALSE;
 	endtrip = put_tjmp(r);
+	cnd = NULL;
+	savechain = NULL;
 	for (;;)
 	{
-		cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (NULL == cnd)
+			cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (shifting && !got_true)
+		{
+			loop_save_start = TREF(expr_start);
+			loop_save_start_orig = TREF(expr_start_orig);
+		}
 		if (!bool_expr(FALSE, cnd))
 		{
 			SELECT_CLEANUP;
@@ -98,7 +109,7 @@ int f_select(oprtype *a, opctype op)
 		}
 		advancewindow();
 		for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
-			;
+			;	/* get back, get back to where we once belonged - to find an indicator of the actual result */
 		if (!got_true && OC_LIT == triptr->opcode)
 		{	/* it is a literal not following an already optimizing TRUE, so optimize it */
 			dqdel(triptr, exorder);
@@ -110,8 +121,8 @@ int f_select(oprtype *a, opctype op)
 				savechain = setcurtchain(&dmpchain);
 			} else
 			{	/* it's TRUE: take this argument and disregard any following */
+				assert(!throwing && (NULL == savechain));
 				got_true = TRUE;
-				savechain = NULL;
 			}
 		}
 		if (EXPR_FAIL == expr(&tmparg, MUMPS_EXPR))
@@ -119,6 +130,10 @@ int f_select(oprtype *a, opctype op)
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
+			else if ((NULL != savechain)
+				/* the below guards against returning to a chain that should be abandoned because of an error */
+				&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);
 			return FALSE;
 		}
 		assert(TRIP_REF == tmparg.oprclass);
@@ -126,6 +141,12 @@ int f_select(oprtype *a, opctype op)
 		{	/* finished with the false argument so put things back to normal */
 			assert(savechain);
 			setcurtchain(savechain);
+			if (shifting)
+			{
+				TREF(expr_start) = loop_save_start;
+				TREF(expr_start_orig) = loop_save_start_orig;
+			}
+			savechain = NULL;
 			throwing = FALSE;
 			if (TK_COMMA != TREF(window_token))
 				break;
@@ -135,15 +156,22 @@ int f_select(oprtype *a, opctype op)
 		old_op = tmparg.oprval.tref->opcode;
 		if (first_time)
 		{
-			if ((OC_LIT == old_op) || (oc_tab[old_op].octype & OCT_MVADDR))
-			{
-				ref = newtriple(OC_STOTEMP);
-				ref->operand[0] = tmparg;
-				tmparg = put_tref(ref);
-			}
-			r->operand[0] = target = tmparg;
 			first_time = FALSE;
-		} else
+			if (got_true && (OC_LIT == old_op))
+			{	/* if this is the only possible result, NOOP the OC_PASSTHRU so tmparg becomes the return value */
+				assert((OC_PASSTHRU == r->opcode) && (NO_REF == r->operand[0].oprclass));
+				r = tmparg.oprval.tref;
+			} else
+			{
+				if ((OC_LIT == old_op) || (oc_tab[old_op].octype & OCT_MVADDR))
+				{
+					ref = newtriple(OC_STOTEMP);
+					ref->operand[0] = tmparg;
+					tmparg = put_tref(ref);
+				}
+				r->operand[0] = target = tmparg;
+			}
+		} else if (OC_PASSTHRU == r->opcode)
 		{
 			ref = newtriple(OC_STO);
 			ref->operand[0] = target;
@@ -156,7 +184,7 @@ int f_select(oprtype *a, opctype op)
 				ref->operand[1] = put_tref(tmparg.oprval.tref->operand[0].oprval.tref);
 			}
 		}
-		if (!got_true && !throwing)
+		if (!got_true)
 		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
 			ref = newtriple(OC_JMP);
 			ref->operand[0] = endtrip;
@@ -166,12 +194,25 @@ int f_select(oprtype *a, opctype op)
 			break;
 		advancewindow();
 		if (got_true && (NULL == savechain))
+		{
+			if (shifting)
+			{
+				loop_save_start = TREF(expr_start);
+				loop_save_start_orig = TREF(expr_start_orig);
+			}
 			savechain = setcurtchain(&dmpchain);	/* discard arguments after a compile time TRUE */
+		}
+		cnd = NULL;
 	}
 	if (got_true)
 	{
+		if (shifting)
+		{
+			TREF(expr_start) = loop_save_start;
+			TREF(expr_start_orig) = loop_save_start_orig;
+		}
 		if (NULL != savechain)
-			setcurtchain(savechain);		/* if we discarded things return the chain to normal */
+			setcurtchain(savechain);		/* if we discarded things, return the chain to normal */
 	} else
 	{	/* if we didn't find a TRUE at compile time, then insert a possible error in case there's no TRUE at run time */
 		tmparg = put_ilit(ERR_SELECTFALSE);
@@ -184,7 +225,8 @@ int f_select(oprtype *a, opctype op)
 		ref->operand[0] = tmparg;
 		ref->operand[1] = put_ilit(FALSE);		/* Not a subroutine reference */
 	}
-	ins_triple(r);
+	if (OC_PASSTHRU == r->opcode)
+		ins_triple(r);
 	saw_se_in_select = TREF(saw_side_effect);		/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */
@@ -197,7 +239,7 @@ int f_select(oprtype *a, opctype op)
 	SELECT_CLEANUP;	/* restores TREF(expr_depth), TREF(side_effect_base) and TREF(side_effect_depth) */
 	if (shifting)
 	{
-		shifting = ((1 < TREF(expr_depth)) || ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
+		shifting = ((1 < save_expr_depth) || ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
 		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
 		setcurtchain(oldchain);
 		assert(NULL != save_start);
@@ -209,7 +251,7 @@ int f_select(oprtype *a, opctype op)
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(save_start);
 		}
-				TREF(expr_start) = save_start;
+		TREF(expr_start) = save_start;
 	}
 	*a = put_tref(r);
 	return TRUE;

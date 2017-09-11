@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +19,8 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
+LITREF	mval		literal_notimeout;
+
 error_def(ERR_RPARENMISSING);
 
 int m_lock(void)
@@ -30,18 +33,10 @@ int m_lock(void)
 
 	SETUP_THREADGBL_ACCESS;
 	restart = newtriple(OC_RESTARTPC);
-	newtriple(OC_LKINIT);
 	indirect = FALSE;
+	ox = OC_LOCK;
 	switch (TREF(window_token))
 	{
-	case TK_MINUS:
-		advancewindow();
-		ox = OC_LCKDECR;
-		break;
-	case TK_PLUS:
-		advancewindow();
-		ox = OC_LCKINCR;
-		break;
 	case TK_EOL:
 	case TK_SPACE:
 		ox = OC_UNLOCK;
@@ -49,24 +44,31 @@ int m_lock(void)
 		newtriple(OC_UNLOCK);
 		return TRUE;
 		break;
+	case TK_MINUS:
+	case TK_PLUS:
+		ox = (TK_MINUS == TREF(window_token)) ? OC_LCKDECR : OC_LCKINCR;
+		advancewindow();
+		if (TK_ATSIGN != TREF(window_token))
+			break;
+		/* WARNING possible fall-through */
 	case TK_ATSIGN:
 		if (!indirection(&indopr))
 			return FALSE;
 		ref = maketriple(OC_COMMARG);
 		ref->operand[0] = indopr;
-		if (TK_COLON != TREF(window_token))
+		if ((TK_COLON != TREF(window_token)) && (OC_LOCK == ox))
 		{
-			ref->operand[1] = put_ilit((mint) indir_lock);
+			ref->operand[1] = put_ilit((mint)indir_lock);
 			ins_triple(ref);
 			return TRUE;
 		}
-		ref->operand[1] = put_ilit((mint) indir_nref);
-		indirect = TRUE;
-		/*** CAUTION:  FALL-THROUGH ***/
+		ref->operand[1] = put_ilit((mint)indir_nref);
+		indirect = TRUE;			/* WARNING  fall-through */
 	default:
-		newtriple(OC_UNLOCK);
-		ox = OC_LOCK;
+		if (OC_LOCK == ox)
+			newtriple(OC_UNLOCK);
 	}
+	newtriple(OC_LKINIT);
 	if (indirect)
 		ins_triple(ref);
 	else
@@ -88,20 +90,21 @@ int m_lock(void)
 			advancewindow();
 			break;
 		default:
-			if (nref() == EXPR_FAIL)
+			if (EXPR_FAIL == nref())
 				return FALSE;
 			break;
 		}
 	}
 	ref = maketriple(ox);
 	if (TK_COLON != TREF(window_token))
-	{	ref->operand[0] = put_ilit(NO_M_TIMEOUT);
+	{
+		ref->operand[0] = put_lit((mval *)&literal_notimeout);
 		ins_triple(ref);
 	}
 	else
 	{
 		advancewindow();
-		if (EXPR_FAIL == expr(&(ref->operand[0]), MUMPS_INT))
+		if (EXPR_FAIL == expr(&(ref->operand[0]), MUMPS_EXPR))
 			return FALSE;
 		ins_triple(ref);
 		newtriple(OC_TIMTRU);

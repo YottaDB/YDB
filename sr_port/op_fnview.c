@@ -54,6 +54,9 @@
 #include "gtm_ctype.h"		/* for ISDIGIT_ASCII macro */
 #include "gvn2gds.h"
 #include "io.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "interlock.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
@@ -77,6 +80,8 @@ GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
 GBLREF gv_key		*gv_currkey;
 GBLREF boolean_t	is_gtm_chset_utf8;
+GBLREF jnlpool_addrs	jnlpool;
+GBLREF	uint4		process_id;
 UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
 
 error_def(ERR_COLLATIONUNDEF);
@@ -363,6 +368,48 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			csa = &FILE_INFO(reg)->s_addrs;
 			n = csa->gbuff_limit;
 			break;
+#ifdef TESTPOLLCRIT
+		case VTK_GRABCRIT:
+		case VTK_RELCRIT:
+		case VTK_GRABLOCK:
+		case VTK_RELLOCK:
+		case VTK_GRABJNLPH2:
+		case VTK_RELJNLPH2:
+		case VTK_RELJNLPOOLPH2:
+		case VTK_GRABJNLPOOLPH2:
+		case VTK_GRABJNLQIO:
+		case VTK_RELJNLQIO:
+			reg = parmblk.gv_ptr;
+			if (!reg->open)
+				gv_init_reg(reg);
+			csa = &FILE_INFO(reg)->s_addrs;
+			if (NULL != csa->hdr)
+			{
+				if (VTK_GRABCRIT == vtp->keycode)
+					grab_crit(reg);
+				else if (VTK_RELCRIT == vtp->keycode)
+					rel_crit(reg);
+				else if (VTK_GRABLOCK == vtp->keycode)
+					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+				else if (VTK_RELLOCK == vtp->keycode)
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+				else if (VTK_GRABJNLPH2 == vtp->keycode)
+					grab_latch(&csa->jnl->jnl_buff->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+				else if (VTK_RELJNLPH2 == vtp->keycode)
+					rel_latch(&csa->jnl->jnl_buff->phase2_commit_latch);
+				else if (VTK_GRABJNLPOOLPH2 == vtp->keycode)
+					grab_latch(&jnlpool.jnlpool_ctl->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+				else if (VTK_RELJNLPOOLPH2 == vtp->keycode)
+					rel_latch(&jnlpool.jnlpool_ctl->phase2_commit_latch);
+				else if (VTK_GRABJNLQIO == vtp->keycode)
+				{
+					while (!GET_SWAPLOCK(&csa->jnl->jnl_buff->io_in_prog_latch))
+						SHORT_SLEEP(1);
+				} else if (VTK_RELJNLQIO == vtp->keycode)
+					RELEASE_SWAPLOCK(&csa->jnl->jnl_buff->io_in_prog_latch);
+			}
+			break;
+#endif
 		case VTK_PROBECRIT:
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;

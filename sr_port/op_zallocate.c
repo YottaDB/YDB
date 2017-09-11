@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,7 @@
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int op_zallocate(int timeout)
+int op_zallocate(mval *timeout)
 {
 
 	return op_lock2(timeout, CM_ZALLOCATES);

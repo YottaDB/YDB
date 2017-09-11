@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2016 Fidelity National Information	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -322,19 +322,12 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			}
 		}
 		linkctl->fd = fd;
-		if (RELINKCTL_MMAP_SZ != stat_buf.st_size)
+		FTRUNCATE(fd, RELINKCTL_MMAP_SZ, rc);
+		if (0 != rc)
 		{
-			DBGARLNK((stderr, "relinkctl_open: file size = %d\n", stat_buf.st_size));
-			if (RELINKCTL_MMAP_SZ != stat_buf.st_size)
-			{
-				FTRUNCATE(fd, RELINKCTL_MMAP_SZ, rc);
-				if (0 != rc)
-				{
-					save_errno = errno;
-					SNPRINTF(errstr, SIZEOF(errstr), "ftruncate() of file %s failed", linkctl->relinkctl_path);
-					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-				}
-			}
+			save_errno = errno;
+			SNPRINTF(errstr, SIZEOF(errstr), "ftruncate() of file %s failed", linkctl->relinkctl_path);
+			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 		}
 		relinkctl_map(linkctl);	/* linkctl->hdr is now accessible */
 		hdr = linkctl->hdr;
@@ -396,7 +389,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					if (!shm_removed)
 						ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 					else
-						ISSUE_REQRLNKCTLRNDWN_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+						ISSUE_REQRLNKCTLRNDWN_SYSCALL(linkctl, errstr, save_errno);
 				} else
 				{	/* This is MUPIP RUNDOWN -RELINKCTL and shm is removed. There is no point creating one. */
 					DBGARLNK((stderr, "relinkctl_open: Set hdr->relinkctl_shmid to INVALID_SHMID\n"));
@@ -414,8 +407,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			{
 				relinkctl_unlock_exclu(linkctl);
 				relinkctl_unmap(linkctl);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REQRLNKCTLRNDWN, 2,
-						RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
+						linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 			}
 			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
 			hdr->n_records = 0;

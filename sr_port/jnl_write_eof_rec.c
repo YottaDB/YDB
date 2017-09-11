@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,10 +35,11 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 {
 	jnl_private_control	*jpc;
 
-	assert(csa->now_crit);
+	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	jpc = csa->jnl;
 	assert((0 != jpc->pini_addr)
-		|| ((off_t)jpc->jnl_buff->freeaddr > ((off_t)DISK_BLOCK_SIZE * jpc->jnl_buff->filesize) - JNL_FILE_TAIL_PRESERVE));
+		|| ((off_t)jpc->jnl_buff->rsrv_freeaddr
+				> ((off_t)DISK_BLOCK_SIZE * jpc->jnl_buff->filesize) - JNL_FILE_TAIL_PRESERVE));
 	eof_record->prefix.jrec_type = JRT_EOF;
 	eof_record->prefix.forwptr = eof_record->suffix.backptr = EOF_RECLEN;
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
@@ -71,5 +72,5 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 		QWASSIGN(eof_record->jnl_seqno, jgbl.mur_jrec_seqno);
 	eof_record->filler = 0;
 	eof_record->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)eof_record, SIZEOF(struct_jrec_eof));
-	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL, NULL, NULL);
+	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL);
 }

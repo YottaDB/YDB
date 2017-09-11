@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,9 @@
 
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
+
 LITREF mident		zero_ident;
+LITREF mval		literal_notimeout;
 
 error_def(ERR_COMMAORRPAREXP);
 error_def(ERR_JOBACTREF);
@@ -122,15 +125,15 @@ int m_job(void)
 		if (is_timeout)
 		{
 			advancewindow();
-			if (EXPR_FAIL == expr(&timeout, MUMPS_INT))
+			if (EXPR_FAIL == expr(&timeout, MUMPS_EXPR))
 				return FALSE;
 		} else
-			timeout = put_ilit(NO_M_TIMEOUT);
+			timeout = put_lit((mval *)&literal_notimeout);
 	} else
 	{
 		is_timeout = FALSE;
 		plist = put_str((char *)empty_plist,SIZEOF(empty_plist));
-		timeout = put_ilit(NO_M_TIMEOUT);
+		timeout = put_lit((mval *)&literal_notimeout);
 	}
 
 	ref = newtriple(OC_JOB);

@@ -19,6 +19,7 @@
 #include "jnl.h"
 #include "gtmio.h"
 #include "anticipatory_freeze.h"
+#include "is_file_identical.h"
 
 /* For use when disabling journaling in standalone to mark the current journal file as being a prior journal file.
  * The journal file is not always present/usable/writable, in which case we can't change it, so ignore errors.
@@ -57,7 +58,11 @@ void jnl_set_fd_prior(int jnl_fd, sgmnt_addrs* csa, sgmnt_data* csd, jnl_file_he
 		}
 	} else
 		jfh_checked = jfh;
-	if (NULL != jfh_checked)
+	/* Only do an update if we successfully read the journal header and the database file in the journal header matches
+	 * the current database file. A mismatch may occur when working with a database backup on the same machine as the
+	 * original database, as the backup will still point to the original journal file.
+	 */
+	if ((NULL != jfh_checked) && is_file_identical((char *)csa->region->dyn.addr->fname, (char *)jfh_checked->data_file_name))
 	{
 		jfh_checked->is_not_latest_jnl = TRUE;
 		JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jnl_fd, 0, jfh_checked, get_fs_block_size(jnl_fd), status1, status2);

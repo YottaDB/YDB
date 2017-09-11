@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -488,11 +488,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			}
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			{	/* This code will need changes in case the jnl-ver changes from V26 to V27 so add an assert to
+			{	/* This code will need changes in case the jnl-ver changes from V27 to V28 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V26_JNL_VER);
+				assert(JNL_VER_THIS == V27_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -846,7 +846,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 #	endif
 	/* Note that even though we are reopening a fresh connection, we should NOT reset the cached information
 	 * last_rcvd_histinfo, last_valid_histinfo etc. in this case as we might just resume processing from where
-	 * the previous connection left off in which case all the cached information is still valid. If we dont
+	 * the previous connection left off in which case all the cached information is still valid. If we don't
 	 * resume from where we left off, the receiver will anyways error out asking for a rollback to be done so
 	 * the cached information never gets used if it is invalid.
 	 */
@@ -935,7 +935,7 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
-	/* Assert that if we dont know the endianness of the remote side, we assume it is the same endianness */
+	/* Assert that if we don't know the endianness of the remote side, we assume it is the same endianness */
 	assert(remote_side->endianness_known || !remote_side->cross_endian);
 	if (!remote_side->cross_endian)
 	{
@@ -982,11 +982,11 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	assert(remote_side->endianness_known); /* ensure remote_side->cross_endian is reliable */
 	/* If the remote source server is <= V62000 it would have endian converted "need_instinfo_msg" ONLY IF
 	 * src_jnl_ver < rcv_jnl_ver. If remote source server is > V62000 it would have endian converted unconditionally.
-	 * So we dont need to do the endian conversion in either of those cases. The need_instinfo_msg->proto_ver will let
+	 * So we don't need to do the endian conversion in either of those cases. The need_instinfo_msg->proto_ver will let
 	 * us distinguish the > V62000 vs <= V62000 case. But if src version is <= V62000, we cannot easily distinguish what
-	 * the other side's jnl_ver is so we dont know if the source server would have endian converted or not. We work around
+	 * the other side's jnl_ver is so we don't know if the source server would have endian converted or not. We work around
 	 * it by assuming that pids are limited to a max of 2**24 and so the most significant byte of the 4-byte pid should be 0.
-	 * This trick might not work always in case an OS supports > 2**24 pid number (I dont know of any now) OR if both the
+	 * This trick might not work always in case an OS supports > 2**24 pid number (I don't know of any now) OR if both the
 	 * most and least significant bytes of the 4-byte pid are 0, but if it does not, the worst we will see is a) an incorrect
 	 * INSNOTJOINED error issued by the receiver server OR b) an incorrect lms_group_info copied over into the instance file
 	 * (which will soon elicit some other related error). We can address (a) by trying out endian converting again below to
@@ -1015,7 +1015,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Source side is >= V5.5-000 implies -UPDATERESYNC needs a value specified"));
-		assert(FALSE);	/* we dont expect the rts_error to return control */
+		assert(FALSE);	/* we don't expect the rts_error to return control */
 	}
 	/* We usually expect the LMS group info to be non-NULL on both primary and secondary. An exception is if
 	 * both of them are being brought up for the first time using a GT.M version that supports supplementary instances.
@@ -1039,7 +1039,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOSUPPLSUPPL, 4,
 						LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 						LEN_AND_STR((char *)need_instinfo_msg->instname));
-				assert(FALSE);	/* we dont expect the rts_error to return control */
+				assert(FALSE);	/* we don't expect the rts_error to return control */
 			}
 		} else
 		{	/* this supplementary instance was started with -UPDNOTOK. Issue error if source is not supplementary */
@@ -1048,7 +1048,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SUPRCVRNEEDSSUPSRC, 4,
 					LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 					LEN_AND_STR((char *)need_instinfo_msg->instname));
-				assert(FALSE);	/* we dont expect the rts_error to return control */
+				assert(FALSE);	/* we don't expect the rts_error to return control */
 			}
 		}
 	}
@@ -1092,7 +1092,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSNOTJOINED, 4,
 						LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 						LEN_AND_STR((char *)need_instinfo_msg->instname));
-				assert(FALSE);	/* we dont expect the rts_error to return control */
+				assert(FALSE);	/* we don't expect the rts_error to return control */
 			}
 		} else
 		{	/* Primary and Secondary are part of SAME LMS Group. If this instance is supplementary and remote
@@ -1104,7 +1104,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSROLECHANGE, 4,
 						LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 						LEN_AND_STR((char *)need_instinfo_msg->instname));
-				assert(FALSE);	/* we dont expect the rts_error to return control */
+				assert(FALSE);	/* we don't expect the rts_error to return control */
 			}
 		}
 		if (is_rcvr_srvr && recvpool.gtmrecv_local->updateresync
@@ -1161,7 +1161,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		reuse_slot = 0;
 		if (is_rcvr_srvr && recvpool.gtmrecv_local->updateresync && gtmrecv_options.reuse_specified)
 		{	/* If -REUSE was specified, check if instance name specified matches any existing slot.
-			 * If slot has already been found, dont search any more.
+			 * If slot has already been found, don't search any more.
 			 */
 			for (strm_info = strm_start; strm_info < strm_top; strm_info++)
 			{
@@ -1225,7 +1225,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSUNKNOWN, 4,
 						LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 						LEN_AND_STR((char *)need_instinfo_msg->instname));
-				assert(FALSE);	/* we dont expect the rts_error to return control */
+				assert(FALSE);	/* we don't expect the rts_error to return control */
 			}
 			/* Since we did not find the stream in the existing instance file but did find a slot, fill that slot
 			 * while we have the lock on the instance file. This way another -updateresync startup of a receiver
@@ -2195,7 +2195,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						recvpool_ctl->insert_strm_histinfo = FALSE;
 				}
 				/* Now that at least one history record has been written into the receive pool and is guaranteed
-				 * to be written to the instance file (when this gets processed by the update process), dont use
+				 * to be written to the instance file (when this gets processed by the update process), don't use
 				 * -updateresync or -noresync for future handshakes in case the current connection gets reset.
 				 */
 				if (recvpool.gtmrecv_local->updateresync)
@@ -2283,7 +2283,7 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 		offset = REPL_INST_HISTINFO_START + ((histinfo_num) * SIZEOF(repl_histinfo));
 		LSEEKREAD(fd, offset, histinfo, SIZEOF(repl_histinfo), status);
 		if (0 != status)
-		{	/* At this point, we dont have the name of the input instance file used in the -updateresync qualifier.
+		{	/* At this point, we don't have the name of the input instance file used in the -updateresync qualifier.
 			 * So we use a value of "" instead. The fact that the REPLINSTREAD message is preceded by a UPDSYNCINSTFILE
 			 * error indicates to the user it is the -updateresync qualifier where the issue is so it is not a big loss.
 			 */
@@ -2331,7 +2331,7 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_get(int4 index, repl_histinfo *histi
 	offset = REPL_INST_HISTINFO_START + ((index) * SIZEOF(repl_histinfo));
 	LSEEKREAD(fd, offset, histinfo, SIZEOF(repl_histinfo), status);
 	if (0 != status)
-	{	/* At this point, we dont have the name of the input instance file used in the -updateresync qualifier.
+	{	/* At this point, we don't have the name of the input instance file used in the -updateresync qualifier.
 		 * So we use a value of "" instead. The fact that the REPLINSTREAD message is preceded by a UPDSYNCINSTFILE
 		 * error indicates to the user it is the -updateresync qualifier where the issue is so it is not a big loss.
 		 */
@@ -3568,7 +3568,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							recvpool.upd_proc_local->read_jnl_seqno = recvd_jnl_seqno;
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Wrote upd_proc_local->read_jnl_seqno"
 								" : "INT8_FMT" "INT8_FMTX"\n", recvd_jnl_seqno, recvd_jnl_seqno);
-							/* If -NORESYNC was used in receiver startup, we dont want to use it
+							/* If -NORESYNC was used in receiver startup, we don't want to use it
 							 * anymore as future such connections could cause recvpool_ctl->jnl_seqno
 							 * to be reset further backwards and will confuse the update process.
 							 */

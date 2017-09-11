@@ -44,10 +44,7 @@
 #include "eintr_wrappers.h"
 #include "anticipatory_freeze.h"
 #include "error.h"
-
-#ifdef UNIX
 #include "wcs_clean_dbsync.h"
-#endif
 
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
@@ -116,14 +113,16 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 			 * However, if we are already in the tail due to a prior disruption, skip the
 			 * pini/pfin and just write the eof.
 			 */
-			if (jb->freeaddr != jb->end_of_data_at_open)
+			assert(jb->rsrv_freeaddr >= jb->freeaddr);
+			if (jb->rsrv_freeaddr != jb->end_of_data_at_open)
 			{
 				DEBUG_ONLY(jpc->status = SS_NORMAL);
-				in_tail = ((off_t)jb->freeaddr > ((off_t)DISK_BLOCK_SIZE * jb->filesize) - JNL_FILE_TAIL_PRESERVE);
+				in_tail = ((off_t)jb->rsrv_freeaddr
+							> ((off_t)DISK_BLOCK_SIZE * jb->filesize) - JNL_FILE_TAIL_PRESERVE);
 				if ((0 == jpc->pini_addr) && !in_tail)
 				{
-					jnl_put_jrt_pini(csa);
-					jnl_put_jrt_pfin(csa);
+					jnl_write_pini(csa);
+					jnl_write_pfin(csa);
 				}
 				jnl_write_eof_rec(csa, &eof_record);
 			} else
@@ -152,9 +151,16 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during jnl_file_close"),
 				jpc->status);
 		}
-		assert(jb->dskaddr == jb->freeaddr);
-		UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
-		UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
+#		ifdef DEBUG
+		if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+		{
+			assert(jb->rsrv_freeaddr == jb->freeaddr);
+			assert(jb->dskaddr == jb->freeaddr);
+		}
+#		endif
+		jnl_fsync(reg, jb->dskaddr);
+		assert((jb->freeaddr == jb->fsync_dskaddr)
+			|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 		read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
 		assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_base));
 		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
@@ -188,18 +194,16 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
-			UNIX_ONLY(
-				GTM_JNL_FSYNC(csa, jpc->channel, rc);
-				if (-1 == rc)
-				{
-					save_errno = errno;
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
-						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
-					assert(FALSE);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
-						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
-				}
-			)
+			GTM_JNL_FSYNC(csa, jpc->channel, rc);
+			if (-1 == rc)
+			{
+				save_errno = errno;
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
+			}
 		}
 		/* jnl_file_id should be nullified only after the jnl file header has been written to disk.
 		 * Nullifying the jnl_file_id signals that the jnl file has been switched. The replication source server

@@ -15,11 +15,11 @@ pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd i
 	; See the following link for non-authoritative information on the pinentry protocol:
 	; http://info2html.sourceforge.net/cgi-bin/info2html-demo/info2html/info2html?%28pinentry%29Protocol
 	;
-	set $etrap="do error",$zinterrupt=$etrap
+	set $etrap="do error^"_$text(+0),$zinterrupt=$etrap
 	; gtm_passwd is validated as non-null by pinentry-gtm.sh
 	set obfpwd=$zconvert($ztrnlnm("gtm_passwd"),"U"),obfpwdlen=$zlength(obfpwd)
-	; Avoid NOBADCHAR on $PRINCIPAL - must use [io]chset on the OPEN and not USE
-	open $principal:(ichset="M":ochset="M")
+	; Avoid NOBADCHAR on $PRINCIPAL and other functions
+	use $principal:(chset="M") view "NOBADCHAR"
 	; Unmask the password ahead of initiating the pinentry protocol. If the external call is not
 	; available, the error handler is invoked
 	set binobfpwd=""
@@ -29,11 +29,14 @@ pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd i
 	. set binobfpwd=binobfpwd_$zchar(16*msb+lsb)
 	; If unmasking fails, exit
 	do:$&gpgagent.unmaskpwd(binobfpwd,.clrpwds) error
-	use $principal:(exception="goto error")
+	use $principal:(exception="goto error^"_$text(+0))
 	write "OK Your orders please",!
 	for  read in quit:'$zlength(in)  do
-	. if "GETPIN"=$zconvert($zpiece(in," ",1),"U") write "D ",clrpwds,!,"OK",! zhalt 0
-	. else  write "OK",!
+	. if "GETPIN"'=$zconvert($zpiece(in," ",1),"U") write "OK",! quit
+	. write "D "
+	. write clrpwds,!
+	. write "OK",!
+	. zhalt 0
 	; Since this routine only responds to GETPIN, issue an error if it did not receive that command,
 	; letting pinentry-gtm.sh execute the default pinentry
 	zhalt 1
@@ -43,7 +46,8 @@ pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd i
 	; status. Note that the locals are all killed prior to dumping status
 error	kill
 	new $etrap set $etrap="zhalt +$zstatus"
-	set errmsg="%GTM-E-PINENTRYERR, Custom pinentry program failure. "_$zstatus
+	new i,info
+	set errmsg="%GTM-E-PINENTRYERR, Custom pinentry program failure. "_$zstatus_"; from "_$zdirectory
 	if $zsyslog(errmsg)
 	set pinlog=$ztrnlnm("gtm_pinentry_log")
 	if $zlength(pinlog) do
@@ -51,8 +55,11 @@ error	kill
 	. use pinlog
 	. write !,$zdate($horolog,"YYYY/MM/DD 24:60:SS"),errmsg,!
 	. zwrite $zversion,$ecode,$job,$zchset,$zdirectory,$zroutines,$zstatus
-	. write "Stack trace:",! zshow "S"
-	. write "Loaded external calls:",! zshow "C"
+	. write "Stack trace:"
+	. for i=$STACK:-1:0 write !,i,?8 for info="ecode","place","mcode" do
+	. . write ":",info,"=",$zjustify($stack(i,info),18)
+	. write !,"Loaded external calls:",! zshow "C"
+	. write "Device parameters:",! zshow "D"
 	. close pinlog
 	zhalt +$zstatus
 	quit

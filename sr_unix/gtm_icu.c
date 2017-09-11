@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,9 +162,9 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	int4		major_ver, minor_ver;
 	int		i;
 
-	if (NULL == icu_ver_buf)
+	if ((NULL == icu_ver_buf) || (0 == len))
 		return FALSE;	/* empty string */
-	
+
 	/* Deconstruct the two known forms of gtm_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
 	ptr = icu_ver_buf;
 	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
@@ -325,7 +325,8 @@ void gtm_icu_init(void)
 			buflen = 0;
 			/* real_path = /usr/local/lib64/libicuio36.0.a */
 			ptr = basename(real_path);
-			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr);
 			buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
 			ptr = strrchr(buf, '.');
 			strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */

@@ -59,7 +59,7 @@ void mlk_unlock(mlk_pvtblk *p)
 		d = p->nodptr;
 		if (dollar_tlevel)
 		{
-			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}

@@ -40,7 +40,8 @@
 #define FAKE_DIRTY		((trans_num)(-1))
 #define SEND_MSG_CSA(...)	send_msg_csa(CSA_ARG(csa) __VA_ARGS__)	/* to avoid formatting various send_msg calls */
 
-GBLREF 	uint4			process_id;
+GBLREF 	uint4		process_id;
+GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_DBADDRALIGN);
 error_def(ERR_DBADDRANGE);
@@ -69,12 +70,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
         ssize_t			offset ;
         trans_num 		max_tn, tmp_8byte;
 	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
-	sm_uc_ptr_t		bptmp;
-	boolean_t		asyncio, ret;
+	sm_uc_ptr_t		bptmp, bp_bmp;
+	boolean_t		asyncio, do_cert_blk, ret;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	cache_rec_ptr_t		cr, cr0, cr_tmp, cr_tmp2, cr_prev, cr_hi, cr_lo, cr_qbase;
+	cache_rec_ptr_t		cr, cr0, cr_bmp, cr_tmp, cr_tmp2, cr_prev, cr_hi, cr_lo, cr_qbase;
 	bt_rec_ptr_t		bt, bt0, bt_prev, bt_hi, bt_lo;
 	th_rec_ptr_t		th, th_prev;
 	cache_que_head_ptr_t	que_head;
@@ -85,7 +86,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	boolean_t		(*blkque_array)[] = NULL; /* TRUE indicates we saw the cr or bt of that array index */
 	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
-	int4			in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
+	int4			bml_status, in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
+	block_id		curbmp;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 #	ifdef DEBUG
 	mval			rand_lru;
 #	endif
@@ -201,22 +205,25 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	}
 	if (JNL_ALLOWED(csd))
 	{
-		if (NULL == csa->jnl)
+		jpc = csa->jnl;
+		jbp = NULL;
+		if (NULL == jpc)
 			SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				RTS_ERROR_TEXT("csa->jnl"), csa->jnl, (UINTPTR_T)-1);
-		else if (NULL == csa->jnl->jnl_buff)
+		else if (NULL == (jbp = jpc->jnl_buff))
 			SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
-					RTS_ERROR_TEXT("csa->jnl->jnl_buff"), csa->jnl->jnl_buff, (UINTPTR_T)-1);
+					RTS_ERROR_TEXT("csa->jnl->jnl_buff"), jbp, (UINTPTR_T)-1);
 		else
 		{
 			jnl_buff_expected = ((sm_uc_ptr_t)(cnl) + NODE_LOCAL_SPACE(csd) + JNL_NAME_EXP_SIZE);
-			if (csa->jnl->jnl_buff != (jnl_buffer_ptr_t)jnl_buff_expected)
+			if (jbp != (jnl_buffer_ptr_t)jnl_buff_expected)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
-					RTS_ERROR_TEXT("csa->jnl->jnl_buff_expected"), csa->jnl->jnl_buff, jnl_buff_expected);
-				csa->jnl->jnl_buff = (jnl_buffer_ptr_t)jnl_buff_expected;
+					RTS_ERROR_TEXT("csa->jnl->jnl_buff_expected"), jbp, jnl_buff_expected);
+				jbp = (jnl_buffer_ptr_t)jnl_buff_expected;
+				jpc->jnl_buff = jbp;
 			}
 		}
 	}
@@ -264,17 +271,17 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					in_wtstart, 0);
 				assert(expect_damage);
 				cnl->in_wtstart = 0;
-				csa->in_wtstart = FALSE; /* To allow wcs_wtstart() after wcs_recover() */
+				csa->in_wtstart = FALSE; /* To allow "wcs_wtstart" after "wcs_recover" */
 			}
 			intent_wtstart = cnl->intent_wtstart;
 			if (0 != intent_wtstart)
 			{	/* Two situations are possible.
-				 *	a) A wcs_wtstart() call is concurrently in progress and that the process has just now
+				 *	a) A "wcs_wtstart" call is concurrently in progress and that the process has just now
 				 *		incremented intent_wtstart. It will notice cnl->wc_blocked to be TRUE and
 				 *		decrement intent_wtstart right away and return. So we don't need to do anything.
-				 *	b) A wcs_wtstart() call had previously increment intent_wtstart but got shot before it could
-				 *		get a chance to decrement the field. In this case, we need to clear the field to
-				 *		recover from this situation.
+				 *	b) A "wcs_wtstart" call had previously increment intent_wtstart but got shot before it
+				 *		could get a chance to decrement the field. In this case, we need to clear the
+				 *		field to recover from this situation.
 				 *	Since the writer uses the DECR_INTENT_WTSTART macro which does not do DECR_CNTs if the value
 				 *	is already 0, it is okay to do the decrement even in case (a). There is a very small window
 				 *	that still exists. If the DECR_INTENT_WTSTART macro did the > 0 check when the field was
@@ -644,25 +651,58 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
 						cr, cr->blk, RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0, CALLFROM);
 				}
-			} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover && (CR_BLKEMPTY != cr->blk)
-				&& !cr->data_invalid
-				&& (!IS_BITMAP_BLK(cr->blk) || (0 == cr->twin) || (0 != cr->bt_index)))
+			} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover
+						&& (CR_BLKEMPTY != cr->blk) && !cr->data_invalid)
 			{	/* If the buffer is not being read into currently (checked both by cr->r_epid being 0 and
 				 * cr->read_in_progress being -1) and we are being called from DSE CACHE -VERIFY and cr points
-				 * to a valid non-empty block, check the content of cr->buffaddr through a cert_blk().
-				 * If it is a bitmap block, we could have twins so do check only on newtest twin as
-				 * older twin could have an incorrect masterbitmap full/free status (DBBMMSTR error).
-				 * Use "bp" as the buffer as cr->buffaddr might be detected as corrupt by the buffaddr checks
-				 * above. The reason why the cert_blk() is done only from a DSE CACHE -VERIFY call and not from a
-				 * wcs_recover() call is that wcs_recover() is supposed to check the integrity of the data
+				 * to a valid non-empty block, check the content of cr->buffaddr through a "cert_blk".
+				 * The reason why the "cert_blk" is done only from a DSE CACHE -VERIFY call and not from a
+				 * "wcs_recover" call is that "wcs_recover" is supposed to check the integrity of the data
 				 * structures in the cache and not the integrity of the data (global buffers) in the cache. If the
-				 * database has an integrity error, a global buffer will fail cert_blk() but the cache structures
-				 * as such are not damaged. wcs_recover() should not return failure in that case.
+				 * database has an integrity error, a global buffer will fail "cert_blk" but the cache structures
+				 * as such are not damaged. "wcs_recover" should not return failure in that case.
+				 */
+				/* Use "bp" to derive the buffer as cr->buffaddr might have been detected as corrupt
+				 * by the buffaddr checks above.
 				 */
 				bptmp = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, bp);
-				if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, FALSE, NULL))
+				if (!IS_BITMAP_BLK(cr->blk))
+				{	/* Note that it is possible a FREE/REUSABLE block was brought from disk in to the cache
+					 * by "t_qread" due to restartable circumstances (e.g. a process read the wrong child
+					 * block # while traversing an index block). In that case, this block would have a header
+					 * of all 0's and "cert_blk" would issue a DBBSIZMN error. So skip the "cert_blk".
+					 * We check the FREE status by examining the bitmap block if it is in the cache already.
+					 * If not, we examine the block-header for all 0's and if so assume it is a FREE block.
+					 */
+					curbmp = ROUND_DOWN2(cr->blk, BLKS_PER_LMAP);
+					cs_addrs = csa;		/* needed by "db_csh_get" so temporarily set global variable */
+					cr_bmp = db_csh_get(curbmp);
+					csa = cs_addrs;		/* undo temporary global variable set */
+					if (((cache_rec_ptr_t)CR_NOTVALID != cr_bmp) && (NULL != cr_bmp))
+					{
+						bp_bmp = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr_bmp->buffaddr);
+						GET_BM_STATUS(bp_bmp, (cr->blk - curbmp), bml_status);
+						do_cert_blk = (BLK_BUSY == bml_status);
+					} else
+					{	/* We do the all 0's check by checking TWO 8-byte values in the 16-byte blk header.
+						 * The asserts below ensure we adjust the below code if/ever the block header
+						 * size changes.
+						 */
+						assert(16 == SIZEOF(blk_hdr));
+						assert(8 == SIZEOF(tmp_8byte));
+						tmp_8byte = ((trans_num *)bptmp)[0];
+						if (!tmp_8byte)
+							tmp_8byte = ((trans_num *)bptmp)[1];
+						do_cert_blk = (0 != tmp_8byte);
+					}
+				} else
+				{	/* If it is a bitmap block, we could have twins so do check only on newtest twin as
+					 * older twin could have an incorrect master-bitmap full/free status (DBBMMSTR error).
+					 */
+					do_cert_blk = ((0 == cr->twin) || (0 != cr->bt_index));
+				}
+				if (do_cert_blk && !cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, FALSE, NULL))
 				{
-					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
 						cr, cr->blk, RTS_ERROR_TEXT("Block certification result"),
@@ -670,6 +710,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("Block certification result buffer"),
 						bptmp, csa->lock_addrs[0], CALLFROM);
+					assert(expect_damage);
 				}
 			}
 			if (0 != cr->in_cw_set)
@@ -679,17 +720,15 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
 					cr, cr->blk, RTS_ERROR_TEXT("cr->in_cw_set"), (uint4)cr->in_cw_set, 0, CALLFROM);
 			}
-			assert(!JNL_ALLOWED(csd) || (NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff));
+			assert(!JNL_ALLOWED(csd) || (NULL != jpc) && (NULL != jbp));
 			if (JNL_ENABLED(csd))
 			{
-				if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff)
-					&& (0 != cr->dirty) && (cr->jnl_addr > csa->jnl->jnl_buff->freeaddr))
+				if ((0 != cr->dirty) && (cr->jnl_addr > jbp->rsrv_freeaddr))
 				{
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg), cr, cr->blk,
-						(uint4)cr->jnl_addr, RTS_ERROR_TEXT("cr->jnl_addr"), 0,
-						csa->jnl->jnl_buff->freeaddr);
+						(uint4)cr->jnl_addr, RTS_ERROR_TEXT("cr->jnl_addr"), 0, jbp->rsrv_freeaddr);
 				}
 			} else if (!JNL_ALLOWED(csd) && (cr->jnl_addr != 0))
 			{
@@ -823,7 +862,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets, CALLFROM);
 					if (caller_is_wcs_recover && !cr->stopped)
-					{	/* if cr->stopped is TRUE, then the buffer was created by secshr_db_clnup(),
+					{	/* if cr->stopped is TRUE, then the buffer was created by "secshr_db_clnup",
 						 * and hence it is ok to have different hash value, but otherwise we believe
 						 * the hash value and consider cr->blk to be invalid and hence make this buffer
 						 * empty
@@ -840,10 +879,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						 * better to copy this buffer into another area in shared-memory dedicated to
 						 * holding such information so a later DSE session can then dump the information.
 						 *
-						 * Ideally, it should be wcs_recover() that fixes the cache-record, but then the
+						 * Ideally, it should be "wcs_recover" that fixes the cache-record, but then the
 						 * blk_que traversing logic has to be redone there in order to determine this
 						 * disparity in the hash value. To avoid that we reset cr->blk here itself but
-						 * do it only if called from wcs_recover().
+						 * do it only if called from "wcs_recover".
 						 */
 						assert(expect_damage);
 						cr->blk = CR_BLKEMPTY;

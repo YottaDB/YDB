@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,18 +123,10 @@ error_def(ERR_TEXT);
 													\
 	if (NULL != jnlpool.jnlpool_ctl)								\
 	{												\
- 		JNLPOOL_SHMDT(status, save_errno);							\
+ 		JNLPOOL_SHMDT(jnlpool, status, save_errno);						\
  		if (0 > status)										\
  			RTS_ERROR_OR_GTM_PUTMSG(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,		\
 				RTS_ERROR_LITERAL("Could not detach from journal pool"), save_errno);	\
-		jnlpool_ctl = NULL;									\
-		jnlpool.jnlpool_ctl = NULL;								\
-		jnlpool.repl_inst_filehdr = NULL;							\
-		jnlpool.gtmsrc_lcl_array = NULL;							\
-		jnlpool.gtmsource_local_array = NULL;							\
-		jnlpool.jnldata_base = NULL;								\
-		jnlpool.jnlpool_dummy_reg->open = FALSE;						\
-		pool_init = FALSE;									\
 	}												\
 }
 
@@ -191,8 +183,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	jnlpool_ctl_ptr_t	tmp_jnlpool_ctl;
 	struct sembuf   	sop[3];
 	uint4           	sopcnt;
-	DEBUG_ONLY(int4		semval;)
-	DEBUG_ONLY(boolean_t	sem_created = FALSE;)
+	DEBUG_ONLY(int4		semval);
+	DEBUG_ONLY(boolean_t	sem_created = FALSE);
+	DEBUG_ONLY(int		i);
+	DEBUG_ONLY(char 	*ptr);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -445,7 +439,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		save_errno = errno;
 		DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
-		/* Assert below ensures we dont try to clean up the journal pool even though we errored out while attaching to it */
+		/* Assert below ensures we don't try to clean up journal pool even though we errored out while attaching to it */
 		assert(NULL == jnlpool.jnlpool_ctl);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
@@ -496,12 +490,18 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 * journal pool.
 	 */
 	assert(MERRORS_ARRAY_SZ > merrors_ctl.msg_cnt);
-	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE); /* secshr_db_clnup uses this
-												    * relationship */
+	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE);
+	assert(jnlpool.jnlpool_ctl == REPLCSA2JPL(csa));	/* secshr_db_clnup uses this relationship */
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
 	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + SIZEOF(mutex_spin_parms_struct));
+#	ifdef DEBUG
 	if (new_ipc)
-		memset(csa->nl, 0, SIZEOF(node_local)); /* Make csa->nl->glob_sec_init FALSE */
+	{	/* We allocated shared storage -- "shmget" ensures it is null initialized. Assert that. */
+		ptr = (char *)csa->nl;
+		for (i = 0; i < SIZEOF(*csa->nl); i++)
+			assert('\0' == ptr[i]);
+	}
+#	endif
 	csa->now_crit = FALSE;
 	csa->onln_rlbk_cycle = jnlpool.jnlpool_ctl->onln_rlbk_cycle; /* Take a copy of the latest onln_rlbk_cycle */
 	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SIZE);
@@ -665,7 +665,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						reset_gtmsrclcl_info = FALSE;
 					} else if (!gtmsource_options.needrestart && !gtmsource_options.showbacklog
 							&& !gtmsource_options.checkhealth)
-					{	/* If NEEDRESTART, we dont care if the source server is alive or not. All that
+					{	/* If NEEDRESTART, we don't care if the source server is alive or not. All that
 						 * we care about is if the primary and secondary did communicate or not. That
 						 * will be determined in gtmsource_needrestart.c. Do not trigger an error here.
 						 * If SHOWBACKLOG or CHECKHEALTH, do not trigger an error as slot was found
@@ -780,6 +780,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	if (!new_ipc)
 	{	/* We did not create shm or sem so no need to remove any of them for any "rts_error" within this IF */
 		assert(!STRCMP(repl_instance.inst_info.this_instname, jnlpool.repl_inst_filehdr->inst_info.this_instname));
+		/* Source Server restart - attempt to install custom errors if not installed before */
+		if (gtmsource_startup && (!jnlpool_ctl->instfreeze_environ_inited) && CUSTOM_ERRORS_AVAILABLE
+				&& !init_anticipatory_freeze_errors())
+		{
+			ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error initializing custom errors"));
+		}
 		/* Check compatibility of caller source server or receiver server command with the current state of journal pool */
 		if (!jnlpool.jnlpool_ctl->upd_disabled)
 		{
@@ -816,7 +824,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				{	/* ACTIVATE was specified. Check if there is a receiver server OR update process
 					 * attached to the journal pool. If so we cannot allow the ACTIVATE (issue ACTIVATEFAIL
 					 * error). Those have to be shut down before the instance can be activated. In addition,
-					 * disallow an in-progress receiver server startup command. This is because we dont want
+					 * disallow an in-progress receiver server startup command. This is because we don't want
 					 * the activate to sneak in between the jnlpool_init and recvpool_init calls done by the
 					 * receiver server startup command creating a confusing situation (because the receiver
 					 * will be ready to play updates as if this is a secondary but an active source server
@@ -852,7 +860,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			}
 		} else if ((GTMRECEIVE == pool_user) && gtmrecv_options.start)
 		{	/* This is a receiver server startup command. Increment RECV_SERV_STARTUP_SEM semaphore for
-			 * a later source server activate command to know this command is in progress. We dont do
+			 * a later source server activate command to know this command is in progress. We don't do
 			 * a corresponding decr_sem later but rely on the OS doing it when the receiver startup command
 			 * exits (due to the SEM_UNDO done inside incr_sem).
 			 */
@@ -894,10 +902,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		jnlpool_ctl->jnldata_base_off = JNLDATA_BASE_OFF;
 		jnlpool_ctl->jnlpool_size = gtmsource_options.buffsize - jnlpool_ctl->jnldata_base_off;
 		assert((jnlpool_ctl->jnlpool_size & ~JNL_WRT_END_MASK) == 0);
-		jnlpool_ctl->write = 0;
 		jnlpool_ctl->lastwrite_len = 0;
-		QWASSIGNDW(jnlpool_ctl->early_write_addr, 0);
-		QWASSIGNDW(jnlpool_ctl->write_addr, 0);
+		jnlpool_ctl->write_addr = 0;
+		jnlpool_ctl->rsrv_write_addr = 0;
 		if (0 < jnlpool.repl_inst_filehdr->num_histinfo)
 		{
 			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
@@ -948,6 +955,18 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
 					/* ensure that the pool identifier is at the top of the pool */
 		jnlpool_ctl->jnlpool_id.pool_type = JNLPOOL_SEGMENT;
+		SET_LATCH_GLOBAL(&jnlpool_ctl->phase2_commit_latch, LOCK_AVAILABLE);
+		jnlpool_ctl->phase2_commit_index1 = jnlpool_ctl->phase2_commit_index2 = 0;
+		/* The below value of "tot_jrec_len == 0" is relied upon by "mutex_salvage" of jnlpool in case the
+		 * jnlpool is created, a process goes to t_end and gets killed and salvage happens right afterwards.
+		 * The salvage logic needs to set jnlpool_ctl->lastwrite_len correctly and for that it needs to
+		 * go one previous entry in the phase2_commit_array. "shmget()" guarantees this by initializing
+		 * all of shm to 0 at startup.
+		 */
+		assert(0 == jnlpool_ctl->phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE - 1].process_id);
+		assert(0 == jnlpool_ctl->phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE - 1].start_write_addr);
+		assert(0 == jnlpool_ctl->phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE - 1].tot_jrec_len);
+		assert(0 == jnlpool_ctl->phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE - 1].jnl_seqno);
 		csa->nl->glob_sec_init = TRUE;
 		assert(NULL != jnlpool_creator);
 		*jnlpool_creator = TRUE;

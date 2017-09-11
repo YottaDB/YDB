@@ -305,7 +305,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->recordsize = recordsize;
 				rm_ptr->def_recsize = FALSE;
 				/* for sequential device in fixed M mode, recordsize defines initial width */
-				if (dev_open != iod->state && rm_ptr->fixed && (!rm_ptr->fifo && !rm_ptr->pipe) &&
+				if (dev_open != iod->state && rm_ptr->fixed && (!rm_ptr->fifo && !rm_ptr->is_pipe) &&
 				    (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)))
 					iod->width = recordsize;
 			}
@@ -324,7 +324,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_rewind:
 			if ((FALSE == outdevparam) && (io_std_device.out == iod))
 				break;
-			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->pipe)
+			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->is_pipe)
 			{
 				if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 				{
@@ -383,7 +383,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			/* truncate if not a fifo and not a pipe and (it is a non-split device or this is the
 			 * output side of a split device)
 			 */
-			if (!rm_ptr->fifo && !rm_ptr->pipe && ((iod->pair.in == iod->pair.out) || (io_std_device.out == iod)))
+			if (!rm_ptr->fifo && !rm_ptr->is_pipe && ((iod->pair.in == iod->pair.out) || (io_std_device.out == iod)))
 			{
 				int ftruncate_res;
 				int fc_res;
@@ -668,11 +668,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_follow:
-			if (!rm_ptr->fifo && !rm_ptr->pipe)
+			if (!rm_ptr->fifo && !rm_ptr->is_pipe)
 				rm_ptr->follow = TRUE;
 			break;
 		case iop_nofollow:
-			if (!rm_ptr->fifo && !rm_ptr->pipe)
+			if (!rm_ptr->fifo && !rm_ptr->is_pipe)
 				rm_ptr->follow = FALSE;
 			break;
 		case iop_outseek:
@@ -690,7 +690,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			if ((FALSE == outdevparam) && (io_std_device.out == iod))
 				break;
 			seek_specified = TRUE;
-			if (!rm_ptr->fifo && !rm_ptr->pipe)
+			if (!rm_ptr->fifo && !rm_ptr->is_pipe)
 			{
 				/* need to do FSTAT_FILE to get file size if not already done */
 				FSTAT_CHECK(FALSE);
@@ -719,7 +719,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					 * file is not empty, and not writeonly, and encryption is not in effect, then go to the
 					 * beginning of the file and read the potential BOM.
 					 */
-					if ((!rm_ptr->bom_checked) && (!rm_ptr->no_destroy) && (!rm_ptr->fifo) && (!rm_ptr->pipe)
+					if ((!rm_ptr->bom_checked) && (!rm_ptr->no_destroy) && (!rm_ptr->fifo) && (!rm_ptr->is_pipe)
 					    && (!rm_ptr->input_encrypted) && (2 < rm_ptr->fildes) && (0 < statbuf.st_size)
 					    && IS_UTF_CHSET(iod->ichset) && !rm_ptr->write_only)
 					{

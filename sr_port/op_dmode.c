@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +27,7 @@
 #include "jnl.h"
 #include "indir_enum.h"
 #include "io.h"
-#ifdef UNIX
 #include "iottdef.h"
-#endif
 #include "iotimer.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
@@ -46,7 +45,7 @@
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
 
-#define	DIRECTMODESTR	"Entering DIRECT MODE - TP RESTART will fail"
+#define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	io_pair		io_curr_device;
@@ -55,21 +54,21 @@ GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*restart_pc;
 GBLREF	unsigned char	*restart_ctxt;
 
+LITREF	mval		literal_notimeout;
+
 error_def(ERR_NOTPRINCIO);
 error_def(ERR_NOPRINCIO);
 
 void	op_dmode(void)
 {
-	gd_region	*save_reg;
-	mval		prompt, dummy, *input_line;
-	static io_pair	save_device;
-	static bool	dmode_intruptd;
-#	ifdef UNIX
-	static int	loop_cnt = 0;
-	static int	old_errno = 0;
-	d_tt_struct	*tt_ptr;
-#	endif
-	static bool	kill = FALSE;
+	d_tt_struct		*tt_ptr;
+	gd_region		*save_re;
+	mval			prompt, dummy, *input_line;
+	static boolean_t	dmode_intruptd;
+	static boolean_t	kill = FALSE;
+	static int		loop_cnt = 0;
+	static int		old_errno = 0;
+	static io_pair		save_device;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -93,19 +92,16 @@ void	op_dmode(void)
 	/* The following code avoids an infinite loop on UNIX systems when there is an error in writing to the principal device
 	 * resulting in a call to the condition handler and an eventual return to this location
 	 */
-#	ifdef UNIX
 	if ((loop_cnt > 0) && (errno == old_errno))
 	{	/* Tried and failed 2x to write to principal device */
 		kill = TRUE;
-		send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
-		rts_error(VARLSTCNT(1) ERR_NOPRINCIO);
+		send_msg_csa(NULL, VARLSTCNT(1) ERR_NOPRINCIO);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_NOPRINCIO);
 	}
 	++loop_cnt;
 	old_errno = errno;
-#	endif
 	*((INTPTR_T **)&restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
 	*((INTPTR_T **)&restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
-#	ifdef UNIX
 	loop_cnt = 0;
 	old_errno = 0;
 	if (tt == io_curr_device.in->type)
@@ -113,7 +109,6 @@ void	op_dmode(void)
 	else
 		tt_ptr = NULL;
 	if (!tt_ptr || !tt_ptr->mupintr)
-#	endif
 		op_wteol(1);
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
@@ -123,7 +118,7 @@ void	op_dmode(void)
 		prompt.mvtype = MV_STR;
 		prompt.str = TREF(gtmprompt);
 		op_write(&prompt);
-		op_read(input_line, NO_M_TIMEOUT);
+		op_read(input_line, (mval *)&literal_notimeout);
 	}
 	op_wteol(1);
 	io_curr_device = save_device;

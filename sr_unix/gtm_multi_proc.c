@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2016 Fidelity National Information	*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@
 #include "tp.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "init_secshr_addrs.h"
 #include "mutex.h"
 
 #ifdef DEBUG
@@ -214,8 +213,22 @@ int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 				return -1;
 			}
 			if (0 == child_pid)
-			{	/* The child process should operate as a regular process so re-enable interrupts */
+			{	/* The child process should operate as a regular process so re-enable interrupts.
+				 * But before that, set "process_id" to a value different from the parent
+				 * as the ENABLE_INTERRUPTS macro could end up calling
+				 * deferred_signal_handler -> forced_exit_err_display -> gtm_putmsg_csa -> grab_latch
+				 * and grab_latch would fail an assert otherwise.
+				 */
+				getjobnum();    /* set "process_id" to a value different from parent */
+				/* Skip exit handler, as otherwise we would reduce reference counts in database
+				 * shared memory etc. for each forked off process when they go to gds_rundown when
+				 * actually they did not do any db_init (they inherited the db from the parent).
+				 * Do it here instead of in the helper in case enabling interrupts causes us to exit.
+				 */
+				skip_exit_handler = TRUE;
+				DEBUG_ONLY(multi_proc_key_exception = TRUE);	/* Allow error messages without a key */
 				ENABLE_INTERRUPTS(INTRPT_IN_GTM_MULTI_PROC, prev_intrpt_state);
+				DEBUG_ONLY(multi_proc_key_exception = FALSE);
 				gtm_multi_proc_helper();	/* Note: does not return */
 			}
 			mp_hdr->pid[tasknum] = child_pid;
@@ -240,17 +253,10 @@ void	gtm_multi_proc_helper(void)
 	gtm_multi_proc_fnptr_t	fnptr;
 	boolean_t		release_latch;
 
-	getjobnum();    /* set "process_id" to a value different from parent */
 #	ifdef MUR_DEBUG
 	fprintf(stderr, "pid = %d : Started\n", process_id);
 #	endif
-	skip_exit_handler = TRUE;	/* as otherwise we would reduce reference counts in database shared memory etc. for each
-					 * forked off process when they go to gds_rundown when actually they did not do any
-					 * db_init (they inherited the db from the parent).
-					 */
 	/* Do process-level reinitialization of a few things (see gtmrecv.c, gtmsource.c for example usage) */
-	/* Reinvoke secshr related initialization with the child's pid */
-	INVOKE_INIT_SECSHR_ADDRS;
 	/* Re-initialize mutex socket, memory semaphore etc. with child's pid if already done by parent */
 	if (mutex_per_process_init_pid)
 	{
@@ -329,7 +335,7 @@ int	gtm_multi_proc_finish(gtm_multi_proc_fnptr_t finish_fnptr)
 		num_pids_to_wait++;
 	}
 	assert(num_pids_to_wait == max_procs);
-	/* It is possible the child pids terminate in an arbitrary order. In that case, we dont want to be
+	/* It is possible the child pids terminate in an arbitrary order. In that case, we don't want to be
 	 * stuck doing a WAITPID of the first pid when the second pid has finished since it is possible the
 	 * second pid terminated abnormally (e.g. holding a latch) and until we do the WAITPID for that pid
 	 * it would be a defunct pid and "is_proc_alive" calls from the first pid will return the second pid

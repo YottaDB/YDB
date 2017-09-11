@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,6 @@
 #include "buddy_list.h"
 #include "hashtab_int4.h"
 #include "tp.h"
-#include "init_secshr_addrs.h"
 #include "fork_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
@@ -172,7 +171,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
 	/* Preallocate some timer blocks. */
 	prealloc_gt_timers();

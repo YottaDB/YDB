@@ -1,7 +1,7 @@
 #!/bin/sh -
 #################################################################
 #                                                               #
-# Copyright (c) 2014-2015 Fidelity National Information 	#
+# Copyright (c) 2014-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -136,6 +136,17 @@ mktmpdir()
         *) tmpdirname=`mktemp -d` ;;
     esac
     echo $tmpdirname
+}
+
+read_yes_no()
+{
+	read resp
+	response=`echo $resp | tr '[a-z]' '[A-Z]'`
+	if [ "Y" = $response -o "YES" = $response ] ; then
+		echo "yes"
+	else
+		echo "no"
+	fi
 }
 
 # Defaults that can be over-ridden by command line options to follow
@@ -408,6 +419,49 @@ fi
 if [ -z "$gtm_installdir" ] ; then gtm_installdir=/usr/lib/fis-gtm/${gtm_version}_${gtm_install_flavor} ; fi
 if [ -d "$gtm_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
     echo $gtm_installdir exists and --overwrite-existing not specified ; err_exit
+fi
+
+issystemd=`which systemctl`
+if [ "" != "$issystemd" ] ; then
+	# It is a systemd installation
+	logindconf="/etc/systemd/logind.conf"
+	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`
+	if [ "no" != "$removeipcopt" ] ; then
+		# RemoveIPC=no is NOT the final settings in the file
+		ipcissue1="If RemoveIPC=yes is configured for systemd, ipcs (database shm & sem)"
+		ipcissue1="$ipcissue1 are removed for a non-system user's processes when that user logs out."
+		ipcissue2="That can cause database operations to fail with mysterious errors."
+
+		ipcline1="# GT.M : Override systemd default of RemoveIPC=yes to prevent automatic ipc removal of"
+		ipcline1="$ipcline1 Shared Memory Segments and Semaphore Arrays of orphaned databases"
+		ipcline2="RemoveIPC=no"
+		ipccmd="systemctl restart systemd-logind"
+
+		echo "$ipcissue1"
+		echo "$ipcissue2"
+		echo "The installation would like to add the below two lines to $logindconf"
+		echo "   $ipcline1"
+		echo "   $ipcline2"
+		echo "And issue the below command to restart systemd-logind"
+		echo "   $ipccmd"
+		echo -n "Do you wish to proceed (Y/N)? "
+		answer=`read_yes_no`
+		if [ "yes" != "$answer" ] ; then
+			echo "Will abort installation"
+			echo $ipcissue1
+			echo $ipcissue2
+			echo "Please add the below two lines to $logindconf"
+			echo "   $ipcline1"
+			echo "   $ipcline2"
+			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
+			echo "   $ipccmd"
+			echo "and retry GT.M installation"
+			exit 1
+		fi
+		echo $ipcline1 >> $logindconf
+		echo $ipcline2 >> $logindconf
+		$ipccmd
+	fi
 fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning defaults ; dump_info ; fi
 

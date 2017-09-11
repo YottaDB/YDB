@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,18 +91,19 @@ MBSTART {													\
 #define	GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(CTL, CSA)									\
 MBSTART {														\
 	boolean_t		flush_done;										\
-	uint4			dskaddr, freeaddr, saved_jpc_cycle;							\
+	uint4			dskaddr, freeaddr, rsrv_freeaddr, saved_jpc_cycle;					\
 	jnl_private_control	*jpc;											\
 	int			rc;											\
 															\
 	jpc = CSA->jnl;													\
 	saved_jpc_cycle = jpc->cycle; /* remember current cycle */							\
-	DO_JNL_FLUSH_IF_POSSIBLE(CTL->reg, CSA, flush_done, dskaddr, freeaddr);						\
+	DO_JNL_FLUSH_IF_POSSIBLE(CTL->reg, CSA, flush_done, dskaddr, freeaddr, rsrv_freeaddr);				\
 	if (flush_done)													\
 	{	/* Source server did a flush. Log that event for debugging purposes */					\
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_INFO : Source server did flush of journal file %s "	\
-			"state %s : seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x]\n", CTL->jnl_fn,			\
-			jnl_file_state_lit[CTL->file_state], CTL->seqno, CTL->seqno, dskaddr, freeaddr);		\
+			"state %s : seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x rsrv_freeaddr 0x%x]\n",		\
+			CTL->jnl_fn, jnl_file_state_lit[CTL->file_state], CTL->seqno, CTL->seqno,			\
+			dskaddr, freeaddr, rsrv_freeaddr);								\
 		/* Since "flush_done" is TRUE, it means the source server has done a "jnl_ensure_open" inside the	\
 		 * DO_JNL_FLUSH_IF_POSSIBLE macro and has opened the journal file. It already has a copy of the fd in	\
 		 * ctl->repl_buff->fc->fd which it uses to read the journal file. Now that the jnl_flush (rare event)	\
@@ -416,7 +417,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	/* Note that at this point, journaling might have been turned OFF (e.g. REPL_WAS_ON state) in which case
 	 * JNL_GDID_PTR(csa) would have been nullified by jnl_file_lost. Therefore comparing with that is not a good idea
 	 * to use the "id" to check if the journal file remains same (this was done previously). Instead use the ID of
-	 * the current reg_ctl_end and the NAME of the newly opened journal file. Because we dont have crit, we cannot
+	 * the current reg_ctl_end and the NAME of the newly opened journal file. Because we don't have crit, we cannot
 	 * safely read the journal file name from the file header therefore we invoke repl_ctl_create unconditionally
 	 * (that has safety protections for crit) and use the new_ctl that it returns to access the journal file name
 	 * returned and use that for the ID to NAME comparison.
@@ -737,11 +738,12 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(ctl, csa); /* See if a "jnl_flush" might help nudge */
 				if (0 == (wait_for_jnl % LOG_WAIT_FOR_JNL_RECS_PERIOD))
 				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for "
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for"
 						" journal record(s) to be written to journal file %s while attempting to read "
-						"seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x]. Check for problems with "
-						"journaling\n", wait_for_jnl / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
-						csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
+						"seqno %llu [0x%llx]. [dskaddr 0x%x freeaddr 0x%x rsrv_freeaddr 0x%x]."
+						" Check for problems with journaling\n", wait_for_jnl / 1000, ctl->jnl_fn,
+						ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+						csa->jnl->jnl_buff->freeaddr, csa->jnl->jnl_buff->rsrv_freeaddr);
 				}
 			} else
 			{
@@ -1049,9 +1051,10 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %u seconds for journal "
 					"record(s) to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
-					"[dskaddr 0x%x freeaddr 0x%x]. Check for problems with journaling\n",
+					"[dskaddr 0x%x freeaddr 0x%x rsrv_freeaddr 0x%x]. Check for problems with journaling\n",
 					total_wait_for_jnl_recs / 1000, ctl->jnl_fn, ctl->seqno, ctl->seqno,
-					csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr);
+					csa->jnl->jnl_buff->dskaddr, csa->jnl->jnl_buff->freeaddr,
+					csa->jnl->jnl_buff->rsrv_freeaddr);
 			}
 		} else
 		{
@@ -1370,12 +1373,21 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 			/* Since we know that read_seqno is LESSER than ctl->max_seqno, we know for sure we should not return
 			 * this function with found = TR_NOT_FOUND. If ever the binary/linear search invocation at the end of
 			 * this function returns with TR_NOT_FOUND, we have to change that to TR_WILL_NOT_BE_FOUND and also
-			 * adjust ctl->seqno to point to ctl->max_seqno that way we dont repeat binary search (wastefully) for
+			 * adjust ctl->seqno to point to ctl->max_seqno that way we don't repeat binary search (wastefully) for
 			 * all seqnos between read_seqno and the least seqno larger than read_seqno in this file.
 			 */
 			willnotbefound_addr = hi_addr;
 			assert(ctl->max_seqno_dskaddr < rb->fc->eof_addr);
 			willnotbefound_stop_at = rb->fc->eof_addr;
+			if (lo_addr == hi_addr)
+			{	/* Since hi_addr corresponds to ctl->max_seqno which is in turn > read_seqno, the above
+				 * "if" check succeeding implies we can never find read_seqno here. So skip calling
+				 * "do_binary_search" in that case as that and "do_linear_search" have asserts that expect
+				 * callers to never invoke them with the same value of lo_addr and hi_addr.
+				 */
+				found = TR_NOT_FOUND;
+				srch_func = NULL;
+			}
 		} else if (read_seqno == ctl->max_seqno)
 		{	/* For read_seqno == ctl->max_seqno, do not use linear search. Remember, max_seqno_dskaddr may be the
 			 * the address of the TCOM record of a transaction, and this TCOM record may be in a different block
@@ -1429,7 +1441,8 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 #	endif
 	REPL_DPRINT6("position_read: Using %s search to locate %llu in %s between %u and %u\n",
 			(srch_func == do_linear_search) ? "linear" : "binary", read_seqno, ctl->jnl_fn, lo_addr, hi_addr);
-	found = srch_func(ctl, lo_addr, hi_addr, read_seqno, &srch_status);
+	if (NULL != srch_func)
+		found = srch_func(ctl, lo_addr, hi_addr, read_seqno, &srch_status);
 	if ((TR_NOT_FOUND == found) && (0 != willnotbefound_addr))
 	{	/* There is a block that contains a seqno larger than read_seqno; leave ctl positioned at this higher seqno.
 		 * If we don't do this, we could end up in an infinite loop if the caller of this function is "read_regions".
@@ -1516,10 +1529,11 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 						csa->nl->wt_pid_array[0], csa->nl->wt_pid_array[1],
 						csa->nl->wt_pid_array[2]);
 					repl_log(gtmsource_log_fp, TRUE, TRUE, " "
-						"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
-						"ctl->repl_rctl->read_complete = %d\n",
+						"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x,rsrv_freeaddr = 0x%x]."
+						" ctl->repl_rctl->read_complete = %d\n",
 						ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
-						csa->jnl->jnl_buff->freeaddr, ctl->repl_rctl->read_complete);
+						csa->jnl->jnl_buff->freeaddr, csa->jnl->jnl_buff->rsrv_freeaddr,
+						ctl->repl_rctl->read_complete);
 				}
 			}
 		}
@@ -1673,7 +1687,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					if (QWLT(read_jnl_seqno, jctl->jnl_seqno))
 					{
 						csa = &FILE_INFO(ctl->reg)->s_addrs;
-						freeaddr = csa->jnl->jnl_buff->freeaddr;
+						freeaddr = csa->jnl->jnl_buff->rsrv_freeaddr;
 						if ((ctl->repl_buff->fc->eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
 						{	/* No more pending updates in the journal file. Next update to the
 							 * journal file will take the seqno jctl->jnl_seqno which will be
@@ -1927,7 +1941,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	 * concurrent GT.M process updates this 8-byte field in a sequence of two 4-byte operations instead of one
 	 * atomic operation (possible in architectures where 8-byte operations are not native) AND if the pre-update and
 	 * post-update value differ in their most significant 4-bytes. Since that is considered a virtually impossible
-	 * rare occurrence and since we want to avoid the overhead of doing a "grab_lock", we dont do that here.
+	 * rare occurrence and since we want to avoid the overhead of doing a "grab_lock", we don't do that here.
 	 */
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct));
 	DEBUG_ONLY(loopcnt = 0;)
@@ -1965,9 +1979,9 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			if (gtmsource_save_read_jnl_seqno < read_jnl_seqno)
 			{
 				read_addr += read_size;
-				if (jnlpool_size >= (jctl->early_write_addr - read_addr))
+				if (jnlpool_size >= (jctl->rsrv_write_addr - read_addr))
 				{	/* No more overflow, switch to READ_POOL.  To avoid the expense of memory barrier
-					 * in jnlpool_hasnt_overflowed(), we use a possibly stale value of early_write_addr
+					 * in jnlpool_hasnt_overflowed(), we use a possibly stale value of rsrv_write_addr
 					 * to check if we can switch back to pool. The consequence is that we may switch
 					 * back and forth between file and pool read if we are in a situation wherein a GTM
 					 * process races with source server, writing transactions into the pool right when
@@ -2050,6 +2064,12 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	} while (TRUE);
 	if (file2pool && !gtmsource_local->jnlfileonly)
 	{
+		/* Ahead of the transition to pool, force repl_phase2_cleanup() when write_addr is behind read_addr. This
+		 * condition happens frequently with replicating instances and instances with infrequent updates.
+		 */
+		if (jctl->write_addr < read_addr)
+			repl_phase2_cleanup(&jnlpool);
+		assert(jctl->write_addr >= read_addr);
 		gtmsource_local->read = (uint4)(read_addr % jnlpool_size) ;
 		gtmsource_local->read_state = read_state = READ_POOL;
 	} else

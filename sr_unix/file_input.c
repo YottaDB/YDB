@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,9 +32,12 @@
 
 #define BUFF_SIZE	65535
 
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	uint4		dollar_tlevel;
 GBLREF io_pair		io_curr_device;
+
+LITREF	mval		literal_notimeout;
+LITREF	mval		literal_zero;
 
 error_def(ERR_LOADFILERR);
 error_def(ERR_FILEOPENFAIL);
@@ -96,7 +100,7 @@ void file_input_init(char *fn, short fn_len, open_params_flags params_flag)
 	val.str.len = fn_len;
 	val.str.addr = (char *)fn;
 	/* The mode will be set to M for reads */
-	status = (*op_open_ptr)(&val, &pars, 0, 0);
+	status = (*op_open_ptr)(&val, &pars, (mval *)&literal_zero, NULL);
 	if (!status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEOPENFAIL, 2, fn_len, fn);
 	pars.str.len = SIZEOF(iop_eol);
@@ -227,7 +231,7 @@ int file_input_get_xchar(char *in_ptr, int max_chars_to_read) /* uses opreadfl w
 	int		rd_len;
 	mval		val;
 
-	op_readfl(&val, max_chars_to_read, dollar_tlevel ? 0: NO_M_TIMEOUT);
+	op_readfl(&val, max_chars_to_read, (mval *)(dollar_tlevel ? &literal_zero : &literal_notimeout));
 	rd_len = val.str.len;
 	if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		return -1;
@@ -265,7 +269,7 @@ int file_input_get(char **in_ptr, int max_len)
 	ret_len = 0;
 	for (;;)
 	{	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
-		op_read(&val, dollar_tlevel ? 0: NO_M_TIMEOUT);
+		op_read(&val, (mval *)(dollar_tlevel ? &literal_zero: &literal_notimeout));
 		rd_len = val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{

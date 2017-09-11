@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,16 +89,14 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	now_writer = jb->io_in_prog_latch.u.parts.latch_pid;
 	fsync_in_prog = jb->fsync_in_prog_latch.u.parts.latch_pid ? TRUE : FALSE;
 	fsync_pid     = jb->fsync_in_prog_latch.u.parts.latch_pid;
-	/* note: the alignment of the parameters below is modelled on the alignment defined for JNLBUFINFO in merrors.msg */
 	if (ok_to_log)
 	{
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(18) ERR_JNLBUFINFO, 16, process_id,
-				jb->dsk,      jb->free,     jb->bytcnt,  io_in_prog,  fsync_in_prog,
-				jb->dskaddr,  jb->freeaddr, jb->qiocnt,  now_writer,  fsync_pid,
-				jb->filesize, jb->cycle,    jb->errcnt,  jb->wrtsize, jb->fsync_dskaddr);
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_JNLPVTINFO, 8, process_id,
-				jpc->cycle,     jpc->fd_mismatch, jpc->channel,    jpc->sync_io,
-				jpc->pini_addr, jpc->qio_active,  jpc->old_channel);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(23) ERR_JNLBUFINFO, 21, process_id,
+			jb->dsk, jb->free, jb->bytcnt, io_in_prog, fsync_in_prog, jb->dskaddr, jb->freeaddr, jb->qiocnt,
+			now_writer, fsync_pid, jb->filesize, jb->cycle, jb->errcnt, jb->wrtsize, jb->fsync_dskaddr,
+			jb->rsrv_free, jb->rsrv_freeaddr, jb->phase2_commit_index1, jb->phase2_commit_index2, jb->next_align_addr);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_JNLPVTINFO, 8, process_id, jpc->cycle, jpc->fd_mismatch,
+			jpc->channel, jpc->sync_io, jpc->pini_addr, jpc->qio_active, jpc->old_channel);
 	}
 	caller_id_flag = TRUE;
 }

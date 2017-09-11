@@ -183,7 +183,8 @@ endif
 
 version $version p  # Set the current version so that relative paths work
 cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
-set releasever = `$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2),!'`
+set zver = `$gtm_dist/mumps -run %XCMD 'write $zversion'`
+set releasever = $zver[2]
 
 # create a README.txt which has the current year in it
 setenv readme_txt ${gtm_com}/README.txt
@@ -357,6 +358,37 @@ foreach image ($imagetype)
 	endif
 end
 echo ""
+
+if (-f $gtm_tools/gtmpcat.m) then
+	pushd $gtm_tools
+	set nonomatch ; set fldbld = (gtmpcat*On*${version}.m) ; unset nonomatch
+	if (("$fldbld" == "gtmpcat*On*${version}.m") || ($#fldbld > 1)) then
+		echo ""
+		echo "FAIL:missing or duplicate gtmpcat field build file ($fldbld)"
+	else
+		set dist_file = "${dist}/gtmpcat_for_${version}_${osname}_${arch}.${package_ext}"
+		echo ""
+		echo "Creating $dist_file"
+		sed "s/#ZVERSION#/${zver}/;s/#FLDBLD#/${fldbld}/" < install_gtmpcat_sh.txt > install_gtmpcat.sh
+		cat gtmpcat_sh.txt > gtmpcat.sh
+		chmod 500 install_gtmpcat.sh gtmpcat.sh
+		set prev_user = `filetest -U gtmpcat.m`
+		set prev_group = `filetest -G gtmpcat.m`
+		set prev_perm = `filetest -P: gtmpcat.m`
+		chown 0:0 gtmpcat.m $fldbld
+		chmod 400 gtmpcat.m $fldbld
+		$package $dist_file gtmpcat.m $fldbld install_gtmpcat.sh gtmpcat.sh || exit 10
+		chown ${prev_user}:${prev_group} gtmpcat.m $fldbld
+		chmod ${prev_perm} gtmpcat.m $fldbld
+		echo ""
+		echo "Gzipping $dist_file"
+		gzip $dist_file || exit 11
+	endif
+	popd
+else
+	echo ""
+	echo "FAIL:gtmpcat was not found"
+endif
 
 find $dist -type f -exec chmod 444 {} \;
 find $dist -type d -exec chmod 755 {} \;
@@ -545,6 +577,18 @@ CONFIGURE_EOF
 			echo "Test of installation for group restriced ${version}/${image} FAILED"
 			set leavedir = 1
 		endif
+
+		# Install gtmpcat
+		pushd $gtm_tools
+		yes | env gtm_dist=${install}/defgroup/${image} sh ./install_gtmpcat.sh
+		yes | env gtm_dist=${install}/${image} sh ./install_gtmpcat.sh
+		popd
+
+		# Test gtmpcat
+		pushd /tmp
+		(source ${install}/defgroup/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
+		(source ${install}/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
+		popd
 
 	end
 endif

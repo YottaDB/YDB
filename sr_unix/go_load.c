@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,9 @@ GBLREF int		onerror;
 GBLREF io_pair		io_curr_device;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF spdesc		stringpool;
+
+LITREF	mval		literal_notimeout;
+LITREF	mval		literal_zero;
 
 error_def(ERR_LOADCTRLY);
 error_def(ERR_LOADEOF);
@@ -304,7 +307,7 @@ int go_get(char **in_ptr, int max_len, uint4 max_rec_size)
 	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
 	for (ret_len = 0; ; )
 	{
-		op_read(&val, dollar_tlevel ? 0 : NO_M_TIMEOUT);
+		op_read(&val, (mval *)(dollar_tlevel ? &literal_zero : &literal_notimeout));
 		rd_len = val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{

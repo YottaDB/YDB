@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,8 +108,8 @@ uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **p
 	}
 	pinirec = (struct_jrec_pini *)(mur_desc->random_buff.base + (pini_addr - mur_desc->random_buff.dskaddr));
 	/* Verify that it's actually a PINI record */
-	if (JRT_PINI != pinirec->prefix.jrec_type || PINI_RECLEN != pinirec->prefix.forwptr ||
-       		!IS_VALID_JNLREC((jnl_record *)pinirec, jctl->jfh))
+	if (JRT_PINI != pinirec->prefix.jrec_type
+		|| PINI_RECLEN != pinirec->prefix.forwptr || !IS_VALID_JNLREC((jnl_record *)pinirec, jctl->jfh))
 	{
 		if (mur_options.update && jctl->after_end_of_data && !jgbl.forw_phase_recovery)
 			return ERR_JNLBADRECFMT;

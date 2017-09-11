@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2016 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,8 @@ typedef struct semwait_status_struct
 } semwait_status_t;
 
 boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stacktrace_time, boolean_t *timedout,
-				semwait_status_t *status, gd_region *reg, boolean_t *bypass, boolean_t *sem_halted);
+				semwait_status_t *status, gd_region *reg, boolean_t *bypass, boolean_t *sem_halted,
+				boolean_t incr_sem);
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 {																 \
@@ -85,15 +86,15 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 
 #define DBFILERR_PARAMS(REG)			ERR_DBFILERR, 2, DB_LEN_STR(REG)
 #define CRITSEMFAIL_PARAMS(REG)			ERR_CRITSEMFAIL,2, DB_LEN_STR(REG)
-#define SYSCALL_PARAMS(RETSTAT, OP)		ERR_SYSCALL, 5, LEN_AND_STR(OP), LEN_AND_STR(RETSTAT->module), RETSTAT->line_no
+#define SYSCALL_PARAMS(RETSTAT, OP)		ERR_SYSCALL, 5, LEN_AND_STR(OP), LEN_AND_STR((RETSTAT)->module), (RETSTAT)->line_no
 #define SEMKEYINUSE_PARAMS(UDI)			ERR_SEMKEYINUSE, 1, UDI->key
-#define SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, TOT_WAIT_TIME)						\
-						ERR_SEMWT2LONG, 7, process_id, TOT_WAIT_TIME,			\
-							LEN_AND_LIT(GTM_SEMTYPE), DB_LEN_STR(REG), RETSTAT->sem_pid
+#define SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, TOT_WAIT_TIME)							\
+						ERR_SEMWT2LONG, 7, process_id, TOT_WAIT_TIME,				\
+							LEN_AND_LIT(GTM_SEMTYPE), DB_LEN_STR(REG), (RETSTAT)->sem_pid
 
 #define GET_OP_STR(RETSTAT, OP)												\
 {															\
-	switch (RETSTAT->op)												\
+	switch ((RETSTAT)->op)												\
 	{														\
 		case op_semget:												\
 			OP = "semget()";										\
@@ -113,45 +114,47 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 	}														\
 }
 
-#define ISSUE_SEMWAIT_ERROR(RETSTAT, REG, UDI, GTM_SEMTYPE)							\
-{														\
+#define ISSUE_SEMWAIT_ERROR(RETSTAT, REG, UDI, GTM_SEMTYPE) SEMWAIT_ERROR_COMMON(RETSTAT, REG, UDI, GTM_SEMTYPE, rts_error_csa)
+#define PRINT_SEMWAIT_ERROR(RETSTAT, REG, UDI, GTM_SEMTYPE) SEMWAIT_ERROR_COMMON(RETSTAT, REG, UDI, GTM_SEMTYPE, gtm_putmsg_csa)
+#define SEMWAIT_ERROR_COMMON(RETSTAT, REG, UDI, GTM_SEMTYPE, REPORT_FN)						\
+MBSTART {														\
 	const char	*op;											\
 	uint4		tot_wait_time;										\
 														\
 	GBLREF uint4	process_id;										\
 														\
-	if (ERR_CRITSEMFAIL == RETSTAT->status2)								\
+	if (ERR_CRITSEMFAIL == (RETSTAT)->status2)								\
 	{													\
-		if (0 == RETSTAT->status1)									\
+		if (0 == (RETSTAT)->status1)									\
 		{												\
 				GET_OP_STR(RETSTAT, op);							\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(16) DBFILERR_PARAMS(REG),			\
+				REPORT_FN(CSA_ARG(NULL) VARLSTCNT(16) DBFILERR_PARAMS(REG),			\
 					CRITSEMFAIL_PARAMS(REG), SYSCALL_PARAMS(RETSTAT, op),			\
-					RETSTAT->save_errno);							\
-		} else if (ERR_SEMKEYINUSE == RETSTAT->status1)							\
+					(RETSTAT)->save_errno);							\
+		} else if (ERR_SEMKEYINUSE == (RETSTAT)->status1)						\
 		{												\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG),\
+			REPORT_FN(CSA_ARG(NULL) VARLSTCNT(11) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG),	\
 				SEMKEYINUSE_PARAMS(UDI));							\
 		} else												\
 			assertpro(FALSE);									\
-	} else if (ERR_MAXSEMGETRETRY == RETSTAT->status2)							\
+	} else if (ERR_MAXSEMGETRETRY == (RETSTAT)->status2)							\
 	{													\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) DBFILERR_PARAMS(REG), ERR_MAXSEMGETRETRY, 1,		\
+		REPORT_FN(CSA_ARG(NULL) VARLSTCNT(7) DBFILERR_PARAMS(REG), ERR_MAXSEMGETRETRY, 1,		\
 				MAX_SEMGET_RETRIES);								\
-	} else if (ERR_FTOKERR == RETSTAT->status2)								\
+	} else if (ERR_FTOKERR == (RETSTAT)->status2)								\
 	{													\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) DBFILERR_PARAMS(REG), ERR_FTOKERR, 2, DB_LEN_STR(REG), \
-				RETSTAT->save_errno);								\
-	} else if (0 == RETSTAT->status2)									\
+		REPORT_FN(CSA_ARG(NULL) VARLSTCNT(9) DBFILERR_PARAMS(REG), ERR_FTOKERR, 2, DB_LEN_STR(REG),	\
+				(RETSTAT)->save_errno);								\
+	} else if (0 == (RETSTAT)->status2)									\
 	{													\
-		assert(ERR_SEMWT2LONG == RETSTAT->status1);							\
-		assert(RETSTAT->sem_pid && (-1 != RETSTAT->sem_pid));						\
+		assert(ERR_SEMWT2LONG == (RETSTAT)->status1);							\
+		assert((RETSTAT)->sem_pid && (-1 != (RETSTAT)->sem_pid));					\
 		tot_wait_time = TREF(dbinit_max_delta_secs);							\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) DBFILERR_PARAMS(REG),					\
+		REPORT_FN(CSA_ARG(NULL) VARLSTCNT(13) DBFILERR_PARAMS(REG),					\
 			SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, tot_wait_time));				\
 	} else													\
 		assertpro(FALSE);										\
-}
+} MBEND
 
 /* Set the value of semaphore number 2 ( = FTOK_SEM_PER_ID - 1) as GTM_ID. This way, in case of an orphaned
  * semaphore (say, kill -9), MUPIP RUNDOWN will be able to identify GT.M semaphore from the value and will

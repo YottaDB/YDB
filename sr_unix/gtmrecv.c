@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,6 @@
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
 #include "ftok_sem_incrcnt.h"
-#include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "fork_init.h"
 #include "gtmio.h"
@@ -398,8 +397,6 @@ int gtmrecv(void)
 	is_rcvr_server = TRUE;
 	process_id = getpid();
 	OPERATOR_LOG_MSG;
-	/* Reinvoke secshr related initialization with the child's pid */
-	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.

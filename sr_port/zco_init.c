@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,24 +32,22 @@ void zco_init(void)
 	SETUP_THREADGBL_ACCESS;
 	if ((TREF(dollar_zcompile)).addr)
 		free((TREF(dollar_zcompile)).addr);
+	(TREF(dollar_zcompile)).len = 0; /* default */
 	val.addr = ZCOMPILE;
 	val.len = SIZEOF(ZCOMPILE) - 1;
 	status = TRANS_LOG_NAME(&val, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
-	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
+	if (SS_NORMAL != status)
 	{
-#		ifdef UNIX
-		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
+		if (SS_NOLOGNAM == status)
+			return;
+		else if (SS_LOG2LONG == status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
 		else
-#		endif
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
-	if (status == SS_NOLOGNAM)
-		(TREF(dollar_zcompile)).len = 0;
-	else
-	{
-		(TREF(dollar_zcompile)).len = tn.len;
-		(TREF(dollar_zcompile)).addr = (char *) malloc (tn.len);
-		memcpy ((TREF(dollar_zcompile)).addr, buf1, tn.len);
-	}
+	if (0 == tn.len)
+		return;
+	(TREF(dollar_zcompile)).len = tn.len;
+	(TREF(dollar_zcompile)).addr = (char *) malloc (tn.len);
+	memcpy ((TREF(dollar_zcompile)).addr, buf1, tn.len);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,7 +181,7 @@ void iorm_close(io_desc *iod, mval *pp)
 
 	iod->state = dev_closed;
 	/* save no_destroy for disk device */
-	if ((FALSE == rm_destroy) && !rm_ptr->fifo && !rm_ptr->pipe && (2 < rm_ptr->fildes))
+	if ((FALSE == rm_destroy) && !rm_ptr->fifo && !rm_ptr->is_pipe && (2 < rm_ptr->fildes))
 	{
 		rm_ptr->no_destroy = TRUE;
 		/* We can write anywhere in the file so need to save current file pointer for re-open
@@ -327,7 +327,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			iorm_close(rm_ptr->stderr_child,pp);
 		}
 	}
-	if ((rm_destroy || rm_ptr->pipe || rm_ptr->fifo) && !rm_rundown)
+	if ((rm_destroy || rm_ptr->is_pipe || rm_ptr->fifo) && !rm_rundown)
 	        remove_rms (iod);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;

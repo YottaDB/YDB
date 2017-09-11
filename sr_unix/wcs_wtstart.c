@@ -536,7 +536,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver));
 #			endif
 			if (csa->do_fullblockwrites)
-				size = ROUND_UP(size, csa->fullblockwrite_len);
+			{	/* See similiar logic in wcs_wtstart.c */
+				size = (int)ROUND_UP(size,
+						(FULL_DATABASE_WRITE == csa->do_fullblockwrites && csr->needs_first_write)
+						? csd->blk_size : csa->fullblockwrite_len);
+			}
 			assert(size <= csd->blk_size);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_write, 1);
 			save_bp = bp;
@@ -643,7 +647,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * So we disable asyncio in the forward phase of offline/online rollback/recover.
 			 * This is easily identified currently by the global variable "multi_proc_in_use" being TRUE.
 			 */
+#			ifdef USE_NOAIO
+			do_asyncio = FALSE;
+#			else
 			do_asyncio = csd->asyncio && !multi_proc_in_use;
+#			endif
 			if (udi->fd_opened_with_o_direct)
 			{
 				size = ROUND_UP2(size, DIO_ALIGNSIZE(udi));
@@ -657,6 +665,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (!do_asyncio)
 				{
 					DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, save_bp, size, save_errno);
+					csr->needs_first_write = FALSE;
 				} else
 				{
 					cr->wip_is_encr_buf = (save_bp != bp);
@@ -670,6 +679,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							BG_TRACE_PRO_ANY(csa, wcs_wtstart_eagain_incrit);
 							DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset,		\
 											save_bp, size, save_errno);
+							csr->needs_first_write = FALSE;
 						}
 						/* else: We do not hold crit so flushing this is not critical. */
 					} else if (0 == save_errno)

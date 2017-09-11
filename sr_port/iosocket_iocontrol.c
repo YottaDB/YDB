@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,10 +28,32 @@
 #include "stringpool.h"
 #include "min_max.h"
 #include "error.h"
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
+#include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "change_reg.h"
+#include "setterm.h"
+#include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
+
 LITREF	mval		skiparg;
+LITREF mval		literal_notimeout;
 
 error_def(ERR_EXPR);
 error_def(ERR_INVCTLMNE);
@@ -41,18 +63,22 @@ error_def(ERR_INVCTLMNE);
 #define READ		"READ|"
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
+#define FORMATTIMESTR "FORMAT"
 
 void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
 	char		action[MAX_DEVCTL_LENGTH];
 	unsigned short 	depth;
-	int		length, n, timeout;
+	int		length, n;
+	int4		msec_timeout;
 	pid_t		pid;
 	mval		*arg, *handlesvar = NULL;
 #ifdef	GTM_TLS
 	mval		*option, *tlsid, *password, *extraarg;
 #endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (0 == mn->len)
 		return;
 	assert(MAX_DEVCTL_LENGTH > mn->len);
@@ -75,21 +101,15 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		iosocket_listen(io_curr_device.in, depth);
 	} else if (0 == memcmp(action, "WAIT", length))
 	{
-		if (1 > argcnt)
-			timeout = NO_M_TIMEOUT;
+		arg = (0 < argcnt) ? va_arg(args, mval *) : (mval *)&literal_notimeout;
+		if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
+			MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
 		else
 		{
-			arg = va_arg(args, mval *);
-			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				timeout = MV_FORCE_INTD(arg);
-			else
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
-				return;
-			}
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
+			return;
 		}
-		iosocket_wait(io_curr_device.in, timeout);
-#	ifndef VMS
+		iosocket_wait(io_curr_device.in, msec_timeout);
 	} else if (0 == memcmp(action, "PASS", length))
 	{
 		n = argcnt;
@@ -107,13 +127,12 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				timeout = MV_FORCE_INTD(arg);
-			else
-				timeout = NO_M_TIMEOUT;
+			if ((NULL == arg) || M_ARG_SKIPPED(arg) || !MV_DEFINED(arg))
+				arg = (mval *)&literal_notimeout;
 		} else
-			timeout = NO_M_TIMEOUT;
-		iosocket_pass_local(io_curr_device.out, pid, timeout, n, args);
+			arg = (mval *)&literal_notimeout;
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		iosocket_pass_local(io_curr_device.out, pid, msec_timeout, n, args);
 	} else if (0 == memcmp(action, "ACCEPT", length))
 	{
 		n = argcnt;
@@ -138,16 +157,15 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				timeout = MV_FORCE_INTD(arg);
-			else
-				timeout = NO_M_TIMEOUT;
+			if ((NULL == arg) || M_ARG_SKIPPED(arg) || !MV_DEFINED(arg))
+				arg = (mval *)&literal_notimeout;
 		} else
-			timeout = NO_M_TIMEOUT;
-		iosocket_accept_local(io_curr_device.in, handlesvar, pid, timeout, n, args);
+			arg = (mval *)&literal_notimeout;
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		iosocket_accept_local(io_curr_device.in, handlesvar, pid, msec_timeout, n, args);
 #ifdef	GTM_TLS
 	} else if (0 == memcmp(action, "TLS", length))
-	{	/*	WRITE /TLS(option[,[timeout][,tlsid[,password]]]) */
+	{	/*	WRITE /TLS(option[,[msec_timeout][,tlsid[,password]]]) */
 		if (1 <= argcnt)
 		{
 			option = va_arg(args, mval *);
@@ -166,12 +184,11 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		if (2 <= argcnt)
 		{
 			arg = va_arg(args, mval *);
-			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				timeout = MV_FORCE_INTD(arg);
-			else
-				timeout = NO_M_TIMEOUT;
+			if ((NULL == arg) || M_ARG_SKIPPED(arg) || !MV_DEFINED(arg))
+				arg = (mval *)&literal_notimeout;
 		} else
-			timeout = NO_M_TIMEOUT;
+			arg = (mval *)&literal_notimeout;
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
 		if (3 <= argcnt)
 		{
 			tlsid = va_arg(args, mval *);
@@ -199,8 +216,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				extraarg = NULL;
 		} else
 			extraarg = NULL;
-		iosocket_tls(option, timeout, tlsid, password, extraarg);
-#	endif
+		iosocket_tls(option, msec_timeout, tlsid, password, extraarg);
 #	endif
 	} else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,7 @@ void init_relink_allowed(mstr *keyword)
 
 	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(check_max_keyword_len());
-	if (keyword->len >= MAX_KEYWORD_LEN)
+	if ((keyword->len >= MAX_KEYWORD_LEN) || (0 == keyword->len))
 	{	/* unrecognized keyword - use default */
 		TREF(relink_allowed) = LINK_NORECURSIVE;
 		return;

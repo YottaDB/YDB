@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@
 
 GBLREF io_pair	io_curr_device;
 
-int	iorm_rdone(mint *v, int4 timeout)
+int	iorm_rdone(mint *v, int4 msec_timeout)
 {
 	mval		tmp;
 	int		ret;
@@ -30,7 +31,7 @@ int	iorm_rdone(mint *v, int4 timeout)
 	gtm_chset_t	ichset;
 
 	*v = -1;
-	ret = iorm_readfl(&tmp, -1, timeout);
+	ret = iorm_readfl(&tmp, -1, msec_timeout);
 	if (ret)
 	{
 		if (0 != tmp.str.len)
@@ -51,13 +52,13 @@ int	iorm_rdone(mint *v, int4 timeout)
 					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
 					break;
 				case CHSET_UTF16:
-					GTMASSERT;
+					assertpro(ichset && FALSE);
 				default:
 #ifdef __MVS
 					codepoint = (unsigned char)tmp.str.addr[0];
 					break;
 #else
-					GTMASSERT;
+					assertpro(ichset && FALSE);
 #endif
 			}
 			UNICODE_ONLY(assert(WEOF != codepoint);)

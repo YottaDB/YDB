@@ -118,9 +118,6 @@ LITREF	mval	*fndata_table[2][2];
 #endif
 LITREF	mval	literal_batch;
 
-#define SKIP_ASSERT_TRUE	TRUE
-#define SKIP_ASSERT_FALSE	FALSE
-
 #define	GOTO_RETRY(CDB_STATUS, SKIP_ASSERT)							\
 {												\
 	assert((CDB_STAGNATE > t_tries) || IS_FINAL_RETRY_CODE(CDB_STATUS) || SKIP_ASSERT);	\

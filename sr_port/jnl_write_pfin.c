@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,12 +26,12 @@
 
 GBLREF 	jnl_gbls_t		jgbl;
 
-void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
+void	jnl_write_pfin(sgmnt_addrs *csa)
 {
 	struct_jrec_pfin	pfin_record;
 	jnl_private_control	*jpc;
 
-	assert(csa->now_crit);
+	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	jpc = csa->jnl;
 	assert((0 != jpc->pini_addr) ||
 			(gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
@@ -46,5 +46,5 @@ void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
 	pfin_record.prefix.checksum = INIT_CHECKSUM_SEED;
 	pfin_record.filler = 0;
 	pfin_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&pfin_record, SIZEOF(struct_jrec_pfin));
-	jnl_write(jpc, JRT_PFIN, (jnl_record *)&pfin_record, NULL, NULL, NULL);
+	jnl_write(jpc, JRT_PFIN, (jnl_record *)&pfin_record, NULL);
 }

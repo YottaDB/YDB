@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,12 +136,8 @@ int m_zwrite(void)
 						ref = maketriple(OC_ZWRITESVN);
 						ref->operand[0] = put_ilit(svn_data[index].opcode);
 						ins_triple(ref);
-					} else
-					{       /* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-						 * (invoked by stx_error). No need to do anything else.
-						 */
-						assert(OC_RTERROR == (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode);
-					}
+					} else	/*  ins_errtriple should have already provided an OC_RTERROR */
+						assert(ALREADY_RTERROR);
 					return TRUE;
 				default:
 					stx_error(ERR_SVNEXPECTED);

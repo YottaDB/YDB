@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +30,15 @@ GBLREF sgm_info		*sgm_info_ptr;
 void tp_get_cw (cw_set_element *cs, int depth, cw_set_element **cs1)
 {
 	cw_set_element *cs_tmp;			/* to avoid double dereferencing in the TRAVERSE macro */
+#	ifdef DEBUG
+	cw_set_element	*cs_tmp1;
+
+	cs_tmp = sgm_info_ptr->first_cw_set;
+	TRAVERSE_TO_LATEST_CSE(cs_tmp);
+	cs_tmp1 = cs;
+	TRAVERSE_TO_LATEST_CSE(cs_tmp1);
+	assert(cs_tmp1 == cs_tmp);
+#	endif
 	assert (depth < sgm_info_ptr->cw_set_depth);
 	cs_tmp = (cw_set_element *)find_element(sgm_info_ptr->cw_set_list, depth);
 

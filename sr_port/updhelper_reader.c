@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,9 +16,6 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -41,18 +38,6 @@
 #include "repl_shutdcode.h"
 #include "gvcst_protos.h"
 
-#ifdef VMS
-#include <ssdef.h>
-#include <fab.h>
-#include <rms.h>
-#include <iodef.h>
-#include <secdef.h>
-#include <psldef.h>
-#include <lckdef.h>
-#include <syidef.h>
-#include <xab.h>
-#include <prtdef.h>
-#endif
 #include "op.h"
 #include "targ_alloc.h"
 #include "dpgbldir.h"
@@ -94,7 +79,7 @@
 
 #define IS_GOOD_RECORD(REC, RECLEN, READADDRS, LIMITADDRS, PRE_READ, LOCAL_READ) 	\
 	((IS_VALID_RECTYPE(REC))							\
-	    && (MIN_JNLREC_SIZE < RECLEN)						\
+	    && (MIN_JNLREC_SIZE <= RECLEN)						\
 	    && (ROUND_DOWN2(RECLEN, JNL_REC_START_BNDRY) == RECLEN)			\
 	    && (READADDRS + RECLEN <= LIMITADDRS)					\
 	    && (RECLEN == REC_LEN_FROM_SUFFIX(READADDRS, RECLEN))			\
@@ -115,10 +100,7 @@ GBLREF	FILE			*updhelper_log_fp;
 GBLREF	int			num_additional_processors;
 GBLREF  sgmnt_addrs             *cs_addrs;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
-#ifdef VMS
-GBLREF  uint4                   image_count;
-#endif
-GBLREF boolean_t		disk_blk_read;
+GBLREF	boolean_t		disk_blk_read;
 #ifdef DEBUG
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 #endif
@@ -283,7 +265,7 @@ boolean_t updproc_preread(void)
 				readaddrs = recvpool.recvdata_base + pre_read_offset;
 				limit_readaddrs = recvpool.recvdata_base +
 					(recvpool_ctl->wrapped ? recvpool_ctl->write_wrap : recvpool_ctl->write);
-				if ((limit_readaddrs - MIN_JNLREC_SIZE) > readaddrs)
+				if ((limit_readaddrs - MIN_JNLREC_SIZE) >= readaddrs)
 				{
 					rec = (jnl_record *)readaddrs;
 					rec_len = rec->prefix.forwptr;
@@ -315,7 +297,7 @@ boolean_t updproc_preread(void)
 		readaddrs = recvpool.recvdata_base + pre_read_offset;
 		limit_readaddrs = recvpool.recvdata_base +
 			(recvpool_ctl->wrapped ? recvpool_ctl->write_wrap : recvpool_ctl->write);
-		if ((limit_readaddrs - MIN_JNLREC_SIZE) > readaddrs)
+		if ((limit_readaddrs - MIN_JNLREC_SIZE) >= readaddrs)
 		{
 			rec = (jnl_record *)readaddrs;
 			rec_len = rec->prefix.forwptr;

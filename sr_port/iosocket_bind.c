@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,11 +42,11 @@ error_def(ERR_SOCKBIND);
 error_def(ERR_SOCKINIT);
 error_def(ERR_TEXT);
 
-boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion)
+boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t update_bufsiz, boolean_t newversion)
 {
 	int			temp_1 = 1;
 	char			*errptr, *charptr;
-	int4			errlen, msec_timeout, real_errno;
+	int4			errlen, real_errno;
 	short			len;
 	in_port_t		actual_port;
 	boolean_t		no_time_left = FALSE, ioerror;
@@ -72,13 +73,11 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		socketptr->sd = socketptr->temp_sd;
 		socketptr->temp_sd = FD_INVALID;
 	}
-	if (timepar != NO_M_TIMEOUT)
+	if (NO_M_TIMEOUT != msec_timeout)
 	{
-		msec_timeout = timeout2msec(timepar);
 		sys_get_curr_time(&cur_time);
 		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 	}
-
 	do
 	{
 		temp_1 = 1;
@@ -180,11 +179,14 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 				case EINTR:
 					break;
 				case EADDRINUSE:
-					if (NO_M_TIMEOUT != timepar)
+					if (NO_M_TIMEOUT != msec_timeout)
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						if (cur_time.at_sec > 0)
+						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+							/* Round up in order to prevent premature timeouts */
+							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+						if (msec_timeout > 0)
 							no_time_left = FALSE;
 					} else
 						no_time_left = FALSE;	/* retry */

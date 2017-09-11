@@ -47,11 +47,10 @@
 #define FSYNC_WAIT_TIME     	(2 * SLEEP_ONE_MIN)	/* 2 mins of wait for fsync between JNLFSYNCSTUCK complaints */
 #define FSYNC_WAIT_HALF_TIME    SLEEP_ONE_MIN	/* 1 min of wait for fsync between DEBUG JNLFSYNCSTUCK complaints */
 #define MAX_WIP_QWAIT 		SLEEP_ONE_MIN
-#define MAX_WTSTART_FINI_SLEEPS	(4 * SLEEP_ONE_MIN) /* after this many sleeps without progress request cache recovery */
-
-#define PHASE2_COMMIT_SLEEP	MAXSLPTIME	/* 10 msec inter-iteration sleep wait for active phase2 commits */
+#define MAX_WTSTART_FINI_SLEEPS	(4 * SLEEP_ONE_MIN * MAXSLPTIME)/* After this many sleeps (each 1 msec in duration)
+								 * without progress, request cache recovery.
+								 */
 #define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
-#define	PHASE2_COMMIT_WAIT_MS	(64 * MILLISECS_IN_SEC)
 
 #define	SLEEP_INSTFREEZEWAIT	100		/* 100-msec wait between re-checks of instance freeze status */
 #define	SLEEP_IORETRYWAIT	500		/* 500-msec wait between retries of the same write operation */
@@ -77,6 +76,16 @@
 						 * than (4 * LOCK_TRIES_PER_SEC) allows a faster remainder using AND
 						 * so use that instead.
 						 */
+#define	LOCK_CASLATCH_CHKINTVL_USEC	16384 * 128	/* This is used in callers that sleep for 1 micro-sec every 4 iterations
+							 * (instead of the usual 1 millisecond). Here too we want the caslatch
+							 * check to be done every ~4 seconds. One might be tempted to make
+							 * this 1000 * LOCK_CASLATCH_CHKINTVL, but in practice this is expected
+							 * to end up taking up a lot more time than ~4 seconds so we stick
+							 * with this approximation which is a perfect 2-power as well as ~10
+							 * times lesser so is expected to take ~.4 seconds but might be closer
+							 * to 1 second in practice which is considered okay. Might need some
+							 * experimentation and fine-tuning.
+							 */
 
 /* To compute the maximum duration of an inner spinloop, the following macro can be
  * used. The theory behind this macro is that the basic definition of LOCK_SPINS is

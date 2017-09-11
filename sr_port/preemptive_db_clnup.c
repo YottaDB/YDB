@@ -21,7 +21,6 @@
 #include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
-#include "probe.h"
 #include "gdsfhead.h"
 #include "error.h"
 #include "gdskill.h"
@@ -87,11 +86,11 @@ void preemptive_db_clnup(int preemptive_severe)
 			{
 				csa = si->tp_csa;
 				assert(si->tp_csa == si->kip_csa);
-				PROBE_DECR_KIP(csa->hdr, csa, si->kip_csa);
+				DECR_KIP(csa->hdr, csa, si->kip_csa);
 			}
 		}
 	} else if (NULL != kip_csa && (NULL != kip_csa->hdr) && (NULL != kip_csa->nl))
-		PROBE_DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
+		DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
 	if (IS_DSE_IMAGE)
 	{	/* Release crit on any region that was obtained for the current erroring DSE operation.
 		 * Take care NOT to release crits obtained by a previous CRIT -SEIZE command.

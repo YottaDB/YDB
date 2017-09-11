@@ -490,6 +490,24 @@ mval *underr_strict(mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
+#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
+MBSTART {					/* also requires threaddef DCL and SETUP*/				\
+	GBLREF uint4		dollar_tlevel;										\
+	GBLREF uint4		dollar_trestart;									\
+															\
+															\
+	MV_FORCE_NUM(TMV);												\
+	if (NO_M_TIMEOUT == TMV->m[1])											\
+		TMS = NO_M_TIMEOUT;											\
+	else														\
+	{														\
+		assert(MV_BIAS >= 1000);        	/* if formats change scale may need attention */		\
+		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */					\
+		TMS = (TMV->mvtype & MV_INT) ? ((0 > TMV->m[1]) ? 0 : TMV->m[1]) : (TMV->sgn ? 0 : MAXPOSINT4);		\
+	}														\
+	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
+		TPNOTACID_CHECK(NOTACID);										\
+} MBEND
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -680,9 +698,9 @@ int4 timeout2msec(int4 timeout);
 
 #ifdef DEBUG
 /* Original debug code has been removed since it was superfluous and did not work on all platforms. SE 03/01 */
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #else
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #endif
 
 /* If this is unix, we have a faster sleep for short sleeps ( < 1 second) than doing a hiber start.
@@ -1413,6 +1431,8 @@ typedef gtm_uint64_t	gtm_off_t;
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
 #define MAXUINT2	((unsigned short)-1)
+
+#define MAXINT4		(MAXUINT4/2)
 #define	MAXINT2		(MAXUINT2/2)
 
 /* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other

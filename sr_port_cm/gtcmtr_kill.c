@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,14 +37,14 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key 		*gv_currkey;
 GBLREF jnl_process_vector *originator_prc_vec;
 
+error_def(ERR_DBPRIVERR);
+
 bool gtcmtr_kill(void)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
 	unsigned short	len;
 	static readonly	gds_file_id file;
-
-	error_def(ERR_DBPRIVERR);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_KILL);
@@ -56,7 +57,7 @@ bool gtcmtr_kill(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (JNL_ALLOWED(cs_addrs))
 	{	/* we need to copy client's specific prc_vec into the global variable in order that the gvcst* routines
 		 *	do the right job. actually we need to do this only if JNL_ENABLED(cs_addrs), but since it is not
@@ -65,7 +66,7 @@ bool gtcmtr_kill(void)
 		 *	if JNL_ALLOWED(cs_addrs) is TRUE instead of checking for JNL_ENABLED(cs_addrs) to be TRUE.
 		 * this approach has the overhead that we will be doing the following assignments even though JNL_ENABLED
 		 * 	might not be TRUE but since the following two are just pointer copies, it is not considered a big overhead.
-		 * this approach ensures that the jnl_put_jrt_pini gets the appropriate prc_vec for writing into the
+		 * this approach ensures that the jnl_write_pini gets the appropriate prc_vec for writing into the
 		 * 	journal record in case JNL_ENABLED turns out to be TRUE in t_end time.
 		 * note that the value of JNL_ALLOWED(cs_addrs) cannot be changed on the fly without obtaining standalone access
 		 * 	and hence the correctness of prc_vec (whenever it turns out necessary) is guaranteed.

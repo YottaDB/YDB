@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,12 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef UNIX
-#include "aswp.h"
-#elif defined(VMS)
-#include <descrip.h>
-#endif
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -41,6 +35,7 @@
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "send_msg.h"
 #include "have_crit.h"
+#include "aswp.h"
 
 GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
@@ -52,7 +47,7 @@ GBLREF	uint4			dollar_trestart;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
-GBLREF  tp_region               *tp_reg_list;	      /* List of tp_regions for this transaction */
+GBLREF	tp_region		*tp_reg_list;	      /* List of tp_regions for this transaction */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -61,9 +56,8 @@ GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	uint4			update_trans;
-#ifdef UNIX
 GBLREF	jnl_gbls_t		jgbl;
-#endif
+GBLREF	boolean_t		dse_running;
 
 error_def(ERR_DBCOMMITCLNUP);
 
@@ -88,35 +82,77 @@ error_def(ERR_DBCOMMITCLNUP);
 	}								\
 }
 
-#define	RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa)					\
-{										\
-	if (reg_seqno_reset)							\
-	{									\
-		assert(csa->hdr->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1));	\
-		assert(csa->now_crit && jpl_csa->now_crit);			\
-		csa->hdr->reg_seqno = jnlpool_ctl->jnl_seqno;			\
-	}									\
-}
+#define	T_COMMIT_CLEANUP_DB(CR_ARRAY, CR_ARRAY_INDEX, CS_ADDRS, UPDATE_TRANS, JNLPOOL_CTL, JGBL, RELEASE_CRIT, GV_CUR_REGION)	\
+MBSTART {															\
+	cache_rec_ptr_t		*crArray;											\
+	sgmnt_addrs		*csa;												\
+	sgmnt_data_ptr_t	csd;												\
+	jnl_buffer_ptr_t	jbp;												\
+	int			index1, index2;											\
+	jbuf_phase2_in_prog_t	*lastJbufCmt;											\
+																\
+	crArray = CR_ARRAY;													\
+	UNPIN_CR_ARRAY_ON_RETRY(crArray, CR_ARRAY_INDEX);									\
+	assert(!CR_ARRAY_INDEX);												\
+	csa = CS_ADDRS;														\
+	assert(!csa->t_commit_crit);												\
+	assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));							\
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, JNLPOOL_CTL); /* debug-only sanity check between				\
+								  * seqno of filehdr and jnlpool */				\
+	csd = csa->hdr;														\
+	/* Note: Below code is slightly similar to that in "mutex_salvage" */							\
+	if (csa->now_crit && JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn))				\
+	{	/* CMT04 finished but error happened before CMT08. Check if CMT06 needs to be undone */				\
+		assert(csa->nl->update_underway_tn < csd->trans_hist.early_tn);							\
+		assert(NULL != csa->jnl);											\
+		assert(NULL != csa->jnl->jnl_buff);										\
+		jbp = csa->jnl->jnl_buff;											\
+		index1 = jbp->phase2_commit_index1;										\
+		index2 = jbp->phase2_commit_index2;										\
+		if (index1 != index2)												\
+		{														\
+			assert(jbp->freeaddr <= jbp->rsrv_freeaddr);								\
+			DECR_PHASE2_COMMIT_INDEX(index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);						\
+			lastJbufCmt = &jbp->phase2_commit_array[index2];							\
+			if (lastJbufCmt->process_id == process_id)								\
+			{	/* CMT06 finished. So undo it as a whole */							\
+				assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);					\
+			/* 	NARSTODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
+				SET_JBP_RSRV_FREEADDR(jbp, lastJbufCmt->start_freeaddr);					\
+				SHM_WRITE_MEMORY_BARRIER;/* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */\
+				jbp->phase2_commit_index2 = index2;	/* remove last commit entry */				\
+				/* Undo Step (CMT06) complete */								\
+			}													\
+		}														\
+	}															\
+	if (UPDATE_TRANS)													\
+		RESET_EARLY_TN_IF_NEEDED(csa);		/* Undo Step (CMT04) */							\
+	assert(!csa->hold_onto_crit || JGBL.onlnrlbk || TREF(in_gvcst_redo_root_search) || dse_running);			\
+	if (!csa->hold_onto_crit && RELEASE_CRIT)										\
+		rel_crit(GV_CUR_REGION); 		/* Undo Step (CMT01) */							\
+} MBEND
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
 	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit;
 	cache_rec_ptr_t			cr;
 	sgm_info			*si;
-	sgmnt_addrs			*csa, *jpl_csa = NULL;
+	sgmnt_addrs			*csa;
 	tp_region			*tr;
 	char				*trstr;
 	gd_region			*xactn_err_region, *jpl_reg = NULL;
-	cache_rec_ptr_t			*tp_cr_array;
+	jnlpool_ctl_ptr_t		jpl;
+	int				index1, index2;
+	jpl_phase2_in_prog_t		*lastJplCmt;
 	DEBUG_ONLY(unsigned int		lcl_t_tries;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(cdb_sc_normal != status);
 	xactn_err_region = gv_cur_region;
-	/* see comments in secshr_db_clnup for the commit logic flow as a sequence of steps in t_end and tp_tend and how
-	 * t_commit_cleanup() and secshr_db_clnup() complement each other (one does the rollback and one the roll forward)
-	 * update_underway is set to TRUE to indicate the commit is beyond rollback. It is set only if we hold crit on the region.
+	/* See comment at the top of "secshr_db_clnup" for the commit logic flow as a sequence of steps numbered CMTxx (where
+	 * xx is 01, 02, etc.) in t_end/tp_tend and how "t_commit_cleanup" and "secshr_db_clnup" complement each other (one does
+	 * the roll-back and one the roll-forward). update_underway is set to TRUE to indicate the commit is beyond rollback.
 	 */
 	update_underway = FALSE;
 	if (dollar_tlevel)
@@ -151,14 +187,15 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	} else
 	{
 		trstr = "NON-TP";
-		update_underway = (cs_addrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & update_trans)
-					|| T_UPDATE_UNDERWAY(cs_addrs));
-		if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
-			gv_target->clue.end = 0; /* in case t_end() had set history's tn to be "valid_thru++", undo it */
+		assert(!(cs_addrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & update_trans)) || T_UPDATE_UNDERWAY(cs_addrs));
+		update_underway = T_UPDATE_UNDERWAY(cs_addrs);
+		if (NULL != gv_target)			/* gv_target can be NULL in case of DSE MAPS command etc. */
+			gv_target->clue.end = 0;	/* in case t_end() had set history's tn to be "valid_thru++", undo it */
 	}
 	if (!update_underway)
-	{	/* Rollback (undo) the transaction. the comments below refer to step numbers as documented in secshr_db_clnup */
-		/* If we are here due to a restart (in t_end or tp_tend), we release crit as long as it is not the transition
+	{	/* Rollback (undo) the transaction. the comments below refer to CMTxx step numbers described in secshr_db_clnup.
+		 * At this point we know an update is not underway. That means we got an error BEFORE Step CMT08.
+		 * If we are here due to a restart (in t_end or tp_tend), we release crit as long as it is not the transition
 		 * from 2nd to 3rd retry or 3rd to 3rd retry. However, if we are here because of a runtime error in t_end or tp_tend
 		 * at a point where the transaction can be rolled backwards (update_underway = FALSE), we release crit before going
 		 * to the error trap thereby avoiding any unintended crit hangs.
@@ -168,15 +205,24 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		{
 			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 			if (csa->now_crit)
-			{	/* reset any csa->hdr->early_tn like increments that might have occurred in jnlpool */
-				assert((sm_uc_ptr_t)csa->critical == ((sm_uc_ptr_t)jnlpool_ctl + JNLPOOL_CTL_SIZE));
-				if (jnlpool_ctl->early_write_addr != jnlpool_ctl->write_addr)
+			{	/* Undo Step CMT03. Note: The below code is similar to that in "mutex_salvage" for the jnlpool */
+				jpl = jnlpool.jnlpool_ctl;
+				index1 = jpl->phase2_commit_index1;
+				index2 = jpl->phase2_commit_index2;
+				if (index1 != index2)
 				{
-					reg_seqno_reset = TRUE;	/* reset reg_seqnos of all regions to jnlpool_ctl->jnl_seqno */
-					DEBUG_ONLY(jpl_csa = csa;)
-					jnlpool_ctl->early_write_addr = jnlpool_ctl->write_addr; /* step (3) gets undone here */
+					assert(jpl->write_addr <= jpl->rsrv_write_addr);
+					DECR_PHASE2_COMMIT_INDEX(index2, JPL_PHASE2_COMMIT_ARRAY_SIZE);
+					lastJplCmt = &jpl->phase2_commit_array[index2];
+					if (lastJplCmt->process_id == process_id)
+					{	/* An error occurred after CMT03 but before CMT07. Undo CMT03 */
+						assert(lastJplCmt->jnl_seqno == jpl->jnl_seqno);
+						jpl->rsrv_write_addr = lastJplCmt->start_write_addr;
+						jpl->lastwrite_len = lastJplCmt->prev_jrec_len;
+						SHM_WRITE_MEMORY_BARRIER; /* similar layout as UPDATE_JPL_RSRV_WRITE_ADDR */
+						jpl->phase2_commit_index2 = index2;	/* remove last commit entry */
+					}
 				}
-				assert(jnlpool_ctl->write == jnlpool_ctl->write_addr % jnlpool_ctl->jnlpool_size);
 				if (!csa->hold_onto_crit)
 					jpl_reg = jnlpool.jnlpool_dummy_reg;	/* note down to release crit later */
 			}
@@ -191,28 +237,14 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
 				TP_CHANGE_REG(si->gv_cur_region);
-				tp_cr_array = &si->cr_array[0];
-				UNPIN_CR_ARRAY_ON_RETRY(tp_cr_array, si->cr_array_index);
-				assert(!si->cr_array_index);
-				csa = cs_addrs;
-				if (si->update_trans)
-				{
-					RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
-					RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
-				}
-				assert(!csa->t_commit_crit);
-				assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));
-				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
-											  * seqno of filehdr and jnlpool */
-				/* Do not release crit on the region until reg_seqno has been reset above. */
-				assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
-				if (!csa->hold_onto_crit && release_crit)
-					rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
+				/* Undo CMT06, CMT04 and CMT01 */
+				T_COMMIT_CLEANUP_DB(&si->cr_array[0], si->cr_array_index, cs_addrs, si->update_trans,	\
+									jnlpool_ctl, jgbl, release_crit, gv_cur_region);
 			}
 			if (release_crit)
 			{	/* If final retry and released crit (in the above loop), do the following
-				 * Decrement t_tries to ensure that we dont have an out-of-design situation (with crit not being
-				 * held in the final retry).
+				 * Decrement t_tries to ensure that we don't have an out-of-design situation
+				 * (with crit not being held in the final retry).
 				 */
 				if (CDB_STAGNATE <= t_tries)
 					TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK; /* t_tries untouched for rollback and recover */
@@ -230,32 +262,23 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 					csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
 					assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
 					if (!csa->hold_onto_crit && csa->now_crit)
-						rel_crit(tr->reg);
+						rel_crit(tr->reg);	/* Undo Step (CMT01) */
 				}
 			}
 			assert(!jgbl.onlnrlbk || (lcl_t_tries == t_tries));
 			assert((lcl_t_tries == t_tries) || (t_tries == (CDB_STAGNATE - 1)));
-			/* Do not release crit on jnlpool until reg_seqno has been reset above */
-			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
+			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT02) */
 		} else
 		{
-			UNPIN_CR_ARRAY_ON_RETRY(cr_array, cr_array_index);
-			assert(!cr_array_index);
-			csa = cs_addrs;
-			if (update_trans)
-			{
-				RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
-				RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
-			}
-			/* Do not release crit on jnlpool or the region until reg_seqno has been reset above */
-			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
-			if (!csa->hold_onto_crit && release_crit)
-				rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
+			/* Undo CMT06, CMT04 and CMT01 */
+			T_COMMIT_CLEANUP_DB(cr_array, cr_array_index, cs_addrs, update_trans,			\
+							jnlpool_ctl, jgbl, release_crit, gv_cur_region);
+			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT02) */
 		}
-		DEBUG_ONLY(
-			csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-			assert((NULL == csa) || !csa->now_crit || csa->hold_onto_crit);
-		)
+#		ifdef DEBUG
+		csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		assert((NULL == csa) || !csa->now_crit || csa->hold_onto_crit);
+#		endif
 		/* Do any pending buffer flush (wcs_wtstart) if we missed a flush timer. We should do this ONLY if we don't hold
 		 * crit. Use release_crit for that purpose. The only case where release_crit is TRUE but we still hold crit is if
 		 * the process wants to hold onto crit (for instance, DSE or ONLINE ROLLBACK). In that case, do the flush anyways.

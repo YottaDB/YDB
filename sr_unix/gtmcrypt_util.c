@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,8 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 
 int gc_load_gtmshr_symbols()
 {
-#	ifndef USE_SYSLIB_FUNCS
+/* CYGWIN TODO: This is to fix a linker error. Undo when it is fixed. */
+#	if !defined(USE_SYSLIB_FUNCS) && !defined(__CYGWIN__)
 	gtm_malloc_fnptr = &gtm_malloc;
 	gtm_free_fnptr = &gtm_free;
 #	endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,8 +268,8 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 	sbufh_p->free_cnt = sbufh_p->backup_cnt = 0;
 	sbufh_p->allocs_since_chk = 0;	/* Restart the counter */
 	/* Rebuild the queues and counts according to:
-	   1) What the block thinks it is (free, backup or reformat.
-	   2) Verify that the block is in a valid state (needs pid set, process should exist)
+	   1) What the block thinks it is (free, backup or reformat)
+	   2) Verify that the block is in a valid (valid_data) OR "in-flight" state (in use by an existing process)
 	   3) Invalid state blocks are considered abandoned and put on the free queue.
 	*/
 	for (sblkh_p = (shmpool_blk_hdr_ptr_t)(sbufh_p + 1), blks = sbufh_p->total_blks;
@@ -278,8 +278,9 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 	{	/* For each block not free, check if it is assigned to a process and if so if that process exists.
 		   If not or if the block is already free, put on the free queue after a thorough cleaning.
 		*/
-		if (SHMBLK_FREE == sblkh_p->blktype
-		    || 0 == sblkh_p->holder_pid || !is_proc_alive(sblkh_p->holder_pid, sblkh_p->image_count))
+		if ((SHMBLK_FREE == sblkh_p->blktype)
+		    || (0 == sblkh_p->holder_pid)
+		    || ((FALSE == sblkh_p->valid_data) && (!is_proc_alive(sblkh_p->holder_pid, sblkh_p->image_count))))
 		{	/* Make sure block is clean (orphaned blocks might not be) and queue on free. */
 			sblkh_p->holder_pid = 0;
 			sblkh_p->valid_data = FALSE;

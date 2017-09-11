@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_inet.h"
+#include "gtm_ipc.h"
 
 #include <sys/shm.h>
 #include <errno.h>
@@ -39,11 +40,10 @@
 #include "repl_instance.h"
 #include "wbox_test_init.h"
 #include "have_crit.h"
-#include "gtm_ipc.h"
 #include "anticipatory_freeze.h"
+#include "jnl.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	boolean_t		pool_init;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	int			gtmrecv_srv_count;
 
@@ -122,17 +122,8 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	if (INST_FREEZE_ON_ERROR_POLICY && !(attempt_ipc_cleanup && (INVALID_SHMID != udi->shmid)))
 		return FALSE;
 	/* detach from shared memory irrespective of whether we need to cleanup ipcs or not */
-	JNLPOOL_SHMDT(detach_status, save_errno);
-	if (0 == detach_status)
-	{
-		jnlpool.jnlpool_ctl = NULL; /* Detached successfully */
-		jnlpool_ctl = NULL;
-		jnlpool.repl_inst_filehdr = NULL;
-		jnlpool.gtmsrc_lcl_array = NULL;
-		jnlpool.gtmsource_local_array = NULL;
-		jnlpool.jnldata_base = NULL;
-		pool_init = FALSE;
-	} else
+	JNLPOOL_SHMDT(jnlpool, detach_status, save_errno);
+	if (0 != detach_status)
 	{
 		repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", STRERROR(save_errno));
 		attempt_ipc_cleanup = FALSE;

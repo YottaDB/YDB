@@ -54,8 +54,13 @@ GBLREF	boolean_t		created_core;			/* Core file was created */
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
+#ifdef DEBUG
+GBLREF 	boolean_t		stringpool_unusable;
+GBLREF 	boolean_t		stringpool_unexpandable;
+#endif
 
 enum rundown_state
 {
@@ -72,6 +77,8 @@ static	enum rundown_state	attempting;
 #ifdef DEBUG
 GBLREF	int			process_exiting;
 #endif
+
+LITREF	mval		literal_notimeout;
 
 /* This macro is a framework to help perform ONE type of rundown (e.g. db or lock or io rundown etc.).
  * "gtm_exit_handler" invokes this macro for each type of rundown that is needed and passes appropriate
@@ -117,9 +124,8 @@ GBLREF	int			process_exiting;
 	 */												\
 	secshr_db_clnup(NORMAL_TERMINATION);								\
 	zcall_halt();											\
-	op_lkinit();											\
 	op_unlock();											\
-	op_zdeallocate(NO_M_TIMEOUT);									\
+	op_zdeallocate((mval *)&literal_notimeout);									\
 }
 
 #define	IO_RUNDOWN_MACRO											\
@@ -170,6 +176,14 @@ void gtm_exit_handler(void)
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
+#ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) && (TRUE == TREF(statshare_opted_in)))
+	{	/* Forced to FALSE when killing processes and we may need to rundown statsdbs */
+		stringpool_unusable = FALSE;
+		stringpool_unexpandable = FALSE;
+		fast_lock_count = 0;
+	}
+#endif
 	RUNDOWN_STEP(rundown_state_lock, rundown_state_mprof, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
 	RUNDOWN_STEP(rundown_state_mprof, rundown_state_statsdb, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
 	/* The condition handler used in the gvcst_remove_statsDB_linkage_all() path takes care of sending errors */

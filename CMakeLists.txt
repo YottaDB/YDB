@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2016 Fidelity National Information		#
+# Copyright (c) 2012-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.3-001A)
+set(version V6.3-002)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -35,6 +35,10 @@ endif()
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+if(GTM_RELEASE_NAME)
+  add_definitions(-DGTM_RELEASE_NAME="${GTM_RELEASE_NAME}")
 endif()
 
 # Enable GT.M debug options unless directed not to enable them. Added to build without whitebox tests.
@@ -612,6 +616,7 @@ set(m_files_sr_port
   gdeexit.m
   gdehelp.m
   gdeinit.m
+  gdeinitsz.m
   gdelocks.m
   gdelog.m
   gdemap.m
@@ -688,6 +693,7 @@ foreach(f
   gtm_stdlib.h
   gtm_string.h
   gtm_strings.h
+  gtmgblstat.xc
   gtmxc_types.h
   main_pragma.h
   arch.gtc
@@ -707,6 +713,13 @@ foreach(f
   custom_errors_sample.txt
   )
   select_file(src ${f})
+  get_filename_component(srcfname "${src}" NAME)
+  add_custom_command(
+    OUTPUT "${GTM_BINARY_DIR}/${srcfname}"
+    DEPENDS "${src}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${GTM_BINARY_DIR}/${srcfname}"
+    )
+  list(APPEND files_to_place "${GTM_BINARY_DIR}/${srcfname}")
   list(APPEND files ${src})
 endforeach()
 install(FILES ${files} DESTINATION ${GTM_INSTALL_DIR})

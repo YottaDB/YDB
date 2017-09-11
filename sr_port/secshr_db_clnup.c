@@ -30,7 +30,6 @@
 #include "copy.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "probe.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
@@ -60,29 +59,9 @@
 #include "db_snapshot.h"
 #include "muextr.h"
 #include "mupip_reorg.h"
-#include "t_abort.h"
 #include "op.h"
-
-/* This section documents DOs and DONTs about code used by GTMSECSHR on Alpha VMS. Any module linked into GTMSECSHR (see
- * secshrlink.axp for the current list) must follow certain rules as GTMSECSHR provides user-defined system services
- * (privileged image that runs in kernel mode). See "Creating User Written System Sevice" chapter of the "Programming Concepts"
- * OpenVMS manual and the "Shareable Images Cookbook" available from the OpenVMS Wizard's page. SYS$EXAMPLES:uwss*.* is also a
- * good reference.
- *
- ** DO NOT use modulo (%) operation. If % is used, GTMSECSHR links with LIBOTS.EXE - an external shared image. This will result
- *  in "-SYSTEM-F-NOSHRIMG, privileged shareable image cannot have outbound calls" errors when GTMSECSHR is invoked. We might as
- *  well avoid division too.
- *
- ** The only library/system calls allowed are SYS$ calls.
- *
- ** No I/O allowed - any device, including operator console.
- *
- ** Always PROBE memory before accessing it. If not, should SECSHR access invalid memory (out of bounds for instance) the machine
- *  will crash (BUGCHECK in VMS parlance). Remember, SECSHR is running in kernel mode!
- *
- ** Both secshr_db_clnup.c and sec_shr_blk_build.c are compiled with /prefix=except=memmove. If any of the other modules used
- *  memmove, they would need special treatment as well.
- */
+#include "dpgbldir.h"		/* for "get_next_gdr" */
+#include "t_abort.h"
 
 #define FLUSH 1
 
@@ -90,103 +69,49 @@
 #define	WCBLOCKED_WBUF_DQD_LIT		"wcb_secshr_db_clnup_wbuf_dqd"
 #define	WCBLOCKED_PHASE2_CLNUP_LIT	"wcb_secshr_db_clnup_phase2_clnup"
 
-/* IMPORTANT : SECSHR_PROBE_REGION sets csa */
-#define	SECSHR_PROBE_REGION(reg)									\
-	if (!GTM_PROBE(SIZEOF(gd_region), (reg), READ))							\
-		continue; /* would be nice to notify the world of a problem but where and how?? */	\
-	if (!reg->open || reg->was_open)								\
-		continue;										\
-	if (!GTM_PROBE(SIZEOF(gd_segment), (reg)->dyn.addr, READ))					\
-		continue; /* would be nice to notify the world of a problem but where and how? */	\
-	if (!IS_REG_BG_OR_MM(reg))									\
-		continue;										\
-	if (!GTM_PROBE(SIZEOF(file_control), (reg)->dyn.addr->file_cntl, READ))				\
-		continue; /* would be nice to notify the world of a problem but where and how? */	\
-	if (!GTM_PROBE(SIZEOF(GDS_INFO), (reg)->dyn.addr->file_cntl->file_info, READ))			\
-		continue; /* would be nice to notify the world of a problem but where and how? */	\
-	csa = &(FILE_INFO((reg)))->s_addrs;								\
-	if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, WRITE))						\
-		continue; /* would be nice to notify the world of a problem but where and how? */	\
-	assert(reg->read_only && !csa->read_write || !reg->read_only && csa->read_write);
-
 #ifdef DEBUG_CHECK_LATCH
 #  define DEBUG_LATCH(x) x
 #else
 #  define DEBUG_LATCH(x)
 #endif
 
-#  define SALVAGE_UNIX_LATCH_DBCRIT(X, is_exiting, wcblocked)								\
-MBSTART {														\
-	/* "wcblocked" is relevant only if X is the database crit semaphore. In this case, BEFORE salvaging crit,	\
-	 * (but AFTER ensuring the previous holder pid is dead) we need to set cnl->wc_blocked to TRUE to		\
-	 * ensure whoever grabs crit next does a cache-recovery. This is necessary in case previous holder of crit	\
-	 * had set some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect assertpro()s	\
-	 * in PIN_CACHE_RECORD macro in t_end/tp_tend.									\
-	 */														\
-	uint4 pid;													\
-															\
-	if ((pid = (X)->u.parts.latch_pid) == rundown_process_id)							\
-	{														\
-		if (is_exiting)												\
-		{													\
-			SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);								\
-			DEBUG_LATCH(util_out_print("Latch cleaned up", FLUSH));						\
-		}													\
-	} else if (0 != pid && FALSE == is_proc_alive(pid, 0))								\
-	{														\
-		(wcblocked) = TRUE;											\
-		DEBUG_LATCH(util_out_print("Orphaned latch cleaned up", TRUE));						\
-		COMPSWAP_UNLOCK((X), pid, (X)->u.parts.latch_image_count, LOCK_AVAILABLE, 0);				\
-	}														\
+#define	RELEASE_LATCH_IF_OWNER_AND_EXITING(X, is_exiting)			\
+MBSTART {									\
+	if (is_exiting && ((X)->u.parts.latch_pid == process_id))		\
+	{									\
+		SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);				\
+		DEBUG_LATCH(util_out_print("Latch cleaned up", FLUSH));		\
+	}									\
 } MBEND
 
-/* The SALVAGE_UNIX_LATCH macro needs to do exactly the same thing as done by the SALVAGE_UNIX_LATCH_DBCRIT	\
- * macro except that we don't need any special set of wc_blocked to TRUE. So we pass in a dummy variable	\
- * (instead of cnl->wc_blocked) to be set to TRUE in case the latch is salvaged.				\
- */														\
-#define	SALVAGE_UNIX_LATCH(X, is_exiting)									\
-MBSTART {													\
-	boolean_t	dummy;											\
-														\
-	SALVAGE_UNIX_LATCH_DBCRIT(X, is_exiting, dummy);							\
-} MBEND
-
-GBLDEF gd_addr_fn_ptr	get_next_gdr_addrs;
-GBLDEF cw_set_element	*cw_set_addrs;
-GBLDEF sgm_info		**first_sgm_info_addrs;
-GBLDEF sgm_info		**first_tp_si_by_ftok_addrs;
-GBLDEF unsigned char	*cw_depth_addrs;
-GBLDEF uint4		rundown_process_id;
-GBLDEF uint4		rundown_image_count;
-GBLDEF int4		rundown_os_page_size;
-GBLDEF gd_region	**jnlpool_reg_addrs;
-GBLDEF inctn_opcode_t	*inctn_opcode_addrs;
-GBLDEF inctn_detail_t	*inctn_detail_addrs;
-GBLDEF uint4		*dollar_tlevel_addrs;
-GBLDEF uint4		*update_trans_addrs;
-GBLDEF sgmnt_addrs	**cs_addrs_addrs;
-GBLDEF sgmnt_addrs 	**kip_csa_addrs;
-GBLDEF boolean_t	*need_kip_incr_addrs;
-GBLDEF trans_num	*start_tn_addrs;
-
-GBLREF	uint4			process_id;	/* Used in xxx_SWAPLOCK macros .. has same value as rundown_process_id on UNIX */
-GBLREF	volatile int4		crit_count;
-GBLREF	short			crash_count;
-GBLREF	node_local_ptr_t	locknl;
-GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		certify_all_blocks;
-GBLREF	gd_region		*gv_cur_region;
+GBLREF	boolean_t		need_kip_incr;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	gd_region		*gv_cur_region;		/* for the LOCK_HIST macro in the RELEASE_BUFF_UPDATE_LOCK macro */
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	node_local_ptr_t	locknl;			/* set explicitly before invoking RELEASE_BUFF_UPDATE_LOCK macro */
-GBLREF	int4			strm_index;
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
+GBLREF	sgm_info		*first_sgm_info;	/* List of all regions (unsorted) in TP transaction */
+GBLREF	sgm_info		*first_tp_si_by_ftok;	/* List of READ or UPDATED regions sorted on ftok order */
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_addrs 		*kip_csa;
+GBLREF	short			crash_count;
+GBLREF	trans_num		start_tn;
+GBLREF	uint4			process_id;
+GBLREF	uint4			update_trans;
+GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	volatile int4		crit_count;
+GBLREF	int4			strm_index;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
 
 #ifdef DEBUG
 GBLREF	volatile boolean_t	in_wcs_recover; /* TRUE if in "wcs_recover" */
+GBLREF	boolean_t		dse_running;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 #endif
 
 error_def(ERR_WCBLOCKED);
@@ -198,50 +123,125 @@ typedef enum
 	REG_COMMIT_COMPLETE	 /* indicates that GT.M has already committed all cw-set-elements for this region */
 } commit_type;
 
-boolean_t	secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
+/* secshr_db_clnup can be called with one of the following three values for "secshr_state"
+ *
+ * 	a) NORMAL_TERMINATION   --> We are called from the exit-handler for precautionary cleanup.
+ * 				    We should NEVER be in the midst of a database update in this case.
+ * 	b) COMMIT_INCOMPLETE    --> We are called from t_commit_cleanup.
+ * 				    We should ALWAYS be in the midst of a database update in this case.
+ * 	c) ABNORMAL_TERMINATION --> This is currently VMS ONLY. This process received a STOP/ID.
+ * 				    We can POSSIBLY be in the midst of a database update in this case.
+ * 				    When UNIX boxes allow kernel extensions, it can then handle "kill -9".
+ *
+ * If we are in the midst of a database update, then depending on where we are in the commit logic
+ * 	we need to ROLL-BACK (undo the partial commit) or ROLL-FORWARD (complete the partial commit) the database update.
+ * t_commit_cleanup handles the ROLL-BACK and secshr_db_clnup handles the ROLL-FORWARD
+ *
+ * For all error conditions in the database commit logic, t_commit_cleanup gets control first.
+ * If then determines whether to do a ROLL-BACK or a ROLL-FORWARD.
+ * If a ROLL-BACK needs to be done, then t_commit_cleanup handles it all by itself and we will not come here.
+ * If a ROLL-FORWARD needs to be done, then t_commit_cleanup invokes secshr_db_clnup.
+ * 	In this case, secshr_db_clnup will be called with a "secshr_state" value of "COMMIT_INCOMPLETE".
+ *
+ * Irrespective of whether we are in the midst of a database commit or not, t_commit_cleanup does not get control.
+ * Since the process can POSSIBLY be in the midst of a database update while it was STOP/IDed,
+ * 	the logic for determining whether it is a ROLL-BACK or a ROLL-FORWARD needs to also be in secshr_db_clnup.
+ * If it is determined that a ROLL-FORWARD needs to be done, secshr_db_clnup takes care of it by itself.
+ * But if a ROLL-BACK needs to be done, then secshr_db_clnup DOES NOT invoke t_commit_cleanup.
+ * Instead it sets cnl->wc_blocked to TRUE thereby ensuring the next process that gets CRIT does a cache recovery
+ * 	which will take care of doing more than the ROLL-BACK that t_commit_cleanup would have otherwise done.
+ *
+ * In order to understand how a ROLL-BACK or ROLL-FORWARD decision is made, the commit flow needs to be understood first.
+ * The commit logic flow in t_end & tp_tend can be captured as follows.
+ * Note that
+ *	a) In t_end there is only one region in the "For each region" loop. And "si->update_trans" == "update_trans".
+ *	b) All jnlpool steps below apply only if replication is turned ON.
+ *	c) For MM, the jnl and db commits happen inside crit i.e. no phase2 outside crit like BG.
+ *
+ * (CMT01) Get crit on all regions (UPDATED & NON-UPDATED)
+ * (CMT02) Get crit on jnlpool
+ * (CMT03) Reserve space in JNLPOOL for journal records (UPDATE_JPL_RSRV_WRITE_ADDR macro)
+ *         For each UPDATED region
+ *         {
+ * (CMT04)     csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+ * (CMT05)     csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;
+ *         }
+ *         For each UPDATED & JOURNALED region
+ *         {
+ * (CMT06)     Reserve space in JNLBUFF for journal records PHASE1 (UPDATE_JRS_RSRV_FREEADDR macro)
+ *         }
+ * (CMT06a) If (MM or (BG && jnlbuff-overflow)) Do Step CMT16 here instead of later
+ * (CMT06b) If (MM) Do Step CMT17 here instead of later
+ * (CMT07) jnlpool_ctl->jnl_seqno++; jnlpool_ctl->strm_seqno[]++ if supplementary; (SET_JNL_SEQNO macro)
+ *         For each UPDATED region
+ *         {
+ * (CMT08)     csa->t_commit_crit = T_COMMIT_CRIT_PHASE1; cnl->update_underway_tn = csd->trans_hist.curr_tn;
+ * (CMT09)     If replication is ON, csd->reg_seqno = jnlpool_ctl->jnl_seqno + 1; csd->strm_reg_seqno[] = xxx
+ * (CMT10)     Commit all cw-set-elements of this region PHASE1 (inside crit)	// bg_update_phase1 or mm_update
+ * (CMT10a)    If (BG && (bitmap cw-set-element of this region)) commit it PHASE2 (inside crit)	// bg_update_phase2
+ * (CMT11)     si->update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK;
+ * (CMT12)     csd->trans_hist.curr_tn++;
+ * (CMT13)     csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;
+ * (CMT14)     Release crit on region
+ *         }
+ * (CMT15) Release crit on jnlpool
+ *         For each UPDATED & JOURNALED region
+ * (CMT16)     If (BG) Write journal records in JNLBUFF & JNLPOOL. PHASE2 (outside crit). Mark write complete in JNLBUFF.
+ * (CMT17) If (BG) Mark journal record write complete in JNLPOOL.
+ *         For each participating region being UPDATED
+ *         {
+ * (CMT18)     Commit all cw-set-elements of this region PHASE2 (outside crit)	// bg_update_phase2
+ * (CMT19)     csa->t_commit_crit = FALSE;
+ *         }
+ *
+ * If a transaction has proceeded to Step (CMT08) for at least one region, then "tp_update_underway" is set to TRUE
+ * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
+ * This is for the case where the process encounters an error in the midst of commit. In this case, we are guaranteed
+ * a clean recovery by secshr_db_clnup() & wcs_recover(). Database integrity is guaranteed.
+ * But if the process in the midst of commit is abnormally killed (e.g. kill -9), then "mutex_salvage",
+ * "jnl_phase2_salvage" and "repl_phase2_salvage" try to cleanup various pieces of the leftover mess but
+ * we are not guaranteed db integrity (i.e. CMT18 cannot be currently easily redone by a different process).
+ */
 
 void secshr_db_clnup(enum secshr_db_state secshr_state)
 {
 	unsigned char		*chain_ptr;
 	char			*wcblocked_ptr;
-	uint4			dlr_tlevel;
-	boolean_t		is_bg, jnlpool_reg, do_accounting, first_time = TRUE, is_exiting;
-	boolean_t		kip_csa_usable, needkipincr;
-	uint4			upd_trans; /* a copy of the global variable "update_trans" which is needed for VMS STOP/ID case */
+	boolean_t		is_bg, do_accounting, first_time = TRUE, is_exiting;
 	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
 	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
 	boolean_t		update_underway = FALSE;	/* set to TRUE if either TP or non-TP commit was underway */
 	boolean_t		set_wc_blocked = FALSE;		/* set to TRUE if cnl->wc_blocked needs to be set */
-	boolean_t		dont_reset_data_invalid;	/* set to TRUE in case cr->data_invalid was TRUE in phase2 */
+	boolean_t		donot_reset_data_invalid;	/* set to TRUE in case cr->data_invalid was TRUE in phase2 */
 	int			max_bts, old_mode;
 	unsigned int		lcnt;
 	cache_rec_ptr_t		clru, cr, cr_alt, cr_top, start_cr, actual_cr;
 	cache_que_heads_ptr_t	cache_state;
 	cw_set_element		*cs, *cs_ptr, *cs_top, *first_cw_set, *nxt, *orig_cs;
-	gd_addr			*gd_header;
+	gd_addr			*gd_hdr;
 	gd_region		*reg, *reg_top, *save_gv_cur_region;
 	jnl_buffer_ptr_t	jbp;
 	off_chain		chain;
-	sgm_info		*si, *firstsgminfo;
-	sgmnt_addrs		*csa, *csaddrs;
+	sgm_info		*si, *save_si;
+	sgmnt_addrs		*csa, *tmp_csa, *repl_csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	sm_uc_ptr_t		blk_ptr;
 	blk_hdr_ptr_t		blk_hdr_ptr;
 	jnlpool_ctl_ptr_t	jpl;
-	jnldata_hdr_ptr_t	jh;
-	uint4			cumul_jnl_rec_len, jsize, new_write, imgcnt;
 	pid_t			pid;
 	sm_uc_ptr_t		bufstart;
 	int4			bufindx;	/* should be the same type as "csd->bt_buckets" */
 	commit_type		this_reg_commit_type;	/* indicate the type of commit of a given region in a TP transaction */
-	gv_namehead		*gvt = NULL, *gvtarget;
+	gv_namehead		*gvtarget;
 	srch_blk_status		*t1;
 	trans_num		currtn;
 	int4			n;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 	cache_rec_ptr_t		snapshot_cr;
 	uint4			blk_size;
+	jbuf_rsrv_struct_t	*jrs;
+	seq_num			strm_seqno;
 #	ifdef DEBUG
 	cache_rec_ptr_t		*crArray;
 	unsigned int		crArrayIndex;
@@ -249,150 +249,46 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NULL == get_next_gdr_addrs)
-		return;
 	save_gv_cur_region = gv_cur_region;	/* save it for use at function end in case code in between changes this variable */
-	/*
-	 * secshr_db_clnup can be called with one of the following three values for "secshr_state"
-	 *
-	 * 	a) NORMAL_TERMINATION   --> We are called from the exit-handler for precautionary cleanup.
-	 * 				    We should NEVER be in the midst of a database update in this case.
-	 * 	b) COMMIT_INCOMPLETE    --> We are called from t_commit_cleanup.
-	 * 				    We should ALWAYS be in the midst of a database update in this case.
-	 * 	c) ABNORMAL_TERMINATION --> This is currently VMS ONLY. This process received a STOP/ID.
-	 * 				    We can POSSIBLY be in the midst of a database update in this case.
-	 * 				    When UNIX boxes allow kernel extensions, this can be made to handle "kill -9" too.
-	 *
-	 * If we are in the midst of a database update, then depending on the stage of the commit we are in,
-	 * 	we need to ROLL-BACK (undo the partial commit) or ROLL-FORWARD (complete the partial commit) the database update.
-	 *
-	 * t_commit_cleanup handles the ROLL-BACK and secshr_db_clnup handles the ROLL-FORWARD
-	 *
-	 * For all error conditions in the database commit logic, t_commit_cleanup gets control first.
-	 * If then determines whether to do a ROLL-BACK or a ROLL-FORWARD.
-	 * If a ROLL-BACK needs to be done, then t_commit_cleanup handles it all by itself and we will not come here.
-	 * If a ROLL-FORWARD needs to be done, then t_commit_cleanup invokes secshr_db_clnup.
-	 * 	In this case, secshr_db_clnup will be called with a "secshr_state" value of "COMMIT_INCOMPLETE".
-	 *
-	 * In case of a STOP/ID in VMS, secshr_db_clnup is directly invoked with a "secshr_state" value of "ABNORMAL_TERMINATION".
-	 * Irrespective of whether we are in the midst of a database commit or not, t_commit_cleanup does not get control.
-	 * Since the process can POSSIBLY be in the midst of a database update while it was STOP/IDed,
-	 * 	the logic for determining whether it is a ROLL-BACK or a ROLL-FORWARD needs to also be in secshr_db_clnup.
-	 * If it is determined that a ROLL-FORWARD needs to be done, secshr_db_clnup takes care of it by itself.
-	 * But if a ROLL-BACK needs to be done, then secshr_db_clnup DOES NOT invoke t_commit_cleanup.
-	 * Instead it sets cnl->wc_blocked to TRUE thereby ensuring the next process that gets CRIT does a cache recovery
-	 * 	which will take care of doing more than the ROLL-BACK that t_commit_cleanup would have otherwise done.
-	 *
-	 * The logic for determining if it is a ROLL-BACK or ROLL-FORWARD is explained below.
-	 * The commit logic flow in tp_tend and t_end can be captured as follows. Note that in t_end there is only one region.
-	 *
-	 *  1) Get crit on all regions
-	 *  2) Get crit on jnlpool
-	 *  3) jnlpool_ctl->early_write_addr += delta;
-	 *       For each participating region being UPDATED
-	 *       {
-	 *  4)     csd->trans_hist.early_tn++;
-	 *         Write journal records
-	 *  5)     csa->hdr->reg_seqno = jnlpool_ctl->jnl_seqno + 1;
-	 *       }
-	 *       For each participating region being UPDATED
-	 *       {
-	 *  6)	    csa->t_commit_crit = T_COMMIT_CRIT_PHASE1;
-	 *             For every cw-set-element of this region
-	 *             {
-	 *  6a)          Commit this particular block PHASE1 (inside crit).
-	 *             }
-	 *  7)       csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;
-	 *  8)     csd->trans_hist.curr_tn++;
-	 *       }
-	 *  9) jnlpool_ctl->write_addr = jnlpool_ctl->early_write_addr;
-	 * 10) jnlpool_ctl->jnl_seqno++;
-	 * 11) Release crit on all db regions
-	 * 12) Release crit on jnlpool
-	 *       For each participating region being UPDATED
-	 *       {
-	 *             For every cw-set-element of this region
-	 *             {
-	 * 13)           Commit this particular block PHASE2 (outside crit).
-	 * 14)           cs->mode = gds_t_committed;
-	 *             }
-	 * 15)       csa->t_commit_crit = FALSE;
-	 *       }
-	 *
-	 * If a TP transaction has proceeded to step (6) for at least one region, then "tp_update_underway" is set to TRUE
-	 * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
-	 *
-	 * If a non-TP transaction has proceeded to step (6), then "non_tp_update_underway" is set to TRUE
-	 * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
-	 */
-	assert(rundown_process_id == process_id);
-	is_exiting = (ABNORMAL_TERMINATION == secshr_state) || (NORMAL_TERMINATION == secshr_state);
-	if (GTM_PROBE(SIZEOF(*start_tn_addrs), start_tn_addrs, READ))
-		currtn = *start_tn_addrs;
-	else
-	{	/* init_secshr_addrs did not even complete before we got a terminating signal so no database actions to clean up */
-		assert(NULL == start_tn_addrs);
-		assert(is_exiting);
-		return;
-	}
-	if (GTM_PROBE(SIZEOF(*dollar_tlevel_addrs), dollar_tlevel_addrs, READ))
-		dlr_tlevel = *dollar_tlevel_addrs;
-	else
-	{
-		assert(FALSE);
-		dlr_tlevel = FALSE;
-	}
-	if (dlr_tlevel && GTM_PROBE(SIZEOF(*first_tp_si_by_ftok_addrs), first_tp_si_by_ftok_addrs, READ))
+	is_exiting = (NORMAL_TERMINATION == secshr_state);
+	currtn = start_tn;
+	if (dollar_tlevel)
 	{	/* Determine update_underway for TP transaction. A similar check is done in t_commit_cleanup as well.
 		 * Regions are committed in the ftok order using "first_tp_si_by_ftok". Also crit is released on each region
 		 * as the commit completes. Take that into account while determining if update is underway.
 		 */
-		for (si = *first_tp_si_by_ftok_addrs; NULL != si; si = si->next_tp_si_by_ftok)
+		for (si = first_tp_si_by_ftok; NULL != si; si = si->next_tp_si_by_ftok)
 		{
-			if (GTM_PROBE(SIZEOF(sgm_info), si, READ))
+			if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
+			{	/* Two possibilities.
+				 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
+				 *	(b) Have completed commit for this region and have released crit on this region.
+				 *		(in a potentially multi-region TP transaction).
+				 * In either case, update is underway and the transaction cannot be rolled back.
+				 */
+				tp_update_underway = TRUE;
+				update_underway = TRUE;
+				break;
+			}
+			if (NULL != si->first_cw_set)
 			{
-				assert(GTM_PROBE(SIZEOF(cw_set_element), si->first_cw_set, READ) || (NULL == si->first_cw_set));
-				if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
-				{	/* Two possibilities.
-					 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
-					 *	(b) Have completed commit for this region and have released crit on this region.
-					 *		(in a potentially multi-region TP transaction).
-					 * In either case, update is underway and the transaction cannot be rolled back.
-					 */
+				csa = si->tp_csa;
+				assert(NULL != csa);
+				if (T_UPDATE_UNDERWAY(csa))
+				{
 					tp_update_underway = TRUE;
 					update_underway = TRUE;
 					break;
 				}
-				if (GTM_PROBE(SIZEOF(cw_set_element), si->first_cw_set, READ))
-				{	/* Note that SECSHR_PROBE_REGION does a "continue" if any probes fail. */
-					csa = si->tp_csa;
-					if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
-						continue;
-					if (T_UPDATE_UNDERWAY(csa))
-					{
-						tp_update_underway = TRUE;
-						update_underway = TRUE;
-						break;
-					}
-				}
-			} else
-			{
-				assert(FALSE);
-				break;
 			}
 		}
-	}
-	if (!dlr_tlevel)
-	{	/* determine update_underway for non-TP transaction */
-		upd_trans = FALSE;
-		if (GTM_PROBE(SIZEOF(*update_trans_addrs), update_trans_addrs, READ))
-			upd_trans = *update_trans_addrs;
-		csaddrs = NULL;
-		if (GTM_PROBE(SIZEOF(*cs_addrs_addrs), cs_addrs_addrs, READ))
-			csaddrs = *cs_addrs_addrs;
-		if (GTM_PROBE(SIZEOF(sgmnt_addrs), csaddrs, READ))
+	} else
+	{	/* Determine update_underway for non-TP transaction */
+		if (NULL != cs_addrs)
 		{
-			if (csaddrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & upd_trans) || T_UPDATE_UNDERWAY(csaddrs))
+			assert(!(cs_addrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & update_trans))
+									|| T_UPDATE_UNDERWAY(cs_addrs));
+			if (T_UPDATE_UNDERWAY(cs_addrs))
 			{
 				non_tp_update_underway = TRUE;	/* non-tp update was underway */
 				update_underway = TRUE;
@@ -403,136 +299,86 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	 * (as otherwise t_commit_cleanup would not have called us)
 	 */
 	assert((COMMIT_INCOMPLETE != secshr_state) || update_underway);
-	for (gd_header = (*get_next_gdr_addrs)(NULL);  NULL != gd_header;  gd_header = (*get_next_gdr_addrs)(gd_header))
+	for (gd_hdr = get_next_gdr(NULL); NULL != gd_hdr; gd_hdr = get_next_gdr(gd_hdr))
 	{
-		if (!GTM_PROBE(SIZEOF(gd_addr), gd_header, READ))
-			break;	/* if gd_header is accessible */
-		for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;  reg < reg_top;  reg++)
+		for (reg = gd_hdr->regions, reg_top = reg + gd_hdr->n_regions;  reg < reg_top;  reg++)
 		{
-			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
+			if (!reg->open || reg->was_open)
+				continue;
+			if (!IS_REG_BG_OR_MM(reg))
+				continue;
+			csa = REG2CSA(reg);
+			if (NULL == csa)
+				continue;
+			assert((reg->read_only && !csa->read_write) || (!reg->read_only && csa->read_write));
 			csd = csa->hdr;
-			if (!GTM_PROBE(SIZEOF(sgmnt_data), csd, WRITE))
-			{
-				assert(FALSE);
-				continue; /* would be nice to notify the world of a problem but where and how? */
-			}
+			assert(NULL != csd);
 			cnl = csa->nl;
-			if (!GTM_PROBE(NODE_LOCAL_SIZE_DBS, cnl, WRITE))
-			{
-				assert(FALSE);
-				continue; /* would be nice to notify the world of a problem but where and how? */
-			}
+			assert(NULL != cnl);
 			is_bg = (csd->acc_meth == dba_bg);
 			do_accounting = FALSE;	/* used by SECSHR_ACCOUNTING macro */
-			/* do SECSHR_ACCOUNTING only if holding crit (to avoid another process' normal termination call
-			 * to secshr_db_clnup from overwriting whatever important information we wrote. if we are in
-			 * crit, for the next process to overwrite us it needs to get crit which in turn will invoke
-			 * wcs_recover which in turn will send whatever we wrote to the operator log).
-			 * also cannot update csd if MM and read-only. take care of that too. */
+			/* Do SECSHR_ACCOUNTING only if holding crit. This is so we avoid another process' normal termination call
+			 * to "secshr_db_clnup" from overwriting whatever important information we wrote. If we are in crit,
+			 * for the next process to overwrite us it needs to get crit which in turn will invoke wcs_recover
+			 * which in turn will send whatever we wrote (using SECSHR_ACCOUNTING) to the syslog).
+			 * Also cannot update csd if MM and read-only. take care of that too.
+			 */
 			if (csa->now_crit && (csa->read_write || is_bg))
 			{	/* start accounting */
 				cnl->secshr_ops_index = 0;
 				do_accounting = TRUE;	/* used by SECSHR_ACCOUNTING macro */
 			}
-			SECSHR_ACCOUNTING(4);	/* 4 is the number of arguments following including self */
-			SECSHR_ACCOUNTING(__LINE__);
-			SECSHR_ACCOUNTING(rundown_process_id);
-			SECSHR_ACCOUNTING(secshr_state);
-			if (csa->ti != &csd->trans_hist)
-			{
-				SECSHR_ACCOUNTING(4);
-				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING((INTPTR_T)csa->ti);
-				SECSHR_ACCOUNTING((INTPTR_T)&csd->trans_hist);
-				csa->ti = &csd->trans_hist;	/* better to correct and proceed than to stop */
-			}
-			SECSHR_ACCOUNTING(3);	/* 3 is the number of arguments following including self */
-			SECSHR_ACCOUNTING(__LINE__);
-			SECSHR_ACCOUNTING(csd->trans_hist.curr_tn);
+			SECSHR_ACCOUNTING(do_accounting, 5);	/* 5 is the number of arguments following including self */
+			SECSHR_ACCOUNTING(do_accounting, __LINE__);
+			SECSHR_ACCOUNTING(do_accounting, process_id);
+			SECSHR_ACCOUNTING(do_accounting, secshr_state);
+			SECSHR_ACCOUNTING(do_accounting, csd->trans_hist.curr_tn);
+			csa->ti = &csd->trans_hist;	/* correct it in case broken */
 			if (is_exiting)
 			{	/* If we hold any latches in the node_local area, release them. Note we do not check
-				   db_latch here because it is never used by the compare and swap logic but rather
-				   the aswp logic. Since it is only used for the 3 state cache record lock and
-				   separate recovery exists for it, we do not do anything with it here.
-				*/
-				SALVAGE_UNIX_LATCH(&cnl->wc_var_lock, is_exiting);
-				if (ABNORMAL_TERMINATION == secshr_state)
-				{
-					if (csa->timer)
-					{
-						if (-1 < cnl->wcs_timers) /* private flag is optimistic: don't overdo */
-							PROBE_DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
-						REMOVE_WT_PID(csa);
-						csa->canceled_flush_timer = TRUE;
-						csa->timer = FALSE;
-					}
-					if (csa->read_write && csa->ref_cnt)
-					{
-						assert(0 < cnl->ref_cnt);
-						csa->ref_cnt--;
-						assert(!csa->ref_cnt);
-						PROBE_DECR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
-					}
-				}
+				 * db_latch here because it is never used by the compare and swap logic but rather
+				 * the aswp logic. Since it is only used for the 3 state cache record lock and
+				 * separate recovery exists for it, we do not do anything with it here.
+				 */
+				RELEASE_LATCH_IF_OWNER_AND_EXITING(&cnl->wc_var_lock, is_exiting);
+				assert(ABNORMAL_TERMINATION != secshr_state);
+				/* Note: In case of "kill -9", cnl->wcs_timers & cnl->ref_cnt will stay uncleaned */
 				if ((csa->in_wtstart) && (0 < cnl->in_wtstart))
 				{
-					PROBE_DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
+					DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 					assert(0 < cnl->intent_wtstart);
 					if (0 < cnl->intent_wtstart)
-						PROBE_DECR_CNT(&cnl->intent_wtstart, &cnl->wc_var_lock);
+						DECR_CNT(&cnl->intent_wtstart, &cnl->wc_var_lock);
 				}
 				csa->in_wtstart = FALSE;	/* Let wcs_wtstart run for exit processing */
-				if (cnl->wcsflu_pid == rundown_process_id)
+				if (cnl->wcsflu_pid == process_id)
 					cnl->wcsflu_pid = 0;
 			}
 			set_wc_blocked = FALSE;
 			if (is_bg)
 			{
-				if ((0 == cnl->sec_size) || !GTM_PROBE(cnl->sec_size, cnl, WRITE))
-				{
-					SECSHR_ACCOUNTING(3);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(cnl->sec_size);
-					assert(FALSE);
-					continue;
-				}
+				assert(cnl->sec_size);
 				cache_state = csa->acc_meth.bg.cache_state;
-				if (!GTM_PROBE(SIZEOF(cache_que_heads), cache_state, WRITE))
-				{
-					SECSHR_ACCOUNTING(3);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING((INTPTR_T)cache_state);
-					assert(FALSE);
-					continue;
-				}
-				SALVAGE_UNIX_LATCH(&cache_state->cacheq_active.latch, is_exiting);
+				RELEASE_LATCH_IF_OWNER_AND_EXITING(&cache_state->cacheq_active.latch, is_exiting);
 				start_cr = cache_state->cache_array + csd->bt_buckets;
 				bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, start_cr->buffaddr);
 				max_bts = csd->n_bts;
-				if (!GTM_PROBE((uint4)(max_bts * SIZEOF(cache_rec)), start_cr, WRITE))
-				{
-					SECSHR_ACCOUNTING(3);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING((INTPTR_T)start_cr);
-					assert(FALSE);
-					continue;
-				}
 				cr_top = start_cr + max_bts;
 				if (is_exiting)
 				{
 #					ifdef DEBUG
-					if (gtm_white_box_test_case_enabled && (reg == gd_header->regions)
+					if (gtm_white_box_test_case_enabled && (reg == gd_hdr->regions)
 						&& (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number))
 					{
 						assert((NULL != TREF(block_now_locked))
-							&& ((TREF(block_now_locked))->r_epid == rundown_process_id));
+							&& ((TREF(block_now_locked))->r_epid == process_id));
 					}
 #					endif
 					if (NULL != (cr = TREF(block_now_locked)))	/* done by region to ensure access */
 					{	/* The following is potentially thread-specific rather than process-specific */
 						TREF(block_now_locked) = NULL;
-						SALVAGE_UNIX_LATCH(&cr->rip_latch, is_exiting);
-						if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty) && (0 == cr->in_cw_set))
+						RELEASE_LATCH_IF_OWNER_AND_EXITING(&cr->rip_latch, is_exiting);
+						if ((cr->r_epid == process_id) && (0 == cr->dirty) && (0 == cr->in_cw_set))
 						{	/* increment cycle for blk number changes (for tp_hist) */
 							cr->cycle++;
 							cr->blk = CR_BLKEMPTY;
@@ -550,185 +396,164 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			 * ftok ordered linked list ("first_tp_si_by_ftok") so we can safely use this.
 			 */
 			if (tp_update_underway)
-			{	/* this is constructed to deal with the issue of reg != si->gv_cur_region
-				 * due to the possibility of multiple global directories pointing to regions
-				 * that resolve to the same physical file; was_open prevents processing the segment
-				 * more than once, so this code matches on the file rather than the region to make sure
-				 * that it gets processed at least once */
-				for (si = *first_tp_si_by_ftok_addrs; NULL != si; si = si->next_tp_si_by_ftok)
+			{	/* This is constructed to deal with the issue of reg != si->gv_cur_region due to the possibility
+				 * of multiple global directories pointing to regions that resolve to the same physical file;
+				 * was_open prevents processing the segment more than once, so this code matches on the file
+				 * rather than the region to make sure that it gets processed at least once.
+				 */
+				for (si = first_tp_si_by_ftok; NULL != si; si = si->next_tp_si_by_ftok)
 				{
-					if (!GTM_PROBE(SIZEOF(sgm_info), si, READ))
-					{
-						SECSHR_ACCOUNTING(3);
-						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING((INTPTR_T)si);
-						assert(FALSE);
-						break;
-					} else if (!GTM_PROBE(SIZEOF(gd_region), si->gv_cur_region, READ))
-					{
-						SECSHR_ACCOUNTING(3);
-						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING((INTPTR_T)si->gv_cur_region);
-						assert(FALSE);
-						continue;
-					} else if (!GTM_PROBE(SIZEOF(gd_segment), si->gv_cur_region->dyn.addr, READ))
-					{
-						SECSHR_ACCOUNTING(3);
-						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING((INTPTR_T)si->gv_cur_region->dyn.addr);
-						assert(FALSE);
-						continue;
-					} else if (si->gv_cur_region->dyn.addr->file_cntl == reg->dyn.addr->file_cntl)
+					if (FILE_CNTL(si->gv_cur_region) == FILE_CNTL(reg))
 					{
 						cs = si->first_cw_set;
-						if (cs && GTM_PROBE(SIZEOF(cw_set_element), cs, READ))
-						{
-							while (cs->high_tlevel)
-							{
-								if (GTM_PROBE(SIZEOF(cw_set_element),
-											cs->high_tlevel, READ))
-									cs = cs->high_tlevel;
-								else
-								{
-									SECSHR_ACCOUNTING(3);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cs->high_tlevel);
-									assert(FALSE);
-									first_cw_set = cs = NULL;
-									break;
-								}
-							}
-						}
+						TRAVERSE_TO_LATEST_CSE(cs);
 						first_cw_set = cs;
 						break;
 					}
 				}
-			} else if (!dlr_tlevel && csa->t_commit_crit)
-			{
-				if (!GTM_PROBE(SIZEOF(unsigned char), cw_depth_addrs, READ))
+			} else if (!dollar_tlevel && T_UPDATE_UNDERWAY(csa))
+			{	/* We have reached Step (CMT08). ROLL-FORWARD the commit unconditionally */
+				if (0 != cw_set_depth)
 				{
-					SECSHR_ACCOUNTING(3);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING((INTPTR_T)cw_depth_addrs);
-					assert(FALSE);
-				} else
-				{	/* csa->t_commit_crit being TRUE is a clear cut indication that we have
-					 * reached stage (6). ROLL-FORWARD the commit unconditionally.
-					 */
-					if (0 != *cw_depth_addrs)
-					{
-						first_cw_set = cs = cw_set_addrs;
-						cs_top = cs + *cw_depth_addrs;
-					}
-					/* else is the case where we had a duplicate set that did not update any cw-set */
-					assert(!tp_update_underway);
-					assert(non_tp_update_underway);	/* should have already determined update is underway */
-					/* This is a situation where we are in non-TP and have a region that we hold
-					 * crit in and are in the midst of commit but this region was not the current
-					 * region when we entered secshr_db_clnup. This is an out-of-design situation
-					 * that we want to catch.
-					 */
-					assertpro(non_tp_update_underway);
-					non_tp_update_underway = TRUE;	/* just in case */
-					update_underway = TRUE;		/* just in case */
+					first_cw_set = cs = cw_set;
+					cs_top = cs + cw_set_depth;
 				}
+				/* else is the case where we had a duplicate set that did not update any cw-set */
+				assert(!tp_update_underway);
+				assert(non_tp_update_underway);	/* should have already determined update is underway */
+				/* This is a situation where we are in non-TP and have a region that we hold
+				 * crit in and are in the midst of commit but this region was not the current
+				 * region when we entered secshr_db_clnup. This is an out-of-design situation
+				 * that we want to catch.
+				 */
+				assertpro(non_tp_update_underway);
+				non_tp_update_underway = TRUE;	/* just in case */
+				update_underway = TRUE;		/* just in case */
 			}
 			assert(!tp_update_underway || (NULL == first_cw_set) || (NULL != si));
-			/* It is possible that we were in the midst of a non-TP commit for this region at or past stage (7)
+			/* It is possible that we were in the midst of a non-TP commit for this region at or past Step (CMT13)
 			 * but first_cw_set is NULL. This is a case of duplicate SET with zero cw_set_depth. In this case,
-			 * don't have any cw-set-elements to commit. The only thing remaining to do is steps (9) through (12)
-			 * which are done later in this function.
+			 * don't have any cw-set-elements to commit. The only thing remaining to do is Step (CMT14) through
+			 * Step (CMT17) which is done later in this function.
 			 */
-			assert((FALSE == csa->t_commit_crit) || (T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit)
-								|| (T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit));
-			assert(!csa->t_commit_crit || (NULL != first_cw_set));	/* don't miss out committing a region */
-			/* Skip processing region in case of a multi-region TP transaction where this region is already committed */
+			assert((FALSE == csa->t_commit_crit) || (T_COMMIT_CRIT_PHASE0 == csa->t_commit_crit)
+				|| (T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) || (T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit));
 			assert((NULL == first_cw_set) || csa->now_crit || csa->t_commit_crit || tp_update_underway);
-			if ((csa->now_crit || csa->t_commit_crit) && (NULL != first_cw_set))
+			do     /* have a dummy loop to be able to use "break" for various codepaths below */
 			{
-				SECSHR_ACCOUNTING(6);
-				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(csa->now_crit);
-				SECSHR_ACCOUNTING(csa->t_commit_crit);
-				SECSHR_ACCOUNTING(csd->trans_hist.early_tn);
-				SECSHR_ACCOUNTING(csd->trans_hist.curr_tn);
-				assert(non_tp_update_underway || tp_update_underway);
+				if (!csa->now_crit && !csa->t_commit_crit)
+					break;	/* Skip processing region in case of a multi-region TP transaction
+						 * where this region is already committed.
+						 */
+				SECSHR_ACCOUNTING(do_accounting, 6);
+				SECSHR_ACCOUNTING(do_accounting, __LINE__);
+				SECSHR_ACCOUNTING(do_accounting, csa->now_crit);
+				SECSHR_ACCOUNTING(do_accounting, csa->t_commit_crit);
+				SECSHR_ACCOUNTING(do_accounting, csd->trans_hist.early_tn);
+				SECSHR_ACCOUNTING(do_accounting, csd->trans_hist.curr_tn);
+				assert(non_tp_update_underway || tp_update_underway || ((NULL == first_cw_set) && is_exiting));
 				assert(!non_tp_update_underway || !tp_update_underway);
-				if (is_bg)
-				{
-					clru = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cnl->cur_lru_cache_rec_off);
-					lcnt = 0;
-				}
 				assert((T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit) || csa->now_crit);
 				if (T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit)
 				{	/* in PHASE1 so hold crit AND have noted down valid value in csa->prev_free_blks */
 					/* for normal termination we should not have been in the midst of commit */
-					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
+					assert(!is_exiting || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					assert(csa->now_crit);
 					csd->trans_hist.free_blocks = csa->prev_free_blks;
 				}
-				SECSHR_ACCOUNTING(tp_update_underway ? 6 : 7);
-				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING((INTPTR_T)first_cw_set);
-				SECSHR_ACCOUNTING(tp_update_underway);
-				SECSHR_ACCOUNTING(non_tp_update_underway);
+				SECSHR_ACCOUNTING(do_accounting, tp_update_underway ? 6 : 7);
+				SECSHR_ACCOUNTING(do_accounting, __LINE__);
+				SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)first_cw_set);
+				SECSHR_ACCOUNTING(do_accounting, tp_update_underway);
+				SECSHR_ACCOUNTING(do_accounting, non_tp_update_underway);
 				if (!tp_update_underway)
 				{
-					SECSHR_ACCOUNTING((INTPTR_T)cs_top);
-					SECSHR_ACCOUNTING(*cw_depth_addrs);
+					SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs_top);
+					SECSHR_ACCOUNTING(do_accounting, cw_set_depth);
+					jrs = TREF(nontp_jbuf_rsrv);
 				} else
 				{
-					SECSHR_ACCOUNTING(si->cw_set_depth);
+					SECSHR_ACCOUNTING(do_accounting, si->cw_set_depth);
 					this_reg_commit_type = REG_COMMIT_UNSTARTED; /* assume GT.M did no commits in this region */
+					jrs = si->jbuf_rsrv_ptr;
 					/* Note that "this_reg_commit_type" is uninitialized if "tp_update_underway" is not TRUE
-					 * so should always be used within an "if (tp_update_underway)" */
+					 * so should always be used within an "if (tp_update_underway)".
+					 */
+				}
+				if (NEED_TO_FINISH_JNL_PHASE2(jrs))
+					FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);	/* Roll forward CMT16 */
+				if (NULL == first_cw_set)
+				{	/* This is a duplicate set (update_trans is TRUE, but cw_set is NULL).
+					 * OR we hold crit and are exiting. There is nothing to commit to the db.
+					 * Now that we finished jnl record writing, break.
+					 */
+					break;
+				}
+				if (is_bg)
+				{
+					clru = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cnl->cur_lru_cache_rec_off);
+					lcnt = 0;
 				}
 				/* Determine transaction number to use for the gvcst_*_build functions.
 				 * If not phase2, then we have crit, so it is the same as the current database transaction number.
 				 * If phase2, then we don't have crit, so use value stored in "start_tn" or "si->start_tn".
 				 */
 				if (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit)
-					currtn = csd->trans_hist.curr_tn;
-				else
 				{
-					if (tp_update_underway)		/* otherwise currtn initialized above from start_tn_addrs */
+					currtn = csd->trans_hist.curr_tn;
+					if (dollar_tlevel && (T_COMMIT_CRIT_PHASE0 == csa->t_commit_crit))
+					{	/* This region is part of a TP transaction where another region got an error
+						 * inside PHASE1 but this region is still in PHASE0 (since this region is
+						 * later in the "first_tp_si_by_ftok" list order). Finish CMT08 & CMT09
+						 * stages for this region.
+						 */
+						cnl->update_underway_tn = currtn;	/* Roll forward CMT08 */
+						/* Note csa->t_commit_crit = T_COMMIT_CRIT_PHASE1 is also set in CMT08
+						 * but we do not do that here as that confuses code below and is anyways
+						 * a process-private flag that is not needed otherwise below.
+						 */
+						if (jnl_fence_ctl.replication && REPL_ALLOWED(csa))
+						{	/* Indication that this is an update to a replicated region
+							 * that bumps the journal seqno. So finish CMT09.
+							 * Note: In "tp_tend", the variable "supplementary" is TRUE if
+							 * "jnl_fence_ctl.strm_seqno" is non-zero. We use that here since
+							 * the local variable "supplementary" is not available here.
+							 */
+							strm_seqno = GET_STRM_SEQ60(jnl_fence_ctl.strm_seqno);
+#							ifdef DEBUG
+							assert(!jnl_fence_ctl.strm_seqno
+								|| ((INVALID_SUPPL_STRM != strm_index)
+									&& (GET_STRM_INDEX(jnl_fence_ctl.strm_seqno)
+													== strm_index)));
+							assert(jnlpool.jnlpool_dummy_reg->open);
+							repl_csa = REG2CSA(jnlpool.jnlpool_dummy_reg);
+							assert(repl_csa->now_crit);
+							/* see jnlpool_init() for relationship between critical and jpl */
+							jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)repl_csa->critical
+											- JNLPOOL_CTL_SIZE);
+							assert(jpl->jnl_seqno == (jnl_fence_ctl.token + 1));
+							assert(!jnl_fence_ctl.strm_seqno
+									|| (jpl->strm_seqno[strm_index] == (strm_seqno + 1)));
+#							endif
+							SET_REG_SEQNO(csa, jnl_fence_ctl.token + 1, jnl_fence_ctl.strm_seqno,	\
+								strm_index, strm_seqno + 1, SKIP_ASSERT_FALSE); /* Step CMT09 */
+						}
+					}
+				} else
+				{
+					if (tp_update_underway)		/* otherwise currtn initialized above from start_tn */
 						currtn = si->start_tn;
 					assert(currtn < csd->trans_hist.curr_tn);
 				}
 				blk_size = csd->blk_size;
-				for (; (tp_update_underway  &&  NULL != cs) || (!tp_update_underway  &&  cs < cs_top);
-					cs = tp_update_underway ? orig_cs->next_cw_set : (cs + 1))
+				for ( ; (tp_update_underway && (NULL != cs)) || (!tp_update_underway && (cs < cs_top));
+									cs = tp_update_underway ? orig_cs->next_cw_set : (cs + 1))
 				{
-					dont_reset_data_invalid = FALSE;
+					donot_reset_data_invalid = FALSE;
 					if (tp_update_underway)
 					{
 						orig_cs = cs;
-						if (cs && GTM_PROBE(SIZEOF(cw_set_element), cs, READ))
-						{
-							while (cs->high_tlevel)
-							{
-								if (GTM_PROBE(SIZEOF(cw_set_element),
-											cs->high_tlevel, READ))
-									cs = cs->high_tlevel;
-								else
-								{
-									SECSHR_ACCOUNTING(3);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cs->high_tlevel);
-									assert(FALSE);
-									cs = NULL;
-									break;
-								}
-							}
-						}
-					}
-					if (!GTM_PROBE(SIZEOF(cw_set_element), cs, WRITE))
-					{
-						SECSHR_ACCOUNTING(3);
-						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING((INTPTR_T)cs);
-						assert(FALSE);
-						break;
+						TRAVERSE_TO_LATEST_CSE(cs);
 					}
 					if (gds_t_committed < cs->mode)
 					{
@@ -768,20 +593,19 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 											get_new_free_element(si->new_buff_list);
 								assert(NULL != cs->new_buff);
 								blk_ptr = (sm_uc_ptr_t)cs->new_buff;
-								/* No need to probe blk_ptr as sec_shr_blk_build does that */
 								if (FALSE == sec_shr_blk_build(csa, csd, is_bg, cs, blk_ptr,
 												currtn))
 								{
-									SECSHR_ACCOUNTING(10);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cs);
-									SECSHR_ACCOUNTING(cs->blk);
-									SECSHR_ACCOUNTING(cs->level);
-									SECSHR_ACCOUNTING(cs->done);
-									SECSHR_ACCOUNTING(cs->forward_process);
-									SECSHR_ACCOUNTING(cs->first_copy);
-									SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
-									SECSHR_ACCOUNTING((INTPTR_T)cs->new_buff);
+									SECSHR_ACCOUNTING(do_accounting, 10);
+									SECSHR_ACCOUNTING(do_accounting, __LINE__);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+									SECSHR_ACCOUNTING(do_accounting, cs->blk);
+									SECSHR_ACCOUNTING(do_accounting, cs->level);
+									SECSHR_ACCOUNTING(do_accounting, cs->done);
+									SECSHR_ACCOUNTING(do_accounting, cs->forward_process);
+									SECSHR_ACCOUNTING(do_accounting, cs->first_copy);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs->upd_addr);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs->new_buff);
 									assert(FALSE);
 									continue;
 								} else if (cs->ins_off != 0)
@@ -791,13 +615,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 										|| (cs->ins_off
 										 < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr))))
 									{
-										SECSHR_ACCOUNTING(7);
-										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING((INTPTR_T)cs);
-										SECSHR_ACCOUNTING(cs->blk);
-										SECSHR_ACCOUNTING(cs->index);
-										SECSHR_ACCOUNTING(cs->ins_off);
-										SECSHR_ACCOUNTING(
+										SECSHR_ACCOUNTING(do_accounting, 7);
+										SECSHR_ACCOUNTING(do_accounting, __LINE__);
+										SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+										SECSHR_ACCOUNTING(do_accounting, cs->blk);
+										SECSHR_ACCOUNTING(do_accounting, cs->index);
+										SECSHR_ACCOUNTING(do_accounting, cs->ins_off);
+										SECSHR_ACCOUNTING(do_accounting,	\
 											((blk_hdr *)blk_ptr)->bsiz);
 										assert(FALSE);
 										continue;
@@ -812,23 +636,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 										|| (&first_cw_set[cs->index] < cs));
 									chain.cw_index = cs->index;
 									chain.next_off = cs->next_off;
-									if (!(GTM_PROBE(SIZEOF(int4), chain_ptr, WRITE)))
-									{
-										SECSHR_ACCOUNTING(5);
-										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING((INTPTR_T)cs);
-										SECSHR_ACCOUNTING(cs->ins_off);
-										SECSHR_ACCOUNTING((INTPTR_T)chain_ptr);
-										assert(FALSE);
-										continue;
-									}
 									GET_LONGP(chain_ptr, &chain);
 									cs->ins_off = cs->next_off = 0;
 								}
 								cs->done = TRUE;
 								assert(NULL != cs->blk_target);
-								assert(NULL == gvt);
-								CERT_BLK_IF_NEEDED(certify_all_blocks, reg, cs, cs->new_buff, gvt);
+								CERT_BLK_IF_NEEDED(certify_all_blocks, reg,
+											cs, cs->new_buff, ((gv_namehead *)NULL));
 							}
 						}
 						cs->old_mode = (int4)cs->mode;
@@ -859,22 +673,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								this_reg_commit_type = REG_COMMIT_COMPLETE;
 						}
 						cr = cs->cr;
-						assert(!dlr_tlevel || (gds_t_write_root != old_mode));
+						assert(!dollar_tlevel || (gds_t_write_root != old_mode));
 						assert(gds_t_committed != old_mode);
 						if (gds_t_committed > old_mode)
-						{
-							if (!GTM_PROBE(SIZEOF(cache_rec), cr, WRITE))
-							{
-								SECSHR_ACCOUNTING(4);
-								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING((INTPTR_T)cs);
-								SECSHR_ACCOUNTING((INTPTR_T)cr);
-								assert(FALSE);
-							} else if (rundown_process_id == cr->in_tend)
-							{	/* Not sure how this is possible */
-								assert(FALSE);
-							}
-						} else
+							assert(process_id != cr->in_tend);
+						else
 						{	/* For the kill_t_* case, cs->cr will be NULL as bg_update was not invoked
 							 * and the cw-set-elements were memset to 0 in TP. But for gds_t_write_root
 							 * and gds_t_busy2free, they are non-TP ONLY modes and cses are not
@@ -892,7 +695,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 */
 					set_wc_blocked = TRUE;
 					/* for normal termination we should not have been in the midst of commit */
-					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
+					assert(!is_exiting || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					if (tp_update_underway)
 					{	/* Since the current cse has not been committed, this is a partial
 						 * GT.M commit in this region even if we have already seen committed cses.
@@ -913,24 +716,22 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									clru = start_cr;
 								assert(!clru->stopped);
 								if (!clru->stopped && (0 == clru->dirty)
-									&& (0 == clru->in_cw_set)
-									&& (!clru->in_tend)
-									&& (-1 == clru->read_in_progress)
-									&& GTM_PROBE(blk_size,
-										GDS_ANY_REL2ABS(csa, clru->buffaddr), WRITE))
+										&& (0 == clru->in_cw_set)
+										&& (!clru->in_tend)
+										&& (-1 == clru->read_in_progress))
 									break;
 							}
 							if (lcnt >= max_bts)
-							{
-								SECSHR_ACCOUNTING(9);
-								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING((INTPTR_T)cs);
-								SECSHR_ACCOUNTING(cs->blk);
-								SECSHR_ACCOUNTING(cs->tn);
-								SECSHR_ACCOUNTING(cs->level);
-								SECSHR_ACCOUNTING(cs->done);
-								SECSHR_ACCOUNTING(cs->forward_process);
-								SECSHR_ACCOUNTING(cs->first_copy);
+							{	/* Did not find space in global buffers to finish commit */
+								SECSHR_ACCOUNTING(do_accounting, 9);
+								SECSHR_ACCOUNTING(do_accounting, __LINE__);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+								SECSHR_ACCOUNTING(do_accounting, cs->blk);
+								SECSHR_ACCOUNTING(do_accounting, cs->tn);
+								SECSHR_ACCOUNTING(do_accounting, cs->level);
+								SECSHR_ACCOUNTING(do_accounting, cs->done);
+								SECSHR_ACCOUNTING(do_accounting, cs->forward_process);
+								SECSHR_ACCOUNTING(do_accounting, cs->first_copy);
 								assert(FALSE);
 								continue;
 							}
@@ -949,11 +750,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							{	/* Not a bitmap block, update clue history to reflect new cr */
 								assert((0 <= cs->level) && (MAX_BT_DEPTH > cs->level));
 								gvtarget = cs->blk_target;
-								assert((MAX_BT_DEPTH + 1)
-									== (SIZEOF(gvtarget->hist.h)
-										/ SIZEOF(gvtarget->hist.h[0])));
+								assert((MAX_BT_DEPTH + 1) == ARRAYSIZE(gvtarget->hist.h));
 								if ((0 <= cs->level) && (MAX_BT_DEPTH > cs->level)
-									&& GTM_PROBE(SIZEOF(gv_namehead), gvtarget, WRITE)
+									&& (NULL != gvtarget)
 									&& (0 != gvtarget->clue.end))
 								{
 									t1 = &gvtarget->hist.h[cs->level];
@@ -972,17 +771,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							 * phase2 yet. Use the picked out "cr" and finish phase2.
 							 */
 							cr = cs->cr;
-							if (!GTM_PROBE(SIZEOF(cache_rec), cr, WRITE))
-							{
-								SECSHR_ACCOUNTING(4);
-								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING((INTPTR_T)cs);
-								SECSHR_ACCOUNTING((INTPTR_T)cr);
-								assert(FALSE);
-								continue;
-							}
-							assert(rundown_process_id == cr->in_tend);
-							assert(rundown_process_id == cr->in_cw_set);
+							assert(process_id == cr->in_tend);
+							assert(process_id == cr->in_cw_set);
 							assert(cr->blk == cs->cr->blk);
 							if (cr->data_invalid)
 							{	/* Buffer is already in middle of update. Since blk builds are
@@ -992,16 +782,16 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								 * chance of resulting in a clean block. Make sure data_invalid
 								 * flag is set until the next cache-recovery (wcs_recover will
 								 * send a DBDANGER syslog message for this block to alert of
-								 * potential database damage) by setting dont_reset_data_invalid.
+								 * potential database damage) by setting donot_reset_data_invalid.
 								 */
-								SECSHR_ACCOUNTING(6);
-								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING((INTPTR_T)cs);
-								SECSHR_ACCOUNTING((INTPTR_T)cr);
-								SECSHR_ACCOUNTING(cr->blk);
-								SECSHR_ACCOUNTING(cr->data_invalid);
+								SECSHR_ACCOUNTING(do_accounting, 6);
+								SECSHR_ACCOUNTING(do_accounting, __LINE__);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cr);
+								SECSHR_ACCOUNTING(do_accounting, cr->blk);
+								SECSHR_ACCOUNTING(do_accounting, cr->data_invalid);
 								assert(FALSE);
-								dont_reset_data_invalid = TRUE;
+								donot_reset_data_invalid = TRUE;
 							}
 						}
 						/* Check if online backup is in progress and if there is a before-image to write.
@@ -1055,9 +845,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								if (gds_t_acquired == cs->mode)
 								{
 									if (GDSV4 == csd->desired_db_format)
-									{
 										INCR_BLKS_TO_UPGRD(csa, csd, 1);
-									}
 								} else
 								{
 #									ifdef DEBUG
@@ -1068,12 +856,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									 * block, then that cr's ondsk_blkver matches with the cs.
 									 * db_csh_get uses the global variable cs_addrs to determine
 									 * the region. So make it uptodate temporarily holding its
-									 * value in the local variable csaddrs.
+									 * value in the local variable tmp_csa.
 									 */
-									csaddrs = cs_addrs;	/* save cs_addrs in local */
+									tmp_csa = cs_addrs;	/* save cs_addrs in local */
 									cs_addrs = csa;		/* set cs_addrs for db_csh_get */
 									actual_cr = db_csh_get(cs->blk);
-									cs_addrs = csaddrs;	/* restore cs_addrs */
+									cs_addrs = tmp_csa;	/* restore cs_addrs */
 									/* actual_cr can be NULL if the block is NOT in the cache.
 									 * It can be CR_NOTVALID if the cache record originally
 									 * containing this block got reused for a different block
@@ -1110,52 +898,24 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					} else
 					{	/* access method is MM */
 						blk_ptr = MM_BASE_ADDR(csa) + (off_t)blk_size * cs->blk;
-						if (!GTM_PROBE(blk_size, blk_ptr, WRITE))
-						{
-							SECSHR_ACCOUNTING(7);
-							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING((INTPTR_T)cs);
-							SECSHR_ACCOUNTING(cs->blk);
-							SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
-							SECSHR_ACCOUNTING(blk_size);
-							SECSHR_ACCOUNTING((INTPTR_T)(MM_BASE_ADDR(csa)));
-							assert(FALSE);
-							continue;
-						}
 					}
-					/* The following block of code rolls forward steps (6a) and/or (13) of the commit */
+					/* The following block of code rolls forward Step (CMT10) and/or Step (CMT18) */
 					if (cs->mode == gds_t_writemap)
 					{
-						if (!GTM_PROBE(blk_size, cs->old_block, READ))
-						{
-							SECSHR_ACCOUNTING(11);
-							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING((INTPTR_T)cs);
-							SECSHR_ACCOUNTING(cs->blk);
-							SECSHR_ACCOUNTING(cs->tn);
-							SECSHR_ACCOUNTING(cs->level);
-							SECSHR_ACCOUNTING(cs->done);
-							SECSHR_ACCOUNTING(cs->forward_process);
-							SECSHR_ACCOUNTING(cs->first_copy);
-							SECSHR_ACCOUNTING((INTPTR_T)cs->old_block);
-							SECSHR_ACCOUNTING(blk_size);
-							assert(FALSE);
-							continue;
-						}
 						memmove(blk_ptr, cs->old_block, blk_size);
 						if (FALSE == sec_shr_map_build(csa, (uint4*)cs->upd_addr, blk_ptr, cs, currtn))
 						{
-							SECSHR_ACCOUNTING(11);
-							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING((INTPTR_T)cs);
-							SECSHR_ACCOUNTING(cs->blk);
-							SECSHR_ACCOUNTING(cs->tn);
-							SECSHR_ACCOUNTING(cs->level);
-							SECSHR_ACCOUNTING(cs->done);
-							SECSHR_ACCOUNTING(cs->forward_process);
-							SECSHR_ACCOUNTING(cs->first_copy);
-							SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
-							SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
+							SECSHR_ACCOUNTING(do_accounting, 11);
+							SECSHR_ACCOUNTING(do_accounting, __LINE__);
+							SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+							SECSHR_ACCOUNTING(do_accounting, cs->blk);
+							SECSHR_ACCOUNTING(do_accounting, cs->tn);
+							SECSHR_ACCOUNTING(do_accounting, cs->level);
+							SECSHR_ACCOUNTING(do_accounting, cs->done);
+							SECSHR_ACCOUNTING(do_accounting, cs->forward_process);
+							SECSHR_ACCOUNTING(do_accounting, cs->first_copy);
+							SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs->upd_addr);
+							SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)blk_ptr);
 							assert(FALSE);
 							continue;
 						}
@@ -1165,16 +925,16 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						{
 							if (FALSE == sec_shr_blk_build(csa, csd, is_bg, cs, blk_ptr, currtn))
 							{
-								SECSHR_ACCOUNTING(10);
-								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING((INTPTR_T)cs);
-								SECSHR_ACCOUNTING(cs->blk);
-								SECSHR_ACCOUNTING(cs->level);
-								SECSHR_ACCOUNTING(cs->done);
-								SECSHR_ACCOUNTING(cs->forward_process);
-								SECSHR_ACCOUNTING(cs->first_copy);
-								SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
-								SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
+								SECSHR_ACCOUNTING(do_accounting, 10);
+								SECSHR_ACCOUNTING(do_accounting, __LINE__);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+								SECSHR_ACCOUNTING(do_accounting, cs->blk);
+								SECSHR_ACCOUNTING(do_accounting, cs->level);
+								SECSHR_ACCOUNTING(do_accounting, cs->done);
+								SECSHR_ACCOUNTING(do_accounting, cs->forward_process);
+								SECSHR_ACCOUNTING(do_accounting, cs->first_copy);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs->upd_addr);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)blk_ptr);
 								assert(FALSE);
 								continue;
 							} else if (cs->ins_off)
@@ -1184,20 +944,21 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									|| (cs->ins_off < (SIZEOF(blk_hdr)
 										+ SIZEOF(rec_hdr)))
 									|| (0 > (short)cs->index)
-									|| ((cs - cw_set_addrs) <= cs->index))
+									|| ((cs - cw_set) <= cs->index))
 								{
-									SECSHR_ACCOUNTING(7);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cs);
-									SECSHR_ACCOUNTING(cs->blk);
-									SECSHR_ACCOUNTING(cs->index);
-									SECSHR_ACCOUNTING(cs->ins_off);
-									SECSHR_ACCOUNTING(((blk_hdr *)blk_ptr)->bsiz);
+									SECSHR_ACCOUNTING(do_accounting, 7);
+									SECSHR_ACCOUNTING(do_accounting, __LINE__);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+									SECSHR_ACCOUNTING(do_accounting, cs->blk);
+									SECSHR_ACCOUNTING(do_accounting, cs->index);
+									SECSHR_ACCOUNTING(do_accounting, cs->ins_off);
+									SECSHR_ACCOUNTING(do_accounting,		\
+											((blk_hdr *)blk_ptr)->bsiz);
 									assert(FALSE);
 									continue;
 								}
 								PUT_LONG((blk_ptr + cs->ins_off),
-								 ((cw_set_element *)(cw_set_addrs + cs->index))->blk);
+									((cw_set_element *)(cw_set + cs->index))->blk);
 								if (((nxt = cs + 1) < cs_top)
 									&& (gds_t_write_root == nxt->mode))
 								{
@@ -1206,22 +967,22 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 										|| (nxt->ins_off < (SIZEOF(blk_hdr)
 											 + SIZEOF(rec_hdr)))
 										|| (0 > (short)nxt->index)
-										|| ((cs - cw_set_addrs) <= nxt->index))
+										|| ((cs - cw_set) <= nxt->index))
 									{
-										SECSHR_ACCOUNTING(7);
-										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING((INTPTR_T)nxt);
-										SECSHR_ACCOUNTING(cs->blk);
-										SECSHR_ACCOUNTING(nxt->index);
-										SECSHR_ACCOUNTING(nxt->ins_off);
-										SECSHR_ACCOUNTING(
+										SECSHR_ACCOUNTING(do_accounting, 7);
+										SECSHR_ACCOUNTING(do_accounting, __LINE__);
+										SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)nxt);
+										SECSHR_ACCOUNTING(do_accounting, cs->blk);
+										SECSHR_ACCOUNTING(do_accounting, nxt->index);
+										SECSHR_ACCOUNTING(do_accounting, nxt->ins_off);
+										SECSHR_ACCOUNTING(do_accounting,
 											((blk_hdr *)blk_ptr)->bsiz);
 										assert(FALSE);
 										continue;
 									}
 									PUT_LONG((blk_ptr + nxt->ins_off),
 										 ((cw_set_element *)
-										 (cw_set_addrs + nxt->index))->blk);
+										 (cw_set + nxt->index))->blk);
 								}
 							}
 						} else
@@ -1231,16 +992,16 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								if (FALSE == sec_shr_blk_build(csa, csd, is_bg, cs, blk_ptr,
 												currtn))
 								{
-									SECSHR_ACCOUNTING(10);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cs);
-									SECSHR_ACCOUNTING(cs->blk);
-									SECSHR_ACCOUNTING(cs->level);
-									SECSHR_ACCOUNTING(cs->done);
-									SECSHR_ACCOUNTING(cs->forward_process);
-									SECSHR_ACCOUNTING(cs->first_copy);
-									SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
-									SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
+									SECSHR_ACCOUNTING(do_accounting, 10);
+									SECSHR_ACCOUNTING(do_accounting, __LINE__);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+									SECSHR_ACCOUNTING(do_accounting, cs->blk);
+									SECSHR_ACCOUNTING(do_accounting, cs->level);
+									SECSHR_ACCOUNTING(do_accounting, cs->done);
+									SECSHR_ACCOUNTING(do_accounting, cs->forward_process);
+									SECSHR_ACCOUNTING(do_accounting, cs->first_copy);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs->upd_addr);
+									SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)blk_ptr);
 									assert(FALSE);
 									continue;
 								}
@@ -1252,13 +1013,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 										|| (cs->ins_off
 										 < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr))))
 									{
-										SECSHR_ACCOUNTING(7);
-										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING((INTPTR_T)cs);
-										SECSHR_ACCOUNTING(cs->blk);
-										SECSHR_ACCOUNTING(cs->index);
-										SECSHR_ACCOUNTING(cs->ins_off);
-										SECSHR_ACCOUNTING(
+										SECSHR_ACCOUNTING(do_accounting, 7);
+										SECSHR_ACCOUNTING(do_accounting, __LINE__);
+										SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+										SECSHR_ACCOUNTING(do_accounting, cs->blk);
+										SECSHR_ACCOUNTING(do_accounting, cs->index);
+										SECSHR_ACCOUNTING(do_accounting, cs->ins_off);
+										SECSHR_ACCOUNTING(do_accounting,	\
 											((blk_hdr *)blk_ptr)->bsiz);
 										assert(FALSE);
 										continue;
@@ -1286,28 +1047,31 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									GET_LONGP(&chain, chain_ptr);
 									if ((1 == chain.flag)
-									   && ((chain_ptr - blk_ptr + SIZEOF(block_id))
-										  <= ((blk_hdr *)blk_ptr)->bsiz)
-									   && (chain.cw_index < si->cw_set_depth)
-									   && (FALSE != secshr_tp_get_cw(
-									      first_cw_set, chain.cw_index, &cs_ptr)))
+										&& ((chain_ptr - blk_ptr + SIZEOF(block_id))
+											<= ((blk_hdr *)blk_ptr)->bsiz)
+										&& (chain.cw_index < si->cw_set_depth))
 									{
+										save_si = sgm_info_ptr;
+										sgm_info_ptr = si;	/* needed by "tp_get_cw" */
+										tp_get_cw(first_cw_set, chain.cw_index, &cs_ptr);
+										sgm_info_ptr = save_si;
 										PUT_LONG(chain_ptr, cs_ptr->blk);
 										if (0 == chain.next_off)
 											break;
 									} else
 									{
-										SECSHR_ACCOUNTING(11);
-										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING((INTPTR_T)cs);
-										SECSHR_ACCOUNTING(cs->blk);
-										SECSHR_ACCOUNTING(cs->index);
-										SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
-										SECSHR_ACCOUNTING((INTPTR_T)chain_ptr);
-										SECSHR_ACCOUNTING(chain.next_off);
-										SECSHR_ACCOUNTING(chain.cw_index);
-										SECSHR_ACCOUNTING(si->cw_set_depth);
-										SECSHR_ACCOUNTING(
+										SECSHR_ACCOUNTING(do_accounting, 11);
+										SECSHR_ACCOUNTING(do_accounting, __LINE__);
+										SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cs);
+										SECSHR_ACCOUNTING(do_accounting, cs->blk);
+										SECSHR_ACCOUNTING(do_accounting, cs->index);
+										SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)blk_ptr);
+										SECSHR_ACCOUNTING(do_accounting,	\
+												(INTPTR_T)chain_ptr);
+										SECSHR_ACCOUNTING(do_accounting, chain.next_off);
+										SECSHR_ACCOUNTING(do_accounting, chain.cw_index);
+										SECSHR_ACCOUNTING(do_accounting, si->cw_set_depth);
+										SECSHR_ACCOUNTING(do_accounting,	\
 											((blk_hdr *)blk_ptr)->bsiz);
 										assert(FALSE);
 										break;
@@ -1319,9 +1083,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (0 > cs->reference_cnt)
 					{	/* blocks were freed up */
 						assert(non_tp_update_underway);
-						assert((&inctn_opcode == inctn_opcode_addrs)
-							&& (&inctn_detail == inctn_detail_addrs)
-							&& ((inctn_bmp_mark_free_gtm == inctn_opcode)
+						assert(((inctn_bmp_mark_free_gtm == inctn_opcode)
 								|| (inctn_bmp_mark_free_mu_reorg == inctn_opcode)
 								|| (inctn_blkmarkfree == inctn_opcode)
 								|| dse_running));
@@ -1329,16 +1091,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						 * blks_to_upgrd counter. Do not do this in case MUPIP REORG UPGRADE/DOWNGRADE
 						 * is marking a recycled block as free (inctn_opcode is inctn_blkmarkfree).
 						 */
-						if ((NULL != inctn_opcode_addrs)
-							&& (GTM_PROBE(SIZEOF(*inctn_opcode_addrs), inctn_opcode_addrs, READ))
-							&& ((inctn_bmp_mark_free_gtm == *inctn_opcode_addrs)
-								|| (inctn_bmp_mark_free_mu_reorg == *inctn_opcode_addrs))
-							&& (NULL != inctn_detail_addrs)
-							&& (GTM_PROBE(SIZEOF(*inctn_detail_addrs), inctn_detail_addrs, READ))
-							&& (0 != inctn_detail_addrs->blknum_struct.blknum))
-						{
+						if (((inctn_bmp_mark_free_gtm == inctn_opcode)
+								|| (inctn_bmp_mark_free_mu_reorg == inctn_opcode))
+								&& (0 != inctn_detail.blknum_struct.blknum))
 							DECR_BLKS_TO_UPGRD(csa, csd, 1);
-						}
 					}
 					assert(!cs->reference_cnt || (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit));
 					if (csa->now_crit)
@@ -1356,67 +1112,68 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					}
 					cs->old_mode = (int4)cs->mode;
 					assert(0 < cs->old_mode);
-					cs->mode = gds_t_committed;	/* rolls forward step (14) */
-					assert(NULL == gvt);
-					CERT_BLK_IF_NEEDED(certify_all_blocks, reg, cs, blk_ptr, gvt);
-					if (is_bg && (rundown_process_id == cr->in_tend))
+					cs->mode = gds_t_committed;	/* rolls forward Step (CMT18) */
+					/* Do not do a cert_blk of bitmap here since it could give a DBBMMSTR error. The
+					 * bitmap block build is COMPLETE only in wcs_recover so do the cert_blk there.
+					 * Assert that the bitmap buffer will indeed go through cert_blk there.
+					 */
+					CERT_BLK_IF_NEEDED(certify_all_blocks, reg, cs, blk_ptr, ((gv_namehead *)NULL));
+					if (is_bg && (process_id == cr->in_tend))
 					{	/* Reset cr->in_tend now that cr is uptodate.
 						 * Take this opportunity to reset data_invalid, in_cw_set and the write interlock
 						 * as well thereby simulating exactly what bg_update_phase2 would have done.
 						 */
-						if (!dont_reset_data_invalid)
+						if (!donot_reset_data_invalid)
 							cr->data_invalid = 0;
-						if (PROBE_EVEN(cr))
-						{	/* Release write interlock. The following code is very similar to that
-							 * at the end of the function "bg_update_phase2".
+						/* Release write interlock. The following code is very similar to that
+						 * at the end of the function "bg_update_phase2".
+						 */
+						/* Avoid using gv_cur_region in the LOCK_HIST macro that is
+						 * used by the RELEASE_BUFF_UPDATE_LOCK macro by setting locknl
+						 */
+						locknl = cnl;
+						if (!cr->tn)
+						{
+							cr->jnl_addr = cs->jnl_freeaddr;
+							assert(LATCH_SET == WRITE_LATCH_VAL(cr));
+							/* cache-record was not dirty BEFORE this update.
+							 * insert this in the active queue.
 							 */
-							/* Avoid using gv_cur_region in the LOCK_HIST macro that is
-							 * used by the RELEASE_BUFF_UPDATE_LOCK macro by setting locknl
-							 */
-							locknl = cnl;
-							if (!cr->tn)
+							n = INSQTI((que_ent_ptr_t)&cr->state_que,
+									(que_head_ptr_t)&cache_state->cacheq_active);
+							if (INTERLOCK_FAIL == n)
 							{
-								cr->jnl_addr = cs->jnl_freeaddr;
-								assert(LATCH_SET == WRITE_LATCH_VAL(cr));
-								/* cache-record was not dirty BEFORE this update.
-								 * insert this in the active queue.
-								 */
-								n = INSQTI((que_ent_ptr_t)&cr->state_que,
-										(que_head_ptr_t)&cache_state->cacheq_active);
-								if (INTERLOCK_FAIL == n)
-								{
-									SECSHR_ACCOUNTING(7);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cr);
-									SECSHR_ACCOUNTING(cr->blk);
-									SECSHR_ACCOUNTING(n);
-									SECSHR_ACCOUNTING(cache_state->cacheq_active.fl);
-									SECSHR_ACCOUNTING(cache_state->cacheq_active.bl);
-									assert(FALSE);
-								}
-								ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
+								SECSHR_ACCOUNTING(do_accounting, 7);
+								SECSHR_ACCOUNTING(do_accounting, __LINE__);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cr);
+								SECSHR_ACCOUNTING(do_accounting, cr->blk);
+								SECSHR_ACCOUNTING(do_accounting, n);
+								SECSHR_ACCOUNTING(do_accounting, cache_state->cacheq_active.fl);
+								SECSHR_ACCOUNTING(do_accounting, cache_state->cacheq_active.bl);
+								assert(FALSE);
 							}
-							RELEASE_BUFF_UPDATE_LOCK(cr, n, &cnl->db_latch);
-							/* "n" holds the pre-release value so check that we did hold the
-							 * lock before releasing it above.
-							 */
-							assert(LATCH_CONFLICT >= n);
-							assert(LATCH_CLEAR < n);
-							if (WRITER_BLOCKED_BY_PROC(n))
+							ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
+						}
+						RELEASE_BUFF_UPDATE_LOCK(cr, n, &cnl->db_latch);
+						/* "n" holds the pre-release value so check that we did hold the
+						 * lock before releasing it above.
+						 */
+						assert(LATCH_CONFLICT >= n);
+						assert(LATCH_CLEAR < n);
+						if (WRITER_BLOCKED_BY_PROC(n))
+						{
+							n = INSQHI((que_ent_ptr_t)&cr->state_que,
+									(que_head_ptr_t)&cache_state->cacheq_active);
+							if (INTERLOCK_FAIL == n)
 							{
-								n = INSQHI((que_ent_ptr_t)&cr->state_que,
-										(que_head_ptr_t)&cache_state->cacheq_active);
-								if (INTERLOCK_FAIL == n)
-								{
-									SECSHR_ACCOUNTING(7);
-									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING((INTPTR_T)cr);
-									SECSHR_ACCOUNTING(cr->blk);
-									SECSHR_ACCOUNTING(n);
-									SECSHR_ACCOUNTING(cache_state->cacheq_active.fl);
-									SECSHR_ACCOUNTING(cache_state->cacheq_active.bl);
-									assert(FALSE);
-								}
+								SECSHR_ACCOUNTING(do_accounting, 7);
+								SECSHR_ACCOUNTING(do_accounting, __LINE__);
+								SECSHR_ACCOUNTING(do_accounting, (INTPTR_T)cr);
+								SECSHR_ACCOUNTING(do_accounting, cr->blk);
+								SECSHR_ACCOUNTING(do_accounting, n);
+								SECSHR_ACCOUNTING(do_accounting, cache_state->cacheq_active.fl);
+								SECSHR_ACCOUNTING(do_accounting, cache_state->cacheq_active.bl);
+								assert(FALSE);
 							}
 						}
 						RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(cr); /* resets cr->in_tend & cr->in_cw_set
@@ -1457,23 +1214,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					assert((REG_COMMIT_COMPLETE == this_reg_commit_type)
 						|| (REG_COMMIT_PARTIAL == this_reg_commit_type)
 						|| (REG_COMMIT_UNSTARTED == this_reg_commit_type));
-					/* We have already checked that "si" is READABLE. Check that it is WRITABLE since
-					 * we might need to set "si->kip_csa" in the PROBE_INCR_KIP macro.
-					 */
-					if (GTM_PROBE(SIZEOF(sgm_info), si, WRITE))
-					{
-						kip_csa_usable = TRUE;
-						/* Take this opportunity to reset si->cr_array_index */
-						si->cr_array_index = 0;
-					} else
-					{
-						kip_csa_usable = FALSE;
-						assert(FALSE);
-					}
+					si->cr_array_index = 0; /* Take this opportunity to reset si->cr_array_index */
 					if (REG_COMMIT_COMPLETE != this_reg_commit_type)
 					{
-						if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL == si->kip_csa))
-							PROBE_INCR_KIP(csd, csa, si->kip_csa);
+						if ((NULL != si->kill_set_head) && (NULL == si->kip_csa))
+							INCR_KIP(csd, csa, si->kip_csa);
 					} else
 						assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
 					assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
@@ -1481,30 +1226,19 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{	/* Non-TP. Check need_kip_incr and value pointed to by kip_csa. */
 					assert(non_tp_update_underway);
 					cr_array_index = 0; /* Take this opportunity to reset cr_array_index */
-					/* Note that *kip_csa_addrs could be NULL if we are in the
+					/* Note that kip_csa could be NULL if we are in the
 					 * 1st phase of the M-kill and NON NULL if we are in the 2nd phase of the kill.
 					 * Only if it is NULL, should we increment the kill_in_prog flag.
 					 */
-					kip_csa_usable =
-						(GTM_PROBE(SIZEOF(*kip_csa_addrs), kip_csa_addrs, WRITE))
-							? TRUE : FALSE;
-					assert(kip_csa_usable);
-					if (GTM_PROBE(SIZEOF(*need_kip_incr_addrs), need_kip_incr_addrs, WRITE))
-						needkipincr = *need_kip_incr_addrs;
-					else
+					if (need_kip_incr && (NULL == kip_csa))
 					{
-						needkipincr = FALSE;
-						assert(FALSE);
-					}
-					if (needkipincr && kip_csa_usable && (NULL == *kip_csa_addrs))
-					{
-						PROBE_INCR_KIP(csd, csa, *kip_csa_addrs);
-						*need_kip_incr_addrs = FALSE;
+						INCR_KIP(csd, csa, kip_csa);
+						need_kip_incr = FALSE;
 					}
 					if (MUSWP_INCR_ROOT_CYCLE == TREF(in_mu_swap_root_state))
 						cnl->root_search_cycle++;
 				}
-			}	/* if (NULL != first_cw_set) */
+			} while (FALSE);
 			/* If the process is about to exit AND any kills are in progress (bitmap freeup phase of kill), mark
 			 * kill_in_prog as abandoned. Non-TP and TP maintain kill_in_prog information in different structures
 			 * so access them appropriately. Note that even for a TP transaction, the bitmap freeup happens as a
@@ -1512,86 +1246,48 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			 * Thankfully first_sgm_info is guaranteed to be non-NULL in the case of a TP transaction that is
 			 * temporarily running its bitmap freeup phase as a non-TP transaction. And for true non-TP
 			 * transactions, first_sgm_info is guaranteed to be NULL. So we use this for the determination.
-			 * But this global variable value is obtained by dereferencing first_sgm_info_addrs (due to the way
-			 * GTMSECSHR runs as a separate privileged image in VMS). If the probe of first_sgm_info_addrs does
-			 * not succeed (due to some corruption), then we have no clue about the nullness of first_sgm_info.
-			 * Therefore we also check for dlr_tlevel also since if that is TRUE, we are guaranteed it is a TP
-			 * transaction irrespective of the value of first_sgm_info. Note that we store the value of the global
-			 * variable first_sgm_info in a local variable firsgsgminfo (slightly different name) for clarity sake.
 			 */
 			if (is_exiting)
 			{
-				if (GTM_PROBE(SIZEOF(*first_sgm_info_addrs), first_sgm_info_addrs, READ))
-					firstsgminfo = *first_sgm_info_addrs;
-				else
-				{
-					assert(FALSE);
-					firstsgminfo = NULL;
-				}
-				if (dlr_tlevel || (NULL != firstsgminfo))
+				if (NULL != first_sgm_info)
 				{
 					si = csa->sgm_info_ptr;
 					/* Note that it is possible "si" is NULL in case of a GTM-E-MEMORY error in gvcst_init.
 					 * Handle that accordingly in the code below.
 					 */
-					kip_csa_usable = (GTM_PROBE(SIZEOF(sgm_info), si, WRITE)) ? TRUE : FALSE;
 					/* Since the kill process cannot be completed, we need to decerement KIP count
 					 * and increment the abandoned_kills count.
 					 */
-					if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL != si->kip_csa))
+					if ((NULL != si->kill_set_head) && (NULL != si->kip_csa))
 					{
 						assert(csa == si->kip_csa);
-						PROBE_DECR_KIP(csd, csa, si->kip_csa);
-						PROBE_INCR_ABANDONED_KILLS(csd, csa);
+						DECR_KIP(csd, csa, si->kip_csa);
+						INCR_ABANDONED_KILLS(csd, csa);
 					} else
 						assert((NULL == si) || (NULL == si->kill_set_head) || (NULL == si->kip_csa));
-				} else if (!dlr_tlevel)
+				} else if (!dollar_tlevel)
 				{
-					kip_csa_usable =
-						(GTM_PROBE(SIZEOF(*kip_csa_addrs), kip_csa_addrs, WRITE))
-						? TRUE : FALSE;
-					assert(kip_csa_usable);
-					if (kip_csa_usable && (NULL != *kip_csa_addrs) && (csa == *kip_csa_addrs))
+					if ((NULL != kip_csa) && (csa == kip_csa))
 					{
-						assert(0 < (*kip_csa_addrs)->hdr->kill_in_prog);
-						PROBE_DECR_KIP(csd, csa, *kip_csa_addrs);
-						PROBE_INCR_ABANDONED_KILLS(csd, csa);
+						assert(0 < kip_csa->hdr->kill_in_prog);
+						DECR_KIP(csd, csa, kip_csa);
+						INCR_ABANDONED_KILLS(csd, csa);
 					}
 				}
 			}
-			if (JNL_ENABLED(csd))
+			if (JNL_ENABLED(csd) && is_exiting)
 			{
-				if (GTM_PROBE(SIZEOF(jnl_private_control), csa->jnl, WRITE))
+				jbp = csa->jnl->jnl_buff;
+				RELEASE_LATCH_IF_OWNER_AND_EXITING(&jbp->fsync_in_prog_latch, is_exiting);
+				if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
+					RELEASE_SWAPLOCK(&jbp->io_in_prog_latch);
+				if (jbp->blocked == process_id)
 				{
-					jbp = csa->jnl->jnl_buff;
-					if (GTM_PROBE(SIZEOF(jnl_buffer), jbp, WRITE) && is_exiting)
-					{
-						SALVAGE_UNIX_LATCH(&jbp->fsync_in_prog_latch, is_exiting);
-						if (jbp->io_in_prog_latch.u.parts.latch_pid == rundown_process_id)
-						{
-							if (csa->jnl->dsk_update_inprog)
-							{
-								jbp->dsk = csa->jnl->new_dsk;
-								jbp->dskaddr = csa->jnl->new_dskaddr;
-							}
-							RELEASE_SWAPLOCK(&jbp->io_in_prog_latch);
-						}
-						if (jbp->blocked == rundown_process_id)
-						{
-							assert(csa->now_crit);
-							jbp->blocked = 0;
-						}
-					}
-				} else
-				{
-					SECSHR_ACCOUNTING(4);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING((INTPTR_T)csa->jnl);
-					SECSHR_ACCOUNTING(SIZEOF(jnl_private_control));
-					assert(FALSE);
+					assert(csa->now_crit);
+					jbp->blocked = 0;
 				}
 			}
-			if (is_exiting && csa->freeze && csd->freeze == rundown_process_id && !csa->persistent_freeze)
+			if (is_exiting && csa->freeze && csd->freeze == process_id && !csa->persistent_freeze)
 			{
 				csd->image_count = 0;
 				csd->freeze = 0;
@@ -1622,69 +1318,55 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					BG_TRACE_PRO_ANY(csa, wcb_secshr_db_clnup_phase2_clnup);
 				}
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
-					rundown_process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));
+					process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));
 			}
 			csa->wbuf_dqd = 0;		/* We can clear the flag now */
 			if (csa->wcs_pidcnt_incremented)
-				PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
+				DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
 			if (csa->now_crit)
 			{
 				if (csd->trans_hist.curr_tn == csd->trans_hist.early_tn - 1)
 				{	/* there can be at most one region in non-TP with different curr_tn and early_tn */
 					assert(!non_tp_update_underway || first_time);
 					/* for normal termination we should not have been in the midst of commit */
-					assert((NORMAL_TERMINATION != secshr_state)
-						|| WBTEST_ENABLED(WBTEST_JNL_CREATE_FAIL)
+					assert(!is_exiting || WBTEST_ENABLED(WBTEST_JNL_CREATE_FAIL)
 						|| WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART)
 						|| (!update_underway && in_wcs_recover));
 					DEBUG_ONLY(first_time = FALSE;)
 					if (update_underway)
-						INCREMENT_CURR_TN(csd);	/* roll forward step (8) */
+						INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
 					else
 						csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
 				}
 				assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
-				if (GTM_PROBE(CRIT_SPACE(NUM_CRIT_ENTRY(csd)), csa->critical, WRITE))
-				{
-					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
-					 * process exiting as secshr_db_clnup during process exiting is always preceded by
-					 * mur_close_files which does the rel_crit anyways. Assert that.
+				/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
+				 * process exiting as secshr_db_clnup during process exiting is always preceded by
+				 * mur_close_files which does the rel_crit anyways. Assert that.
+				 */
+				assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting);
+				if (!csa->hold_onto_crit || is_exiting)
+				{ 	/* Release crit but since it involves modifying more than one field, make sure
+					 * we prevent interrupts while in this code. The global variable "crit_count"
+					 * does this for us. See similar usage in rel_crit.c.
 					 */
-					assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting);
-					if (!csa->hold_onto_crit || is_exiting)
-					{ 	/* Release crit but since it involves modifying more than one field, make sure
-						 * we prevent interrupts while in this code. The global variable "crit_count"
-						 * does this for us. See similar usage in rel_crit.c.
-						 */
-						assert(0 == crit_count);
-						crit_count++;	/* prevent interrupts */
-						CRIT_TRACE(crit_ops_rw); /* see gdsbt.h for comment on placement */
-						if (cnl->in_crit == rundown_process_id)
-							cnl->in_crit = 0;
-						csa->hold_onto_crit = FALSE;
-						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-						mutex_unlockw(reg, crash_count);/* roll forward step (11) */
-						assert(!csa->now_crit);
-						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
-						crit_count = 0;
-						UNSUPPORTED_PLATFORM_CHECK;
-					}
-				} else
-				{
-					SECSHR_ACCOUNTING(6);
-					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING((INTPTR_T)cnl);
-					SECSHR_ACCOUNTING(NODE_LOCAL_SIZE_DBS);
-					SECSHR_ACCOUNTING((INTPTR_T)csa->critical);
-					SECSHR_ACCOUNTING(CRIT_SPACE(NUM_CRIT_ENTRY(csd)));
-					assert(FALSE);
+					assert(0 == crit_count);
+					crit_count++;	/* prevent interrupts */
+					CRIT_TRACE(crit_ops_rw); /* see gdsbt.h for comment on placement */
+					if (cnl->in_crit == process_id)
+						cnl->in_crit = 0;
+					csa->hold_onto_crit = FALSE;
+					DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
+					mutex_unlockw(reg, crash_count);/* roll forward Step (CMT14) */
+					assert(!csa->now_crit);
+					DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
+					crit_count = 0;
+					UNSUPPORTED_PLATFORM_CHECK;
 				}
 			}
-			csa->t_commit_crit = FALSE; /* ensure we don't process this region again (rolls forward step (15)) */
-			if ((NORMAL_TERMINATION == secshr_state || ABNORMAL_TERMINATION == secshr_state)
-						&& GTM_PROBE(SHMPOOL_BUFFER_SIZE, csa->shmpool_buffer, WRITE))
+			csa->t_commit_crit = FALSE; /* ensure we don't process this region again (rolls forward Step (CMT19)) */
+			if (is_exiting && (NULL != csa->shmpool_buffer))
 			{
-				if ((pid = csa->shmpool_buffer->shmpool_crit_latch.u.parts.latch_pid) == rundown_process_id)
+				if ((pid = csa->shmpool_buffer->shmpool_crit_latch.u.parts.latch_pid) == process_id)
 				{
 					if (is_exiting)
 					{	/* Tiz our lock. Force recovery to run and release */
@@ -1696,112 +1378,59 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				} else if (0 != pid && FALSE == is_proc_alive(pid, 0))
 				{
 					/* Attempt to make it our lock so we can set blocked */
-					if (COMPSWAP_LOCK(&csa->shmpool_buffer->shmpool_crit_latch, pid, imgcnt,
-							  rundown_process_id, rundown_image_count))
+					if (COMPSWAP_LOCK(&csa->shmpool_buffer->shmpool_crit_latch, pid, 0, process_id, 0))
 					{	/* Now our lock .. set blocked and release.  */
 						csa->shmpool_buffer->shmpool_blocked = TRUE;
 						BG_TRACE_PRO_ANY(csa, shmpool_blkd_by_sdc);
 						DEBUG_LATCH(util_out_print("Orphaned latch cleaned up", TRUE));
-						COMPSWAP_UNLOCK(&csa->shmpool_buffer->shmpool_crit_latch, rundown_process_id,
-								rundown_image_count, LOCK_AVAILABLE, 0);
+						COMPSWAP_UNLOCK(&csa->shmpool_buffer->shmpool_crit_latch, process_id,
+								0, LOCK_AVAILABLE, 0);
 					} /* Else someone else took care of it */
 				}
 			}
 			/* All releases done now. Double check latch is really cleared */
-			if (GTM_PROBE(CRIT_SPACE(NUM_CRIT_ENTRY(csd)), csa->critical, WRITE))
-			{
-				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
-				assert(!csa->now_crit || csa->hold_onto_crit);
-				SALVAGE_UNIX_LATCH_DBCRIT(&csa->critical->semaphore, is_exiting, cnl->wc_blocked);
-				SALVAGE_UNIX_LATCH(&csa->critical->crashcnt_latch, is_exiting);
-				SALVAGE_UNIX_LATCH(&csa->critical->prochead.latch, is_exiting);
-				SALVAGE_UNIX_LATCH(&csa->critical->freehead.latch, is_exiting);
-			}
-		}	/* For all regions */
-	}	/* For all glds */
-	if (jnlpool_reg_addrs && (GTM_PROBE(SIZEOF(*jnlpool_reg_addrs), jnlpool_reg_addrs, READ)))
-	{	/* although there is only one jnlpool reg, SECSHR_PROBE_REGION macro might do a "continue" and hence the for loop */
-		for (reg = *jnlpool_reg_addrs, jnlpool_reg = TRUE; jnlpool_reg && reg; jnlpool_reg = FALSE) /* only jnlpool reg */
-		{
-			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
-			if (csa->now_crit)
-			{
-				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)csa->critical - JNLPOOL_CTL_SIZE); /* see jnlpool_init() for
-													   * relationship between
-													   * critical and jpl */
-				if (GTM_PROBE(SIZEOF(jnlpool_ctl_struct), jpl, WRITE))
-				{
-					if ((jpl->early_write_addr > jpl->write_addr) && (update_underway))
-					{	/* we need to update journal pool to reflect the increase in jnl-seqno */
-						cumul_jnl_rec_len = (uint4)(jpl->early_write_addr - jpl->write_addr);
-						jh = (jnldata_hdr_ptr_t)((sm_uc_ptr_t)jpl + JNLDATA_BASE_OFF + jpl->write);
-						if (GTM_PROBE(SIZEOF(*jh), jh, WRITE) && 0 != (jsize = jpl->jnlpool_size))
-						{	/* Below chunk of code mirrors  what is done in t_end/tp_tend */
-							/* Begin atomic stmnts. Follow same order as in t_end/tp_tend */
-							jh->jnldata_len = cumul_jnl_rec_len;
-							jh->prev_jnldata_len = jpl->lastwrite_len;
-							if (INVALID_SUPPL_STRM != strm_index)
-							{	/* Need to also update supplementary stream seqno */
-								assert(0 <= strm_index);
-								/* assert(strm_index < ARRAYSIZE(tjpl->strm_seqno)); */
-								ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
-								jpl->strm_seqno[strm_index]++;
-							}
-							jpl->lastwrite_len = cumul_jnl_rec_len;
-							SHM_WRITE_MEMORY_BARRIER;
-							/* Emulate
-							 * jpl->write = (jpl->write + cumul_jnl_rec_len) % jsize;
-							 * See note in DOs and DONTs about using % operator
-							 */
-							for (new_write = jpl->write + cumul_jnl_rec_len;
-								new_write >= jsize;
-								new_write -= jsize)
-								;
-							jpl->write = new_write;
-							jpl->write_addr += cumul_jnl_rec_len;
-							jpl->jnl_seqno++;
-							/* End atomic stmts */
-							/* the above takes care of rolling forward steps (9) and (10) of the
-							 * commit flow */
-						}
-					}
-#ifdef DEBUG
-					else if (jpl->early_write_addr > jpl->write_addr)
-					{   /* PRO code will do the right thing by overwriting that exact space in the jnlpool with
-					     * the current transaction's journal records. For dbg though, it is better if
-					     * secshr_db_clnup (which is invoked as part of exit handling) does the cleanup.
-					     */
-						assert(!update_underway);
-						jpl->early_write_addr = jpl->write_addr;
-					}
-#endif
-				}
-				cnl = csa->nl;
-				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, cnl, WRITE)) &&
-					(GTM_PROBE(JNLPOOL_CRIT_SPACE, csa->critical, WRITE)))
-				{
-					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
-					 * process exiting as secshr_db_clnup during process exiting is always preceded by
-					 * mur_close_files which does the rel_crit anyways. Assert that.
-					 */
-					assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting);
-					if (!csa->hold_onto_crit || is_exiting)
-					{
-						CRIT_TRACE(crit_ops_rw); /* see gdsbt.h for comment on placement */
-						if (cnl->in_crit == rundown_process_id)
-							cnl->in_crit = 0;
-						csa->hold_onto_crit = FALSE;
-						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-						mutex_unlockw(reg, 0);		/* roll forward step (12) */
-						assert(!csa->now_crit);
-						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
-						/* the above takes care of rolling forward step (12) of the commit flow */
-					}
-				}
-			}
+			assert(NULL != csa->critical);
 			/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
 			assert(!csa->now_crit || csa->hold_onto_crit);
+			/* Note: Do not release crit if we still hold it. As we want the next process to grab crit to invoke
+			 * "mutex_salvage" (to cleanup stuff) in case we terminate while holding crit. Hence the below line
+			 * is commented out.
+			 *
+			 * RELEASE_LATCH_IF_OWNER_AND_EXITING(&csa->critical->semaphore, is_exiting);
+			 */
+			RELEASE_LATCH_IF_OWNER_AND_EXITING(&csa->critical->crashcnt_latch, is_exiting);
+			RELEASE_LATCH_IF_OWNER_AND_EXITING(&csa->critical->prochead.latch, is_exiting);
+			RELEASE_LATCH_IF_OWNER_AND_EXITING(&csa->critical->freehead.latch, is_exiting);
+		}	/* For all regions */
+	}	/* For all glds */
+	if ((NULL != (reg = jnlpool.jnlpool_dummy_reg)) && reg->open)
+	{
+		csa = REG2CSA(reg);
+		if (csa->now_crit)
+		{
+			jpl = REPLCSA2JPL(csa);
+			cnl = csa->nl;
+			/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
+			 * process exiting as secshr_db_clnup during process exiting is always preceded by
+			 * mur_close_files which does the rel_crit anyways. Assert that.
+			 */
+			assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting);
+			if (!csa->hold_onto_crit || is_exiting)
+			{
+				CRIT_TRACE(crit_ops_rw); /* see gdsbt.h for comment on placement */
+				if (cnl->in_crit == process_id)
+					cnl->in_crit = 0;
+				csa->hold_onto_crit = FALSE;
+				DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
+				mutex_unlockw(reg, 0);		/* roll forward Step (CMT15) */
+				assert(!csa->now_crit);
+				DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
+			}
 		}
+		/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
+		assert(!csa->now_crit || csa->hold_onto_crit);
+		assert(jnlpool.jnlpool_dummy_reg == reg);
+		FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(TRUE, jnlpool);	/* Roll forward CMT17 */
 	}
 	if (is_exiting)
 	{	/* It is possible we are exiting while in the middle of a transaction (e.g. called through "deferred_signal_handler"
@@ -1818,34 +1447,4 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			OP_TROLLBACK(0);
 	}
 	return;
-}
-
-boolean_t	secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1)
-{
-	int	iter;
-
-	*cs1 = cs;
-	for (iter = 0; iter < depth; iter++)
-	{
-		if (!(GTM_PROBE(SIZEOF(cw_set_element), *cs1, READ)))
-		{
-			*cs1 = NULL;
-			return FALSE;
-		}
-		*cs1 = (*cs1)->next_cw_set;
-	}
-	if (*cs1 && GTM_PROBE(SIZEOF(cw_set_element), *cs1, READ))
-	{
-		while ((*cs1)->high_tlevel)
-		{
-			if (GTM_PROBE(SIZEOF(cw_set_element), (*cs1)->high_tlevel, READ))
-				*cs1 = (*cs1)->high_tlevel;
-			else
-			{
-				*cs1 = NULL;
-				return FALSE;
-			}
-		}
-	}
-	return TRUE;
 }

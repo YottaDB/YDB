@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@
 #include "buddy_list.h"
 #include "hashtab_int4.h"
 #include "tp.h"
-#include "init_secshr_addrs.h"
 #include "cli.h"
 #include "cli_parse.h"
 #include "iosp.h"
@@ -471,7 +470,6 @@ int main(int argc, char **argv, char **envp)
 		EXIT(status);
 	}
 	atexit(gtcm_exi_handler);
-	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
 	/* Pre-allocate some timer blocks. */
 	prealloc_gt_timers();

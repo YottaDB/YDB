@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ error_def(ERR_ZROSYNTAX);
 void zro_load(mstr *str)
 {
 	unsigned		toktyp, status;
-	boolean_t		enable_autorelink;
+	boolean_t		arlink_thisdir_enable, arlink_enabled;
 	mstr			tok, transtr;
 	char			*lp, *top;
 	zro_ent			array[ZRO_MAX_ENTS], *op;
@@ -61,7 +61,7 @@ void zro_load(mstr *str)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	ARLINK_ONLY(TREF(arlink_enabled) = FALSE);	/* Set if any zro entry is enabled for autorelink */
+	arlink_enabled = FALSE;
 	memset(array, 0, SIZEOF(array));
 	lp = str->addr;
 	top = lp + str->len;
@@ -95,7 +95,7 @@ void zro_load(mstr *str)
 			 * of it indicating that it is supposed to (1) be a directory and not a shared library and (2) that the
 			 * user desires this directory to have auto-relink capability.
 			 */
-			enable_autorelink = FALSE;
+			arlink_thisdir_enable = FALSE;
 			/* All platforms allow the auto-relink indicator on object directories but only autorelink able platforms
 			 * (#ifdef AUTORELINK_SUPPORTED is set) do anything with it. Other platforms just ignore it. Specifying
 			 * "*" at end of non-object directories causes an error further downstream (FILEPARSE) when the "*" is
@@ -103,8 +103,7 @@ void zro_load(mstr *str)
 			 */
 			if (ZRO_ALF == *(tok.addr + tok.len - 1))
 			{	/* Auto-relink is indicated */
-				enable_autorelink = TRUE;
-				TREF(arlink_enabled) = TRUE;
+				arlink_thisdir_enable = TRUE;
 				--tok.len;		/* Remove indicator from name so we can use it */
 				assert(0 <= tok.len);
 			}
@@ -125,7 +124,7 @@ void zro_load(mstr *str)
 					      ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
 			if (S_ISREG(outbuf.st_mode))
 			{	/* Regular file - a shared library file */
-				if (enable_autorelink)
+				if (arlink_thisdir_enable)
 					/* Auto-relink indicator on shared library not permitted */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_FILEPARSE, 2, tok.len, tok.addr);
@@ -146,12 +145,9 @@ void zro_load(mstr *str)
 					 * object directory specified in $zroutines as if * has been additionally specified.
 					 */
 					if (TREF(gtm_test_autorelink_always))
-					{
-						enable_autorelink = TRUE;
-						TREF(arlink_enabled) = TRUE;
-					}
+						arlink_thisdir_enable = TRUE;
 #					endif
-				if (enable_autorelink)
+				if (arlink_thisdir_enable)
 				{	/* Only setup autorelink struct if it is enabled */
 					if (!TREF(is_mu_rndwn_rlnkctl))
 					{
@@ -175,6 +171,7 @@ void zro_load(mstr *str)
 				}
 #				endif
 			}
+			arlink_enabled |= arlink_thisdir_enable;	/* Cumulative value of enabled dirs */
 			array[0].count++;
 			array[oi].str = tok;
 			toktyp = GETTOK;
@@ -313,5 +310,6 @@ void zro_load(mstr *str)
 			}
 		}
 	}
-	(TREF(set_zroutines_cycle))++;		/* Signal need to recompute zroutines histories for each linked routine */
+	ARLINK_ONLY(TREF(arlink_enabled) = arlink_enabled);	/* Set if any zro entry is enabled for autorelink */
+	(TREF(set_zroutines_cycle))++;			/* Signal need to recompute zroutines histories for each linked routine */
 }

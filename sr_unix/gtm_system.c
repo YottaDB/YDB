@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
+#include "gtm_string.h"
 
 #include <sys/wait.h>
 #include <errno.h>
@@ -30,13 +31,17 @@
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, RC);	\
 }
 
+error_def(ERR_INVSTRLEN);
+
 int gtm_system(const char *cmdline)
 {
 	struct sigaction	ignore, old_intrpt, old_quit;
+	char			*sh;
 	sigset_t		mask, savemask;
 	pid_t			pid;
 	int			stat;		/* child exit status */
 	int			rc, ret;	/* return value from waitpid */
+	int			len, shlen;
 	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -71,6 +76,8 @@ int gtm_system(const char *cmdline)
 	/* Below FORK is not used as interrupts are already disabled at the
 	 * beginning of this function
 	 */
+	sh = GETENV("SHELL");
+	sh = (NULL == sh) || ('\0' == *sh) ? "/bin/sh" : sh;
 	pid = fork(); /* BYPASSOK */
 	if (0 > pid)
 	{
@@ -81,7 +88,8 @@ int gtm_system(const char *cmdline)
 	else if (0 == pid)
 	{
 		RESTOREMASK(rc);
-		execl("/bin/sh", "sh", "-c", cmdline, (char *)0);
+		assert('\0' != *cmdline);
+		execl(sh, sh, "-c", cmdline, NULL);
 		UNDERSCORE_EXIT(127);
 	} else
 	{

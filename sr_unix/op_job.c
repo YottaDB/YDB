@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,12 +66,14 @@ GBLREF	int4		outofband;
 GBLREF	d_socket_struct	*socket_pool;
 static	int4	tid;	/* Job Timer ID */
 
-error_def(ERR_TEXT);
-error_def(ERR_JOBFAIL);
-error_def(ERR_NULLENTRYREF);
-error_def(ERR_JOBLVN2LONG);
+LITREF mval		skiparg;
 
-#define JOBTIMESTR "JOB time too long"
+error_def(ERR_JOBFAIL);
+error_def(ERR_JOBLVN2LONG);
+error_def(ERR_NULLENTRYREF);
+error_def(ERR_TEXT);
+
+#define JOBTIMESTR "JOB"
 
 /*
  * ---------------------------------------------------
@@ -96,7 +98,7 @@ int	op_job(int4 argcnt, ...)
 	mval			*label;
 	int4			offset;
 	mval			*routine, *param_buf;
-	int4			timeout;	/* timeout in seconds */
+	mval			*timeout;	/* timeout in milliseconds */
 	int4			msec_timeout;	/* timeout in milliseconds */
 	boolean_t		timed, single_attempt, non_exit_return;
 	unsigned char		buff[128], *c;
@@ -117,8 +119,6 @@ int	op_job(int4 argcnt, ...)
 	job_buffer_size_msg	buffer_size;
 	DCL_THREADGBL_ACCESS;
 
-	LITREF mval		skiparg;
-
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, argcnt);
 	assert(argcnt >= 5);
@@ -126,7 +126,7 @@ int	op_job(int4 argcnt, ...)
 	offset = va_arg(var, int4);
 	routine = va_arg(var, mval *);
 	param_buf = va_arg(var, mval *);
-	timeout = va_arg(var, int4);	/* in seconds */
+	timeout = va_arg(var, mval *);	/* in milliseconds */
 	argcnt -= 5;
 	/* initialize $zjob = 0, in case JOB fails */
 	dollar_zjob = 0;
@@ -158,21 +158,12 @@ int	op_job(int4 argcnt, ...)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
 	}
 	/* Start the timer */
-	ojtimeout = FALSE;
-	if (timeout < 0)
-		timeout = 0;
-	else if (TREF(tpnotacidtime) < timeout)
-		TPNOTACID_CHECK(JOBTIMESTR);
-	if (NO_M_TIMEOUT == timeout)
-	{
-		timed = FALSE;
-		msec_timeout = NO_M_TIMEOUT;
-	} else
+	ojtimeout = timed = FALSE;
+	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, JOBTIMESTR);
+	if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
 	{
 		timed = TRUE;
-		msec_timeout = timeout2msec(timeout);
-		if (msec_timeout > 0)
-			start_timer((TID)&tid, msec_timeout, job_timer_handler, 0, NULL);
+		start_timer((TID)&tid, msec_timeout, job_timer_handler, 0, NULL);
 	}
 	if (argcnt)
 	{
@@ -234,7 +225,6 @@ int	op_job(int4 argcnt, ...)
 						      errno);
 			}
 		}
-
 	}
 	if (argcnt)
 		free(job_params.parms);
@@ -293,7 +283,6 @@ int	op_job(int4 argcnt, ...)
 							  joberrs[exit_stat].len,
 							  joberrs[exit_stat].msg,
 							  job_errno);
-
 					}
 				} else					/* unknown exit status */
 				{
@@ -316,7 +305,6 @@ int	op_job(int4 argcnt, ...)
 			dollar_truth = 1;
 		assert(0 < zjob_pid);
 		dollar_zjob = zjob_pid;
-
 		if (IS_JOB_SOCKET(job_params.input.addr, job_params.input.len))
 		{
 			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.input.len);
@@ -338,7 +326,6 @@ int	op_job(int4 argcnt, ...)
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}
-
 		return TRUE;
 	}
 	return FALSE; /* This will never get executed, added to make compiler happy */
