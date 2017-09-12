@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,7 +19,7 @@
 #include "gtm_unistd.h"
 
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "error.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"	/* for zintcmd_active */
@@ -49,6 +52,7 @@
 #include "alias.h"
 #include "tp_timeout.h"
 #include "localvarmonitor.h"
+#include "gtmio.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -247,7 +251,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
 				vname.c[hte->key.var_name.len] = '\0';
 			);
-			DBGRFCT((stderr, "unw_mv_ent1: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
+			DBGRFCT((stderr, "unw_mv_ent-NTAB: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
 				 &vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_ntab.save_value));
 			hte->value = (char *)mv_st_ent->mv_st_cont.mvs_ntab.save_value;
 			if (lvval_ptr)
@@ -269,8 +273,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
 					vname.c[hte->key.var_name.len] = '\0';
 				);
-				DBGRFCT((stderr, "unw_mv_ent2: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
-					 &vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.save_value));
+				DBGRFCT((stderr, "unw_mv_ent-PVAL: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr
+					 "\n", &vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.save_value));
 				hte->value = (char *)mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.save_value;
 				/* At this point lvval_ptr has one of two values:
 				 * 1 - It has the same value as in mv_st_ent->mv_st_cont.mvs_pval.mvs_val which is the lv_val
@@ -311,7 +315,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
 				vname.c[hte->key.var_name.len] = '\0';
 			);
-			DBGRFCT((stderr, "unw_mv_ent3: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
+			DBGRFCT((stderr, "unw_mv_ent-NVAL: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
 				 &vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value));
 			hte->value = (char *)mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value;
 			/* See comment in handling of MVST_PVAL above for content and treatment of lvval_ptr */
@@ -420,8 +424,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			if (dollar_stack.array)
 				free(dollar_stack.array);
 			/* Restore the old values from dollar_ecode_ci and dollar_stack_ci */
-			DBGEHND((stderr, "unw_mv_ent: Restoring saved error frame 0x"lvaddr" over existing error frame value 0x"
-				 lvaddr"\n", mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save, error_frame));
+			DBGEHND((stderr, "unw_mv_ent-ZINTR: Restoring saved error frame 0x"lvaddr" over existing error frame value"
+				 " 0x"lvaddr"\n", mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save, error_frame));
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));

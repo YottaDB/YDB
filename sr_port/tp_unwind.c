@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,10 +53,8 @@
 # include "gt_timer.h"
 # include "wbox_test_init.h"
 #endif
-#ifdef DEBUG
-# include "gtmio.h"
-# include "gtm_stdio.h"
-#endif
+#include "gtmio.h"
+#include "gtm_stdio.h"
 
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop;

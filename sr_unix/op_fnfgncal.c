@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -625,10 +628,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
 	}
 	free(types_descr_ptr);
-	/* Exit from the residual call-in environment(SFF_CI and base frames) which might still exist on M stack when the externally
+	/* Exit from the residual call-in environment(SFT_CI base frame) which might still exist on M stack when the externally
 	 * called function in turn called into an M routine.
 	 */
-	if (frame_pointer->flags & SFF_CI)
+	if (frame_pointer->type & SFT_CI)
 		ci_ret_code_quit();
 	/* Only process the input-output and output-only arguments if the external call succeeded; otherwise, return -1
 	 * if non-void return is expected.
@@ -994,11 +997,11 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	TREF(in_ext_call) = FALSE;
 	mumps_status = save_mumps_status;
 
-	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
+	/* Exit from the residual call-in environment(SFT_CI base frame) which might
 	 * still exist on M stack when the externally called function in turn called
 	 * into an M routine.
 	 */
-	if (frame_pointer->flags & SFF_CI)
+	if (frame_pointer->type & SFT_CI)
 		ci_ret_code_quit();
 	/* NOTE: ADD RETURN STATUS CALCUATIONS HERE */
 	/* Compute space requirement for return values */
