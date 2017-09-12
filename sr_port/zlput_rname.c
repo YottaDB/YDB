@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -140,8 +143,9 @@ boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate)
 
 	if (NULL != need_duplicate)
 		*need_duplicate = FALSE;
-	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 	{
+		fp = SKIP_BASE_FRAME(fp);
 		if (MSTR_EQ(&fp->rvector->routine_name, &rtnhdr->routine_name))
 		{
 			if ((NULL != need_duplicate) && (CURRENT_RHEAD_ADR(fp->rvector) == rtnhdr))
@@ -234,8 +238,9 @@ STATICFNDEF boolean_t handle_active_old_versions(boolean_t *duplicated, rhdtyp *
 		 */
 		assert(NULL == old_rhead->active_rhead_adr);
 		old_rhead->active_rhead_adr = copy_rhead; /* Reserve previous version on active chain */
-		for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
+			fp = SKIP_BASE_FRAME(fp);
 			DBGARLNK_ONLY(fprhd = CURRENT_RHEAD_ADR(fp->rvector));
 			if (CURRENT_RHEAD_ADR(fp->rvector) == old_rhead)
 			{
@@ -304,8 +309,9 @@ void zr_cleanup_recursive_rtn(rhdtyp *rtnhdr)
 	stack_frame	*fp;
 
 	/* See if routine is still in use */
-	for (fp = frame_pointer; fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
+		fp = SKIP_BASE_FRAME(fp);
 		if (rtnhdr == fp->rvector)
 			break; /* Found reference - not done with it */
 	}

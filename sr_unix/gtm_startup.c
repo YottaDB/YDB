@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -217,6 +220,10 @@ void gtm_startup(struct startup_vector *svec)
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
+	/* Put a base frame on the stack. One assumes this base frame is so there is *something* on the stack in case an error
+	 * or some such gets driven that looks at the stack. Needs to be at least one frame there. However, once we invoke
+	 * gtm_init_env (via jobchild_init()), this frame is no longer reachable since it builds the "real" base frame.
+	 */
 	msp -= SIZEOF(stack_frame);
 	frame_pointer_lcl = (stack_frame *)msp;
 	memset(frame_pointer_lcl, 0, SIZEOF(stack_frame));
@@ -276,7 +283,7 @@ void gtm_startup(struct startup_vector *svec)
 	 * seen alias acitivity so those structures are initialized as well.
 	 */
 	assert(FALSE == curr_symval->alias_activity);
-	curr_symval->alias_activity = TRUE;
+	curr_symval->alias_activity = TRUE;			/* Temporary during lvzwr_init() */
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;

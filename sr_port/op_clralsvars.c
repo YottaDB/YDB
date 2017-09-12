@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2014 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +45,7 @@ void op_clralsvars(lv_val *rslt)
 	hash_table_mname        *table;
 	ht_ent_mname		*table_base, *table_top, **last_lsym_hte, **htep, *table_base_orig;
 	ht_ent_mname    	*tabent, *tabent_top;
-	stack_frame		*fp, *fpprev;
+	stack_frame		*fp;
 	lv_val			*lvp;
  	DEBUG_ONLY(boolean_t	first_sym;)
 
@@ -102,15 +106,19 @@ void op_clralsvars(lv_val *rslt)
 			}
 			if (done)
 				break;
-			fpprev = fp;
-			fp = fp->old_frame_pointer;
-			if (SFF_CI & fpprev->flags)
-			{	/* Callins needs to be able to crawl past apparent end of stack to earlier stack segments */
-				/* We should be in the base frame now. See if an earlier frame exists */
+			if (SFT_CI & fp->type)
+			{	/* Callins needs to be able to crawl past apparent end of stack (due to call-in base frame)
+				 * to earlier stack segments. Base frames hide the stack continue address behind them so
+				 * pick that up and see if it allows us to continue the unroll.
+				 *
+				 * Note no check for triggers here as their locals are isolated so hitting a trigger base
+				 * frame stops this search back through the stack.
+				 */
 				fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
-				if (NULL == fp || fp >= (stack_frame *)stackbase || fp < (stack_frame *)stacktop)
+				if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
 					break;	/* Pointer not within the stack -- must be earliest occurence */
-			}
+			} else
+				fp = fp->old_frame_pointer;
 		} while(fp);
 		/* Now that $ZWRTAC* vars have been deleted, we should check if compaction is a suggested thing
 		 * to get rid of the deleted vars which will improve the free slot search and reduce the slot scan

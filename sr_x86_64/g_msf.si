@@ -3,6 +3,9 @@
 # Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -122,8 +125,7 @@ SFT_ZINTR		=	0x100
 SFF_INDCE		=	0x01
 SFF_ZTRAP_ERR		=	0x02
 SFF_DEV_ACT_ERR		=	0x04
-SFF_CI			=	0x08
-SFF_ETRAP_ERR		=	0x10
+SFF_ETRAP_ERR		=	0x08
 
 /* Opcode definition needed by assembly files
  * These are defined in i386*.h for using in "c" files

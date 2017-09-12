@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -88,6 +91,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_ZSTEP_ACT	(1 << 7)	/* 0x0080 action frame for a zstep */
 #define SFT_ZINTR	(1 << 8)	/* 0x0100 $zinterrupt frame */
 #define SFT_TRIGR	(1 << 9)	/* 0x0200 Trigger base frame */
+#define SFT_CI		(1 << 10)	/* 0x0400 Call-in base frame */
 
 #define SFT_ZINTR_OFF	~(SFT_ZINTR)	/* Mask to turn off SFF_ZINTR */
 
@@ -102,12 +106,11 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_INDCE	(1 << 0)	/* 0x01 This frame is executing an indirect cache entry */
 #define SFF_ZTRAP_ERR 	(1 << 1)	/* 0x02 error occured during $ZTRAP compilation */
 #define SFF_DEV_ACT_ERR	(1 << 2)	/* 0x04 compilation error occured in device exception handler */
-#define SFF_CI		(1 << 3)	/* 0x08 call-in base frame */
-#define SFF_ETRAP_ERR	(1 << 4)	/* 0x10 An $ETRAP style error occurred while in this frame. A return to this frame will
+#define SFF_ETRAP_ERR	(1 << 3)	/* 0x08 An $ETRAP style error occurred while in this frame. A return to this frame will
 					 *      cause the getframe macro to invoke error_return() for further error processing.
 					 */
-#define SFF_UNW_SYMVAL	(1 << 5)	/* 0x20 Unwound a symval in this stackframe (relevant to tp_restart) */
-#define SSF_NORET_VIA_MUMTSTART	(1 << 6)/* 0x40 This frame was not created by MUMPS code and cannot return via
+#define SFF_UNW_SYMVAL	(1 << 4)	/* 0x10 Unwound a symval in this stackframe (relevant to tp_restart) */
+#define SSF_NORET_VIA_MUMTSTART	(1 << 5)/* 0x20 This frame was not created by MUMPS code and cannot return via
 					 *	MUM_TSTART. This macro was originally written for trigger calls
 					 *	and then adapted for spanning node/region transactions.
 					 *	See comments in tp_restart.c for further details.
@@ -116,7 +119,6 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_INDCE_OFF   		~(SFF_INDCE)			/* Mask to turn off SFF_INDCE */
 #define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)		/* Mask to turn off SFF_ZTRAP_ERR */
 #define SFF_DEV_ACT_ERR_OFF		~(SFF_DEV_ACT_ERR)		/* Mask to turn off SFF_DEV_ACT_ERR */
-#define SFF_CI_OFF			~(SFF_CI)			/* Mask to turn off SFF_CI */
 #define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)		/* Mask to turn off SFF_ETRAP_ERR */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SSF_NORET_VIA_MUMTSTART_OFF	~(SSF_NORET_VIA_MUMTSTART)	/* Mask to turn off SSF_NORET_VIA_MUMTSTART */
@@ -136,13 +138,10 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 }
 
 /*
- * Skip past trigger base frames
+ * Skip past trigger and/or call-in base frames
  */
-#ifdef GTM_TRIGGER
-# define SKIP_BASE_FRAME(FP) (((NULL != (FP)) && (SFT_TRIGR & (FP)->type)) ? *(stack_frame **)((FP) + 1) : (FP))
-#else
-# define SKIP_BASE_FRAME(FP) (FP)
-#endif
+#define SKIP_BASE_FRAME(FP) (((NULL != (FP)) && ((GTMTRIG_ONLY(SFT_TRIGR |) SFT_CI) & (FP)->type)) \
+			     ? *(stack_frame **)((FP) + 1) : (FP))
 
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);

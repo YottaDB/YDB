@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -845,8 +848,9 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		 * routine-header structures that are not added to the rtn_names[] array but could potentially have
 		 * done rtnobj_shm_malloc(). In that case do rtnobj_shm_free() on those to decrement shared memory refcnts.
 		 */
-		for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
+			fp = SKIP_BASE_FRAME(fp);	/* Separate from for above so SKIP_BASE_FRAME runs on first value */
 			rtnhdr = CURRENT_RHEAD_ADR(fp->rvector);
 			if ((NULL != rtnhdr) && rtnhdr->rtn_relinked && rtnhdr->shared_object)
 			{

@@ -20,15 +20,8 @@
 #include "gtm_inet.h"	/* Required for gtmsource.h */
 #include "gtm_stdio.h"
 #include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
-
-#ifdef VMS
-# include <descrip.h>	/* required for gtmsource.h */
-# include <ssdef.h>
-#endif
-#ifdef UNIX
 #include "gtm_signal.h"
-# include <stdarg.h>
-#endif
+#include <stdarg.h>
 
 #include "ast.h"
 #include "gdsroot.h"
@@ -86,11 +79,10 @@
 #include "alias.h"
 #include "create_fatal_error_zshow_dmp.h"
 #include "have_crit.h"
-#ifdef UNIX
-# include "iormdef.h"
-# include "ftok_sems.h"
-# include "gtm_putmsg_list.h"
-#endif
+#include "invocation_mode.h"
+#include "iormdef.h"
+#include "ftok_sems.h"
+#include "gtm_putmsg_list.h"
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
@@ -134,13 +126,7 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
 GBLREF	int4			gtm_trigger_depth;
 #endif
-#ifdef UNIX
 GBLREF	jnl_gbls_t		jgbl;
-#endif
-#ifdef VMS
-GBLREF	boolean_t		tp_restart_fail_sig_used;
-GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-#endif
 
 error_def(ERR_ASSERT);
 error_def(ERR_CTRAP);
@@ -170,12 +156,10 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
-error_def(ERR_VMSMEMORY);
 
 boolean_t clean_mum_tstart(void);
 void setup_error(sgmnt_addrs *csa, int argcnt, ...);
 
-#ifdef UNIX
 /* When we restart generated code after handling an error, verify that we are not in the frame or one created on its
  * behalf that invoked a trigger or spanning node and caused a dynamic TSTART to be done on its behalf. This can happen
  * for example if a trigger is invoked for the first time but gets a compilation or link failure error or if a spanning
@@ -193,9 +177,6 @@ void setup_error(sgmnt_addrs *csa, int argcnt, ...);
 		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */					\
 	}												\
 }
-#else
-#define MUM_TSTART_FRAME_CHECK
-#endif
 
 /* Since a call to SET_ZSTATUS may cause the stringpool expansion, record whether we are using an indirection pool or not
  * in a local variable rather than recompare the stringpool bases.
@@ -244,7 +225,6 @@ boolean_t clean_mum_tstart(void)
 	return (NULL != err_act);
 }
 
-#ifdef UNIX
 /* Routine to setup an error in util_outbuff as if rts_error had put it there. Used when we morph ERR_TPRETRY
  * to ERR_TPRESTNESTERR. Requires a va_list var containing the args so do this in this separate routine.
  */
@@ -256,7 +236,6 @@ void setup_error(sgmnt_addrs *csa, int argcnt, ...)
 	gtm_putmsg_list(csa, argcnt, var);
 	va_end(var);
 }
-#endif
 
 CONDITION_HANDLER(mdb_condition_handler)
 {
@@ -275,11 +254,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
-#	ifdef UNIX
 	unix_db_info		*udi;
 	stack_frame		*lcl_error_frame;
 	mv_stent		*mvst;
-#	endif
 
 	START_CH(FALSE);
 	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=0x"lvaddr"\n", SIGNAL, frame_pointer));
@@ -292,10 +269,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		if (gtmsocket == gtm_err_dev->type)
 			iosocket_destroy(gtm_err_dev);
-#		ifdef UNIX
 		else
 			remove_rms(gtm_err_dev);
-#		endif
 		gtm_err_dev = NULL;
 	}
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
@@ -333,7 +308,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	}
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
-#		ifdef UNIX
 		lcl_error_frame = error_frame;
 		if ((NULL == lcl_error_frame) && dollar_zininterrupt)
 		{	/* We are in a $zininterrupt handler AND have a restart request. See if we were in error processing
@@ -350,9 +324,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			lcl_error_frame = mvst->mv_st_cont.mvs_zintr.error_frame_save;
 		}
 		if (NULL == lcl_error_frame)
-#		endif
 		{
-			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used));
 #			ifdef GTM_TRIGGER
 			/* Assert that we never end up invoking the MUM_TSTART macro handler in case of an implicit tstart restart.
 			 * See GBLDEF of skip_INVOKE_RESTART and donot_INVOKE_MUMTSTART in gbldefs.c for more information.
@@ -404,29 +376,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			assert(!donot_INVOKE_MUMTSTART);
 #			endif
-#			ifdef UNIX
 			if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
-#			elif defined VMS
-			if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
-#			endif
 			{
 				/* Set mumps program counter back tstart level 1 */
 				MUM_TSTART;
 			}
-#			ifdef VMS
-			else
-			{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
-				 * information with that saved from tp_restart.
-				 * Assert that we have room for these arguments - the array malloc is in tp_restart
-				 */
-				assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
-				tp_restart_fail_sig_used = FALSE;
-			}
-#			endif
-		}
-#		ifdef UNIX
-		else
+		} else
 		{
 			if (0 == dollar_tlevel)
 				SIGNAL = ERR_TLVLZERO;		/* TPRESTART specified but not in TP */
@@ -439,7 +394,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 */
 			setup_error(gv_target ? gv_target->gd_csa : NULL, VARLSTCNT(1) SIGNAL);
 		}
-#		endif
 	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)
@@ -491,17 +445,16 @@ CONDITION_HANDLER(mdb_condition_handler)
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	if (DUMPABLE)
 	{	/* Certain conditions we don't want to attempt to create the M-level ZSHOW dump.
-		 * 1) Unix: If gtmMallocDepth > 0 indicating memory manager was active and could be reentered.
-		 * 2) Unix: If we have a SIGBUS or SIGSEGV (could be likely to occur again
+		 * 1) If gtmMallocDepth > 0 indicating memory manager was active and could be reentered.
+		 * 2) If we have a SIGBUS or SIGSEGV (could be likely to occur again
 		 *    in the local variable code which would cause immediate shutdown with
 		 *    no cleanup).
-		 * 3) VMS: If we got an ACCVIO for the same as reason (2).
-		 * Note that we will bypass checks 2 and 3 if GDL_ZSHOWDumpOnSignal debug flag is on
+		 * Note that we will bypass check 2 if GDL_ZSHOWDumpOnSignal debug flag is on
 		 */
 		SET_PROCESS_EXITING_TRUE;	/* So zshow doesn't push stuff on stack to "protect" it when
 						 * we potentially already have a stack overflow */
 		CANCEL_TIMERS;			/* No unsafe interruptions now that we are dying */
-		if (!repeat_error UNIX_ONLY(&& (0 == gtmMallocDepth)))
+		if (!repeat_error && (0 == gtmMallocDepth))
 		{
 			src_line_d.addr = src_line;	/* Setup entry point buffer for set_zstatus() */
 			src_line_d.len = 0;
@@ -512,15 +465,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 
 		/* If we are about to core/exit on a stack over flow, only do the core part if a debug
 		 * flag requests this behaviour. Otherwise, supress the core and just exit.
-		 * 2006-03-07 se: If a stack overflow occurs on VMS, it has happened that the stack is no
-		 * longer well formed so attempting to unwind it as it does in MUMPS_EXIT causes things
-		 * to really become screwed up. For this reason, this niceness of avoiding a dump on a
-		 * stack overflow on VMS is being disabled. The dump can be controlled wih set proc/dump
-		 * (or not) as desired.
 		 * 2008-01-29 (se): Added fatal MEMORY error so we no longer generate a core for it by
 		 * default unless the DumpOnStackOFlow flag is turned on. Since this flag is not a user-exposed
-		 * interface, I'm avoiding renaming it for now. Note the core avoidance applies to both UNIX
-		 * and VMS since stack formation is not at issue in this sort of memory request.
+		 * interface, I'm avoiding renaming it for now.
+		 *
 		 * Finally note that in UNIX, ch_cond_core (called by DRIVECH macro which invoked this condition
 		 * handler has likely already created the core and set the created_core flag which will prevent
 		 * this process from creating another core for the same SIGNAL. We leave this code in here in
@@ -528,26 +476,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * first.
 		 */
 		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
-		    VMS_ONLY((int)ERR_VMSMEMORY == SIGNAL)
-		    UNIX_ONLY(((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
-			       || (int)ERR_MEMORY == SIGNAL  || (int)ERR_MEMORY == arg)))
+		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
+		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
 		{
-#			ifdef VMS
-			/* Inside this ifdef, we are definitely here because of ERR_VMSMEMORY. If the conditions
-			 * of the above if change, revisit these assmuptions.
-			 * For VMSMEMORY error, we have to send the message to the operator log and to the
-			 * console ourselves because the MUMP_EXIT method of exiting on a fatal error does
-			 * not preserve the substitution parameters for the message making it useless. After
-			 * sending the message change the status code so we exit with something other than the
-			 * duplicate message.
-			 */
-			assert(ERR_VMSMEMORY == SIGNAL);
-			send_msg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),	/* BYPASSOK - send_msg */
-				 *(int **)(&sig->chf$is_sig_arg1 + 2));
-			gtm_putmsg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),	/* BYPASSOK - gtm_putmsg */
-				   *(int **)(&sig->chf$is_sig_arg1 + 2));
-			SIGNAL = ERR_GTMERREXIT;	/* Override reason for "stop" */
-#			endif
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
 		gtm_dump();
@@ -605,7 +536,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 		}
-#		ifdef UNIX
 		/* Release FTOK lock on the replication instance file if holding it (possible if error in jnlpool_init) */
 		assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open || !pool_init);
 		if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
@@ -619,7 +549,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				assert(!udi->grabbed_ftok_sem);
 			}
 		}
-#		endif
 		/* Release crit lock on journal pool if holding it */
 		if (pool_init) /* atleast one region replicated and we have done jnlpool init */
 		{
@@ -805,7 +734,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 					}
 					/* Note that trans_code will set error_frame appropriately for this condition */
 				}
-				if (SFF_CI & frame_pointer->flags)
+				if (SFT_CI & frame_pointer->type)
 				{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
 					mumps_status = SIGNAL;
 					MUM_TSTART_FRAME_CHECK;
@@ -893,12 +822,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
-		/* In VMS skip printing error messages for INFO messages if skip_gtm_putmsg is TRUE.
-		 * this is currently relied upon by GDE for the VIEW "YCHKCOLL" command.
-		 * In UNIX send out messages only in utilities or direct mode, this addresses the GDE
-		 * issue described above for VMS as GDE is never in direct mode
-		 */
-		if (UNIX_ONLY(!IS_GTM_IMAGE || dm_action) VMS_ONLY(!TREF(skip_gtm_putmsg)))
+		/* Send out messages only in utilities or direct mode */
+		if (!IS_GTM_IMAGE || dm_action)
 			PRN_ERROR;
 		CONTINUE;
 	}
@@ -955,7 +880,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				GTMTRIG_ONLY(assert(0 == gtm_trigger_depth));	/* Should never happen in a trigger */
 				DBGEHND((stderr, "mdb_condition_handler: ztrap_explicit_null set - unwinding till find handler\n"));
 				assert(0 == dollar_etrap.str.len);
-				for (level = dollar_zlevel() - 1; level > 0; level--)
+				for (level = dollar_zlevel() - 1; 0 <= level; level--)
 				{
 					GOLEVEL(level, FALSE);
 					assert(level == dollar_zlevel());
@@ -965,16 +890,15 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 				if (0 >= level)
 				{
-					assert(0 == level);
 					etrap_handling = FALSE;
 					DBGEHND((stderr, "mdb_condition_handler: Unwound to stack start - exiting\n"));
 				}
 				/* note that trans_code will set error_frame appropriately for this condition */
 			}
-			if (SFF_CI & frame_pointer->flags)
+			if (SFT_CI & frame_pointer->type)
 			{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
 				mumps_status = SIGNAL;
-				DBGEHND((stderr, "mdb_condition_handler: Call in base frame found - returnning to callins\n"));
+				DBGEHND((stderr, "mdb_condition_handler: Call in base frame found - returning to callins\n"));
 				MUM_TSTART_FRAME_CHECK;
 				MUM_TSTART;
 			} else if (etrap_handling)
@@ -1055,7 +979,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			if (err_dev)
 			{
-#				ifdef UNIX
 				/* On z/OS, if opening a fifo which is not read only we need to fix the err_dev type to rm */
 #				ifdef __MVS__
 				if ((dev_open != err_dev->state) && (ff == err_dev->type))
@@ -1079,7 +1002,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 					/* structures pointed to by err_dev were freed so make sure it's not used again */
 					err_dev = NULL;
 				}
-#				endif
 				if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created)
 				{
 					assert(err_dev->state != dev_open);
@@ -1113,7 +1035,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 		DBGEHND((stderr, "mdb_condition_handler: Transient or direct mode frame -- bypassing handler dispatch\n"));
 		if (err_dev)
 		{
-#			ifdef UNIX
 			/* Executed from the direct mode so do the rms check and cleanup if necessary. On z/OS, if opening a fifo
 			 * which is not read only we need to fix the type for the err_dev to rm.
 			 */
@@ -1136,7 +1057,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				remove_rms(err_dev);
 				err_dev = NULL;
 			}
-#			endif
 			if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created)
 			{
 				assert(err_dev->state != dev_open);
@@ -1162,14 +1082,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 				show_source_line(TRUE);
 		}
 	}
-	/* Slight divergence in how we handle otherwise unhandled errors on UNIX and VMS. UNIX now has a strict no-unsolicited
-	 * output from error messages policy unless dealing with a direct mode frame. This has a dependency on a robust
-	 * error_return() routine which VMS does not presently have. Consequently the previous way of doing things still
-	 * exists on VMS while on UNIX, a new cleaner (from an unsolicited console output) viewpoint is in place. Note that
-	 * while it would be possible to extract out the common code between the two below versions, the result is nowhere
-	 * near as clean looking. In this routine, clarity rules the roost.
+	/* We now have a strict no-unsolicited output from error messages policy unless dealing with a direct mode frame.
+	 * This has a dependency on a robust error_return(). Consequently, a new cleaner (from an unsolicited console output)
+	 * viewpoint is in place.
 	 */
-#	ifdef UNIX
 	if (trans_action || dm_action)
 	{	/* If true transcendental, do trans_code_cleanup(). If our counted frame is
 		 * masquerading as a transcendental frame, run jobinterrupt_process_cleanup().
@@ -1183,42 +1099,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		MUM_TSTART_FRAME_CHECK;
 		MUM_TSTART;
 	}
-#	elif VMS	/* VMS only */
-	if (!dm_action && !trans_action && (0 != src_line_d.len))
-	{
-		if (MSG_OUTPUT)
-			dec_err(VARLSTCNT(4) ERR_RTSLOC, 2, src_line_d.len, src_line_d.addr);
-	} else
-	{
-		if (trans_action || dm_action)
-		{	/* If true transcendental, do trans_code_cleanup(). If our counted frame is
-			 * masquerading as a transcendental frame, run jobinterrupt_process_cleanup().
-			 */
-			DBGEHND((stderr, "mdb_condition_handler: trans_code_cleanup() or jobinterrupt_process_cleanup being "
-				 "dispatched\n"));
-			if (!(SFT_ZINTR & proc_act_type))
-				trans_code_cleanup();
-			else
-				jobinterrupt_process_cleanup();
-			MUM_TSTART_FRAME_CHECK;
-			MUM_TSTART;
-		} else if (MSG_OUTPUT)
-		{	/* If a message about the location is needed, it should be possible to pull the location
-			 * out of the $STACK array. If it exists, use it instead.
-			 */
-			if ((NULL != dollar_stack.array) && (0 < dollar_stack.index))
-			{	/* Error entry exists */
-				src_line_d = dollar_stack.array[dollar_stack.index - 1].place_str;
-				assert(src_line_d.len);
-				assert(src_line_d.addr);
-				dec_err(VARLSTCNT(4) ERR_RTSLOC, 2, src_line_d.len, src_line_d.addr);
-			} else
-				dec_err(VARLSTCNT(1) ERR_SRCLOCUNKNOWN);
-		}
-	}
-#	else
-#	 error "Unsupported platform"
-#	endif
 	DBGEHND((stderr, "mdb_condition_handler: Condition not handled -- defaulting to process exit\n"));
+	assert(!(MUMPS_CALLIN & invocation_mode));
 	MUMPS_EXIT;
 }
