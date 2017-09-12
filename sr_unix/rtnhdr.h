@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -235,9 +238,9 @@ typedef struct
 	/* For USHBIN_SUPPORTED routines, if the rtn_relinked flag is ON in the routine header (which results from not cleaning	\
 	 * up a routine when it is either explicitly or automatically re-linked), check if the stack contains any more		\
 	 * references to this routine header. If not, it is ripe for cleanup as it has been replaced so drive zr_unlink_rtn()	\
-	 * on it.														\
+	 * on it. The RTNHDR being checked for non-NULL is due to a call-in base frame not having a rtnhdr value.		\
 	 */															\
-	if ((RTNHDR)->rtn_relinked)												\
+	if ((NULL != (RTNHDR)) && (RTNHDR)->rtn_relinked)									\
 		zr_cleanup_recursive_rtn(RTNHDR);										\
 }
 /* Format of a relocation datum. */

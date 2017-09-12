@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,7 +20,7 @@
 
 #include "min_max.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "compiler.h"
 #include "gdsroot.h"
@@ -28,6 +31,7 @@
 #include "alias.h"
 #include "stack_frame.h"
 #include "parm_pool.h"
+#include "fgncalsp.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF mv_stent		*mv_chain;
@@ -112,89 +116,7 @@ STATICFNDEF void parm_pool_init(unsigned int init_capacity)
 	(*(TREF(parm_pool_ptr))->parms).mask_and_cnt.actualcnt = SAFE_TO_OVWRT;
 }
 
-/* Push lv_val parameters into our pool, taking proper care of unread parameters. An important note is that
- * op_bindparm() should increase actualcnt of the read set of parameters by a value of SAFE_TO_OVWRT, to
- * indicate that it is OK to overwrite those parameters, since they have already been read and bound.
- */
-void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
-{
-	va_list			var;
-	mval			*ret_value, *actpmv;
-	int			mask, i, slots_needed;
-	VMS_ONLY(unsigned int	totalcnt;)
-	unsigned int		actualcnt, prev_count;
-	lv_val			*actp;
-	lv_val			**act_list_ptr;
-	stack_frame		*save_frame;
-	parm_slot		*curr_slot;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, truth_value);
-	VMS_ONLY(va_count(totalcnt));
-	assert(PUSH_PARM_OVERHEAD <= totalcnt);
-	ret_value = va_arg(var, mval *);
-	mask = va_arg(var, int);
-	actualcnt = va_arg(var, unsigned int);
-	assert(PUSH_PARM_OVERHEAD + actualcnt == totalcnt);
-	assert(MAX_ACTUALS >= actualcnt);
-	if (!TREF(parm_pool_ptr))
-	{
-		parm_pool_init(SLOTS_NEEDED_FOR_SET(actualcnt));		/* Allocate pool memory for actualcnt params
-										 * plus the frame and mask_and_cnt slots. */
-		act_list_ptr = &((*(TREF(parm_pool_ptr))->parms).actuallist);	/* Save a reference to the first vacant slot. */
-	} else
-	{	/* If some parameters have been saved, it is only safe to overwrite them if they have been marked read;
-		 * in such case back off start_idx to the beginning of that set to reutilize the space.
-		 */
-		prev_count = (*(((TREF(parm_pool_ptr))->parms + (TREF(parm_pool_ptr))->start_idx) - 1)).mask_and_cnt.actualcnt;
-		if ((0 != (TREF(parm_pool_ptr))->start_idx) && (MAX_ACTUALS < prev_count))
-			(TREF(parm_pool_ptr))->start_idx -= (SLOTS_NEEDED_FOR_SET((prev_count - SAFE_TO_OVWRT)));
-		assert(MAX_TOTAL_SLOTS > (TREF(parm_pool_ptr))->start_idx);	/* In debug, ensure we are not growing endlessly. */
-		slots_needed = (TREF(parm_pool_ptr))->start_idx + SLOTS_NEEDED_FOR_SET(actualcnt);
-		if (slots_needed > (TREF(parm_pool_ptr))->capacity)		/* If we have less than needed, expand the pool. */
-			parm_pool_expand(slots_needed, (TREF(parm_pool_ptr))->start_idx);
-		/* Save a reference to the first vacant slot. */
-		act_list_ptr = &((*((TREF(parm_pool_ptr))->parms + (TREF(parm_pool_ptr))->start_idx)).actuallist);
-	}
-	save_frame = NULL;
-	if (frame_pointer->old_frame_pointer)
-	{	/* Temporarily rewind frame_pointer if the parent is not a base frame. */
-		save_frame = frame_pointer;
-		frame_pointer = frame_pointer->old_frame_pointer;
-	}
-	for (i = 0; i < actualcnt; i++, act_list_ptr++)				/* Save parameters in the following empty slots. */
-	{
-		actp = va_arg(var, lv_val *);
-		if (!(mask & 1 << i))
-		{	/* Not a dotted pass-by-reference parm. */
-			actpmv = &actp->v;
-			MV_FORCE_DEFINED_UNLESS_SKIPARG(actpmv);
-			PUSH_MV_STENT(MVST_PVAL);
-			mv_chain->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
-			LVVAL_INIT(mv_chain->mv_st_cont.mvs_pval.mvs_val, curr_symval);
-			mv_chain->mv_st_cont.mvs_pval.mvs_val->v = *actpmv;		/* Copy mval input. */
-			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.save_value = NULL;	/* Filled in by op_bindparm. */
-			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.hte_addr = NULL;
-			DEBUG_ONLY(mv_chain->mv_st_cont.mvs_pval.mvs_ptab.nam_addr = NULL);
-			*act_list_ptr = (lv_val *)&mv_chain->mv_st_cont.mvs_pval;
-		} else
-			/* Dotted pass-by-reference parm. No save of previous value, just pass lvval. */
-			*act_list_ptr = actp;
-	}
-	va_end(var);
-	if (save_frame)								/* Restore frame_pointer if previously saved. */
-		frame_pointer = save_frame;
-	frame_pointer->ret_value = ret_value;					/* Save the return value in the stack frame. */
-	if (ret_value)								/* Save $test value in the stack frame. */
-		frame_pointer->dollar_test = truth_value;
-	(TREF(parm_pool_ptr))->start_idx += SLOTS_NEEDED_FOR_SET(actualcnt);	/* Update start_idx for the future parameter set. */
-	curr_slot = PARM_CURR_SLOT;
-	(*(curr_slot - 1)).mask_and_cnt.mask = mask;				/* Save parameter mask. */
-	(*(curr_slot - 1)).mask_and_cnt.actualcnt = actualcnt;			/* Save parameter count. */
-	PARM_ACT_FRAME(curr_slot, actualcnt) = frame_pointer;			/* Save frame pointer. */
-	assert(frame_pointer && (frame_pointer->type & SFT_COUNT));		/* Ensure we are dealing with a counted frame. */
-}
 
 /* Expand the allocation for the parameter pool. */
 STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
@@ -218,3 +140,13 @@ STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
 	TREF(parm_pool_ptr) = pool_ptr;						/* Update the global reference. */
 	assert(MAX_TOTAL_SLOTS > (*((TREF(parm_pool_ptr))->parms + (TREF(parm_pool_ptr))->start_idx - 1)).mask_and_cnt.actualcnt);
 }
+
+/* Generate the two forms of push_parm{_ci}() we need by including the source twice with different #defines so generate the correct
+ * code for each.
+ */
+#define BLD_PUSH_PARM
+#include "push_parm_src.h"
+
+#undef BLD_PUSH_PARM
+#define BLD_PUSH_PARM_CI
+#include "push_parm_src.h"

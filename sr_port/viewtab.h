@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,6 +26,7 @@ VIEWTAB("DEBUG2",		VTP_VALUE | VTP_NULL,		VTK_DEBUG2,		MV_STR),
 VIEWTAB("DEBUG3",		VTP_VALUE | VTP_NULL,		VTK_DEBUG3,		MV_STR),
 VIEWTAB("DEBUG4",		VTP_VALUE | VTP_NULL,		VTK_DEBUG4,		MV_STR),
 VIEWTAB("DMTERM",		VTP_NULL,			VTK_DMTERM,		MV_NM),
+VIEWTAB("ENVIRONMENT",		VTP_NULL,			VTK_ENVIRONMENT,	MV_STR),
 VIEWTAB("EPOCH",		VTP_DBREGION | VTP_NULL,	VTK_EPOCH,		MV_STR),
 VIEWTAB("FILL_FACTOR",		VTP_VALUE | VTP_NULL,		VTK_FILLFACTOR,		MV_NM),
 VIEWTAB("FLUSH",		VTP_DBREGION | VTP_NULL,	VTK_FLUSH,		MV_STR),
@@ -62,15 +66,15 @@ VIEWTAB("LABELS",		VTP_VALUE | VTP_NULL,		VTK_LABELS,		MV_NM),
 VIEWTAB("LINK",			VTP_VALUE | VTP_NULL,		VTK_LINK,		MV_STR),
 VIEWTAB("LOGNONTP",		VTP_VALUE | VTP_NULL,		VTK_LOGNONTP,		MV_NM),
 VIEWTAB("LOGTPRESTART",		VTP_VALUE | VTP_NULL,		VTK_LOGTPRESTART,	MV_NM),
+#ifdef DEBUG_ALIAS
+VIEWTAB("LVAMONOUT",		VTP_NULL,			VTK_LVAMONOUT,		MV_NM), /* nodoc : code debugging feature */
+VIEWTAB("LVAMONSTART",		VTP_NULL,			VTK_LVAMONSTART,	MV_NM), /* nodoc : code debugging feature */
+VIEWTAB("LVAMONSTOP",		VTP_NULL,			VTK_LVAMONSTOP,		MV_NM), /* nodoc : code debugging feature */
+#endif
 #ifdef DEBUG
 VIEWTAB("LVDMP",		VTP_LVN,			VTK_LVDMP,		MV_NM),
 #endif
 VIEWTAB("LVMON",		VTP_NULL | VTP_VALUE,		VTK_LVMON,		MV_STR),/* nodoc : code debugging feature */
-#ifdef DEBUG_ALIAS
-VIEWTAB("LVMONOUT",		VTP_NULL,			VTK_LVMONOUT,		MV_NM), /* nodoc : code debugging feature */
-VIEWTAB("LVMONSTART",		VTP_NULL,			VTK_LVMONSTART,		MV_NM), /* nodoc : code debugging feature */
-VIEWTAB("LVMONSTOP",		VTP_NULL,			VTK_LVMONSTOP,		MV_NM), /* nodoc : code debugging feature */
-#endif
 VIEWTAB("LVNULLSUBS",		VTP_NULL,			VTK_LVNULLSUBS,		MV_NM),
 VIEWTAB("LV_CREF",		VTP_LVN,			VTK_LVCREF,		MV_NM),
 VIEWTAB("LV_GCOL",		VTP_NULL,			VTK_LVGCOL,		MV_NM),

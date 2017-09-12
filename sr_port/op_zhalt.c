@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,6 +25,8 @@
 #include "mvalconv.h"
 #include "op.h"
 
+GBLREF	int		mumps_status;
+
 LITREF	gtmImageName	gtmImageNames[];
 
 error_def(ERR_PROCTERM);
@@ -31,7 +36,9 @@ void op_zhalt(mval *returncode)
 {
 	int	retcode;
 	GTMTRIG_ONLY(mval zposition;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	retcode = 0;
 	assert(returncode);
 	retcode = mval2i(returncode);		/* can only use integer portion */
@@ -48,8 +55,15 @@ void op_zhalt(mval *returncode)
 			 retcode, zposition.str.len, zposition.str.addr);
 	}
 #	endif
+	if (0 < TREF(gtmci_nested_level))
+	{	/* Need to return to caller - not halt (halting out of this call-in level) */
+		mumps_status = retcode;
+		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
+		assertpro(FALSE);		/* Should not return */
+		return;				/* Previous call does not return so this is for the compiler */
+	}
 	if ((0 != retcode) && (0 == (retcode & 0xFF)))
-		retcode = 255;;	/* If the truncated return code that can be passed back to a parent process is zero
+		retcode = 255;	/* If the truncated return code that can be passed back to a parent process is zero
 				 * set the retcode to 255 so a non-zero return code is returned instead (UNIX only).
 				 */
 	EXIT(retcode);

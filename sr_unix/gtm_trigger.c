@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -898,6 +901,9 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Verify trigger routine we want to remove is not currently active. If it is, we need to assert fail.
 	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
+	 * Note, we can use SKIP_BASE_FRAME in the "for" statement here where we cannot in other places. In those
+	 * other places, we want the checks done in SKIP_BASE_FRAME to be applicable to "fp" in the first iteration
+	 * but here it is impossible for the first frame we look at to be either a trigger or call-in frame.
 	 */
 #	ifdef DEBUG
 	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))

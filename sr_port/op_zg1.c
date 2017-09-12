@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -134,11 +137,10 @@ void op_zg1(int4 level)
 		 " type 0x%04lx\n", curlvl, level, unwframes, frame_pointer, (frame_pointer ? frame_pointer->type : 0xffff)));
 	assert(level == dollar_zlevel());
 #	ifdef GTM_TRIGGER
-	if (goframes_unwound_trigger)
-	{
-		/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
+	if (goframes_unwound_trigger || (SFT_CI & fp->type))
+	{	/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
-		 * MUM_TSTART incurs.
+		 * MUM_TSTART incurs. Also, if we unwound to a call-in base frame, we need to return to gtm_ci[p]().
 		 */
 		MUM_TSTART;
 	}
