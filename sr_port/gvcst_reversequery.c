@@ -62,18 +62,24 @@ error_def(ERR_GVQUERYFAIL);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_reversequery_ch)
 
+/* This function implements reverse $query for global nodes. With Standard NULL collation, a null subscript ("")
+ * is represented as the byte 0x01. Whereas a node that spans multiple GDS blocks (spanning node) has multiple nodes
+ * with hidden subscripts each of which start with the byte 0x02. So if $query(^x(1,2,3,7),-1) is requested, we
+ * might need to go back not just one node, but skip over hidden subscripts too until we find a node with non-hidden
+ * subscripts. Below is an example node layout where the subscripts of each node are listed. The result of the
+ * $query(^x(1,2,3,7)) operation should be ^x(1,2,3,"","",""). Hence the MAX_GVSUBSCRIPTS for loop below.
+ *
+ *  ^x(1,2,3,"")
+ *  ^x(1,2,3,"","")
+ *  ^x(1,2,3,"","","")              <--- reverse $query needs to end up here
+ *  ^x(1,2,3,"","","",hidden)
+ *  ^x(1,2,3,"","",hidden)
+ *  ^x(1,2,3,"",hidden)
+ *  ^x(1,2,3,hidden)
+ *  ^x(1,2,3,7)                     <--- reverse $query begins here
+ */
 boolean_t	gvcst_reversequery(void)
-{	/* Similar to gvcst_query, we need to skip over hidden subscripts as needed.
-	 *
-	 *     1  2  3  NULL
-	 *     1  2  3  NULL  NULL
-	 *     1  2  3  NULL  NULL  NULL                                <--- reverse $query needs to end up here
-	 *     1  2  3  NULL  NULL  NULL  hidden
-	 *     1  2  3  NULL  NULL  hidden
-	 *     1  2  3  NULL  hidden
-	 *     1  2  3  hidden
-	 *     1  2  3  7                                               <--- reverse $query from here ...
-	 */
+{
 	boolean_t	found, is_hidden, sn_tpwrapped;
 	boolean_t	est_first_pass;
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
@@ -125,6 +131,11 @@ boolean_t	gvcst_reversequery(void)
 	return found;
 }
 
+/* This function does a reverse $query on an input key (gv_currkey points to the input key) and returns the
+ * immediately previous key (gv_altkey points to this at function end). It is possible that the last subscript in
+ * the previous key has a hidden subscript in which case, the caller "gvcst_query2" would invoke this function again
+ * until a key with no hidden subscripts is found which is the final $query return value.
+ */
 boolean_t	gvcst_reversequery2(void)
 {
 	boolean_t	found, two_histories;

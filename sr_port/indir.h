@@ -97,5 +97,4 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 #ifdef AUTORELINK_SUPPORTED
 ,INDIR(indir_zrupdate,		m_zrupdate,	0)
 #endif
-,INDIR(indir_fnquery1,		f_query1,	OC_FNQUERY)
 ,INDIR(indir_fnreversequery1,	f_reversequery1,OC_FNREVERSEQUERY)

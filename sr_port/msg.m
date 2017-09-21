@@ -170,11 +170,11 @@ hdr
  Open cfile:read
  Use prevout w "/****************************************************************",!
  For i=1:1 Use cfile Read line Quit:$zeof  Do
- . If (1<$zl(line,"XXXX")) Do
+ . If (1<$zlength(line,"XXXX")) Do
  . . Set str=$zpiece(line,"XXXX",1)_xxxx_$zpiece(line,"XXXX",2)
  . . Set str=$zpiece(str,"YYYY",1)_yyyy_$zpiece(str,"YYYY",2)
  . Else  Do
- . . if (1<$zl(line,"YYYY")) Do
+ . . if (1<$zlength(line,"YYYY")) Do
  . . . Set str=$zpiece(line,"YYYY",1)_yyyy_$zpiece(line,"YYYY",2)
  . . Else  Do
  . . . Set str=line

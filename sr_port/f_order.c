@@ -47,7 +47,7 @@ int f_order(oprtype *a, opctype op)
 	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *triptr;
 	triple		*chain2, *obp, tmpchain2;
 	save_se		save_state;
-	opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
+	static opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
 	{
 		/* FORWARD	BACKWARD	TBD */
 		{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* GLOBAL */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -46,7 +46,7 @@ int f_query(oprtype *a, opctype op)
 	triple		*chain2, *obp, tmpchain2;
 	triple		*oldchain, *r, *r0, *r1, *r2, *sav_dirref, *triptr;
 	triple		*sav_gv1, *sav_gvn, *sav_lvn, *sav_ref;
-	opctype		query_opc[LAST_OBJECT][LAST_DIRECTION] =
+	static opctype	query_opc[LAST_OBJECT][LAST_DIRECTION] =
 	{
 		/* FORWARD	BACKWARD		TBD */
 		{ OC_GVQUERY,	OC_GVREVERSEQUERY,	OC_GVQ2		},	/* GLOBAL */
@@ -57,7 +57,6 @@ int f_query(oprtype *a, opctype op)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Note: The below code is similar to f_query1.c. Any changes here might need to be made there and vice versa */
 	oldchain = sav_dirref = NULL;			/* default to no direction and no shifting indirection */
 	r = maketriple(OC_NOOP);			/* We'll fill in the opcode later, when we figure out what it is */
 	switch (TREF(window_token))
@@ -71,11 +70,24 @@ int f_query(oprtype *a, opctype op)
 		assert(TRIP_REF == tmpa->oprclass);
 		tmpa0 = &tmpa->oprval.tref->operand[0];
 		if (OC_FNQUERY == tmpa->oprval.tref->opcode)
-		{
+		{	/* $query on subscripted lvn */
 			assert(TRIP_REF == tmpa0->oprclass);
 			assert(OC_ILIT == tmpa0->oprval.tref->opcode);
 			assert(ILIT_REF == tmpa0->oprval.tref->operand[0].oprclass);
 			assert(0 < tmpa0->oprval.tref->operand[0].oprval.ilit);
+			/* If the compiled code is say $query(x(1,2)), the triple chain after the "lvn" call above would look as
+			 *	OC_FNQUERY
+			 *	OC_ILIT (holding a count of 3 == 2 subscripts + 1 base-variable)
+			 *	OC_VAR (corresponding to base variable name "x")
+			 *	OC_LIT (corresponding to subscript 1)
+			 *	OC_LIT (corresponding to subscript 2)
+			 * But op_fnquery & op_fnreversequery (the run-time functions that implement the $query operation) need
+			 * to be passed 2 more parameters
+			 *	a) the total # of parameters that follow (including this total parameter) and
+			 *	b) the unsubscripted local variable name.
+			 * Therefore bump the OC_ILIT count by 2 more below. And insert the variable name in between the
+			 *	OC_ILIT and OC_VAR opcode.
+			 */
 			tmpa0->oprval.tref->operand[0].oprval.ilit += 2;
 			tmpa1 = &tmpa->oprval.tref->operand[1];
 			assert(TRIP_REF == tmpa1->oprclass);
@@ -90,7 +102,7 @@ int f_query(oprtype *a, opctype op)
 			*tmpa1 = put_tref(r1);
 			dqins(tmpa->oprval.tref->exorder.fl, exorder, r1);
 		} else
-		{
+		{	/* $query on unsubscripted lvn */
 			assert(OC_VAR == tmpa->oprval.tref->opcode);
 			r0 = newtriple(OC_FNQUERY);
 			r0->operand[0] = put_ilit(3);
@@ -259,7 +271,12 @@ int f_query(oprtype *a, opctype op)
 		if (NULL != oldchain)
 			PLACE_GVBIND_CHAIN(&save_state, oldchain); 	/* shift chain back to "expr_start" */
 		if (OC_INDFUN == r->opcode)
-			*next_oprptr = put_ilit((mint)((FORWARD == direction) ? indir_fnquery1 : indir_fnreversequery1));
+		{	/* If the direction is known as FORWARD, then use indir_fnquery (which would in turn come
+			 * back to "f_query" as FORWARD is the default direction). If direction is BACKWARD, need to
+			 * use a separate opcode indir_fnreversequery1 which in turn would invoke "f_reversequery1".
+			 */
+			*next_oprptr = put_ilit((mint)((FORWARD == direction) ? indir_fnquery : indir_fnreversequery1));
+		}
 		*a = put_tref(r);
 	}
 	return TRUE;

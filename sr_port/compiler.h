@@ -690,7 +690,6 @@ int		f_piece(oprtype *a, opctype op);
 int		f_qlength(oprtype *a, opctype op);
 int		f_qsubscript(oprtype *a, opctype op);
 int		f_query(oprtype *a, opctype op);
-int		f_query1(oprtype *a, opctype op);
 int		f_reversequery1(oprtype *a, opctype op);
 int		f_reverse(oprtype *a, opctype op);
 int		f_select(oprtype *a, opctype op);

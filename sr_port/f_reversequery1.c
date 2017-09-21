@@ -25,6 +25,18 @@
 
 error_def(ERR_VAREXPECTED);
 
+/* This function is basically a 1-argument $query call where the direction (2nd argument) is known as reverse (i.e. reverse query).
+ *
+ * In case of $query(@x,-1), where the first argument is an indirection, "f_query" does not know what opcode to generate
+ * (OC_FNQUERY or OC_GVQUERY). But since the direction "-1" is a literal known at compile time, "f_query" knows this is
+ * a forward query (not a reverse query) and hence generates an OC_INDFUN triple with an indirection opcode indir_fnreversequery1.
+ * The OC_INDFUN triple causes "op_indfun" to be invoked. That invokes the function "f_reversequery1" (because of
+ * indir_fnreversequery1). Assuming the variable "x" evaluated to "y", at the time of "f_reversequery1" invocation, we have
+ * reduced the original $query(@x,-1) function invocation to a $query(y,-1) i.e. a 2-argument $query to a 1-argument $query
+ * where the second argument is known to be -1 (i.e. reverse query). So "f_reversequery1" is very similar to "f_query" in that
+ * it needs to still compile a $query() call but it is a lot simpler due to no 2nd argument.
+ * Any changes here might need to be made in "f_query.c" and vice versa.
+ */
 int f_reversequery1(oprtype *a, opctype op)
 {
 	triple		*oldchain, *r, *r0, *r1;
@@ -38,7 +50,7 @@ int f_reversequery1(oprtype *a, opctype op)
 			return FALSE;
 		assert(TRIP_REF == a->oprclass);
 		if (OC_FNREVERSEQUERY == a->oprval.tref->opcode)
-		{
+		{	/* See comments in "f_query.c" for why the +2 and chain manipulations done below */
 			assert(OC_FNREVERSEQUERY == a->oprval.tref->opcode);
 			assert(TRIP_REF == a->oprval.tref->operand[0].oprclass);
 			assert(OC_ILIT == a->oprval.tref->operand[0].oprval.tref->opcode);
@@ -88,14 +100,14 @@ int f_reversequery1(oprtype *a, opctype op)
 					setcurtchain(oldchain);
 					return FALSE;
 				}
-				r->operand[1] = put_ilit((mint)indir_fnquery);
+				r->operand[1] = put_ilit((mint)indir_fnreversequery1);
 				ins_triple(r);
 				PLACE_GVBIND_CHAIN(&save_state, oldchain);
 			} else
 			{
 				if (!indirection(&(r->operand[0])))
 					return FALSE;
-				r->operand[1] = put_ilit((mint)indir_fnquery);
+				r->operand[1] = put_ilit((mint)indir_fnreversequery1);
 				ins_triple(r);
 			}
 			r->opcode = OC_INDFUN;
