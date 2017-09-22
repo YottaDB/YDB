@@ -102,7 +102,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     		LC_CTYPE=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1` ; export LC_CTYPE
     	fi
     	echo $LC_CTYPE | grep -i .utf > /dev/null
-    	if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
+    	if [ $? = 0 -a "`echo Halt | gtm_prompt='YDB>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'YDB>' ] ; then
     		gtm_dist=$gtm_dist/utf8
     		if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then
     			gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
@@ -115,7 +115,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
     # Set $gtm_prompt - must be set after checking for UTF-8 mode since prompt may be based on gtm_dist
     if [ -z "$gtm_prompt" ] ; then
-        gtm_prompt="GTM>"
+        gtm_prompt="YDB>"
     else
         if [ -n "$old_gtm_dist" ] ; then
             gtm_prompt=`echo $gtm_prompt | sed "s;$old_gtm_dist;$gtm_dist;"`
