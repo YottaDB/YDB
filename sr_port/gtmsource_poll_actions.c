@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -198,10 +201,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "End statistics logging\n");
 	}
 	if ((gtmsource_filter & EXTERNAL_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
-	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping filter\n");
-		repl_stop_filter();
-		gtmsource_filter &= ~EXTERNAL_FILTER;
-	}
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_POLL_ACTIONS");
 	return (SS_NORMAL);
 }
