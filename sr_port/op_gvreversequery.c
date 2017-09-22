@@ -91,11 +91,14 @@ void op_gvreversequery(mval *v)
 		case dba_mm:
 			gvnh_reg = TREF(gd_targ_gvnh_reg);
 			if (NULL == gvnh_reg)
+			{	/* Entire global maps to a single region */
 				found = ((0 != gv_target->root) ? gvcst_reversequery() : FALSE);/* global does not exist
 												 * if root is 0.
 												 */
-			else
+			} else
+			{	/* Global maps to multiple regions in the gld. Use spr (spanning regions) logic. */
 				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_reversequery());
+			}
 			break;
 		case dba_cm:
 			found = gvcmx_reversequery(&val); /* val ignored currently just like "gvcmx_query" */

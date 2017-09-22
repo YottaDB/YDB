@@ -77,6 +77,9 @@ DEFINE_NSB_CONDITION_HANDLER(gvcst_reversequery_ch)
  *  ^x(1,2,3,"",hidden)
  *  ^x(1,2,3,hidden)
  *  ^x(1,2,3,7)                     <--- reverse $query begins here
+ *
+ * "gv_currkey" already points to the input "gvn" for which reverse $query is sought.
+ * "gv_altkey" stores the result of the reverse $query at function end.
  */
 boolean_t	gvcst_reversequery(void)
 {

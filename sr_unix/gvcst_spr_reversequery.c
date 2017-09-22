@@ -50,6 +50,12 @@ GBLREF uint4		dollar_tlevel;
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_spr_reversequery_ch)
 
+/* This function does a reverse $query when "gv_currkey" corresponds to a global that spans across multiple regions in the gld.
+ * "gv_currkey" already points to the input "gvn" for which reverse $query is sought.
+ * "gv_altkey" stores the result of the reverse $query at function end.
+ *
+ * Also note that the general flow below is similar to that of gvcst_spr_query.c.
+ */
 boolean_t	gvcst_spr_reversequery(void)
 {
 	boolean_t	spr_tpwrapped;

@@ -13,7 +13,11 @@
  ****************************************************************/
 
 
-/*** STUB FILE ***/
+/* This file defines various stub functions for executables that link to functions related to the dba_cm access method
+ * (GT.CM GNP) but are guaranteed to never use/need them. Utilities like MUPIP/DSE/LKE etc. never need access to the
+ * client-side functions of a GT.CM GNP server so all such functions are included here.
+ */
+
 #include "mdef.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"

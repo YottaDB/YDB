@@ -22,7 +22,10 @@
 #include "gvusr.h"
 #include "gvusr_queryget.h"
 
-/* this module is just a set of stubs */
+/* This file defines various stub functions for executables that link to functions related to the dba_usr access method
+ * (unused DDP) but are guaranteed to never use/need them. Utilities like MUPIP/DSE/LKE etc. never need access to the
+ * client-side functions of a DDP server so all such functions are included here.
+ */
 
 void gvusr_init(gd_region *reg, gd_region **creg, gv_key **ckey, gv_key **akey)
 {
