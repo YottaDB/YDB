@@ -39,7 +39,11 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region        *gv_cur_region;
 
-/* Note: This function is very similar to "gtcmtr_query" */
+/* This function is invoked by the GT.CM GNP server on behalf of a $query(gvn,-1) operation on the client.
+ * This function sets "gv_currkey" from the input message and invokes "gvcst_reversequery" (which does the $query)
+ * and copies the result (which is in "gv_altkey") in a message that is sent back to the client by the caller.
+ * Also note that the general flow below is similar to that of "gtcmtr_query.c".
+ */
 bool gtcmtr_reversequery(void)
 {
 	unsigned char	*ptr, *gv_key_top_ptr, regnum;

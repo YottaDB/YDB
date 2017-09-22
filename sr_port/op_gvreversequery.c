@@ -32,6 +32,12 @@ GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
 GBLREF mstr             extnam_str;
 
+/* This function is the entry point for $query(gvn,dir) where dir is or evaluates to -1.
+ * "gv_currkey" already points to the input "gvn".
+ * "v" stores the result of the reverse $query at function end.
+ *
+ * Also note that the general flow below is similar to that of op_gvquery.c.
+ */
 void op_gvreversequery(mval *v)
 {
 	int4			size;

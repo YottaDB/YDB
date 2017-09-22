@@ -3,9 +3,6 @@
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,6 +39,11 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_LVNULLSUBS);
 
+/* This function is the runtime entry point for $query(lvn,-1) where the -1 is known at compile time.
+ * It is passed a variable number of parameters (corresponding to the potentially subscripted lvn).
+ * Get a varargs list started for that part. And invoke another function "op_fnreversequery_va" as that is also
+ * used by "op_fnq2" which is the runtime entry point for $query(lvn,dir) where dir is an expression evaluating to -1.
+ */
 void op_fnreversequery(int sbscnt, mval *dst, ...)
 {
 	va_list		var;
@@ -50,6 +52,16 @@ void op_fnreversequery(int sbscnt, mval *dst, ...)
 	op_fnreversequery_va(sbscnt, dst, var);
 }
 
+/* This function implements reverse $query for a lvn.
+ * sbscnt is the count of the # of parameters including
+ *	sbscnt,
+ *	varname, (the base variable name which is the first parameter in the "var" varargs list)
+ *	v,       (the lv_val corresponding to the base local variable)
+ *	# of subscripts in the lvn if any
+ * dst is the destination mval where the $query return is placed
+ *
+ * Also note that the general flow below is similar to that of op_fnquery.c.
+ */
 void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 {
 	int			length;
@@ -69,7 +81,7 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 	SETUP_THREADGBL_ACCESS;
 	VMS_ONLY(va_count(sbscnt));
 	assert(3 <= sbscnt);
-	sbscnt -= 3;
+	sbscnt -= 3;	/* Take away sbscnt, varname and v from sbscnt and you will get the # of subscripts in the lvn */
 	if (!sbscnt)
 	{	/* Reverse $query of unsubscripted base local variable name is always the null string */
 		dst->mvtype = MV_STR;
@@ -84,7 +96,10 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 	h1 = history;
 	*h1 = (lvTreeNode *)v;
 	if (NULL != lvt)
-	{
+	{	/* There is at least one subscripted node under the base lv. Traverse the lv tree searching for the
+		 * input subscripted lvn and later use the located node to find its left sibling (if one exists) or
+		 * a parent to determine the reverse $query result.
+		 */
 		DEBUG_ONLY(node = NULL;)
 		h1++;
 		for (i = 0, argpp = &args[0]; ; argpp++, h1++)

@@ -33,6 +33,15 @@ error_def(ERR_GVIS);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 
+/* This function is invoked by "op_gvreversequery" if the access method is "dba_cm".
+ * In this case, we are the client and the $query operation is done by a GT.CM GNP server.
+ * So invoke the necessary functions for that. Before that though, check that the GT.CM GNP server
+ * does support reverse $query (new feature introduced in YottaDB R1.10) and if not issue error.
+ *
+ * "val" is an output parameter that is currently not set (see comment below).
+ *
+ * Also note that the general flow below is similar to that of "gvcmx_query.c".
+ */
 bool gvcmx_reversequery(mval *val)
 {
 	mval		temp;
