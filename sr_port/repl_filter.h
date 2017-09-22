@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -273,4 +276,20 @@ error_def(ERR_REPLNOHASHTREC);
 	else	/* (EREPL_INTLFILTER_INCMPLREC == REPL_ERRNO) */								\
 		assertpro(FALSE);												\
 }
+
+/* This macro is called by the source or receiver server when they need to stop an external filter.
+ * CALLER_FILTER : is gtmsource_filter (if caller is source server) and gtmrecv_filter (if caller is receiver server)
+ * CALLER_FP     : is gtmsource_log_fp (if caller is source server) and gtmrecv_log_fp (if caller is receiver server)
+ * CALLER_DETAIL : is string that provides caller context and is printed in the corresponding log file.
+ */
+#define STOP_EXTERNAL_FILTER_IF_NEEDED(CALLER_FILTER, CALLER_FP, CALLER_DETAIL)			\
+MBSTART {											\
+	if (CALLER_FILTER & EXTERNAL_FILTER)							\
+	{											\
+		repl_log(CALLER_FP, TRUE, TRUE, "Stopping filter : " CALLER_DETAIL "\n");	\
+		repl_stop_filter();								\
+		CALLER_FILTER &= ~EXTERNAL_FILTER;						\
+	}											\
+} MBEND
+
 #endif

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -442,6 +445,10 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		err_same_as_out;
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	FILE			*gtmsource_log_fp;
+GBLREF	FILE			*gtmrecv_log_fp;
+GBLREF	int			gtmsource_filter;
+GBLREF	int			gtmrecv_filter;
 
 LITREF	char			*trigger_subs[];
 
@@ -1140,8 +1147,11 @@ int repl_stop_filter(void)
 
 void repl_filter_error(seq_num filter_seqno, int why)
 {
-	repl_log(stderr, TRUE, TRUE, "Stopping filter due to error\n");
-	repl_stop_filter();
+	assert(is_src_server || is_rcvr_server);
+	if (is_src_server)
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "REPL_FILTER_ERROR");
+	else
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmrecv_filter, gtmrecv_log_fp, "REPL_FILTER_ERROR");
 	switch (repl_errno)
 	{
 		case EREPL_FILTERNOTALIVE :
