@@ -132,6 +132,8 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
 #    elif defined(__s390__)
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.psw.addr;
+#    elif defined(__armv7l__)
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.arm_pc;
 #    else
 #      error "Unsupported Linux Platform"
 #    endif

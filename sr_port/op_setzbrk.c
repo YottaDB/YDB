@@ -72,7 +72,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	mident		rname, lname;
 	mstr		*obj, tmprtnname;
 	rhdtyp		*routine;
-	zb_code		*addr, tmp_xf_code;
+	zb_code		*addr, *addrx, tmp_xf_code;
 	int4		*line_offset_addr, *next_line_offset_addr;
 	ssize_t		addr_off;
 	zbrk_struct	*z_ptr;

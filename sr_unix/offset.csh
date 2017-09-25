@@ -105,6 +105,7 @@ gt_ld ${TMPFILE}_$srcfile.o -o ${TMPFILE}_$srcfile:r.out >& ${TMPFILE}_$srcfile:
 
 ${TMPFILE}_$srcfile:r.out
 rm -f ${TMPFILE}_$srcfile:r.lis
+rm -f ${TMPFILE}_$srcfile:r.lis
 rm -f ${TMPFILE}_$srcfile
 rm -f ${TMPFILE}_$srcfile.o
 rm -f ${TMPFILE}_$srcfile:r.out

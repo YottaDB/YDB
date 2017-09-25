@@ -108,6 +108,9 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	IFLAGS += -I /usr/include/openssl-1.0
 	ifeq ($(BIT64),0)
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
+	else ifneq (,$(findstring armv7l,$(MACHTYPE)))
+		IFLAGS += -I /usr/include/openssl -I /usr/lib/arm-linux-gnueabihf
+		LIBFLAGS += -L /usr/lib/arm-linux-gnueabihf
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
 	endif

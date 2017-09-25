@@ -213,8 +213,11 @@ if [ -d "utf8" ]; then
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
+	isarm_gtm=`file mumps | grep -w "ARM" | wc -l`
 	if [ $is64bit_gtm -eq 1 ] ; then
 		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu"
+	elif [ "$isarm_gtm" -eq 1 ] ; then
+		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/arm-linux-gnueabihf /lib32 /lib"
 	else
 		library_path="                 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
 	fi

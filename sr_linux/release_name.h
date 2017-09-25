@@ -21,6 +21,8 @@
 
 #if defined(__x86_64__)
 # define YDB_PLATFORM		"Linux x86_64"
+#elif defined(__armv7l__)
+# define YDB_PLATFORM		"Linux armv7l"
 #else
 # define YDB_PLATFORM		"Linux x86"
 #endif

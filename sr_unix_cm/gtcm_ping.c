@@ -212,7 +212,6 @@ int get_ping_rsp(void)
 	}
 	ip = (struct ip *) pingrcv;
 	icp = (struct icmp *)(pingrcv + ((ip->ip_hl) << 2));
-	/* xxxxxxx icp = (struct icmp *)(pingrcv + (ip->ip_hl << 2)); */
 #ifdef DEBUG_PING
 	{
 		char host[SA_MAXLEN];

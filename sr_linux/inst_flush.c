@@ -9,11 +9,14 @@
  *								*
  ****************************************************************/
 
-/* STUB FILE only for non-ia64 versions */
+/* STUB FILE only for non-ia64 and non-arm versions */
 #include "mdef.h"
+
 #include "inst_flush.h"
+#include "cacheflush.h"
 
 void inst_flush(void *start, int4 len)
 {
         IA64_ONLY(cacheflush(start, len, 0 ));
+	ARM_ONLY(cacheflush(start, len, 0 ));
 }

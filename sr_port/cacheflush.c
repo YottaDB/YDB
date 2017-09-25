@@ -32,5 +32,6 @@
 
 int	cacheflush (void *addr, long nbytes, int cache_select)
 {
+	ARM_ONLY(__builtin___clear_cache(addr, addr + nbytes));		/* GCC built-in */
 	return 0;	/* incr_link requires a zero return value for success */
 }

@@ -113,7 +113,7 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{
-                        if (GET_SWAPLOCK(&base->latch))
+			if (GET_SWAPLOCK(&base->latch))
 			{
 				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);
