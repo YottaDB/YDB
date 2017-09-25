@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -553,13 +556,10 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE,
 					 "Start JNL_SEQNO msg tagged with STOP SOURCE FILTER\n");
-				if (gtmsource_filter & EXTERNAL_FILTER)
-				{
-					repl_stop_filter();
-					gtmsource_filter &= ~EXTERNAL_FILTER;
-				} else
+				if (!(gtmsource_filter & EXTERNAL_FILTER))
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 						 "Filter is not active, ignoring STOP SOURCE FILTER msg\n");
+				STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_RECV_RESTART");
 			}
 			/* Determine the protocol version of the receiver side. That information is encoded in the
 			 * "proto_ver" field of the message from V51 onwards but to differentiate V50 vs V51 we need

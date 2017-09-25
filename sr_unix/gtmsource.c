@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -514,8 +517,7 @@ int gtmsource()
 		gtmsource_stop_heartbeat();
 		if (FD_INVALID != gtmsource_sock_fd)
 			repl_close(&gtmsource_sock_fd);
-		if (gtmsource_filter & EXTERNAL_FILTER)
-			repl_stop_filter();
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_CHANGING_MODE");
 	} while (TRUE);
 	gtmsource_end();
 	return(SS_NORMAL);
