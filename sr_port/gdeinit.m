@@ -29,6 +29,7 @@ GDEINIT
 	s endian("MC-680x0","SYS_V/68_R3V6")=TRUE,endian("MC-680x0","TOPIX")=TRUE,glo("SYS_V/68_R3V6")=1024,glo("TOPIX")=1024
 	s endian("RS6000","AIX")=TRUE,glo("AIX")=1024
 	s endian("S390","OS390")=TRUE,endian("S390X","Linux")=TRUE,glo("OS390")=1024
+	s endian("armv7l","Linux")=FALSE,glo("Linux")=1024
 	; The following line is for support of AIX V3.2.5 only and can (and should)
 	; be removed (along with this comment) as soon as we drop support for
 	; AIX V3.2.5.  This change is needed to correspond to the change in

@@ -41,6 +41,7 @@ endif()
 set(YDB_ENABLE_DEBUG 1 CACHE BOOL "Enable YottaDB debug options")
 if(YDB_ENABLE_DEBUG)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
 endif()
 
 set(install_permissions_script
@@ -49,7 +50,7 @@ set(install_permissions_script
   WORLD_READ WORLD_EXECUTE
   )
 
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
+set_property(DIRECTORY APPEND PROPERTY $<$<CONFIG:Debug>:DEBUG)
 
 # Only IA64 and x86_64 architectures use this option
 set(gen_xfer_desc 0)
@@ -88,7 +89,7 @@ if(YDB_DIST)
 else()
   # Bootstrap using pre-generated bootstrap sources.
   # We generate them again only for comparison.
-  message(STATUS "Bootstraping from pre-generated sources.")
+  message(STATUS "Bootstrapping from pre-generated sources.")
   set(gen_bootstrap 0)
   set(gen_bootstrap_dist "${YDB_BINARY_DIR}")
   set(gen_bootstrap_mumps "$<TARGET_FILE:mumps>")

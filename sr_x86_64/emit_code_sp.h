@@ -38,6 +38,10 @@ void clear_memory_reg(void);
 
 void emit_base_offset(int base, int offset);
 
+#define EMIT_BASE_OFFSET_ADDR(base, offset)		emit_base_offset(base, offset)
+#define EMIT_BASE_OFFSET_LOAD(base, offset)		emit_base_offset(base, offset)
+#define EMIT_BASE_OFFSET_EITHER(base, offset, inst)	emit_base_offset(base, offset)
+
 /*  Define the COND values for use in the 2 byte JCC instructions.. */
 #define INST_SIZE 	1
 #define XFER_BYTE_INST_SIZE 3

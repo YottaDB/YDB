@@ -43,6 +43,9 @@ int	gtm_reg(int vax_reg);
 #elif defined(__MVS__) || defined(Linux390)
 #  define CODE_TYPE uint2
 #  define NUM_BUFFERRED_INSTRUCTIONS 100
+#elif defined(__armv7l__)
+#  define CODE_TYPE uint4
+#  define NUM_BUFFERRED_INSTRUCTIONS 25
 #else
 #  define CODE_TYPE uint4
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
@@ -55,7 +58,7 @@ int	gtm_reg(int vax_reg);
 	|| defined(__MVS__)
 #  define TRUTH_IN_REG
 #elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390) \
-	|| (defined(__CYGWIN__) && defined(__x86_64__))
+	|| (defined(__CYGWIN__) && defined(__x86_64__)) || (defined(__linux__) && defined(__armv7l__))
 #  undef TRUTH_IN_REG
 #else
 #  error UNSUPPORTED PLATFORM

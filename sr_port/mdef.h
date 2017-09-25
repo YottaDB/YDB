@@ -227,7 +227,7 @@ typedef UINTPTR_T uintszofptr_t;
 #	define UNALIGNED_ACCESS_SUPPORTED
 #endif
 
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
+#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun) || defined(__armv7l__)
 #	define GTM_PTHREAD
 #	define GTM_PTHREAD_ONLY(X) X
 #	define NON_GTM_PTHREAD_ONLY(X)
@@ -258,21 +258,45 @@ typedef UINTPTR_T uintszofptr_t;
 #define	IS_OFFSET_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)	(OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
 
 #ifdef __x86_64__
-#define X86_64_ONLY(x)		x
+#define X86_64_ONLY(x)			x
 #define NON_X86_64_ONLY(x)
 #else
 #define X86_64_ONLY(x)
-#define NON_X86_64_ONLY(x)    x
+#define NON_X86_64_ONLY(x)    		x
 #endif /* __x86_64__ */
+
+#ifdef __armv7l__
+#define ARMV7L_ONLY(x)			x
+#define NON_ARMV7L_ONLY(x)
+#define	X86_64_OR_ARMV7L_ONLY(x)	x
+#else
+#define ARMV7L_ONLY(x)
+#define NON_ARMV7L_ONLY(x)    		x
+#endif /* __armv7l__ */
+
+#if defined(__x86_64__) || defined(__armv7l__)
+#define	X86_64_OR_ARMV7L_ONLY(x)	x
+#define	NON_X86_64_OR_ARMV7L_ONLY(x)
+#else
+#define	X86_64_OR_ARMV7L_ONLY(x)
+#define	NON_X86_64_OR_ARMV7L_ONLY(x)	x
+#endif
 
 #if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
 #define NON_RISC_ONLY(x)	x
 #define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha)
+#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv7l__)
 #define RISC_ONLY(x)	x
 #define NON_RISC_ONLY(x)
 #endif
 
+#ifdef __armv7l__
+#	define ARM_ONLY(x)	x
+#	define NON_ARM_ONLY(x)
+#else
+#	define ARM_ONLY(x)
+#	define NON_ARM_ONLY(x)	x
+#endif
 
 #ifdef _AIX
 #       define  AIX_ONLY(X) X
@@ -348,7 +372,7 @@ typedef struct
  *
  */
 #if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) &&  \
-	(defined(__ia64) || defined(__x86_64__) || defined(__s390__)))
+	(defined(__ia64) || defined(__x86_64__) || defined(__s390__) || defined(__armv7l__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -1716,7 +1740,7 @@ typedef enum
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
 
 /* Encryption- and TLS-related macros */
-#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)
+#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__) || defined(__armv7l__)
 # define GTM_TLS
 # define GTMTLS_ONLY(X)			X
 # define GTMTLS_ONLY_COMMA(X)		, X

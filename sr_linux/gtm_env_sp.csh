@@ -43,8 +43,8 @@ if (!($?OBJECT_MODE)) then
 endif
 
 ### 64bit vs 32bit builds
-# The only 32 bit targets are cygwin, ia32 and x86_64 with specific settings
-if ( ( "ia32" == $mach_type ) ||  ( "cywgin" == $platform_only ) ) then
+# The only 32 bit targets are cygwin, ia32, armv7l, and x86_64 with specific settings
+if ( ( "ia32" == $mach_type ) ||  ( "cywgin" == $platform_only )  ||  ( "armv7l" == $mach_type )) then
 	setenv gt_build_type 32
 # build 32 bit on x86_64 when $gtm_inc/x86_64.h does not exist with comlist.csh OR when OBJECT_MODE is set to 32 with comlist.mk
 else if ( "x86_64" == $mach_type && ((! -e $gtm_inc/x86_64.h && "inc" == "${gtm_inc:t}") || "32" == $OBJECT_MODE)) then
@@ -107,6 +107,9 @@ if ( $?gtm_version_change == "1" ) then
 	    else if ( "cygwin" == $platform_only ) then
 	        setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
+	    else if ("armv7l" == $mach_type) then
+	        setenv gt_as_options_common	"-Wa,-march=armv7-a -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard"
+		setenv gt_as_option_debug	"--gdwarf-2"
 	    else
         	setenv gt_as_option_debug      "--gstabs"
 	    endif
@@ -142,6 +145,12 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_cc_options_common     "-c -ansi "
 	endif
 
+	if ( "armv7l" == $mach_type ) then
+		setenv  gt_ld_m_shl_options     "-shared"
+		setenv  gt_cc_options_common    "$gt_cc_options_common -D__armv7l__ -marm -march=armv7-a -mfpu=neon "
+		setenv  gt_cc_options_common    "$gt_cc_options_common -mabi=aapcs-linux -mthumb-interwork -mfloat-abi=hard "
+	endif
+	
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char -Wreturn-type -Wpointer-sign "
 
@@ -215,7 +224,7 @@ if ( $?gtm_version_change == "1" ) then
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer"
-		if ( "32" == $gt_build_type ) then
+		if ( ( "32" == $gt_build_type ) && ( "armv7l" != $mach_type ) ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
@@ -244,7 +253,7 @@ if ( $?gtm_version_change == "1" ) then
  	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
  	# of libc routines from libpthread.
         setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
-	if ( 32 == $gt_build_type ) then
+	if ( ( 32 == $gt_build_type ) && ( "armv7l" != $platform_only) ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"
 	endif

@@ -884,8 +884,13 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 		shm_base = linkctl->rtnobj_shm_base[dbg_shm_index];
 		assert(NULL != shm_base);
 		shm_size = ((size_t)1 << (dbg_shm_index + MIN_RTNOBJ_SHM_INDEX));
+#		ifdef __armv7l__
+		if ((shm_base <= (uchar_ptr_t)rtnobj)
+		    && ((shm_base + shm_size) > (uchar_ptr_t)rtnobj))
+#		else
 		if (((gtm_uint64_t)shm_base <= (gtm_uint64_t)rtnobj)
 				&& (((gtm_uint64_t)shm_base + shm_size) > (gtm_uint64_t)rtnobj))
+#		endif
 			break;	/* shared memory corresponding to rtnobj is found */
 	}
 	assert(dbg_shm_index < max_index);

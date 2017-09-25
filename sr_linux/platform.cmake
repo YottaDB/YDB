@@ -15,19 +15,27 @@
 
 set(srdir "sr_linux")
 if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
-  set(arch "x86")
-  set(bits 32)
-  set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
-  # Set arch to i586 in order to compile for Galileo
-  set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=i586")
-  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586")
+#  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l")
+if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm.*")
+    set(arch "armv7l")
+    set(bits 32)
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -marm -march=armv7-a -mfpu=neon -mabi=aapcs-linux -mfloat-abi=hard")
+    set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv7-a -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard")
+  else()
+    set(arch "x86")
+    set(bits 32)
+    set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
+    # Set arch to i586 in order to compile for Galileo
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=i586")
+    set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586")
 # (Sam): I am not really sure if we need this at all. The Linker has
 #        no issues finding the symbols. If we add _, it now has trouble.
 # For Cygwin, we need to change the assembly symbols to start with _.
 # See http://www.drpaulcarter.com/pcasm/faq.php, esp. the examples in the zip files.
 # UPDATE: Now I figure out that this is needed for 32 bit CYGWIN ONLY. 64 bit keeps the same symbols!
-  if(CYGWIN)
-    list(APPEND CMAKE_ASM_COMPILE_OBJECT "objcopy --prefix-symbols=_ <OBJECT>")
+    if(CYGWIN)
+      list(APPEND CMAKE_ASM_COMPILE_OBJECT "objcopy --prefix-symbols=_ <OBJECT>")
+    endif()
   endif()
 else()
   set(arch "x86_64")
@@ -37,7 +45,11 @@ endif()
 # Platform directories
 list(APPEND gt_src_list sr_linux)
 if(${bits} EQUAL 32)
-  list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
+  if("${arch}" MATCHES "armv7.*")
+    list(APPEND gt_src_list sr_armv7l)
+  else()
+    list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
+  endif()
 else()
   list(APPEND gt_src_list sr_x86_64 sr_x86_regs)
   set(gen_xfer_desc 1)
@@ -99,7 +111,11 @@ set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${YDB_BINARY_DIR}/g
 set(libgtmshr_dep  "${YDB_BINARY_DIR}/gtmexe_symbols.export")
 
 if(${bits} EQUAL 32)
-  set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lrt")
+  if("${arch}" MATCHES "armv7.*")
+    set(libmumpslibs "-lelf -lncurses -lm -ldl -lc -lpthread -lrt")
+  else()
+    set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lrt")
+  endif()
 else()
   set(libmumpslibs "-lelf -lncurses -lm -ldl -lc -lpthread -lrt")
 endif()

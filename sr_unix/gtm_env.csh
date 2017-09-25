@@ -255,13 +255,13 @@ endif
 setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"
 # customization for non-GG environment
 if !($?gt_as_option_I) then
-        setenv  gt_as_option_I  "-I$gtm_inc"
+	setenv	gt_as_option_I	"-I$gtm_inc"
 else
-        setenv  gt_as_option_I  "$gt_as_option_I -I$gtm_inc"
+	setenv	gt_as_option_I	"$gt_as_option_I -I$gtm_inc"
 endif
 if !($?gt_cc_option_I) then
-        setenv  gt_cc_option_I  "-I$gtm_inc"
+	setenv	gt_cc_option_I	"-I$gtm_inc"
 else
-        setenv  gt_cc_option_I  "$gt_cc_option_I -I$gtm_inc"
+	setenv	gt_cc_option_I	"$gt_cc_option_I -I$gtm_inc"
 endif
 # customization ends

@@ -57,7 +57,7 @@ setenv	gtm_vrt		$vernam			# /translate=(concealed) on VMS
 setenv	gtm_tools	$gtm_vrt/tools
 setenv	gtm_inc		$gtm_vrt/inc
 
-source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
+####### source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
 
 setenv	gtm_exe		$gtm_dbg		# the active version (initially debug)
 setenv	gtmsrc_last_exe	$gtm_exe		# initial value for use by gtmsrc.csh
