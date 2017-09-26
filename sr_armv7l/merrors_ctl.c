@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +83,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLNAME", "Either an identifier or a left parenthesis is expected after a ^ in this context", 0 },
 	{ "GBLOFLOW", "Database segment is full", 0 },
 	{ "CORRUPT", "Corrupt input in Blk # !UL, Key #!UL; resuming with next global block", 2 },
-	{ "GTMCHECK", "Internal GT.M error--Report to your GT.M Support Channel", 0 },
+	{ "GTMCHECK", "Internal YottaDB error--Report to your YottaDB Support Channel", 0 },
 	{ "GVDATAFAIL", "Global variable $DATA function failed.  Failure code: !AD.", 2 },
 	{ "EORNOTFND", "!_!AD!/!_!_!_End of record not found", 2 },
 	{ "GVGETFAIL", "Global variable retrieval failed.  Failure code: !AD.", 2 },
@@ -258,7 +261,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZCCONVERT", "External call: error converting output argument", 0 },
 	{ "ZCRTENOTF", "External call routine !AD not found", 2 },
 	{ "GVRUNDOWN", "Error during global database rundown", 0 },
-	{ "LKRUNDOWN", "Error during lock database rundown", 0 },
+	{ "LKRUNDOWN", "Error during LOCK database rundown", 0 },
 	{ "IORUNDOWN", "Error during image rundown", 0 },
 	{ "FILENOTFND", "File !AD not found", 2 },
 	{ "MUFILRNDWNFL", "File !AD rundown failed", 2 },
@@ -349,14 +352,14 @@ LITDEF	err_msg merrors[] = {
 	{ "FNOTONSYS", "Function or special variable is not supported by this operating system", 0 },
 	{ "AMBISYIPARAM", "Parameter !AD is ambiguous to $ZGETSYI()", 2 },
 	{ "PREVJNLNOEOF", "A previous generation journal file !AD does not have valid EOF", 2 },
-	{ "LKSECINIT", "Error creating lock section for database !AD", 2 },
+	{ "LKSECINIT", "Error creating LOCK section for database !AD", 2 },
 	{ "MTDOSLAB", "Tape label is not in valid DOS-11 format", 0 },
 	{ "MTDOSFOR", "Use of DOS-11 labels requires stream format", 0 },
 	{ "MTINVLAB", "Invalid label type specified in magtape OPEN", 0 },
 	{ "TXTSRCMAT", "M object module and source file do not match", 0 },
 	{ "CCENOGROUP", "CCE does not have GROUP privilege.  Information may be incomplete.", 0 },
 	{ "BADDBVER", "Incorrect database version: !AD", 2 },
-	{ "LINKVERSION", "This image must be relinked with the current version of GT.M", 0 },
+	{ "LINKVERSION", "This image must be relinked with the current version of YottaDB", 0 },
 	{ "TOTALBLKMAX", "Extension exceeds maximum total blocks.  Not extending.", 0 },
 	{ "LOADCTRLY", "User interrupt encountered during load.  Load halting.", 0 },
 	{ "CLSTCONFLICT", "Cluster conflict opening database file !AD; could not secure access.  Already open on node !AD.", 4 },
@@ -366,7 +369,7 @@ LITDEF	err_msg merrors[] = {
 	{ "EXTRACTCTRLY", "User interrupt encountered during extract -- halting", 0 },
 	{ "CCENOWORLD", "CCE does not have WORLD privilege.  Information may be incomplete.", 0 },
 	{ "GVQUERYFAIL", "Global variable $QUERY function failed.  Failure code: !AD.", 2 },
-	{ "LCKSCANCELLED", "Error on remote node holding locks or zallocates.  All locks and zallocates cancelled.", 0 },
+	{ "LCKSCANCELLED", "Error on remote node holding LOCKs or ZALLOCATEs.  All LOCKs and ZALLOCATEs cancelled.", 0 },
 	{ "INVNETFILNM", "Invalid file name following node designation in global directory", 0 },
 	{ "NETDBOPNERR", "Error while attempting to open database across net", 0 },
 	{ "BADSRVRNETMSG", "Invalid message received from GT.CM server", 0 },
@@ -404,7 +407,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CCECLSTPRCS", "!UL processes are accessing clustered database files", 1 },
 	{ "ZSHOWBADFUNC", "An illegal function was specified for ZSHOW", 0 },
 	{ "NOTALLJNLEN", "Journaling disabled/off for !AD regions", 2 },
-	{ "UNUSEDMSG570", "ZSHOWGLOSMALL last used in V6.2-002A", 0 },
+	{ "BADLOCKNEST", "Unsupported nesting of LOCK commands", 0 },
 	{ "NOLBRSRC", "Object libraries cannot have SRC paths associated", 0 },
 	{ "INVZSTEP", "Invalid ZSTEP qualifier", 0 },
 	{ "ZSTEPARG", "ZSTEP argument expected", 0 },
@@ -414,7 +417,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZWRSPONE", "Subscript patterns in ZWRITE are atomic; Invalid delimiter", 0 },
 	{ "FILEDEL", "File !AD successfully deleted", 2 },
 	{ "JNLBADLABEL", "Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.", 6 },
-	{ "JNLREADEOF", "End of journal file encountered for !AD", 2 },
+	{ "JNLREADEOF", "End of journal file encountered", 0 },
 	{ "JNLRECFMT", "Journal file record format error encountered", 0 },
 	{ "BLKTOODEEP", "Block level too deep", 0 },
 	{ "NESTFORMP", "Formal parameter list cannot be combined with nested line", 0 },
@@ -453,7 +456,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZCWRONGDESC", "A string longer than 65535 is passed via 32-bit descriptor", 0 },
 	{ "MUTNWARN", "Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET", 4 },
 	{ "GTMSECSHRUPDDBHDR", "[client pid !UL] database fileheader (!AD) updated !AD", 5 },
-	{ "LCKSTIMOUT", "DAL timed lock request expired", 0 },
+	{ "LCKSTIMOUT", "DAL timed LOCK request expired", 0 },
 	{ "CTLMNEMAXLEN", "The maximum length of a control mnemonic has been exceeded", 0 },
 	{ "CTLMNEXPECTED", "Control mnemonic is expected in this context", 0 },
 	{ "USRIOINIT", "User-defined device driver not successfully initialized", 0 },
@@ -477,7 +480,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TRIGZBREAKREM", "ZBREAK in trigger !AD removed due to trigger being reloaded", 2 },
 	{ "TLVLZERO", "Transaction is not in progress", 0 },
 	{ "TRESTNOT", "Cannot TRESTART, transaction is not restartable", 0 },
-	{ "TPLOCK", "Cannot release lock(s) held prior to current TSTART", 0 },
+	{ "TPLOCK", "Cannot release LOCK(s) held prior to current TSTART", 0 },
 	{ "TPQUIT", "Cannot QUIT out of a routine with an active transaction", 0 },
 	{ "TPFAIL", "Transaction COMMIT failed.  Failure code: !AD.", 2 },
 	{ "TPRETRY", "Restart transaction from non-concurrency DB failure", 0 },
@@ -504,11 +507,11 @@ LITDEF	err_msg merrors[] = {
 	{ "CETOOLONG", "Compiler escape substitution exceeds maximum line size", 0 },
 	{ "CENOINDIR", "Indirection type information not available for compiler escape feature", 0 },
 	{ "COLLATIONUNDEF", "Collation type !UL is not defined", 1 },
-	{ "UNUSEDMSG670", "RBWRNNOTCHG last used in V6.2-002A", 0 },
+	{ "UNUSEDMSG673", "RBWRNNOTCHG last used in V6.2-002A", 0 },
 	{ "GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed (retry = !UL)", 4 },
 	{ "FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0 },
 	{ "JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2 },
-	{ "CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.", 0 },
+	{ "CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your YottaDB Support Channel.", 0 },
 	{ "NOPRINCIO", "Unable to write to principal device", 0 },
 	{ "INVPORTSPEC", "Invalid port specification", 0 },
 	{ "INVADDRSPEC", "Invalid IP address specification", 0 },
@@ -551,8 +554,8 @@ LITDEF	err_msg merrors[] = {
 	{ "INVACCMETHOD", "Invalid access method", 0 },
 	{ "JNLOPNERR", "Error opening journal file !AD!/  for database !AD", 4 },
 	{ "JNLRECTYPE", "Journal record type does not match expected type", 0 },
-	{ "JNLTRANSGTR", "Transaction number in journal is greater than in database", 0 },
-	{ "JNLTRANSLSS", "Transaction number in journal is less than in database", 0 },
+	{ "JNLTRANSGTR", "Transaction number !@UQ in journal header is greater than !@UQ in database header", 2 },
+	{ "JNLTRANSLSS", "Transaction number !@UQ in journal header is less than !@UQ in database header", 2 },
 	{ "JNLWRERR", "Error writing journal file !AD.  Unable to update header.", 2 },
 	{ "FILEIDMATCH", "Saved File ID does not match the current ID - the file appears to have been moved", 0 },
 	{ "EXTSRCLIN", "!_!AD!/!_!AD", 4 },
@@ -610,8 +613,8 @@ LITDEF	err_msg merrors[] = {
 	{ "MEMORYRECURSIVE", "Memory Subsystem called recursively", 0 },
 	{ "FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7 },
 	{ "BLKWRITERR", "Unable to queue disk write for block 0x!XL.  Will keep trying.", 1 },
-	{ "STOPTIMEOUT", "Waited too long for stopped process to release.  Region: !AD.", 2 },
-	{ "UNUSEDMSG777", "TRIGMODINTP last used in V6.2-000", 0 },
+	{ "UNUSEDMSG779", "STOPTIMEOUT last used in V6.3-000A", 0 },
+	{ "PINENTRYERR", "Custom pinentry program failure", 0 },
 	{ "BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0 },
 	{ "NOFORKCORE", "Unable to fork off process to create core.  Core creation postponed.", 0 },
 	{ "JNLREAD", "Error reading from journal file !AD at offset [0x!XL]", 3 },
@@ -673,7 +676,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSTART", "!AD - !UL : gtmsecshr failed to startup", 3 },
 	{ "DBVERPERFWARN1", "Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance", 2 },
 	{ "FILEIDGBLSEC", "File ID in global section does not match with the database file !AD", 2 },
-	{ "GBLSECNOTGDS", "Global Section !AD is not a GT.M global section", 2 },
+	{ "GBLSECNOTGDS", "Global Section !AD is not a YottaDB global section", 2 },
 	{ "BADGBLSECVER", "Global Section !AD does not match the current database version", 2 },
 	{ "RECSIZENOTEVEN", "RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE", 1 },
 	{ "BUFFLUFAILED", "Error flushing buffers from !AD for database file !AD", 4 },
@@ -763,7 +766,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBCREINCOMP", "!AD Header indicates database file creation was interrupted before completion", 2 },
 	{ "DBFLCORRP", "!AD Header indicates database file is corrupt", 2 },
 	{ "DBHEADINV", "!AD Header size not valid for database", 2 },
-	{ "DBINCRVER", "!AD Incorrect version of GT.M database", 2 },
+	{ "DBINCRVER", "!AD Incorrect version of YottaDB database", 2 },
 	{ "DBINVGBL", "!AD Invalid mixing of global names", 2 },
 	{ "DBKEYGTIND", "!AD Key greater than index key", 2 },
 	{ "DBGTDBMAX", "!AD Key larger than database maximum", 2 },
@@ -797,7 +800,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBSVBNMIN", "!AD Start VBN smaller than possible", 2 },
 	{ "DBTTLBLK0", "!AD Total blocks equal zero", 2 },
 	{ "DBNOTDB", "!AD File does not have a valid GDS file header", 2 },
-	{ "DBTOTBLK", "Total blocks should be 0x!XL, is 0x!XL", 2 },
+	{ "DBTOTBLK", "File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL", 2 },
 	{ "DBTN", "Block TN is 0x!16@XQ", 1 },
 	{ "DBNOREGION", "None of the database regions accessible", 0 },
 	{ "DBTNRESETINC", "WARNING: tn_reset for database is incomplete due to integrity errors", 0 },
@@ -817,16 +820,16 @@ LITDEF	err_msg merrors[] = {
 	{ "LOWSPACECRE", "Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.", 6 },
 	{ "WAITDSKSPACE", "Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD ", 4 },
 	{ "OUTOFSPACE", "Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.", 3 },
-	{ "JNLPVTINFO", "Pid 0x!XL!/     cycle 0x!XL fd_mismatch 0x!XL     channel 0x!XL sync_io 0x!XL!/ pini_addr 0x!XL  qio_active 0x!XL old_channel 0x!XL", 8 },
+	{ "JNLPVTINFO", "Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL", 8 },
 	{ "NOSPACEEXT", "Not enough disk space for file !AD to extend.  !UL blocks needed.  !UL blocks available.", 4 },
 	{ "WCBLOCKED", "Field !AD is set by process !UL at transaction number 0x!16@XQ for database file !AD", 6 },
 	{ "REPLJNLCLOSED", "Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]", 6 },
 	{ "RENAMEFAIL", "Rename of file !AD to !AD failed", 4 },
 	{ "FILERENAME", "File !AD is renamed to !AD", 4 },
-	{ "JNLBUFINFO", "Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL    cycle 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL", 16 },
+	{ "JNLBUFINFO", "Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL", 21 },
 	{ "SDSEEKERR", "Sequential device seek error - !AD", 2 },
 	{ "LOCALSOCKREQ", "LOCAL socket required", 0 },
-	{ "TPNOTACID", "!AD at !AD in a final TP retry violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur !AD !AD", 8 },
+	{ "TPNOTACID", "!AD at !AD violates ACID properties of a TRANSACTION and could exceed !AD seconds; $TRESTART = !UL and indefinite RESTARTs may occur", 7 },
 	{ "JNLSETDATA2LONG", "SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.", 2 },
 	{ "JNLNEWREC", "Target system cannot recognize journal record of type !UL, last recognized type is !UL", 2 },
 	{ "REPLFTOKSEM", "Error with replication semaphores for instance file !AD", 2 },
@@ -949,8 +952,8 @@ LITDEF	err_msg merrors[] = {
 	{ "DBCDBNOCERTIFY", "Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN", 2 },
 	{ "DBFRZRESETSUC", "Freeze released successfully on database file !AD", 2 },
 	{ "JNLFILEXTERR", "Error during extension of journal file !AD", 2 },
-	{ "JOBEXAMDONE", "GT.M process !UL completed job examine to !AD", 3 },
-	{ "JOBEXAMFAIL", "GT.M process !UL executing $ZJOBEXAM function failed with the preceding error message", 1 },
+	{ "JOBEXAMDONE", "YottaDB process !UL completed job examine to !AD", 3 },
+	{ "JOBEXAMFAIL", "YottaDB process !UL executing $ZJOBEXAM function failed with the preceding error message", 1 },
 	{ "JOBINTRRQST", "Job interrupt requested", 0 },
 	{ "ERRWZINTR", "Error while processing $ZINTERRUPT", 0 },
 	{ "CLIERR", "!AD", 2 },
@@ -994,7 +997,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTEXRELEASED", "Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL", 6 },
 	{ "JNLCRESTATUS", "!AD at line !UL for journal file !AD, database file !AD encountered error", 7 },
 	{ "ZBREAKFAIL", "Could not set breakpoint at !AD due to insufficient memory", 2 },
-	{ "DLLVERSION", "Routine !AD in library !AD was compiled with an incompatible version of GT.M.  Recompile with the current version and re-link.", 4 },
+	{ "DLLVERSION", "Routine !AD in library !AD was compiled with an incompatible version of GT.M/YottaDB.  Recompile with the current version of YottaDB and re-link", 4 },
 	{ "INVZROENT", "!AD is neither a directory nor an object library(DLL)", 2 },
 	{ "DDPLOGERR", "!AD: !AD", 4 },
 	{ "GETSOCKNAMERR", "Getting the socket name failed from getsockname(): (errno==!UL) !AD", 3 },
@@ -1090,7 +1093,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLINSTSEQORD", "!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD", 6 },
 	{ "REPLINSTSTNDALN", "Could not get exclusive access to replication instance file !AD", 2 },
 	{ "REPLREQROLLBACK", "Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first", 2 },
-	{ "REQROLLBACK", "Error accessing database !AD.  Run MUPIP JOURNAL ROLLBACK on cluster node !AD.", 4 },
+	{ "REQROLLBACK", "Error accessing database !AD.  Run MUPIP JOURNAL -ROLLBACK -NOONLINE on cluster node !AD.", 4 },
 	{ "INVOBJFILE", "Cannot ZLINK object file !AD due to unexpected format", 2 },
 	{ "SRCSRVEXISTS", "Source server for secondary instance !AD is already running with pid !UL", 3 },
 	{ "SRCSRVNOTEXIST", "Source server for secondary instance !AD is not alive", 2 },
@@ -1105,7 +1108,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DLRCILLEGAL", "!_!AD!/!_!_!_Illegal $CHAR() value !UL", 3 },
 	{ "NONUTF8LOCALE", "Locale has character encoding (!AD) which is not compatible with UTF-8 character set", 2 },
 	{ "INVDLRCVAL", "Invalid $CHAR() value !UL", 1 },
-	{ "DBMISALIGN", "Database file !AD has !UL blocks which does not match alignment rules. Reconstruct the database from a backup or extend it by at least !UL blocks.", 4 },
+	{ "DBMISALIGN", "File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.", 4 },
 	{ "LOADINVCHSET", "Extract file CHSET (!AD) is incompatible with gtm_chset", 2 },
 	{ "DLLCHSETM", "Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.", 4 },
 	{ "DLLCHSETUTF8", "Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.", 4 },
@@ -1126,9 +1129,9 @@ LITDEF	err_msg merrors[] = {
 	{ "KILLBYSIGSINFO3", "!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ", 5 },
 	{ "GTMSECSHRTMPPATH", "gtmsecshr path is !AD", 2 },
 	{ "GTMERREXIT", "GTM image has exited with errors", 0 },
-	{ "INVMEMRESRV", "Could not allocate GT.M memory reserve (!AD)", 2 },
+	{ "INVMEMRESRV", "Could not allocate YottaDB memory reserve (!AD)", 2 },
 	{ "OPCOMMISSED", "!UL errors and !UL MBFULLs sending prior operator messages", 2 },
-	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD", 5 },
+	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD", 5 },
 	{ "COMMITWAITPID", "Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD", 6 },
 	{ "UPDREPLSTATEOFF", "Error replicating global ^!AD as it maps to database !AD which has replication turned OFF", 4 },
 	{ "LITNONGRAPH", "M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)", 2 },
@@ -1150,7 +1153,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CRYPTDLNOOPEN", "Could not load encryption library while opening encrypted file !AD. !AD", 4 },
 	{ "CRYPTNOV4", "!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.", 2 },
 	{ "CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2 },
-	{ "UNUSEDMSG1316", "Last used in V6.2-002A", 0 },
+	{ "UNUSEDMSG1319", "Last used in V6.2-002A", 0 },
 	{ "CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4 },
 	{ "CRYPTKEYFETCHFAILEDNF", "Could not retrieve encryption key during !AD operation key. !AD", 4 },
 	{ "CRYPTHASHGENFAILED", "Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD", 4 },
@@ -1159,7 +1162,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ICUVERLT36", "!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used", 4 },
 	{ "ICUSYMNOTFOUND", "Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified", 2 },
 	{ "STUCKACT", "Process stuck script invoked: !AD : !AD", 4 },
-	{ "CALLINAFTERXIT", "After a gtm_exit, a process can never create a valid GT.M context", 0 },
+	{ "CALLINAFTERXIT", "After a gtm_exit, a process can never create a valid YottaDB context", 0 },
 	{ "LOCKSPACEFULL", "No more room for LOCK slots on database file !AD", 2 },
 	{ "IOERROR", "Error occured while doing !AD in !AD operation -- called from module !AD at line !UL", 7 },
 	{ "MAXSSREACHED", "Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.", 3 },
@@ -1208,7 +1211,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUUSERLBK", "Abnormal shutdown of replication-enabled database !AD detected", 2 },
 	{ "SETINSETTRIGONLY", "ISV !AD can only be modified in a 'SET' type trigger", 2 },
 	{ "DZTRIGINTRIG", "$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD", 2 },
-	{ "UNUSEDMSG1374", "SECNODZTRIGINTP : Last used in V6.2-000", 0 },
+	{ "UNUSEDMSG1377", "SECNODZTRIGINTP : Last used in V6.2-000", 0 },
 	{ "BOOLSIDEFFECT", "Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression", 0 },
 	{ "DBBADUPGRDSTATE", "Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.", 4 },
 	{ "WRITEWAITPID", "PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD", 6 },
@@ -1220,7 +1223,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLORDBFLU", "Error flushing database blocks to !AD. See related messages in the operator log", 2 },
 	{ "ZCCLNUPRTNMISNG", "External call: Cleanup routine name missing. Cannot continue", 0 },
 	{ "ZCINVALIDKEYWORD", "External call: Invalid keyword found. Cannot continue", 0 },
-	{ "UNUSEDMSG1386", "REPLNOMULTILINETRG : Last used in V6.2-000", 0 },
+	{ "UNUSEDMSG1389", "REPLNOMULTILINETRG : Last used in V6.2-000", 0 },
 	{ "DBSHMNAMEDIFF", "Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ", 4 },
 	{ "SHMREMOVED", "Removed Shared Memory id !UL corresponding to file !AD", 3 },
 	{ "DEVICEWRITEONLY", "Cannot read from a write-only device", 0 },
@@ -1277,7 +1280,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting", 2 },
 	{ "IGNBMPMRKFREE", "Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK", 4 },
 	{ "PERMGENFAIL", "Failed to determine access permissions to use for creation of !AD for file !AD", 4 },
-	{ "PERMGENDIAG", "Permissions: Proc(uid:!UL,gid:!UL), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD), Group Mem(opener:!UL,owner:!UL)", 11 },
+	{ "PERMGENDIAG", "Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)", 11 },
 	{ "MUTRUNC1ATIME", "Process with PID !UL already performing truncate in region !AD", 3 },
 	{ "MUTRUNCBACKINPROG", "Truncate detected concurrent backup in progress for region !AD", 2 },
 	{ "MUTRUNCERROR", "Truncate of region !AD encountered service error !AD", 4 },
@@ -1307,7 +1310,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DSKSPCAVAILABLE", "Write to file !AD succeeded after out-of-space condition cleared", 2 },
 	{ "ENOSPCQIODEFER", "Write to file !AD deferred due to lack of disk space", 2 },
 	{ "CUSTOMFILOPERR", "Error while doing !AD operation on file !AD", 4 },
-	{ "CUSTERRNOTFND", "Error mnemonic !AD specified in custom errors file is not valid for this version of GT.M", 2 },
+	{ "CUSTERRNOTFND", "Error mnemonic !AD specified in custom errors file is not valid for this version of YottaDB", 2 },
 	{ "CUSTERRSYNTAX", "Syntax error in file !AD at line number !UL", 3 },
 	{ "ORLBKINPROG", "Online ROLLBACK in progress by PID !UL in region !AD", 3 },
 	{ "DBSPANGLOINCMP", "!AD Spanning node is missing. Block no !UL of spanning node is missing", 3 },
@@ -1361,7 +1364,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GETNAMEINFO", "Error in getting name info", 0 },
 	{ "SOCKBIND", "Error in binding socket", 0 },
 	{ "INSTFRZDEFER", "Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict", 4 },
-	{ "REGOPENRETRY", "Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...", 4 },
+	{ "UNUSEDMSG1532", "REGOPENRETRY last used in V6.3-000A", 0 },
 	{ "REGOPENFAIL", "Failed to open region !AD (!AD) due to conflicting database shutdown activity", 4 },
 	{ "REPLINSTNOSHM", "Database !AD has no active connection to a replication journal pool", 2 },
 	{ "DEVPARMTOOSMALL", "Deviceparameter must be greater than zero (0)", 0 },
@@ -1371,11 +1374,11 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLNOMAPTOREG", "Global !AD does not map to region !AD in current global directory", 4 },
 	{ "ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2 },
 	{ "TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0 },
-	{ "GVSUBSERR", "Invalid subscripted global name specification in $VIEW() function", 0 },
-	{ "UNUSEDMSG1540", "TRIGNOSPANBL : Last used in V6.2-000", 0 },
+	{ "UNUSEDMSG1542", "GVSUBSERR last used in V6.3-000A", 0 },
+	{ "ZATRANSERR", "The input string is too long to convert", 0 },
 	{ "FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1 },
-	{ "TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0 },
-	{ "TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0 },
+	{ "TLSDLLNOOPEN", "Failed to load YottaDB TLS/SSL library for secure communication", 0 },
+	{ "TLSINIT", "Failed to initialize YottaDB TLS/SSL library for secure communication", 0 },
 	{ "TLSCONVSOCK", "Failed to convert Unix TCP/IP socket to TLS/SSL aware socket", 0 },
 	{ "TLSHANDSHAKE", "Connection to remote side using TLS/SSL protocol failed", 0 },
 	{ "TLSCONNINFO", "Failed to obtain information on the TLS/SSL connection", 0 },
@@ -1393,7 +1396,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DSENOTOPEN", "DSE could not open region !AD - see DSE startup error message for cause", 2 },
 	{ "ZSOCKETATTR", "Attribute \"!AD\" invalid for $ZSOCKET function", 2 },
 	{ "ZSOCKETNOTSOCK", "$ZSOCKET function called but device is not a socket", 0 },
-	{ "CHSETALREADY", "CHSET !AD already specified for socket device", 2 },
+	{ "CHSETALREADY", "Socket device already contains sockets with iCHSET=!AD, oCHSET=!AD", 4 },
 	{ "DSEMAXBLKSAV", "DSE cannot SAVE another block as it already has the maximum of !UL", 1 },
 	{ "BLKINVALID", "!XL is not a valid block as database file !AD has !XL total blocks", 4 },
 	{ "CANTBITMAP", "Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)", 0 },
@@ -1415,7 +1418,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLNOHASHTREC", "Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue", 3 },
 	{ "REMOTEDBNOTRIG", "Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file", 4 },
 	{ "NEEDTRIGUPGRD", "Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first", 2 },
-	{ "REQRLNKCTLRNDWN", "Error accessing relinkctl file for $ZROUTINES directory !AD. Must be rundown", 2 },
+	{ "REQRLNKCTLRNDWN", "Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Must be rundown", 3 },
 	{ "RLNKCTLRNDWNSUC", "Relinkctl file for $ZROUTINES directory !AD successfully rundown", 2 },
 	{ "RLNKCTLRNDWNFL", "Relinkctl file for $ZROUTINES directory !AD failed to rundown as it is open by !UL process(es)", 3 },
 	{ "MPROFRUNDOWN", "Error during M-profiling rundown", 0 },
@@ -1451,8 +1454,55 @@ LITDEF	err_msg merrors[] = {
 	{ "MUREENCRYPTSTART", "Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]", 4 },
 	{ "MUREENCRYPTV4NOALLOW", "Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks", 2 },
 	{ "ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6 },
-	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.", 3 },
+	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal files (!UL) at journal sequence number [0x!16@XQ] for the replication instance file !AZ. The journal pool has been recovered.", 4 },
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2 },
+	{ "PBNUNSUPTYPE", "$ZPEEK() does not support type !AD", 2 },
+	{ "DBFHEADLRU", "Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned", 5 },
+	{ "ASYNCIONOV4", "!AD database has !AD; cannot !AD", 6 },
+	{ "AIOCANCELTIMEOUT", "Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD", 3 },
+	{ "DBGLDMISMATCH", "Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ", 9 },
+	{ "DBBLKSIZEALIGN", "Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL", 4 },
+	{ "ASYNCIONOMM", "Database file !AD!AD cannot !AD", 6 },
+	{ "RESYNCSEQLOW", "MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested is lower than !@ZQ [0x!16@XQ] which is the starting sequence number of the instance", 4 },
+	{ "DBNULCOL", "NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD", 6 },
+	{ "UTF16ENDIAN", "The device previously set UTF-16 endianness to !AD and cannot change to !AD", 4 },
+	{ "OFRZACTIVE", "Region !AD has an Online Freeze", 2 },
+	{ "OFRZAUTOREL", "Online Freeze automatically released for database file !AD", 2 },
+	{ "OFRZCRITREL", "Proceeding with a write to region !AD after Online Freeze while holding crit", 2 },
+	{ "OFRZCRITSTUCK", "Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.", 2 },
+	{ "OFRZNOTHELD", "Online Freeze had been automatically released for at least one region", 0 },
+	{ "AIOBUFSTUCK", "Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL", 5 },
+	{ "DBDUPNULCOL", "Discarding !AD=!AD key due to duplicate null collation record", 4 },
+	{ "CHANGELOGINTERVAL", "!AD Server now logging to !AD with a !UL second interval", 5 },
+	{ "DBNONUMSUBS", "!AD key contains a numeric form of subscript in a global defined to collate all subscripts as strings", 2 },
+	{ "AUTODBCREFAIL", "Automatic creation of database file !AD associated with region !AD failed; see associated messages for details", 4 },
+	{ "RNDWNSTATSDBFAIL", "Rundown of statistics database region !AD (DB !AD) failed at/in !AD with following error: !AD", 8 },
+	{ "STATSDBNOTSUPP", "Attempted operation is not supported on statistics database file !AD", 2 },
+	{ "TPNOSTATSHARE", "VIEW \"[NO]STATSHARE\" is not allowed inside a TP transaction", 0 },
+	{ "FNTRANSERROR", "Buffer too small error occurred trying to translate filename !AD", 2 },
+	{ "NOCRENETFILE", "Database file !AD not created; cannot create across network", 2 },
+	{ "DSKSPCCHK", "Error while checking for available disk space to create file !AD", 2 },
+	{ "NOCREMMBIJ", "MM access method not compatible with BEFORE image journaling; Database file !AD not created", 2 },
+	{ "FILECREERR", "Error !AD for file !AD during DB creation", 4 },
+	{ "RAWDEVUNSUP", "RAW device for region !AD is not supported", 2 },
+	{ "DBFILECREATED", "Database file !AD created", 2 },
+	{ "PCTYRESERVED", "Attempted operation not supported on ^%Y* namespace", 0 },
+	{ "REGFILENOTFOUND", "Database file !AD corresponding to region !AD cannot be found", 4 },
+	{ "DRVLONGJMP", "Fake internal error that drives longjmp()", 0 },
+	{ "INVSTATSDB", "Database file !AD associated with statistics database region !AD is not a valid statistics database", 4 },
+	{ "STATSDBERR", "Error in/at !AD attempting to use a statistics database: !AD", 4 },
+	{ "STATSDBINUSE", "Statistics database !AD is in use with database !AD so cannot also be used with database !AD", 6 },
+	{ "STATSDBFNERR", "This database has no accessible statistics database due to the following error: !AD", 2 },
+	{ "JNLSWITCHRETRY", "Retrying previously abandoned switch of journal file !AD for database !AD", 4 },
+	{ "JNLSWITCHFAIL", "Failed to switch journal file !AD for database file !AD", 4 },
+	{ "CLISTRTOOLONG", "!AZ specified is !UL bytes long which is greater than the allowed maximum of !UL bytes", 3 },
+	{ "LVMONBADVAL", "Value for local variable !AD changed inappropriately between two points for indexes !UL and !UL - expected value: !AD  actual value: !AD - Generating core", 8 },
+	{ "RESTRICTEDOP", "Attempt to perform a restricted operation: !AZ", 1 },
+	{ "RESTRICTSYNTAX", "Syntax error in file !AD at line number !UL. All facilities restricted for process.", 3 },
+	{ "MUCREFILERR", "Error in/at !AD creating database !AD (region !AD)", 6 },
+	{ "JNLBUFFPHS2SALVAGE", "Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]", 7 },
+	{ "JNLPOOLPHS2SALVAGE", "Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]", 6 },
+	{ "MURNDWNARGLESS", "Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD", 4 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1846,7 +1896,7 @@ LITDEF	int ERR_CCECCPPID = 150375459;
 LITDEF	int ERR_CCECLSTPRCS = 150375467;
 LITDEF	int ERR_ZSHOWBADFUNC = 150375474;
 LITDEF	int ERR_NOTALLJNLEN = 150375480;
-LITDEF	int ERR_UNUSEDMSG570 = 150375490;
+LITDEF	int ERR_BADLOCKNEST = 150375490;
 LITDEF	int ERR_NOLBRSRC = 150375498;
 LITDEF	int ERR_INVZSTEP = 150375506;
 LITDEF	int ERR_ZSTEPARG = 150375514;
@@ -1858,7 +1908,7 @@ LITDEF	int ERR_FILEDEL = 150375555;
 LITDEF	int ERR_JNLBADLABEL = 150375562;
 LITDEF	int ERR_JNLREADEOF = 150375570;
 LITDEF	int ERR_JNLRECFMT = 150375578;
-LITDEF	int ERR_BLKTOODEEP = 150375586;
+LITDEF	int ERR_BLKTOODEEP = 150375584;
 LITDEF	int ERR_NESTFORMP = 150375594;
 LITDEF	int ERR_BINHDR = 150375603;
 LITDEF	int ERR_GOQPREC = 150375611;
@@ -1946,7 +1996,7 @@ LITDEF	int ERR_CEBIGSKIP = 150376258;
 LITDEF	int ERR_CETOOLONG = 150376266;
 LITDEF	int ERR_CENOINDIR = 150376274;
 LITDEF	int ERR_COLLATIONUNDEF = 150376282;
-LITDEF	int ERR_UNUSEDMSG670 = 150376290;
+LITDEF	int ERR_UNUSEDMSG673 = 150376290;
 LITDEF	int ERR_GTMSECSHRSRVF = 150376298;
 LITDEF	int ERR_FREEZECTRL = 150376307;
 LITDEF	int ERR_JNLFLUSH = 150376315;
@@ -2052,8 +2102,8 @@ LITDEF	int ERR_KRNLKILL = 150377108;
 LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
 LITDEF	int ERR_FREEZEID = 150377123;
 LITDEF	int ERR_BLKWRITERR = 150377131;
-LITDEF	int ERR_STOPTIMEOUT = 150377138;
-LITDEF	int ERR_UNUSEDMSG777 = 150377146;
+LITDEF	int ERR_UNUSEDMSG779 = 150377138;
+LITDEF	int ERR_PINENTRYERR = 150377146;
 LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
 LITDEF	int ERR_NOFORKCORE = 150377160;
 LITDEF	int ERR_JNLREAD = 150377170;
@@ -2592,7 +2642,7 @@ LITDEF	int ERR_CRYPTOPFAILED = 150381426;
 LITDEF	int ERR_CRYPTDLNOOPEN = 150381434;
 LITDEF	int ERR_CRYPTNOV4 = 150381442;
 LITDEF	int ERR_CRYPTNOMM = 150381450;
-LITDEF	int ERR_UNUSEDMSG1316 = 150381458;
+LITDEF	int ERR_UNUSEDMSG1319 = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 150381466;
 LITDEF	int ERR_CRYPTKEYFETCHFAILEDNF = 150381474;
 LITDEF	int ERR_CRYPTHASHGENFAILED = 150381482;
@@ -2650,7 +2700,7 @@ LITDEF	int ERR_GVZTRIGFAIL = 150381890;
 LITDEF	int ERR_MUUSERLBK = 150381898;
 LITDEF	int ERR_SETINSETTRIGONLY = 150381906;
 LITDEF	int ERR_DZTRIGINTRIG = 150381914;
-LITDEF	int ERR_UNUSEDMSG1374 = 150381922;
+LITDEF	int ERR_UNUSEDMSG1377 = 150381922;
 LITDEF	int ERR_BOOLSIDEFFECT = 150381928;
 LITDEF	int ERR_DBBADUPGRDSTATE = 150381936;
 LITDEF	int ERR_WRITEWAITPID = 150381946;
@@ -2662,7 +2712,7 @@ LITDEF	int ERR_GTMSECSHRCHDIRF = 150381986;
 LITDEF	int ERR_JNLORDBFLU = 150381994;
 LITDEF	int ERR_ZCCLNUPRTNMISNG = 150382002;
 LITDEF	int ERR_ZCINVALIDKEYWORD = 150382010;
-LITDEF	int ERR_UNUSEDMSG1386 = 150382018;
+LITDEF	int ERR_UNUSEDMSG1389 = 150382018;
 LITDEF	int ERR_DBSHMNAMEDIFF = 150382026;
 LITDEF	int ERR_SHMREMOVED = 150382035;
 LITDEF	int ERR_DEVICEWRITEONLY = 150382042;
@@ -2803,7 +2853,7 @@ LITDEF	int ERR_GETADDRINFO = 150383114;
 LITDEF	int ERR_GETNAMEINFO = 150383122;
 LITDEF	int ERR_SOCKBIND = 150383130;
 LITDEF	int ERR_INSTFRZDEFER = 150383139;
-LITDEF	int ERR_REGOPENRETRY = 150383147;
+LITDEF	int ERR_UNUSEDMSG1532 = 150383146;
 LITDEF	int ERR_REGOPENFAIL = 150383154;
 LITDEF	int ERR_REPLINSTNOSHM = 150383162;
 LITDEF	int ERR_DEVPARMTOOSMALL = 150383170;
@@ -2813,8 +2863,8 @@ LITDEF	int ERR_ACTCOLLMISMTCH = 150383194;
 LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
 LITDEF	int ERR_ISSPANGBL = 150383210;
 LITDEF	int ERR_TPNOSUPPORT = 150383218;
-LITDEF	int ERR_GVSUBSERR = 150383226;
-LITDEF	int ERR_UNUSEDMSG1540 = 150383234;
+LITDEF	int ERR_UNUSEDMSG1542 = 150383226;
+LITDEF	int ERR_ZATRANSERR = 150383234;
 LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
 LITDEF	int ERR_TLSDLLNOOPEN = 150383250;
 LITDEF	int ERR_TLSINIT = 150383258;
@@ -2895,9 +2945,56 @@ LITDEF	int ERR_MUREENCRYPTV4NOALLOW = 150383850;
 LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
 LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;
+LITDEF	int ERR_PBNUNSUPTYPE = 150383882;
+LITDEF	int ERR_DBFHEADLRU = 150383891;
+LITDEF	int ERR_ASYNCIONOV4 = 150383898;
+LITDEF	int ERR_AIOCANCELTIMEOUT = 150383906;
+LITDEF	int ERR_DBGLDMISMATCH = 150383914;
+LITDEF	int ERR_DBBLKSIZEALIGN = 150383922;
+LITDEF	int ERR_ASYNCIONOMM = 150383930;
+LITDEF	int ERR_RESYNCSEQLOW = 150383938;
+LITDEF	int ERR_DBNULCOL = 150383946;
+LITDEF	int ERR_UTF16ENDIAN = 150383954;
+LITDEF	int ERR_OFRZACTIVE = 150383960;
+LITDEF	int ERR_OFRZAUTOREL = 150383968;
+LITDEF	int ERR_OFRZCRITREL = 150383976;
+LITDEF	int ERR_OFRZCRITSTUCK = 150383984;
+LITDEF	int ERR_OFRZNOTHELD = 150383992;
+LITDEF	int ERR_AIOBUFSTUCK = 150384002;
+LITDEF	int ERR_DBDUPNULCOL = 150384010;
+LITDEF	int ERR_CHANGELOGINTERVAL = 150384019;
+LITDEF	int ERR_DBNONUMSUBS = 150384026;
+LITDEF	int ERR_AUTODBCREFAIL = 150384034;
+LITDEF	int ERR_RNDWNSTATSDBFAIL = 150384042;
+LITDEF	int ERR_STATSDBNOTSUPP = 150384050;
+LITDEF	int ERR_TPNOSTATSHARE = 150384058;
+LITDEF	int ERR_FNTRANSERROR = 150384066;
+LITDEF	int ERR_NOCRENETFILE = 150384074;
+LITDEF	int ERR_DSKSPCCHK = 150384082;
+LITDEF	int ERR_NOCREMMBIJ = 150384090;
+LITDEF	int ERR_FILECREERR = 150384098;
+LITDEF	int ERR_RAWDEVUNSUP = 150384106;
+LITDEF	int ERR_DBFILECREATED = 150384115;
+LITDEF	int ERR_PCTYRESERVED = 150384122;
+LITDEF	int ERR_REGFILENOTFOUND = 150384131;
+LITDEF	int ERR_DRVLONGJMP = 150384138;
+LITDEF	int ERR_INVSTATSDB = 150384146;
+LITDEF	int ERR_STATSDBERR = 150384154;
+LITDEF	int ERR_STATSDBINUSE = 150384162;
+LITDEF	int ERR_STATSDBFNERR = 150384170;
+LITDEF	int ERR_JNLSWITCHRETRY = 150384179;
+LITDEF	int ERR_JNLSWITCHFAIL = 150384186;
+LITDEF	int ERR_CLISTRTOOLONG = 150384194;
+LITDEF	int ERR_LVMONBADVAL = 150384202;
+LITDEF	int ERR_RESTRICTEDOP = 150384210;
+LITDEF	int ERR_RESTRICTSYNTAX = 150384218;
+LITDEF	int ERR_MUCREFILERR = 150384226;
+LITDEF	int ERR_JNLBUFFPHS2SALVAGE = 150384235;
+LITDEF	int ERR_JNLPOOLPHS2SALVAGE = 150384243;
+LITDEF	int ERR_MURNDWNARGLESS = 150384251;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1440};
+	1487};
