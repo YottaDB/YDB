@@ -31,6 +31,7 @@ void op_gvq2(mval *dst,mval *direct)
 	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
 		rts_error(VARLSTCNT(1) ERR_QUERY2);
 	else
+	{
 		if (direct->m[1] == (1 * MV_BIAS))
 			op_gvquery(dst);
 		else
