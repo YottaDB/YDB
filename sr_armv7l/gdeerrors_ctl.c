@@ -68,7 +68,7 @@ LITDEF	err_msg gdeerrors[] = {
 	{ "INVGBLDIR", "Invalid Global Directory spec: !AD.!/Continuing with !AD", 4 },
 	{ "WRITEERROR", "Cannot exit because of write failure.  Reason for failure: !AD", 2 },
 	{ "NONASCII", "!AD is illegal for a !AD as it contains non-ASCII characters", 4 },
-	{ "CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2 },
+	{ "GDECRYPTNOMM", "!AD segment has encryption turned on. Cannot support MM access method.", 2 },
 	{ "JNLALLOCGROW", "Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD", 8 },
 	{ "KEYFORBLK", "But block size !AD and reserved bytes !AD limit key size to !AD", 6 },
 	{ "STRMISSQUOTE", "Missing double-quote at end of string specification !AD", 2 },
@@ -97,6 +97,8 @@ LITDEF	err_msg gdeerrors[] = {
 	{ "GBLNAMCOLLRANGE", "Collation sequence #!UL is out of range (0 thru 255)", 3 },
 	{ "STDNULLCOLLREQ", "Region !AD needs Standard Null Collation enabled because global !AD spans through it", 4 },
 	{ "GBLNAMCOLLVER", "Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL", 5 },
+	{ "GDEASYNCIONOMM", "!AD segment has ASYNCIO turned on. Cannot support MM access method.", 2 },
+	{ "NOPERCENTY", "^%Y* is a reserved global name in GT.M", 0 },
 };
 
 LITDEF	int GDE_BLKSIZ512 = 150503435;
@@ -154,7 +156,7 @@ LITDEF	int GDE_GDNOTSET = 150503843;
 LITDEF	int GDE_INVGBLDIR = 150503851;
 LITDEF	int GDE_WRITEERROR = 150503859;
 LITDEF	int GDE_NONASCII = 150503866;
-LITDEF	int GDE_CRYPTNOMM = 150503874;
+LITDEF	int GDE_GDECRYPTNOMM = 150503874;
 LITDEF	int GDE_JNLALLOCGROW = 150503883;
 LITDEF	int GDE_KEYFORBLK = 150503891;
 LITDEF	int GDE_STRMISSQUOTE = 150503898;
@@ -183,9 +185,11 @@ LITDEF	int GDE_NAMGVSUBOFLOW = 150504074;
 LITDEF	int GDE_GBLNAMCOLLRANGE = 150504082;
 LITDEF	int GDE_STDNULLCOLLREQ = 150504091;
 LITDEF	int GDE_GBLNAMCOLLVER = 150504098;
+LITDEF	int GDE_GDEASYNCIONOMM = 150504106;
+LITDEF	int GDE_NOPERCENTY = 150504114;
 
 GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],
-	84};
+	86};
