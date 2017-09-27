@@ -1,5 +1,7 @@
 /****************************************************************
  *								*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -9,6 +11,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/* Code in this module is based on op_gvquery.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
 
 #include "mdef.h"
 
@@ -21,7 +27,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_protos.h"	/* for gvcst_query prototype */
+#include "gvcst_protos.h"	/* for gvcst_reversequery prototype */
 #include "format_targ_key.h"
 #include "gvcmx.h"
 #include "gvusr.h"
@@ -120,7 +126,7 @@ void op_gvreversequery(mval *v)
 	{
 		if (acc_meth != dba_usr)
 		{
-			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)) == 0)
+			if (0 == (end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			size = (int)(end - &buff[0] - 1); /* exclude ^ */
 			glob_begin = &buff[1]; /* skip ^ */

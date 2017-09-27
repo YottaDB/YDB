@@ -1,5 +1,8 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
+! Copyright (c) 2001-2017 Fidelity National Information		!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
+!								!
 ! Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
@@ -9,6 +12,10 @@
 !	the license, please stop and do not read further.	!
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Code in this module is based on merrors.msg and hence has an
+! FIS copyright even though this module was not created by FIS.
+
 	.FACILITY	YDB,256/PREFIX=ERR_
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !

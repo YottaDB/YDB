@@ -13,6 +13,10 @@
  *								*
  ****************************************************************/
 
+/* Code in this module is based on gvcst_spr_query.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
+
 #include "mdef.h"
 
 #include "gtm_stdio.h"

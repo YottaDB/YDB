@@ -1,5 +1,8 @@
 /****************************************************************
  *								*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -9,6 +12,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/* Code in this module is based on gvcst_query.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
 
 #include "mdef.h"
 
@@ -96,6 +103,13 @@ boolean_t	gvcst_reversequery(void)
 	IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(return found);
 	assert(found && is_hidden);
 	SAVE_GV_CURRKEY(save_currkey);
+	/* Note: This code does: 1) tstart, 2) ESTABLISH, 3) tcommit, 4) REVERT in that order.
+	 * One might think either (1 & 2) or (3 & 4) be reversed to keep things straight.
+	 * But the order has to the way it is laid out because condition handler "gvcst_reversequery_ch"
+	 * needs to take control inside a TP transaction so it has to be after the tstart.
+	 * But restarts are possible even inside the tcommit step. And so the REVERT has to happen
+	 * after the tcommit.
+	 */
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;

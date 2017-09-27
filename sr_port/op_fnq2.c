@@ -12,12 +12,19 @@
  *								*
  ****************************************************************/
 
+/* Code in this module is based on op_fno2.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
+
 #include "mdef.h"
 
 #include "lv_val.h"
 #include "mvalconv.h"
 
 error_def(ERR_QUERY2);
+
+LITREF	mval	literal_one;
+LITREF	mval	literal_minusone;
 
 /* This function is basically a 2-argument $query(lvn,dir) call where the first argument is a lvn
  * and the 2nd argument dir is not a literal constant (so direction is not known at compile time in "f_query").
@@ -30,12 +37,13 @@ void op_fnq2(int sbscnt, mval *dst, mval *direct, ...)
 	va_list		var;
 
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
+	if (!MV_IS_TRUEINT(direct, &dummy_intval)
+			|| ((literal_one.m[1] != direct->m[1]) && (literal_minusone.m[1] != direct->m[1])))
 		rts_error(VARLSTCNT(1) ERR_QUERY2);
 	else
 	{
 		VAR_START(var, direct);
-		if (direct->m[1] == (1 * MV_BIAS))
+		if (literal_one.m[1] == direct->m[1])
 			op_fnquery_va(sbscnt, dst, var);
 		else
 			op_fnreversequery_va(sbscnt, dst, var);

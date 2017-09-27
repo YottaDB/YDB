@@ -1,5 +1,7 @@
 /****************************************************************
  *								*
+ * Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -9,6 +11,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/* Code in this module is based on gvcmx_query.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
 
 #include "mdef.h"
 

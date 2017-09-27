@@ -12,6 +12,10 @@
  *								*
  ****************************************************************/
 
+/* Note: Code in this module is based on op_indo2.c which has a FIS copyright hence
+ * the copyright is copied over here even though this module was not created by FIS.
+ */
+
 #include "mdef.h"
 
 #include "compiler.h"
@@ -26,6 +30,9 @@ error_def(ERR_QUERY2);
 error_def(ERR_VAREXPECTED);
 
 GBLREF	symval			*curr_symval;
+
+LITREF	mval	literal_one;
+LITREF	mval	literal_minusone;
 
 void	op_indq2(mval *dst, uint4 indx, mval *direct)
 {
@@ -44,7 +51,8 @@ void	op_indq2(mval *dst, uint4 indx, mval *direct)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
+	if (!MV_IS_TRUEINT(direct, &dummy_intval)
+			|| ((literal_one.m[1] != direct->m[1]) && (literal_minusone.m[1] != direct->m[1])))
 		rts_error(VARLSTCNT(1) ERR_QUERY2);
 	slot = &((TREF(glvn_pool_ptr))->slot[indx]);
 	oc = slot->sav_opcode;
@@ -64,8 +72,8 @@ void	op_indq2(mval *dst, uint4 indx, mval *direct)
 			lv_newname(tabent, curr_symval);
 		paramlist.arg[2] = (lv_val *)tabent->value;
 		for (i = 3; i < n; i++)
-			paramlist.arg[i] = lvn_info->lv_subs[i-3];
-		if ((1 * MV_BIAS) == direct->m[1])
+			paramlist.arg[i] = lvn_info->lv_subs[i - 3];
+		if (literal_one.m[1] == direct->m[1])
 			callg((callgfnptr)op_fnquery, &paramlist);
 		else
 			callg((callgfnptr)op_fnreversequery, &paramlist);
@@ -73,7 +81,7 @@ void	op_indq2(mval *dst, uint4 indx, mval *direct)
 	{	/* gvn */
 		op_rfrshgvn(indx, oc);
 		/* like op_gvno2 */
-		if ((1 * MV_BIAS) == direct->m[1])
+		if (literal_one.m[1] == direct->m[1])
 			op_gvquery(dst);
 		else
 			op_gvreversequery(dst);

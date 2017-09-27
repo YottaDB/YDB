@@ -12,6 +12,10 @@
  *								*
  ****************************************************************/
 
+/* Code in this module is based on gtcmtr_query.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
+
 #include "mdef.h"
 
 #include <stddef.h>

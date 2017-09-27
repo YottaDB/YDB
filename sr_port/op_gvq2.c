@@ -12,27 +12,36 @@
  *								*
  ****************************************************************/
 
+/* Code in this module is based on op_gvo2.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
+
 #include "mdef.h"
+
 #include "op.h"
 #include "mvalconv.h"
 
 error_def(ERR_QUERY2);
+
+LITREF	mval	literal_one;
+LITREF	mval	literal_minusone;
 
 /* This function is basically a 2-argument $query(gvn,dir) call where the first argument is a gvn
  * and the 2nd argument dir is not a literal constant (so direction is not known at compile time in "f_query").
  * In this case, "f_query" generates an OC_GVQ2 opcode that invokes "op_gvq2" with the direction parameter evaluated
  * and so we can now decide whether to go with forward or reverse query of gvn.
  */
-void op_gvq2(mval *dst,mval *direct)
+void op_gvq2(mval *dst, mval *direct)
 {
 	int4	dummy_intval;
 
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
+	if (!MV_IS_TRUEINT(direct, &dummy_intval)
+			|| ((literal_one.m[1] != direct->m[1]) && (literal_minusone.m[1] != direct->m[1])))
 		rts_error(VARLSTCNT(1) ERR_QUERY2);
 	else
 	{
-		if (direct->m[1] == (1 * MV_BIAS))
+		if (literal_one.m[1] == direct->m[1])
 			op_gvquery(dst);
 		else
 			op_gvreversequery(dst);

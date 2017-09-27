@@ -1,5 +1,7 @@
 /****************************************************************
  *								*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -9,6 +11,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/* Code in this module is based on f_query.c and hence has an
+ * FIS copyright even though this module was not created by FIS.
+ */
 
 #include "mdef.h"
 
@@ -29,7 +35,7 @@ error_def(ERR_VAREXPECTED);
  *
  * In case of $query(@x,-1), where the first argument is an indirection, "f_query" does not know what opcode to generate
  * (OC_FNQUERY or OC_GVQUERY). But since the direction "-1" is a literal known at compile time, "f_query" knows this is
- * a forward query (not a reverse query) and hence generates an OC_INDFUN triple with an indirection opcode indir_fnreversequery1.
+ * a reverse query (not a forward query) and hence generates an OC_INDFUN triple with an indirection opcode indir_fnreversequery1.
  * The OC_INDFUN triple causes "op_indfun" to be invoked. That invokes the function "f_reversequery1" (because of
  * indir_fnreversequery1). Assuming the variable "x" evaluated to "y", at the time of "f_reversequery1" invocation, we have
  * reduced the original $query(@x,-1) function invocation to a $query(y,-1) i.e. a 2-argument $query to a 1-argument $query
