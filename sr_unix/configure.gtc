@@ -309,8 +309,12 @@ if [ -d "utf8" ]; then
 				# set the gtm_icu_version
 				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
 					save_icu_libpath="$libpath"
+					# "expr" used below can exit with 1 if $majmin is a multiple of 10 and so
+					# temporarily suspend "set -e"
+					set +e
 					minorver=`expr $majmin % 10`
 					majorver=`expr $majmin / 10`
+					set -e
 					gtm_icu_version="$majorver.$minorver"
 					export gtm_icu_version
 					break
