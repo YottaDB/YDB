@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +43,7 @@ error_def(ERR_GVIS);
 void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 {
 	unsigned char	*ptr;
-	short		len, temp_short;
+	short		len, keylen, temp_short;
 	int4		status, max_reply_len;
 	struct CLB	*lnk;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
@@ -172,49 +175,48 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		MV_FORCE_MVAL(v, status);
 		return;
 	}
-	if (reply_code == CMMS_R_PREV || reply_code == CMMS_R_QUERY || reply_code == CMMS_R_ORDER)
+	if ((CMMS_R_PREV == reply_code) || (CMMS_R_QUERY == reply_code) || (CMMS_R_ORDER == reply_code)
+		|| (CMMS_R_REVERSEQUERY == reply_code))
 	{
 		CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 		ptr += SIZEOF(short);
 		if (1 == len)
-		{
 			MV_FORCE_MVAL(v, 0);
-		} else
+		else
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
 				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
-#ifdef DEBUG
+			keylen = (len - 1 - (3 * SIZEOF(unsigned short)));	/* 3 for gv_key->top, prev, end */
+#			ifdef DEBUG
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
-			/* Check gv_altkey has enough size allocated for the data to be copied*/
-			/*gv_init_reg would have got the correct key length from server*/
-			assert(srv_buff_size >= (len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) -
-							SIZEOF(unsigned short)));
-#endif
+			/* Check gv_altkey has enough size allocated for the data to be copied */
+			/* gv_init_reg would have got the correct key length from server */
+			assert(srv_buff_size >= keylen);
+#			endif
 			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->end, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			DEBUG_ONLY(assert(gv_altkey->end <= gv_altkey->top));
   			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->prev, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			ptr += SIZEOF(unsigned short);
-			memcpy(gv_altkey->base, ptr, len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) -
-						     SIZEOF(unsigned short));
-			ptr += (len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
+			memcpy(gv_altkey->base, ptr, keylen);
+			ptr += keylen;
 			MV_FORCE_MVAL(v, 1);
 		}
-		if (CMMS_R_QUERY != reply_code || 1 == len || !((link_info *)lnk->usr)->query_is_queryget)
+		if ((CMMS_R_QUERY != reply_code) || (1 == len) || !((link_info *)lnk->usr)->query_is_queryget)
 		{
-			if (CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget)
+			if ((CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget)
 				v->mvtype = 0; /* force undefined to distinguish $Q returning "" from value of QUERYGET being 0 */
 			return;
 		}
 	}
-	assert(CMMS_R_GET == reply_code
-		|| CMMS_R_INCREMENT == reply_code
-		|| CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget && 1 < len);
+	assert((CMMS_R_GET == reply_code)
+		|| (CMMS_R_INCREMENT == reply_code)
+		|| (CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget && (1 < len));
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += SIZEOF(unsigned short);
-	assert(ptr >= stringpool.base && ptr + len < stringpool.top); /* incoming message is in stringpool */
+	assert((ptr >= stringpool.base) && ((ptr + len) < stringpool.top)); /* incoming message is in stringpool */
 	v->mvtype = MV_STR;
 	v->str.len = len;
 	v->str.addr = (char *)stringpool.free;	/* we don't need the reply msg anymore, can overwrite reply */

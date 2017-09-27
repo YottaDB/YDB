@@ -11,6 +11,7 @@ gvcmx_put
 gvcmx_query
 gvcmx_reqremlk
 gvcmx_resremlk
+gvcmx_reversequery
 gvcmx_susremlk
 gvcmx_unlock
 gvcmx_zprevious

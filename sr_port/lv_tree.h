@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -216,6 +219,7 @@ int 		lvAvlTreeNodeSubscrCmp(lvTreeNode *aNode, lvTreeNode *bNode);
 #endif
 lvTreeNode	*lvAvlTreeFirst(lvTree *lvt);
 lvTreeNode	*lvAvlTreeLast(lvTree *lvt);
+lvTreeNode	*lvAvlTreeCollatedLast(lvTree *lvt);
 lvTreeNode 	*lvAvlTreePrev(lvTreeNode *node);
 lvTreeNode 	*lvAvlTreeKeyPrev(lvTree *lvt, treeKeySubscr *key);
 lvTreeNode 	*lvAvlTreeNext(lvTreeNode *node);
@@ -224,6 +228,8 @@ lvTreeNode	*lvAvlTreeFirstPostOrder(lvTree *lvt);
 lvTreeNode	*lvAvlTreeNextPostOrder(lvTreeNode *node);
 lvTreeNode	*lvAvlTreeKeyCollatedNext(lvTree *lvt, treeKeySubscr *key);
 lvTreeNode	*lvAvlTreeNodeCollatedNext(lvTreeNode *node);
+lvTreeNode	*lvAvlTreeKeyCollatedPrev(lvTree *lvt, treeKeySubscr *key);
+lvTreeNode	*lvAvlTreeNodeCollatedPrev(lvTreeNode *node);
 lvTreeNode	*lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent, boolean_t refCntMaint);
 
 #ifdef DEBUG

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +13,11 @@
  ****************************************************************/
 
 
-/*** STUB FILE ***/
+/* This file defines various stub functions for executables that link to functions related to the dba_cm access method
+ * (GT.CM GNP) but are guaranteed to never use/need them. Utilities like MUPIP/DSE/LKE etc. never need access to the
+ * client-side functions of a GT.CM GNP server so all such functions are included here.
+ */
+
 #include "mdef.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -70,6 +77,11 @@ void gvcmx_put(mval *v)
 }
 
 bool gvcmx_query(mval *val)
+{
+	assert (FALSE);
+	return(-1);
+}
+bool gvcmx_reversequery(mval *val)
 {
 	assert (FALSE);
 	return(-1);

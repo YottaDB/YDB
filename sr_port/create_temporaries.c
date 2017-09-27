@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +57,9 @@
  *	subscript is not also an individual target within the same compound SET. Even in that case, this function
  *	will be called to store the subscript in temporaries (as we dont know at compile time if a particular
  *	subscript is also used as a target within a compound SET).
+ * Note: The above comment was written when the only purpose of this function was to address the COMPOUND SET case.
+ *	Later, other needs for this function arose (e.g. f_order etc.) and many callers started using this without
+ *	accordingly revising this comment. That is my understanding based on the current state of the code. 2017/08 --- nars
  */
 void create_temporaries(triple *sub, opctype put_oc)
 {
@@ -67,7 +73,15 @@ void create_temporaries(triple *sub, opctype put_oc)
 	sb1 = &sub->operand[1];
 	if ((OC_GVNAME == put_oc) || (OC_PUTINDX == put_oc) || (OC_SRCHINDX == put_oc))
 	{
-		sub = sb1->oprval.tref;		/* global name */
+		sub = sb1->oprval.tref;		/* global or local name */
+		assert(OC_PARAMETER == sub->opcode);
+		sb1 = &sub->operand[1];
+	} else if (OC_FNQUERY == put_oc)
+	{
+		sub = sb1->oprval.tref;		/* OC_LIT : # of subscripts + 2 */
+		assert(OC_PARAMETER == sub->opcode);
+		sb1 = &sub->operand[1];
+		sub = sb1->oprval.tref;		/* OC_VAR : unsubscripted local variable name */
 		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[1];
 	} else if (OC_GVEXTNAM == put_oc)

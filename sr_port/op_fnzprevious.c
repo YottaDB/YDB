@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +41,7 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 		if (MV_IS_STRING(key) && (0 == key->str.len))
 			get_last = TRUE;
 		if (get_last)
-			node = lvAvlTreeLast(lvt);
+			node = lvAvlTreeCollatedLast(lvt);
 		else
 		{
 			is_canonical = MV_IS_CANONICAL(key);
@@ -65,15 +68,9 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 				tmp_sbs = *key;
 				key = &tmp_sbs;
 				MV_FORCE_NUM(key);
-				TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeKeyPrev function */
+				TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeKeyCollatedPrev function */
 			}
-			node = lvAvlTreeKeyPrev(lvt, key);
-		}
-		/* If STDNULLCOLL, skip to the previous subscript should the current subscript be "" */
-		if (TREF(local_collseq_stdnull) && (NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
-		{
-			assert(LVNULLSUBS_OK == TREF(lv_null_subs));
-			node = lvAvlTreePrev(node);
+			node = lvAvlTreeKeyCollatedPrev(lvt, key);
 		}
 	} else
 		node = NULL;

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,11 +94,14 @@
 #define CMMS_C_BUFFLUSH		52	/* [0x34] */
 #define CMMS_Q_INCREMENT	53	/* [0x35] */	/* Opcode for message type sent from   client (to   server) */
 #define CMMS_R_INCREMENT	54	/* [0x36] */	/* Opcode for message type received by client (from server) */
+#define CMMS_Q_REVERSEQUERY	55	/* [0x37] */
+#define CMMS_R_REVERSEQUERY	56	/* [0x38] */
 
-#define	CMM_QUERYGET_MIN_LEVEL	"200"	/* $query works as queryget only from version "V200" onwards */
-#define	CMM_INCREMENT_MIN_LEVEL	"210"	/* $INCREMENT works only from version "V210" onwards */
+#define	CMM_QUERYGET_MIN_LEVEL		"200"	/* $query works as queryget only from version "V200" onwards */
+#define	CMM_INCREMENT_MIN_LEVEL		"210"	/* $INCREMENT works only from version "V210" onwards */
 #define	CMM_STDNULLCOLL_MIN_LEVEL	"210"	/* Standard null collation works only from version "V210" onwards */
-#define	CMM_LONGNAMES_MIN_LEVEL	"210"	/* long name works only from protocol "V210" onwards */
+#define	CMM_LONGNAMES_MIN_LEVEL		"210"	/* long name works only from protocol "V210" onwards */
+#define	CMM_REVERSEQUERY_MIN_LEVEL	"220"	/* Reverse $query works only from protocol "V220" onwards */
 
 typedef struct cm_region_list_struct
 	{
@@ -187,6 +193,7 @@ typedef struct link_info_struct
 		boolean_t			server_supports_dollar_incr;	/* decided based on server protocol levels */
 		boolean_t			server_supports_std_null_coll;	/* decided based on server protocol levels */
 		boolean_t			server_supports_long_names;	/* decided based on server protocol levels */
+		boolean_t			server_supports_reverse_query;	/* decided based on server protocol levels */
 	} link_info;
 
 typedef struct

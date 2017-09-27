@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -523,6 +526,7 @@ void	op_fnzdata(lv_val *x, mval *y);
 void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
 void	op_fnnext(lv_val *src,mval *key,mval *dst);
 void	op_fno2(lv_val *src,mval *key,mval *dst,mval *direct);
+void	op_fnq2(int sbscnt, mval *dst, mval *direct, ...);
 void	op_fnorder(lv_val *src, mval *key, mval *dst);
 void	op_fnzahandle(lv_val *src, mval *dst);
 void	op_fnzprevious(lv_val *src, mval *key, mval *dst);

@@ -3,6 +3,8 @@
 ; Copyright (c) 2001, 2015 Fidelity National Information	;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -168,11 +170,14 @@ hdr
  Open cfile:read
  Use prevout w "/****************************************************************",!
  For i=1:1 Use cfile Read line Quit:$zeof  Do
- . If (1<$zl(line,"XXXX")) Do
+ . If (1<$zlength(line,"XXXX")) Do
  . . Set str=$zpiece(line,"XXXX",1)_xxxx_$zpiece(line,"XXXX",2)
  . . Set str=$zpiece(str,"YYYY",1)_yyyy_$zpiece(str,"YYYY",2)
  . Else  Do
- . . Set str=line
+ . . if (1<$zlength(line,"YYYY")) Do
+ . . . Set str=$zpiece(line,"YYYY",1)_yyyy_$zpiece(line,"YYYY",2)
+ . . Else  Do
+ . . . Set str=line
  . Use prevout Write " *"_str_"*",!
  Close cfile
  Use prevout

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2004 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +37,7 @@ bool	gtcmtr_lksuspend(void);
 bool	gtcmtr_order(void);
 bool	gtcmtr_put(void);
 bool	gtcmtr_query(void);
+bool	gtcmtr_reversequery(void);
 bool	gtcmtr_terminate(bool cm_err);
 void	gtcmtr_terminate_free(connection_struct *ce);
 bool	gtcmtr_zprevious(void);

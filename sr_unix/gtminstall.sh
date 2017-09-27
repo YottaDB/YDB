@@ -1,14 +1,16 @@
 #!/bin/sh -
 #################################################################
-#                                                               #
 # Copyright (c) 2014-2017 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
-#                                                               #
-#       This source code contains the intellectual property     #
-#       of its copyright holder(s), and is made available       #
-#       under a license.  If you do not know the terms of       #
-#       the license, please stop and do not read further.       #
-#                                                               #
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
 #################################################################
 
 # This script automates the installation of GT.M as much as possible,
@@ -345,7 +347,8 @@ fi
 
 gtm_tmp=`mktmpdir`
 mkdir $gtm_tmp/tmp
-if [ -z "$gtm_version" -o "latest" = "`echo "$gtm_version" | tr LATES lates`" ] ; then
+latest=`echo "$gtm_version" | tr LATES lates`
+if [ -z "$gtm_version" -o "latest" = "$latest" ] ; then
     case $gtm_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             gtm_gtm="Y"
@@ -546,6 +549,9 @@ if [ "$gtm_distrib" != "$gtm_tmp" ] ; then
     chmod +w $gtm_tmp/tmp
     cd $gtm_tmp/tmp
 fi
+
+if [ -e configure.sh ] ; then rm -f configure.sh ; fi
+
 tmp=`head -1 configure | cut -f 1`
 if [ "#!/bin/sh" != "$tmp" ] ; then
     echo "#!/bin/sh" >configure.sh
@@ -557,7 +563,7 @@ chmod +x configure.sh
 if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit ; fi
 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
-if [ $? -gt 0 ] ; then cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; fi
+if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; exit 1; fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Installation complete ; ls -l $gtm_installdir ; fi
 
 # Create copies of environment scripts and gtm executable

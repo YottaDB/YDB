@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,6 +53,8 @@ boolean_t	gvcst_query(void);
 boolean_t	gvcst_query2(void);
 boolean_t	gvcst_queryget(mval *val);
 boolean_t	gvcst_queryget2(mval *val, unsigned char *sn_ptr);
+boolean_t	gvcst_reversequery(void);
+boolean_t	gvcst_reversequery2(void);
 void		gvcst_remove_statsDB_linkage(gd_region *baseDBreg);
 void		gvcst_remove_statsDB_linkage_all(void);
 void		gvcst_remove_statsDB_linkage_wrapper(gd_region *baseDBreg, gd_region *statsDBreg);
@@ -67,6 +72,7 @@ boolean_t	gvcst_spr_order(void);
 boolean_t	gvcst_spr_zprevious(void);
 boolean_t	gvcst_spr_query(void);
 boolean_t	gvcst_spr_queryget(mval *cumul_val);
+boolean_t	gvcst_spr_reversequery(void);
 
 # define INVOKE_GVCST_SPR_XXX(GVNH_REG, STATEMENT)	\
 {							\

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -316,4 +319,9 @@ XFER(xf_zrupdate, op_zrupdate),
 XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
-XFER(xf_fnzatransform, op_fnzatransform)
+XFER(xf_fnzatransform, op_fnzatransform),
+XFER(xf_fnreversequery, op_fnreversequery),
+XFER(xf_gvreversequery, op_gvreversequery),
+XFER(xf_fnq2, op_fnq2),
+XFER(xf_gvq2, op_gvq2),
+XFER(xf_indq2, op_indq2)

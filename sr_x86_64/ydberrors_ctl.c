@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -11,23 +12,17 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include "mdef.h"
+#include "error.h"
 
-#ifndef _FNORDER_H_INC_
-#define _FNORDER_H_INC_
-
-enum order_obj {
-	GLOBAL = 0,
-	LOCAL,
-	LOCAL_NAME,
-	INDIRECT,
-	LAST_OBJECT
+LITDEF	err_msg ydberrors[] = {
+	{ "QUERY2", "Invalid second argument to $QUERY. Must be -1 or 1.", 0 },
 };
 
-enum order_dir {
-	FORWARD = 0,
-	BACKWARD,
-	TBD,
-	LAST_DIRECTION
-};
+LITDEF	int ERR_QUERY2 = 151027722;
 
-#endif
+GBLDEF	err_ctl ydberrors_ctl = {
+	256,
+	"YDB",
+	&ydberrors[0],
+	1};

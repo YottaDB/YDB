@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +46,8 @@ GBLREF gd_region        *gv_cur_region;
 
 bool gtcmtr_zprevious(void)
 {
-	boolean_t		found, is_null;
-	unsigned char		*ptr, regnum, *kprev, *kcur, *ktop;
+	boolean_t		found;
+	unsigned char		*ptr, regnum;
 	unsigned short		top, old_top;
 	unsigned short		len, tmp_len;
 	gv_key			*save_key;
@@ -74,38 +77,7 @@ bool gtcmtr_zprevious(void)
 	if (gv_currkey->prev)
 	{
 		gtcm_bind_name(cm_reg_head, FALSE); /* sets gv_target; do not use gv_target before gtcm_bind_name */
-		if (gv_target->collseq || gv_target->nct)
-		{	/* Need to convert subscript representation from client side to string representation
-			 * so any collation transformations can happen on server side.
-			 * First determine if last subscript is a NULL subscript. Code in op_zprevious uses same logic
-			 */
-			is_null = TRUE;
-			kprev = &gv_currkey->base[gv_currkey->prev];
-			for (kcur = kprev, ktop = &gv_currkey->base[old_top] - 1; kcur < ktop; kcur++)
-			{
-				if (STR_SUB_MAXVAL != *kcur)
-				{
-					is_null = FALSE;
-					break;
-				}
-			}
-			if (is_null)
-			{	/* Last subscript of incoming key is a NULL subscript.
-				 * Client would have represented it using a sequence of FF, FF, FF, ...
-				 * Remove the representation temporarily before doing the gv_xform_key.
-				 * Introduce the NULL subscript after the transformation.
-				 * This is because we do NOT allow a null subsc to be transformed to a non null subsc
-				 * 	so no need for that be part of the transformation.
-				 */
-				*kprev = KEY_DELIMITER;
-				gv_currkey->end = gv_currkey->prev;
-			}
-			gv_xform_key(gv_currkey, FALSE);
-			if (is_null)
-			{	/* Insert the NULL subscript at the end just in time for the gvcst_zprevious call. */
-				GVZPREVIOUS_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
-			}
-		}
+		GTCMTR_SUBS2STR_XFORM_IF_NEEDED(gv_target, gv_currkey, old_top);
 		found = (0 == gv_target->root) ? FALSE : gvcst_zprevious();
 	} else
 	{	/* name level */

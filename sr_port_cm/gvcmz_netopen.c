@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -216,6 +219,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	li->server_supports_dollar_incr = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_INCREMENT_MIN_LEVEL, 3));
 	li->server_supports_std_null_coll = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
 	li->server_supports_long_names = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
+	li->server_supports_reverse_query = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_REVERSEQUERY_MIN_LEVEL, 3));
 	if (!(li->err_compat = gtcm_err_compat((protocol_msg *)(c->mbf + 1), &myproto)))
 	{
 		gvcmy_close(c);

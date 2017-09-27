@@ -2,6 +2,9 @@
 ;								;
 ;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
+; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -1061,3 +1064,20 @@ OC_FNZSYSLOG:	pushab	val.0			; /* destination mval */
 		calls	#2,xfer.xf_fnzsyslog
 OC_ZRUPDATE:	irepab	val.2
 		calls	val.1,xfer.xf_zrupdate
+OC_FNREVERSEQUERY:	irepab	val.3
+		pushab	val.2
+		pushab	val.0
+		calls	val.1,xfer.xf_fnreversequery
+OC_GVREVERSEQUERY:	pushab	val.0
+		calls	#1,xfer.xf_gvreversequery
+OC_FNQ2:	irepab	val.3
+		pushab	val.2
+		pushab	val.0
+		calls	val.1,xfer.xf_fnq2
+OC_GVQ2:	pushab	val.1
+		pushab	val.0
+		calls	#2,xfer.xf_gvq2
+OC_INDQ2:	pushab	val.2
+		pushab	val.1
+		pushab	val.0
+		calls	#3,xfer.xf_indq2

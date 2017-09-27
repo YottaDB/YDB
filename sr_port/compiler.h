@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -148,8 +151,10 @@ typedef struct	tripletype
 				jmplist;	/* triples which jump to this one */
 	source_address		src;
 	int			rtaddr;		/* relative run time address of triple */
-	oprtype			operand[2],
-				destination;
+	oprtype			operand[2],	/* Note: operand[0] corresponds to val.1 in ttt.txt
+						 *	 operand[1] corresponds to val.2 in ttt.txt
+						 */
+				destination;	/* Note: corresponds to val.0 in ttt.txt */
 } triple;
 
 typedef struct
@@ -684,7 +689,8 @@ int		f_order1(oprtype *a, opctype op);
 int		f_piece(oprtype *a, opctype op);
 int		f_qlength(oprtype *a, opctype op);
 int		f_qsubscript(oprtype *a, opctype op);
-int		f_query (oprtype *a, opctype op);
+int		f_query(oprtype *a, opctype op);
+int		f_reversequery1(oprtype *a, opctype op);
 int		f_reverse(oprtype *a, opctype op);
 int		f_select(oprtype *a, opctype op);
 int		f_stack(oprtype *a, opctype op);

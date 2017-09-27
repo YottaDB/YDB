@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -248,6 +251,9 @@ static void gtcm_gnp_server_actions(void)
 				case CMMS_Q_QUERY:
 					reply = gtcmtr_query();
 					break;
+				case CMMS_Q_REVERSEQUERY:
+					reply = gtcmtr_reversequery();
+					break;
 				case CMMS_Q_ZWITHDRAW:
 					reply = gtcmtr_zwithdraw();
 					break;
@@ -263,14 +269,14 @@ static void gtcm_gnp_server_actions(void)
 				case CMMS_E_TERMINATE:
 					reply = gtcmtr_terminate(FALSE);
 					break;
-#ifdef notdef
+#				ifdef notdef
 				case CMMS_U_LKEDELETE:
 					reply = gtcmtr_lke_clearrep(curr_entry->clb_ptr, (clear_request *)curr_entry->clb_ptr->mbf);
 					break;
 				case CMMS_U_LKESHOW:
 					reply = gtcmtr_lke_showrep(curr_entry->clb_ptr, (show_request *)curr_entry->clb_ptr->mbf);
 					break;
-#endif
+#				endif
 				case CMMS_B_BUFRESIZE:
 					reply = CM_WRITE;
 					GET_USHORT(value, curr_entry->clb_ptr->mbf + 1);

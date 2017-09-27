@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -805,7 +808,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
 	if (handle_errors_internally)
 		REVERT;
-	TREF(expand_prev_key) = FALSE;	/* in case we did a "t_retry" in the middle of "gvcst_zprevious2" */
+	TREF(expand_prev_key) = FALSE; /* in case we did a "t_retry" in the middle of "gvcst_zprevious2" or "gvcst_reversequery2" */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: completed\n")));
 	return 0;
 }

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,9 @@ bool gvcmx_query(mval *val)
 	mval		temp;
 	struct CLB	*lnk;
 
+	/* Note: We do not initialize "val" in case the caller is "op_gvquery" as the latter does not use this currently.
+	 * It instead uses "gv_altkey" to derive the return value of the $query.
+	 */
 	gvcmz_doop(CMMS_Q_QUERY, CMMS_R_QUERY, &temp);
 	lnk = gv_cur_region->dyn.addr->cm_blk;
 	if (((link_info *)lnk->usr)->query_is_queryget)
