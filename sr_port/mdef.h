@@ -1771,7 +1771,7 @@ typedef struct gtm_num_range_struct
 /* Macro used intermittently in code to debug alias code in general. Uncomment the #define below to
  * enable the debugging.
  */
-#define DEBUG_ALIAS
+/* #define DEBUG_ALIAS */
 #ifdef DEBUG_ALIAS
 # define DBGALS(x) DBGFPF(x)
 # define DBGALS_ONLY(x) x

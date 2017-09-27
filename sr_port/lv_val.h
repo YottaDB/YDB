@@ -142,7 +142,7 @@
 	(lv_ptr)->ptrs.free_ent.next_free = *savflist_ptr;					\
 	*savflist_ptr = (lv_ptr);								\
 	LV_SYMVAL(lv_ptr) = NULL;								\
-	DBGALS_ONLY((lv_ptr)->lvmon_mark = FALSE);						\
+	DBGALS_ONLY((lv_ptr)->lvamon_mark = FALSE);						\
 }
 
 /* Increment the cycle for tstarts. Field is compared to same name field in lv_val to signify an lv_val has been seen
@@ -192,7 +192,7 @@
 /* Initialize given lv_val (should be of type "lv_val *" and not "lvTreeNode *") */
 #define LVVAL_INIT(lv, symvalarg)											\
 {															\
-	DBGALS_ONLY(GBLREF boolean_t lvmon_enabled;)									\
+	DBGALS_ONLY(GBLREF boolean_t lvamon_enabled;)									\
 	DBGALS_ONLY(GBLREF stack_frame *frame_pointer;)									\
 	assert(MV_SYM == symvalarg->ident); /* ensure above macro is never used to initialize a "lvTreeNode *" */	\
 	(lv)->v.mvtype = 0;												\
@@ -201,7 +201,7 @@
 	(lv)->stats.tstartcycle = 0;											\
 	(lv)->stats.lvtaskcycle = 0;											\
 	(lv)->has_aliascont = FALSE;											\
-	DBGALS_ONLY(if (lvmon_enabled) (lv)->lvmon_mark = TRUE; else (lv)->lvmon_mark = FALSE);				\
+	DBGALS_ONLY(if (lvamon_enabled) (lv)->lvamon_mark = TRUE; else (lv)->lvamon_mark = FALSE);			\
 	(lv)->tp_var = NULL;												\
 	LV_CHILD(lv) = NULL;												\
 	LV_SYMVAL(lv) = symvalarg;											\
@@ -294,7 +294,7 @@ typedef struct lv_val_struct
 #		endif
 	} stats;
 	boolean_t			has_aliascont;		/* This base var has or had an alias container in it */
-	boolean_t			lvmon_mark;		/* This lv_val is being monitored; Used only #ifdef DEBUG_ALIAS */
+	boolean_t			lvamon_mark;		/* This lv_val is being monitored; Used only #ifdef DEBUG_ALIAS */
 	struct tp_var_struct		*tp_var;
 } lv_val;
 

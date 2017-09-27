@@ -66,15 +66,15 @@ VIEWTAB("LABELS",		VTP_VALUE | VTP_NULL,		VTK_LABELS,		MV_NM),
 VIEWTAB("LINK",			VTP_VALUE | VTP_NULL,		VTK_LINK,		MV_STR),
 VIEWTAB("LOGNONTP",		VTP_VALUE | VTP_NULL,		VTK_LOGNONTP,		MV_NM),
 VIEWTAB("LOGTPRESTART",		VTP_VALUE | VTP_NULL,		VTK_LOGTPRESTART,	MV_NM),
+#ifdef DEBUG_ALIAS
+VIEWTAB("LVAMONOUT",		VTP_NULL,			VTK_LVAMONOUT,		MV_NM), /* nodoc : code debugging feature */
+VIEWTAB("LVAMONSTART",		VTP_NULL,			VTK_LVAMONSTART,	MV_NM), /* nodoc : code debugging feature */
+VIEWTAB("LVAMONSTOP",		VTP_NULL,			VTK_LVAMONSTOP,		MV_NM), /* nodoc : code debugging feature */
+#endif
 #ifdef DEBUG
 VIEWTAB("LVDMP",		VTP_LVN,			VTK_LVDMP,		MV_NM),
 #endif
 VIEWTAB("LVMON",		VTP_NULL | VTP_VALUE,		VTK_LVMON,		MV_STR),/* nodoc : code debugging feature */
-#ifdef DEBUG_ALIAS
-VIEWTAB("LVMONOUT",		VTP_NULL,			VTK_LVMONOUT,		MV_NM), /* nodoc : code debugging feature */
-VIEWTAB("LVMONSTART",		VTP_NULL,			VTK_LVMONSTART,		MV_NM), /* nodoc : code debugging feature */
-VIEWTAB("LVMONSTOP",		VTP_NULL,			VTK_LVMONSTOP,		MV_NM), /* nodoc : code debugging feature */
-#endif
 VIEWTAB("LVNULLSUBS",		VTP_NULL,			VTK_LVNULLSUBS,		MV_NM),
 VIEWTAB("LV_CREF",		VTP_LVN,			VTK_LVCREF,		MV_NM),
 VIEWTAB("LV_GCOL",		VTP_NULL,			VTK_LVGCOL,		MV_NM),

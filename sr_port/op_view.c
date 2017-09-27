@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -105,7 +108,7 @@ GBLREF	boolean_t		badchar_inhibit;
 GBLREF	int			gv_fillfactor;
 GBLREF	symval			*curr_symval;
 GBLREF	uint4			gtmDebugLevel;
-GBLREF	boolean_t		lvmon_enabled;
+GBLREF	boolean_t		lvamon_enabled;
 GBLREF	spdesc			stringpool;
 GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			process_id;
@@ -722,11 +725,11 @@ void	op_view(int numarg, mval *keyword, ...)
 			init_relink_allowed(&parmblk.value->str);
 			break;
 #		ifdef DEBUG_ALIAS
-		case VTK_LVMONOUT:
-			als_lvmon_output();
+		case VTK_LVAMONOUT:
+			als_lvamon_output();
 			break;
-		case VTK_LVMONSTART:
-			lvmon_enabled = TRUE;	/* Enable lv_val monitoring */
+		case VTK_LVAMONSTART:
+			lvamon_enabled = TRUE;	/* Enable lv_val monitoring */
 			/* Clear any existing marks on all lv_vals */
 			for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
 			{
@@ -736,14 +739,14 @@ void	op_view(int numarg, mval *keyword, ...)
 							lvp < lvp_top; lvp++)
 					{
 						assert(LV_IS_BASE_VAR(lv));
-						lvp->lvmon_mark = FALSE;
+						lvp->lvamon_mark = FALSE;
 					}
 				}
 			}
 			break;
-		case VTK_LVMONSTOP:
-			als_lvmon_output();
-			lvmon_enabled = FALSE;
+		case VTK_LVAMONSTOP:
+			als_lvamon_output();
+			lvamon_enabled = FALSE;
 			break;
 #		endif
 #		ifdef DEBUG

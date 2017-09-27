@@ -891,7 +891,7 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 							 * that is going to be destroyed.
 							 */
 #ifdef DEBUG_ALIAS
-GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
+GBLDEF	boolean_t	lvamon_enabled;			/* Enable lv_val/alias monitoring */
 #endif
 GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
 GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */

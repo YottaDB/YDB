@@ -1202,7 +1202,7 @@ int als_lvval_gc(void)
  * when necessary. Other tests check for memory leaks so if they find one, this monitoring can be used to discover the
  * source so this is not needed for test coverage.
  */
-void als_lvmon_output(void)
+void als_lvamon_output(void)
 {
 	symval		*lvlsymtab;
 	lv_blk		*lvbp;
@@ -1212,9 +1212,9 @@ void als_lvmon_output(void)
 	for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
 		for (lvbp = curr_symval->lv_first_block; lvbp; lvbp = lvbp->next)
 			for (lvp = (lv_val *)LV_BLK_GET_BASE(lvbp), lvp_top = LV_BLK_GET_FREE(lvbp, lvp); lvp < lvp_top; lvp++)
-				if (lvp->lvmon_mark)
+				if (lvp->lvamon_mark)
 				{	/* lv_val slot not used as an sbs and is marked. Report it */
-					FPRINTF(stderr, "als_lvmon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
+					FPRINTF(stderr, "als_lvamon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
 				}
 	FFLUSH(stderr);
 }
