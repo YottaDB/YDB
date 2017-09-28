@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,9 +51,7 @@
 #include "gvnh_spanreg.h"
 #include "targ_alloc.h"
 #include "change_reg.h"
-#ifdef UNIX
-# include "gtmlink.h"
-#endif
+#include "gtmlink.h"
 #include "gtm_ctype.h"		/* for ISDIGIT_ASCII macro */
 #include "gvn2gds.h"
 #include "io.h"
@@ -81,8 +82,9 @@ GBLREF int4		gtm_max_sockets;
 GBLREF gv_key		*gv_currkey;
 GBLREF boolean_t	is_gtm_chset_utf8;
 GBLREF jnlpool_addrs	jnlpool;
-GBLREF	uint4		process_id;
-UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
+GBLREF uint4		process_id;
+GBLREF boolean_t	dmterm_default;
+GBLREF int4		gtm_trigger_depth; 
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -94,15 +96,21 @@ LITREF	mstr		relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 
-#define		MM_RES			"MM"
-#define		BG_RES			"BG"
-#define		CM_RES			"CM"
-#define		USR_RES			"USR"
-#define		GTM_BOOL_RES		"GT.M Boolean short-circuit"
-#define		STD_BOOL_RES		"Standard Boolean evaluation side effects"
-#define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
-#define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
-#define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
+/* Define possible return values for "ENVIRONMENT" */
+#define	ENV_MUMPS		"MUMPS"
+#define ENV_CALLIN		"CALLIN"
+#define ENV_MUPIP		"MUPIP"
+#define ENV_TRIGGER		"TRIGGER"
+
+#define	MM_RES			"MM"
+#define	BG_RES			"BG"
+#define	CM_RES			"CM"
+#define	USR_RES			"USR"
+#define	GTM_BOOL_RES		"GT.M Boolean short-circuit"
+#define	STD_BOOL_RES		"Standard Boolean evaluation side effects"
+#define	WRN_BOOL_RES		"Standard Boolean with side-effect warning"
+#define	STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
+#define	STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
 
 #define STATS_PUT_PARM(TXT, CNTR, BASE)					\
 {									\
@@ -114,9 +122,8 @@ LITREF	mval		literal_one;
 	assert(stringpool.free <= stringpool.top);			\
 }
 
-void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
+void	op_fnview(int numarg, mval *dst, ...)
 {
-	VMS_ONLY(int	numarg;)
 	boolean_t	save_transform;
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	unsigned char	*key;
@@ -128,7 +135,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
-	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
 	lv_val		*lv;
 	gd_gblname	*gname;
 	mstr		tmpstr, commastr, *gblnamestr;
@@ -144,7 +151,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VMS_ONLY(va_count(numarg));
 	assertpro(2 <= numarg);
 	VAR_START(var, dst);
 	keyword = va_arg(var, mval *);
@@ -424,7 +430,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
 					rel_crit(reg);
 				dst->str.len = 0;
-#				ifdef UNIX
 				ENSURE_STP_FREE_SPACE(n_probecrit_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize csa->proberit_rec.p_crit_success field from cnl->gvstats_rec */
@@ -435,7 +440,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				assert(stringpool.free < stringpool.top);
 				/* subtract one to remove extra trailing comma delimiter */
 				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);
-#				endif
 			}
 			break;
 		case VTK_REGION:
@@ -732,7 +736,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_LOGNONTP:
 			n = TREF(nontprestart_log_delta);
 			break;
-#		ifdef UNIX
 		case VTK_JNLERROR:
 			n = TREF(error_on_jnl_file_lost);
 			break;
@@ -744,9 +747,45 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_DMTERM:
 			n = dmterm_default;
 			break;
-#		endif
 		case VTK_STATSHARE:
 			n = TREF(statshare_opted_in) ? TRUE : FALSE;
+			break;
+		case VTK_ENVIRONMENT:
+			trigdepth = gtm_trigger_depth;
+			cidepth = TREF(gtmci_nested_level);
+			dst->mvtype = vtp->restype;
+			if (IS_MUMPS_IMAGE)
+			{	/* Running MUMPS image */
+				tmpstr.addr = ENV_MUMPS;
+				tmpstr.len = sizeof(ENV_MUMPS) - 1;
+				s2pool(&tmpstr);
+				dst->str = tmpstr;
+			} else if (IS_MUPIP_IMAGE)
+			{	/* Running in a MUPIP image */
+				tmpstr.addr = ENV_MUPIP;
+				tmpstr.len = sizeof(ENV_MUPIP) - 1;
+				s2pool(&tmpstr);
+				dst->str = tmpstr;
+			} else
+				assertpro(FALSE);
+			if (0 < trigdepth)
+			{	/* Operating in a trigger environment */
+				tmpstr.addr = ENV_TRIGGER;
+				tmpstr.len = sizeof(ENV_TRIGGER) - 1;
+				commastr.len = 1;
+				commastr.addr = ",";
+				s2pool_concat(dst, &commastr);
+				s2pool_concat(dst, &tmpstr);
+			}
+			if (0 < cidepth)
+			{	/* Operating in a CALL-IN */
+				tmpstr.addr = ENV_CALLIN;
+				tmpstr.len = sizeof(ENV_CALLIN) - 1;
+				commastr.len = 1;
+				commastr.addr = ",";
+				s2pool_concat(dst, &commastr);
+				s2pool_concat(dst, &tmpstr);
+			}
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,10 +53,8 @@
 # include "gt_timer.h"
 # include "wbox_test_init.h"
 #endif
-#ifdef DEBUG
-# include "gtmio.h"
-# include "gtm_stdio.h"
-#endif
+#include "gtmio.h"
+#include "gtm_stdio.h"
 
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop;
@@ -422,8 +423,8 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		assert(OFFSETOF(lv_val, v) + SIZEOF(curr_lv->v) == OFFSETOF(lv_val, ptrs));
 		assert(OFFSETOF(lv_val, ptrs) + SIZEOF(curr_lv->ptrs) == OFFSETOF(lv_val, stats));
 		assert(OFFSETOF(lv_val, stats) + SIZEOF(curr_lv->stats) == OFFSETOF(lv_val, has_aliascont));
-		assert(OFFSETOF(lv_val, has_aliascont) + SIZEOF(curr_lv->has_aliascont) == OFFSETOF(lv_val, lvmon_mark));
-		assert(OFFSETOF(lv_val, lvmon_mark) + SIZEOF(curr_lv->lvmon_mark) == OFFSETOF(lv_val, tp_var));
+		assert(OFFSETOF(lv_val, has_aliascont) + SIZEOF(curr_lv->has_aliascont) == OFFSETOF(lv_val, lvamon_mark));
+		assert(OFFSETOF(lv_val, lvamon_mark) + SIZEOF(curr_lv->lvamon_mark) == OFFSETOF(lv_val, tp_var));
 		assert(OFFSETOF(lv_val, tp_var) + SIZEOF(curr_lv->tp_var) == SIZEOF(lv_val));
 		/* save_lv -> curr_lv Copy begin */
 		curr_lv->v = save_lv->v;
@@ -432,7 +433,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		assert(0 < curr_lv->stats.crefcnt);
 		assert(8 == (OFFSETOF(lv_val, tp_var) - OFFSETOF(lv_val, has_aliascont)));
 		curr_lv->has_aliascont = save_lv->has_aliascont;
-		DBGALS_ONLY(curr_lv->lvmon_mark = save_lv->lvmon_mark);
+		DBGALS_ONLY(curr_lv->lvamon_mark = save_lv->lvamon_mark);
 		assert(save_lv->tp_var == curr_lv->tp_var);	/* no need to copy this field */
 		/* save_lv -> curr_lv Copy done */
 		/* Some fixup may need to be done if the variable was cloned (and thus moved around) */
@@ -458,7 +459,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		assert(NULL == save_lv->ptrs.val_ent.children);
 		/* No need to copy "save_lv->stats" as "curr_lv->stats" is more uptodate */
 		assert(save_lv->has_aliascont == curr_lv->has_aliascont);	/* No need to copy this field */
-		assert(save_lv->lvmon_mark == curr_lv->lvmon_mark);		/* No need to copy this field */
+		assert(save_lv->lvamon_mark == curr_lv->lvamon_mark);		/* No need to copy this field */
 		assert(save_lv->tp_var == curr_lv->tp_var);			/* No need to copy this field */
 	}
 	if (clearTStartCycle)

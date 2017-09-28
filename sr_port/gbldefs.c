@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -392,8 +395,6 @@ GBLDEF	fd_set			mutex_wait_on_descs;
 #endif
 GBLDEF	void			(*call_on_signal)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
-
-GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr;
@@ -890,7 +891,7 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 							 * that is going to be destroyed.
 							 */
 #ifdef DEBUG_ALIAS
-GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
+GBLDEF	boolean_t	lvamon_enabled;			/* Enable lv_val/alias monitoring */
 #endif
 GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
 GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */

@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -900,8 +903,11 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
 	 */
 #	ifdef DEBUG
-	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
+	{
+		fp = SKIP_BASE_FRAME(fp);
 		assert(fp->rvector != rtnhdr);
+	}
 #	endif
 	/* Locate the routine in the routine table while all the pieces are available. Then remove from routine table
 	 * after the routine is unlinked.

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,8 +21,10 @@
 #include "gtmimagename.h"
 #include "send_msg.h"
 #include "getzposition.h"
-
 #include "op.h"
+#include "invocation_mode.h"
+
+GBLREF	int		mumps_status;
 
 LITREF	gtmImageName	gtmImageNames[];
 
@@ -42,5 +47,12 @@ void op_halt(void)
 			 0, zposition.str.len, zposition.str.addr);
 	}
 #	endif
+	if (MUMPS_CALLIN & invocation_mode)
+	{	/* Need to return to caller - not halt (halting out of this call-in level) */
+		mumps_status = 0;
+		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
+		assertpro(FALSE);		/* Should not return */
+		return;				/* Previous call does not return so this is for the compiler */
+	}
 	EXIT(EXIT_SUCCESS);
 }

@@ -3,6 +3,9 @@
  * Copyright (c) 2009, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -290,10 +293,9 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 			}
 		}
 		fpprev = fp;
-		fp = fp->old_frame_pointer;
 		if (done)
 			break;
-		if (SFF_CI & fpprev->flags)
+		if (SFT_CI & fp->type)
 		{	/* Callins needs to be able to crawl past apparent end of stack to earlier stack segments.
 			 * We should be in the base frame now. See if an earlier frame exists.
 			 * Note we don't worry about trigger base frames here because triggers *always* have a
@@ -302,7 +304,8 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 			fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
 			if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
 				break;	/* Pointer not within the stack -- must be earliest occurence */
-		}
+		} else
+			fp = fp->old_frame_pointer;
 	} while(fp);
 	/* Next, check the mv_stents for the stackframes we processed. Certain mv_stents also have hash
 	 * table references in them that need repair.
@@ -1199,7 +1202,7 @@ int als_lvval_gc(void)
  * when necessary. Other tests check for memory leaks so if they find one, this monitoring can be used to discover the
  * source so this is not needed for test coverage.
  */
-void als_lvmon_output(void)
+void als_lvamon_output(void)
 {
 	symval		*lvlsymtab;
 	lv_blk		*lvbp;
@@ -1209,9 +1212,9 @@ void als_lvmon_output(void)
 	for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
 		for (lvbp = curr_symval->lv_first_block; lvbp; lvbp = lvbp->next)
 			for (lvp = (lv_val *)LV_BLK_GET_BASE(lvbp), lvp_top = LV_BLK_GET_FREE(lvbp, lvp); lvp < lvp_top; lvp++)
-				if (lvp->lvmon_mark)
+				if (lvp->lvamon_mark)
 				{	/* lv_val slot not used as an sbs and is marked. Report it */
-					FPRINTF(stderr, "als_lvmon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
+					FPRINTF(stderr, "als_lvamon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
 				}
 	FFLUSH(stderr);
 }

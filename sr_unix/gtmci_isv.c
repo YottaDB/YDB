@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2009 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,12 +37,12 @@ void gtmci_isv_save(void)
 {
 	gtm_savetraps();	/* Save either etrap or ztrap as appropriate */
 	op_newintrinsic(SV_ESTACK);
-
-	/* Save $ECODE/$STACK values of previous environment into SFF_CI frame of
+	/* Save $ECODE/$STACK values of previous environment into SFT_CI frame of
 	 * the current call-in environment. When this frame unwinds, their old values
 	 * will be restored in dollar_ecode_ci and dollar_stack_ci (see unwind logic
-	 * in ci_ret_code_quit) */
-	assert(frame_pointer->flags & SFF_CI);
+	 * in ci_ret_code_quit).
+	 */
+	assert(frame_pointer->type & SFT_CI);
 	dollar_ecode_addr = &dollar_ecode_ci;
 	push_stck(&dollar_ecode, SIZEOF(dollar_ecode), (void**)&dollar_ecode_addr, MVST_STCK);
 	dollar_stack_addr = &dollar_stack_ci;
@@ -48,8 +52,9 @@ void gtmci_isv_save(void)
 
 void gtmci_isv_restore(void)
 {
-	/* free the allocated $ECODE/$STACK storage before exiting from the current
-	 * call-in environment. NOTE: any changes here should be reflected in ecode_init() */
+	/* Free the allocated $ECODE/$STACK storage before exiting from the current
+	 * call-in environment. NOTE: any changes here should be reflected in ecode_init()
+	 */
 	if (dollar_ecode.begin)
 		free(dollar_ecode.begin);
 	if (dollar_ecode.array)

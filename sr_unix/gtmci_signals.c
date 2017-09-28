@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2009 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,8 +92,7 @@ void 	gtmci_exit_handler(void)
 	static boolean_t 	handler_active = FALSE;
 	struct sigaction 	*act, ignore;
 
-	if ((0 >= exi_condition && NSIG < exi_condition) || !(MUMPS_CALLIN & invocation_mode) ||
-			!(MUMPS_GTMCI & invocation_mode) || handler_active)
+	if ((0 >= exi_condition && NSIG < exi_condition) || !(MUMPS_CALLIN & invocation_mode) || handler_active)
 		return;
 	handler_active = TRUE;
 	sig_switch_ext();

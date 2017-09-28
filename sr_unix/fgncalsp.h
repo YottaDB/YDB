@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2013 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,9 +147,8 @@ typedef struct callin_entry_list
 /* parameter block that ci_restart uses to pass arguments to M routine */
 typedef struct parmblk_struct
 {
-	void	(*ci_rtn)(void);
+	void    *retaddr;
 	int4    argcnt;
-	void    *rtnaddr, *labaddr, *retaddr;
 	int4    mask;
 	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;
