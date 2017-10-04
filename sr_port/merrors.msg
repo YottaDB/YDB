@@ -1635,7 +1635,7 @@ RESYNCSEQLOW	<MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested
 DBNULCOL	<NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD>/error/fao=6!/ansi=0
 UTF16ENDIAN	<The device previously set UTF-16 endianness to !AD and cannot change to !AD>/error/fao=4!/ansi=0
 OFRZACTIVE	<Region !AD has an Online Freeze>/warning/fao=2!/ansi=0
-OFRZAUTOREL	<Online Freeze automatically released for region !AD>/warning/fao=2!/ansi=0
+OFRZAUTOREL	<Online Freeze automatically released for database file !AD>/warning/fao=2!/ansi=0
 OFRZCRITREL	<Proceeding with a write to region !AD after Online Freeze while holding crit>/warning/fao=2!/ansi=0
 OFRZCRITSTUCK	<Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=2!/ansi=0
 OFRZNOTHELD	<Online Freeze had been automatically released for at least one region>/warning/fao=0!/ansi=0
