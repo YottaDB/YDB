@@ -57,7 +57,29 @@ else()
   # independent. So don't add -fPIC
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
 endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wuninitialized -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign")
+# Add flags for warnings that we want and don't want.
+# First enable Wall. That will include a lot of warnings. In them, disable a few. Below is a comment from sr_linux/gtm_env_sp.csh
+# on why these warnings specifically are disabled.
+#	The following warnings would be desirable, but together can result in megabytes of warning messages. We
+#	should look into how hard they would be to clean up. It is possible that some header changes could
+#	reduce a large number of these.
+#		set desired_warnings = ( $desired_warnings -Wconversion -Wsign-compare )
+#	We should also look into how hard these would be to restore. Some of the warnings come from generated
+#	code and macro use, making them harder to deal with.
+# Note: -Wimplicit not explicitly mentioned since it is enabled by Wall
+# Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+
+# Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
+#	-fno-defer-pop to prevent problems with assembly/generated code with optimization
+#	-fno-strict-aliasing since we don't comply with the rules
+#	-ffloat-store for consistent results avoiding rounding differences
+#	-fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
+# All these are needed only in case of pro builds (if compiler optimization if turned on).
+# But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
