@@ -254,7 +254,7 @@ if ( $?gtm_version_change == "1" ) then
  	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
  	# of libc routines from libpthread.
         setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
-	if ( ( 32 == $gt_build_type ) && ( "armv7l" != $platform_only) ) then
+	if ( ( 32 == $gt_build_type ) && ( "armv7l" != $mach_type ) ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"
 	endif
