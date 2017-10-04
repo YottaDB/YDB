@@ -146,6 +146,7 @@ if ( $?gtm_version_change == "1" ) then
 	endif
 
 	if ( "armv7l" == $mach_type ) then
+		setenv	gt_ld_m_shl_linker	"cc"
 		setenv  gt_ld_m_shl_options     "-shared"
 		setenv  gt_cc_options_common    "$gt_cc_options_common -D__armv7l__ -marm -march=armv7-a -mfpu=neon "
 		setenv  gt_cc_options_common    "$gt_cc_options_common -mabi=aapcs-linux -mthumb-interwork -mfloat-abi=hard "
