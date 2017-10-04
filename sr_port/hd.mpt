@@ -14,7 +14,7 @@
 %HD	;GT.M %HD utility - hexadecimal to decimal conversion program
 	;invoke at INT with %HD in hexadecimal to return %HD in decimal
 	;invoke at FUNC as an extrinsic function
-	;Note: works even if input hex number contains 0x or 0X prefix
+	;Note: Ignores any prefix of 0x or 0X
 	;if you make heavy use of this routine, consider $ZCALL
 	;
 	s %HD=$$FUNC(%HD)
