@@ -1812,7 +1812,7 @@ MBSTART {														\
 			(CSD)->freeze = FALSE;										\
 			(CSD)->image_count = 0;										\
 			(CSD)->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
-			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_OFRZAUTOREL, 2, REG_LEN_STR((CSA)->region),		\
+			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_OFRZAUTOREL, 2, DB_LEN_STR((CSA)->region),		\
 					ERR_ERRCALL, 3, CALLFROM);							\
 		}													\
 		if (!was_latch)												\

@@ -1467,7 +1467,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBNULCOL", "NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD", 6 },
 	{ "UTF16ENDIAN", "The device previously set UTF-16 endianness to !AD and cannot change to !AD", 4 },
 	{ "OFRZACTIVE", "Region !AD has an Online Freeze", 2 },
-	{ "OFRZAUTOREL", "Online Freeze automatically released for region !AD", 2 },
+	{ "OFRZAUTOREL", "Online Freeze automatically released for database file !AD", 2 },
 	{ "OFRZCRITREL", "Proceeding with a write to region !AD after Online Freeze while holding crit", 2 },
 	{ "OFRZCRITSTUCK", "Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.", 2 },
 	{ "OFRZNOTHELD", "Online Freeze had been automatically released for at least one region", 0 },
