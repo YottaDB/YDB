@@ -57,7 +57,7 @@ else()
   # independent. So don't add -fPIC
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
 endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wuninitialized -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
