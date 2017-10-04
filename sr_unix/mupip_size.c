@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,7 +55,6 @@ error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSIZEINVARG);
 error_def(ERR_NOSELECT);
 
-GBLREF block_id			mu_int_adj_prev[MAX_BT_DEPTH + 1];
 GBLREF bool			error_mupip;
 GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			mu_ctrly_occurred;
@@ -92,8 +94,6 @@ void mupip_size(void)
 	SETUP_THREADGBL_ACCESS;
 	mu_outofband_setup();
 	error_mupip = FALSE;
-	memset(mu_int_adj, 0, ARRAYSIZE(mu_int_adj));
-	memset(mu_int_adj_prev, 0, ARRAYSIZE(mu_int_adj_prev));
 	/* Region qualifier */
 	grlist = NULL;
 	if (CLI_PRESENT == cli_present("REGION"))
