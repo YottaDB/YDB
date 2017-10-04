@@ -24,6 +24,8 @@
 #include "fnorder.h"
 #include "advancewindow.h"
 #include "glvn_pool.h"
+#include "mvalconv.h"
+#include "show_source_line.h"
 
 GBLREF	boolean_t	run_time;
 GBLREF	int		source_column;

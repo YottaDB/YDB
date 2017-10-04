@@ -20,6 +20,7 @@
 
 #include "lv_val.h"
 #include "mvalconv.h"
+#include "op.h"
 
 error_def(ERR_QUERY2);
 
