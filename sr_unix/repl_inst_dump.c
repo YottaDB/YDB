@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -141,7 +144,7 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	assert(dstlen <= 3);
 	util_out_print( PREFIX_FILEHDR "Minor Version                                      !R3AD", TRUE, dstlen, dststr);
 
-	/* Assert that the endianness of the instance file matches the endianness of the GT.M version
+	/* Assert that the endianness of the instance file matches the endianness of the YottaDB version
 	 * as otherwise we would have errored out long before reaching here.
 	 */
 #	ifdef BIGENDIAN
@@ -570,7 +573,7 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	}
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, now_running[0]), SIZEOF(jnlpool_ctl->jnlpool_id.now_running));
-	util_out_print( PREFIX_JNLPOOLCTL "GT.M Version            !R30AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
+	util_out_print( PREFIX_JNLPOOLCTL "YottaDB Version         !R30AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, instfilename[0]), SIZEOF(jnlpool_ctl->jnlpool_id.instfilename));
 	if (22 >= strlen(jnlpool_ctl->jnlpool_id.instfilename))
