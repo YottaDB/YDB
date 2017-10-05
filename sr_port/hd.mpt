@@ -1,9 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright 1987,2001 Sanchez Computer Associates, Inc.		;
-;								;
-; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
-; All rights reserved.						;
+;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright (c) 2017 YottaDB LLC and/or its subsidiaries	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,19 +12,16 @@
 %HD	;GT.M %HD utility - hexadecimal to decimal conversion program
 	;invoke at INT with %HD in hexadecimal to return %HD in decimal
 	;invoke at FUNC as an extrinsic function
-	;Note: Ignores any prefix of 0x or 0X
-	;if you make heavy use of this routine, consider $ZCALL
+	;if you make heavy use of this routine, consider an external call.
 	;
 	s %HD=$$FUNC(%HD)
 	q
-INT	r !,"Hexidecimal: ",%HD s %HD=$$FUNC(%HD)
+INT	r !,"Hexadecimal: ",%HD s %HD=$$FUNC(%HD)
 	q
 FUNC(h)
-	n prefix
-	set prefix=$zextract(h,1,2)
-	set:(("0X"=prefix)!("0x"=prefix)) h=($zextract(h,3,99))
-	q:$tr(h,"E","e")<0 ""
-	n c,d,dg
-	s d=0,h=$tr(h,"abcdef","ABCDEF")
-	f c=1:1:$l(h) s dg=$f("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
+	q:"-"=$ze(h,1) ""
+	n d,i,p,x,y
+	s d=$ze(h,1,2) s:"0x"=d!("0X"=d) h=$ze(h,3,$zlength(h))
+	s y=$ztr(h,"0123456789ABCDEFabcdef"_$zch(0)_$zch(1)_$zch(2)_$zch(3)_$zch(4)_$zch(5)_$zch(6)_$zch(7)_$zch(8)_$zch(9)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15),$zch(0)_$zch(1)_$zch(2)_$zch(3)_$zch(4)_$zch(5)_$zch(6)_$zch(7)_$zch(8)_$zch(9)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15))
+	s d=0,p=1/16 f i=$zl(y):-1:1 s x=$za($ze(y,i)) s p=p*16,d=p*x+d s:15<x d=0,p=1/16
 	q d
