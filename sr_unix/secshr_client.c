@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -71,8 +74,8 @@ GBLREF ipcs_mesg		db_ipcs;
 GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF boolean_t		gtm_dist_ok_to_use;
 
-LITREF char			gtm_release_name[];
-LITREF int4			gtm_release_name_len;
+LITREF char			ydb_release_name[];
+LITREF int4			ydb_release_name_len;
 LITREF gtmImageName		gtmImageNames[];
 
 static int			secshr_sem;
@@ -196,9 +199,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	/* Create communication key (hash of release name) if it has not already been done */
 	if (0 == TREF(gtmsecshr_comkey))
-	{
-		STR_HASH((char *)gtm_release_name, gtm_release_name_len, TREF(gtmsecshr_comkey), 0);
-	}
+		STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
 	timer_id = (TID)send_mesg2gtmsecshr;
 	if (!gtmsecshr_file_check_done)
 	{

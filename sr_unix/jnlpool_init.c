@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,8 +88,8 @@ GBLREF	gd_addr					*gd_header;
 GBLREF	uint4	is_updhelper;
 #endif
 
-LITREF	char			gtm_release_name[];
-LITREF	int4			gtm_release_name_len;
+LITREF	char			ydb_release_name[];
+LITREF	int4			ydb_release_name_len;
 
 error_def(ERR_ACTIVATEFAIL);
 error_def(ERR_JNLPOOLBADSLOT);
@@ -949,7 +952,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		memcpy(jnlpool_ctl->jnlpool_id.instfilename, seg->fname, seg->fname_len);
 		jnlpool_ctl->jnlpool_id.instfilename[seg->fname_len] = '\0';
 		memcpy(jnlpool_ctl->jnlpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ);
-		memcpy(jnlpool_ctl->jnlpool_id.now_running, gtm_release_name, gtm_release_name_len + 1);
+		memcpy(jnlpool_ctl->jnlpool_id.now_running, ydb_release_name, ydb_release_name_len + 1);
 		assert(0 == (offsetof(jnlpool_ctl_struct, start_jnl_seqno) % 8));
 					/* ensure that start_jnl_seqno starts at an 8 byte boundary */
 		assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -106,8 +109,8 @@ GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t		gtm_dist_ok_to_use;
 
-LITREF	char			gtm_release_name[];
-LITREF	int4			gtm_release_name_len;
+LITREF	char			ydb_release_name[];
+LITREF	int4			ydb_release_name_len;
 
 static	volatile int		gtmsecshr_timer_popped;
 static	int			gtmsecshr_socket_dir_len;
@@ -519,10 +522,10 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Create communication key used in all gtmsecshr messages. Key's purpose is to eliminate cross-version
 	 * communication issues.
 	 */
-	STR_HASH((char *)gtm_release_name, gtm_release_name_len, TREF(gtmsecshr_comkey), 0);
+	STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
 	/* Initialization complete */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRDMNSTARTED, 5,
-		gtmsecshr_key, gtm_release_name_len, gtm_release_name, *rundir_len, *rundir);
+		gtmsecshr_key, ydb_release_name_len, ydb_release_name, *rundir_len, *rundir);
 	return;
 }
 

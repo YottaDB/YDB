@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -141,8 +144,8 @@ void list_cmd(void)
 }
 
 
-LITREF char gtm_release_name[];
-LITREF int4 gtm_release_name_len;
+LITREF char ydb_release_name[];
+LITREF int4 ydb_release_name_len;
 
 GBLREF char source_file_name[];
 GBLREF unsigned short source_name_len;
@@ -159,8 +162,8 @@ void list_head(bool newpage)
 		op_wtff();
 
 	head.mvtype = MV_STR;
-	head.str.addr = (char *)&gtm_release_name[0];
-	head.str.len = gtm_release_name_len;
+	head.str.addr = (char *)&ydb_release_name[0];
+	head.str.len = ydb_release_name_len;
 	op_write (&head);
 
 	op_wttab(col_2);

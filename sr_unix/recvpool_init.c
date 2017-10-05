@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -58,8 +61,8 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 
-LITREF	char			gtm_release_name[];
-LITREF	int4			gtm_release_name_len;
+LITREF	char			ydb_release_name[];
+LITREF	int4			ydb_release_name_len;
 
 error_def(ERR_NORECVPOOL);
 error_def(ERR_RECVPOOLSETUP);
@@ -344,7 +347,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		recvpool.recvpool_ctl->wrapped = FALSE;
 		memcpy( (char *)recvpool.recvpool_ctl->recvpool_id.instfilename, instfilename, full_len);
 		memcpy(recvpool.recvpool_ctl->recvpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ);
-		memcpy(recvpool.recvpool_ctl->recvpool_id.now_running, gtm_release_name, gtm_release_name_len + 1);
+		memcpy(recvpool.recvpool_ctl->recvpool_id.now_running, ydb_release_name, ydb_release_name_len + 1);
 		assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));
 					/* ensure that the pool identifier is at the top of the pool */
 		recvpool.recvpool_ctl->recvpool_id.pool_type = RECVPOOL_SEGMENT;

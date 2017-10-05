@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -527,7 +530,7 @@ typedef struct node_local_struct
 {
 	unsigned char   label[GDS_LABEL_SZ];			/* 12	signature for GDS shared memory */
 	unsigned char	fname[MAX_FN_LEN + 1];			/* 256	filename of corresponding database */
-	char		now_running[MAX_REL_NAME];		/* 36	current active GT.M version stamp */
+	char		now_running[MAX_REL_NAME];		/* 36	current active YottaDB version stamp */
 	char		machine_name[MAX_MCNAMELEN];		/* 256	machine name for clustering */
 	sm_off_t	bt_header_off;				/* (QW alignment) offset to hash table */
 	sm_off_t	bt_base_off;				/* bt first entry */

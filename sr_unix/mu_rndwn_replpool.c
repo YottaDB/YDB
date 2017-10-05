@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -68,8 +71,8 @@ GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	uint4			process_id;
 
-LITREF char             	gtm_release_name[];
-LITREF int4             	gtm_release_name_len;
+LITREF char             	ydb_release_name[];
+LITREF int4             	ydb_release_name_len;
 
 error_def(ERR_REPLACCSEM);
 error_def(ERR_REPLINSTOPEN);
@@ -117,10 +120,10 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 		DETACH(start_addr, shm_id, instfilename);
 		return -1;
 	}
-	if (memcmp(replpool_id->now_running, gtm_release_name, gtm_release_name_len + 1))
+	if (memcmp(replpool_id->now_running, ydb_release_name, ydb_release_name_len + 1))
 	{
 		util_out_print("Attempt to access with version !AD, while already using !AD for replpool segment (id = !UL)"
-				" belonging to replication instance !AD.", TRUE, gtm_release_name_len, gtm_release_name,
+				" belonging to replication instance !AD.", TRUE, ydb_release_name_len, ydb_release_name,
 				LEN_AND_STR(replpool_id->now_running), shm_id, LEN_AND_STR(instfilename));
 		DETACH(start_addr, shm_id, instfilename);
 		return -1;
