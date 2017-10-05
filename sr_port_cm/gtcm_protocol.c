@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +49,7 @@ LITDEF	gtcm_proto_os_info_t	gtcm_proto_os_info[] =
 	{LIT_AND_LEN(GTCM_PROTO_BAD_OS),	GTCM_PROTO_BAD_OS}
 };
 
-LITREF	char		gtm_release_name[];
-LITREF	int4		gtm_release_name_len;
+LITREF	char		ydb_release_name[];
 LITREF	char		gtm_version[];
 LITREF	char 		cm_ver_name[];
 LITREF	int4		cm_ver_len;
@@ -107,7 +109,7 @@ static char *encode_cpu()
 	int		count, cpuidx;
 
 	count = 0;
-	p = (unsigned char *)gtm_release_name;
+	p = (unsigned char *)ydb_release_name;
 	/* fourth arg in release name string */
 	while (*p && count < 3)
 	{
@@ -134,7 +136,7 @@ static char *encode_os()
 	int		count, osidx;
 
 	count = 0;
-	p = (unsigned char *)gtm_release_name;
+	p = (unsigned char *)ydb_release_name;
 	/* third arg in release name string */
 	while (*p && count < 2)
 	{

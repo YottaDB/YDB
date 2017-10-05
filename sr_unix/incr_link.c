@@ -120,9 +120,6 @@ GBLDEF int		total_length;
 GBLDEF int		text_counter;
 #endif
 
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
-
 typedef struct	res_list_struct
 {
 	struct res_list_struct	*next,

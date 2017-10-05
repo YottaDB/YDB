@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -143,8 +146,6 @@ GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	uint4			process_id;
-LITREF char			gtm_release_name[];
-LITREF int4			gtm_release_name_len;
 LITREF mval			literal_statsDB_gblname;
 
 #define MAX_DBINIT_RETRY	3

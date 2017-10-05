@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,8 +106,8 @@ static boolean_t	sem_created;
 static boolean_t	no_shm_exists;
 static boolean_t	shm_status_confirmed;
 
-LITREF char             gtm_release_name[];
-LITREF int4             gtm_release_name_len;
+LITREF char             ydb_release_name[];
+LITREF int4             ydb_release_name_len;
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILERR);
@@ -942,9 +945,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	SEG_SHMATTACH(0, reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 	assert(csa == cs_addrs);
 	csa->nl = cnl = (node_local_ptr_t)csa->db_addrs[0];
-	/* The following checks for GDS_LABEL_GENERIC, gtm_release_name, and cnl->glob_sec_init ensure that the
+	/* The following checks for GDS_LABEL_GENERIC, ydb_release_name, and cnl->glob_sec_init ensure that the
 	 * shared memory under consideration is valid.  First, since cnl->label is in the same place for every
-	 * version, a failing check means it is most likely NOT a GT.M created shared memory, so no attempt will be
+	 * version, a failing check means it is most likely NOT a YottaDB created shared memory, so no attempt will be
 	 * made to delete it. Next a successful match of the currently running release will guarantee that all fields in
 	 * the structure are where they're expected to be -- without this check the glob_sec_init check should not be done
 	 * as this field is at different offsets in different versions. Finally, we can check the glob_sec_init flag to
@@ -961,10 +964,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		is_gtm_shm = TRUE;
 		remove_shmid = TRUE;
 		memcpy(now_running, cnl->now_running, MAX_REL_NAME);
-		if (memcmp(now_running, gtm_release_name, gtm_release_name_len + 1))
+		if (memcmp(now_running, ydb_release_name, ydb_release_name_len + 1))
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
-				   gtm_release_name, LEN_AND_STR(now_running));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), ydb_release_name_len,
+				   ydb_release_name, LEN_AND_STR(now_running));
 			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 			return FALSE;
 		}

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -102,8 +105,8 @@ GBLREF	int			process_exiting;
 GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 GBLREF	gv_namehead		*gv_target_list;
 
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
+LITREF  char                    ydb_release_name[];
+LITREF  int4                    ydb_release_name_len;
 LITREF gtmImageName		gtmImageNames[];
 
 error_def(ERR_AIOCANCELTIMEOUT);
@@ -412,7 +415,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * both callers. Therefore use interlocked INCR_CNT/DECR_CNT.
 	 */
 	DECR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
-	if (memcmp(cnl->now_running, gtm_release_name, gtm_release_name_len + 1))
+	if (memcmp(cnl->now_running, ydb_release_name, ydb_release_name_len + 1))
 	{	/* VERMISMATCH condition. Possible only if DSE */
 		assert(dse_running);
 		vermismatch = TRUE;

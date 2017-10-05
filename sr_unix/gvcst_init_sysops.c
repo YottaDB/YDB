@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -159,7 +162,7 @@ MBSTART {								\
 #define GTM_ATTACH_SHM_AND_CHECK_VERS(VERMISMATCH, SHM_SETUP_OK)								\
 MBSTART {															\
 	GTM_ATTACH_SHM;														\
-	/* The following checks for GDS_LABEL_GENERIC and  gtm_release_name ensure that the shared memory under consideration	\
+	/* The following checks for GDS_LABEL_GENERIC and  ydb_release_name ensure that the shared memory under consideration	\
 	 * is valid.  If shared memory is already initialized, do VERMISMATCH check BEFORE referencing any other fields in	\
 	 * shared memory.													\
 	 */															\
@@ -167,7 +170,7 @@ MBSTART {															\
 	SHM_SETUP_OK = FALSE;													\
 	if (!MEMCMP_LIT(csa->nl->label, GDS_LABEL_GENERIC))									\
 	{															\
-		if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))					\
+		if (memcmp(csa->nl->now_running, ydb_release_name, ydb_release_name_len + 1))					\
 		{	/* Copy csa->nl->now_running into a local variable before passing to rts_error due to the following	\
 			 * issue:												\
 			 * In VMS, a call to rts_error copies only the error message and its arguments (as pointers) and	\
@@ -195,7 +198,7 @@ MBSTART {														\
 	if (!vermismatch_already_printed)										\
 	{														\
 		vermismatch_already_printed = TRUE;									\
-		RTS_ERROR(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name,	\
+		RTS_ERROR(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), ydb_release_name_len, ydb_release_name,	\
 			  LEN_AND_STR(now_running));									\
 	}														\
 } MBEND
@@ -372,8 +375,8 @@ GBLREF	boolean_t		pool_init;
 GBLREF	int 	mutex_sock_fd;
 #endif
 
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
+LITREF  char                    ydb_release_name[];
+LITREF  int4                    ydb_release_name_len;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -1305,8 +1308,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		shmpool_buff_init(reg);
 		SS_INFO_INIT(csa);
 		STRNCPY_STR(cnl->machine_name, machine_name, MAX_MCNAMELEN);				/* machine name */
-		assert(MAX_REL_NAME > gtm_release_name_len);
-		memcpy(cnl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
+		assert(MAX_REL_NAME > ydb_release_name_len);
+		memcpy(cnl->now_running, ydb_release_name, ydb_release_name_len + 1);		/* YottaDB release name */
 		memcpy(cnl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
 		memcpy(cnl->fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);		/* database filename */
 		cnl->creation_date_time4 = csd->creation_time4;
