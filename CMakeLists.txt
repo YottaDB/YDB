@@ -178,7 +178,8 @@ macro(set_source_list target)
       if(";${sources_${d}};" MATCHES ";(${name}\\.(c|s|si));")
       	set(fname ${CMAKE_MATCH_1})
 	set(src ${d}/${fname})
-	set("source_used_${fname}" 1)
+	get_filename_component(fnoext ${fname} NAME_WE)
+	set("source_used_${fnoext}" 1)
 	list(APPEND sources_used ${source_dir_${d}}/${fname})
 	break()
       endif()
@@ -235,13 +236,14 @@ set_source_list(semstat2         semstat2)
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
-set(source_used_dtgbldir.c 1) # exclude unused source
+set(source_used_dtgbldir 1) # exclude unused source
 set(libmumps_SOURCES "")
 foreach(d ${gt_src_list})
   foreach(s ${sources_${d}})
-    if(NOT source_used_${s} AND "${s}" MATCHES "\\.(c|s|si)$")
+    get_filename_component(snoext ${s} NAME_WE)
+    if(NOT source_used_${snoext} AND "${s}" MATCHES "\\.(c|s|si)$")
       list(APPEND libmumps_SOURCES ${d}/${s})
-      set(source_used_${s} 1)
+      set(source_used_${snoext} 1)
       list(APPEND sources_used ${source_dir_${d}}/${s})
     endif()
   endforeach()
