@@ -14,6 +14,7 @@
 #								#
 #################################################################
 
+set -x		# debug flow of configure in case an error occurs
 set -e		# exit right where an error occurs
 
 . ./arch.gtc
@@ -203,7 +204,9 @@ $echo ""
 $echo "Installing YottaDB...."
 $echo ""
 
+set +e		# Do not let 1 exit status from "grep -c" below cause configure script exit. Temporarily suspend "set -e"
 is64bit_gtm=`file mumps | grep -c 64`
+set -e
 
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
