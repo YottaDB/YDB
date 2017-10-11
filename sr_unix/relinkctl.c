@@ -388,7 +388,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					relinkctl_unlock_exclu(linkctl);
 					relinkctl_unmap(linkctl);
 					SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
-						shmid, shm_size, shm_size);
+						shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 					if (!shm_removed)
 						ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 					else
@@ -423,7 +423,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				relinkctl_delete(linkctl);
 				relinkctl_unlock_exclu(linkctl);
 				relinkctl_unmap(linkctl);
-				SNPRINTF(errstr, SIZEOF(errstr), "shmget() failed for shmsize=%llu [0x%llx]", shm_size, shm_size);
+				SNPRINTF(errstr, SIZEOF(errstr), "shmget() failed for shmsize=%llu [0x%llx]",
+							(unsigned long long)shm_size, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
@@ -434,7 +435,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				relinkctl_unmap(linkctl);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_STAT) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
+					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			assert(obtained_perms);
@@ -463,7 +464,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				relinkctl_unmap(linkctl);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_SET) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
+					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			/* Initialize shared memory header */
@@ -475,7 +476,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				relinkctl_unmap(linkctl);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
+					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			hdr->relinkctl_shmid = shmid;
