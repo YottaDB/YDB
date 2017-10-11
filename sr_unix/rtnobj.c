@@ -96,7 +96,7 @@
 						rel_latch(&SHM_HDR->relinkctl_latch);						\
 					rel_latch(&RELINKREC->rtnobj_latch);							\
 					SNPRINTF(errstr, SIZEOF(errstr), "rtnobj2 shmat() failed for shmid=%d shmsize=0x%llx",	\
-						shr_shmid, shm_size);								\
+						shr_shmid, (unsigned long long)shm_size);					\
 					if (!SHM_REMOVED(save_errno))								\
 						ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
 					else											\
@@ -543,7 +543,8 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				save_errno = errno;
 				rel_latch(&shm_hdr->relinkctl_latch);
 				rel_latch(&relinkrec->rtnobj_latch);
-				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmget() failed for shmsize=0x%llx", shm_size);
+				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmget() failed for shmsize=0x%llx",
+											(unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			STAT_FILE(linkctl->zro_entry_name.addr, &dir_stat_buf, stat_res);
@@ -574,7 +575,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmctl(IPC_STAT) failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			/* change uid, group-id and permissions if needed */
@@ -601,7 +602,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmctl(IPC_SET) failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			shm_base = (sm_uc_ptr_t)do_shmat_exec_perm(shmid, shm_size, &save_errno);
@@ -612,7 +613,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmat() failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			assert(shm_index < NUM_RTNOBJ_SHM_INDEX);

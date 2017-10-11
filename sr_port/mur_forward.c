@@ -776,7 +776,7 @@ finish:
 				{
 					save_errno = errno;
 					SNPRINTF(errstr, SIZEOF(errstr),
-						"shmget() : shmsize=0x%llx", shm_size);
+						"shmget() : shmsize=0x%llx", (unsigned long long)shm_size);
 					MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);	/* to print region name prefix */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
 								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
@@ -786,7 +786,7 @@ finish:
 				{
 					save_errno = errno;
 					SNPRINTF(errstr, SIZEOF(errstr),
-						"shmat() : shmid=%d shmsize=0x%llx", shmid, shm_size);
+						"shmat() : shmid=%d shmsize=0x%llx", shmid, (unsigned long long)shm_size);
 					MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);	/* to print region name prefix */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
 								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
