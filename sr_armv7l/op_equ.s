@@ -1,5 +1,17 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_equ.s */
-	
+
 	.title	op_equ	determine whether two mvals are equal
 /*
 	op_equ
@@ -17,12 +29,12 @@
 		r0	1, if the two mval's are equal
 			0, if they're not equal
 */
-	
+
 	.sbttl	op_equ
 
 .include "linkage.si"
 .include "debug.si"
-	
+
 	.text
 .extern	is_equ
 

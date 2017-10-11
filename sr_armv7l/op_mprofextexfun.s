@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_mprofextexfun.s */
 
 /*
@@ -109,7 +121,7 @@ ENTRY op_mprofextexfun
 	ldr	r12, [r3, #8]					/* See if a parameter list was supplied */
 	cmp	r12, #0
 	beq	fmllstmissing					/* If not, raise error */
-	
+
 	b	justgo						/* Bypass autorelink check for indirects (done by caller) */
 	/*
 	 * We have a non-negative index. Use args as indexes into caller's linkage table.
@@ -206,7 +218,7 @@ autorelink_check:
 	bne	gtmcheck
 	ldr	r0, [fp, #rtnidx]				/* Restore both args as parms for call */
 	ldr	r1, [fp, #lblidx]
-	bl	auto_relink_check				/* r0 still populated by rtnhdr */ 
+	bl	auto_relink_check				/* r0 still populated by rtnhdr */
 	ldr	r0, [fp, #rtnidx]				/* Restore both args after call */
 	ldr	r1, [fp, #lblidx]
 	mov	r8, #2

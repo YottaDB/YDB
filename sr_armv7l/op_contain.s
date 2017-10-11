@@ -1,6 +1,18 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_contain.s */
 
-	
+
 	.title	op_contain.s "'[' ('contains') operator"
 
 /*
@@ -21,7 +33,7 @@
 .include "linkage.si"
 .include "mval_def.si"
 .include "debug.si"
-	
+
 	.sbttl	op_contain
 
 	.data

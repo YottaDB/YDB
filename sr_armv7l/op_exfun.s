@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_exfun.s */
 
 /*
@@ -13,14 +25,14 @@
 		actual2		address of actual second argument
 		. . .
 */
-	
+
 	.title	op_exfun.s
 
 .include "linkage.si"
 .include "g_msf.si"
 .include "stack.si"
 .include "debug.si"
-	
+
 	.sbttl	op_exfun
 
 	.data
@@ -37,7 +49,7 @@ act_cnt		=	-12
 mask_arg	=	 -8
 ret_val		=	 -4
 FRAME_SAVE_SIZE	=	 16				/* Multiple of 8 to ensure stack alignment */
-	
+
 ENTRY op_exfun
 	push	{fp, lr}
 	mov	fp, sp

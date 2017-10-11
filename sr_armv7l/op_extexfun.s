@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_extexfun.s */
 
 /*
@@ -33,7 +45,7 @@
  * macro so we need not save it separately.
  */
 	.title	op_extexfun.s
-	
+
 .include "linkage.si"
 .include "g_msf.si"
 .include "gtm_threadgbl_deftypes_asm.si"
@@ -41,7 +53,7 @@
 .include "debug.si"
 
 	.sbttl	op_extexfun
-	
+
 	.data
 .extern	ERR_FMLLSTMISSING
 .extern	ERR_GTMCHECK
@@ -61,7 +73,7 @@ ret_val		=	-12					/* r2 */
 lblidx		=	 -8					/* r1 */
 rtnidx		=	 -4					/* r0 */
 SAVE_SIZE	=	 24					/* Multiple of 8 to ensure stack alignment */
-	
+
 ENTRY op_extexfun
 	putframe						/* Save registers into current M stack frame */
 	ldr	r4, [sp]					/* actual count of args on stack */
@@ -108,7 +120,7 @@ ENTRY op_extexfun
 	ldr	r12, [r3, #8]					/* See if a parameter list was supplied */
 	cmp	r12, #0
 	beq	fmllstmissing					/* If not, raise error */
-	
+
 	b	justgo						/* Bypass autorelink check for indirects (done by caller) */
 	/*
 	 * We have a non-negative index. Use args as indexes into caller's linkage table.

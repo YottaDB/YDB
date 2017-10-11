@@ -1,6 +1,18 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* mum_tstart.s */
 /* (re)start a GT.M stack frame
- *	
+ *
  *	mum_tstart calls trans_code if proc_act_type is non-zero.  Then
  *	mum_tstart (re)loads the GT.M registers (including the code address)
  *	from the GT.M MUMPS stack frame and then jumps to the code address indicated
@@ -8,11 +20,11 @@
  */
 
 	.title	mum_tstart.s
-	
+
 .include "linkage.si"
 .include "g_msf.si"
 .include "debug.si"
-	
+
 	.sbttl	mum_tstart
 
 	.data
@@ -23,7 +35,7 @@
 	.text
 .extern	trans_code
 
- 
+
 ENTRY mum_tstart
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r0, =proc_act_type

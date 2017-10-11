@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_forloop.s */
 
 /*
@@ -16,7 +28,7 @@
 .include "debug.si"
 
 	.sbttl	op_forloop
-	
+
 	.data
 .extern	frame_pointer
 
@@ -31,7 +43,7 @@ term		= -12
 step		=  -8
 indx		=  -4
 FRAME_SIZE	=  16
-	
+
 ENTRY op_forloop
 	stmfd	sp!, {r6, fp}
 	mov	fp, sp

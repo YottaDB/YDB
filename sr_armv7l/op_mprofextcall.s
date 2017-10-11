@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_mprofextcall.s */
 
 /*
@@ -60,15 +72,15 @@
 .extern	auto_zlink
 .extern auto_relink_check
 .extern	new_stack_frame_sp
-.extern	rts_error	
+.extern	rts_error
 .extern laberror
-	
+
 /*
  * Define offsets for arguments saved in stack space
  */
 stack_arg1	= -8
 stack_arg0	= -4
-SAVE_SIZE	=  8	
+SAVE_SIZE	=  8
 
 ENTRY op_mprofextcall
 	push	{fp, r12}					/* r12 is to maintain 8 byte stack alignment */

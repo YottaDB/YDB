@@ -1,7 +1,19 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_fnzextract.s */
-	
+
 	.title	op_fnzextract.s
-	
+
 .include "linkage.si"
 .include "mval_def.si"
 .include "debug.si"
@@ -28,7 +40,7 @@ dest	=	-16
 .extern	n2s
 .extern underr
 
- 
+
 ENTRY op_fnzextract
 	stmfd   sp!, {r4, fp, r12, lr}
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -69,7 +81,7 @@ l30:	str	r12, [r0, #mval_l_strlen]		/* dest str len */
 	ldr	r12, [r1, #mval_a_straddr]
 	add	r12, r4
 	str	r12, [r0, #mval_a_straddr]
-	
+
 retlab:	mov	sp, fp
 	ldmfd   sp!, {r4, fp, r12, pc}
 

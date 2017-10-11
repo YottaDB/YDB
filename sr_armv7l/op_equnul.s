@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_equnul.s */
 
 /*
@@ -7,15 +19,15 @@
  *		r0 - 1 if mval is null string, otherwise 0
  *		z flag is NOT set if null string, otherwise set
  */
-	
+
 	.title	op_equnul.s
 
 .include "linkage.si"
 .include "mval_def.si"
 .include "debug.si"
-	
+
 	.sbttl	op_equnul
-	
+
 	.data
 .extern	undef_inhibit
 
@@ -51,4 +63,4 @@ l3:	ldr	r1, =undef_inhibit	/* not defined */
 
 
 .end
-	
+
