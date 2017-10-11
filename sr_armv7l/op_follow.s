@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_follow.s */
 /*
 	op_follow implements the string relational operator "]" ("follows"):
@@ -33,7 +45,7 @@
 */
 
 	.title	op_follow.s
-	
+
 .include "linkage.si"
 .include "mval_def.si"
 .include "debug.si"
@@ -48,7 +60,7 @@ sav_r1	=	-8
 .extern	n2s
 .extern underr
 
- 
+
 ENTRY op_follow
 	push	{r4, r6, fp, lr}
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -66,7 +78,7 @@ ENTRY op_follow
 
 	ldr	r0, [fp, #sav_r0]
 	ldr	r1, [fp, #sav_r1]
-	
+
 	ldr	r3, [r1, #mval_l_strlen]
 	ldr	r2, [r1, #mval_a_straddr]
 	ldr	r1, [r0, #mval_l_strlen]

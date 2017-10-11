@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* dm_start.s */
 /* int dm_start() */
 
@@ -61,7 +73,7 @@ ENTRY gtm_ret_code
 	str	r2, [r0]			/* msp += 4 */
 	b	return
 
-	
+
 	.sbttl	gtm_levl_ret_code
 
 /* Used by triggers (and eventually call-ins) to return from a nested generated code call */
@@ -70,5 +82,5 @@ ENTRY gtm_levl_ret_code
 	CHKSTKALIGN				/* Verify stack alignment */
 	REVERT
 	b	return
-	
+
 .end

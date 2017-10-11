@@ -1,3 +1,15 @@
+/****************************************************************
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
 /*	find_line_call searches through machine instructions starting at the address corresponding to the
  *	beginning of a MUMPS statement looking for a call to any of op_linestart, op_zbstart, op_linefetch,
  *	or op_zbfetch.  It will return the address of the displacement field of the instruction that indexes

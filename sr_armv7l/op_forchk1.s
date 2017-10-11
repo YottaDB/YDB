@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_forchk1.s */
 
 /* 
@@ -11,11 +23,11 @@
 
 	.title	op_forchk1.s
 	.sbttl	op_forchk1
-	
+
 .include "linkage.si"
 
 	.text
-	
+
 /*
  * This routine just provides an interception point potential. No work happens here so no need to
  * check stack alignment. If ever a call is added then this routine should take care to align the stack

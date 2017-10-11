@@ -1,7 +1,19 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_bkpt.s */
 
 	.title	op_bkpt.s
-	
+
 .include "linkage.si"
 .include "g_msf.si"
 .include "stack.si"
@@ -22,7 +34,7 @@
 .extern	op_zstepret
 .extern	opp_ret
 
-	
+
 ENTRY opp_zstepret
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
@@ -36,7 +48,7 @@ ENTRY opp_zstepret
 	bl	op_zstepret
 l1:
 	b	opp_ret
-	
+
 
 	.sbttl	opp_zstepretarg
 
@@ -57,7 +69,7 @@ l2:
 	b	op_retarg
 
 
-	.sbttl	op_zbfetch	
+	.sbttl	op_zbfetch
 
 ENTRY op_zbfetch
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -69,9 +81,9 @@ ENTRY op_zbfetch
 	getframe
 	bx	lr
 
-	
+
 	.sbttl	op_zbstart
-	
+
 ENTRY op_zbstart
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r0, [r5]
@@ -80,9 +92,9 @@ ENTRY op_zbstart
 	getframe
 	bx	lr
 
-	
+
 	.sbttl	op_zstepfetch
-	
+
 ENTRY op_zstepfetch
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
@@ -103,7 +115,7 @@ ENTRY op_zstepstart
 	getframe
 	bx	lr
 
-	
+
 	.sbttl	op_zstzbfetch
 
 ENTRY op_zstzbfetch
@@ -117,7 +129,7 @@ ENTRY op_zstzbfetch
 	getframe
 	bx	lr
 
-	
+
 	.sbttl	op_zstzbstart
 
 ENTRY op_zstzbstart
@@ -158,7 +170,7 @@ l5:
 	ldr	lr, [r12, #msf_mpc_off]
 	bx	lr
 
-	
+
 	.sbttl	op_zstzb_st_over
 
 ENTRY op_zstzb_st_over
@@ -207,7 +219,7 @@ l9:
 	ldr	lr, [r12, #msf_mpc_off]
 	bx	lr
 
-	
+
 	.sbttl	op_zst_st_over
 
 ENTRY op_zst_st_over
@@ -265,5 +277,5 @@ l12:
 	pop	{r0, r1}
 	b	op_retarg
 
-	
+
 .end

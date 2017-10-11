@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_neg.s */
 /*
 
@@ -8,7 +20,7 @@
 */
 
 	.title	op_neg.s
-	
+
 
 .include "linkage.si"
 .include "mval_def.si"
@@ -20,7 +32,7 @@
 
 .extern	s2n
 .extern underr
-	
+
 save_ret1	= -8
 save_ret0	= -4
 FRAME_SIZE	=  8

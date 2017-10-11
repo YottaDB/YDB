@@ -1,8 +1,20 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* op_sto.s */
 
 	/* r0 is mval of destination */
 	/* r1 is mval of value to store in destination */
-	
+
 	.title	op_sto.s
 	.sbttl	op_sto
 

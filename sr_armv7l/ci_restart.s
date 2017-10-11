@@ -1,11 +1,23 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 /* ci_restart.s */
 /* (re)start a GT.M frame */
-	
+
 /* setup register/stack arguments from 'param_list' and transfer
  *	control to op_extcall/op_extexfun which return only after the M
  *	routine finishes and QUITs.
  */
-	
+
 	.title	ci_restart.s
 	.sbttl	ci_restart
 
@@ -13,7 +25,7 @@
 .include "stack.si"
 
 .extern	param_list
-	
+
 	.text
 
 ci_rtn		=  0
