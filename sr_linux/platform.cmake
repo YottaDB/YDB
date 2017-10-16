@@ -90,13 +90,13 @@ add_definitions(
   )
 
 # Linker
-set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmexe_symbols.export\"")
-set(gtm_dep   "${GTM_BINARY_DIR}/gtmexe_symbols.export")
+set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script,\"${YDB_BINARY_DIR}/gtmexe_symbols.export\"")
+set(gtm_dep   "${YDB_BINARY_DIR}/gtmexe_symbols.export")
 
 set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
 set(libgtmshr_link "${libgtmshr_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
-set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
-set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
+set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${YDB_BINARY_DIR}/gtmshr_symbols.export\"")
+set(libgtmshr_dep  "${YDB_BINARY_DIR}/gtmexe_symbols.export")
 
 if(${bits} EQUAL 32)
   set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lrt")

@@ -4,6 +4,9 @@
 # Copyright (c) 2011-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -326,7 +329,7 @@ foreach image ($imagetype)
 	find . -type f -exec chmod a-xw {} \;
 	# no directories to be writeable for group or world if aix or 32-bit linux, otherwise for all
 	chmod a+x configure
-	chmod a+x gtminstall
+	chmod a+x ydbinstall
 	if ((aix == ${osname}) || ((linux == ${osname}) && ("i586" == "$arch"))) then
 		find . -type d -exec chmod go-w {} \;
 	else

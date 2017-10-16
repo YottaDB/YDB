@@ -17,7 +17,7 @@
 # CMake 2.8.4 introduced generator expressions in custom commands
 # CMake 2.8.5 introduced use of C compiler as the assembler
 cmake_minimum_required(VERSION 2.8.5)
-project(GTM C ASM)
+project(YDB C ASM)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
@@ -30,23 +30,16 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V63002_R100)
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
+set(version r110)
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-if(GTM_RELEASE_NAME)
-  add_definitions(-DGTM_RELEASE_NAME="${GTM_RELEASE_NAME}")
-endif()
-
-# Enable GT.M debug options unless directed not to enable them. Added to build without whitebox tests.
-set(GTM_ENABLE_DEBUG 1 CACHE BOOL "Enable GT.M debug options")
-if(GTM_ENABLE_DEBUG)
+# Enable YottaDB debug options unless directed not to enable them. Added to build without whitebox tests.
+set(YDB_ENABLE_DEBUG 1 CACHE BOOL "Enable YottaDB debug options")
+if(YDB_ENABLE_DEBUG)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 endif()
 
@@ -84,27 +77,27 @@ else()
 endif()
 
 # Choose where to get bootstrap sources.
-set(GTM_DIST "" CACHE PATH "Existing GT.M Distribution")
-if(GTM_DIST)
+set(YDB_DIST "" CACHE PATH "Existing YottaDB Distribution")
+if(YDB_DIST)
   # Bootstrap using already-installed mumps.
-  message(STATUS "Using existing gtm_dist=${GTM_DIST} to generate sources.")
+  message(STATUS "Using existing gtm_dist=${YDB_DIST} to generate sources.")
   set(gen_bootstrap 1)
-  set(gen_bootstrap_dist "${GTM_DIST}")
-  set(gen_bootstrap_mumps "${GTM_DIST}/mumps")
+  set(gen_bootstrap_dist "${YDB_DIST}")
+  set(gen_bootstrap_mumps "${YDB_DIST}/mumps")
   set(gen_bootstrap_depend "${gen_bootstrap_mumps}")
 else()
   # Bootstrap using pre-generated bootstrap sources.
   # We generate them again only for comparison.
   message(STATUS "Bootstraping from pre-generated sources.")
   set(gen_bootstrap 0)
-  set(gen_bootstrap_dist "${GTM_BINARY_DIR}")
+  set(gen_bootstrap_dist "${YDB_BINARY_DIR}")
   set(gen_bootstrap_mumps "$<TARGET_FILE:mumps>")
   set(gen_bootstrap_depend mumps)
 endif()
 
-set(GTM_INSTALL_DIR lib/fis-gtm/${version}_${arch} CACHE STRING "Install directory (under CMAKE_PREFIX_PATH if relative)")
-if(NOT GTM_INSTALL_DIR)
-  set(GTM_INSTALL_DIR .)
+set(YDB_INSTALL_DIR yottadb_${version} CACHE STRING "Install directory")
+if(NOT YDB_INSTALL_DIR)
+  set(YDB_INSTALL_DIR .)
 endif()
 
 #-----------------------------------------------------------------------------
@@ -127,13 +120,13 @@ list(APPEND gt_src_list
 # the full path to a directory in 'source_dir_${d}' and the list of
 # source file names in the directory in 'sources_${d}'.
 foreach(d ${gt_src_list})
-  set(source_dir_${d} ${GTM_SOURCE_DIR}/${d})
+  set(source_dir_${d} ${YDB_SOURCE_DIR}/${d})
   file(GLOB sources_${d} RELATIVE ${source_dir_${d}}
 	  ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
 endforeach()
 # Prefer generated sources over all other locations.
-file(MAKE_DIRECTORY ${GTM_BINARY_DIR}/gen)
-set(source_dir_gen ${GTM_BINARY_DIR}/gen)
+file(MAKE_DIRECTORY ${YDB_BINARY_DIR}/gen)
+set(source_dir_gen ${YDB_BINARY_DIR}/gen)
 # Hard-code list since we cannot glob files that do not exist.
 set(sources_gen gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
 if(gen_bootstrap)
@@ -142,13 +135,13 @@ endif()
 
 # The C preprocessor include search path consists of every source
 # directory ordered by 'gt_src_list'.
-set(includes ${GTM_BINARY_DIR}/gen)
+set(includes ${YDB_BINARY_DIR}/gen)
 foreach(d ${gt_src_list})
   list(APPEND includes ${source_dir_${d}})
 endforeach()
 include_directories(${includes})
 # We generate some uniquely-named headers in the top of the build tree.
-include_directories(${GTM_BINARY_DIR})
+include_directories(${YDB_BINARY_DIR})
 include_directories(/usr/include/openssl-1.0)
 
 # Function to select the first instance of a given source file name
@@ -256,8 +249,8 @@ endforeach()
 foreach(m chk2lev.m chkop.m gendash.m genout.m loadop.m loadvx.m msg.m tttgen.m tttscan.m)
   add_custom_command(
     OUTPUT gen/${m}
-    DEPENDS ${GTM_SOURCE_DIR}/sr_port/${m}
-    COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/sr_port/${m} ${GTM_BINARY_DIR}/gen/${m}
+    DEPENDS ${YDB_SOURCE_DIR}/sr_port/${m}
+    COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/sr_port/${m} ${YDB_BINARY_DIR}/gen/${m}
     )
 endforeach()
 
@@ -271,16 +264,16 @@ add_custom_command(
   DEPENDS ${tttfiles}
     gen/chk2lev.m gen/chkop.m gen/gendash.m gen/genout.m gen/loadop.m
     gen/loadvx.m gen/tttgen.m gen/tttscan.m
-    ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
-  WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
+    ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
+  WORKING_DIRECTORY ${YDB_BINARY_DIR}/gen
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${gen_bootstrap_dist}
-    -D gtm_tools=${GTM_SOURCE_DIR}/sr_port
+    -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
     -D gtmroutines=.
     -D mumps=${gen_bootstrap_mumps}
     -D "args=${mumps_ttt_args}"
     -D output_file=ttt.log
-    -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
   VERBATIM
   )
 list(APPEND gen_bootstrap_files gen/ttt.c)
@@ -293,20 +286,20 @@ foreach(msg
     sr_unix_gnp/cmierrors.msg
     )
   get_filename_component(name ${msg} NAME_WE)
-  set(mumps_msg_args -run msg ${GTM_SOURCE_DIR}/${msg} unix)
+  set(mumps_msg_args -run msg ${YDB_SOURCE_DIR}/${msg} unix)
   set(outputs gen/${name}_ctl.c ${gen_${name}_extra})
   add_custom_command(
     OUTPUT ${outputs}
-    DEPENDS gen/msg.m ${GTM_SOURCE_DIR}/${msg}
-            ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
-    WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
+    DEPENDS gen/msg.m ${YDB_SOURCE_DIR}/${msg}
+            ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
+    WORKING_DIRECTORY ${YDB_BINARY_DIR}/gen
     COMMAND ${CMAKE_COMMAND}
       -D gtm_dist=${gen_bootstrap_dist}
-      -D gtm_tools=${GTM_SOURCE_DIR}/sr_port
+      -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
       -D gtmroutines=.
       -D mumps=${gen_bootstrap_mumps}
       -D "args=${mumps_msg_args}"
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
     )
   list(APPEND gen_bootstrap_files ${outputs})
@@ -322,17 +315,17 @@ if(gen_xfer_desc)
   foreach(src ${sources_used})
     set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}${src}\n")
   endforeach()
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/sources.list)
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${YDB_BINARY_DIR}/sources.list)
   add_custom_command(
     OUTPUT xfer_desc.i
-    WORKING_DIRECTORY ${GTM_BINARY_DIR}
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
-            ${GTM_BINARY_DIR}/sources.list
+    WORKING_DIRECTORY ${YDB_BINARY_DIR}
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
+            ${YDB_BINARY_DIR}/sources.list
     COMMAND ${CMAKE_COMMAND}
       -D CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
       -D "arch=${arch}"
       -D "includes=${includes}"
-      -P ${GTM_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
+      -P ${YDB_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
     VERBATIM
     )
   add_custom_target(gen_xfer_desc DEPENDS xfer_desc.i)
@@ -365,20 +358,20 @@ add_custom_command(
     -D "gtmthreadgblasmfile=${gtmthreadgblasmfile}"
     -D "gtmthreadgblasmhdr=${gtmthreadgblasmhdr}"
     -D "gtmthreadgblasmaccess=${gtmthreadgblasmaccess}"
-    -P ${GTM_SOURCE_DIR}/${srdir}/gen_threadgbl_asm.cmake
+    -P ${YDB_SOURCE_DIR}/${srdir}/gen_threadgbl_asm.cmake
   VERBATIM
   )
 
 add_custom_target(gen_gtm_threadgbl_deftypes
-  DEPENDS ${GTM_BINARY_DIR}/${gtmthreadgblasmhdr} ${GTM_BINARY_DIR}/${gtmthreadgblasmfile})
+  DEPENDS ${YDB_BINARY_DIR}/${gtmthreadgblasmhdr} ${YDB_BINARY_DIR}/${gtmthreadgblasmfile})
 
 foreach(exp exe shr)
   set(out gtm${exp}_symbols.export)
-  set(in ${GTM_SOURCE_DIR}/sr_unix/gtm${exp}_symbols.exp)
+  set(in ${YDB_SOURCE_DIR}/sr_unix/gtm${exp}_symbols.exp)
   add_custom_command(
     OUTPUT ${out}
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
-    COMMAND tcsh -f ${GTM_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
+    COMMAND tcsh -f ${YDB_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
     )
 endforeach()
 
@@ -434,7 +427,7 @@ add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
 target_link_libraries(gtmsecshr_real libmumps)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
-  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/gtmsecshrdir
+  RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
 add_dependencies(gtmsecshr_real		gen_gtm_threadgbl_deftypes)
 
@@ -506,52 +499,52 @@ add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
 add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
 target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
-install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
+install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 # Establish the default encryption link
-set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
+set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.so)
 set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
 add_custom_command(
 	OUTPUT ${default_encr_link}
 	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
-	DEPENDS ${GTM_BINARY_DIR}/plugin/${default_encr_target}
+	DEPENDS ${YDB_BINARY_DIR}/plugin/${default_encr_target}
 	COMMENT "Generating default_encr symbolic link"
 	)
 add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
-install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
+install(FILES ${default_encr_link} DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 # Library=OPENSSL Algorithm=AES256CFB
 add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
   OUTPUT_NAME gtmcrypt_openssl_AES256CFB
   COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
 set_target_properties(libgtmtls PROPERTIES
   OUTPUT_NAME gtmtls
   COMPILE_DEFINITIONS "USE_OPENSSL"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmtls ${TLS_LIBRARIES})
 add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
+install(TARGETS libgtmtls DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 add_executable(maskpass ${maskpass_SOURCES})
 target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 set_target_properties(maskpass PROPERTIES
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
-  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
+  RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin/gtmcrypt
   )
-install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+install(TARGETS maskpass DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt)
 
 # Always copy files into the plugin directory
 foreach(f
@@ -580,9 +573,9 @@ foreach(f
       pinentry.m
       show_install_config.sh
     )
-  set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
+  set(f_in "${YDB_SOURCE_DIR}/sr_unix/${f}")
   string(REGEX REPLACE ".mk$" "" f_mod "${f}")
-  set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
+  set(f_out "${YDB_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
   add_custom_command(
     OUTPUT "${f_out}"
     DEPENDS "${f_in}"
@@ -593,7 +586,7 @@ foreach(f
   else()
     set(permissions "")
   endif()
-  install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
+  install(FILES "${f_out}" DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
   list(APPEND files_to_place "${f_out}")
 endforeach()
 
@@ -612,12 +605,12 @@ install(TARGETS
   gtmsecshr
   mupip
   libgtmshr
-  DESTINATION ${GTM_INSTALL_DIR}
+  DESTINATION ${YDB_INSTALL_DIR}
   )
-install(TARGETS gtmsecshr_real DESTINATION ${GTM_INSTALL_DIR}/gtmsecshrdir)
+install(TARGETS gtmsecshr_real DESTINATION ${YDB_INSTALL_DIR}/gtmsecshrdir)
 
 # <r>.m -> <R>.m
-#file(GLOB m_files_sr_port RELATIVE ${GTM_SOURCE_DIR}/sr_port ${GTM_SOURCE_DIR}/sr_port/*.m)
+#file(GLOB m_files_sr_port RELATIVE ${YDB_SOURCE_DIR}/sr_port ${YDB_SOURCE_DIR}/sr_port/*.m)
 set(m_files_sr_port
   gde.m
   gdeadd.m
@@ -640,11 +633,11 @@ set(m_files_sr_port
   gdespawn.m
   gdetempl.m
   )
-file(GLOB m_files_sr_unix RELATIVE ${GTM_SOURCE_DIR}/sr_unix ${GTM_SOURCE_DIR}/sr_unix/*.m)
-file(GLOB m_files_sr_x86_64 RELATIVE ${GTM_SOURCE_DIR}/sr_x86_64 ${GTM_SOURCE_DIR}/sr_x86_64/*.m)
-file(GLOB m_files_sr_i386 RELATIVE ${GTM_SOURCE_DIR}/sr_i386 ${GTM_SOURCE_DIR}/sr_i386/*.m)
-file(GLOB mpt_files_sr_port RELATIVE ${GTM_SOURCE_DIR}/sr_port ${GTM_SOURCE_DIR}/sr_port/*.mpt)
-file(GLOB mpt_files_sr_unix RELATIVE ${GTM_SOURCE_DIR}/sr_unix ${GTM_SOURCE_DIR}/sr_unix/*.mpt)
+file(GLOB m_files_sr_unix RELATIVE ${YDB_SOURCE_DIR}/sr_unix ${YDB_SOURCE_DIR}/sr_unix/*.m)
+file(GLOB m_files_sr_x86_64 RELATIVE ${YDB_SOURCE_DIR}/sr_x86_64 ${YDB_SOURCE_DIR}/sr_x86_64/*.m)
+file(GLOB m_files_sr_i386 RELATIVE ${YDB_SOURCE_DIR}/sr_i386 ${YDB_SOURCE_DIR}/sr_i386/*.m)
+file(GLOB mpt_files_sr_port RELATIVE ${YDB_SOURCE_DIR}/sr_port ${YDB_SOURCE_DIR}/sr_port/*.mpt)
+file(GLOB mpt_files_sr_unix RELATIVE ${YDB_SOURCE_DIR}/sr_unix ${YDB_SOURCE_DIR}/sr_unix/*.mpt)
 
 set(gtm_chset_dir_ "")
 set(gtm_chset_dir_UTF-8 "/utf8")
@@ -655,40 +648,40 @@ foreach(d ${gt_src_list})
     string(TOUPPER "${m_name}" m_upper)
     if("${m}" MATCHES "^gde")
       foreach(gtm_chset "" "UTF-8")
-        set(m_out "${GTM_BINARY_DIR}${gtm_chset_dir_${gtm_chset}}/${m_upper}.m")
+        set(m_out "${YDB_BINARY_DIR}${gtm_chset_dir_${gtm_chset}}/${m_upper}.m")
         add_custom_command(
           OUTPUT "${m_out}"
-          DEPENDS ${GTM_SOURCE_DIR}/${d}/${m}
-          COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/${d}/${m} "${m_out}"
+          DEPENDS ${YDB_SOURCE_DIR}/${d}/${m}
+          COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
           )
         list(APPEND files_to_place "${m_out}")
         list(APPEND gtm_chset_routines_${gtm_chset} "${m_out}")
       endforeach()
     else()
       if(";${m_name};" MATCHES ";GTMDefinedTypesInit[a-zA-Z]*;")
-	set(m_out "${GTM_BINARY_DIR}/${m_name}.m")
+	set(m_out "${YDB_BINARY_DIR}/${m_name}.m")
 	set(${m_name}_found 1)
       else()
-        set(m_out "${GTM_BINARY_DIR}/${m_upper}.m")
+        set(m_out "${YDB_BINARY_DIR}/${m_upper}.m")
       endif()
       add_custom_command(
         OUTPUT "${m_out}"
-        DEPENDS ${GTM_SOURCE_DIR}/${d}/${m}
-        COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/${d}/${m} "${m_out}"
+        DEPENDS ${YDB_SOURCE_DIR}/${d}/${m}
+        COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
         )
-      install(FILES "${m_out}" DESTINATION ${GTM_INSTALL_DIR})
+      install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
       list(APPEND files_to_place "${m_out}")
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
     string(TOUPPER "_${m}" m_upper)
-    string(REGEX REPLACE "MPT$" "m" m_out "${GTM_BINARY_DIR}/${m_upper}")
+    string(REGEX REPLACE "MPT$" "m" m_out "${YDB_BINARY_DIR}/${m_upper}")
     add_custom_command(
       OUTPUT "${m_out}"
-      DEPENDS ${GTM_SOURCE_DIR}/${d}/${m}
-      COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/${d}/${m} "${m_out}"
+      DEPENDS ${YDB_SOURCE_DIR}/${d}/${m}
+      COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
       )
-    install(FILES "${m_out}" DESTINATION ${GTM_INSTALL_DIR})
+    install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
     list(APPEND files_to_place "${m_out}")
   endforeach()
 endforeach()
@@ -725,14 +718,14 @@ foreach(f
   select_file(src ${f})
   get_filename_component(srcfname "${src}" NAME)
   add_custom_command(
-    OUTPUT "${GTM_BINARY_DIR}/${srcfname}"
+    OUTPUT "${YDB_BINARY_DIR}/${srcfname}"
     DEPENDS "${src}"
-    COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${GTM_BINARY_DIR}/${srcfname}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${YDB_BINARY_DIR}/${srcfname}"
     )
-  list(APPEND files_to_place "${GTM_BINARY_DIR}/${srcfname}")
+  list(APPEND files_to_place "${YDB_BINARY_DIR}/${srcfname}")
   list(APPEND files ${src})
 endforeach()
-install(FILES ${files} DESTINATION ${GTM_INSTALL_DIR})
+install(FILES ${files} DESTINATION ${YDB_INSTALL_DIR})
 
 set(scripts)
 foreach(f
@@ -743,7 +736,7 @@ foreach(f
   list(APPEND scripts ${src})
 endforeach()
 install(FILES ${scripts}
-  DESTINATION ${GTM_INSTALL_DIR}
+  DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}
   )
 
@@ -799,21 +792,21 @@ foreach(gtm_chset "" "UTF-8")
     get_filename_component(out_dir "${out}" PATH)
     add_custom_command(
       OUTPUT ${out}
-      DEPENDS ${in} ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps
+      DEPENDS ${in} ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps
       COMMAND ${CMAKE_COMMAND}
-        -D gtm_dist=${GTM_BINARY_DIR}
+        -D gtm_dist=${YDB_BINARY_DIR}
         -D gtmroutines=.
         -D gtm_chset=${gtm_chset}
         -D gtm_icu_version=${gtm_icu_version}
         -D LC_ALL=${LC_ALL}
         -D mumps=$<TARGET_FILE:mumps>
         -D "args=${in}"
-        -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+        -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
       WORKING_DIRECTORY ${out_dir}
       VERBATIM
       )
     list(APPEND files_to_place ${out})
-    install(FILES "${out}" DESTINATION ${GTM_INSTALL_DIR}${gtm_chset_dir_${gtm_chset}})
+    install(FILES "${out}" DESTINATION ${YDB_INSTALL_DIR}${gtm_chset_dir_${gtm_chset}})
   endforeach()
 endforeach()
 
@@ -829,81 +822,80 @@ foreach(help gtm gde mupip dse lke)
 Change -region DEFAULT -record=1020 -key=255
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${GTM_BINARY_DIR}/${help}help.in1)
+                 ${YDB_BINARY_DIR}/${help}help.in1)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
     "Do ^GTMHLPLD
-${GTM_SOURCE_DIR}/sr_port/${${help}_hlp}
+${YDB_SOURCE_DIR}/sr_port/${${help}_hlp}
 Halt")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${GTM_BINARY_DIR}/${help}help.in2)
+                 ${YDB_BINARY_DIR}/${help}help.in2)
   set(env
-    -D gtm_dist=${GTM_BINARY_DIR}
+    -D gtm_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
+    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
     )
   add_custom_command(
     OUTPUT ${help}help.dat ${help}help.gld
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
-            ${GTM_BINARY_DIR}/${help}help.in1
-            ${GTM_BINARY_DIR}/${help}help.in2
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+            ${YDB_BINARY_DIR}/${help}help.in1
+            ${YDB_BINARY_DIR}/${help}help.in2
     COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
-      -D input_file=${GTM_BINARY_DIR}/${help}help.in1
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+      -D input_file=${YDB_BINARY_DIR}/${help}help.in1
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip> -D "args=create"
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-direct"
-      -D input_file=${GTM_BINARY_DIR}/${help}help.in2
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+      -D input_file=${YDB_BINARY_DIR}/${help}help.in2
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
     )
   list(APPEND files_to_place ${help}help.dat)
-  install(FILES ${GTM_BINARY_DIR}/${help}help.dat DESTINATION ${GTM_INSTALL_DIR})
-  install(FILES ${GTM_BINARY_DIR}/${help}help.gld DESTINATION ${GTM_INSTALL_DIR})
+  install(FILES ${YDB_BINARY_DIR}/${help}help.dat DESTINATION ${YDB_INSTALL_DIR})
+  install(FILES ${YDB_BINARY_DIR}/${help}help.gld DESTINATION ${YDB_INSTALL_DIR})
 endforeach()
 if (GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
   DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m
-  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/GTMDefinedTypesInit.m
+  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
-    -D gtm_dist=${GTM_BINARY_DIR}
+    -D gtm_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${GTM_BINARY_DIR}/gtmhelp
+    -D gtmgbldir=${YDB_BINARY_DIR}/gtmhelp
     -D mumps=$<TARGET_FILE:mumps>
     -D "args=-run;GTMDEFINEDTYPESTODB"
-    -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 #-----------------------------------------------------------------------------
 
-set(GTM_TOP "${GTM_BINARY_DIR}")
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
-set(GTM_TOP "${CMAKE_INSTALL_PREFIX}/${GTM_INSTALL_DIR}")
+set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
 configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)
-install(FILES ${GTM_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${GTM_INSTALL_DIR}/plugin)
+install(FILES ${YDB_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
-install(FILES sr_unix/configure.gtc DESTINATION ${GTM_INSTALL_DIR}
+install(FILES sr_unix/configure.gtc DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}
   RENAME configure
   )
 
-install(FILES sr_unix/gtminstall.sh DESTINATION ${GTM_INSTALL_DIR}
+install(FILES sr_unix/ydbinstall.sh DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}
-  RENAME gtminstall
+  RENAME ydbinstall
   )
 
-install(FILES sr_unix/lowerc_cp.sh DESTINATION ${GTM_INSTALL_DIR}
+install(FILES sr_unix/lowerc_cp.sh DESTINATION ${YDB_INSTALL_DIR}
   RENAME lowerc_cp
   )
 
-if (EXISTS ${GTM_SOURCE_DIR}/COPYING)
-  install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
+if (EXISTS ${YDB_SOURCE_DIR}/COPYING)
+  install(FILES COPYING DESTINATION ${YDB_INSTALL_DIR})
 endif()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})

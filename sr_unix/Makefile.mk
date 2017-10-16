@@ -34,7 +34,7 @@ CURDIR = `pwd`
 # Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
-# Users may install GT.M without Unicode support
+# Users may install YottaDB without Unicode support
 HAVE_UNICODE = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
 
 # Determine machine and OS type.
@@ -44,7 +44,7 @@ MACHTYPE = $(shell uname -m)
 ifneq (,$(findstring Linux,$(UNAMESTR)))
 	FILEFLAG = -L
 endif
-# 64 bit version of GT.M? 0 for yes!
+# 64 bit version of YottaDB? 0 for yes!
 BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; echo $$?)
 
 # Determine if GPG 2.1+ is installed

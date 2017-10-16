@@ -6,7 +6,7 @@ to you under the terms of a license. Refer to the [LICENSE](LICENSE) file for de
 
 YottaDB relies on CMake to generate the Makefiles to build binaries from source.
 The prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
-(x86_64), libraries and development files for libz, Unicode, OpenSSL and GPG.
+(`x86_64`), libraries and development files for libz, Unicode, OpenSSL and GPG.
 Ubuntu 16.04 LTS was used to test the builds for this distribution, with default
 versions of packages from the distribution repositories.
 
@@ -15,7 +15,7 @@ versions of packages from the distribution repositories.
 1. Fulfill the pre-requisites
 
    Install developement libraries
-   
+
    ```sh
     cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
    ```
@@ -25,60 +25,51 @@ versions of packages from the distribution repositories.
 
 2. Unpack the YottaDB sources
 
-   The YottaDB source tarball extracts to a directory with the version number in
-   the name, e.g., YottaDB-r1.10
+   The YottaDB source tarball extracts to a directory with the version number in the name, i.e. ```yottadb_r110```
+
    ```sh
-   $ tar xfz r1.10.tar.gz
-   $ cd YottaDB-r1.10
+   $ tar xfz yottadb_r110_src.tar.gz
+   $ cd yottadb_r110
    ```
 
-   You should find this README, LICENSE, COPYING and CMakeLists.txt file and
-   sr_* source directories.
+   You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr_* source directories.
 
-3. Building YottaDB
+3. Build the YottaDB binaries
 
-   `<build>` can be a sub directory of the source directory,
-   YottaDB-r1.10, or any other valid path.
-  
-  ```sh
-   $ mkdir <build>
-   $ cd <build>
-  ```
+   ```sh
+   $ mkdir build
+   $ cd build
+   ```
 
-   > [OPTIONAL] If you installed a YottaDB binary distribution, provide the directory path to cmake
-   >   `-D GTM_DIST:PATH=$gtm_dist`
-   >
    > By default the script creates production (pro) builds of YottaDB. To create
    > a debug (dbg) build of YottaDB supply the following parameter to cmake
-   >     -D CMAKE_BUILD_TYPE=Debug	*Note: title case is important*
+   >     ```-D CMAKE_BUILD_TYPE=Debug```	*Note: title case is important*
    >
-   > Note that the cmake install does not create the final installed YottaDB.
-   > Instead, it stages YottaDB for distribution. Change the CMAKE_INSTALL_PREFIX
-   > to place the staged files in a local directory. To install YottaDB, you must
-   > cd to that installed directory and execute the configure script.
-   >
-   >  `-D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package`
-   >
-   
+
    ```sh
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package ../
-
+   $ cmake ../
    $ make
-
    $ make install
+   $ cd yottadb/r110
+   ```
 
-   $ cd pro/lib/yottadb/V6.3-002_R100_x86_64 # or dbg for debug builds
-  ```
-  
+  Note that the make install done above does not create the final installed YottaDB.
+  Instead, it stages YottaDB for distribution.
+
   Now you are ready to install YottaDB. Answer a few questions and install it.
-  The recommended installation path is `/opt/yottadb/V6.3-002_x86_64`
+  The recommended installation path is `/opt/yottadb/r110`
 
   ```sh
-  $ sudo ./gtminstall # to install the version you just built
-  # ./gtminstall --help # get installation options
-
+  $ sudo ./ydbinstall	# to install the version you just built
   $ cd - ; make clean
   ```
+
+  (Note: The below will help get installation options if needed.)
+
+  ```sh
+  # ./ydbinstall --help	# get installation options
+  ```
+
 4. Packaging YottaDB
 
    Create a tar file from the installed directory

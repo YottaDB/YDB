@@ -3,6 +3,9 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -308,12 +311,12 @@ rm *
 
 cp $gtm_tools/lowerc_cp.sh lowerc_cp
 if ( "$HOSTOS" == "SunOS" ) then
-	cp $gtm_tools/gtminstall_Solaris.sh gtminstall
+	cp $gtm_tools/ydbinstall_Solaris.sh ydbinstall
 else
-	cp $gtm_tools/gtminstall.sh gtminstall
+	cp $gtm_tools/ydbinstall.sh ydbinstall
 endif
 
-chmod +x {lowerc,gtminstall}*
+chmod +x {lowerc,ydbinstall}*
 
 cp $gtm_tools/*.xc .
 cp $gtm_tools/*.gtc .
