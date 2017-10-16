@@ -97,7 +97,7 @@ dump_info()
 err_exit()
 {
     set +x
-    echo "gtminstall [option] ... [version]"
+    echo "ydbinstall [option] ... [version]"
     echo "Options are:"
     echo "--build-type buildtype - * type of GT.M build, default is pro"
     echo "--copyenv dirname - copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
@@ -318,7 +318,7 @@ case ${gtm_hostos}_${gtm_arch} in
     default) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
-# GT.M version is required - first see if gtminstall and mumps are bundled
+# GT.M version is required - first see if ydbinstall and mumps are bundled
 if [ -z "$gtm_version" ] ; then
     tmp=`dirname $0`
     if [ -e "$tmp/mumps" -a -e "$tmp/_XCMD.m" ] ; then
@@ -389,7 +389,7 @@ if [ -z "$gtm_version" ] ; then
 echo GT.M version to install is required ; err_exit
 fi
 
-# Get GT.M distribution if gtminstall is not bundled with distribution
+# Get GT.M distribution if ydbinstall is not bundled with distribution
 if [ -f "${gtm_distrib}/mumps" ] ; then gtm_tmp=$gtm_distrib
 else
     tmp=`echo $gtm_version | tr -d .-`
