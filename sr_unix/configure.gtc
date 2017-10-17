@@ -107,8 +107,8 @@ $echo ""
 
 # Native super user and group
 rootuser=root
-bingroup=bin
-defowner=bin
+bingroup=root
+defowner=root
 
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
@@ -143,13 +143,13 @@ fi
 $echo "Should execution of YottaDB be restricted to this group? (y or n) \c"
 read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-	# root and bin are invalid groups to be restricted
-	if [ 0 = $bingroup -o "bin" = $bingroup -o "root" = $bingroup ] ; then
+	# root is an invalid group to be restricted
+	if [ 0 = $bingroup -o "root" = $bingroup ] ; then
 		$echo YDB-E-GROUPNOTVALID - $bingroup not allowed to be a restricted group - exiting!
 		exit 1
 	fi
 	# for all owners other than root or bin do an owner in group membership check
-	if [ 0 != $owner -a "bin" != $owner -a "root" != $owner -a  `groups $owner | grep -w -c $bingroup` -eq 0 ] ; then
+	if [ 0 != $owner -a "root" != $owner -a  `groups $owner | grep -w -c $bingroup` -eq 0 ] ; then
 		$echo YDB-E-NOTINGROUP - $owner is not a member of $bingroup - exiting!
 		exit 1
 	fi
@@ -605,8 +605,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 gtm_chset="M"
 export gtm_chset
-(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; \
- if [ "$is64bit_gtm" -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libgtmutil$ext *.o )
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
