@@ -16,9 +16,10 @@
 #define INCR_LINK_SP_INCLUDED
 
 #include <rtnhdr.h>
+#include <obj_file.h>
 #include <elf.h>
 
-#define NATIVE_HDR_LEN		(SIZEOF(Elf32_Ehdr))
+#define NATIVE_HDR_LEN		(ROUND_UP2(SIZEOF(Elf32_Ehdr), SECTION_ALIGN_BOUNDARY))
 
 #define COFFHDRLEN		(SIZEOF(int4) * 8)		/* Size of old masscomp-coff header before routine hdr */
 

@@ -205,7 +205,7 @@ void finish_object_file(void)
         ehdr->e_type = ET_REL;
         ehdr->e_machine = EM_ARM;
         ehdr->e_version = EV_CURRENT;
-	ehdr->e_shoff = SIZEOF(Elf32_Ehdr);
+	ehdr->e_shoff = ROUND_UP2(SIZEOF(Elf32_Ehdr), SECTION_ALIGN_BOUNDARY);
         ehdr->e_flags = EF_ARM_EABI_VER5;
 
         if (NULL == (text_scn = elf_newscn(elf)))
@@ -218,7 +218,7 @@ void finish_object_file(void)
                 FPRINTF(stderr, "elf_newdata() failed for text section!\n");
                 assertpro(FALSE);
         }
-        text_data->d_align = 1;
+        text_data->d_align = SECTION_ALIGN_BOUNDARY;
         text_data->d_off  = 0LL;
         text_data->d_buf  = gtm_obj_code;
         text_data->d_type = ELF_T_REL;
