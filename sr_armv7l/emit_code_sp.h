@@ -420,7 +420,7 @@ void	tab_to_column(int col);
 {																\
 	GEN_LOAD_WORD(GTM_REG_CODEGEN_TEMP, GTM_REG_XFER_TABLE, xfer);								\
 	code_buf[code_idx++] = ARM_INS_BLX | GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM;						\
-	if (MACHINE_REG_ARGS < stack_depth)											\
+	if (MACHINE_REG_ARGS < vax_pushes_seen)											\
 	{															\
 		code_buf[code_idx++] = (ARM_INS_MOV_REG										\
 						| ARM_REG_FP << ARM_SHIFT_RM							\
