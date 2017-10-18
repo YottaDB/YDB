@@ -14,14 +14,14 @@
 
 /* op_currtn.s */
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_currtn
 	.data
-.extern frame_pointer
+	.extern frame_pointer
 
 	.text
 
@@ -42,4 +42,4 @@ ENTRY op_currtn
 	str	r4, [r1, #mval_a_straddr]	/* r1->str.addr = frame_pointer->rvector->routine_name.addr */
 	bx	lr
 
-.end
+	.end

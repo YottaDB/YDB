@@ -49,26 +49,23 @@
 
 	.title	op_mprofextexfun.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "gtm_threadgbl_deftypes_asm.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "gtm_threadgbl_deftypes_asm.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_mprofextexfun
 
 	.DATA
-.extern	ERR_FMLLSTMISSING
-.extern	ERR_GTMCHECK
-.extern	ERR_LABELUNKNOWN
-.extern	dollar_truth
-.extern	frame_pointer
+	.extern	dollar_truth
+	.extern	frame_pointer
 
 	.text
-.extern	auto_zlink
-.extern	new_stack_frame_sp
-.extern	push_parm
-.extern	rts_error
+	.extern	auto_zlink
+	.extern	new_stack_frame_sp
+	.extern	push_parm
+	.extern	rts_error
 
 act_cnt		=	-20					/* top of stack */
 mask_arg	=	-16					/* r3 */
@@ -231,8 +228,7 @@ autorelink_check:
  * occurs
  */
 gtmcheck:
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 	b	retlab
@@ -247,10 +243,9 @@ label_missing:
  * Raise missing formal list error
  */
 fmllstmissing:
-	ldr	r1, =ERR_FMLLSTMISSING
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_FMLLSTMISSING
 	mov	r0, #1
 	bl	rts_error
 	b	retlab
 
-.end
+	.end

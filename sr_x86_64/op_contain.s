@@ -16,7 +16,7 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 	.include "mval_def.si"
-	.include "debug.si"
+#	include "debug.si"
 
 sav_rax		= -8
 sav_rdx		= -16

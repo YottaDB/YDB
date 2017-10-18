@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +12,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #include "mdef.h"
 #include "error.h"
 
@@ -21,12 +25,6 @@ LITDEF	err_msg cmerrors[] = {
 	{ "CMSYSSRV", "Error doing system service, status:", 0 },
 };
 
-LITDEF	int CMERR_INVPROT = 150568970;
-LITDEF	int CMERR_REGNTFND = 150568978;
-LITDEF	int CMERR_CMINTQUE = 150568988;
-LITDEF	int CMERR_INVINTMSG = 150568994;
-LITDEF	int CMERR_CMEXCDASTLM = 150569002;
-LITDEF	int CMERR_CMSYSSRV = 150569010;
 
 GBLDEF	err_ctl cmerrors_ctl = {
 	249,

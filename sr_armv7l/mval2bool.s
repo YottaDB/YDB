@@ -19,15 +19,15 @@
 
 	.title	mval2bool.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	mval2bool
 
 	.text
-.extern	s2n
-.extern underr
+	.extern	s2n
+	.extern underr
 
 ENTRY mval2bool
 	push	{r6, lr}
@@ -40,5 +40,4 @@ ENTRY mval2bool
 	cmp	r0, #0
 	pop	{r6, pc}
 
-
-.end
+	.end

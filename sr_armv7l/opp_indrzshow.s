@@ -20,18 +20,17 @@
 
 	.title	opp_indrzshow.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indrzshow
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_indrzshow
-
+	.extern	op_indrzshow
 
 ENTRY opp_indrzshow
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_indrzshow
 	getframe
 	bx	lr
 
-
-.end
+	.end

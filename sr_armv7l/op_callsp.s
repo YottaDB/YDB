@@ -25,21 +25,20 @@
  * separate set of compiler temps for use by the new frame. Particularly when it called on same line with FOR.
  */
 
-
 	.title	op_callsp.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_callsp
 	.data
-.extern	dollar_truth
-.extern	frame_pointer
+	.extern	dollar_truth
+	.extern	frame_pointer
 
 	.text
-.extern	exfun_frame
-.extern	push_tval
+	.extern	exfun_frame
+	.extern	push_tval
 
 	.sbttl	op_callspb, op_callspw, op_callspl
 
@@ -59,4 +58,4 @@ ENTRY op_callspb
 	ldr	r9, [r12, #msf_temps_ptr_off]
 	pop	{r4, pc}
 
-.end
+	.end

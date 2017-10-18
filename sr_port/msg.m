@@ -5,6 +5,7 @@
 ;								;
 ; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -12,6 +13,7 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
+ set $etrap="use $principal write $zstats,!! kill outmsg zshow ""*"" zhalt 1"
  New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up,vms
  Set severe("warning")=0
  Set severe("success")=1
@@ -21,6 +23,7 @@
  Set severe("severe")=4
  Set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
  Set lo="abcdefghijklmnopqrstuvwxyz"
+ set ydbplatform=$zpiece($zversion," ",3)
  ;
  ; On Unix, start this program with .../mumps -run msg filename osname
  ; On VMS, first compile and link msg.m into msg.exe
@@ -44,7 +47,21 @@
  Set cnt=0
  Open in:readonly,out:newversion
  Set ansiopen=0
- Use out Do hdr
+ Use out Do chdr		; Create <fn>_ctl.c file and its prologue
+ set ydbfn=$select("ydberrors"=fn:"ydberrors.h",1:"ydb"_fn_".h") ; Avoid naming it ydbydberrors.h
+ open ydbfn:newversion		; Create ydb<fn>.h file and its prologue
+ use ydbfn
+ do chdr
+ ;
+ ; If this is merrors.msg, we have a file to create:
+ ;   - libydberrors.h  - header file with YDB_ERR_ #defines for each error with negated error values.
+ ;
+ if ("merrors"=fn) do
+ . set libydberrorsfn="libydberrors.h"
+ . open libydberrorsfn:newversion
+ . use libydberrorsfn
+ . do chdr
+ ;
  For  Use in Read msg Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
  Set err=0 Do  Quit:err
  . New i1,i2,upmsg
@@ -144,31 +161,47 @@
  . Quit:ansi="none"
  . Do:'ansiopen
  . . Open outansi:newversion Use outansi
- . . Do hdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
+ . . Do chdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
  . . Quit
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
- Do:'vms
- . Write "};",!!
- . For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
- . Quit
- ; VMS can have addresses in constants, most Unix platforms cannot.
- Write !,$Select(vms:"LITDEF",1:"GBLDEF"),$Char(9),"err_ctl "_fn_"_ctl = {",!
+ Write "};",!!
+ Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
  Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!
  Write $Char(9),cnt_"};",!
  If ansiopen Use outansi Write $Char(9),"};",! Close outansi
+ ;
+ ; Now that we know all the error codes, write them out to the header file associated with the error file we read
+ ;
+ use ydbfn
+ for i=1:1:cnt write "#define ",prefix,outmsg(i)," ",outmsg(i,"code"),!
+ close ydbfn
+ ;
+ ; Write out additional header files if needed
+ ;
+ do:("merrors"=fn)
+ . ;
+ . ; Write the negative values of errors used by libyottadb and its users
+ . ;
+ . use libydberrorsfn
+ . for i=1:1:cnt write "#define YDB_ERR_",outmsg(i)," -",outmsg(i,"code"),!
+ . close libydberrorsfn
  Quit
-hdr
- Set prevout=$IO
+
+;
+; Routine to write C header file for the generated_ctl.c file and the C header files
+;
+chdr
+ Set saveIO=$IO
  If vms Set cfile=$ztrnlnm("gtm$src")_"copyright.txt"
  If 'vms Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
  Set xxxx="2001"
  Set yyyy=$zdate($H,"YYYY")
  Open cfile:read
- Use prevout w "/****************************************************************",!
+ Use saveIO w "/****************************************************************",!
  For i=1:1 Use cfile Read line Quit:$zeof  Do
  . If (1<$zlength(line,"XXXX")) Do
  . . Set str=$zpiece(line,"XXXX",1)_xxxx_$zpiece(line,"XXXX",2)
@@ -178,9 +211,8 @@ hdr
  . . . Set str=$zpiece(line,"YYYY",1)_yyyy_$zpiece(line,"YYYY",2)
  . . Else  Do
  . . . Set str=line
- . Use prevout Write " *"_str_"*",!
+ . Use saveIO Write " *"_str_"*",!
  Close cfile
- Use prevout
- Write " ****************************************************************/",!
+ Use saveIO
+ Write " ****************************************************************/",!!
  Quit
- ;

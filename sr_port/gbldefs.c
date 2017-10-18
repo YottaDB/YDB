@@ -939,6 +939,8 @@ GBLDEF	int		gtm_white_box_test_case_count;
 GBLDEF	int 		gtm_wbox_input_test_case_count; /* VMS allows maximum 31 characters for external identifer */
 GBLDEF	boolean_t	stringpool_unusable;		/* Set to TRUE by any function that does not expect any of its function
 							 * callgraph to use/expand the stringpool. */
+GBLDEF	char		stringpool_unusable_set_at_buf[STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE];
+/* Buffer of WHO last set/unset stringpool usable */
 GBLDEF	boolean_t	stringpool_unexpandable;	/* Set to TRUE by any function for a small period when it has ensured
 							 * enough space in the stringpool so it does not expect any more garbage
 							 * collections or expansions.

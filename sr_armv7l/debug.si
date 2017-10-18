@@ -15,6 +15,7 @@
 #								#
 #################################################################
 
+	.include "ydbmerrors.h"
 #
 # Any debugging macros should be defined here
 #
@@ -28,17 +29,13 @@
 #
 .macro	CHKSTKALIGN
 	.ifdef	DEBUG
-	.data
-	.extern ERR_GTMCHECK
-	.text
 	.extern rts_error
 	tst	sp, #7					/* Check for 8 byte alignment */
 	beq	stkok\@					/* Branch around if stack ok */
 	/*
 	 * Stack is not aligned - raise error
 	 */
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 stkok\@:
@@ -47,9 +44,6 @@ stkok\@:
 
 .macro CHKXFREG
 	.ifdef	DEBUG
-	.data
-	.extern ERR_GTMCHECK
-	.text
 	.extern	rts_error
 	ldr	r12, =xfer_table
 	cmp	r12, r5
@@ -57,8 +51,7 @@ stkok\@:
 	/*
 	 * r7 isn't xfer_table - raise error
 	 */
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 fpok\@:

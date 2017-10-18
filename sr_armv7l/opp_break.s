@@ -20,20 +20,19 @@
 
 	.title	opp_break.s
 
-
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_break
 
 	.data
-.extern frame_pointer
+	.extern frame_pointer
 
 	.text
-.extern	op_break
+	.extern	op_break
 
- 
+
 ENTRY opp_break
 	putframe
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -41,4 +40,4 @@ ENTRY opp_break
 	getframe
 	bx	lr
 
-.end
+	.end

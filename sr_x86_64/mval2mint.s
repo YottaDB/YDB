@@ -23,7 +23,7 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 	.include "mval_def.si"
-	.include "debug.si"
+#	include "debug.si"
 
 	.text
 	.extern	mval2i

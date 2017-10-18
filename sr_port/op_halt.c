@@ -22,6 +22,7 @@
 #include "send_msg.h"
 #include "getzposition.h"
 #include "op.h"
+#include "error.h"
 
 GBLREF	int		mumps_status;
 
@@ -50,7 +51,7 @@ void op_halt(void)
 #	endif
 	if (0 < TREF(gtmci_nested_level))
 	{	/* Call-in is active - Need to return to caller - not halt */
-		mumps_status = 0;
+		mumps_status = SUCCESS;		/* 1 is success */
 		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
 		assertpro(FALSE);		/* Should not return */
 		return;				/* Previous call does not return so this is for the compiler */

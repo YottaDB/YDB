@@ -15,7 +15,7 @@
 
 	.include "g_msf.si"
 	.include "linkage.si"
-	.include "debug.si"
+#	include "debug.si"
 #
 # op_numcmp calls numcmp to compare two mvals
 #

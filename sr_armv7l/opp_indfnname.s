@@ -20,17 +20,17 @@
 
 	.title	opp_indfnname.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indfnname
 
 	.data
-.extern frame_pointer
+	.extern frame_pointer
 
 	.text
-.extern	op_indfnname
+	.extern	op_indfnname
 
 ENTRY opp_indfnname
 	putframe
@@ -39,4 +39,4 @@ ENTRY opp_indfnname
 	getframe
 	bx	lr
 
-.end
+	.end

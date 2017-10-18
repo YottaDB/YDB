@@ -20,16 +20,16 @@
 	.title	op_sto.s
 	.sbttl	op_sto
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.data
-.extern	literal_null
-.extern	undef_inhibit
+	.extern	literal_null
+	.extern	undef_inhibit
 
 	.text
-.extern	underr
+	.extern	underr
 
 ENTRY op_sto
 	push	{r12, lr}
@@ -64,4 +64,4 @@ clab:
 	bl	underr
 	b	done
 
-.end
+	.end

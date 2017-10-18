@@ -48,9 +48,9 @@
 
 	.title	op_follow.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_follow
 
@@ -58,10 +58,9 @@ sav_r0	=	-4
 sav_r1	=	-8
 
 	.text
-.extern	memvcmp
-.extern	n2s
-.extern underr
-
+	.extern	memvcmp
+	.extern	n2s
+	.extern underr
 
 ENTRY op_follow
 	push	{r4, r6, fp, lr}
@@ -91,5 +90,4 @@ ENTRY op_follow
 	mov	sp, fp
 	pop	{r4, r6, fp, pc}
 
-
-.end
+	.end

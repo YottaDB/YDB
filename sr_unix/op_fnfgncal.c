@@ -25,7 +25,7 @@
 
 #include "stringpool.h"
 #include "copy.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"		/* needed for "fgncal.h" */
@@ -135,23 +135,23 @@ error_def(ERR_ZCVECTORINDX);
 STATICDEF int		call_table_initialized = 0;
 /* The following are one-letter mnemonics for Java argument types (capital letters to denote output direction):
  * 						boolean	int	long	float	double	String	byte[] */
-STATICDEF char		gtm_jtype_chars[] = {	'b',	'i',	'l',	'f',	'd',	'j',	'a',
+STATICDEF char		ydb_jtype_chars[] = {	'b',	'i',	'l',	'f',	'd',	'j',	'a',
 						'B',	'I',	'L',	'F',	'D',	'J',	'A' };
-STATICDEF int		gtm_jtype_start_idx = gtm_jboolean,	/* Value of first gtm_j... type for calculation of table indices. */
-	  		gtm_jtype_count = gtm_jbyte_array - gtm_jboolean + 1;	/* Number of types supported with Java call-outs. */
+STATICDEF int		ydb_jtype_start_idx = ydb_jboolean,	/* Value of first ydb_j... type for calculation of table indices. */
+			ydb_jtype_count = ydb_jbyte_array - ydb_jboolean + 1;	/* Number of types supported with Java call-outs. */
 
-STATICFNDCL void	extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t java, boolean_t starred);
-STATICFNDCL int		extarg_getsize(void *src, enum gtm_types typ, mval *dst);
+STATICFNDCL void	extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred);
+STATICFNDCL int		extarg_getsize(void *src, enum ydb_types typ, mval *dst);
 STATICFNDCL void	op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
 				struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var);
 
 /* Routine to convert external return values to mval's */
-STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t java, boolean_t starred)
+STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred)
 {
-	gtm_int_t		s_int_num;
-	gtm_long_t		str_len, s_long_num;
-	gtm_uint_t		uns_int_num;
-	gtm_ulong_t		uns_long_num;
+	ydb_int_t		s_int_num;
+	ydb_long_t		str_len, s_long_num;
+	ydb_uint_t		uns_int_num;
+	ydb_ulong_t		uns_long_num;
 	char			*cp;
 	struct extcall_string	*sp;
 
@@ -159,46 +159,46 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 	{
 		switch (typ)
 		{
-			case gtm_notfound:
+			case ydb_notfound:
 				break;
-			case gtm_void:
+			case ydb_void:
 				break;
-			case gtm_status:
+			case ydb_status:
 				/* Note: reason for double cast is to first turn ptr to same sized int, then big int to little int
 				 * (on 64 bit platforms). This avoids a warning msg with newer 64 bit gcc compilers.
 				 */
-				s_int_num = (gtm_int_t)(intszofptr_t)src;
+				s_int_num = (ydb_int_t)(intszofptr_t)src;
 				if (0 != s_int_num)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
 				MV_FORCE_MVAL(dst, s_int_num);
 				break;
-			case gtm_jboolean:
-			case gtm_jint:
+			case ydb_jboolean:
+			case ydb_jint:
 				if (starred)
-					s_int_num = *((gtm_int_t *)src);
+					s_int_num = *((ydb_int_t *)src);
 				else
-					s_int_num = (gtm_int_t)(intszofptr_t)src;
+					s_int_num = (ydb_int_t)(intszofptr_t)src;
 				MV_FORCE_MVAL(dst, s_int_num);
 				break;
-			case gtm_jlong:
+			case ydb_jlong:
 #				ifdef GTM64
 				if (starred)
-					s_long_num = *((gtm_long_t *)src);
+					s_long_num = *((ydb_long_t *)src);
 				else
-					s_long_num = (gtm_long_t)src;
+					s_long_num = (ydb_long_t)src;
 				MV_FORCE_LMVAL(dst, s_long_num);
 #				else
 				i82mval(dst, *(gtm_int64_t *)src);
 #				endif
 				break;
-			case gtm_jfloat:
+			case ydb_jfloat:
 				float2mval(dst, *((float *)src));
 				break;
-			case gtm_jdouble:
+			case ydb_jdouble:
 				double2mval(dst, *((double *)src));
 				break;
-			case gtm_jstring:
-			case gtm_jbyte_array:
+			case ydb_jstring:
+			case ydb_jbyte_array:
 				sp = (struct extcall_string *)src;
 				dst->mvtype = MV_STR;
 				if (sp->len > MAX_STRLEN)
@@ -224,52 +224,52 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 	/* The following switch is for non-Java call-outs. */
 	switch (typ)
 	{
-		case gtm_notfound:
+		case ydb_notfound:
 			break;
-		case gtm_void:
+		case ydb_void:
 			break;
-		case gtm_status:
+		case ydb_status:
 			/* Note: reason for double cast is to first turn ptr to same sized int, then big int to little int
 			 * (on 64 bit platforms). This avoids a warning msg with newer 64 bit gcc compilers.
 			 */
-			s_int_num = (gtm_int_t)(intszofptr_t)src;
+			s_int_num = (ydb_int_t)(intszofptr_t)src;
 			if (0 != s_int_num)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case gtm_int:
-			s_int_num = (gtm_int_t)(intszofptr_t)src;
+		case ydb_int:
+			s_int_num = (ydb_int_t)(intszofptr_t)src;
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case gtm_uint:
-			uns_int_num = (gtm_uint_t)(intszofptr_t)src;
+		case ydb_uint:
+			uns_int_num = (ydb_uint_t)(intszofptr_t)src;
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
-		case gtm_int_star:
-			s_int_num = *((gtm_int_t *)src);
+		case ydb_int_star:
+			s_int_num = *((ydb_int_t *)src);
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case gtm_uint_star:
-			uns_int_num = *((gtm_uint_t *)src);
+		case ydb_uint_star:
+			uns_int_num = *((ydb_uint_t *)src);
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
-		case gtm_long:
-			s_long_num = (gtm_long_t)src;
+		case ydb_long:
+			s_long_num = (ydb_long_t)src;
 			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
-		case gtm_ulong:
-			uns_long_num = (gtm_ulong_t)src;
+		case ydb_ulong:
+			uns_long_num = (ydb_ulong_t)src;
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
-		case gtm_long_star:
-			s_long_num = *((gtm_long_t *)src);
+		case ydb_long_star:
+			s_long_num = *((ydb_long_t *)src);
 			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
-		case gtm_ulong_star:
-			uns_long_num = *((gtm_ulong_t *)src);
+		case ydb_ulong_star:
+			uns_long_num = *((ydb_ulong_t *)src);
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
-		case gtm_string_star:
+		case ydb_string_star:
 			sp = (struct extcall_string *)src;
 			dst->mvtype = MV_STR;
 			if (sp->len > MAX_STRLEN)
@@ -281,10 +281,10 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 				s2pool(&dst->str);
 			}
 			break;
-		case gtm_float_star:
+		case ydb_float_star:
 			float2mval(dst, *((float *)src));
 			break;
-		case gtm_char_star:
+		case ydb_char_star:
 			cp = (char *)src;
 			assert(((INTPTR_T)cp < (INTPTR_T)stringpool.base) || ((INTPTR_T)cp > (INTPTR_T)stringpool.top));
 			dst->mvtype = MV_STR;
@@ -295,13 +295,13 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 			dst->str.addr = cp;
 			s2pool(&dst->str);
 			break;
-		case gtm_char_starstar:
+		case ydb_char_starstar:
 			if (!src)
 				dst->mvtype = 0;
 			else
-				extarg2mval(*((char **)src), gtm_char_star, dst, java, starred);
+				extarg2mval(*((char **)src), ydb_char_star, dst, java, starred);
 			break;
-		case gtm_double_star:
+		case ydb_double_star:
 			double2mval(dst, *((double *)src));
 			break;
 		default:
@@ -312,7 +312,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 }
 
 /* Subroutine to calculate stringpool requirements for an external argument */
-STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst)
+STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst)
 {
 	char			*cp, **cpp;
 	struct extcall_string	*sp;
@@ -321,37 +321,37 @@ STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst)
 		return 0;
 	switch(typ)
 	{	/* The following group of cases either return nothing or use the numeric part of the mval */
-		case gtm_notfound:
-		case gtm_void:
-		case gtm_double_star:
-		case gtm_status:
-		case gtm_int:
-		case gtm_uint:
-		case gtm_long:
-		case gtm_ulong:
-		case gtm_float_star:
-		case gtm_int_star:
-		case gtm_uint_star:
-		case gtm_long_star:
-		case gtm_ulong_star:
-		case gtm_jboolean:
-		case gtm_jint:
-		case gtm_jlong:
-		case gtm_jfloat:
-		case gtm_jdouble:
+		case ydb_notfound:
+		case ydb_void:
+		case ydb_double_star:
+		case ydb_status:
+		case ydb_int:
+		case ydb_uint:
+		case ydb_long:
+		case ydb_ulong:
+		case ydb_float_star:
+		case ydb_int_star:
+		case ydb_uint_star:
+		case ydb_long_star:
+		case ydb_ulong_star:
+		case ydb_jboolean:
+		case ydb_jint:
+		case ydb_jlong:
+		case ydb_jfloat:
+		case ydb_jdouble:
 			return 0;
-		case gtm_char_starstar:
+		case ydb_char_starstar:
 			cpp = (char **)src;
 			if (*cpp)
 				return STRLEN(*cpp);
 			else
 				return 0;
-		case gtm_char_star:
+		case ydb_char_star:
 			cp = (char *)src;
 			return STRLEN(cp);
-		case gtm_jstring:
-		case gtm_jbyte_array:
-		case gtm_string_star:
+		case ydb_jstring:
+		case ydb_jbyte_array:
+		case ydb_string_star:
 			sp = (struct extcall_string *)src;
 			if ((0 < sp->len)
 			    && ((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
@@ -421,10 +421,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	{	/* Record the expected return type. */
 		switch (entry_ptr->return_type)
 		{
-			case gtm_status:
+			case ydb_status:
 				*types_descr_dptr = 'i';
 				break;
-			case gtm_jlong:
+			case ydb_jlong:
 				*types_descr_dptr = 'l';
 				break;
 			default:
@@ -433,7 +433,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	} else
 		*types_descr_dptr = 'v';
 	types_descr_dptr++;
-	assert(2 * gtm_jtype_count == SIZEOF(gtm_jtype_chars));
+	assert(2 * ydb_jtype_count == SIZEOF(ydb_jtype_chars));
 	for (i = argcnt + 2, j = -2, m1 = entry_ptr->input_mask, m2 = entry_ptr->output_mask, space_n = 0; 0 < i; i--, j++)
 	{	/* Enforce mval values and record expected argument types. */
 		v = va_arg(var, mval *);
@@ -448,27 +448,27 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
 		}
 		/* Estimate how much allocation we are going to need for arguments which require more than pointer-size space. */
-		if (MASK_BIT_ON(m1) && ((gtm_jstring == entry_ptr->parms[j]) || (gtm_jbyte_array == entry_ptr->parms[j])))
+		if (MASK_BIT_ON(m1) && ((ydb_jstring == entry_ptr->parms[j]) || (ydb_jbyte_array == entry_ptr->parms[j])))
 		{
 			if (MV_DEFINED(v))
 			{
 				MV_FORCE_STR(v);
-				n += SIZEOF(gtm_long_t) + v->str.len + 1;  /* length + string + '\0' */
+				n += SIZEOF(ydb_long_t) + v->str.len + 1;  /* length + string + '\0' */
 			} else
-				n += SIZEOF(gtm_long_t) + 1;		    /* length + '\0' */
+				n += SIZEOF(ydb_long_t) + 1;		    /* length + '\0' */
 		}
 #		ifndef GTM64
-		else if ((gtm_jdouble == entry_ptr->parms[j]) || (gtm_jlong == entry_ptr->parms[j]))
+		else if ((ydb_jdouble == entry_ptr->parms[j]) || (ydb_jlong == entry_ptr->parms[j]))
 		{	/* Account for potential 8-byte alignment on 32-bit boxes */
 			n += SIZEOF(gtm_int64_t);
 			space_n += SIZEOF(gtm_int64_t);
 		}
 #		endif
-		jtype_char = entry_ptr->parms[j] - gtm_jtype_start_idx;
-		if ((0 > jtype_char) || (gtm_jtype_count <= jtype_char))
+		jtype_char = entry_ptr->parms[j] - ydb_jtype_start_idx;
+		if ((0 > jtype_char) || (ydb_jtype_count <= jtype_char))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 		else
-			*types_descr_dptr = gtm_jtype_chars[MASK_BIT_ON(m2) ? (gtm_jtype_count + jtype_char) : jtype_char];
+			*types_descr_dptr = ydb_jtype_chars[MASK_BIT_ON(m2) ? (ydb_jtype_count + jtype_char) : jtype_char];
 		types_descr_dptr++;
 		m1 >>= 1;
 		m2 >>= 1;
@@ -481,14 +481,14 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 *  |____________|______________|_______________|
 	 *
 	 * All input-output and output-only parameters have to be passed by reference, which means that param_list contains a
-	 * pointer to the space buffer where the actual value is stored. Furthermore, in case of gtm_jstring_t and gtm_jbyte_array_t
+	 * pointer to the space buffer where the actual value is stored. Furthermore, in case of ydb_jstring_t and ydb_jbyte_array_t
 	 * another pointer from within the space buffer is referencing an area inside the string buffer. Note, however, that certain
-	 * arguments, such as gtm_jfloat_t and gtm_jdouble_t, and gtm_jlong_t on 32-bit boxes, are always passed by reference.
+	 * arguments, such as ydb_jfloat_t and ydb_jdouble_t, and ydb_jlong_t on 32-bit boxes, are always passed by reference.
 	 */
 	param_list = (gparam_list *)malloc(n);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
-	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * (argcnt + 3)));
+	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * (argcnt + 3)));
 	/* Adding 3 for the same reason as above and another 3 to account for the fact that each of type description, class name,
 	 * and method name arguments require room in the free_space buffer, which comes ahead of free_string buffer in memory.
 	 */
@@ -517,30 +517,30 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		/* Verify that all input values are defined. */
 		switch (entry_ptr->parms[i])
 		{
-			case gtm_jboolean:
+			case ydb_jboolean:
 				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
 					param_list->arg[j] = free_space_pointer;
-					*((gtm_int_t *)free_space_pointer) = (gtm_int_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
+					*((ydb_int_t *)free_space_pointer) = (ydb_int_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
 					free_space_pointer++;
 				} else	/* Input expected. */
-					param_list->arg[j] = (void *)(gtm_long_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
+					param_list->arg[j] = (void *)(ydb_long_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
 				break;
-			case gtm_jint:
+			case ydb_jint:
 				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
 					param_list->arg[j] = free_space_pointer;
-					*((gtm_int_t *)free_space_pointer) = (gtm_int_t)(MV_ON(m1, v) ? mval2i(v) : 0);
+					*((ydb_int_t *)free_space_pointer) = (ydb_int_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 					free_space_pointer++;
 				} else	/* Input expected. */
-					param_list->arg[j] = (void *)(gtm_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
+					param_list->arg[j] = (void *)(ydb_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 				break;
-			case gtm_jlong:
+			case ydb_jlong:
 #				ifndef GTM64
 				/* Only need to do this rounding on non-64 it platforms because this one type has a 64-bit
 				 * alignment requirement on those platforms.
 				 */
-				free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t)));
+				free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t)));
 #				endif
 #				ifdef GTM64
 				if (MASK_BIT_ON(m2))
@@ -548,38 +548,38 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 #				endif
 					param_list->arg[j] = free_space_pointer;
 					*((gtm_int64_t *)free_space_pointer) = (gtm_int64_t)(MV_ON(m1, v) ? mval2i8(v) : 0);
-					free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(gtm_int64_t));
+					free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(gtm_int64_t));
 #				ifdef GTM64
 				} else	/* Input expected. */
 					param_list->arg[j] = (void *)(gtm_int64_t)(MV_ON(m1, v) ? mval2i8(v) : 0);
 #				endif
 				break;
-			case gtm_jfloat:
+			case ydb_jfloat:
 				/* Have to go with additional storage either way due to the limitations of callg. */
 				param_list->arg[j] = free_space_pointer;
 				*((float *)free_space_pointer) = (float)(MV_ON(m1, v) ? mval2double(v) : 0.0);
 				free_space_pointer++;
 				break;
-			case gtm_jdouble:
+			case ydb_jdouble:
 #				ifndef GTM64
 				/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
 				 * alignment requirement on those platforms.
 				 */
-				free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(double)));
+				free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(double)));
 #				endif
 				/* Have to go with additional storage either way due to the limitations of callg. */
 				param_list->arg[j] = free_space_pointer;
 				*((double *)free_space_pointer) = (double)(MV_ON(m1, v) ? mval2double(v) : 0.0);
-				free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(double));
+				free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(double));
 				break;
-			case gtm_jstring:
-			case gtm_jbyte_array:
+			case ydb_jstring:
+			case ydb_jbyte_array:
 				param_list->arg[j] = free_space_pointer;
 				/* If this is input-enabled and defined, it should have been forced to string in an earlier loop. */
 				assert(!MV_ON(m1, v) || MV_IS_STRING(v));
 				if (MV_ON(m1, v) && v->str.len)
 				{
-					*free_space_pointer++ = (gtm_long_t)v->str.len;
+					*free_space_pointer++ = (ydb_long_t)v->str.len;
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 					*(char **)free_space_pointer = (char *)free_string_pointer;
 					free_string_pointer += v->str.len;
@@ -652,7 +652,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		}
 		va_end(var);
 		if (dst)
-			n += extarg_getsize((void *)&status, gtm_status, dst);
+			n += extarg_getsize((void *)&status, ydb_status, dst);
 		ENSURE_STP_FREE_SPACE(n);
 		/* Convert return values. */
 		VAR_COPY(var, var_copy);
@@ -669,7 +669,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		va_end(var);
 		if (dst)
 		{
-			if (entry_ptr->return_type != gtm_void)
+			if (entry_ptr->return_type != ydb_void)
 				extarg2mval((void *)status, entry_ptr->return_type, dst, TRUE, FALSE);
 			else
 			{
@@ -694,7 +694,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 					  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 			}
 		}
-	} else if (dst && (gtm_void != entry_ptr->return_type))
+	} else if (dst && (ydb_void != entry_ptr->return_type))
 		i2mval(dst, -1);
 	free(param_list);
 	check_for_timer_pops();
@@ -709,7 +709,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	int		i, pre_alloc_size, rslt, save_mumps_status;
 	int4 		callintogtm_vectorindex, n;
 	gparam_list	*param_list;
-	gtm_long_t	*free_space_pointer;
+	ydb_long_t	*free_space_pointer;
 	INTPTR_T	status;
 	mval		*v;
 	struct extcall_package_list	*package_ptr;
@@ -759,7 +759,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
 	/* Detect a call-out to Java. */
-	if ((NULL != entry_ptr->call_name.addr) && !strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
+	if ((NULL != entry_ptr->call_name.addr) && !strncmp(entry_ptr->call_name.addr, "ydb_xcj", 7))
 	{
 		java = TRUE;
 		argcnt -= 2;
@@ -779,20 +779,20 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		/* For char*, char **, and gtm_string_t * types, add the length. Also a good time to force it into string form. */
+		/* For char*, char **, and ydb_string_t * types, add the length. Also a good time to force it into string form. */
 		switch (entry_ptr->parms[i])
 		{
-			case gtm_string_star:	/* CAUTION: Fall-through. */
-			case gtm_char_star:
+			case ydb_string_star:	/* CAUTION: Fall-through. */
+			case ydb_char_star:
 				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				/* CAUTION: Fall-through. */
-			case gtm_char_starstar:
+			case ydb_char_starstar:
 				if (MASK_BIT_ON(m1))
 				{
 					if (MV_DEFINED(v))
 					{
 						MV_FORCE_STR(v);
-						n += v->str.len + 1;	/* gtm_string_star does not really need the extra byte */
+						n += v->str.len + 1;	/* ydb_string_star does not really need the extra byte */
 					} else
 					{
 						MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
@@ -801,7 +801,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				}
 				break;
 #			ifndef GTM64
-			case gtm_double_star:
+			case ydb_double_star:
 				n += SIZEOF(double);
 				/* CAUTION: Fall-through. */
 #			endif
@@ -819,13 +819,13 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 *  | param_list | space buffer | string buffer |
 	 *  |____________|______________|_______________|
 	 *
-	 * For pointer-type arguments (gtm_long_t *, gtm_float_t *, etc.) the value in param_list is a pointer to a slot inside the
-	 * space buffer, unless it is gtm_char_t *, in which case the string buffer is used. For double-pointer types (char ** or
-	 * gtm_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
+	 * For pointer-type arguments (ydb_long_t *, ydb_float_t *, etc.) the value in param_list is a pointer to a slot inside the
+	 * space buffer, unless it is ydb_char_t *, in which case the string buffer is used. For double-pointer types (char ** or
+	 * ydb_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
 	 * the string buffer is stored.
 	 */
 	param_list = (gparam_list *)malloc(n * 2);
-	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
+	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
 	VAR_START(var, argcnt);
@@ -836,23 +836,23 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		pre_alloc_size = entry_ptr->param_pre_alloc_size[i];
 		switch (entry_ptr->parms[i])
 		{
-			case gtm_uint:
-				param_list->arg[i] = (void *)(gtm_ulong_t)(MV_ON(m1, v) ? mval2ui(v) : 0);
-				/* Note: output gtm_int and gtm_uint is an error (only "star" flavor can be modified). */
+			case ydb_uint:
+				param_list->arg[i] = (void *)(ydb_ulong_t)(MV_ON(m1, v) ? mval2ui(v) : 0);
+				/* Note: output ydb_int and ydb_uint is an error (only "star" flavor can be modified). */
 				break;
-			case gtm_int:
-				param_list->arg[i] = (void *)(gtm_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
+			case ydb_int:
+				param_list->arg[i] = (void *)(ydb_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 				break;
-			case gtm_ulong:
-				param_list->arg[i] = (void *)GTM64_ONLY((gtm_uint64_t)) NON_GTM64_ONLY((gtm_ulong_t))
+			case ydb_ulong:
+				param_list->arg[i] = (void *)GTM64_ONLY((gtm_uint64_t)) NON_GTM64_ONLY((ydb_ulong_t))
 					(MV_ON(m1, v) ? GTM64_ONLY(mval2ui8(v)) NON_GTM64_ONLY(mval2ui(v)) : 0);
 				/* Note: output xc_long and xc_ulong is an error as described above. */
 				break;
-			case gtm_long:
-				param_list->arg[i] = (void *)GTM64_ONLY((gtm_int64_t)) NON_GTM64_ONLY((gtm_long_t))
+			case ydb_long:
+				param_list->arg[i] = (void *)GTM64_ONLY((gtm_int64_t)) NON_GTM64_ONLY((ydb_long_t))
 					(MV_ON(m1, v) ? GTM64_ONLY(mval2i8(v)) NON_GTM64_ONLY(mval2i(v)) : 0);
 				break;
-			case gtm_char_star:
+			case ydb_char_star:
 				param_list->arg[i] = free_string_pointer;
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
@@ -878,7 +878,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 							package->str.len, package->str.addr, extref->str.len, extref->str.addr);
 				}
 				break;
-			case gtm_char_starstar:
+			case ydb_char_starstar:
 				param_list->arg[i] = free_space_pointer;
 				/* If this is defined and input-enabled, it should have been forced to string in an earlier loop. */
 				assert(!MV_ON(m1, v) || MV_IS_STRING(v));
@@ -891,36 +891,36 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				*free_string_pointer++ = '\0';
 				free_space_pointer++;
 				break;
-			case gtm_int_star:
+			case ydb_int_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_int_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_int_t)mval2i(v) : 0;
+				*((ydb_int_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int_t)mval2i(v) : 0;
 				free_space_pointer++;
 				break;
-			case gtm_uint_star:
+			case ydb_uint_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_uint_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_uint_t)mval2ui(v) : 0;
+				*((ydb_uint_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint_t)mval2ui(v) : 0;
 				free_space_pointer++;
 				break;
-			case gtm_long_star:
+			case ydb_long_star:
 				param_list->arg[i] = free_space_pointer;
 				GTM64_ONLY(*((gtm_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_int64_t)mval2i8(v) : 0);
-				NON_GTM64_ONLY(*((gtm_long_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_long_t)mval2i(v) : 0);
+				NON_GTM64_ONLY(*((ydb_long_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_long_t)mval2i(v) : 0);
 				free_space_pointer++;
 				break;
-			case gtm_ulong_star:
+			case ydb_ulong_star:
 				param_list->arg[i] = free_space_pointer;
 				GTM64_ONLY(*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_uint64_t)mval2ui8(v) : 0);
-				NON_GTM64_ONLY(*((gtm_ulong_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_ulong_t)mval2ui(v) : 0);
+				NON_GTM64_ONLY(*((ydb_ulong_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_ulong_t)mval2ui(v) : 0);
 				free_space_pointer++;
 				break;
-			case gtm_string_star:
+			case ydb_string_star:
 				param_list->arg[i] = free_space_pointer;
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
 					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
 					if (MV_DEFINED(v) && v->str.len)
 					{
-						*free_space_pointer++ = (gtm_long_t)v->str.len;
+						*free_space_pointer++ = (ydb_long_t)v->str.len;
 						*(char **)free_space_pointer = (char *)free_string_pointer;
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
 						free_string_pointer += v->str.len;
@@ -932,7 +932,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					}
 				} else if (0 < pre_alloc_size)
 				{
-					*free_space_pointer++ = (gtm_long_t)pre_alloc_size;
+					*free_space_pointer++ = (ydb_long_t)pre_alloc_size;
 					*(char **)free_space_pointer = (char *)free_string_pointer;
 					*free_string_pointer = '\0';
 					free_space_pointer++;
@@ -950,22 +950,22 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 							  extref->str.len, extref->str.addr);
 				}
 				break;
-			case gtm_float_star:
+			case ydb_float_star:
 				param_list->arg[i] = free_space_pointer;
 				*((float *)free_space_pointer) = MV_ON(m1, v) ? (float)mval2double(v) : (float)0.0;
 				free_space_pointer++;
 				break;
-			case gtm_double_star:
+			case ydb_double_star:
 				/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
 				 * alignment requirement on those platforms.
 				 */
-				NON_GTM64_ONLY(free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
+				NON_GTM64_ONLY(free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
 											    SIZEOF(double))));
 				param_list->arg[i] = free_space_pointer;
 				*((double *)free_space_pointer) = MV_ON(m1, v) ? (double)mval2double(v) : 0.0;
-				free_space_pointer += (SIZEOF(double) / SIZEOF(gtm_long_t));
+				free_space_pointer += (SIZEOF(double) / SIZEOF(ydb_long_t));
 				break;
-			case gtm_pointertofunc:
+			case ydb_pointertofunc:
 				callintogtm_vectorindex = MV_DEFINED(v) ? (int4)mval2i(v) : 0;
 				if ((callintogtm_vectorindex >= gtmfunc_unknown_function) || (callintogtm_vectorindex < 0))
 				{
@@ -975,9 +975,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				} else
 					param_list->arg[i] = (void *)callintogtm_vectortable[callintogtm_vectorindex];
 				break;
-			case gtm_pointertofunc_star:
+			case ydb_pointertofunc_star:
 				/* Cannot pass in a function address to be modified by the user program */
-				free_space_pointer = (gtm_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
+				free_space_pointer = (ydb_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
 				param_list->arg[i] = free_space_pointer;
 				*((INTPTR_T *)free_space_pointer) = 0;
 				free_space_pointer++;
@@ -1015,7 +1015,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	va_end(var);
 	if (dst)
-		n += extarg_getsize((void *)&status, gtm_status, dst);
+		n += extarg_getsize((void *)&status, ydb_status, dst);
 	ENSURE_STP_FREE_SPACE(n);
 	/* Convert return values */
 	VAR_START(var, argcnt);
@@ -1028,7 +1028,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	if (dst)
 	{
-		if (entry_ptr->return_type != gtm_void)
+		if (entry_ptr->return_type != ydb_void)
 			extarg2mval((void *)status, entry_ptr->return_type, dst, FALSE, FALSE);
 		else
 		{

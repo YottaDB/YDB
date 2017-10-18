@@ -20,18 +20,17 @@
 
 	.title	opp_tcommit.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_tcommit
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_tcommit
-
+	.extern	op_tcommit
 
 ENTRY opp_tcommit
 	putframe
@@ -40,4 +39,4 @@ ENTRY opp_tcommit
 	getframe
 	bx	lr
 
-.end
+	.end

@@ -23,20 +23,19 @@
 
 	.title	mum_tstart.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	mum_tstart
 
 	.data
-.extern	frame_pointer
-.extern	proc_act_type
-.extern xfer_table
+	.extern	frame_pointer
+	.extern	proc_act_type
+	.extern xfer_table
 
 	.text
-.extern	trans_code
-
+	.extern	trans_code
 
 ENTRY mum_tstart
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -51,5 +50,4 @@ l1:
 	ldr	r5, =frame_pointer
 	bx	lr
 
-
-.end
+	.end

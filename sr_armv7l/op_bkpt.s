@@ -16,26 +16,25 @@
 
 	.title	op_bkpt.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	opp_zstepret
 
 	.data
-.extern	frame_pointer
-.extern	zstep_level
+	.extern	frame_pointer
+	.extern	zstep_level
 
 	.text
-.extern	gtm_fetch
-.extern	op_retarg
-.extern	op_zbreak
-.extern	op_zst_break
-.extern	op_zst_over
-.extern	op_zstepret
-.extern	opp_ret
-
+	.extern	gtm_fetch
+	.extern	op_retarg
+	.extern	op_zbreak
+	.extern	op_zst_break
+	.extern	op_zst_over
+	.extern	op_zstepret
+	.extern	opp_ret
 
 ENTRY opp_zstepret
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -294,5 +293,4 @@ l12:
 	pop	{r0, r1}
 	b	op_retarg
 
-
-.end
+	.end

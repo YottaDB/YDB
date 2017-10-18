@@ -20,17 +20,17 @@
 
 	.title	opp_trestart.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_trestart
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_trestart
+	.extern	op_trestart
 
 
 ENTRY opp_trestart
@@ -40,5 +40,4 @@ ENTRY opp_trestart
 	getframe
 	bx	lr
 
-
-.end
+	.end

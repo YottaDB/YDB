@@ -24,21 +24,21 @@
 
 	.title	op_forloop.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_forloop
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	add_mvals
-.extern	numcmp
-.extern	s2n
-.extern underr
+	.extern	add_mvals
+	.extern	numcmp
+	.extern	s2n
+	.extern underr
 
 loop		= -16
 term		= -12
@@ -230,4 +230,4 @@ newiter:
 	ldmfd   sp!, {r6, fp}
 	bx	lr
 
-.end
+	.end

@@ -32,18 +32,18 @@
 
 	.title	opp_tstart.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	opp_tstart
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_tstart
+	.extern	op_tstart
 
 orig_fp		=	-4
 FRAME_SAVE_SIZE	=	 8
@@ -94,4 +94,4 @@ no_arg:
 	getframe
 	bx	lr
 
-.end
+	.end

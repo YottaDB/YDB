@@ -16,15 +16,15 @@
 
 	.title	op_linestart.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_linestart
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
 
@@ -41,4 +41,4 @@ ENTRY op_linestart
 	str	r6, [r12, #msf_ctxt_off]			/* save ctxt in frame_pointer */
 	bx	lr
 
-.end
+	.end

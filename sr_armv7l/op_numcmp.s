@@ -29,12 +29,11 @@
 
 	.sbttl	op_numcmp
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.text
-.extern	numcmp
-
+	.extern	numcmp
 
 ENTRY op_numcmp
 	push	{r4, lr}				/* r4 is to maintain 8 byte stack alignment */
@@ -43,5 +42,4 @@ ENTRY op_numcmp
 	cmp	r0, #0					/* set flags according to result from numcmp */
 	pop	{r4, pc}
 
-
-.end
+	.end

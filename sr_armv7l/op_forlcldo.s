@@ -17,21 +17,21 @@
 
 	.title	op_forlcldo.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_forlcldo
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	exfun_frame
+	.extern	exfun_frame
 
 	.sbttl	op_forlcldob
 
- 
+
 ENTRY op_forlcldob
 ENTRY op_forlcldol
 ENTRY op_forlcldow
@@ -46,4 +46,4 @@ ENTRY op_forlcldow
 	ldr	r9, [r12, #msf_temps_ptr_off]
 	pop	{r4, pc}
 
-.end
+	.end

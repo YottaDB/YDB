@@ -95,7 +95,7 @@ void error_return(void)
 	 */
 	if (rethrow_needed && BASE_FRAME(curframe))
 	{	/* If the computed frame is a base frame for call-ins, we cannot do rethrow and must use MUM_TSTART to return to
-		 * the call-in invocation code (gtm_ci()).
+		 * the call-in invocation code (ydb_ci[p]()).
 		 */
 		rethrow_needed = FALSE;
 		DBGEHND((stderr, "error_return: rethrow_needed set to FALSE due to call-in base frame"));
@@ -129,7 +129,7 @@ void error_return(void)
 	gtm_err_dev = NULL;
 	if (!zintrframe)
 	{
-		if (parent_counted_frame->type & SFT_CI)	/* Unhandled error in call-in: return to gtm_ci */
+		if (parent_counted_frame->type & SFT_CI)	/* Unhandled error in call-in: return to ydb_ci() */
 			mumps_status = dollar_ecode.error_last_ecode;
 		MUM_TSTART;
 	}

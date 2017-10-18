@@ -16,20 +16,20 @@
 
 	.title	op_mproflinefetch.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_mproflinefetch
 
-.data
-.extern	frame_pointer
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	gtm_fetch
-.extern	stack_leak_check
-.extern pcurrpos
+	.extern	gtm_fetch
+	.extern	stack_leak_check
+	.extern pcurrpos
 
 ENTRY op_mproflinefetch
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -49,4 +49,4 @@ ENTRY op_mproflinefetch
 	ldr	lr, [r12, #msf_mpc_off]
 	bx	lr
 
-.end
+	.end
