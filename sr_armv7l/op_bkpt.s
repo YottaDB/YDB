@@ -75,7 +75,10 @@ ENTRY op_zbfetch
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
 	str	lr, [r12, +#msf_mpc_off]
+	mov	r4, r0				/* Save arg count */
 	bl	gtm_fetch
+	cmp	r4, #4
+	movge	sp, fp				/* One or more args on stack, fix stack pointer */
 	ldr	r0, [r5]
 	bl	op_zbreak
 	getframe
@@ -99,7 +102,10 @@ ENTRY op_zstepfetch
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
 	str	lr, [r12, #msf_mpc_off]
+	mov	r4, r0				/* Save arg count */
 	bl	gtm_fetch
+	cmp	r4, #4
+	movge	sp, fp				/* One or more args on stack, fix stack pointer */
 	bl	op_zst_break
 	getframe
 	bx	lr
@@ -122,7 +128,10 @@ ENTRY op_zstzbfetch
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
 	str	lr, [r12, #msf_mpc_off]
+	mov	r4, r0				/* Save arg count */
 	bl	gtm_fetch
+	cmp	r4, #4
+	movge	sp, fp				/* One or more args on stack, fix stack pointer */
 	ldr	r0, [r5]
 	bl	op_zbreak
 	bl	op_zst_break
@@ -148,7 +157,10 @@ ENTRY op_zstzb_fet_over
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
 	str	lr, [r12, #msf_mpc_off]
+	mov	r4, r0				/* Save arg count */
 	bl	gtm_fetch
+	cmp	r4, #4
+	movge	sp, fp				/* One or more args on stack, fix stack pointer */
 	ldr	r0, [r5]
 	bl	op_zbreak
 	ldr	r2, =zstep_level
@@ -204,7 +216,10 @@ ENTRY op_zst_fet_over
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
 	str	lr, [r12, #msf_mpc_off]
+	mov	r4, r0				/* Save arg count */
 	bl	gtm_fetch
+	cmp	r4, #4
+	movge	sp, fp				/* One or more args on stack, fix stack pointer */
 	ldr	r1, =zstep_level
 	ldr	r1, [r1]
 	ldr	r12, [r5]
