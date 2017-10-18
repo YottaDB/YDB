@@ -12,14 +12,13 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #include "mdef.h"
 #include "error.h"
 
 LITDEF	err_msg ydberrors[] = {
 	{ "QUERY2", "Invalid second argument to $QUERY. Must be -1 or 1.", 0 },
 };
-
-LITDEF	int ERR_QUERY2 = 151027722;
 
 GBLDEF	err_ctl ydberrors_ctl = {
 	256,

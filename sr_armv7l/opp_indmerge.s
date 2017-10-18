@@ -20,18 +20,17 @@
 
 	.title	opp_indmerge.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indmerge
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_indmerge
-
+	.extern	op_indmerge
 
 ENTRY opp_indmerge
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_indmerge
 	getframe
 	bx	lr
 
-
-.end
+	.end

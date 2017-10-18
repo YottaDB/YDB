@@ -57,25 +57,24 @@
 
 	.title	op_mprofextcall.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "gtm_threadgbl_deftypes_asm.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "gtm_threadgbl_deftypes_asm.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_mprofextcall
 
 	.data
-.extern	ERR_GTMCHECK
-.extern	ERR_LABELUNKNOWN
-.extern	frame_pointer
+	.extern	ERR_LABELUNKNOWN
+	.extern	frame_pointer
 
 	.text
-.extern	auto_zlink
-.extern auto_relink_check
-.extern	new_stack_frame_sp
-.extern	rts_error
-.extern laberror
+	.extern	auto_zlink
+	.extern auto_relink_check
+	.extern	new_stack_frame_sp
+	.extern	rts_error
+	.extern laberror
 
 /*
  * Define offsets for arguments saved in stack space
@@ -195,8 +194,7 @@ autorelink_check:
  * occurs
  */
 gtmcheck:
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 	b	retlab
@@ -208,4 +206,4 @@ label_missing:
 	bl	laberror
 	b	retlab
 
-.end
+	.end

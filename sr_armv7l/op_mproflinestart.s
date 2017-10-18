@@ -20,18 +20,18 @@
 
 	.title	op_mproflinestart.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_mproflinestart
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	pcurrpos
+	.extern	pcurrpos
 
 
 /*
@@ -46,4 +46,4 @@ ENTRY op_mproflinestart
 	bl	pcurrpos
 	bx	r4
 
-.end
+	.end

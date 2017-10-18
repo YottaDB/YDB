@@ -30,22 +30,21 @@
 
 	.title	op_exfun.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_exfun
 
 	.data
-.extern	ERR_GTMCHECK
-.extern	dollar_truth
-.extern	frame_pointer
+	.extern	dollar_truth
+	.extern	frame_pointer
 
 	.text
-.extern	exfun_frame
-.extern	push_parm
-.extern	rts_error
+	.extern	exfun_frame
+	.extern	push_parm
+	.extern	rts_error
 
 act_cnt		=	-12
 mask_arg	=	 -8
@@ -67,14 +66,7 @@ ENTRY op_exfun
 	ldr	r4, [lr]				/* verify the instruction immediately after return */
 	lsr	r4, r4, #24
 	cmp	r4, #0xea				/* the instruction is a branch */
-	beq	inst_ok
-error:
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
-	mov	r0, #1
-	bl	rts_error
-	b	retlab
-inst_ok:
+	bne	gtmcheck
 	ldr	r12, [r5]
 	add	r1, lr
 	str	r1, [r12, #msf_mpc_off]
@@ -107,4 +99,10 @@ retlab:
 	mov	sp, fp					/* sp is back where it was just after push at entry */
 	pop	{fp, pc}				/* now fp is value on entry */
 
-.end
+gtmcheck:
+	ldr	r1, =#ERR_GTMCHECK
+	mov	r0, #1
+	bl	rts_error
+	b	retlab
+
+	.end

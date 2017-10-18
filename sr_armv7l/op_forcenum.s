@@ -21,15 +21,14 @@
 
 	.title	op_forcenum.s
 
-
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_forcenum
 
 	.data
-.extern	s2n
+	.extern	s2n
 
 	.text
 save_r1		= -8
@@ -83,4 +82,4 @@ done:
 	mov	sp, fp
 	pop	{fp, pc}
 
-.end
+	.end

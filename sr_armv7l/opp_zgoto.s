@@ -20,18 +20,17 @@
 
 	.title	opp_zgoto.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_zgoto
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_zgoto
-
+	.extern	op_zgoto
 
 ENTRY opp_zgoto
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_zgoto
 	getframe
 	bx	lr
 
-
-.end
+	.end

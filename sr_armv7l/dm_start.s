@@ -18,25 +18,24 @@
 	.title	dm_start.s
 	.sbttl	dm_start
 
-.include "linkage.si"
-.include "error.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "error.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.data
-.extern	frame_pointer
-.extern	dollar_truth
-.extern	xfer_table
-.extern	msp
-.extern	mumps_status
-.extern	restart
-.extern ERR_GTMCHECK
+	.extern	frame_pointer
+	.extern	dollar_truth
+	.extern	xfer_table
+	.extern	msp
+	.extern	mumps_status
+	.extern	restart
 
 	.text
-.extern	mdb_condition_handler
-.extern	op_unwind
-.extern __sigsetjmp				/* setjmp() is really __sigsetjmp(env,0) */
-.extern rts_error
+	.extern	mdb_condition_handler
+	.extern	op_unwind
+	.extern __sigsetjmp				/* setjmp() is really __sigsetjmp(env,0) */
+	.extern rts_error
 
 ENTRY dm_start
 	stmfd   sp!, {r4, r5, r6, r7, r8, r9, r10, fp, r12, lr}
@@ -75,14 +74,14 @@ ENTRY gtm_ret_code
 	str	r2, [r0]			/* msp += 4 */
 	b	return
 
-
 	.sbttl	gtm_levl_ret_code
 
-/* Used by triggers (and eventually call-ins) to return from a nested generated code call */
-/* (a call not at the base C stack level). */
+/* Used by triggers and call-ins to return from a nested generated code call
+ * (a call not at the base C stack level) without doing an unwind.
+ */
 ENTRY gtm_levl_ret_code
 	CHKSTKALIGN				/* Verify stack alignment */
 	REVERT
 	b	return
 
-.end
+	.end

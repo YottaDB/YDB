@@ -18,20 +18,17 @@
 
 	.title	op_gettruth.s
 
-.include "linkage.si"
-.include "mval_def.si"
+	.include "linkage.si"
+	.include "mval_def.si"
 
 	.sbttl	op_gettruth
 
 	.data
-
-.extern	dollar_truth
-.extern	literal_one
-.extern	literal_zero
+	.extern	dollar_truth
+	.extern	literal_one
+	.extern	literal_zero
 
 	.text
-
- 
 /*
  * Routine to fetch mval representing value of $TEST (formerly $TRUTH).
  *
@@ -54,5 +51,4 @@ l3:	ldr	r0, [r2], #+4
 	bgt	l3
 	bx	lr
 
-
-.end
+	.end

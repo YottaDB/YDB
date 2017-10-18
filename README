@@ -1,0 +1,21 @@
+Issue #59 - Project to implement the libyottadb access library (simple API)
+
+Drop 10/19/2017
+- No real functionality additions. This drop is mostly foundational" - likely a few more
+  of these before anything really interesting comes along but it allows the new call-in
+  interface to be used.
+
+- Changes:
+  - All of the call-in routines have been renamed to have a ydb_ prefix instead of a gtm_
+    prefix (e.g. gtm_cip() -> ydb_cip()). Note the gtm_ prefix names are still available
+    but a macro definition in gtmxc_types.h converts them to ydb_ calls instead.
+  - All of the call-in/external-call data types (e.g. gtm_int_t) have been changed to have
+    a ydb_ prefix. Note the gtm_ prefix is still supported as are the native types (int,
+    char, etc) and the long deprecated xc_ types. Note also there is a slight performance
+    bump for using ydb_ types (only during initialization - no long term benefit).
+  - The gtmxc_types.h header file has been separated into two parts:
+      1. gtmxc_types.h contains the gtm_ prefixed type definitions as well as the macros
+         that change calls to gtm_ prefixed callin routines to ydb_ routine calls. Also
+         in here are the deprecated xc_ type definitions. It also includes ydbxc_types.h
+      2. ydbxc_types.h contains the current set of call-in definitions with no backlevel
+         support.

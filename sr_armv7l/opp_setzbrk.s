@@ -25,19 +25,18 @@
 
 	.title	opp_setzbrk.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	opp_setzbrk
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_setzbrk
-
+	.extern	op_setzbrk
 
 ENTRY opp_setzbrk
 	putframe
@@ -46,5 +45,4 @@ ENTRY opp_setzbrk
 	getframe
 	bx	lr
 
-
-.end
+	.end

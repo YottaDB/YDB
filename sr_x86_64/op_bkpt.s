@@ -15,7 +15,7 @@
 
 	.include "linkage.si"
 	.include "g_msf.si"
-	.include "debug.si"
+#	include "debug.si"
 
 save0	= 0						# Stack offset for first save arg
 save1	= 8						# Stack offset for 2nd save arg

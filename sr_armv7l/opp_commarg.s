@@ -20,18 +20,17 @@
 
 	.title	opp_commarg.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_commarg
 
 	.data
-.extern frame_pointer
+	.extern frame_pointer
 
 	.text
-.extern	op_commarg
-
+	.extern	op_commarg
 
 ENTRY opp_commarg
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_commarg
 	getframe
 	bx	lr
 
-
-.end
+	.end

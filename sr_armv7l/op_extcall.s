@@ -57,32 +57,31 @@
 
 	.title	op_extcall.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "gtm_threadgbl_deftypes_asm.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "gtm_threadgbl_deftypes_asm.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_extcall
 
 	.data
-.extern	ERR_GTMCHECK
-.extern	frame_pointer
-.extern gtm_threadgbl
+	.extern	frame_pointer
+	.extern gtm_threadgbl
 
 	.text
-.extern	auto_zlink
-.extern auto_relink_check
-.extern	new_stack_frame
-.extern	rts_error
-.extern laberror
+	.extern	auto_zlink
+	.extern auto_relink_check
+	.extern	new_stack_frame
+	.extern	rts_error
+	.extern laberror
 
 /*
  * Define offsets for arguments saved in stack space
  */
 stack_arg1	= -8
 stack_arg0	= -4
-SAVE_SIZE	=  8	
+SAVE_SIZE	=  8
 
 ENTRY op_extcall
 	push	{fp, r12}					/* r12 is to maintain 8 byte stack alignment */
@@ -195,8 +194,7 @@ autorelink_check:
  * occurs
  */
 gtmcheck:
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 	b	retlab
@@ -208,4 +206,4 @@ label_missing:
 	bl	laberror
 	b	retlab
 
-.end
+	.end

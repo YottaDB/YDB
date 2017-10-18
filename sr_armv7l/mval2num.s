@@ -18,16 +18,16 @@
 
 	.title	mval2num.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	mval2num
 
 	.text
-.extern	n2s
-.extern	s2n
-.extern underr
+	.extern	n2s
+	.extern	s2n
+	.extern underr
 
 ENTRY mval2num
 	push	{r6, lr}
@@ -39,4 +39,4 @@ ENTRY mval2num
 	mv_force_str_if_num_approx r1
 	pop	{r6, pc}
 
-.end
+	.end

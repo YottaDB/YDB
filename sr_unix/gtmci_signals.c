@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_unistd.h"
 #include "gtmci_signals.h"
 #include "gtmsiginfo.h"
@@ -58,7 +59,8 @@ void 	sig_save_ext(struct sigaction* act)
 void 	sig_save_gtm(void)
 {
 	int	i;
-	if (MUMPS_CALLIN & invocation_mode) {
+	if (MUMPS_CALLIN & invocation_mode)
+	{
 		for (i = 1; i <= NSIG; i++)
 			sigaction(i, 0, &gtm_sig_h[i-1]);
 		sig_gtm_ctxt = TRUE;
@@ -68,7 +70,8 @@ void 	sig_save_gtm(void)
 void	sig_switch_gtm(void) /* switch to GT.M signal context */
 {
 	int	i;
-	if ((MUMPS_CALLIN & invocation_mode) && !sig_gtm_ctxt) {
+	if ((MUMPS_CALLIN & invocation_mode) && !sig_gtm_ctxt)
+	{
 		for (i = 1; i <= NSIG; i++)
 			sigaction(i, &gtm_sig_h[i-1], &ext_sig_h[i-1]);
 		sig_gtm_ctxt = TRUE;
@@ -78,7 +81,8 @@ void	sig_switch_gtm(void) /* switch to GT.M signal context */
 void	sig_switch_ext(void) /* switch to external signal context */
 {
 	int	i;
-	if ((MUMPS_CALLIN & invocation_mode) && sig_gtm_ctxt) {
+	if ((MUMPS_CALLIN & invocation_mode) && sig_gtm_ctxt)
+	{
 		for (i = 1; i <= NSIG; i++)
 			sigaction(i, &ext_sig_h[i-1], &gtm_sig_h[i-1]);
 		sig_gtm_ctxt = FALSE;

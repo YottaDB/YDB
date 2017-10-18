@@ -14,7 +14,7 @@
 
 /* op_fnget.s */
 
-/* 
+/*
 	OP_FNGET implements the $Get() function.
 	Upon entry, r1 -> source mval, r0 -> destination mval.
 	If the source mval is defined, it is copied to the target,
@@ -23,11 +23,11 @@
 
 	.title	op_fnget.s
 
-.include "linkage.si"
-.include "mval_def.si"
+	.include "linkage.si"
+	.include "mval_def.si"
 
 	.sbttl	op_fnget
- 
+
 /*
  * Note there is no stack padding for alignment and no check in this routine because it is a leaf routine
  * so never calls anything else. That is not an issue unless this routine calls something in the future in
@@ -40,8 +40,7 @@ ENTRY op_fnget
 	beq	l5				/* If arg = 0, set type and len */
 	mov	r6, r0
 	mv_if_notdefined r1, l5
-
-/* Copy the mval from [r1] to [r0] */
+	/* Copy the mval from [r1] to [r0] */
 	mov	r0, r6
 	mov	r2, #mval_byte_len		/* Assumption: mval_byte_len > 0 */
 l1:	ldr	r3, [r1], #+4
@@ -61,5 +60,4 @@ l5:	mov	r1, #mval_m_str
 	str	r1, [r0, #mval_l_strlen]	/* dest str len = 0 */
 	pop	{r6, pc}
 
-
-.end
+	.end

@@ -19,7 +19,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "dollar_zlevel.h"
@@ -35,6 +35,7 @@
 #endif
 
 GBLREF	stack_frame		*frame_pointer;
+GBLREF	int			mumps_status;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		goframes_unwound_trigger;
 GBLREF	int4			gtm_trigger_depth;
@@ -142,6 +143,7 @@ void op_zg1(int4 level)
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
 		 * MUM_TSTART incurs. Also, if we unwound to a call-in base frame, we need to return to gtm_ci[p]().
 		 */
+		mumps_status = SUCCESS;			/* ZGOTO 0 is causes return code to be 0 for call-in */
 		MUM_TSTART;
 	}
 #	endif

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,13 +53,15 @@ void	goframes(int4 frames)
 #endif
 {
         mval            *ret_targ;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	GTMTRIG_ONLY(goframes_unwound_trigger = FALSE);
-        for (ret_targ = NULL; frames--; )
-        {
+	for (ret_targ = NULL; frames--; )
+	{
 		while (tp_pointer && tp_pointer->fp <= frame_pointer)
 		{
-               	        OP_TROLLBACK(-1);
+			OP_TROLLBACK(-1);
 		}
 		if (0 == frames)
 		{
@@ -65,11 +70,16 @@ void	goframes(int4 frames)
 			 * Setting it to literal_null in that case would cause reference counts to not be decremented later
 			 * in op_unwind/mdb_condition_handler so it is actually necessary to skip it in that case.
 			 */
-	       		if ((NULL != ret_targ) && (NULL == alias_retarg))
-	       		{
-	       		        *ret_targ = literal_null;
-	       		        ret_targ->mvtype |= MV_RETARG;
-	       		}
+			if ((NULL != ret_targ) && (NULL == alias_retarg))
+			{	/* If gtmci_retval is set, use it instead of literal_null. Existing case of this usage is
+				 * a return value from ZHALT. If other cases are added, the assert below may need to be
+				 * adjusted or removed.
+				 */
+				assert(((NULL != TREF(gtmci_retval) && (0 < TREF(gtmci_nested_level))))
+				       || (NULL == TREF(gtmci_retval)));
+				*ret_targ = *((NULL == TREF(gtmci_retval)) ? &literal_null : TREF(gtmci_retval));
+				ret_targ->mvtype |= MV_RETARG;
+			}
 		}
 		skip_error_ret = TRUE;
 #		ifdef GTM_TRIGGER

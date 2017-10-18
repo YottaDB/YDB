@@ -13,7 +13,7 @@
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	GTM,246/PREFIX=ERR_
-	.TITLE	MERRORS	Error Messages for GTM
+	.TITLE	MERRORS	Error Messages for YDB
 !
 !   The code numbers for the errors that have been
 !   standardized by the MUMPS Development Committee are
@@ -138,7 +138,7 @@
 !   M111, Invalid number of days for date
 !   M112, Invalid number of seconds for time
 !
-!  List of messages which are not reported by GT.M standard error routines(rts_error etc.) but
+!  List of messages which are not reported by YDB standard error routines(rts_error etc.) but
 !  by PRINTFs. NOTE: if the value of any these messages changes in future, all its non-standard
 !  usages should be reflected with the new value.
 !	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
@@ -163,7 +163,7 @@
 !	ERR_JOBINTRRETHROW	internal error (not displayed to users - drives rethrow of jobinterrupt)
 !	ERR_JOBINTRRQST		internal error (not displayed to users - drives jobinterrupt)
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
-!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for GT.M debugging
+!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YDB debugging
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_MUDESTROYSUC	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_REPEATERROR		internal error (not displayed to the users)
@@ -180,7 +180,7 @@
 !
 !
 !
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
+!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YDB since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
@@ -434,7 +434,7 @@ MUFILRNDWNFL	<File !AD rundown failed>/error/fao=2!/ansi=0
 JNLTMQUAL1	<Time qualifier BEFORE_TIME="!AZ" is less than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 FORCEDHALT	<Image HALTed by MUPIP STOP>/fatal/fao=0!/ansi=0
 LOADEOF		<Load error: EOF reached prior to BEGIN record !UL.  No records loaded.>/error/fao=1!/ansi=0
-WILLEXPIRE	<This copy of GT.M will expire within one week>/info/fao=0!/ansi=0
+WILLEXPIRE	<This copy of YottaDB will expire within one week>/info/fao=0!/ansi=0
 LOADEDBG	<Load error: END smaller than BEGIN.  No records loaded.>/error/fao=0!/ansi=0
 LABELONLY	<Routine !AD was compiled for label-only entry>/error/fao=2!/ansi=0
 MUREORGFAIL	<MUPIP REORG failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -1294,7 +1294,7 @@ RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
-GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
+GTMERREXIT	<YottaDB image has exited with errors>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
 COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0

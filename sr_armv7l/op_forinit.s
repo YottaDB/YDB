@@ -14,27 +14,26 @@
 
 /* op_forinit.s */
 
-
 	/* r0 - initial value */
 	/* r1 - increment */
 	/* r2 - final value */
 
 	.title	op_forinit.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_forinit
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	numcmp
-.extern	s2n
-.extern underr
+	.extern	numcmp
+	.extern	s2n
+	.extern underr
 
 arg2_save	= -12
 arg1_save	=  -8
@@ -75,4 +74,4 @@ comp:
 	mov	sp, fp
 	pop	{fp, pc}
 
-.end
+	.end

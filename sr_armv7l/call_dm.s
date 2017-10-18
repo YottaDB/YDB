@@ -24,13 +24,12 @@
 	.title	call_dm.s
 	.sbttl	call_dm
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.text
-.extern opp_dmode
-.extern op_oldvar
-
+	.extern opp_dmode
+	.extern op_oldvar
 
 ENTRY call_dm
 newcmd:
@@ -39,5 +38,4 @@ newcmd:
 	bl	op_oldvar
 	b	newcmd
 
-
-.end
+	.end

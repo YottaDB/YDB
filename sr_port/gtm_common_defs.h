@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,7 +15,7 @@
 #ifndef GTM_COMMON_DEFS_H
 #define GTM_COMMON_DEFS_H
 
-#if defined(__ia64) || defined(__x86_64__) || defined(__sparc) || defined(__s390__) || defined (_AIX)
+#if defined(__x86_64__) || defined(__s390__) || defined (_AIX)
 #  define GTM64
 #endif
 
@@ -24,26 +27,13 @@
 #  define NON_GTM64_ONLY(X)	X
 #endif
 
-#ifndef __vms
-#  define readonly
-#  define GBLDEF
-#  define GBLREF		extern
-#  define LITDEF		const
-#  define LITREF		extern const
-#  define error_def(x)		LITREF int x
-#else
-#  ifdef __cplusplus
-#    define GBLDEF
-#    define GBLREF		extern
-#    define LITDEF		const
-#    define LITREF		extern const
-#  else
-#    define GBLDEF		globaldef
-#    define GBLREF		globalref
-#    define LITDEF		const globaldef
-#    define LITREF		const globalref
-#  endif
-#endif
+#define readonly
+#define GBLDEF
+#define GBLREF		extern
+#define LITDEF		const
+#define LITREF		extern const
+#define error_def(x)	/* No longer used as errors are now #define values */
+
 /* Use GBLDEF to define STATICDEF for variables and STATICFNDEF, STATICFNDCL for functions. Define STATICDEF to "GBLDEF". This way
  * we know such usages are intended to be "static" but yet can effectively debug these variables since they are externally
  * visible. For functions, do not use the "static" keyword to make them externally visible. Note that a STATICREF for variables
@@ -63,7 +53,7 @@
 #  define NULL			((void *) 0)
 #endif
 
-#if defined(__ia64) || defined(__MVS__)
+#if defined(__MVS__)
 #  define INTCAST(X)		((int)(X))
 #  define UINTCAST(X)		((uint4)(X))
 #  define STRLEN(X)		((int)(strlen(X)))
@@ -77,9 +67,7 @@
 #  define OFFSETOF(X,Y)		offsetof(X,Y)
 #endif
 
-#ifndef __vms
-#  define DIR_SEPARATOR		'/'
-#endif
+#define DIR_SEPARATOR		'/'
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)			(SIZEOF(LITERAL) - 1)

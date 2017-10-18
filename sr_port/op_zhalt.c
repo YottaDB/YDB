@@ -24,6 +24,7 @@
 #include "getzposition.h"
 #include "mvalconv.h"
 #include "op.h"
+#include "error.h"
 
 GBLREF	int		mumps_status;
 
@@ -57,7 +58,8 @@ void op_zhalt(mval *returncode)
 #	endif
 	if (0 < TREF(gtmci_nested_level))
 	{	/* Need to return to caller - not halt (halting out of this call-in level) */
-		mumps_status = retcode;
+		mumps_status = SUCCESS;
+		TREF(gtmci_retval) = returncode;
 		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
 		assertpro(FALSE);		/* Should not return */
 		return;				/* Previous call does not return so this is for the compiler */

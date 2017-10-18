@@ -3673,7 +3673,7 @@
          write "Iteration ",i,?15,"x=",$get(x,"<UNDEF>"),!
          break:$data(x) "write ""OK"",!":x,"write ""Wrong again"",!":'x
          set x=$increment(x,$data(x))
-         quit
+         quit 
    GTM>DO ^br
    Iteration 1    x=<UNDEF>
    Iteration 2    x=0
@@ -6488,7 +6488,7 @@
    Example:
 
    GTM>ZMESSAGE 150373850:"x"
-   %GTM-E-GVUNDEF, Undefined local variable: x
+   %GTM-E-UNDEF, Undefined local variable: x
 
    This ZMESSAGE command supplies the substitution text for the message.
 

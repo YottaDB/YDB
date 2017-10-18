@@ -21,18 +21,18 @@
 
 	.title	opp_xnew.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	opp_xnew
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_xnew
+	.extern	op_xnew
 
 ENTRY opp_xnew
 	putframe
@@ -41,4 +41,4 @@ ENTRY opp_xnew
 	getframe
 	bx	lr
 
-.end
+	.end

@@ -26,7 +26,7 @@
 	.title	op_forchk1.s
 	.sbttl	op_forchk1
 
-.include "linkage.si"
+	.include "linkage.si"
 
 	.text
 
@@ -38,4 +38,4 @@
 ENTRY op_forchk1
 	bx	lr
 
-.end
+	.end

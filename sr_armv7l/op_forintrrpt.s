@@ -14,23 +14,22 @@
 
 /* op_forintrrpt.s */
 
-
 	.title	op_forintrrpt.s
 	.sbttl	op_forintrrpt
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.data
-.extern	neterr_pending
-.extern	restart_pc
+	.extern	neterr_pending
+	.extern	restart_pc
 
 	.text
-.extern	gvcmz_neterr
-.extern	async_action
-.extern	outofband_clear
+	.extern	gvcmz_neterr
+	.extern	async_action
+	.extern	outofband_clear
 
- 
+
 ENTRY op_forintrrpt
 	push	{r4, lr}			/* r4 is to maintain 8 byte stack alignment */
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -45,5 +44,4 @@ l1:	mov	r0, #0
 	bl	async_action
 	pop	{r4, pc}
 
-
-.end
+	.end

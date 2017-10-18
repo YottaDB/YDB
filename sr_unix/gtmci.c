@@ -31,7 +31,7 @@
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mvalconv.h"
-#include "gtmxc_types.h"
+#include "ydbxc_types.h"
 #include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
@@ -110,6 +110,7 @@ error_def(ERR_CINOENTRY);
 error_def(ERR_CIRCALLNAME);
 error_def(ERR_CITPNESTED);
 error_def(ERR_DISTPATHMAX);
+error_def(ERR_FMLLSTMISSING);
 error_def(ERR_GTMDISTUNDEF);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_INVGTMEXIT);
@@ -192,7 +193,8 @@ error_def(ERR_SYSCALL);
 	}										\
 }
 
-static callin_entry_list* get_entry(const char *call_name)
+STATICFNDCL callin_entry_list* get_entry(const char *call_name);
+STATICFNDEF callin_entry_list* get_entry(const char *call_name)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	ht_ent_str      *callin_entry;
 	stringkey       symkey;
@@ -207,7 +209,7 @@ static callin_entry_list* get_entry(const char *call_name)
 }
 
 /* Java-specific version of call-in handler. */
-int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
+int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
 		unsigned int *has_ret_value)
 {
 	boolean_t		need_rtnobj_shm_free;
@@ -219,8 +221,8 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	char			*xfer_addr;
 	uint4			inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
-	enum gtm_types		arg_type;
-	gtm_string_t		*mstr_parm;
+	enum ydb_types		arg_type;
+	ydb_string_t		*mstr_parm;
 	parmblk_struct 		param_blk;
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
@@ -234,8 +236,9 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 
 	SETUP_THREADGBL_ACCESS;
 	added = FALSE;
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
-	 * invoked after a gtm_exit
+	TREF(gtmci_retval) = NULL;
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -245,7 +248,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	}
 	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
 	{
-		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
+		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
 	}
 	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
@@ -297,13 +300,18 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		lnr_tab_ent = find_line_addr(base_addr, &label, 0, NULL);
 		xfer_addr = (char *)LINE_NUMBER_ADDR(base_addr, lnr_tab_ent);
 	}
+	/* Verify that if we are calling a routine we believe to have parms, that it actually does expect a parameter
+	 * list. If not we need to raise an error.
+	 */
+	if ((0 < entry->argcnt) && !(TABENT_PROXY).has_parms)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FMLLSTMISSING, 2, (int)label.len, label.addr);
 	/* Fill in the param_blk to be passed to push_parm_ci() to set up routine arguments (if any) */
 	if (MAX_ACTUALS < entry->argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
 	if (entry->argcnt < count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ACTLSTTOOLONG, 2, (int)label.len, label.addr);
 	param_blk.argcnt = count;
-	has_return = (gtm_void != entry->return_type);
+	has_return = (ydb_void != entry->return_type);
 	if (has_return)
 	{	/* Create mval slot for return value */
 		MV_INIT(&arg_mval);
@@ -335,36 +343,36 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		arg_mval.mvtype = MV_XZERO;
 		switch(entry->parms[i])
 		{
-			case gtm_jboolean:
+			case ydb_jboolean:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 0, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
-			case gtm_jint:
+			case ydb_jint:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 1, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
-			case gtm_jlong:
+			case ydb_jlong:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 2, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				i82mval(&arg_mval, *(gtm_int64_t *)arg_blob_ptr);
 				break;
-			case gtm_jfloat:
+			case ydb_jfloat:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 3, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					float2mval(&arg_mval, *(float *)arg_blob_ptr);
 				break;
-			case gtm_jdouble:
+			case ydb_jdouble:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 4, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					double2mval(&arg_mval, *(double *)arg_blob_ptr);
 				break;
-			case gtm_jstring:
+			case ydb_jstring:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 7, 5, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -373,11 +381,11 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					s2pool(&arg_mval.str);
 				}
 				break;
-			case gtm_jbyte_array:
+			case ydb_jbyte_array:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 8, 6, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -386,11 +394,11 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					s2pool(&arg_mval.str);
 				}
 				break;
-			case gtm_jbig_decimal:
+			case ydb_jbig_decimal:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 9, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -437,13 +445,13 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
+	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	if (1 != mumps_status)
 	{
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
-		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
-		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
+		 * it is the unhandled error code propagated by $ZTRAP/$ETRAP (from mdb_condition_handler).
 		 */
 		return mumps_status;
 	}
@@ -465,6 +473,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		} else
 		{
 			arg_ptr = &param_blk.args[i - 1]->v;
+			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = out_mask;
 			arg_type = entry->parms[i - 1];
 			out_mask >>= 1;
@@ -476,27 +485,27 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		{	/* Process all output (O/IO) and return parameters modified by the M routine */
 			switch(arg_type)
 			{
-				case gtm_jboolean:
+				case ydb_jboolean:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 0, *arg_types);
-					*(gtm_int_t *)arg_blob_ptr = mval2double(arg_ptr) ? 1 : 0;
+					*(ydb_int_t *)arg_blob_ptr = mval2double(arg_ptr) ? 1 : 0;
 					break;
-                                case gtm_jint:
+                                case ydb_jint:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 1, *arg_types);
-					*(gtm_int_t *)arg_blob_ptr = mval2i(arg_ptr);
+					*(ydb_int_t *)arg_blob_ptr = mval2i(arg_ptr);
 					break;
-				case gtm_jlong:
+				case ydb_jlong:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 2, *arg_types);
 					*(gtm_int64_t *)arg_blob_ptr = mval2i8(arg_ptr);
 					break;
-				case gtm_jfloat:
+				case ydb_jfloat:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 3, *arg_types);
-					*(gtm_float_t *)arg_blob_ptr = mval2double(arg_ptr);
+					*(ydb_float_t *)arg_blob_ptr = mval2double(arg_ptr);
 					break;
-				case gtm_jdouble:
+				case ydb_jdouble:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 4, *arg_types);
-					*(gtm_double_t *)arg_blob_ptr = mval2double(arg_ptr);
+					*(ydb_double_t *)arg_blob_ptr = mval2double(arg_ptr);
 					break;
-				case gtm_jstring:
+				case ydb_jstring:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 7, *arg_types);
 					MV_FORCE_STR(arg_ptr);
 					/* Since the ci_gateway.c code temporarily switches the character following the string's
@@ -506,19 +515,19 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					if (!IS_IN_STRINGPOOL(arg_ptr->str.addr, arg_ptr->str.len))
 						s2pool(&arg_ptr->str);
 					ENSURE_STP_FREE_SPACE(1);
-					(*(gtm_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
-					(*(gtm_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
+					(*(ydb_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
+					(*(ydb_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
 					break;
-				case gtm_jbyte_array:
+				case ydb_jbyte_array:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 8, *arg_types);
 					MV_FORCE_STR(arg_ptr);
-					(*(gtm_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
-					(*(gtm_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
+					(*(ydb_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
+					(*(ydb_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
 					break;
-				case gtm_jbig_decimal:	/* We currently do not support output for big decimal. */
+				case ydb_jbig_decimal:	/* We currently do not support output for big decimal. */
 					break;
 				default:
-					assertpro((arg_type >= gtm_jboolean) && (arg_type <= gtm_jbig_decimal));
+					assertpro((arg_type >= ydb_jboolean) && (arg_type <= ydb_jbig_decimal));
 			}
 		}
 	}
@@ -528,8 +537,8 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	return 0;
 }
 
-/* Common work-routine for gtm_ci() and gtm_cip() to drive callin */
-int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
+/* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
+int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
 	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
@@ -541,9 +550,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	char			*xfer_addr;
 	uint4			inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
-	enum gtm_types		arg_type;
-	gtm_string_t		*mstr_parm;
-	char			*gtm_char_ptr;
+	enum ydb_types		arg_type;
+	ydb_string_t		*mstr_parm;
+	char			*ydb_char_ptr;
 	parmblk_struct 		param_blk;
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
@@ -556,8 +565,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
-	 * invoked after a gtm_exit
+	TREF(gtmci_retval) = NULL;
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -567,7 +577,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	}
 	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
 	{
-		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
+		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
@@ -624,11 +634,16 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		lnr_tab_ent = find_line_addr(base_addr, &label, 0, NULL);
 		xfer_addr = (char *)LINE_NUMBER_ADDR(base_addr, lnr_tab_ent);
 	}
+	/* Verify that if we are calling a routine we believe to have parms, that it actually does expect a parameter
+	 * list. If not we need to raise an error.
+	 */
+	if ((0 < entry->argcnt) && !(TABENT_PROXY).has_parms)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FMLLSTMISSING, 2, (int)label.len, label.addr);
 	/* Fill in the param_blk to be passed to push_parm_ci() to set up routine arguments (if any) */
 	param_blk.argcnt = entry->argcnt;
 	if (MAX_ACTUALS < param_blk.argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
-	has_return = (gtm_void == entry->return_type) ? 0 : 1;
+	has_return = (ydb_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* Create mval slot for return value */
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
@@ -647,45 +662,27 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		{ 	/* Output-only(O) params : advance va_arg pointer */
 			switch(entry->parms[i])
 			{
-				case gtm_int:
-					va_arg(var, gtm_int_t);
+				case ydb_int:				/* Int sizes are the same so group them */
+				case ydb_uint:
+					va_arg(var, ydb_int_t);
 					break;
-				case gtm_uint:
-					va_arg(var, gtm_uint_t);
+				case ydb_long:				/* Long sizes are the same so group them */
+				case ydb_ulong:
+					va_arg(var, ydb_long_t);
 					break;
-				case gtm_long:
-					va_arg(var, gtm_long_t);
+				case ydb_int_star:			/* Address-of sizes are the same so group them */
+				case ydb_uint_star:
+				case ydb_long_star:
+				case ydb_ulong_star:
+				case ydb_float_star:
+				case ydb_double_star:
+				case ydb_char_star:
+				case ydb_string_star:
+					va_arg(var, void *);
 					break;
-				case gtm_ulong:
-					va_arg(var, gtm_ulong_t);
-					break;
-				case gtm_int_star:
-					va_arg(var, gtm_int_t *);
-					break;
-				case gtm_uint_star:
-					va_arg(var, gtm_uint_t *);
-					break;
-				case gtm_long_star:
-					va_arg(var, gtm_long_t *);
-					break;
-				case gtm_ulong_star:
-					va_arg(var, gtm_ulong_t *);
-					break;
-				case gtm_float:
-				case gtm_double:
-					va_arg(var, gtm_double_t);
-					break;
-				case gtm_float_star:
-					va_arg(var, gtm_float_t *);
-					break;
-				case gtm_double_star:
-					va_arg(var, gtm_double_t *);
-					break;
-				case gtm_char_star:
-					va_arg(var, gtm_char_t *);
-					break;
-				case gtm_string_star:
-					va_arg(var, gtm_string_t *);
+				case ydb_float:
+				case ydb_double:
+					va_arg(var, ydb_double_t);
 					break;
 				default:
 					va_end(var);
@@ -695,61 +692,61 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		{ 	/* I/IO params: create mval for each native type param */
 			switch(entry->parms[i])
 			{
-                                case gtm_int:
-                                        i2mval(&arg_mval, va_arg(var, gtm_int_t));
+                                case ydb_int:
+                                        i2mval(&arg_mval, va_arg(var, ydb_int_t));
                                         break;
-                                case gtm_uint:
-                                        i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
+                                case ydb_uint:
+                                        i2usmval(&arg_mval, va_arg(var, ydb_uint_t));
                                         break;
-				case gtm_long:
+				case ydb_long:
 #					ifdef GTM64
-					i82mval(&arg_mval, (gtm_int64_t)va_arg(var, gtm_long_t));
+					i82mval(&arg_mval, (gtm_int64_t)va_arg(var, ydb_long_t));
 #					else
-					i2mval(&arg_mval, (int)va_arg(var, gtm_long_t));
+					i2mval(&arg_mval, (int)va_arg(var, ydb_long_t));
 #					endif
 					break;
-				case gtm_ulong:
+				case ydb_ulong:
 #					ifdef GTM64
-					ui82mval(&arg_mval, (gtm_uint64_t)va_arg(var, gtm_ulong_t));
+					ui82mval(&arg_mval, (gtm_uint64_t)va_arg(var, ydb_ulong_t));
 #					else
-					i2usmval(&arg_mval, (int)va_arg(var, gtm_ulong_t));
+					i2usmval(&arg_mval, (int)va_arg(var, ydb_ulong_t));
 #					endif
 					break;
-                                case gtm_int_star:
-                                        i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
+                                case ydb_int_star:
+                                        i2mval(&arg_mval, *va_arg(var, ydb_int_t *));
                                         break;
-                                case gtm_uint_star:
-                                        i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
+                                case ydb_uint_star:
+                                        i2usmval(&arg_mval, *va_arg(var, ydb_uint_t *));
                                         break;
-				case gtm_long_star:
+				case ydb_long_star:
 #					ifdef GTM64
-					i82mval(&arg_mval, (gtm_int64_t)*va_arg(var, gtm_long_t *));
+					i82mval(&arg_mval, (gtm_int64_t)*va_arg(var, ydb_long_t *));
 #					else
-					i2mval(&arg_mval, (int)*va_arg(var, gtm_long_t *));
+					i2mval(&arg_mval, (int)*va_arg(var, ydb_long_t *));
 #					endif
 					break;
-				case gtm_ulong_star:
+				case ydb_ulong_star:
 #					ifdef GTM64
-					ui82mval(&arg_mval, (gtm_uint64_t)*va_arg(var, gtm_ulong_t *));
+					ui82mval(&arg_mval, (gtm_uint64_t)*va_arg(var, ydb_ulong_t *));
 #					else
-					i2usmval(&arg_mval, (int)*va_arg(var, gtm_ulong_t *));
+					i2usmval(&arg_mval, (int)*va_arg(var, ydb_ulong_t *));
 #					endif
 					break;
-				case gtm_float:
-					float2mval(&arg_mval, (gtm_float_t)va_arg(var, gtm_double_t));
+				case ydb_float:
+					float2mval(&arg_mval, (ydb_float_t)va_arg(var, ydb_double_t));
 					break;
-				case gtm_double:
-					double2mval(&arg_mval, va_arg(var, gtm_double_t));
+				case ydb_double:
+					double2mval(&arg_mval, va_arg(var, ydb_double_t));
 					break;
-				case gtm_float_star:
-					float2mval(&arg_mval, *va_arg(var, gtm_float_t *));
+				case ydb_float_star:
+					float2mval(&arg_mval, *va_arg(var, ydb_float_t *));
 					break;
-				case gtm_double_star:
-					double2mval(&arg_mval, *va_arg(var, gtm_double_t *));
+				case ydb_double_star:
+					double2mval(&arg_mval, *va_arg(var, ydb_double_t *));
 					break;
-				case gtm_char_star:
+				case ydb_char_star:
 					arg_mval.mvtype = MV_STR;
-					arg_mval.str.addr = va_arg(var, gtm_char_t *);
+					arg_mval.str.addr = va_arg(var, ydb_char_t *);
 					arg_mval.str.len = STRLEN(arg_mval.str.addr);
 					if (MAX_STRLEN < arg_mval.str.len)
 					{
@@ -758,8 +755,8 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					}
 					s2pool(&arg_mval.str);
 					break;
-				case gtm_string_star:
-					mstr_parm = va_arg(var, gtm_string_t *);
+				case ydb_string_star:
+					mstr_parm = va_arg(var, ydb_string_t *);
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 					{
@@ -809,8 +806,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
-	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
-	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
+	TREF(gtmci_retval) = NULL;
+	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
+	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
 	{
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
@@ -828,6 +826,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			if (!has_return)
 				continue;
 			arg_ptr = &((lv_val *)(param_blk.retaddr))->v;
+			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = 1;
 			arg_type = entry->return_type;
 		} else
@@ -844,34 +843,34 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		{	/* Process all output (O/IO) and return parameters modified by the M routine */
 			switch(arg_type)
 			{
-                                case gtm_int_star:
-                                        *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
+                                case ydb_int_star:
+                                        *va_arg(temp_var, ydb_int_t *) = mval2i(arg_ptr);
 					break;
-                                case gtm_uint_star:
-                                        *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
+                                case ydb_uint_star:
+                                        *va_arg(temp_var, ydb_uint_t *) = mval2ui(arg_ptr);
 					break;
-				case gtm_long_star:
-					*va_arg(temp_var, gtm_long_t *) =
+				case ydb_long_star:
+					*va_arg(temp_var, ydb_long_t *) =
 						GTM64_ONLY(mval2i8(arg_ptr)) NON_GTM64_ONLY(mval2i(arg_ptr));
 					break;
-				case gtm_ulong_star:
-					*va_arg(temp_var, gtm_ulong_t *) =
+				case ydb_ulong_star:
+					*va_arg(temp_var, ydb_ulong_t *) =
 						GTM64_ONLY(mval2ui8(arg_ptr)) NON_GTM64_ONLY(mval2ui(arg_ptr));
 					break;
-				case gtm_float_star:
-					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
+				case ydb_float_star:
+					*va_arg(temp_var, ydb_float_t *) = mval2double(arg_ptr);
 					break;
-				case gtm_double_star:
-					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
+				case ydb_double_star:
+					*va_arg(temp_var, ydb_double_t *) = mval2double(arg_ptr);
 					break;
-				case gtm_char_star:
-					gtm_char_ptr = va_arg(temp_var, gtm_char_t *);
+				case ydb_char_star:
+					ydb_char_ptr = va_arg(temp_var, ydb_char_t *);
 					MV_FORCE_STR(arg_ptr);
-					memcpy(gtm_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
-					gtm_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
+					memcpy(ydb_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
+					ydb_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
-				case gtm_string_star:
-					mstr_parm = va_arg(temp_var, gtm_string_t *);
+				case ydb_string_star:
+					mstr_parm = va_arg(temp_var, ydb_string_t *);
 					MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
@@ -884,45 +883,27 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		{
 			switch(arg_type)
 			{
-                                case gtm_int_star:
-                                        va_arg(temp_var, gtm_int_t *);
+                                case ydb_int_star:		/* All of the address types are same size so can lump together */
+                                case ydb_uint_star:
+				case ydb_long_star:
+				case ydb_ulong_star:
+				case ydb_float_star:
+				case ydb_double_star:
+				case ydb_char_star:
+				case ydb_string_star:
+					va_arg(temp_var, void *);
 					break;
-                                case gtm_uint_star:
-                                        va_arg(temp_var, gtm_uint_t *);
+                                case ydb_int:			/* The int sizes are the same so group them */
+                                case ydb_uint:
+                                        va_arg(temp_var, ydb_int_t);
 					break;
-				case gtm_long_star:
-					va_arg(temp_var, gtm_long_t *);
+ 				case ydb_long:			/* Long sizes are the same so group them */
+				case ydb_ulong:
+					va_arg(temp_var, ydb_long_t);
 					break;
-				case gtm_ulong_star:
-					va_arg(temp_var, gtm_ulong_t *);
-					break;
-				case gtm_float_star:
-					va_arg(temp_var, gtm_float_t *);
-					break;
-				case gtm_double_star:
-					va_arg(temp_var, gtm_double_t *);
-					break;
-				case gtm_char_star:
-					va_arg(temp_var, gtm_char_t *);
-					break;
-				case gtm_string_star:
-					va_arg(temp_var, gtm_string_t *);
-					break;
-                                case gtm_int:
-                                        va_arg(temp_var, gtm_int_t);
-					break;
-                                case gtm_uint:
-                                        va_arg(temp_var, gtm_uint_t);
-					break;
- 				case gtm_long:
-					va_arg(temp_var, gtm_long_t);
-					break;
-				case gtm_ulong:
-					va_arg(temp_var, gtm_ulong_t);
-					break;
-				case gtm_float:
-				case gtm_double:
-					va_arg(temp_var, gtm_double_t);
+				case ydb_float:
+				case ydb_double:
+					va_arg(temp_var, ydb_double_t);
 					break;
 				default:
 					va_end(temp_var);
@@ -938,39 +919,39 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 }
 
 /* Initial call-in driver version - does name lookup on each call */
-int gtm_ci(const char *c_rtn_name, ...)
+int ydb_ci(const char *c_rtn_name, ...)
 {
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
-	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var);
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var);
 }
 
 /* Fast path call-in driver version - Adds a struct parm that contains name resolution info after first call
  * to speed up dispatching.
  */
-int gtm_cip(ci_name_descriptor* ci_info, ...)
+int ydb_cip(ci_name_descriptor* ci_info, ...)
 {
 	va_list var;
 
 	VAR_START(var, ci_info);
-	return gtm_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
+	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
 }
 
 #ifdef GTM_PTHREAD
-/* Java flavor of gtm_init() */
-int gtm_jinit()
+/* Java flavor of ydb_init() */
+int ydb_jinit()
 {
 	gtm_jvm_process = TRUE;
-	return gtm_init();
+	return ydb_init();
 }
 #endif
 
-/* Initialization routine - can be called directly by call-in caller or can be driven by gtm_ci*() implicitly. But
- * if other GT.M services are to be used prior to a gtm_ci*() call (like timers, gtm_malloc/free, etc), this routine
+/* Initialization routine - can be called directly by call-in caller or can be driven by ydb_ci*() implicitly. But
+ * if other GT.M services are to be used prior to a ydb_ci*() call (like timers, gtm_malloc/free, etc), this routine
  * should be called first.
  */
-int gtm_init()
+int ydb_init()
 {
 	unsigned char   	*transfer_addr;
 	char			*dist;
@@ -986,8 +967,8 @@ int gtm_init()
 		assert(!gtm_startup_active);
 		GTM_THREADGBL_INIT;
 	}
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_init to be
-	 * invoked after a gtm_exit
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_init to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -1042,7 +1023,7 @@ int gtm_init()
 		init_gtm();			/* Note - this initializes fgncal_stackbase and creates the call-in
 						 * base-frame for the initial level.
 						 */
-		gtm_savetraps(); /* nullify default $ZTRAP handling */
+		gtm_savetraps(); 		/* Nullify default $ZTRAP handling */
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
 		assert(gtm_startup_active);
 		assert(frame_pointer->type & SFT_CI);
@@ -1088,7 +1069,7 @@ int gtm_init()
 }
 
 /* Routine exposed to call-in user to exit from active GT.M environment */
-int gtm_exit()
+int ydb_exit()
 {
         DCL_THREADGBL_ACCESS;
 
@@ -1097,7 +1078,7 @@ int gtm_exit()
 		return 0;		/* GT.M environment not setup yet - quietly return */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	assert(NULL != frame_pointer);
-	/* Do not allow gtm_exit() to be invoked from external calls */
+	/* Do not allow ydb_exit() to be invoked from external calls */
 	if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVGTMEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
@@ -1134,7 +1115,7 @@ int gtm_exit()
 }
 
 /* Routine to fetch $ZSTATUS after an error has been raised */
-void gtm_zstatus(char *msg, int len)
+void ydb_zstatus(char *msg, int len)
 {
 	int msg_len;
 	msg_len = (len <= dollar_zstatus.str.len) ? len - 1 : dollar_zstatus.str.len;
@@ -1158,7 +1139,7 @@ void gtmci_cleanup(void)
 	/* If we have already run the exit handler, no need to do so again */
 	if (gtm_startup_active)
 	{
-		gtm_exit_handler();
+		ydb_exit_handler();
 		gtm_startup_active = FALSE;
 	}
 	/* Unregister exit handler .. AIX only for now */

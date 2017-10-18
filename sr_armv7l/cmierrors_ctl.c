@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -14,6 +14,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
 #include "mdef.h"
 #include "error.h"
 
@@ -45,31 +46,6 @@ LITDEF	err_msg cmierrors[] = {
 	{ "REASON_CONFIRM", "Confirm", 0 },
 };
 
-LITDEF	int CMI_DCNINPROG = 150634508;
-LITDEF	int CMI_LNKNOTIDLE = 150634516;
-LITDEF	int CMI_ASSERT = 150634522;
-LITDEF	int CMI_CMICHECK = 150634532;
-LITDEF	int CMI_NETFAIL = 150634538;
-LITDEF	int CMI_BADPORT = 150634546;
-LITDEF	int CMI_NOTND = 150634556;
-LITDEF	int CMI_OVERRUN = 150634562;
-LITDEF	int CMI_NOSERVENT = 150634570;
-LITDEF	int CMI_BADIPADDRPORT = 150634578;
-LITDEF	int CMI_REASON_CONNECT = 150634586;
-LITDEF	int CMI_REASON_INTMSG = 150634594;
-LITDEF	int CMI_REASON_DISCON = 150634602;
-LITDEF	int CMI_REASON_ABORT = 150634610;
-LITDEF	int CMI_REASON_EXIT = 150634618;
-LITDEF	int CMI_REASON_PATHLOST = 150634626;
-LITDEF	int CMI_REASON_PROTOCOL = 150634634;
-LITDEF	int CMI_REASON_THIRDPARTY = 150634642;
-LITDEF	int CMI_REASON_TIMEOUT = 150634650;
-LITDEF	int CMI_REASON_NETSHUT = 150634658;
-LITDEF	int CMI_REASON_REJECT = 150634666;
-LITDEF	int CMI_REASON_IODONE = 150634674;
-LITDEF	int CMI_REASON_OVERRUN = 150634682;
-LITDEF	int CMI_REASON_STATUS = 150634690;
-LITDEF	int CMI_REASON_CONFIRM = 150634698;
 
 GBLDEF	err_ctl cmierrors_ctl = {
 	250,

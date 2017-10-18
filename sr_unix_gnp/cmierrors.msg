@@ -1,6 +1,10 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2009 Fidelity Information Services, Inc	!
+! Copyright (c) 2001-2009 Fidelity National Information		!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
+!								!
+! Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	!
+! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -9,7 +13,7 @@
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	CMI,250/PREFIX=CMI_
-	.TITLE	CMIERRORS Error Messages for CMI ,GT.CM
+	.TITLE	CMIERRORS Error Messages for CMI and GT.CM
 DCNINPROG	<Attempt to initiate operation while disconnect was in progress>/fatal/fao=0
 LNKNOTIDLE	<Attempt to initiate operation before previous operation completed>/fatal/fao=0
 ASSERT		<Assert failed !AD line !UL>/error/fao=3

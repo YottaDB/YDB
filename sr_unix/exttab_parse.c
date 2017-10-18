@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,17 +16,16 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 #include <stdarg.h>
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "gtm_stdlib.h"
-
 #include "gtm_ctype.h"
 #include "gtm_stat.h"
+
 #include "copy.h"
-#include "gtmxc_types.h"
-#include <rtnhdr.h>
+#include "ydbxc_types.h"
+#include "rtnhdr.h"
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"
@@ -53,7 +55,7 @@ STATICFNDCL void *get_memory(size_t n);
 STATICFNDCL char *exttab_scan_space(char *c);
 STATICFNDCL char *scan_ident(char *c);
 STATICFNDCL char *scan_labelref(char *c);
-STATICFNDCL enum gtm_types scan_keyword(char **c);
+STATICFNDCL enum ydb_types scan_keyword(char **c);
 STATICFNDCL int scan_array_bound(char **b,int curr_type);
 STATICFNDCL char *read_table(char *b, int l, FILE *f);
 STATICFNDCL void put_mstr(mstr *src, mstr *dst);
@@ -65,31 +67,133 @@ const int parm_space_needed[] =
 	0,
 	0,
 	SIZEOF(void *),
-	SIZEOF(gtm_int_t),
-	SIZEOF(gtm_uint_t),
-	SIZEOF(gtm_long_t),
-	SIZEOF(gtm_ulong_t),
-	SIZEOF(gtm_float_t),
-	SIZEOF(gtm_double_t),
-	SIZEOF(gtm_int_t *) + SIZEOF(gtm_int_t),
-	SIZEOF(gtm_uint_t *) + SIZEOF(gtm_uint_t),
-	SIZEOF(gtm_long_t *) + SIZEOF(gtm_long_t),
-	SIZEOF(gtm_ulong_t *) + SIZEOF(gtm_ulong_t),
-	SIZEOF(gtm_string_t *) + SIZEOF(gtm_string_t),
-	SIZEOF(gtm_float_t *) + SIZEOF(gtm_float_t),
-	SIZEOF(gtm_char_t *),
-	SIZEOF(gtm_char_t **) + SIZEOF(gtm_char_t *),
-	SIZEOF(gtm_double_t *) + SIZEOF(gtm_double_t),
-	SIZEOF(gtm_pointertofunc_t),
-	SIZEOF(gtm_pointertofunc_t *) + SIZEOF(gtm_pointertofunc_t),
-	SIZEOF(gtm_int_t *) + SIZEOF(gtm_int_t),
-	SIZEOF(gtm_int_t *) + SIZEOF(gtm_int_t),
-	SIZEOF(gtm_long_t *) + SIZEOF(gtm_long_t),
-	SIZEOF(gtm_float_t *) + SIZEOF(gtm_float_t),
-	SIZEOF(gtm_double_t *) + SIZEOF(gtm_double_t),
-	SIZEOF(gtm_string_t),  /* gtm_string_t contains a (gtm_long_t) and (gtm_char_t *) */
-	SIZEOF(gtm_string_t),
-	SIZEOF(gtm_string_t)
+	SIZEOF(ydb_int_t),
+	SIZEOF(ydb_uint_t),
+	SIZEOF(ydb_long_t),
+	SIZEOF(ydb_ulong_t),
+	SIZEOF(ydb_float_t),
+	SIZEOF(ydb_double_t),
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
+	SIZEOF(ydb_uint_t *) + SIZEOF(ydb_uint_t),
+	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),
+	SIZEOF(ydb_ulong_t *) + SIZEOF(ydb_ulong_t),
+	SIZEOF(ydb_string_t *) + SIZEOF(ydb_string_t),
+	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),
+	SIZEOF(ydb_char_t *),
+	SIZEOF(ydb_char_t **) + SIZEOF(ydb_char_t *),
+	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),
+	SIZEOF(ydb_pointertofunc_t),
+	SIZEOF(ydb_pointertofunc_t *) + SIZEOF(ydb_pointertofunc_t),
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
+	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),
+	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),
+	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),
+	SIZEOF(ydb_string_t),  /* ydb_string_t contains a (ydb_long_t) and (ydb_char_t *) */
+	SIZEOF(ydb_string_t),
+	SIZEOF(ydb_string_t)
+};
+
+/* This table is searched serially so the search priority is:
+ *   1. ydb_ types
+ *   2. gtm_ types
+ *   3. native types
+ *   4. the long deprecated xc_ types bringing up the rear.
+ */
+const static struct
+{
+	char		nam[MAX_NAM_LEN];
+	enum ydb_types	typ[MAXIMUM_STARS + 1]; /* One entry for each level of indirection eg [1] is type* */
+} xctab[] =
+{
+/*	typename		type			type *			type **			*/
+	{"ydb_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
+	{"ydb_double_t",	{ydb_double,		ydb_double_star,	ydb_notfound}		},
+	{"ydb_float_t",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
+	{"ydb_int_t",		{ydb_int,		ydb_int_star,		ydb_notfound}		},
+	{"ydb_jbig_decimal_t",	{ydb_jbig_decimal,	ydb_notfound,		ydb_notfound}		},
+	{"ydb_jboolean_t",	{ydb_jboolean,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_jbyte_array_t",	{ydb_jbyte_array, 	ydb_notfound,		ydb_notfound}		},
+	{"ydb_jdouble_t",	{ydb_jdouble,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_jfloat_t",	{ydb_jfloat,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_jint_t",		{ydb_jint,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_jlong_t",		{ydb_jlong,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_jstring_t",	{ydb_jstring,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_long_t",		{ydb_long,		ydb_long_star,		ydb_notfound}		},
+	{"ydb_pointertofunc_t", {ydb_pointertofunc, 	ydb_pointertofunc_star,	ydb_notfound}		},
+	{"ydb_status_t",	{ydb_status,		ydb_notfound,		ydb_notfound}		},
+	{"ydb_string_t",	{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
+	{"ydb_uint_t",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
+	{"ydb_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		},
+	{"gtm_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
+	{"gtm_double_t",	{ydb_double,		ydb_double_star,	ydb_notfound}		},
+	{"gtm_float_t",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
+	{"gtm_int_t",		{ydb_int,		ydb_int_star,		ydb_notfound}		},
+	{"gtm_jbig_decimal_t",	{ydb_jbig_decimal,	ydb_notfound,		ydb_notfound}		},
+	{"gtm_jboolean_t",	{ydb_jboolean,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_jbyte_array_t",	{ydb_jbyte_array, 	ydb_notfound,		ydb_notfound}		},
+	{"gtm_jdouble_t",	{ydb_jdouble,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_jfloat_t",	{ydb_jfloat,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_jint_t",		{ydb_jint,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_jlong_t",		{ydb_jlong,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_jstring_t",	{ydb_jstring,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_long_t",		{ydb_long,		ydb_long_star,		ydb_notfound}		},
+	{"gtm_pointertofunc_t", {ydb_pointertofunc, 	ydb_pointertofunc_star,	ydb_notfound}		},
+	{"gtm_status_t",	{ydb_status,		ydb_notfound,		ydb_notfound}		},
+	{"gtm_string_t",	{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
+	{"gtm_uint_t",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
+	{"gtm_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		},
+	{"void",		{ydb_void,		ydb_notfound,		ydb_notfound}		},
+	{"char",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
+	{"double",		{ydb_double,		ydb_double_star,	ydb_notfound}		},
+	{"float",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
+	{"int",			{ydb_int,		ydb_notfound,		ydb_notfound}		},
+	{"long",		{ydb_long,		ydb_long_star,		ydb_notfound}		},
+	{"string",		{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
+	{"uint",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
+	{"ulong",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		},
+	{"xc_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
+	{"xc_double_t",		{ydb_double,		ydb_double_star,	ydb_notfound}		},
+	{"xc_float_t",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
+	{"xc_int_t",		{ydb_int,		ydb_int_star,		ydb_notfound}		},
+	{"xc_long_t",		{ydb_long,		ydb_long_star,		ydb_notfound}		},
+	{"xc_pointertofunc_t", 	{ydb_pointertofunc, 	ydb_pointertofunc_star,	ydb_notfound}		},
+	{"xc_status_t",		{ydb_status,		ydb_notfound,		ydb_notfound}		},
+	{"xc_string_t",		{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
+	{"xc_uint_t",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
+	{"xc_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		}
+};
+
+const static int default_pre_alloc_value[] =
+{
+	0, /* unknown Type */
+	0, /* void */
+	0, /* status */
+	0, /* int */
+	0, /* uint */
+	0, /* long */
+	0, /* unsigned long */
+	0, /* float */
+	0, /* double */
+	1, /* pointer to int */
+	1, /* pointer to unsigned int */
+	1, /* pointer to long */
+	1, /* pointer to unsigned long */
+	1, /* pointer to string */
+	1, /* pointer to float */
+	100, /* pointer to char */
+	1, /* pointer to pointer of char */
+	1, /* pointer to double */
+	1, /* pointer to function */
+	1, /* pointer to pointer to function */
+	1, /* java int */
+	1, /* java int */
+	1, /* java long */
+	1, /* java float */
+	1, /* java double */
+	1, /* java string */
+	1, /* java byte array */
+	1  /* java big decimal */
 };
 
 error_def(ERR_CIDIRECTIVE);
@@ -192,64 +296,8 @@ STATICFNDEF char *scan_labelref(char *c)
 	return (b == c) ? 0 : b;
 }
 
-STATICFNDEF enum gtm_types scan_keyword(char **c)
+STATICFNDEF enum ydb_types scan_keyword(char **c)
 {
-	const static struct
-	{
-		char		nam[MAX_NAM_LEN];
-		enum gtm_types	typ[MAXIMUM_STARS + 1]; /* One entry for each level of indirection eg [1] is type* */
-	} xctab[] =
-	{
-	/*	typename		type			type *			type **			*/
-
-		{"void",		{gtm_void,		gtm_notfound,		gtm_notfound}		},
-
-		{"gtm_int_t",		{gtm_int,		gtm_int_star,		gtm_notfound}		},
-		{"gtm_jboolean_t",	{gtm_jboolean,		gtm_notfound,		gtm_notfound}		},
-		{"gtm_jint_t",		{gtm_jint,		gtm_notfound,		gtm_notfound}		},
-		{"xc_int_t",		{gtm_int,		gtm_int_star,		gtm_notfound}		},
-		{"int",			{gtm_int,		gtm_notfound,		gtm_notfound}		},
-
-		{"gtm_uint_t",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
-		{"xc_uint_t",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
-		{"uint",		{gtm_uint,		gtm_uint_star,		gtm_notfound}		},
-
-		{"gtm_long_t",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
-		{"gtm_jlong_t",		{gtm_jlong,		gtm_notfound,		gtm_notfound}		},
-		{"xc_long_t",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
-		{"long",		{gtm_long,		gtm_long_star,		gtm_notfound}		},
-
-		{"gtm_ulong_t",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
-		{"xc_ulong_t",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
-		{"ulong",		{gtm_ulong,		gtm_ulong_star,		gtm_notfound}		},
-
-		{"gtm_status_t",	{gtm_status,		gtm_notfound,		gtm_notfound}		},
-		{"xc_status_t",		{gtm_status,		gtm_notfound,		gtm_notfound}		},
-
-		{"gtm_char_t",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
-		{"gtm_jstring_t",	{gtm_jstring,		gtm_notfound,		gtm_notfound}		},
-		{"gtm_jbyte_array_t",	{gtm_jbyte_array, 	gtm_notfound,		gtm_notfound}		},
-		{"gtm_jbig_decimal_t",	{gtm_jbig_decimal,	gtm_notfound,		gtm_notfound}		},
-		{"xc_char_t",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
-		{"char",		{gtm_notfound,		gtm_char_star,		gtm_char_starstar}	},
-
-		{"gtm_string_t",	{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
-		{"xc_string_t",		{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
-		{"string",		{gtm_notfound,		gtm_string_star,	gtm_notfound}		},
-
-		{"gtm_float_t",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
-		{"gtm_jfloat_t",	{gtm_jfloat,		gtm_notfound,		gtm_notfound}		},
-		{"xc_float_t",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
-		{"float",		{gtm_float,		gtm_float_star,		gtm_notfound}		},
-
-		{"gtm_double_t",	{gtm_double,		gtm_double_star,	gtm_notfound}		},
-		{"gtm_jdouble_t",	{gtm_jdouble,		gtm_notfound,		gtm_notfound}		},
-		{"xc_double_t",		{gtm_double,		gtm_double_star,	gtm_notfound}		},
-		{"double",		{gtm_double,		gtm_double_star,	gtm_notfound}		},
-
-		{"gtm_pointertofunc_t", {gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound}		},
-		{"xc_pointertofunc_t", 	{gtm_pointertofunc, 	gtm_pointertofunc_star,	gtm_notfound}		}
-	};
 	char	*b = *c;
 	char	*d;
 	int	len, i, star_count;
@@ -257,7 +305,7 @@ STATICFNDEF enum gtm_types scan_keyword(char **c)
 	b = exttab_scan_space(b);
 	d = scan_ident(b);
 	if (!d)
-		return gtm_notfound;
+		return ydb_notfound;
 	len = (int)(d - b);
 	for (i = 0 ; i < SIZEOF(xctab) / SIZEOF(xctab[0]) ; i++)
 	{
@@ -277,7 +325,7 @@ STATICFNDEF enum gtm_types scan_keyword(char **c)
 			return xctab[i].typ[star_count];
 		}
 	}
-	return gtm_notfound;
+	return ydb_notfound;
 }
 
 STATICFNDEF int scan_array_bound(char **b,int curr_type)
@@ -285,38 +333,6 @@ STATICFNDEF int scan_array_bound(char **b,int curr_type)
 	char 		number[MAX_DIGITS_IN_INT];
 	char		*c;
 	int 		index;
-
-	const static int default_pre_alloc_value[] =
-	{
-		0, /* unknown Type */
-		0, /* void */
-		0, /* status */
-		0, /* int */
-		0, /* uint */
-		0, /* long */
-		0, /* unsigned long */
-		0, /* float */
-		0, /* double */
-		1, /* pointer to int */
-		1, /* pointer to unsigned int */
-		1, /* pointer to long */
-		1, /* pointer to unsigned long */
-		1, /* pointer to string */
-		1, /* pointer to float */
-		100, /* pointer to char */
-		1, /* pointer to pointer of char */
-		1, /* pointer to double */
-		1, /* pointer to function */
-		1, /* pointer to pointer to function */
-		1, /* java int */
-		1, /* java int */
-		1, /* java long */
-		1, /* java float */
-		1, /* java double */
-		1, /* java string */
-		1, /* java byte array */
-		1  /* java big decimal */
-	};
 
 	c = *b;
 	/* Already found '[' */
@@ -415,7 +431,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
 	void_ptr_t	pakhandle;
-	enum gtm_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
+	enum ydb_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	char		str_temp_buffer[MAX_TABLINE_LEN];
 	FILE		*ext_table_file_handle;
@@ -542,36 +558,36 @@ struct extcall_package_list *exttab_parse(mval *package)
 		/* Check for legal return type */
 		switch (ret_tok)
 		{
-			case gtm_status:
-			case gtm_void:
-			case gtm_int:
-			case gtm_uint:
-			case gtm_long:
-			case gtm_ulong:
-			case gtm_char_star:
-			case gtm_float_star:
-			case gtm_string_star:
-			case gtm_int_star:
-			case gtm_uint_star:
-			case gtm_long_star:
-			case gtm_ulong_star:
-			case gtm_double_star:
-			case gtm_char_starstar:
-			case gtm_pointertofunc:
-			case gtm_pointertofunc_star:
-			case gtm_jboolean:
-			case gtm_jint:
-			case gtm_jlong:
-			case gtm_jfloat:
-			case gtm_jdouble:
-			case gtm_jstring:
-			case gtm_jbyte_array:
-			case gtm_jbig_decimal:
+			case ydb_status:
+			case ydb_void:
+			case ydb_int:
+			case ydb_uint:
+			case ydb_long:
+			case ydb_ulong:
+			case ydb_char_star:
+			case ydb_float_star:
+			case ydb_string_star:
+			case ydb_int_star:
+			case ydb_uint_star:
+			case ydb_long_star:
+			case ydb_ulong_star:
+			case ydb_double_star:
+			case ydb_char_starstar:
+			case ydb_pointertofunc:
+			case ydb_pointertofunc_star:
+			case ydb_jboolean:
+			case ydb_jint:
+			case ydb_jlong:
+			case ydb_jfloat:
+			case ydb_jdouble:
+			case ydb_jstring:
+			case ydb_jbyte_array:
+			case ydb_jbig_decimal:
 				break;
 			default:
 				ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
 		}
-		got_status = (ret_tok == gtm_status);
+		got_status = (ret_tok == ydb_status);
 		/* Get call name */
 		if ('[' == *tbp)
 		{
@@ -623,9 +639,9 @@ struct extcall_package_list *exttab_parse(mval *package)
 				ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
 			/* Scanned colon--now get type */
 			pr = scan_keyword(&tbp);
-			if (gtm_notfound == pr)
+			if (ydb_notfound == pr)
 				ext_stx_error(ERR_ZCUNTYPE, ext_table_file_name);
-			if (gtm_status == pr)
+			if (ydb_status == pr)
 			{
 				/* Only one type "status" allowed per call */
 				if (got_status)
@@ -663,7 +679,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		for (i = 0 ; i < parameter_count; i++)
 		{
 			entry_ptr->parms[i] = parameter_types[i];
-			assert(gtm_void != parameter_types[i]);
+			assert(ydb_void != parameter_types[i]);
 			entry_ptr->parmblk_size += parm_space_needed[parameter_types[i]];
 			entry_ptr->param_pre_alloc_size[i] = parameter_alloc_values[i];
 		}
@@ -692,7 +708,7 @@ callin_entry_list* citab_parse (void)
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
-	enum gtm_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
+	enum ydb_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr = NULL, *save_entry_ptr = NULL;
@@ -720,23 +736,23 @@ callin_entry_list* citab_parse (void)
 		ret_tok = scan_keyword(&tbp); /* return type */
 		switch (ret_tok) /* return type valid ? */
 		{
-			case gtm_void:
-			case gtm_char_star:
-			case gtm_int_star:
-			case gtm_uint_star:
-			case gtm_long_star:
-			case gtm_ulong_star:
-			case gtm_float_star:
-			case gtm_double_star:
-			case gtm_string_star:
-			case gtm_jboolean:
-			case gtm_jint:
-			case gtm_jlong:
-			case gtm_jfloat:
-			case gtm_jdouble:
-			case gtm_jstring:
-			case gtm_jbyte_array:
-			case gtm_jbig_decimal:
+			case ydb_void:
+			case ydb_char_star:
+			case ydb_int_star:
+			case ydb_uint_star:
+			case ydb_long_star:
+			case ydb_ulong_star:
+			case ydb_float_star:
+			case ydb_double_star:
+			case ydb_string_star:
+			case ydb_jboolean:
+			case ydb_jint:
+			case ydb_jlong:
+			case ydb_jfloat:
+			case ydb_jdouble:
+			case ydb_jstring:
+			case ydb_jbyte_array:
+			case ydb_jbig_decimal:
 				break;
 			default:
 				ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
@@ -766,31 +782,31 @@ callin_entry_list* citab_parse (void)
 				ext_stx_error(ERR_CIDIRECTIVE, ext_table_file_name);
 			switch ((pr = scan_keyword(&tbp))) /* valid param type? */
 			{
-				case gtm_int:
-				case gtm_uint:
-				case gtm_long:
-				case gtm_ulong:
-				case gtm_float:
-				case gtm_double:
+				case ydb_int:
+				case ydb_uint:
+				case ydb_long:
+				case ydb_ulong:
+				case ydb_float:
+				case ydb_double:
 					if (out_mask & mask)
 						ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
 					/* fall-thru */
-				case gtm_char_star:
-				case gtm_int_star:
-				case gtm_uint_star:
-				case gtm_long_star:
-				case gtm_ulong_star:
-				case gtm_float_star:
-				case gtm_double_star:
-				case gtm_string_star:
-				case gtm_jboolean:
-				case gtm_jint:
-				case gtm_jlong:
-				case gtm_jfloat:
-				case gtm_jdouble:
-				case gtm_jstring:
-				case gtm_jbyte_array:
-				case gtm_jbig_decimal:
+				case ydb_char_star:
+				case ydb_int_star:
+				case ydb_uint_star:
+				case ydb_long_star:
+				case ydb_ulong_star:
+				case ydb_float_star:
+				case ydb_double_star:
+				case ydb_string_star:
+				case ydb_jboolean:
+				case ydb_jint:
+				case ydb_jlong:
+				case ydb_jfloat:
+				case ydb_jdouble:
+				case ydb_jstring:
+				case ydb_jbyte_array:
+				case ydb_jbig_decimal:
 					break;
 				default:
 					ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);

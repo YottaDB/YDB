@@ -24,7 +24,7 @@
 	.title	aswp.s
 	.sbttl	aswp
 
-.include "linkage.si"
+	.include "linkage.si"
 
 	.text
 
@@ -50,5 +50,5 @@ store_failed:
 	bne	retry
 	mov	r12, #RETRY_COUNT
 	b	retry
-.end
+	.end
 

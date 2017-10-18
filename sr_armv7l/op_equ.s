@@ -34,12 +34,11 @@
 
 	.sbttl	op_equ
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.text
-.extern	is_equ
-
+	.extern	is_equ
 
 ENTRY op_equ
 	push	{r4, lr}			/* r4 is to maintain 8 byte stack alignment */
@@ -48,4 +47,4 @@ ENTRY op_equ
 	cmp	r0, #0
 	pop	{r4, pc}
 
-.end
+	.end

@@ -1,7 +1,7 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,103 +10,60 @@
  *								*
  ****************************************************************/
 
-/*	gtmxc_types.h - GT.M, Unix Edition External Call type definitions.  */
+/* This header file is now called ydbxc_types.h. This header file contains only depcrecated forms (and is
+ * in fact deprecated itself on YottaDB).
+ */
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H
 
-#include <sys/types.h>	/* For intptr_t */
-#include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
+#include "ydbxc_types.h"
 
-#ifdef __osf__
-/* Ensure 32-bit pointers for compatibility with GT.M internal representations.  */
-#pragma pointer_size (save)
-#pragma pointer_size (short)
-#endif
-typedef int		gtm_status_t;
-typedef	int		gtm_int_t;
-typedef unsigned int 	gtm_uint_t;
-#if defined(__osf__)
-typedef	int		gtm_long_t;
-typedef unsigned int 	gtm_ulong_t;
-#else
-typedef	long		gtm_long_t;
-typedef unsigned long 	gtm_ulong_t;
-#endif
-typedef	float		gtm_float_t;
-typedef	double		gtm_double_t;
-typedef	char		gtm_char_t;
-typedef int		(*gtm_pointertofunc_t)();
-/* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
- * 'length' field. Note that for output-only gtm_string_t * arguments the 'length' field is set to the
- * preallocation size of the buffer pointed to by 'address', while the first character of the buffer is '\0'.
- */
-typedef struct
-{
-	gtm_long_t	length;
-	gtm_char_t	*address;
-}	gtm_string_t;
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
-
-#if !defined(__alpha)
-typedef intptr_t	gtm_tid_t;
-#else
-typedef int		gtm_tid_t;
-#endif
-
-typedef void		*gtm_fileid_ptr_t;
-typedef struct
-{
-        gtm_string_t	rtn_name;
-        void*		handle;
-} ci_name_descriptor;
+/* Define types for GT.M backward compatibility. */
+typedef ydb_status_t		gtm_status_t;
+typedef ydb_int_t		gtm_int_t;
+typedef ydb_uint_t		gtm_uint_t;
+typedef ydb_long_t		gtm_long_t;
+typedef ydb_ulong_t		gtm_ulong_t;
+typedef ydb_float_t		gtm_float_t;
+typedef ydb_double_t		gtm_double_t;
+typedef ydb_char_t		gtm_char_t;
+typedef ydb_string_t		gtm_string_t;
+typedef ydb_pointertofunc_t	gtm_pointertofunc_t;
+typedef ydb_fileid_ptr_t	gtm_fileid_ptr_t;
+typedef ydb_tid_t		gtm_tid_t;
 
 /* Define deprecated types for backward compatibility. */
-typedef gtm_status_t		xc_status_t;
-typedef gtm_int_t		xc_int_t;
-typedef gtm_uint_t		xc_uint_t;
-typedef gtm_long_t		xc_long_t;
-typedef gtm_ulong_t		xc_ulong_t;
-typedef gtm_float_t		xc_float_t;
-typedef gtm_double_t		xc_double_t;
-typedef gtm_char_t		xc_char_t;
-typedef gtm_string_t		xc_string_t;
-typedef gtm_pointertofunc_t	xc_pointertofunc_t;
-typedef gtm_fileid_ptr_t	xc_fileid_ptr_t;
+typedef ydb_status_t		xc_status_t;
+typedef ydb_int_t		xc_int_t;
+typedef ydb_uint_t		xc_uint_t;
+typedef ydb_long_t		xc_long_t;
+typedef ydb_ulong_t		xc_ulong_t;
+typedef ydb_float_t		xc_float_t;
+typedef ydb_double_t		xc_double_t;
+typedef ydb_char_t		xc_char_t;
+typedef ydb_string_t		xc_string_t;
+typedef ydb_pointertofunc_t	xc_pointertofunc_t;
+typedef ydb_fileid_ptr_t	xc_fileid_ptr_t;
 
-/* Java types with special names for clarity. */
-typedef gtm_int_t		gtm_jboolean_t;
-typedef gtm_int_t		gtm_jint_t;
-typedef gtm_long_t		gtm_jlong_t;
-typedef gtm_float_t		gtm_jfloat_t;
-typedef gtm_double_t		gtm_jdouble_t;
-typedef gtm_char_t		gtm_jstring_t;
-typedef gtm_char_t		gtm_jbyte_array_t;
-typedef gtm_char_t		gtm_jbig_decimal_t;
+/* Java types for GTM backward compatibility */
+typedef ydb_int_t		gtm_jboolean_t;
+typedef ydb_int_t		gtm_jint_t;
+typedef ydb_long_t		gtm_jlong_t;
+typedef ydb_float_t		gtm_jfloat_t;
+typedef ydb_double_t		gtm_jdouble_t;
+typedef ydb_char_t		gtm_jstring_t;
+typedef ydb_char_t		gtm_jbyte_array_t;
+typedef ydb_char_t		gtm_jbig_decimal_t;
 
-/* Call-in interface. */
-gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);
-gtm_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
-gtm_status_t 	gtm_init(void);
+/* Define backward compatibility routine name defines for GT.M entry points */
+#define gtm_ci				ydb_ci
+#define gtm_cip				ydb_cip
+#define gtm_init			ydb_init
 #ifdef GTM_PTHREAD
-gtm_status_t 	gtm_jinit(void);
+# define gtm_jinit			ydb_jinit
 #endif
-gtm_status_t 	gtm_exit(void);
-gtm_status_t	gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
-		unsigned int *has_ret_value);
-void 		gtm_zstatus(char* msg, int len);
-
-/* Other entry points accessable in libgtmshr. */
-gtm_status_t	gtm_filename_to_id(gtm_string_t *filename, gtm_fileid_ptr_t *fileid);
-void		gtm_hiber_start(gtm_uint_t mssleep);
-void		gtm_hiber_start_wait_any(gtm_uint_t mssleep);
-void		gtm_start_timer(gtm_tid_t tid, gtm_int_t time_to_expir, void (*handler)(), gtm_int_t hdata_len, void *hdata);
-void		gtm_cancel_timer(gtm_tid_t tid);
-gtm_status_t	gtm_is_file_identical(gtm_fileid_ptr_t fileid1, gtm_fileid_ptr_t fileid2);
-void		gtm_xcfileid_free(gtm_fileid_ptr_t fileid);
-int		gtm_is_main_thread(void);
-void 		*gtm_malloc(size_t);
-void 		gtm_free(void *);
+#define gtm_exit			ydb_exit
+#define gtm_cij				ydb_cij
+#define gtm_zstatus			ydb_zstatus
 
 #endif /* GTMXC_TYPES_H */
