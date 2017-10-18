@@ -28,6 +28,7 @@ LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 	{LIT_AND_LEN("RS6000"),			"PPC"},
 	{LIT_AND_LEN("AXP"),			"AXP"},
 	{LIT_AND_LEN("HP-PA"),			"PAR"},
+	{LIT_AND_LEN("armv7l"),			"ARMV7L"},
 	{LIT_AND_LEN("x86"),			"X86"},
 	{LIT_AND_LEN("x86_64"),			"X86_64"},
 	{LIT_AND_LEN("S390"),			"390"},
