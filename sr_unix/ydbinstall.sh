@@ -13,7 +13,7 @@
 #								#
 #################################################################
 
-# This script automates the installation of GT.M as much as possible,
+# This script automates the installation of YottaDB as much as possible,
 # to the extent of attempting to download the distribution file.
 # Current limitation is GNU/Linux on x86 (32- & 64-bit) architectures
 # and root installation, but it is intended to relax this in the future.
@@ -38,20 +38,16 @@
 # 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
 # 2017-07-16  0.15 Sam Habiel   - --yottadb or --distrib https://github.com/YottaDB/YottaDB to install YottaDB
 # 2017-08-12  0.16 Christopher Edwards - Default to YottaDB
+# 2017-10-17  0.17 Narayanan Iyer - See git commit message for description of changes.
 
 # Turn on debugging if set
-if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
+if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 
 # Initialization
 timestamp=`date +%Y%m%d%H%M%S`
 if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
-if [ "SunOS" = `uname -s` ] ; then
-    gtm_id="/usr/xpg4/bin/id"
-    gtm_grep="/usr/xpg4/bin/grep"
-else
-    gtm_id=`which id`
-    gtm_grep=`which grep`
-fi
+gtm_id=`which id`
+gtm_grep=`which grep`
 if [ -z "$USER" ] ; then USER=`$gtm_id -un` ; fi
 
 # Functions
@@ -63,12 +59,12 @@ dump_info()
     if [ -n "$gtm_configure_in" ] ; then echo gtm_configure_in " : " $gtm_configure_in ; fi
     if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
     if [ -n "$gtm_copyexec" ] ; then echo gtm_copyexec " : " $gtm_copyexec ; fi
-    if [ -n "$gtm_debug" ] ; then echo gtm_debug " : " $gtm_debug ; fi
+    if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
     if [ -n "$gtm_dist" ] ; then echo gtm_dist " : " $gtm_dist ; fi
-    if [ -n "$gtm_distrib" ] ; then echo gtm_distrib " : " $gtm_distrib ; fi
+    if [ -n "$ydb_distrib" ] ; then echo ydb_distrib " : " $ydb_distrib ; fi
     if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
-    if [ -n "$gtm_filename" ] ; then echo gtm_filename " : " $gtm_filename ; fi
-    if [ -n "$gtm_flavor" ] ; then echo gtm_flavor " : " $gtm_flavor ; fi
+    if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
+    if [ -n "$ydb_flavor" ] ; then echo ydb_flavor " : " $ydb_flavor ; fi
     if [ -n "$gtm_ftp_dirname" ] ; then echo gtm_ftp_dirname " : " $gtm_ftp_dirname ; fi
     if [ -n "$gtm_group" ] ; then echo gtm_group " : " $gtm_group ; fi
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
@@ -76,7 +72,7 @@ dump_info()
     if [ -n "$gtm_hostos" ] ; then echo gtm_hostos " : " $gtm_hostos ; fi
     if [ -n "$gtm_icu_version" ] ; then echo gtm_icu_version " : " $gtm_icu_version ; fi
     if [ -n "$gtm_install_flavor" ] ; then echo gtm_install_flavor " : " $gtm_install_flavor ; fi
-    if [ -n "$gtm_installdir" ] ; then echo gtm_installdir " : " $gtm_installdir ; fi
+    if [ -n "$ydb_installdir" ] ; then echo ydb_installdir " : " $ydb_installdir ; fi
     if [ -n "$gtm_keep_obj" ] ; then echo gtm_keep_obj " : " $gtm_keep_obj ; fi
     if [ -n "$gtm_lcase_utils" ] ; then echo gtm_lcase_utils " : " $gtm_lcase_utils ; fi
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
@@ -87,48 +83,60 @@ dump_info()
     if [ -n "$gtm_tmp" ] ; then echo gtm_tmp " : " $gtm_tmp ; fi
     if [ -n "$gtm_user" ] ; then echo gtm_user " : " $gtm_user ; fi
     if [ -n "$gtm_verbose" ] ; then echo gtm_verbose " : " $gtm_verbose ; fi
-    if [ -n "$gtm_version" ] ; then echo gtm_version " : " $gtm_version ; fi
+    if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
     if [ -n "$gtm_gtm" ] ; then echo gtm_gtm " : " $gtm_gtm ; fi
     if [ -n "$gtmroutines" ] ; then echo gtmroutines " : " $gtmroutines ; fi
     if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
-    if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
+    if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 }
 
 err_exit()
 {
+	echo "YottaDB installation aborted due to above error. Run ydbinstall --help for detailed option list"
+	exit 1
+}
+
+help_exit()
+{
     set +x
     echo "ydbinstall [option] ... [version]"
     echo "Options are:"
-    echo "--build-type buildtype - * type of GT.M build, default is pro"
+    echo "--build-type buildtype - * type of YottaDB build, default is pro"
     echo "--copyenv dirname - copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
     echo "--copyexec dirname - copy gtm script to dirname; incompatible with linkexec"
     echo "--debug - * turn on debugging with set -x"
-    echo "--distrib dirname or URL - source directory for GT.M distribution tarball, local or remote"
-    echo "--dry-run - do everything short of installing GT.M, including downloading the distribution"
-    echo "--group group - group that should own the GT.M installation"
+    echo "--distrib dirname or URL - source directory for YottaDB/GT.M distribution tarball, local or remote"
+    echo "--dry-run - do everything short of installing YottaDB, including downloading the distribution"
+    echo "--group group - group that should own the YottaDB installation"
     echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
     echo "--gtm - Install GT.M instead of YottaDB"
     echo "--help - print this usage information"
-    echo "--installdir dirname - directory where GT.M is to be installed; defaults to /usr/lib/fis-gtm/version_platform"
+    echo "--installdir dirname - directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
     m1="--keep-obj - keep .o files"
-    m1="$m1"" of M routines (normally deleted on platforms with GT.M support for routines in shared libraries)"
+    m1="$m1"" of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
     echo "$m1"
     echo "--linkenv dirname - create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--linkexec dirname - create link in dirname to gtm script; incompatible with copyexec"
     echo "--overwrite-existing - install into an existing directory, overwriting contents; defaults to requiring new directory"
-    m1="--prompt-for-group - * GT.M installation "
+    m1="--prompt-for-group - * YottaDB installation "
     m1="$m1""script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
     echo "$m1"
     echo "--ucaseonly-utils -- install only upper case utility program names; defaults to both if not specified"
-    echo "--user username - user who should own GT.M installation; default is root"
+    echo "--user username - user who should own YottaDB installation; default is root"
     m1="--utf8 ICU_version - install "
     m1="$m1""UTF-8 support using specified  major.minor ICU version; specify default to use default version"
     echo "$m1"
     echo "--verbose - * output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
-    echo "options marked with * are likely to be of interest primarily to GT.M developers"
+    echo "options marked with * are likely to be of interest primarily to YottaDB developers"
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
     echo "This version must run as root."
+    echo ""
+    echo "Example usages are"
+    echo "  ydbinstall.sh                              # installs latest YottaDB version (r1.10) at /usr/local/lib/yottadb/r110"
+    echo "  ydbinstall.sh --installdir /tmp/r110 r1.00 # installs YottaDB r1.00 at /tmp/r110"
+    echo "  ydbinstall.sh --gtm V6.3-002               # installs GT.M V6.3-002"
+    echo ""
     exit 1
 }
 
@@ -193,17 +201,16 @@ while [ $# -gt 0 ] ; do
             fi
             unset gtm_linkexec
             shift ;;
-        --debug) gtm_debug="Y" ; set -x ; shift ;;
+        --debug) ydb_debug="Y" ; set -x ; shift ;;
         --distrib*) tmp=`echo $1 | cut -s -d = -f 2-`
-            if [ -n "$tmp" ] ; then gtm_distrib=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_distrib=$2 ; shift
+            if [ -n "$tmp" ] ; then ydb_distrib=$tmp
+            else if [ 1 -lt "$#" ] ; then ydb_distrib=$2 ; shift
                 else echo "--distrib needs a value" ; err_exit
                 fi
             fi
             shift ;;
         --dry-run) gtm_dryrun="Y" ; shift ;;
         --gtm)
-            gtm_distrib="https://api.github.com/repos/YottaDB/YottaDB/"
             gtm_gtm="Y"
             shift ;;
         --group-restriction) gtm_group_restriction="Y" ; shift ;; # must come before group*
@@ -214,10 +221,10 @@ while [ $# -gt 0 ] ; do
                 fi
             fi
             shift ;;
-        --help) err_exit ;;
+        --help) help_exit ;;
         --installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
-            if [ -n "$tmp" ] ; then gtm_installdir=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_installdir=$2 ; shift
+            if [ -n "$tmp" ] ; then ydb_installdir=$tmp
+            else if [ 1 -lt "$#" ] ; then ydb_installdir=$2 ; shift
                 else echo "--installdir needs a value" ; err_exit
                 fi
             fi
@@ -258,8 +265,8 @@ while [ $# -gt 0 ] ; do
             shift ;;
         --verbose) gtm_verbose="Y" ; shift ;;
         -*) echo Unrecognized option "$1" ; err_exit ;;
-        *) if [ -n "$gtm_version" ] ; then echo Nothing must follow the GT.M version ; err_exit
-            else gtm_version=$1 ; shift ; fi
+        *) if [ -n "$ydb_version" ] ; then echo Nothing must follow the YottaDB/GT.M version ; err_exit
+            else ydb_version=$1 ; shift ; fi
     esac
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
@@ -280,94 +287,96 @@ case ${gtm_hostos}_${gtm_arch} in
     aix*) # no Source Forge dirname
         gtm_arch="rs6000" # uname -m is not useful on AIX
         gtm_ftp_dirname="aix"
-        gtm_flavor="rs6000"
+        ydb_flavor="rs6000"
         gtm_install_flavor="RS6000" ;;
     hpux_ia64) # no Source Forge dirname
         gtm_ftp_dirname="hpux_ia64"
-        gtm_flavor="ia64"
+        ydb_flavor="ia64"
         gtm_install_flavor="IA64" ;;
     linux_i586)
         gtm_sf_dirname="GT.M-x86-Linux"
         gtm_ftp_dirname="linux"
-        gtm_flavor="i586"
+        ydb_flavor="i586"
         gtm_install_flavor="x86"
         gtm_shlib_support="N" ;;
     linux_i686)
         gtm_sf_dirname="GT.M-x86-Linux"
         gtm_ftp_dirname="linux"
-        gtm_flavor="i686"
+        ydb_flavor="i686"
         gtm_install_flavor="x86"
         gtm_shlib_support="N" ;;
     linux_ia64) # no Source Forge dirname
         gtm_ftp_dirname="linux_ia64"
-        gtm_flavor="ia64"
+        ydb_flavor="ia64"
         gtm_install_flavor="IA" ;;
     linux_s390x) # no Source Forge dirname
         gtm_ftp_dirname="linux_s390x"
-        gtm_flavor="s390x"
+        ydb_flavor="s390x"
         gtm_install_flavor="S390X" ;;
     linux_x8664)
         gtm_sf_dirname="GT.M-amd64-Linux"
         gtm_ftp_dirname="linux_x8664"
-        gtm_flavor="x8664"
+        ydb_flavor="x8664"
         gtm_install_flavor="x86_64" ;;
+    linux_armv7l)
+        ydb_flavor="armv7l" ;;
     solaris_sparc) # no Source Forge dirname
         gtm_ftp_dirname="sun"
-        gtm_flavor="sparc"
+        ydb_flavor="sparc"
         gtm_install_flavor="SPARC" ;;
-    default) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
+    *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
-# GT.M version is required - first see if ydbinstall and mumps are bundled
-if [ -z "$gtm_version" ] ; then
+# YottaDB version is required - first see if ydbinstall and mumps are bundled
+if [ -z "$ydb_version" ] ; then
     tmp=`dirname $0`
     if [ -e "$tmp/mumps" -a -e "$tmp/_XCMD.m" ] ; then
-        gtm_distrib=$tmp
+        ydb_distrib=$tmp
         gtm_dist=$tmp ; export gtm_dist
         chmod +x $gtm_dist/mumps
         tmp=`mktmpdir`
         gtmroutines="$tmp($gtm_dist)" ; export gtmroutines
-        gtm_version=`$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2)'`
+        ydb_version=`$gtm_dist/mumps -run %XCMD '$piece($zyrelease," ",2)'`
         rm -rf $tmp
     fi
 fi
 if [ "Y" = "$gtm_verbose" ] ; then
-    echo Determined architecture, OS and GT.M version ; dump_info
+    echo Determined architecture, OS and YottaDB/GT.M version ; dump_info
     wget_flags="-P"
 else wget_flags="-qP"
 fi
 
-# See if GT.M version can be determined from meta data
-if [ -z "$gtm_distrib" ] ; then
-    gtm_distrib="https://api.github.com/repos/YottaDB/YottaDB/"
+# See if YottaDB version can be determined from meta data
+if [ -z "$ydb_distrib" ] ; then
+    ydb_distrib="https://api.github.com/repos/YottaDB/YottaDB/"
 fi
 if [ "Y" = "$gtm_gtm" ] ; then
-    gtm_distrib="http://sourceforge.net/projects/fis-gtm"
+    ydb_distrib="http://sourceforge.net/projects/fis-gtm"
 fi
 
 gtm_tmp=`mktmpdir`
 mkdir $gtm_tmp/tmp
-latest=`echo "$gtm_version" | tr LATES lates`
-if [ -z "$gtm_version" -o "latest" = "$latest" ] ; then
-    case $gtm_distrib in
+latest=`echo "$ydb_version" | tr LATES lates`
+if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
+    case $ydb_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             gtm_gtm="Y"
             if [ "Y" = "$gtm_verbose" ] ; then
-               echo wget ${gtm_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
+               echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
                echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
-                gtm_version=`cat ${gtm_tmp}/latest`
-            else echo Unable to determine GT.M version ; err_exit
+            if { wget $wget_flags $gtm_tmp ${ydb_distrib}/files/${gtm_sf_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
+                ydb_version=`cat ${gtm_tmp}/latest`
+            else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
         ftp://*)
             if [ "Y" = "$gtm_verbose" ] ; then
-               echo wget $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/latest to determine latest version
+               echo wget $gtm_tmp ${ydb_distrib}/${gtm_ftp_dirname}/latest to determine latest version
                echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
-                gtm_version=`cat ${gtm_tmp}/latest`
-            else echo Unable to determine GT.M version ; err_exit
+            if { wget $wget_flags $gtm_tmp ${ydb_distrib}/${gtm_ftp_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
+                ydb_version=`cat ${gtm_tmp}/latest`
+            else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
         https://api.github.com/repos/YottaDB/YottaDB* | https://github.com/YottaDB/YottaDB*)
             if [ "Y" = "$gtm_verbose" ] ; then
@@ -375,66 +384,100 @@ if [ -z "$gtm_version" -o "latest" = "$latest" ] ; then
                 echo Check proxy settings if wget hangs
             fi
             if { wget $wget_flags $gtm_tmp https://api.github.com/repos/YottaDB/YottaDB/releases/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
-                gtm_version=`grep "tag_name" ${gtm_tmp}/latest | cut -d'"' -f4`
+                ydb_version=`grep "tag_name" ${gtm_tmp}/latest | cut -d'"' -f4`
             fi ;;
         *)
-            if [ -f ${gtm_distrib}/latest ] ; then
-                gtm_version=`cat ${gtm_distrib}/latest`
-                if [ "Y" = "$gtm_verbose" ] ; then echo Version is $gtm_version ; fi
-            else echo Unable to determine GT.M version ; err_exit
+            if [ -f ${ydb_distrib}/latest ] ; then
+                ydb_version=`cat ${ydb_distrib}/latest`
+                if [ "Y" = "$gtm_verbose" ] ; then echo Version is $ydb_version ; fi
+            else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
     esac
 fi
-if [ -z "$gtm_version" ] ; then
-echo GT.M version to install is required ; err_exit
+if [ -z "$ydb_version" ] ; then
+echo YottaDB/GT.M version to install is required ; err_exit
 fi
 
-# Get GT.M distribution if ydbinstall is not bundled with distribution
-if [ -f "${gtm_distrib}/mumps" ] ; then gtm_tmp=$gtm_distrib
+# Now that "ydb_version" is determined, get YottaDB/GT.M distribution if ydbinstall is not bundled with distribution
+if [ -f "${ydb_distrib}/mumps" ] ; then gtm_tmp=$ydb_distrib
 else
-    tmp=`echo $gtm_version | tr -d .-`
-    gtm_filename=""
-    if [ "Y" = "$gtm_gtm" ] ; then gtm_filename=gtm_${tmp}_${gtm_hostos}_${gtm_flavor}_${gtm_buildtype}.tar.gz ; fi
-    case $gtm_distrib in
+    tmp=`echo $ydb_version | tr -d .-`
+    ydb_filename=""
+    if [ "Y" = "$gtm_gtm" ] ; then ydb_filename=gtm_${tmp}_${gtm_hostos}_${ydb_flavor}_${gtm_buildtype}.tar.gz ; fi
+    case $ydb_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             if [ "Y" = "$gtm_verbose" ] ; then
-                echo wget ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} to download tarball
+                echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} to download tarball
                 echo Check proxy settings if wget hangs
             fi
-            if { ! wget $wget_flags $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} \
-                2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
-                echo Unable to download GT.M distribution $gtm_filename ; err_exit
+            if { ! wget $wget_flags $gtm_tmp ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} \
+                	2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+                echo Unable to download GT.M distribution $ydb_filename ; err_exit
             fi ;;
         https://api.github.com/repos/YottaDB/YottaDB* | https://github.com/YottaDB/YottaDB*)
             if [ "Y" = "$gtm_verbose" ] ; then
-                echo wget https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${gtm_version} and parse to download tarball
+                echo wget https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${ydb_version} and parse to download tarball
                 echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmp https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${gtm_version} 2>&1 1>${gtm_tmp}/wget_dist.log ;} ; then
-                yottadb_download_url=`grep "browser_download_url" ${gtm_tmp}/${gtm_version} | cut -d'"' -f4`
-                gtm_filename=`basename ${yottadb_download_url}`
+            if { wget $wget_flags $gtm_tmp https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${ydb_version} 2>&1 1>${gtm_tmp}/wget_dist.log ;} ; then
+		# There might be multiple binary tarballs of YottaDB (for various architectures & platforms).
+		# If so, choose the one that corresponds to the current host.
+		yottadb_download_urls=`grep "browser_download_url" ${gtm_tmp}/${ydb_version} | cut -d'"' -f4`
+		# Determine current host's architecture
+		arch=`uname -m | tr -d '_'`
+		# Determine current host's OS. We expect the OS name in the tarball.
+		platform=`uname -s | tr '[A-Z]' '[a-z]'`
+		yottadb_download_url=""
+		for fullfilename in $yottadb_download_urls
+		do
+			ydb_filename=$(basename "$fullfilename")	# Get filename without the leading path
+			extension="${ydb_filename##*.}"			# Get file extension
+			if [ $extension != "tgz" ] ; then
+				# Binary tarballs have a ".tgz" extension. Skip anything else.
+				continue
+			fi
+			case $ydb_filename in
+				*"$arch"*) ;;			# If tarball has current architecture in its name, consider it
+				*)         continue ;;		# else move on to next tarball
+			esac
+			if [ $platform = "linux" ] ; then
+				# If the current host is a RHEL box then set the OS to RHEL (not Linux) as there is a RHEL-specific tarball.
+				# We check that it is a RHEL box by the existence of the file /etc/redhat-release
+				if [ -e /etc/redhat-release ] ; then
+					platform="rhel"
+				fi
+			fi
+			case $ydb_filename in
+				*"$platform"*) ;;			# If tarball has current architecture in its name, consider it
+				*)             continue ;;		# else move on to next tarball
+			esac
+			yottadb_download_url=$fullfilename
+			break					# Now that we found one tarball, stop looking at other choices
+		done
+		if [ $yottadb_download_url = "" ]; then echo Unable to find YottaDB tarball for ${ydb_version} $platform $arch ; err_exit; fi
                 wget $wget_flags $gtm_tmp $yottadb_download_url
-                if [ ! -f ${gtm_tmp}/${gtm_filename} ]; then echo Unable to download GT.M distribution $gtm_filename ; err_exit; fi
+                if [ ! -f ${gtm_tmp}/${ydb_filename} ]; then echo Unable to download YottaDB distribution $ydb_filename ; err_exit; fi
+            else echo Error during wget of YottaDB distribution file ${ydb_distrib}/${ydb_filename} ; err_exit
             fi ;;
         ftp://*)
             if [ "Y" = "$gtm_verbose" ] ; then
-                echo wget ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} to download tarball
+                echo wget ${ydb_distrib}/${gtm_ftp_dirname}/${tmp}/${ydb_filename} to download tarball
                 echo Check proxy settings if wget hangs
             fi
-            if { ! wget $wget_flags $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} \
-                2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
-                echo Unable to download GT.M distribution $gtm_filename ; err_exit
+            if { ! wget $wget_flags $gtm_tmp ${ydb_distrib}/${gtm_ftp_dirname}/${tmp}/${ydb_filename} \
+                	2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+                echo Unable to download GT.M distribution $ydb_filename ; err_exit
             fi ;;
         *)
-            if [ -f ${gtm_distrib}/${gtm_filename} ] ; then
-                if [ "Y" = "$gtm_verbose" ] ; then echo tarball is ${gtm_distrib}/${gtm_filename} ; fi
-                ln -s ${gtm_distrib}/${gtm_filename} $gtm_tmp
-            else echo Unable to locate GT.M distribution file ${gtm_distrib}/${gtm_filename} ; err_exit
+            if [ -f ${ydb_distrib}/${ydb_filename} ] ; then
+                if [ "Y" = "$gtm_verbose" ] ; then echo tarball is ${ydb_distrib}/${ydb_filename} ; fi
+                ln -s ${ydb_distrib}/${ydb_filename} $gtm_tmp
+            else echo Unable to locate YottaDB/GT.M distribution file ${ydb_distrib}/${ydb_filename} ; err_exit
             fi ;;
     esac
-    ( cd $gtm_tmp/tmp ; gzip -d < ${gtm_tmp}/${gtm_filename} | tar xf - 2>&1 1>${gtm_tmp}/tar.log )
+    ( cd $gtm_tmp/tmp ; gzip -d < ${gtm_tmp}/${ydb_filename} | tar xf - 2>&1 1>${gtm_tmp}/tar.log )
 fi
-if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked GT.M distribution ; dump_info ; fi
+if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked YottaDB/GT.M distribution ; dump_info ; fi
 
 # Check installation settings & provide defaults as needed
 tmp=`$gtm_id -un`
@@ -455,14 +498,15 @@ if [ "root" = $tmp ] ; then
     else echo "Continuing because --dry-run selected"
     fi
 fi
-if [ -z "$gtm_installdir" ] ; then
+if [ -z "$ydb_installdir" ] ; then
     if [ -z "$gtm_gtm" ]; then
-         gtm_installdir=/usr/lib/yottadb/${gtm_version}_${gtm_install_flavor}
-    else gtm_installdir=/usr/lib/fis-gtm/${gtm_version}_${gtm_install_flavor}
+         ydbver=`echo $ydb_version | tr '[A-Z]' '[a-z]' | tr -d '.-'`
+         ydb_installdir=/usr/local/lib/yottadb/${ydbver}
+    else ydb_installdir=/usr/local/lib/fis-gtm/${gtm_version}_${gtm_install_flavor}
     fi
 fi
-if [ -d "$gtm_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
-    echo $gtm_installdir exists and --overwrite-existing not specified ; err_exit
+if [ -d "$ydb_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
+    echo $ydb_installdir exists and --overwrite-existing not specified ; err_exit
 fi
 
 issystemd=`which systemctl`
@@ -476,7 +520,7 @@ if [ "" != "$issystemd" ] ; then
 		ipcissue1="$ipcissue1 are removed for a non-system user's processes when that user logs out."
 		ipcissue2="That can cause database operations to fail with mysterious errors."
 
-		ipcline1="# GT.M : Override systemd default of RemoveIPC=yes to prevent automatic ipc removal of"
+		ipcline1="# YottaDB/GT.M : Override systemd default of RemoveIPC=yes to prevent automatic ipc removal of"
 		ipcline1="$ipcline1 Shared Memory Segments and Semaphore Arrays of orphaned databases"
 		ipcline2="RemoveIPC=no"
 		ipccmd="systemctl restart systemd-logind"
@@ -499,7 +543,7 @@ if [ "" != "$issystemd" ] ; then
 			echo "   $ipcline2"
 			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
 			echo "   $ipccmd"
-			echo "and retry GT.M installation"
+			echo "and retry YottaDB/GT.M installation"
 			exit 1
 		fi
 		echo $ipcline1 >> $logindconf
@@ -509,43 +553,30 @@ if [ "" != "$issystemd" ] ; then
 fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning defaults ; dump_info ; fi
 
-# Prepare input to GT.M configure script
+# Prepare input to GT.M configure script. The corresponding questions in configure.gtc are listed below in comments
 gtm_configure_in=${gtm_tmp}/configure_${timestamp}.in
-if { ! $gtm_id -gn bin 2>/dev/null 1>/dev/null ; } then
-    if [ "N" = "$gtm_prompt_for_group" -o 54002 -gt `echo $gtm_version | cut -s -d V -f 2- | tr -d A-Za-z.-` ] ; then
-        echo y >>$gtm_configure_in
-        echo root >>$gtm_configure_in
-        echo $gtm_group_restriction >>$gtm_configure_in
-        gtm_group_already="Y"
+echo $gtm_user >>$gtm_configure_in		# Response to : "What user account should own the files?"
+echo $gtm_group >>$gtm_configure_in		# Response to : "What group should own the files?"
+echo $gtm_group_restriction >>$gtm_configure_in	# Response to : "Should execution of YottaDB be restricted to this group?"
+echo $ydb_installdir >>$gtm_configure_in	# Response to : "In what directory should YottaDB be installed?"
+echo y >>$gtm_configure_in			# Response to one of two possible questions
+						#	"Directory $gtmdist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
+						#	"Directory $gtmdist does not exist. Do you wish to create it as part of this installation? (y or n)"
+if [ -z "$gtm_icu_version" ] ; then echo n  >>$gtm_configure_in	# Response to : "Should UTF-8 support be installed?"
+else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be installed?"
+    if [ "default" = $gtm_icu_version ] ; then echo n  >>$gtm_configure_in	# Response to : "Should an ICU version other than the default be used?"
+    else echo y >>$gtm_configure_in		# Response to : "Should an ICU version other than the default be used?"
+        echo $gtm_icu_version >>$gtm_configure_in	# Response to : "Enter ICU version"
     fi
 fi
-echo $gtm_user >>$gtm_configure_in
-if [ "Y" = "$gtm_gtm" ]; then
-    if [ "Y" = "$gtm_prompt_for_group" -o 54002 -le `echo $gtm_version | cut -s -d V -f 2- | tr -d A-Za-z.-` ] ; then
-	    echo $gtm_group >>$gtm_configure_in
-    fi
-    else echo $gtm_group >>$gtm_configure_in
-fi
-if [ "N" = "$gtm_group_already" ] ; then
-    echo $gtm_group_restriction >>$gtm_configure_in
-fi
-echo $gtm_installdir >>$gtm_configure_in
-echo y >>$gtm_configure_in
-if [ -z "$gtm_icu_version" ] ; then echo n  >>$gtm_configure_in
-else echo y  >>$gtm_configure_in
-    if [ "default" = $gtm_icu_version ] ; then echo n  >>$gtm_configure_in
-    else echo y >>$gtm_configure_in
-        echo $gtm_icu_version >>$gtm_configure_in
-    fi
-fi
-echo $gtm_lcase_utils >>$gtm_configure_in
-if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi
-echo n >>$gtm_configure_in
+echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
+if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext. Keep original .o object files (y or n)?"
+echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 
 
 # Run the GT.M configure script
-if [ "$gtm_distrib" != "$gtm_tmp" ] ; then
+if [ "$ydb_distrib" != "$gtm_tmp" ] ; then
     chmod +w $gtm_tmp/tmp
     cd $gtm_tmp/tmp
 fi
@@ -564,22 +595,22 @@ if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit 
 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
 if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; exit 1; fi
-if [ "Y" = "$gtm_verbose" ] ; then echo Installation complete ; ls -l $gtm_installdir ; fi
+echo YottaDB version $ydb_version installed successfully at $ydb_installdir
 
 # Create copies of environment scripts and gtm executable
 if [ -d "$gtm_linkenv" ] ; then
-    ( cd $gtm_linkenv ; ln -s $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
+    ( cd $gtm_linkenv ; ln -s $ydb_installdir/gtmprofile $ydb_installdir/gtmcshrc ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 else if [ -d "$gtm_copyenv" ] ; then
-        ( cd $gtm_copyenv ; cp $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
+        ( cd $gtm_copyenv ; cp $ydb_installdir/gtmprofile $ydb_installdir/gtmcshrc ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
      fi
 fi
 if [ -d "$gtm_linkexec" ] ; then
-    ( cd $gtm_linkexec ; ln -s $gtm_installdir/gtm ./ )
+    ( cd $gtm_linkexec ; ln -s $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 else if [ -d "$gtm_copyexec" ] ; then
-        ( cd $gtm_copyexec ; cp $gtm_installdir/gtm ./ )
+        ( cd $gtm_copyexec ; cp $ydb_installdir/gtm ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
      fi
 fi

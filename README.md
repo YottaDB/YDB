@@ -29,7 +29,7 @@ versions of packages from the distribution repositories.
 
    ```sh
    $ tar xfz yottadb_r110_src.tar.gz
-   $ cd yottadb_r110
+   $ cd yottadb_r110_src
    ```
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr_* source directories.
@@ -47,27 +47,21 @@ versions of packages from the distribution repositories.
    >
 
    ```sh
-   $ cmake ../
-   $ make
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+   $ make -j `grep -c processor /proc/cpuinfo`
    $ make install
-   $ cd yottadb/r110
+   $ cd yottadb_r110
    ```
 
   Note that the make install done above does not create the final installed YottaDB.
   Instead, it stages YottaDB for distribution.
 
-  Now you are ready to install YottaDB. Answer a few questions and install it.
-  The recommended installation path is `/opt/yottadb/r110`
+  Now you are ready to install YottaDB. The default installation path is ```/usr/local/lib/yottadb/r110```
+  but can be controlled using the --installdir option. Run ```./ydbinstall --help``` for a list of options.
 
   ```sh
-  $ sudo ./ydbinstall	# to install the version you just built
+  $ sudo ./ydbinstall
   $ cd - ; make clean
-  ```
-
-  (Note: The below will help get installation options if needed.)
-
-  ```sh
-  # ./ydbinstall --help	# get installation options
   ```
 
 4. Packaging YottaDB
