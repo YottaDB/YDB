@@ -12,7 +12,7 @@
 
 /* compswap.s */
 
-/*    boolean_t compswap(sm_global_latch_ptr_t latch, int compval, int newval)
+/*    boolean_t compswap_lock(sm_global_latch_ptr_t latch, int compval, int newval)
  *	If the supplied latch matches the comparison value, the new value
  *	is stored in the latch atomically.
  *     Return TRUE if swap/store succeeds,otherwise return FALSE.
@@ -29,32 +29,38 @@
 
 	.text
 
-RETRY_COUNT	= 32
-
-/*
- * Note since this routine makes no calls, stack alignment is not critical. If ever a call is added then this
+/* Note since this routine makes no calls, stack alignment is not critical. If ever a call is added then this
  * routine should take care to align the stack to 8 bytes and add a CHKSTKALIGN macro.
  */
 
-ENTRY compswap
-	mov	r12, #RETRY_COUNT
-	dmb
-retry:
+ENTRY compswap_lock
 	ldrex	r3, [r0]		/* get latch value */
 	cmp	r3, r1
 	bne	nomatch
 	strexeq	r3, r2, [r0]		/* only do swap if latch value matches comparison value */
 	cmpeq	r3, #1
 	beq	notset			/* store-exclusive failed */
+	dmb				/* ensures that all subsequent accesses are observed (by a concurrent process)
+					 * AFTER the gaining of the lock is observed.
+					 */
 	movs	r0, #1			/* return success */
-	dmb
 	bx	lr
 nomatch:
 	clrex				/* reset exclusive status */
 notset:
-	subs	r12, #1
-	bgt	retry
 	movs	r0, #0			/* return failure */
+	bx	lr
+
+/*    boolean_t compswap_unlock(sm_global_latch_ptr_t latch)
+ *		r0 - Pointer to latch
+ *	Stores 0 in *r0 and returns
+ */
+ENTRY compswap_unlock
+	mov	r1, #0
+	dmb				/* ensures that all previous accesses are observed (by a concurrent process)
+					 * BEFORE the clearing of the lock is observed.
+					 */
+	str	r1, [r0]
 	bx	lr
 
 .end

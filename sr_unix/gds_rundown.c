@@ -580,12 +580,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (jbp->fsync_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                COMPSWAP_UNLOCK(&jbp->fsync_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
+                                COMPSWAP_UNLOCK(&jbp->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
                         }
                         if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
+                                COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, LOCK_AVAILABLE);
                         }
 			/* If we are last writer, it is possible cnl->remove_shm is set to FALSE from the "wcs_flu" call
 			 * above (e.g. we are source server and "wcs_flu" noticed a phase2 commit that need to be cleaned up

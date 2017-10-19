@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -117,7 +120,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
-				COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0);
+				COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE);
 				if (!was_crit)
 					rel_crit(jpc->region);
 				*lcnt = 1;

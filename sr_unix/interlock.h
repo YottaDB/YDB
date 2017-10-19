@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -92,20 +95,14 @@
 #define INCR_CNT(X,Y)			INTERLOCK_ADD(X,Y,1)
 #define DECR_CNT(X,Y)			INTERLOCK_ADD(X,Y,-1)
 
-#if !defined(__ia64) && !defined(__x86_64__) && !defined(__sparc)
-#define GET_SWAPLOCK(X)			(COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
-#else
-/* Doing the simple test before COMPSWAP_LOCK can help performance when a lock is highly contended
- */
-#define GET_SWAPLOCK(X)		(((X)->u.parts.latch_pid == LOCK_AVAILABLE) && COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
-#endif /* __ia64, __x86_64__, and __sparc */
+/* Doing the simple test before COMPSWAP_LOCK can help performance when a lock is highly contended */
+#define GET_SWAPLOCK(X)		(((X)->u.parts.latch_pid == LOCK_AVAILABLE) && COMPSWAP_LOCK((X), LOCK_AVAILABLE, process_id))
+
 /* Use COMPSWAP_UNLOCK to release the lock because of the memory barrier and other-processor notification it implies. Also
  * the usage of COMPSWAP_UNLOCK allows us to check (with low cost) that we have/had the lock we are trying to release.
- * If we don't have the lock and are trying to release it, an assertpro seems the logical choice as the logic is very broken
- * at that point. If this macro is used in part of an expression, the assertpro path must also return a value (to keep
- * the compiler happy) thus the construct (assertpro, 0) which returns a zero (see usage with assert() on UNIX).
  */
-#define RELEASE_SWAPLOCK(X)		(COMPSWAP_UNLOCK((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (assertpro(FALSE), 0))
+#define RELEASE_SWAPLOCK(X)		COMPSWAP_UNLOCK((X), process_id, LOCK_AVAILABLE)
+
 #define	GRAB_LATCH_INDEFINITE_WAIT	-1	/* special value indicating infinite timeout input to "grab_latch" */
 
 /* Function prototypes */

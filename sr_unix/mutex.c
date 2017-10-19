@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -731,8 +734,8 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 		next_alert_uint4 = csa->critical->stuckexec.cas_time;
 		if ((curr_time_uint4 > next_alert_uint4) && !IS_REPL_INST_FROZEN)
 		{	/* We've waited long enough and the Instance is not frozen - might be time to send MUTEXLCKALERT */
-			if (COMPSWAP_LOCK(&csa->critical->stuckexec.time_latch, next_alert_uint4, 0,
-				(curr_time_uint4 + MUTEXLCKALERT_INTERVAL), 0))
+			if (COMPSWAP_LOCK(&csa->critical->stuckexec.time_latch, next_alert_uint4,
+				(curr_time_uint4 + MUTEXLCKALERT_INTERVAL)))
 			{	/* and no one else beat us to it */
 				MUTEX_DPRINT3("%d: Acquired STUCKEXEC time lock, to trace %d\n", process_id, in_crit_pid);
 				if (process_id == in_crit_pid)
@@ -931,14 +934,15 @@ void mutex_cleanup(gd_region *reg)
 {
 	sgmnt_addrs	*csa;
 
-	/* mutex_cleanup is called after doing a rel_crit on the same area so if we still own the lock
-	   it is because csa->now_crit was not in sync with our semaphore. At this point, if we own
-	   the lock, go ahead and release it.
-	*/
+	/* mutex_cleanup is called after doing a rel_crit/rel_lock on the same area so if we still own the lock
+	 * it is because csa->now_crit was not in sync with our semaphore. At this point, if we own
+	 * the lock, go ahead and release it.
+	 */
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, CMPVAL2, LOCK_AVAILABLE, 0))
+	if (csa->critical->semaphore.u.parts.latch_pid == process_id)
 	{
-		MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
+		if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, LOCK_AVAILABLE))
+			MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
 	}
 }
 
@@ -1173,7 +1177,7 @@ void mutex_salvage(gd_region *reg)
 									   * will recover CMT04 and other CMTxx steps.
 									   */
 			}
-			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
+			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, LOCK_AVAILABLE);
 			mutex_salvaged = TRUE;
 			/* Reset jbp->blocked as well if the holder_pid had it set */
 			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (csa->jnl->jnl_buff->blocked == holder_pid))

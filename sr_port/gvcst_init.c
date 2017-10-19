@@ -907,7 +907,7 @@ void gvcst_init(gd_region *reg)
 	curr_time_uint4 = (uint4)curr_time;
 	next_warn_uint4 = csd->next_upgrd_warn.cas_time;
 	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
-	    && COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
+		&& COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, (curr_time_uint4 + UPGRD_WARN_INTERVAL)))
 	{	/* The msg is due and we have successfully updated the next time interval */
 		if (GDSVCURR != csd->desired_db_format)
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(reg));
