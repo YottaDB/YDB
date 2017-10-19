@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,11 +45,11 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 {
 	int4			cntrval, newcntrval, spins, maxspins, retries;
 	boolean_t		cswpsuccess;
-	sm_int_ptr_t volatile	cntrval_p;
+	sm_int_ptr_t volatile	cntrval_p;	/* Need volatile context especially on Itanium */
 
 	++fast_lock_count;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	cntrval_p = addr;	/* Need volatile context especially on Itanium */
+	cntrval_p = addr;
         for (retries = LOCK_TRIES - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
         {	/* seems like a legitinate spin which could take advantage of transactional memory */
 		for (spins = maxspins; 0 < spins; spins--)
@@ -61,8 +64,7 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 			   not changed (SE 08/2007)
 			*/
 			assert(0 == OFFSETOF(global_latch_t, u.parts.latch_pid));
-			IA64_ONLY(cswpsuccess = compswap_unlock(RECAST(sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval));
-			NON_IA64_ONLY(cswpsuccess = compswap((sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval));
+			cswpsuccess = COMPSWAP_LOCK((sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval);
 			if (cswpsuccess)
 			{
 				--fast_lock_count;

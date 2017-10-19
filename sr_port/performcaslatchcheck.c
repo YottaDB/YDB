@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -47,7 +50,7 @@ boolean_t performCASLatchCheck(sm_global_latch_ptr_t latch, boolean_t cont_proc)
 		assertpro((process_id != holder_pid) || (0 != exi_condition));
 		if ((process_id == holder_pid) || (FALSE == is_proc_alive(holder_pid, 0)))
 		{	/* remove (processe_id == holder) when fixed */
-			COMPSWAP_UNLOCK(latch, holder_pid, 0, LOCK_AVAILABLE, 0);
+			COMPSWAP_UNLOCK(latch, holder_pid, LOCK_AVAILABLE);
 			ret = TRUE;
 		} else if (cont_proc)
 			continue_proc(holder_pid);	/* Attempt wakeup in case process is stuck */

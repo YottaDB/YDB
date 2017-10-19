@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -1378,13 +1381,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				} else if (0 != pid && FALSE == is_proc_alive(pid, 0))
 				{
 					/* Attempt to make it our lock so we can set blocked */
-					if (COMPSWAP_LOCK(&csa->shmpool_buffer->shmpool_crit_latch, pid, 0, process_id, 0))
+					if (COMPSWAP_LOCK(&csa->shmpool_buffer->shmpool_crit_latch, pid, process_id))
 					{	/* Now our lock .. set blocked and release.  */
 						csa->shmpool_buffer->shmpool_blocked = TRUE;
 						BG_TRACE_PRO_ANY(csa, shmpool_blkd_by_sdc);
 						DEBUG_LATCH(util_out_print("Orphaned latch cleaned up", TRUE));
 						COMPSWAP_UNLOCK(&csa->shmpool_buffer->shmpool_crit_latch, process_id,
-								0, LOCK_AVAILABLE, 0);
+								LOCK_AVAILABLE);
 					} /* Else someone else took care of it */
 				}
 			}
