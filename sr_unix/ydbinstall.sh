@@ -336,7 +336,7 @@ if [ -z "$ydb_version" ] ; then
         chmod +x $gtm_dist/mumps
         tmp=`mktmpdir`
         gtmroutines="$tmp($gtm_dist)" ; export gtmroutines
-        ydb_version=`$gtm_dist/mumps -run %XCMD '$piece($zyrelease," ",2)'`
+        ydb_version=`$gtm_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)'`
         rm -rf $tmp
     fi
 fi

@@ -375,23 +375,16 @@ if [ "$doutf8" -ne 0 ]; then
 	fi
 fi
 
-# Install COPYING if it is applicable
-file=COPYING
-if [ -f $file ]; then
-	cp -p $file $gtmdist
-	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
+# Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable
+for file in COPYING README.md README.txt
+do
+	if [ -f $file ]; then
+		cp -p $file $gtmdist
+		if [ "$doutf8" -ne 0 ]; then
+			ln -s ../$file $gtmdist/utf8/$file
+		fi
 	fi
-fi
-
-# Install README.txt if it is applicable
-file=README.txt
-if [ -f $file ]; then
-	cp -p $file $gtmdist
-	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
-	fi
-fi
+done
 
 # Install custom_errors_sample.txt if it is applicable
 file=custom_errors_sample.txt
@@ -801,7 +794,7 @@ read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid $other_object_files $csh_script_files lowerc_cp\
-		*.hlp core *.h *.m *help.dat *help.gld COPYING README.txt
+		*.hlp core *.h *.m *help.dat *help.gld COPYING README.md README.txt
 	\rm -rf GETPASS.o plugin GTMHELP.o custom_errors_sample.txt
 	if [ -d utf8 ]; then
 		\rm -rf utf8

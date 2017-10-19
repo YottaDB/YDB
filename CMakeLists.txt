@@ -898,9 +898,11 @@ install(FILES sr_unix/lowerc_cp.sh DESTINATION ${YDB_INSTALL_DIR}
   RENAME lowerc_cp
   )
 
-if (EXISTS ${YDB_SOURCE_DIR}/COPYING)
-  install(FILES COPYING DESTINATION ${YDB_INSTALL_DIR})
-endif()
+foreach(d COPYING README.md)
+  if (EXISTS ${YDB_SOURCE_DIR}/${d})
+    install(FILES ${d} DESTINATION ${YDB_INSTALL_DIR})
+  endif()
+endforeach()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
 
