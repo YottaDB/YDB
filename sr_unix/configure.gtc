@@ -201,7 +201,7 @@ $echo ""
 $echo "Installing YottaDB...."
 $echo ""
 
-is64bit_gtm=`file mumps | grep -c 64`
+is64bit_gtm=`file mumps | grep -c "64-bit"`
 
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
