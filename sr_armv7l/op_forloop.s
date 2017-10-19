@@ -97,10 +97,14 @@ L69:
 	ldrb	r12, [r1, #mval_b_exp]
 	orr	r12, #69
 	strb	r12, [r1, #mval_b_exp]
-
-	mov	r12, #10
-	udiv	r6, r4, r12				/* r4 / 10 --> r6 */
+	movw	r6, #26215				/* Divide r4 by 10 - result in r6 */
+	movt	r6, #26214
+	smull	r2, r6, r4, r6
+	asr	r2, r6, #2
+	asr	r6, r4, #31
+	sub	r6, r2, r6				/* End of division */
 	str	r6, [r1, #mval_l_m1]
+	mov	r12, #10
 	mul	r6, r12, r6
 	sub	r4, r6, r4
 	ldr	r12, =MANT_LO
@@ -189,10 +193,14 @@ l69:
 	ldrb	r12, [r1, #mval_b_exp]
 	orr	r12, #69
 	strb	r12, [r1, #mval_b_exp]
-
-	mov	r12, #10
-	udiv	r6, r4, r12				/* r4 / 10 --> r6 */
+	movw	r6, #26215				/* Divide r4 by 10 - result in r6 */
+	movt	r6, #26214
+	smull	r2, r6, r4, r6
+	asr	r2, r6, #2
+	asr	r6, r4, #31
+	sub	r6, r2, r6				/* End of division */
 	str	r6, [r1, #mval_l_m1]
+	mov	r12, #10
 	mul	r6, r12, r6
 	sub	r4, r6, r4
 	ldr	r12, =MANT_LO
