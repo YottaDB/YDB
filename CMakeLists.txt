@@ -819,7 +819,7 @@ set(lke_hlp lke.hlp)
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
     "Change -segment DEFAULT -block=2048 -file=\$gtm_dist/${help}help.dat
-Change -region DEFAULT -record=1020 -key=255
+Change -region DEFAULT -record=1020 -key=255 -qdbrundown -nostats
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in1)
