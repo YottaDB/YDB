@@ -108,7 +108,7 @@ if ( $?gtm_version_change == "1" ) then
 	        setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
 	    else if ("armv7l" == $mach_type) then
-	        setenv gt_as_options_common	"-Wa,-march=armv7-a -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard"
+	        setenv gt_as_options_common	"-Wa,-march=armv7-a"
 		setenv gt_as_option_debug	"--gdwarf-2"
 	    else
         	setenv gt_as_option_debug      "--gstabs"
@@ -148,8 +148,9 @@ if ( $?gtm_version_change == "1" ) then
 	if ( "armv7l" == $mach_type ) then
 		setenv	gt_ld_m_shl_linker	"cc"
 		setenv  gt_ld_m_shl_options     "-shared"
-		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a -mfpu=neon "
-		setenv  gt_cc_options_common    "$gt_cc_options_common -mabi=aapcs-linux -mthumb-interwork -mfloat-abi=hard "
+#		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a -mfpu=neon "
+#		setenv  gt_cc_options_common    "$gt_cc_options_common -mabi=aapcs-linux -mthumb-interwork -mfloat-abi=hard "
+		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a "
 	endif
 	
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
