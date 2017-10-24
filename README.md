@@ -17,7 +17,14 @@ versions of packages from the distribution repositories.
    Install developement libraries
 
    ```sh
-    cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
+    Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
+	sudo aptitude install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
+
+    Arch Linux
+	sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib}
+
+    CentOS Linux OR RedHat Linux
+	sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel
    ```
 
    There may be other library dependencies or the packages may have different names.
