@@ -107,6 +107,53 @@ $echo "Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries."
 $echo "All rights reserved."
 $echo ""
 
+issystemd=`which systemctl`
+if [ "" != "$issystemd" ] ; then
+	# It is a systemd installation
+	# Check if RemoveIPC=no is set. If not, prompt user for okay to set this. If user says NO, abort the install.
+	logindconf="/etc/systemd/logind.conf"
+	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`
+	if [ "no" != "$removeipcopt" ] ; then
+		# RemoveIPC=no is NOT the final settings in the file
+		ipcissue1="If RemoveIPC=yes is configured for systemd, ipcs (database shm & sem)"
+		ipcissue1="$ipcissue1 are removed for a non-system user's processes when that user logs out."
+		ipcissue2="That can cause database operations to fail with mysterious errors."
+
+		ipcline1="# YottaDB : Override systemd default of RemoveIPC=yes to prevent automatic ipc removal of"
+		ipcline1="$ipcline1 Shared Memory Segments and Semaphore Arrays of orphaned databases"
+		ipcline2="RemoveIPC=no"
+		ipccmd="systemctl restart systemd-logind"
+
+		echo "$ipcissue1"
+		echo "$ipcissue2"
+		echo "The installation would like to add the below two lines to $logindconf"
+		echo "   $ipcline1"
+		echo "   $ipcline2"
+		echo "And issue the below command to restart systemd-logind"
+		echo "   $ipccmd"
+		if [ -z ${ydb_configure_removeipc} ] ; then
+			echo -n "Do you wish to proceed (Y/N)? "
+			answer=`read_yes_no`
+		else
+			answer=${ydb_configure_removeipc}
+		fi
+		if [ "yes" != "$answer" ] ; then
+			echo "Will abort installation"
+			echo $ipcissue1
+			echo $ipcissue2
+			echo "Please add the below two lines to $logindconf"
+			echo "   $ipcline1"
+			echo "   $ipcline2"
+			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
+			echo "   $ipccmd"
+			echo "and retry YottaDB installation"
+			exit 1
+		fi
+		echo $ipcline1 >> $logindconf
+		echo $ipcline2 >> $logindconf
+		$ipccmd
+	fi
+fi
 # Native super user and group
 rootuser=root
 bingroup=root
@@ -116,6 +163,7 @@ defowner=root
 touch tmp_owngrp
 $echo "What user account should own the files? ($defowner) \c"
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "" ] ; then
 	owner=$defowner
 else
@@ -131,6 +179,7 @@ fi
 
 $echo "What group should own the files? ($bingroup) \c"
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" != "" ] ; then
 	bingroup=$resp
 fi
@@ -144,6 +193,7 @@ fi
 
 $echo "Should execution of YottaDB be restricted to this group? (y or n) \c"
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	# root is an invalid group to be restricted
 	if [ 0 = $bingroup -o "root" = $bingroup ] ; then
@@ -162,6 +212,7 @@ rm tmp_owngrp
 
 $echo "In what directory should YottaDB be installed? \c"
 read gtmdist
+if [ ! -t 0 ] ; then echo "$gtmdist"; fi
 
 # if gtmdist is relative then need to make it absolute
 
@@ -183,6 +234,7 @@ else
 	$echo "this installation? (y or n) \c"
 fi
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
 	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
@@ -223,13 +275,16 @@ if [ -d "utf8" ]; then
 	fi
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
+	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 		would_like_utf8=1
 		$echo "Should an ICU version other than the default be used? (y or n) \c"
 		read resp
+		if [ ! -t 0 ] ; then echo "$resp"; fi
 		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
 			read gtm_icu_version
+			if [ ! -t 0 ] ; then echo "$gtm_icu_version"; fi
 			maj=`$echo $gtm_icu_version | cut -f 1 -d "."`
 			if [ "$maj" -ge "49" ] ; then
 				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
@@ -572,8 +627,9 @@ $echo "You can create lowercase copies of these routines if you wish, but"
 $echo "to avoid problems with compatibility in the future, consider keeping"
 $echo "only the uppercase versions of the files."
 $echo ""
-$echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n)\c"
+$echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n) \c"
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
@@ -689,6 +745,7 @@ if [ -f $gtm_dist/libgtmutil$ext ] ; then
 	$echo "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext"
 	$echo "Keep original .o object files (y or n)? \c"
 	read resp
+	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $gtm_dist/*.o $gtm_dist/utf8/*.o ; fi
 	$echo ""
 	if [ -f $gtm_dist/utf8/libgtmutil$ext ] ; then
@@ -790,6 +847,7 @@ $echo ""
 $echo "Installation completed. Would you like all the temporary files"
 $echo "removed from this directory? (y or n) \c"
 read resp
+if [ ! -t 0 ] ; then echo "$resp"; fi
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
