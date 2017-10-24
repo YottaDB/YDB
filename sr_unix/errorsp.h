@@ -436,8 +436,8 @@ MBSTART {													\
 						 * would have gotten the pthread mutex lock as part of the "rts_error_va" call	\
 						 * and that needs to be released before this thread unwinds its error context	\
 						 * (i.e. resumes normal execution). This code has some similarity to that in	\
-						 * GTM_PTHREAD_EXIT macro. In dbg, assert that we do hold the thread mutex lock	\
-						 * but in pro gracefully the case if we do not hold it for reasons unknown.	\
+						 * GTM_PTHREAD_EXIT macro. In dbg, assert that we hold the thread mutex lock	\
+						 * but in pro handle the case we do not hold it (reasons unknown).		\
 						 */										\
 						assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);					\
 						if (IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)						\
