@@ -3,6 +3,9 @@
 ; Copyright (c) 2010-2017 Fidelity National Information 	;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.	     	  	     			;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -10,15 +13,15 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;
 ; Note this file should not be manually invoked
 ;
 	Write "GTM-E-GTMSDFILE This routine (",$TEXT(+0),") should not be manually invoked",!
 	Quit
 ;
-; Entry point used by gtmpcat and others to define GTM structure fields
+; Entry point used by gtmpcat and others to define YottaDB structure fields
 ;
 Init
-	; YottaDB structure and field definitions
 	Set gtmsdver="1.2.0"
 	Set gtmsdtyp="dbg"
 	;
@@ -4587,10 +4590,10 @@ Init
 	Set gtmtypfldindx("fnpc","byte_oriented")=8
 	Set gtmtypes("fnpc",9,"name")="fnpc.pstart"
 	Set gtmtypes("fnpc",9,"off")=32
-	Set gtmtypes("fnpc",9,"len")=328
+	Set gtmtypes("fnpc",9,"len")=324
 	Set gtmtypes("fnpc",9,"type")="unsigned-int"
 	Set gtmtypfldindx("fnpc","pstart")=9
-	Set gtmtypes("fnpc",9,"dim")=82
+	Set gtmtypes("fnpc",9,"dim")=81
 	;
 	Set gtmtypes("fnpc_area")="struct"
 	Set gtmtypes("fnpc_area",0)=12
@@ -4653,10 +4656,10 @@ Init
 	Set gtmtypfldindx("fnpc_area","fnpcs[0].byte_oriented")=11
 	Set gtmtypes("fnpc_area",12,"name")="fnpc_area.fnpcs[0].pstart"
 	Set gtmtypes("fnpc_area",12,"off")=48
-	Set gtmtypes("fnpc_area",12,"len")=328
+	Set gtmtypes("fnpc_area",12,"len")=324
 	Set gtmtypes("fnpc_area",12,"type")="unsigned-int"
 	Set gtmtypfldindx("fnpc_area","fnpcs[0].pstart")=12
-	Set gtmtypes("fnpc_area",12,"dim")=82
+	Set gtmtypes("fnpc_area",12,"dim")=81
 	;
 	Set gtmtypes("forw_multi_struct")="struct"
 	Set gtmtypes("forw_multi_struct",0)=16
@@ -13023,7 +13026,7 @@ Init
 	Set gtmtypfldindx("lab_tabent","filler")=7
 	;
 	Set gtmtypes("link_info")="struct"
-	Set gtmtypes("link_info",0)=19
+	Set gtmtypes("link_info",0)=20
 	Set gtmtypes("link_info","len")=80
 	Set gtmtypes("link_info",1,"name")="link_info.neterr"
 	Set gtmtypes("link_info",1,"off")=0
@@ -13120,6 +13123,11 @@ Init
 	Set gtmtypes("link_info",19,"len")=4
 	Set gtmtypes("link_info",19,"type")="boolean_t"
 	Set gtmtypfldindx("link_info","server_supports_long_names")=19
+	Set gtmtypes("link_info",20,"name")="link_info.server_supports_reverse_query"
+	Set gtmtypes("link_info",20,"off")=76
+	Set gtmtypes("link_info",20,"len")=4
+	Set gtmtypes("link_info",20,"type")="boolean_t"
+	Set gtmtypfldindx("link_info","server_supports_reverse_query")=20
 	;
 	Set gtmtypes("linkage_entry")="struct"
 	Set gtmtypes("linkage_entry",0)=3
@@ -13622,11 +13630,11 @@ Init
 	Set gtmtypes("lv_val",22,"len")=4
 	Set gtmtypes("lv_val",22,"type")="boolean_t"
 	Set gtmtypfldindx("lv_val","has_aliascont")=22
-	Set gtmtypes("lv_val",23,"name")="lv_val.lvmon_mark"
+	Set gtmtypes("lv_val",23,"name")="lv_val.lvamon_mark"
 	Set gtmtypes("lv_val",23,"off")=68
 	Set gtmtypes("lv_val",23,"len")=4
 	Set gtmtypes("lv_val",23,"type")="boolean_t"
-	Set gtmtypfldindx("lv_val","lvmon_mark")=23
+	Set gtmtypfldindx("lv_val","lvamon_mark")=23
 	Set gtmtypes("lv_val",24,"name")="lv_val.tp_var"
 	Set gtmtypes("lv_val",24,"off")=72
 	Set gtmtypes("lv_val",24,"len")=8
@@ -13800,11 +13808,11 @@ Init
 	Set gtmtypes("lvmon_value_ent",23,"len")=4
 	Set gtmtypes("lvmon_value_ent",23,"type")="boolean_t"
 	Set gtmtypfldindx("lvmon_value_ent","varlvval.has_aliascont")=23
-	Set gtmtypes("lvmon_value_ent",24,"name")="lvmon_value_ent.varlvval.lvmon_mark"
+	Set gtmtypes("lvmon_value_ent",24,"name")="lvmon_value_ent.varlvval.lvamon_mark"
 	Set gtmtypes("lvmon_value_ent",24,"off")=68
 	Set gtmtypes("lvmon_value_ent",24,"len")=4
 	Set gtmtypes("lvmon_value_ent",24,"type")="boolean_t"
-	Set gtmtypfldindx("lvmon_value_ent","varlvval.lvmon_mark")=24
+	Set gtmtypfldindx("lvmon_value_ent","varlvval.lvamon_mark")=24
 	Set gtmtypes("lvmon_value_ent",25,"name")="lvmon_value_ent.varlvval.tp_var"
 	Set gtmtypes("lvmon_value_ent",25,"off")=72
 	Set gtmtypes("lvmon_value_ent",25,"len")=8
@@ -13996,11 +14004,11 @@ Init
 	Set gtmtypes("lvmon_var",30,"len")=4
 	Set gtmtypes("lvmon_var",30,"type")="boolean_t"
 	Set gtmtypfldindx("lvmon_var","values[0].varlvval.has_aliascont")=30
-	Set gtmtypes("lvmon_var",31,"name")="lvmon_var.values[0].varlvval.lvmon_mark"
+	Set gtmtypes("lvmon_var",31,"name")="lvmon_var.values[0].varlvval.lvamon_mark"
 	Set gtmtypes("lvmon_var",31,"off")=108
 	Set gtmtypes("lvmon_var",31,"len")=4
 	Set gtmtypes("lvmon_var",31,"type")="boolean_t"
-	Set gtmtypfldindx("lvmon_var","values[0].varlvval.lvmon_mark")=31
+	Set gtmtypfldindx("lvmon_var","values[0].varlvval.lvamon_mark")=31
 	Set gtmtypes("lvmon_var",32,"name")="lvmon_var.values[0].varlvval.tp_var"
 	Set gtmtypes("lvmon_var",32,"off")=112
 	Set gtmtypes("lvmon_var",32,"len")=8
@@ -20005,44 +20013,29 @@ Init
 	Set gtmtypfldindx("parm_slot","actuallist")=5
 	;
 	Set gtmtypes("parmblk_struct")="struct"
-	Set gtmtypes("parmblk_struct",0)=7
-	Set gtmtypes("parmblk_struct","len")=304
-	Set gtmtypes("parmblk_struct",1,"name")="parmblk_struct.ci_rtn"
+	Set gtmtypes("parmblk_struct",0)=4
+	Set gtmtypes("parmblk_struct","len")=272
+	Set gtmtypes("parmblk_struct",1,"name")="parmblk_struct.retaddr"
 	Set gtmtypes("parmblk_struct",1,"off")=0
 	Set gtmtypes("parmblk_struct",1,"len")=8
 	Set gtmtypes("parmblk_struct",1,"type")="addr"
-	Set gtmtypfldindx("parmblk_struct","ci_rtn")=1
+	Set gtmtypfldindx("parmblk_struct","retaddr")=1
 	Set gtmtypes("parmblk_struct",2,"name")="parmblk_struct.argcnt"
 	Set gtmtypes("parmblk_struct",2,"off")=8
 	Set gtmtypes("parmblk_struct",2,"len")=4
 	Set gtmtypes("parmblk_struct",2,"type")="int"
 	Set gtmtypfldindx("parmblk_struct","argcnt")=2
-	Set gtmtypes("parmblk_struct",3,"name")="parmblk_struct.rtnaddr"
-	Set gtmtypes("parmblk_struct",3,"off")=16
-	Set gtmtypes("parmblk_struct",3,"len")=8
-	Set gtmtypes("parmblk_struct",3,"type")="addr"
-	Set gtmtypfldindx("parmblk_struct","rtnaddr")=3
-	Set gtmtypes("parmblk_struct",4,"name")="parmblk_struct.labaddr"
-	Set gtmtypes("parmblk_struct",4,"off")=24
-	Set gtmtypes("parmblk_struct",4,"len")=8
+	Set gtmtypes("parmblk_struct",3,"name")="parmblk_struct.mask"
+	Set gtmtypes("parmblk_struct",3,"off")=12
+	Set gtmtypes("parmblk_struct",3,"len")=4
+	Set gtmtypes("parmblk_struct",3,"type")="int"
+	Set gtmtypfldindx("parmblk_struct","mask")=3
+	Set gtmtypes("parmblk_struct",4,"name")="parmblk_struct.args"
+	Set gtmtypes("parmblk_struct",4,"off")=16
+	Set gtmtypes("parmblk_struct",4,"len")=256
 	Set gtmtypes("parmblk_struct",4,"type")="addr"
-	Set gtmtypfldindx("parmblk_struct","labaddr")=4
-	Set gtmtypes("parmblk_struct",5,"name")="parmblk_struct.retaddr"
-	Set gtmtypes("parmblk_struct",5,"off")=32
-	Set gtmtypes("parmblk_struct",5,"len")=8
-	Set gtmtypes("parmblk_struct",5,"type")="addr"
-	Set gtmtypfldindx("parmblk_struct","retaddr")=5
-	Set gtmtypes("parmblk_struct",6,"name")="parmblk_struct.mask"
-	Set gtmtypes("parmblk_struct",6,"off")=40
-	Set gtmtypes("parmblk_struct",6,"len")=4
-	Set gtmtypes("parmblk_struct",6,"type")="int"
-	Set gtmtypfldindx("parmblk_struct","mask")=6
-	Set gtmtypes("parmblk_struct",7,"name")="parmblk_struct.args"
-	Set gtmtypes("parmblk_struct",7,"off")=48
-	Set gtmtypes("parmblk_struct",7,"len")=256
-	Set gtmtypes("parmblk_struct",7,"type")="addr"
-	Set gtmtypfldindx("parmblk_struct","args")=7
-	Set gtmtypes("parmblk_struct",7,"dim")=32
+	Set gtmtypfldindx("parmblk_struct","args")=4
+	Set gtmtypes("parmblk_struct",4,"dim")=32
 	;
 	Set gtmtypes("parse_blk")="struct"
 	Set gtmtypes("parse_blk",0)=17
