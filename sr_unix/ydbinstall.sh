@@ -38,17 +38,17 @@
 # 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
 # 2017-07-16  0.15 Sam Habiel   - --yottadb or --distrib https://github.com/YottaDB/YottaDB to install YottaDB
 # 2017-08-12  0.16 Christopher Edwards - Default to YottaDB
-# 2017-10-17  0.17 Narayanan Iyer - See git commit message for description of changes.
+# 2017-10-xx  0.17 Narayanan Iyer - See git commit message for description of changes.
+#	Going forward, this script is maintained in a git repository so no need to add Revision history manually.
 
 # Turn on debugging if set
 if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 
 # Initialization
 timestamp=`date +%Y%m%d%H%M%S`
-if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
-gtm_id=`which id`
-gtm_grep=`which grep`
-if [ -z "$USER" ] ; then USER=`$gtm_id -un` ; fi
+ydb_id=`which id`
+ydb_grep=`which grep`
+if [ -z "$USER" ] ; then USER=`$ydb_id -un` ; fi
 
 # Functions
 dump_info()
@@ -354,7 +354,8 @@ if [ "Y" = "$gtm_gtm" ] ; then
     ydb_distrib="http://sourceforge.net/projects/fis-gtm"
 fi
 
-gtm_tmp=`mktmpdir`
+tmpdir=`mktmpdir`
+gtm_tmp=$tmpdir
 mkdir $gtm_tmp/tmp
 latest=`echo "$ydb_version" | tr LATES lates`
 if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
@@ -480,15 +481,15 @@ fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked YottaDB/GT.M distribution ; dump_info ; fi
 
 # Check installation settings & provide defaults as needed
-tmp=`$gtm_id -un`
+tmp=`$ydb_id -un`
 if [ -z "$gtm_user" ] ; then gtm_user=$tmp
-else if [ "$gtm_user" != "`$gtm_id -un $gtm_user`" ] ; then
+else if [ "$gtm_user" != "`$ydb_id -un $gtm_user`" ] ; then
     echo $gtm_user is a non-existent user ; err_exit
     fi
 fi
 if [ "root" = $tmp ] ; then
-    if [ -z "$gtm_group" ] ; then gtm_group=`$gtm_id -gn`
-    else if [ "root" != "$gtm_user" -a "$gtm_group" != "`$gtm_id -Gn $gtm_user | xargs -n 1 | $gtm_grep $gtm_group`" ] ; then
+    if [ -z "$gtm_group" ] ; then gtm_group=`$ydb_id -gn`
+    else if [ "root" != "$gtm_user" -a "$gtm_group" != "`$ydb_id -Gn $gtm_user | xargs -n 1 | $ydb_grep $gtm_group`" ] ; then
         echo $gtm_user is not a member of $gtm_group ; err_exit
         fi
     fi
@@ -509,52 +510,11 @@ if [ -d "$ydb_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
     echo $ydb_installdir exists and --overwrite-existing not specified ; err_exit
 fi
 
-issystemd=`which systemctl`
-if [ "" != "$issystemd" ] ; then
-	# It is a systemd installation
-	logindconf="/etc/systemd/logind.conf"
-	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`
-	if [ "no" != "$removeipcopt" ] ; then
-		# RemoveIPC=no is NOT the final settings in the file
-		ipcissue1="If RemoveIPC=yes is configured for systemd, ipcs (database shm & sem)"
-		ipcissue1="$ipcissue1 are removed for a non-system user's processes when that user logs out."
-		ipcissue2="That can cause database operations to fail with mysterious errors."
-
-		ipcline1="# YottaDB/GT.M : Override systemd default of RemoveIPC=yes to prevent automatic ipc removal of"
-		ipcline1="$ipcline1 Shared Memory Segments and Semaphore Arrays of orphaned databases"
-		ipcline2="RemoveIPC=no"
-		ipccmd="systemctl restart systemd-logind"
-
-		echo "$ipcissue1"
-		echo "$ipcissue2"
-		echo "The installation would like to add the below two lines to $logindconf"
-		echo "   $ipcline1"
-		echo "   $ipcline2"
-		echo "And issue the below command to restart systemd-logind"
-		echo "   $ipccmd"
-		echo -n "Do you wish to proceed (Y/N)? "
-		answer=`read_yes_no`
-		if [ "yes" != "$answer" ] ; then
-			echo "Will abort installation"
-			echo $ipcissue1
-			echo $ipcissue2
-			echo "Please add the below two lines to $logindconf"
-			echo "   $ipcline1"
-			echo "   $ipcline2"
-			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
-			echo "   $ipccmd"
-			echo "and retry YottaDB/GT.M installation"
-			exit 1
-		fi
-		echo $ipcline1 >> $logindconf
-		echo $ipcline2 >> $logindconf
-		$ipccmd
-	fi
-fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning defaults ; dump_info ; fi
 
-# Prepare input to GT.M configure script. The corresponding questions in configure.gtc are listed below in comments
+# Prepare input to YottaDB configure script. The corresponding questions in configure.gtc are listed below in comments
 gtm_configure_in=${gtm_tmp}/configure_${timestamp}.in
+ydb_configure_removeipc="yes" ; export ydb_configure_removeipc	# Signal configure.gtc to set RemoveIPC=no if needed
 echo $gtm_user >>$gtm_configure_in		# Response to : "What user account should own the files?"
 echo $gtm_group >>$gtm_configure_in		# Response to : "What group should own the files?"
 echo $gtm_group_restriction >>$gtm_configure_in	# Response to : "Should execution of YottaDB be restricted to this group?"
@@ -575,7 +535,7 @@ echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you 
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 
 
-# Run the GT.M configure script
+# Run the YottaDB configure script
 if [ "$ydb_distrib" != "$gtm_tmp" ] ; then
     chmod +w $gtm_tmp/tmp
     cd $gtm_tmp/tmp
@@ -595,6 +555,7 @@ if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit 
 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
 if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; exit 1; fi
+rm -rf $tmpdir	# Now that install is successful, remove temporary directory
 echo YottaDB version $ydb_version installed successfully at $ydb_installdir
 
 # Create copies of environment scripts and gtm executable
