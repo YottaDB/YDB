@@ -430,12 +430,19 @@ MBSTART {													\
 																\
 					intrpt_state_t			prev_intrpt_state;					\
 																\
-					/* If threads are in use, an UNWIND inside a condition-handler transitions		\
-					 * the thread from error-handling to a no-error state which can cause an		\
-					 * out-of-design situation because we assume that all threads which go			\
-					 * through any condition-handler exit and never resume execution.			\
-					 */											\
-					assert(!multi_thread_in_use);								\
+					if (multi_thread_in_use)								\
+					{	/* If threads are in use, an UNWIND inside a condition-handler transitions	\
+						 * the thread from error-handling to a no-error state. The condition handler	\
+						 * would have gotten the pthread mutex lock as part of the "rts_error_va" call	\
+						 * and that needs to be released before this thread unwinds its error context	\
+						 * (i.e. resumes normal execution). This code has some similarity to that in	\
+						 * GTM_PTHREAD_EXIT macro. In dbg, assert that we do hold the thread mutex lock	\
+						 * but in pro gracefully the case if we do not hold it for reasons unknown.	\
+						 */										\
+						assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);					\
+						if (IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)						\
+							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(FALSE);					\
+					}											\
 					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);				\
 					/* When we hit an error in the midst of commit, t_ch/t_commit_cleanup should be invoked	\
 					 * and clean it up before any condition handler on the stack unwinds. 			\
