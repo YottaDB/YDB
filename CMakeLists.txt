@@ -43,12 +43,10 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Enable YottaDB debug options unless directed not to enable them. Added to build without whitebox tests.
-set(YDB_ENABLE_DEBUG 1 CACHE BOOL "Enable YottaDB debug options")
-if(YDB_ENABLE_DEBUG)
-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
-endif()
+# If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
+# CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE

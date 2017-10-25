@@ -97,6 +97,15 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscript
 # But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
 
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
+	# in size. Avoid that for production builds of YottaDB.
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
+else()
+	# In Debug builds though, keep stack-protection on for ALL functions.
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
+endif()
+
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
   -D_GNU_SOURCE
