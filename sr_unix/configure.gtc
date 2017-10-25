@@ -131,11 +131,11 @@ if [ "" != "$issystemd" ] ; then
 		echo "   $ipcline2"
 		echo "And issue the below command to restart systemd-logind"
 		echo "   $ipccmd"
-		if [ -z ${ydb_configure_removeipc} ] ; then
+		if [ -z ${ydb_change_removeipc} ] ; then
 			echo -n "Do you wish to proceed (Y/N)? "
 			answer=`read_yes_no`
 		else
-			answer=${ydb_configure_removeipc}
+			answer=${ydb_change_removeipc}
 		fi
 		if [ "yes" != "$answer" ] ; then
 			echo "Will abort installation"

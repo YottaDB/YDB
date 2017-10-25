@@ -87,6 +87,7 @@ dump_info()
     if [ -n "$gtm_gtm" ] ; then echo gtm_gtm " : " $gtm_gtm ; fi
     if [ -n "$gtmroutines" ] ; then echo gtmroutines " : " $gtmroutines ; fi
     if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
+    if [ -n "$ydb_change_removeipc" ] ; then echo ydb_change_removeipc " : " $ydb_change_removeipc ; fi
     if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 }
 
@@ -106,6 +107,7 @@ help_exit()
     echo "--copyexec dirname - copy gtm script to dirname; incompatible with linkexec"
     echo "--debug - * turn on debugging with set -x"
     echo "--distrib dirname or URL - source directory for YottaDB/GT.M distribution tarball, local or remote"
+    echo "--donotchangeRemoveIPC - do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
     echo "--dry-run - do everything short of installing YottaDB, including downloading the distribution"
     echo "--group group - group that should own the YottaDB installation"
     echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
@@ -172,6 +174,7 @@ if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
 if [ -z "$gtm_overwrite_existing" ] ; then gtm_overwrite_existing="N" ; fi
 if [ -z "$gtm_prompt_for_group" ] ; then gtm_prompt_for_group="N" ; fi
 if [ -z "$gtm_verbose" ] ; then gtm_verbose="N" ; fi
+if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
 
 # Initializing internal flags
 gtm_group_already="N"
@@ -209,6 +212,7 @@ while [ $# -gt 0 ] ; do
                 fi
             fi
             shift ;;
+        --donotchangeRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
         --dry-run) gtm_dryrun="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
@@ -443,8 +447,10 @@ else
 			esac
 			if [ $platform = "linux" ] ; then
 				# If the current host is a RHEL box then set the OS to RHEL (not Linux) as there is a RHEL-specific tarball.
-				# We check that it is a RHEL box by the existence of the file /etc/redhat-release
-				if [ -e /etc/redhat-release ] ; then
+				# We check that it is a RHEL box by the existence of the file /etc/redhat-release.
+				# But note that RHEL-specific releases of YottaDB happened only starting r1.10 so do this only
+				# if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
+				if [ -e /etc/redhat-release -a "r1.00" != ${ydb_version} ] ; then
 					platform="rhel"
 				fi
 			fi
@@ -514,7 +520,7 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning 
 
 # Prepare input to YottaDB configure script. The corresponding questions in configure.gtc are listed below in comments
 gtm_configure_in=${gtm_tmp}/configure_${timestamp}.in
-ydb_configure_removeipc="yes" ; export ydb_configure_removeipc	# Signal configure.gtc to set RemoveIPC=no if needed
+export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
 echo $gtm_user >>$gtm_configure_in		# Response to : "What user account should own the files?"
 echo $gtm_group >>$gtm_configure_in		# Response to : "What group should own the files?"
 echo $gtm_group_restriction >>$gtm_configure_in	# Response to : "Should execution of YottaDB be restricted to this group?"
