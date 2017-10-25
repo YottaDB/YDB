@@ -107,7 +107,7 @@ help_exit()
     echo "--copyexec dirname - copy gtm script to dirname; incompatible with linkexec"
     echo "--debug - * turn on debugging with set -x"
     echo "--distrib dirname or URL - source directory for YottaDB/GT.M distribution tarball, local or remote"
-    echo "--donotchangeRemoveIPC - do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
+    echo "--preserveRemoveIPC - do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
     echo "--dry-run - do everything short of installing YottaDB, including downloading the distribution"
     echo "--group group - group that should own the YottaDB installation"
     echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
@@ -212,7 +212,6 @@ while [ $# -gt 0 ] ; do
                 fi
             fi
             shift ;;
-        --donotchangeRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
         --dry-run) gtm_dryrun="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
@@ -251,6 +250,7 @@ while [ $# -gt 0 ] ; do
             unset gtm_copyexec
             shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
+        --preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
         --prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
         --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
         --user*) tmp=`echo $1 | cut -s -d = -f 2-`
