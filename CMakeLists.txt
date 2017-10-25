@@ -21,10 +21,6 @@
 cmake_minimum_required(VERSION 2.8.5)
 project(YDB C ASM)
 
-# By default, cmake uses -rdynamic for C link-time flags. That is not needed here and bloats executable sizes unnecessarily.
-# So disable that by defining the link-time C flags to the null string.
-set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS  )
-
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
 foreach(lang ${languages})
