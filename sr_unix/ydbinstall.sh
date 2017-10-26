@@ -170,6 +170,7 @@ if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
 if [ -z "$gtm_dryrun" ] ; then gtm_dryrun="N" ; fi
 if [ -z "$gtm_group_restriction" ] ; then gtm_group_restriction="N" ; fi
+if [ -z "$gtm_gtm" ] ; then gtm_gtm="N" ; fi
 if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
 if [ -z "$gtm_overwrite_existing" ] ; then gtm_overwrite_existing="N" ; fi
 if [ -z "$gtm_prompt_for_group" ] ; then gtm_prompt_for_group="N" ; fi
@@ -545,6 +546,11 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_c
 if [ "$ydb_distrib" != "$gtm_tmp" ] ; then
     chmod +w $gtm_tmp/tmp
     cd $gtm_tmp/tmp
+    # Starting YottaDB r1.10, unpacking the binary tarball creates an additional directory (e.g. yottadb_r110)
+    # before the untar so cd into that subdirectory to get at the "configure" script from the distribution.
+    if [ "N" = "$gtm_gtm" -a "r1.00" != ${ydb_version} ] ; then
+        cd yottadb_r*
+    fi
 fi
 
 if [ -e configure.sh ] ; then rm -f configure.sh ; fi
