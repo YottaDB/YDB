@@ -507,7 +507,7 @@ if [ "root" = $tmp ] ; then
     fi
 fi
 if [ -z "$ydb_installdir" ] ; then
-    if [ -z "$gtm_gtm" ]; then
+    if [ "N" = "$gtm_gtm" ] ; then
          ydbver=`echo $ydb_version | tr '[A-Z]' '[a-z]' | tr -d '.-'`
          ydb_installdir=/usr/local/lib/yottadb/${ydbver}
     else ydb_installdir=/usr/local/lib/fis-gtm/${gtm_version}_${gtm_install_flavor}
