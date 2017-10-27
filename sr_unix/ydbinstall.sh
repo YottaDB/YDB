@@ -154,17 +154,6 @@ mktmpdir()
     echo $tmpdirname
 }
 
-read_yes_no()
-{
-	read resp
-	response=`echo $resp | tr '[a-z]' '[A-Z]'`
-	if [ "Y" = $response -o "YES" = $response ] ; then
-		echo "yes"
-	else
-		echo "no"
-	fi
-}
-
 # Defaults that can be over-ridden by command line options to follow
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi

@@ -16,7 +16,7 @@
 #								#
 #################################################################
 
-set -x		# debug flow of configure in case an error occurs
+if [ ! -t 0 ] ; then set -x; fi	# debug flow of configure if invoked non-interactive (useful in case of errors)
 
 . ./arch.gtc
 
@@ -57,9 +57,18 @@ fi
 # Native shared library extension.
 ext=".so"
 
+isarm_gtm=`file mumps | grep -w "ARM" | wc -l`
+is64bit_gtm=`file mumps | grep -c "64-bit"`
+
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
-elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
+elif [ "linux" = $arch ] ; then
+	ldflags="-shared"
+	if [ "$isarm_gtm" -eq 1 ] ; then
+		ldcmd="cc" # On Linux/ARM only cc (not ld) creates a valid ELF header when compiling M routines
+	else
+		ldcmd="ld" # Linux - all platforms
+	fi
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
@@ -106,6 +115,18 @@ $echo "software is restricted by the provisions of your license agreement."
 $echo "Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries."
 $echo "All rights reserved."
 $echo ""
+
+# Helper function
+read_yes_no()
+{
+	read resp
+	response=`echo $resp | tr '[a-z]' '[A-Z]'`
+	if [ "Y" = $response -o "YES" = $response ] ; then
+		echo "yes"
+	else
+		echo "no"
+	fi
+}
 
 issystemd=`which systemctl`
 if [ "" != "$issystemd" ] ; then
@@ -255,8 +276,6 @@ $echo ""
 $echo "Installing YottaDB...."
 $echo ""
 
-is64bit_gtm=`file mumps | grep -c "64-bit"`
-
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
 # keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
@@ -265,7 +284,6 @@ if [ -d "utf8" ]; then
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
-	isarm_gtm=`file mumps | grep -w "ARM" | wc -l`
 	if [ $is64bit_gtm -eq 1 ] ; then
 		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu"
 	elif [ "$isarm_gtm" -eq 1 ] ; then
