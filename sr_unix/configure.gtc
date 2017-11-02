@@ -51,7 +51,7 @@ fi
 # which exist in both directories.
 
 if [ -d utf8 ]; then
-	(cd utf8; ln -s ../* . 2> /dev/null; exit 0)
+	(cd utf8; ln -s ../* . 2> /dev/null; rm utf8; exit 0)
 fi
 
 # Native shared library extension.
