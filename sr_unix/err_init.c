@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,8 +32,9 @@
 #include "eintr_wrappers.h"
 
 #define	COREDUMPFILTERFN	"/proc/%i/coredump_filter"
-#define FILTERPARMSIZE		(7 + 2 + 1)			/* 7 bytes for number, 2 bytes for 0x, and 1 null terminator */
-#define FILTERENABLEBITS	0x0000073			/* Bits 0, 1, 4, 5, 6 - 32-bit can only handle 10 bytes total */
+#define	FILTERPARMFMTSTR	"0x%08x"
+#define FILTERPARMSIZE		(2 + 8 + 1)	/* 2 bytes for 0x, 8 hex digits for number and 1 null terminator */
+#define FILTERENABLEBITS	0x0000073	/* Bits 0, 1, 4, 5, 6 - 32-bit can only handle 10 bytes total */
 
 GBLREF enum gtmImageTypes	image_type;
 GBLDEF char                    **gtmenvp;
@@ -114,7 +118,7 @@ void err_init(void (*x)())
 			{	/* At least one flag was missing - reset them */
 				filterbits = filterbits | FILTERENABLEBITS;
 			}
-			snprintf(filter, FILTERPARMSIZE, "0x%07x", filterbits);
+			snprintf(filter, FILTERPARMSIZE, FILTERPARMFMTSTR, filterbits);
 			bytes_buf = filter;
 		}
 		Fopen(filterstrm, procfn, "w");
