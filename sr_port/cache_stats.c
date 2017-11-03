@@ -21,13 +21,15 @@ GBLREF	hash_table_objcode	cache_table;
 
 void cache_stats(void)
 {
-	int		total_attempts, ace;
+	long long	total_attempts, ace, cache_hits_ll, cache_fails_ll;
 	ht_ent_objcode 	*tabent, *topent;
 	cache_entry	*csp;
 
-	total_attempts = cache_hits + cache_fails;
+	cache_hits_ll = cache_hits;
+	cache_fails_ll = cache_fails;
+	total_attempts = cache_hits_ll + cache_fails_ll;
 	FPRINTF(stderr,"\nIndirect code cache performance -- Hits: %d, Fails: %d, Hit Ratio: %d%%\n",
-		cache_hits, cache_fails, total_attempts ? ((100 * cache_hits) / (cache_hits + cache_fails)) : 0);
+		cache_hits_ll, cache_fails_ll, total_attempts ? ((100 * cache_hits_ll) / (cache_hits_ll + cache_fails_ll)) : 0);
 	ace = 0;	/* active cache entries */
 	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
 	{
