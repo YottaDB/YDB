@@ -74,7 +74,7 @@ void	lvtreenode_newblock(symval *sym, int numElems)
 	register gtm_uint64_t	n;
 	lvTreeNode		*lv_base;
 
-	n = (gtm_uint64_t)numElems * SIZEOF(lvTreeNode) + SIZEOF(lv_blk);
+	n = ((gtm_uint64_t)numElems * SIZEOF(lvTreeNode)) + SIZEOF(lv_blk);
 	n = INTCAST(gtm_bestfitsize(n));
 	/* Maximize use of storage block we are going to get */
 	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTreeNode)) >= numElems);
