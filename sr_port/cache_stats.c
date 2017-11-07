@@ -26,7 +26,7 @@ void cache_stats(void)
 	cache_entry	*csp;
 
 	total_attempts = cache_hits + cache_fails;
-	FPRINTF(stderr,"\nIndirect code cache performance -- Hits: %d, Fails: %d, Hit Ratio: %lld%%\n",
+	FPRINTF(stderr,"\nIndirect code cache performance -- Hits: %d, Fails: %d, Hit Ratio: %d%%\n",
 		cache_hits, cache_fails, total_attempts ? (((gtm_uint64_t)100 * cache_hits) / (cache_hits + cache_fails)) : 0);
 	ace = 0;	/* active cache entries */
 	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
