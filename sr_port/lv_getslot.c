@@ -141,7 +141,7 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 					numElems = p->numAlloc;
 				else
 					numElems = LV_NEWBLOCK_INIT_ALLOC;
-				lvtreenode_newblock(sym, (numElems > MAXINT4) ? MAXINT4 : (numElems * 2));
+				lvtreenode_newblock(sym, (numElems < MAXINT4) ? (numElems * 2) : MAXINT4);
 				p = sym->lvtreenode_first_block;
 				assert(NULL != p);
 			}
