@@ -24,7 +24,7 @@
 #include "gtm_stat.h"
 
 #include "copy.h"
-#include "ydbxc_types.h"
+#include "libyottadb.h"
 #include "rtnhdr.h"
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"

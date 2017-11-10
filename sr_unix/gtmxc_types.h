@@ -10,13 +10,14 @@
  *								*
  ****************************************************************/
 
-/* This header file is now called ydbxc_types.h. This header file contains only depcrecated forms (and is
- * in fact deprecated itself on YottaDB).
+/* The current version of this header file is now called libyottadb.h. This header file contains only depcrecated
+ * forms (and is in fact deprecated itself on YottaDB) but maintains the ability of GT.M installation conversions
+ * to "just work" using previously supported type/routine names.
  */
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H
 
-#include "ydbxc_types.h"
+#include "libyottadb.h"
 
 /* Define types for GT.M backward compatibility. */
 typedef ydb_status_t		gtm_status_t;

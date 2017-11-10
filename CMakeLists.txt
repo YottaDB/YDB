@@ -700,7 +700,7 @@ foreach(f
   gtm_strings.h
   gtmgblstat.xc
   gtmxc_types.h
-  ydbxc_types.h
+  libyottadb.h
   main_pragma.h
   arch.gtc
   gtcm_run.gtc

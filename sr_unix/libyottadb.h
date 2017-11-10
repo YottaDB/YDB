@@ -13,9 +13,9 @@
  *								*
  ****************************************************************/
 
-/*	ydbxc_types.h - GT.M, Unix Edition External Call type definitions.  */
-#ifndef YDBXC_TYPES_H
-#define YDBXC_TYPES_H
+/*	libyottadb.h - GT.M, Unix Edition type definitions for call_ins, call-outs, plugins, etc.  */
+#ifndef LIBYOTTADB_TYPES_H
+#define LIBYOTTADB_TYPES_H
 
 #include <sys/types.h>	/* For intptr_t */
 #include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
@@ -49,14 +49,14 @@ typedef struct
 } ci_name_descriptor;
 
 /* Java types with special names for clarity. */
-typedef ydb_int_t		ydb_jboolean_t;
-typedef ydb_int_t		ydb_jint_t;
-typedef ydb_long_t		ydb_jlong_t;
-typedef ydb_float_t		ydb_jfloat_t;
-typedef ydb_double_t		ydb_jdouble_t;
-typedef ydb_char_t		ydb_jstring_t;
-typedef ydb_char_t		ydb_jbyte_array_t;
-typedef ydb_char_t		ydb_jbig_decimal_t;
+typedef ydb_int_t	ydb_jboolean_t;
+typedef ydb_int_t	ydb_jint_t;
+typedef ydb_long_t	ydb_jlong_t;
+typedef ydb_float_t	ydb_jfloat_t;
+typedef ydb_double_t	ydb_jdouble_t;
+typedef ydb_char_t	ydb_jstring_t;
+typedef ydb_char_t	ydb_jbyte_array_t;
+typedef ydb_char_t	ydb_jbig_decimal_t;
 
 /* Call-in interface. */
 ydb_status_t 	ydb_ci(const char *c_rtn_name, ...);
@@ -82,4 +82,4 @@ int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
 
-#endif /* YDBXC_TYPES_H */
+#endif /* LIBYOTTADB_TYPES_H */

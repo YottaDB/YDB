@@ -31,7 +31,7 @@
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mvalconv.h"
-#include "ydbxc_types.h"
+#include "libyottadb.h"
 #include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"

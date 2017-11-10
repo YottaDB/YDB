@@ -1,5 +1,18 @@
 Issue #59 - Project to implement the libyottadb access library (simple API)
 
+Drop 11/10/2017
+- Renamed ydbxc_types.h to libyottadb.h and the small ripples that causes.
+
+
+Drop 11/08/2017
+- Fixed some regression plus day-one errors (see commit note)
+
+- Change how error message ids were defined in the code base. They used to be global
+  integer values. I think this was to keep from having to include a large header file
+  with #define values for the error ids but now even ARM processors handle this situation
+  reasonably.
+
+
 Drop 10/19/2017
 - No real functionality additions. This drop is mostly foundational" - likely a few more
   of these before anything really interesting comes along but it allows the new call-in
