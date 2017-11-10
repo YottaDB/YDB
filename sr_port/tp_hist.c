@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,6 +16,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsblk.h"
@@ -25,7 +29,6 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "longcpy.h"
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
@@ -496,7 +499,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	assert(si->cur_tp_hist_size < si->tp_hist_size);
 	si->cur_tp_hist_size <<= 1;
 	new_first_tp_hist = (srch_blk_status *)malloc(SIZEOF(srch_blk_status) * si->cur_tp_hist_size);
-	longcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
+	memcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
 		(sm_uc_ptr_t)si->last_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	delta = (sm_long_t)((sm_uc_ptr_t)new_first_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	for (tabent = si->blks_in_use->base, topent = si->blks_in_use->top; tabent < topent; tabent++)
