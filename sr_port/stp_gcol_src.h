@@ -56,7 +56,6 @@
 #include "zshow.h"
 #include "zwrite.h"
 #include "error.h"
-#include "longcpy.h"
 #include "stpg_sort.h"
 #include "hashtab_objcode.h"
 #include "hashtab_str.h"
