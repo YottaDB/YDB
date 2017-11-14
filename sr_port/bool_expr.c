@@ -2,6 +2,9 @@
  *                                                              *
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -54,6 +57,12 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		ex_tail(&t2->operand[0]);
 	else if (OCT_BOOL & oc_tab[t1->opcode].octype)
 		bx_boollit(t1);
+	/* It is possible "ex_tail" or "bx_boollit" is invoked above and has a compile-time error. In that case,
+	 * "ins_errtriple" would be invoked which does a "dqdelchain" that could remove "t1" from the "t_orig"
+	 * triple execution chain and so it is no longer safe to do "dqdel" etc. on "t1".
+	 * Hence the RETURN_EXPR_IF_RTS_ERROR check below.
+	 */
+	RETURN_EXPR_IF_RTS_ERROR;
 	for (t1 = x.oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.bl)
 		;
 	if ((OC_COBOOL == t1->opcode) && (OC_LIT == (t2 = t1->operand[0].oprval.tref)->opcode)

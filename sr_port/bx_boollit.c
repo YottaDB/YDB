@@ -1,8 +1,10 @@
-
 /****************************************************************
  *								*
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +63,7 @@ void bx_boollit(triple *t)
 			ex_tail(p);								/* chained arithmetic */
 		else if (OCT_BOOL & oc_tab[c].octype)
 			bx_boollit(optrip[j]);
+		RETURN_IF_RTS_ERROR;
 		assert(OC_COMVAL != optrip[j]->opcode);
 		neg = num = 0;
 		UNARY_TAIL(opr);
@@ -176,6 +179,12 @@ void bx_boollit(triple *t)
 		case OC_NPATTERN:
 		case OC_PATTERN:
 			tvr = !(*(uint4 *)v[1]->str.addr) ? do_pattern(v[0], v[1]) : do_patfixed(v[0], v[1]);
+			/* It is possible "do_patfixed" is invoked above and has a compile-time error. In that case,
+			 * "ins_errtriple" would be invoked which does a "dqdelchain" that could remove "t" from
+			 * the "t_orig" triple execution chain and so it is no longer safe to play with "t".
+			 * Hence the RETURN_IF_RTS_ERROR check below.
+			 */
+			RETURN_IF_RTS_ERROR;
 			break;
 		case OC_NSORTS_AFTER:
 		case OC_SORTS_AFTER:
