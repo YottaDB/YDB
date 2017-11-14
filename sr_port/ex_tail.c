@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -59,7 +62,10 @@ void ex_tail(oprtype *opr)
 				for (t0 = i->oprval.tref; OCT_UNARY & oc_tab[t0->opcode].octype; t0 = t0->operand[0].oprval.tref)
 					;
 				if (OCT_BOOL & oc_tab[t0->opcode].octype)
+				{
 					bx_boollit(t0);
+					RETURN_IF_RTS_ERROR;
+				}
 				ex_tail(i);			/* chained Boolean or arithmetic */
 				RETURN_IF_RTS_ERROR;
 			}
