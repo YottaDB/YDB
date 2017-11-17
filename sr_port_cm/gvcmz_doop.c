@@ -49,6 +49,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned short	srv_buff_size;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	lnk = gv_cur_region->dyn.addr->cm_blk;
 	if (!((link_info *)lnk->usr)->server_supports_long_names && (PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_currkey->base)))
 	{

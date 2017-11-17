@@ -228,7 +228,7 @@ int main(int argc, char_ptr_t argv[])
 
 	GTM_THREADGBL_INIT;
 	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
-	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
+	common_startup_init(GTMSECSHR_IMAGE, NULL); /* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);
 	timer_id = (TID)main;

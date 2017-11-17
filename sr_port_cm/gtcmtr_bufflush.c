@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +52,7 @@ bool gtcmtr_bufflush(void)
 	error_def(ERR_REC2BIG);
 	error_def(ERR_GVIS);
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_B_BUFFLUSH);
 	ptr++;

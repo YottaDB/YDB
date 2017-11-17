@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +55,7 @@ bool gtcmtr_order(void)
 	boolean_t		last_subsc_is_null;
 	cm_region_head		*cm_reg_head;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_ORDER == *ptr);
 	ptr++;

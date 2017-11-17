@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@
 
 void gtcm_write_ast(struct CLB *c)
 {
+	ASSERT_IS_LIBGNPSERVER;
 	if (CMI_CLB_ERROR(c))
 	{	/* error */
 		*c->mbf = CMMS_E_TERMINATE;

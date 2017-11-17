@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,6 +57,7 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 	uint4			status;
 	boolean_t		was_crit;
 
+	ASSERT_IS_LIBGNPSERVER;
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, creq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
 	{

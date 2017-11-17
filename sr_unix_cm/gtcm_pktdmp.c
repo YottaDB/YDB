@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,6 +52,7 @@ char *gtcm_hname(struct addrinfo *ai_ptr)
 	char host[NI_MAXHOST];
 	int	errcode;
 
+	ASSERT_IS_LIBGTCM;
 	if(0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, ipname,
 					 SIZEOF(ipname), NULL, 0, NI_NUMERICHOST)))
 	{
@@ -72,6 +76,7 @@ void gtcm_cpktdmp(char *ptr, int length, char *msg)
     char newmsg[512];
     struct hostent *peer;
 
+	ASSERT_IS_LIBGTCM;
     if (curr_conn && (512-strlen(msg)) > 25)
     {
 	SNPRINTF(newmsg, 512,"Conn: %s - %s",
@@ -101,6 +106,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	char *gtm_dist;
 	int status;
 
+	ASSERT_IS_LIBGTCM;
 	ctim = time(0);
 	GTM_LOCALTIME(ltime, &ctim);
 	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,

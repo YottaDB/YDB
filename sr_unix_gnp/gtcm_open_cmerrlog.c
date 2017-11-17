@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,6 +55,7 @@ void gtcm_open_cmerrlog(void)
 
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
+	ASSERT_IS_LIBGNPSERVER;
 	if (0 != (len = STRLEN(gtcm_gnp_server_log)))
 	{
 		lfn1.addr = gtcm_gnp_server_log;

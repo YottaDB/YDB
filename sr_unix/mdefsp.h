@@ -61,8 +61,6 @@ typedef uint2 mach_inst;
 #define SHMDT(X) shmdt((char *)(X))
 typedef uint4 mach_inst;
 
-/* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
-#define	mval2subsc	rc_mval2subsc
 #ifndef VAR_COPY
 #define VAR_COPY	va_copy
 #endif

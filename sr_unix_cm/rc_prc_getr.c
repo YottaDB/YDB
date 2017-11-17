@@ -65,6 +65,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_IS_LIBGTCM;
 	ESTABLISH_RET(rc_dbms_ch,0);
 	req = (rc_req_getr *)qhdr;
 	rsp = (rc_rsp_page *)qhdr;

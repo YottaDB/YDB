@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@ bool gvcmx_get(mval *v)
 {
 	mval temp;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	temp.mvtype = 0;
 	gvcmz_doop(CMMS_Q_GET, CMMS_R_GET, &temp);
 	if (MV_DEFINED(&temp))

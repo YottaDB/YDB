@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,7 @@ GBLREF	node_local_ptr_t	locknl;
 
 void gtcm_remove_from_action_queue()
 {
+	ASSERT_IS_LIBGNPSERVER;
 	VMS_ONLY(assert(lib$ast_in_prog()));
 	UNIX_ONLY(DEBUG_ONLY(locknl = FILE_INFO(action_que_dummy_reg)->s_addrs.nl;))	/* for DEBUG_ONLY LOCK_HIST macro */
 	curr_entry = (connection_struct *)REMQHI(&action_que);

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +32,7 @@ void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock, uint4 wake)
 	uint4		status;
 	boolean_t	new;
 
+	ASSERT_IS_LIBGNPSERVER;
 	region->blkd = lock;
 	if (curr_entry->state != CMMS_L_LKACQUIRE)
 		return;

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +45,7 @@ int rc_prc_setf(rc_q_hdr *qhdr)
     mname_entry	gvname;
     gvnh_reg_t	*gvnh_reg;
 
+	ASSERT_IS_LIBGTCM;
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
     if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
     {

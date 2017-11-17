@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,7 @@ bool gtcmtr_lkreqimmed(void)
 	cm_region_list *reg_walk;
 	mlk_pvtblk *lk_walk,*lk_walk1;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_L_LKREQIMMED);
 	ptr++;

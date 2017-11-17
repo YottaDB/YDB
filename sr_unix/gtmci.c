@@ -98,7 +98,9 @@ GBLREF	boolean_t		gtm_main_thread_id_set;
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t		gtm_dist_ok_to_use;
 GBLREF	int			dollar_truth;
+GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
+
 LITREF  gtmImageName            gtmImageNames[];
 
 void gtm_levl_ret_code(void);
@@ -982,7 +984,7 @@ int ydb_init()
 	}
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
-		common_startup_init(GTM_IMAGE);
+		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */

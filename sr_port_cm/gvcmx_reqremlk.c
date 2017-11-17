@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +43,7 @@ bool gvcmx_reqremlk(unsigned char laflag, int4 time)
 	uint4		status, buffer;
 	struct CLB	*clb_ptr;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	if (!ntd_root)
 		return FALSE;
 	if (time == 0)

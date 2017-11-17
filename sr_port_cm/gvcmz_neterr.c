@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,7 +34,7 @@
 #include "callg.h"
 
 GBLREF	struct NTD	*ntd_root;
-GBLDEF	bool		neterr_pending;
+GBLREF	bool		neterr_pending;
 
 LITREF	mval		literal_notimeout;
 
@@ -47,6 +50,7 @@ void	gvcmz_neterr(INTPTR_T *err)
 	INTPTR_T	err_buff[10];
 	boolean_t	locks = FALSE;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	neterr_pending = FALSE;
 	assertpro(NULL != ntd_root);
 	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl);  p != (struct CLB *)ntd_root;  p = pn)

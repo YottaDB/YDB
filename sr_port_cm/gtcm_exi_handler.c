@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +49,7 @@ void gtcm_exi_handler()
 	error_def(ERR_UNKNOWNFOREX);
 	error_def(ERR_GTCMEXITLOOP);
 
+	ASSERT_IS_LIBGNPSERVER;
 	ESTABLISH(gtcm_exi_ch);
 	if (ntd_root)
 	{	/* Need a way to detect cycles in the loop below (C9C02-001908) */

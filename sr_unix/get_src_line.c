@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -60,7 +63,6 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 
 LITDEF char		litconst_space = ' ';
-LITDEF mval		literal_null;
 
 error_def(ERR_TXTSRCFMT);
 error_def(ERR_SYSCALL);

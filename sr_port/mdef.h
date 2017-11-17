@@ -1376,6 +1376,18 @@ void suspend(int sig);
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);
 
+int dlopen_libgtmshr(int argc, char **argv, char **envp, char *main_func);
+int gtm_main(int argc, char **argv, char **envp);
+int mupip_main(int argc, char **argv, char **envp);
+int dse_main(int argc, char **argv, char **envp);
+int lke_main(int argc, char **argv, char **envp);
+int gtcm_play_main(int argc, char **argv, char **envp);
+int gtcm_server_main(int argc, char **argv, char **envp);
+int gtcm_gnp_server_main(int argc, char **argv, char **envp);
+int gtcm_shmclean_main(int argc, char **argv, char **envp);
+int dbcertify_main(int argc, char **argv, char **envp);
+int ftok_main(int argc, char **argv, char **envp);
+
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002
 #define ZTRAP_POP	0x00000004
@@ -1883,6 +1895,26 @@ enum
 #define LIBPATH_ENV		"LIBPATH"
 #else
 #define LIBPATH_ENV		"LD_LIBRARY_PATH"
+#endif
+
+#ifdef DEBUG
+  /* Define macros that are helpful in verifying that functions in libgtmshr.so are only invoked
+   * by the executables/utilities we expect and not by anything else. For example, libgnpclient.list
+   * used to have a list of modules that this library includes and was linked only by mumps and lke.
+   * Now libgnpclient.list is nixed (as part of changes that made all utilities use libgtmshr.so
+   * and reduce their sizes) but we now have an ASSERT_IS_LIBGNPCLIENT check at function entry in all
+   * functions that were part of modules in that listing file. Same with the other asserts defined below.
+   */
+# include "gtmimagename.h"
+# define ASSERT_IS_LIBGNPCLIENT		assert(IS_LIBGNPCLIENT)
+# define ASSERT_IS_LIBGNPSERVER		assert(IS_LIBGNPSERVER)
+# define ASSERT_IS_LIBCMISOCKETTCP	assert(IS_LIBCMISOCKETTCP)
+# define ASSERT_IS_LIBGTCM		assert(IS_LIBGTCM)
+#else
+# define ASSERT_IS_LIBGNPCLIENT
+# define ASSERT_IS_LIBGNPSERVER
+# define ASSERT_IS_LIBCMISOCKETTCP
+# define ASSERT_IS_LIBGTCM
 #endif
 
 #endif /* MDEF_included */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,20 +10,12 @@
  *								*
  ****************************************************************/
 
-
-/*** STUB FILE ***/
 #include "mdef.h"
-#include "cmidef.h"
 
-cmi_status_t cmi_read(struct CLB *lnk)
+#include "gtcm.h"
+#include "cli.h"
+
+int main(int argc, char **argv, char **envp)
 {
-	assert(FALSE);
-	return SS_NORMAL;
+	return dlopen_libgtmshr(argc, argv, envp, "gtcm_server_main");
 }
-
-cmi_status_t cmi_write(struct CLB *lnk)
-{
-	assert(FALSE);
-	return SS_NORMAL;
-}
-

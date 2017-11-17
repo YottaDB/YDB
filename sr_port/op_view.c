@@ -584,7 +584,12 @@ void	op_view(int numarg, mval *keyword, ...)
 			zdefbufsiz = (unsigned short)tmpzdefbufsiz;
 			break;
 		case VTK_ZFLUSH:
-			gvcmz_zflush();
+			/* Only MUMPS and LKE are valid gnp clients. Do the ZFLUSH only in that case.
+			 * In other cases e.g. MUPIP (update process) running a trigger that does a VIEW "ZFLUSH"
+			 * skip it without issuing an error (more user-friendly behavior).
+			 */
+			if (IS_LIBGNPCLIENT)
+				gvcmz_zflush();
 			break;
 		case VTK_TRACE :
 			testvalue = MV_FORCE_INT(parmblk.value);

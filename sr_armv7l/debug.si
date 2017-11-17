@@ -15,7 +15,6 @@
 #								#
 #################################################################
 
-	.include "ydbmerrors.h"
 #
 # Any debugging macros should be defined here
 #

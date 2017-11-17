@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,6 +35,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 	int save_errno;
         ssize_t rval;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (-1 == lnk->mun)
 		return ENOTCONN;
 	if (CM_CLB_IDLE != lnk->sta)
@@ -119,6 +123,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 	struct iovec vec[NUM_IOVECS];
 	struct msghdr msg;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (-1 == lnk->mun)
 		return;
 	if (CM_CLB_IDLE == lnk->sta)

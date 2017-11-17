@@ -105,6 +105,7 @@ int init_ping(void)
 {
     struct protoent *proto;
 
+	ASSERT_IS_LIBGTCM;
     ident = getpid() & 0xFFFF;
     if (!(proto = getprotobyname("icmp")))
     {
@@ -138,6 +139,7 @@ int icmp_ping(int conn)
 	struct timeval		timeout;
 	int			cc;
 
+	ASSERT_IS_LIBGTCM;
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
@@ -198,6 +200,7 @@ int get_ping_rsp(void)
 	struct icmp *icp;
 	struct ip *ip;
 
+	ASSERT_IS_LIBGTCM;
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
@@ -247,6 +250,7 @@ int in_cksum(u_short *addr, int len)
 	register int sum = 0;
 	u_short answer = 0;
 
+	ASSERT_IS_LIBGTCM;
 	/* Our algorithm is simple, using a 32 bit accumulator (sum), we add
 	 * sequential 16 bit words to it, and at the end, fold back all the
 	 * carry bits from the top 16 bits into the lower 16 bits.

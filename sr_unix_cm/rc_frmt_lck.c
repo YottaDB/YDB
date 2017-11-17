@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +41,7 @@ short *subcnt;
 	char		buff[MAX_ZWR_KEY_SZ], *b_top, *b, *c_top, *sub_start;
 	mstr		opstr;
 
+	ASSERT_IS_LIBGTCM;
 	c_top = c + max_size;
 	g = key;
 	g_top = g + key_len;

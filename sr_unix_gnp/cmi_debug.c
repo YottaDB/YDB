@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +32,7 @@ void cmi_dprint(char *cs, ...)
 	va_list ap;
 	int	rc;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 #ifdef DEBUG
 	VAR_START(ap, cs);
 	VFPRINTF(stderr, cs, ap, rc);

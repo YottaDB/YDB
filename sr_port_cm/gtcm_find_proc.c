@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +22,7 @@ struct CLB *gtcm_find_proc(struct NTD *tsk, unsigned short pnum)
 {
 	struct CLB *ptr;
 
+	ASSERT_IS_LIBGNPSERVER;
 	for (ptr = (struct CLB *)RELQUE2PTR(tsk->cqh.fl);
 		ptr != (struct CLB *)tsk && ((connection_struct *)ptr->usr)->procnum != pnum ;
 		ptr = (struct CLB *)RELQUE2PTR(ptr->cqe.fl))

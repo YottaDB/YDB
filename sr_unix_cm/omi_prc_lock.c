@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +44,7 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     omi_si		 si;
     mlk_pvtblk		*next, **prior;
 
+	ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Global Ref */

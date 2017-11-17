@@ -137,6 +137,7 @@
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
+#include "gtcm.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -1190,3 +1191,33 @@ GBLDEF	char		io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() in MUPIP but points to a routine
 							 * that assert fails if run from non-MUPIP builds.
 							 */
+GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
+
+/* GT.CM OMI related global variables */
+GBLDEF	bool		neterr_pending;
+GBLDEF	int4		omi_bsent = 0;
+GBLDEF	int		psock = -1;		/* pinging socket */
+GBLDEF	short		gtcm_ast_avail;
+GBLDEF	int4		gtcm_exi_condition;
+GBLDEF	char		*omi_service = (char *)0;
+GBLDEF	FILE		*omi_debug   = (FILE *)0;
+GBLDEF	char		*omi_pklog   = (char *)0;
+GBLDEF	char		*omi_pklog_addr = (char *)0;
+GBLDEF	int		omi_pkdbg   = 0;
+GBLDEF	omi_conn_ll	*omi_conns   = (omi_conn_ll *)0;
+GBLDEF	int		omi_exitp   = 0;
+GBLDEF	int		omi_pid     = 0;
+GBLDEF	int4		omi_errno   = 0;
+GBLDEF	int4		omi_nxact   = 0;
+GBLDEF	int4		omi_nxact2  = 0;
+GBLDEF	int4		omi_nerrs   = 0;
+GBLDEF	int4		omi_brecv   = 0;
+GBLDEF	int4		gtcm_stime  = 0;  /* start time for GT.CM */
+GBLDEF	int4		gtcm_ltime  = 0;  /* last time stats were gathered */
+GBLDEF	int		one_conn_per_inaddr = 0;
+GBLDEF	int		authenticate = 0;   /* authenticate OMI connections */
+GBLDEF	int		ping_keepalive = 0; /* check connections using ping */
+GBLDEF	int		conn_timeout = TIMEOUT_INTERVAL;
+GBLDEF	int		history = 0;
+/* image_id....allows you to determine info about the server by using the strings command, or running dbx */
+GBLDEF	char		image_id[256]= "image_id";

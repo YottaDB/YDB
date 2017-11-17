@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,6 +58,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	unsigned char	ch, node[MAX_HOST_NAME_LEN], *tmp_ptr;
 	sgmnt_addrs	*csa;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = 0;
 	fname = cnx->clb_ptr->mbf;
 	fname++;

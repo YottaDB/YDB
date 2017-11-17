@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,6 +46,7 @@ void gtcml_lklist(void)
 	mlk_pvtblk *inlist1, *inlist2;
 	bool new;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	ptr++; /* hdr */
 	ptr++; /* laflag */

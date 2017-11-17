@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc *
+ * Copyright 2001, 2014 Fidelity Information Services, Inc 	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +80,7 @@ void gtcm_loop(omi_conn_ll *cll)
     omi_conn	*cptr, *prev;
     struct timeval timeout, *tp;
 
+	ASSERT_IS_LIBGTCM;
     if (psock >= 0)
     {
 	    timeout.tv_sec = PING_TIMEOUT;
@@ -223,6 +227,7 @@ void gtcm_loop(omi_conn_ll *cll)
 
 void hang_handler(void)
 {
+	ASSERT_IS_LIBGTCM;
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: server appears to be hung...generating core file...\n",
 		 SRVR_NAME));
@@ -238,6 +243,7 @@ void gcore_server(void)
 {
 	int pid;
 
+	ASSERT_IS_LIBGTCM;
 	if (history)
 	{
 		OMI_DBG((omi_debug, "%s:  dumping RC history\n", SRVR_NAME));

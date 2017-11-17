@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -64,6 +67,7 @@ CONDITION_HANDLER(gtcm_ch)
 	char		time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	short		short_len;
 
+	ASSERT_IS_LIBGNPSERVER;
 	START_CH(FALSE);
 	undef_inhibit = FALSE;	/* reset undef_inhibit to the default value in case it got reset temporarily and there was an error.
 				 * currently, only $INCREMENT temporarily resets this (in gtcmtr_increment.c)

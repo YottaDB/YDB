@@ -22,3 +22,4 @@
 ! Note: This file is similar to sr_port/merrors.msg in layout
 !
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0
+MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/error/fao=4

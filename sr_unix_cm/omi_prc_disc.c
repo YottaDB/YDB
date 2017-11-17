@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +36,7 @@ omi_prc_disc(cptr, xend, buff, bend)
 {
     omi_li	 li;
 
+	ASSERT_IS_LIBGTCM;
 /*  Reason string */
     OMI_LI_READ(&li, cptr->xptr);
 /*  Log the string? */

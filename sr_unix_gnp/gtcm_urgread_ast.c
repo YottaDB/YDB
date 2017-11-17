@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@ void gtcm_urgread_ast(struct CLB *cp, unsigned char transnum)
 {
 	connection_struct	*cnx;
 
+	ASSERT_IS_LIBGNPSERVER;
 	/* Note. earlier code here tested (curr_entry == cnx || gtcm_write_ast == cp->ast) and
 	   if false, built a message in the existing mbf. The thought now is that this could
 	   cause a message overlay problem so urgent messages are always flagged and executed

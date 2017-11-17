@@ -33,6 +33,7 @@ bool gvcmx_query(mval *val)
 	mval		temp;
 	struct CLB	*lnk;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	/* Note: We do not initialize "val" in case the caller is "op_gvquery" as the latter does not use this currently.
 	 * It instead uses "gv_altkey" to derive the return value of the $query.
 	 */

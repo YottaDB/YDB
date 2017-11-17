@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -59,6 +62,7 @@ void gvcmz_bunch(mval *v)
 	bunch_rec 	*brec, nrec;
 	int4		status;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	assert(zdefactive);
 	lnk = gv_cur_region->dyn.addr->cm_blk;
 	usr = (link_info *)lnk->usr;
