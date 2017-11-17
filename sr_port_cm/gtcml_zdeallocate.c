@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,7 @@ void gtcml_zdeallocate(void)
 	int locks_done;
 	mlk_pvtblk	**prior;
 
+	ASSERT_IS_LIBGNPSERVER;
 	gtcml_lckclr();
 
 	for (prior = &mlk_cm_root, locks_done = 0; locks_done < cm_cmd_lk_ct ||

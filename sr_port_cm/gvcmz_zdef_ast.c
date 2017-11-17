@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +30,7 @@ void gvcmz_zdefw_ast(struct CLB *lnk)
 {
 	uint4 status;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	if (CMI_CLB_ERROR(lnk))
 	{
 		((link_info *)(lnk->usr))->neterr = TRUE;
@@ -47,6 +51,7 @@ void gvcmz_zdefw_ast(struct CLB *lnk)
 
 void gvcmz_zdefr_ast(struct CLB *lnk)
 {
+	ASSERT_IS_LIBGNPCLIENT;
 	if (CMI_CLB_ERROR(lnk))
 	{
 		((link_info *)(lnk->usr))->neterr = TRUE;

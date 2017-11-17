@@ -59,7 +59,6 @@ set(gen_xfer_desc 0)
 set(gtm_osarch_libs "")
 
 # Define these ahead of establishing platforms
-set(gt_src_list gen)
 set(sources_used "")
 set(extralibs "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
@@ -126,8 +125,9 @@ foreach(d ${gt_src_list})
 	  ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
 endforeach()
 # Prefer generated sources over all other locations.
-file(MAKE_DIRECTORY ${YDB_BINARY_DIR}/gen)
-set(source_dir_gen ${YDB_BINARY_DIR}/gen)
+file(MAKE_DIRECTORY ${YDB_BINARY_DIR}/genused)
+file(MAKE_DIRECTORY ${YDB_BINARY_DIR}/gennotused)
+set(source_dir_genused ${YDB_BINARY_DIR}/genused)
 # Hard-code list since we cannot glob files that do not exist.
 set(sources_gen gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
 if(gen_bootstrap)
@@ -136,7 +136,7 @@ endif()
 
 # The C preprocessor include search path consists of every source
 # directory ordered by 'gt_src_list'.
-set(includes ${YDB_BINARY_DIR}/gen)
+set(includes ${YDB_BINARY_DIR}/genused)
 foreach(d ${gt_src_list})
   list(APPEND includes ${source_dir_${d}})
 endforeach()
@@ -195,37 +195,29 @@ endmacro()
 
 #-----------------------------------------------------------------------------
 
-# Assign sources to libraries.
-load_source_list(libcmisockettcp sr_unix_gnp/libcmisockettcp.list)
-load_source_list(libdbcertify    sr_unix/libdbcertify.list)
-load_source_list(libdse          sr_unix/libdse.list)
-load_source_list(libgnpclient    sr_unix_gnp/libgnpclient.list)
-load_source_list(libgnpserver    sr_unix_gnp/libgnpserver.list)
-load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
-load_source_list(liblke          sr_unix/liblke.list)
-load_source_list(libmupip        sr_unix/libmupip.list)
-load_source_list(libstub         sr_unix/libstub.list)
-
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-set_source_list(dbcertify        dbcertify dbcertify_cmd)
-set_source_list(dse              dse dse_cmd)
-set_source_list(ftok             ftok)
+set_source_list(dbcertify        dbcertify dlopen_libgtmshr)
+set_source_list(dse              dse dlopen_libgtmshr)
+set_source_list(ftok             ftok dlopen_libgtmshr)
 set_source_list(geteuid          geteuid)
-set_source_list(gtcm_gnp_server  gtcm_gnp_server)
-set_source_list(gtcm_pkdisp      gtcm_pkdisp)
-set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
-set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
-set_source_list(gtcm_shmclean    gtcm_shmclean)
+set_source_list(gtcm_gnp_server  gtcm_gnp_server dlopen_libgtmshr)
+set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
+set_source_list(gtcm_play        gtcm_play dlopen_libgtmshr)
+set_source_list(gtcm_server      gtcm_server dlopen_libgtmshr)
+set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libgtmshr)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
-set_source_list(libgtmshr        gtm_main)
-set_source_list(lke              lke lke_cmd)
+set_source_list(libgtmshr        gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
+set_source_list(libgtmshr        gtcm_play_main omi_srvc_xct omi_extstr)
+set_source_list(libgtmshr        gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
+set_source_list(libgtmshr        dbcertify_main dbcertify_cmd ftok_main)
+set_source_list(lke              lke dlopen_libgtmshr)
 set_source_list(maskpass         maskpass gtmcrypt_util)
-set_source_list(mumps            gtm)
-set_source_list(mupip            mupip mupip_cmd)
+set_source_list(mumps            gtm dlopen_libgtmshr)
+set_source_list(mupip            mupip dlopen_libgtmshr)
 set_source_list(semstat2         semstat2)
 
 #-----------------------------------------------------------------------------
@@ -249,9 +241,9 @@ endforeach()
 # Copy generation routines to a working directory.
 foreach(m chk2lev.m chkop.m gendash.m genout.m loadop.m loadvx.m msg.m tttgen.m tttscan.m)
   add_custom_command(
-    OUTPUT gen/${m}
+    OUTPUT gennotused/${m}
     DEPENDS ${YDB_SOURCE_DIR}/sr_port/${m}
-    COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/sr_port/${m} ${YDB_BINARY_DIR}/gen/${m}
+    COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/sr_port/${m} ${YDB_BINARY_DIR}/gennotused/${m}
     )
 endforeach()
 
@@ -261,12 +253,12 @@ foreach(f ttt.txt opcode_def.h vxi.h)
 endforeach()
 set(mumps_ttt_args -run tttgen ${tttfiles})
 add_custom_command(
-  OUTPUT gen/ttt.c
+  OUTPUT gennotused/ttt.c
   DEPENDS ${tttfiles}
-    gen/chk2lev.m gen/chkop.m gen/gendash.m gen/genout.m gen/loadop.m
-    gen/loadvx.m gen/tttgen.m gen/tttscan.m
+    gennotused/chk2lev.m gennotused/chkop.m gennotused/gendash.m gennotused/genout.m gennotused/loadop.m
+    gennotused/loadvx.m gennotused/tttgen.m gennotused/tttscan.m
     ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
-  WORKING_DIRECTORY ${YDB_BINARY_DIR}/gen
+  WORKING_DIRECTORY ${YDB_BINARY_DIR}/gennotused
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${gen_bootstrap_dist}
     -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
@@ -277,9 +269,9 @@ add_custom_command(
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
   VERBATIM
   )
-list(APPEND gen_bootstrap_files gen/ttt.c)
+list(APPEND gen_bootstrap_files gennotused/ttt.c)
 
-set(gen_merrors_extra gen/merrors_ansi.h)
+set(gen_merrors_extra gennotused/merrors_ansi.h)
 foreach(msg
     sr_port/cmerrors.msg
     sr_port/gdeerrors.msg
@@ -288,12 +280,12 @@ foreach(msg
     )
   get_filename_component(name ${msg} NAME_WE)
   set(mumps_msg_args -run msg ${YDB_SOURCE_DIR}/${msg} unix)
-  set(outputs gen/${name}_ctl.c ${gen_${name}_extra})
+  set(outputs gennotused/${name}_ctl.c ${gen_${name}_extra})
   add_custom_command(
     OUTPUT ${outputs}
-    DEPENDS gen/msg.m ${YDB_SOURCE_DIR}/${msg}
+    DEPENDS gennotused/msg.m ${YDB_SOURCE_DIR}/${msg}
             ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
-    WORKING_DIRECTORY ${YDB_BINARY_DIR}/gen
+    WORKING_DIRECTORY ${YDB_BINARY_DIR}/gennotused
     COMMAND ${CMAKE_COMMAND}
       -D gtm_dist=${gen_bootstrap_dist}
       -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
@@ -343,14 +335,14 @@ if(gen_xfer_desc)
 endif()
 
 # gtm_threadgbl_deftypes
-set(gtmthreadgblasmhdr   "gen/gtm_threadgbl_deftypes.h")
+set(gtmthreadgblasmhdr   "genused/gtm_threadgbl_deftypes.h")
 add_custom_command(
   OUTPUT ${gtmthreadgblasmhdr}
   DEPENDS gtm_threadgbl_deftypes
   COMMAND gtm_threadgbl_deftypes > ${gtmthreadgblasmhdr}
   )
 # gtm_threadgbl_deftypes_asm.si
-set(gtmthreadgblasmfile   "gen/gtm_threadgbl_deftypes_asm.si")
+set(gtmthreadgblasmfile   "genused/gtm_threadgbl_deftypes_asm.si")
 select_file(gtmthreadgblasmaccess "gtm_threadgbl_asm_access.txt")
 add_custom_command(
   OUTPUT ${gtmthreadgblasmfile}
@@ -379,15 +371,6 @@ endforeach()
 add_custom_target(gen_export DEPENDS gtmexe_symbols.export gtmshr_symbols.export)
 
 foreach(lib
-  gtcm
-  cmisockettcp
-  gnpclient
-  gnpserver
-  dbcertify
-  dse
-  lke
-  mupip
-  stub
   mumps
   ${extralibs}
   )
@@ -398,7 +381,7 @@ endforeach()
 
 # TODO: find_package or find_library for system libs?
 include_directories (/usr/local/include)
-target_link_libraries(libmumps		${libmumpslibs})
+target_link_libraries(libmumps		${libsyslibs})
 if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
@@ -406,68 +389,59 @@ endif()
 function(add_executable target)
   _add_executable(${target} ${ARGN})
   set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  # Since all utilities now dlopen() libgtmshr.so at startup, add a dependency to not build the utilities
+  # until libgtmshr.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
+  add_dependencies(${target} libgtmshr gen_gtm_threadgbl_deftypes)
+  # And add system libraries as a target library for all utilities (e.g. dlopen() etc.).
+  target_link_libraries(${target}	${libsyslibs})
 endfunction()
 add_executable(mumps			${mumps_SOURCES})
-target_link_libraries(mumps		libmumps)
 
 add_executable(dse			${dse_SOURCES})
-target_link_libraries(dse		libdse libmumps libstub)
 list(APPEND with_export dse)
 
 add_executable(dbcertify		${dbcertify_SOURCES})
-target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
 
 add_executable(geteuid			${geteuid_SOURCES})
-target_link_libraries(geteuid		libmumps)
-add_dependencies(geteuid		gen_gtm_threadgbl_deftypes)
+target_link_libraries(geteuid		libmumps)	# needed for few functions (e.g. gtm_printf etc.)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
-add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
-target_link_libraries(gtmsecshr_real libmumps)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
-add_dependencies(gtmsecshr_real		gen_gtm_threadgbl_deftypes)
+target_link_libraries(gtmsecshr_real	libmumps)	# needed for static linking since this is a setuid executable
+							# and does not do a dlopen of libgtmshr.so
 
 add_executable(mupip			${mupip_SOURCES})
-target_link_libraries(mupip		libmupip libmumps libstub)
 list(APPEND with_export mupip)
 
 add_executable(lke			${lke_SOURCES})
-target_link_libraries(lke		liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
 list(APPEND with_export lke)
 
 
 add_executable(gtcm_server		${gtcm_server_SOURCES})
-target_link_libraries(gtcm_server	libgtcm libmumps libstub)
 list(APPEND with_export gtcm_server)
 
 add_executable(gtcm_gnp_server		${gtcm_gnp_server_SOURCES})
-target_link_libraries(gtcm_gnp_server	libgnpserver liblke libmumps libcmisockettcp libstub)
 list(APPEND with_export gtcm_gnp_server)
 
 add_executable(gtcm_play		${gtcm_play_SOURCES})
-target_link_libraries(gtcm_play		libgtcm libmumps libstub)
 list(APPEND with_export gtcm_play)
 
 add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
-target_link_libraries(gtcm_pkdisp	libgtcm libmumps libstub)
 
 add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
-target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
 
 add_executable(semstat2		 	${semstat2_SOURCES})
-add_dependencies(semstat2		gen_gtm_threadgbl_deftypes)
 
 add_executable(ftok 			${ftok_SOURCES})
-target_link_libraries(ftok 		libmumps libstub)
 
 add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
-target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
+target_link_libraries(libgtmshr libmumps)
 set_target_properties(libgtmshr PROPERTIES
   LINK_FLAGS "${libgtmshr_link} -Wl,-Map=libgtmshr.map"
   LINK_DEPENDS "${libgtmshr_dep}"

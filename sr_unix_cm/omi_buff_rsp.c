@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +30,7 @@ void	omi_buff_rsp(omi_req_hdr *rhptr, omi_err_hdr *ehptr, omi_status status, cha
 {
 	char	*tptr;
 
+	ASSERT_IS_LIBGTCM;
 	tptr = bptr;
 
 	/*  Fill in the header */

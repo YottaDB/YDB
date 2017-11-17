@@ -53,6 +53,7 @@ bool gtcmtr_lke_showreq(struct CLB *lnk, char rnum, bool all, bool wait, int4 pi
 	bool		locks = FALSE;
 	uint4		status;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	sreq.code = CMMS_U_LKESHOW;
 	sreq.rnum = rnum;
 	sreq.all = all;

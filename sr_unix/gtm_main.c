@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -34,7 +37,6 @@
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
-#include "gtm_main.h"		/* for "gtm_main" prototype */
 #include "io.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
@@ -65,21 +67,8 @@ GBLREF	ch_ret_type			(*ch_at_trigger_init)();
 GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
-GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUMPS specific cmd table */
-
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
-
-#ifdef __osf__
- /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
-  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
-  * the only exception and, in particular because the operating system does not support such an exception, the argv
-  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
-  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
-  */
-# pragma pointer_size (save)
-# pragma pointer_size (long)
-#endif
 
 GBLDEF	char 				**gtmenvp;
 
@@ -92,10 +81,7 @@ error_def(ERR_TEXT);
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TLSINIT);
 
-int gtm_main (int argc, char **argv, char **envp)
-#ifdef __osf__
-# pragma pointer_size (restore)
-#endif
+int gtm_main(int argc, char **argv, char **envp)
 {
 	char			*ptr, *eq, **p;
 	char			gtmlibxc[GTM_PATH_MAX];
@@ -111,7 +97,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	GTM_THREADGBL_INIT;
 	gtmenvp = envp;
 	gtm_dist_ok_to_use = TRUE;
-	common_startup_init(GTM_IMAGE);
+	common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);

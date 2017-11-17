@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -65,8 +68,6 @@
 static char rcsid[] = "$Header:$";
 #endif
 
-GBLDEF	CLI_ENTRY	*cmd_ary = NULL; /* The GTCM server does not have any command tables so initialize command array to NULL */
-
 GBLREF short 			gtcm_ast_avail;
 GBLREF bool			licensed;
 GBLREF int			omi_pid;
@@ -96,6 +97,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	char			msg[256];
 	int			save_errno, maxfds;
 
+	ASSERT_IS_LIBGTCM;
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
 	gtm_wcswidth_fnptr = gtm_wcswidth;
@@ -186,6 +188,7 @@ void gtcm_fail(int sig)
 	void rc_rundown();
         struct sigaction def;
 
+	ASSERT_IS_LIBGTCM;
 	FPRINTF(stderr,"GT.CM terminating on signal %d, cleaning up...\n", sig);
 	/* quickie cleanup */
 	rc_rundown();

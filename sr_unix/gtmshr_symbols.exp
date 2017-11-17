@@ -23,3 +23,12 @@ op_read
 dm_read
 io_curr_device
 io_std_device
+mupip_main
+dse_main
+lke_main
+gtcm_play_main
+gtcm_server_main
+gtcm_gnp_server_main
+gtcm_shmclean_main
+dbcertify_main
+ftok_main

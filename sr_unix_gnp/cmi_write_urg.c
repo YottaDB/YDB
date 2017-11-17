@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@ cmi_status_t cmi_write_urg(struct CLB *lnk, unsigned char urg)
 	sigset_t oset;
 	int rc;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	lnk->urgdata = urg;
 	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	status = cmj_write_urg_start(lnk);

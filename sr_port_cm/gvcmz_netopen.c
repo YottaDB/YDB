@@ -63,6 +63,7 @@ CONDITION_HANDLER(gvcmz_netopen_ch)
 {
 	/* This condition handler is established only for VMS. In VMS, we do not do CONTINUE for INFO/SUCCESS severity.
 	 * FALSE input to START_CH achieves the same thing. */
+	ASSERT_IS_LIBGNPCLIENT;
 	START_CH(FALSE);
 	if (SIGNAL != CMERR_INVPROT || second_attempt)
 	{
@@ -84,6 +85,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	jnl_process_vector	temp_vect;
 #endif
 
+	ASSERT_IS_LIBGNPCLIENT;
 	VMS_ONLY(
 		ESTABLISH(gvcmz_netopen_ch); /* our old servers run only on VMS; no need for retry on other OSs */
 		clb = c; /* need this assignment since we can't pass c to gvcmz_netopen_ch */
@@ -153,6 +155,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	uint4			status;
 	protocol_msg		*server_proto;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
 	c->usr = malloc(SIZEOF(link_info));
 	li = c->usr;

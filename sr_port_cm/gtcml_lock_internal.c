@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@ char gtcml_lock_internal(cm_region_list *reg, unsigned char action)
 	unsigned int	wakeup, status;
 	unsigned short	locks_done, locks_bckout;
 
+	ASSERT_IS_LIBGNPSERVER;
 	for (x = mlk_cm_root, locks_done = 0; locks_done < cm_cmd_lk_ct; x = x->next, locks_done++)
 	{
 		if (ZALLOCATED == action && x->old && !x->zalloc)

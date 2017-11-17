@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +31,7 @@
 
 boolean_t gtcm_is_query_queryget(protocol_msg *peer, protocol_msg *me)
 { /* returns TRUE if QUERY is QUERYGET based on the client/server protocol levels */
+	ASSERT_IS_LIBCMISOCKETTCP;
 	return (0 <= memcmp(peer->msg + CM_LEVEL_OFFSET, CMM_QUERYGET_MIN_LEVEL, 3) &&
 	        0 <= memcmp(me->msg + CM_LEVEL_OFFSET, CMM_QUERYGET_MIN_LEVEL, 3));
 }

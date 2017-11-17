@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -95,6 +98,7 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
     int	 i,j, t;
     boolean_t inv_option = FALSE;
 
+	ASSERT_IS_LIBGTCM;
     for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
     {
 	    for(j = 0; opt = optlist[j].option; j++)

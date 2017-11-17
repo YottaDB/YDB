@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +27,7 @@ void gvcmy_rundown(void)
 
 	if (!ntd_root)
 		return;
+	ASSERT_IS_LIBGNPCLIENT;
 	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl) ; p != (struct CLB *)ntd_root ;
 		p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl))
 	{

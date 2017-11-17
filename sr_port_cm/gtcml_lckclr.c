@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +30,7 @@ void gtcml_lckclr(void)
 	short i;
 	mlk_pvtblk *p1;
 
+	ASSERT_IS_LIBGNPSERVER;
 	p1 = mlk_cm_root;
 	for (i = 0; i < cm_cmd_lk_ct; i++)
 	{

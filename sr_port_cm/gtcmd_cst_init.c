@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +41,7 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	gd_region	*reg;
 	sgmnt_addrs	*csa;
 
+	ASSERT_IS_LIBGNPSERVER;
 	reg = ptr->reg;
 	if (VMS_ONLY(gtcm_ast_avail > 0) UNIX_ONLY(TRUE))
 		gvcst_init(reg);

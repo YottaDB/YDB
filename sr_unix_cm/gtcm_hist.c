@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +35,7 @@ void init_hist(void)
 {
 	int	i;
 
+	ASSERT_IS_LIBGTCM;
 	omi_hist = malloc(SIZEOF(omi_hist_rec) * HISTORY);
 	rc_hist = malloc(SIZEOF(rc_hist_rec) * HISTORY);
 
@@ -47,6 +51,7 @@ void init_hist(void)
 
 void init_omi_hist(int conn)
 {
+	ASSERT_IS_LIBGTCM;
 	omi_hist_num = (omi_hist_num + 1) % HISTORY;
 
 	omi_hist[omi_hist_num].timestamp = time(0);
@@ -57,6 +62,7 @@ void init_omi_hist(int conn)
 
 void save_omi_req(char *buff, int len)
 {
+	ASSERT_IS_LIBGTCM;
 	omi_hist[omi_hist_num].req_len = len;
 	if (len >= 0 && len <= OMI_HIST_BUFSIZ)
 		memcpy(omi_hist[omi_hist_num].req, buff, len);
@@ -69,6 +75,7 @@ void save_omi_req(char *buff, int len)
 
 void save_omi_rsp(char *buff, int len)
 {
+	ASSERT_IS_LIBGTCM;
 	omi_hist[omi_hist_num].rsp_len = len;
 	if (len >= 0 && len <= OMI_HIST_BUFSIZ)
 		memcpy(omi_hist[omi_hist_num].rsp, buff, len);
@@ -82,6 +89,7 @@ void save_omi_rsp(char *buff, int len)
 /* init_rc_hist - Set up the next RC history record */
 void init_rc_hist(int conn)
 {
+	ASSERT_IS_LIBGTCM;
 	rc_hist_num = (rc_hist_num + 1) % HISTORY;
 	rc_hist[rc_hist_num].timestamp = time(0);
 	rc_hist[rc_hist_num].conn = conn;
@@ -91,6 +99,7 @@ void init_rc_hist(int conn)
 
 void save_rc_req(char *buff, int len)
 {
+	ASSERT_IS_LIBGTCM;
 	rc_hist[rc_hist_num].req_len = len;
 	if (len >= 0 && len <= RC_HIST_BUFSIZ)
 		memcpy(rc_hist[rc_hist_num].req, buff, len);
@@ -103,6 +112,7 @@ void save_rc_req(char *buff, int len)
 
 void save_rc_rsp(char *buff, int len)
 {
+	ASSERT_IS_LIBGTCM;
 	rc_hist[rc_hist_num].rsp_len = len;
 	if (len >= 0 && len <= RC_HIST_BUFSIZ)
 		memcpy(rc_hist[rc_hist_num].rsp, buff, len);
@@ -119,6 +129,7 @@ void dump_omi_rq(void)
     char	*then;
     omi_conn	*temp;
 
+    ASSERT_IS_LIBGTCM;
     GTM_CTIME(then, &omi_hist[omi_hist_num].timestamp);
     then[24] = '\0';
     if (omi_hist_num < 0)   /* no history? */
@@ -137,6 +148,7 @@ void dump_rc_hist(void)
 	char	msg[256];
 	char	*then;
 
+	ASSERT_IS_LIBGTCM;
 	if (rc_hist_num < 0)	/* no history? */
 		return;
 	i = rc_hist_num;

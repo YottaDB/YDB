@@ -65,6 +65,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     char	*bptr, *eptr;
     char	*ag_name, *ag_pass, *s;
 
+	ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Version numbers */

@@ -18,6 +18,7 @@
 
 LITDEF	err_msg ydberrors[] = {
 	{ "QUERY2", "Invalid second argument to $QUERY. Must be -1 or 1.", 0 },
+	{ "MIXIMAGE", "Cannot load !AD image on process that already has !AD image loaded", 4 },
 };
 
 
@@ -25,4 +26,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	1};
+	2};

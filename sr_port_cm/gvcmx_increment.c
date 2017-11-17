@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +40,7 @@ void	gvcmx_increment(mval *increment, mval *result)
 	error_def(ERR_TEXT);
 	error_def(ERR_GVIS);
 
+	ASSERT_IS_LIBGNPCLIENT;
 	if (!((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->server_supports_dollar_incr)
 	{
 		assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all other access methods elsewhere */

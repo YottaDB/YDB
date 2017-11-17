@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +49,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	struct addrinfo	*ai_ptr, *local_ai_ptr;
 	boolean_t	af;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	status = cmj_netinit();
 	if (CMI_ERROR(status))
 		return status;

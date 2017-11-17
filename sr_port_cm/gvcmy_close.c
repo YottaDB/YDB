@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +27,7 @@ void gvcmy_close(struct CLB *c)
 	mlk_pvtblk	*temp, *temp1;
 	link_info	*li;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	li = c->usr;
 	if (!li->lnk_active)
 		return;

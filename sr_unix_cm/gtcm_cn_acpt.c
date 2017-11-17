@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +59,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	int			optsize;
 	const boolean_t		keepalive = TRUE;
 
+	ASSERT_IS_LIBGTCM;
 	/*  Accept the connection from the network layer */
 	sln = SIZEOF(sas);
 	if ((fd = accept(cll->nve, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sln)) < 0)

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@ rc_oflow_alc()
 {
     rc_oflow	*rv;
 
+	ASSERT_IS_LIBGTCM;
     rv = (rc_oflow *)malloc(SIZEOF(rc_oflow));
     rv->page   = 0;
     rv->buff   = (char *)0;
@@ -46,6 +50,7 @@ rc_oflow_fin(fop)
     rc_oflow *fop;
 {
 
+	ASSERT_IS_LIBGTCM;
     if (!fop)
 	return;
 

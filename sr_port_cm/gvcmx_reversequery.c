@@ -54,6 +54,7 @@ bool gvcmx_reversequery(mval *val)
 	struct CLB	*lnk;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	if (!((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->server_supports_reverse_query)
 	{
 		assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all other access methods elsewhere */

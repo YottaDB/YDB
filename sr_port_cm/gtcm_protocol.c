@@ -60,6 +60,7 @@ static	protocol_msg	proto;
 
 void gtcm_protocol(protocol_msg *pro)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (!proto_built)
 	{
 		memcpy(proto.msg + CM_CPU_OFFSET, encode_cpu(), 3);
@@ -90,11 +91,13 @@ void gtcm_protocol(protocol_msg *pro)
 
 boolean_t gtcm_is_big_endian(protocol_msg *pro)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	return pro->msg[CM_ENDIAN_OFFSET] == GTCM_BIG_ENDIAN_INDICATOR;
 }
 
 boolean_t gtcm_protocol_match(protocol_msg *peer, protocol_msg *me)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (memcmp(peer->msg + CM_TYPE_OFFSET, me->msg + CM_TYPE_OFFSET, 3))
 		return FALSE;
 	assert(0 <= memcmp(me->msg, CMM_MIN_PEER_LEVEL, 3));
@@ -109,6 +112,7 @@ static char *encode_cpu()
 	unsigned char	*p;
 	int		count, cpuidx;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	count = 0;
 	p = (unsigned char *)ydb_release_name;
 	/* fourth arg in release name string */
@@ -136,6 +140,7 @@ static char *encode_os()
 	unsigned char	*p;
 	int		count, osidx;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	count = 0;
 	p = (unsigned char *)ydb_release_name;
 	/* third arg in release name string */

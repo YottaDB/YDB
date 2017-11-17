@@ -57,6 +57,7 @@ bool gtcmtr_zprevious(void)
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_PREV == *ptr);
 	ptr++;

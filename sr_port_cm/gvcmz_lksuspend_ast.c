@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +26,7 @@ GBLDEF unsigned short	lksusp_rec;
 
 void gvcmz_lksuspend_ast(struct CLB *lnk)
 {
+	ASSERT_IS_LIBGNPCLIENT;
 	lksusp_rec++;
 	if (CMI_CLB_ERROR(lnk))
 	{

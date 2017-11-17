@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +64,7 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 
 	error_def(ERR_LCKSGONE);
 
+	ASSERT_IS_LIBGNPCLIENT;
 	creq.code = CMMS_U_LKEDELETE;
 	creq.rnum = rnum;
 	creq.all = all;

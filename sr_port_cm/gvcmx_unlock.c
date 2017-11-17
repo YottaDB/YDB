@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@ void gvcmx_unlock(unsigned char rmv_locks, bool specific, char incr)
 	struct CLB	*p;
 	unsigned char	operation1,operation2,*ptr;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	if (!ntd_root || !ntd_root->cqh.fl || (specific && !remlkreq))
 		return;
 

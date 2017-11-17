@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,6 +38,7 @@
 #include "copy.h"
 #include "error.h"
 #include "op.h"
+#include "gtmimagename.h"
 
 GBLREF spdesc stringpool;
 
@@ -65,6 +69,12 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	DCL_THREADGBL_ACCESS;		/* needed by TREF usage inside SET_REGION_OPEN_TRUE macro */
 
 	SETUP_THREADGBL_ACCESS;		/* needed by TREF usage inside SET_REGION_OPEN_TRUE macro */
+	if (!IS_LIBGNPCLIENT)
+	{	/* If invoked by an image that is not a valid gnp client (only MUMPS and LKE are valid), issue an error. */
+		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
+			ERR_TEXT, 2, LEN_AND_LIT("This utility does not support remote database operations"));
+	}
+	ASSERT_IS_LIBGNPCLIENT;
 	ESTABLISH(gvcmy_open_ch);
 	if (reg->is_spanned)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REMOTEDBNOSPGBL, 2, REG_LEN_STR(reg));

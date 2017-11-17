@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,7 @@ bool	rc_iscan (mval *v)
 {	bool	can, dot ;
 	char 	*c, *eos, *c1;
 
+	ASSERT_IS_LIBGTCM;
 	c = v->str.addr ;
 	eos = v->str.addr + v->str.len ;
 	if ( v->str.len == 0 )

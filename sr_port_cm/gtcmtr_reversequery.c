@@ -58,6 +58,7 @@ bool gtcmtr_reversequery(void)
 	boolean_t	found, is_null;
 	uint4		msg_len;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_REVERSEQUERY == *ptr);
 	ptr++;

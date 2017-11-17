@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@ cmi_status_t cmj_clb_set_async(struct CLB *lnk)
 	struct NTD *tsk = lnk->ntd;
 	cmi_status_t status = SS_NORMAL;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("in cmj_clb_set_async sta = %d\n", lnk->sta));
 	assertpro(FD_SETSIZE > lnk->mun);
 	switch (lnk->sta)
@@ -42,6 +46,7 @@ cmi_status_t cmj_clb_reset_async(struct CLB *lnk)
 	struct NTD *tsk = lnk->ntd;
 	cmi_status_t status = SS_NORMAL;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("in cmj_clb_reset_async sta = %d\n", lnk->sta));
 	switch (lnk->sta)
 	{

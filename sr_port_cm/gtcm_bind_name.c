@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,6 +46,7 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 	mname_entry	 gvent;
 	gvnh_reg_t	*gvnh_reg;
 
+	ASSERT_IS_LIBGNPSERVER;
 	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
 	gvent.var_name.addr = (char *)gv_currkey->base;
 	gvent.var_name.len = STRLEN((char *)gv_currkey->base);

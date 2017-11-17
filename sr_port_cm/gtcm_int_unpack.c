@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +28,7 @@ void gtcm_int_unpack(connection_struct *cnx)
 {
         struct CLB *tell;
 
+	ASSERT_IS_LIBGNPSERVER;
         VMS_ONLY(assert(lib$ast_in_prog()));		/* remove if call with AST disabled */
 	assert(FALSE == cnx->waiting_in_queue);		/* may be too strict due to lk starve */
 	assert(curr_entry != cnx);

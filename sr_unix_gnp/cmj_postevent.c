@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +26,7 @@ cmi_status_t cmj_postevent(struct CLB *lnk)
 	cmi_reason_t reason = lnk->deferred_reason;
 	cmi_status_t status = lnk->deferred_status;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	lnk->deferred_event = FALSE;
 	switch (reason)
 	{

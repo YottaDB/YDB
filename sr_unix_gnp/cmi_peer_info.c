@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +41,7 @@ void cmi_peer_info(struct CLB *lnk, char *buf, size_t sz)
 	char		port_str[NI_MAXSERV];
 	int		errcode;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	ai_ptr = &lnk->peer_ai;
 	if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen,
 					 ipname, SA_MAXLEN,

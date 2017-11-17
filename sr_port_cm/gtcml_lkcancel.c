@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,7 @@ unsigned char gtcml_lkcancel(void)
 	unsigned short i;
 	mlk_pvtblk *lk_walk, *lk_walk1;
 
+	ASSERT_IS_LIBGNPSERVER;
 	reg_walk = curr_entry->region_root;
 	while (reg_walk)
 	{

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +37,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	error_def(CMI_LNKNOTIDLE);
 	error_def(CMI_OVERRUN);
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (lnk->mun == -1)
 		return ENOTCONN;
 	if (lnk->sta != CM_CLB_IDLE)
@@ -108,6 +112,7 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 	error_def(CMI_LNKNOTIDLE);
 	error_def(CMI_OVERRUN);
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (lnk->mun == -1)
 		return ENOTCONN;
 	lnk->prev_sta = lnk->sta;
@@ -131,6 +136,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
         ssize_t rval;
 	cmi_status_t status = SS_NORMAL;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (lnk->mun == -1)
 		return;
 	if (lnk->sta == CM_CLB_WRITE_URG)

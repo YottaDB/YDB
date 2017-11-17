@@ -64,6 +64,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	uint4			status;
 	boolean_t		was_crit;
 
+	ASSERT_IS_LIBGNPSERVER;
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
 	{
