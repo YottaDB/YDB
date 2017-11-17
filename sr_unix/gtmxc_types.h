@@ -10,9 +10,10 @@
  *								*
  ****************************************************************/
 
-/* The current version of this header file is now called libyottadb.h. This header file contains only depcrecated
- * forms (and is in fact deprecated itself on YottaDB) but maintains the ability of GT.M installation conversions
- * to "just work" using previously supported type/routine names.
+/* The current version of this header file is now called libyottadb.h. This header file contains those
+ * definitions (based on the base types defined in libyottadb.h) that enable compatibility with exiting
+ * GT.M shops supporting the gtm_* types and routines and even the deprecated xc_* types. This allows 
+ * shops used to GT.M to "just work" using previously supported type/routine names.
  */
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H

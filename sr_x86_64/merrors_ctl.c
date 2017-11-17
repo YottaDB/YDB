@@ -1506,6 +1506,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MURNDWNARGLESS", "Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD", 4 },
 };
 
+
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",

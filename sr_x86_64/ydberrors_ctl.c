@@ -20,6 +20,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "QUERY2", "Invalid second argument to $QUERY. Must be -1 or 1.", 0 },
 };
 
+
 GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",

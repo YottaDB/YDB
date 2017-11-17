@@ -13,7 +13,7 @@
  *								*
  ****************************************************************/
 
-/*	libyottadb.h - GT.M, Unix Edition type definitions for call_ins, call-outs, plugins, etc.  */
+/*	libyottadb.h - YottaDB type and routine definitions for call_ins, call-outs, plugins, etc.  */
 #ifndef LIBYOTTADB_TYPES_H
 #define LIBYOTTADB_TYPES_H
 

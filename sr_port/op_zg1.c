@@ -141,7 +141,7 @@ void op_zg1(int4 level)
 	if (goframes_unwound_trigger || (SFT_CI & fp->type))
 	{	/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
-		 * MUM_TSTART incurs. Also, if we unwound to a call-in base frame, we need to return to gtm_ci[p]().
+		 * MUM_TSTART incurs. Also, if we unwound to a call-in base frame, we need to return to ydb_ci[p]().
 		 */
 		mumps_status = SUCCESS;			/* ZGOTO 0 is causes return code to be 0 for call-in */
 		MUM_TSTART;

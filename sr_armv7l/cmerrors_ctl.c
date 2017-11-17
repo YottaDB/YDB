@@ -6,8 +6,6 @@
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +21,7 @@ LITDEF	err_msg cmerrors[] = {
 	{ "REGNTFND", "Region referenced not initialized", 0 },
 	{ "CMINTQUE", "Interlock failure accessing GT.CM server queue", 0 },
 	{ "INVINTMSG", "Invalid interrupt message received.", 0 },
-	{ "CMEXCDASTLM", "Exceeded AST limit - Cannot open database", 0 },
+	{ "CMEXCDASTLM", "Exceeded AST limit. Cannot open database", 0 },
 	{ "CMSYSSRV", "Error doing system service, status:", 0 },
 };
 

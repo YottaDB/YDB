@@ -12,13 +12,13 @@
 !	the license, please stop and do not read further.	!
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
+
 ! Code in this module is based on merrors.msg and hence has an
 ! FIS copyright even though this module was not created by FIS.
 
 	.FACILITY	YDB,256/PREFIX=ERR_
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !
-! Note: This file is similar to sr_port/merrors.msg in layout.
+! Note: This file is similar to sr_port/merrors.msg in layout
 !
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0

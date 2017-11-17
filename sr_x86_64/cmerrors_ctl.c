@@ -21,9 +21,10 @@ LITDEF	err_msg cmerrors[] = {
 	{ "REGNTFND", "Region referenced not initialized", 0 },
 	{ "CMINTQUE", "Interlock failure accessing GT.CM server queue", 0 },
 	{ "INVINTMSG", "Invalid interrupt message received.", 0 },
-	{ "CMEXCDASTLM", "Exceeded AST limit - Cannot open database", 0 },
+	{ "CMEXCDASTLM", "Exceeded AST limit. Cannot open database", 0 },
 	{ "CMSYSSRV", "Error doing system service, status:", 0 },
 };
+
 
 GBLDEF	err_ctl cmerrors_ctl = {
 	249,

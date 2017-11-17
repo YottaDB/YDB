@@ -44,6 +44,7 @@ LITDEF	err_msg cmierrors[] = {
 	{ "REASON_CONFIRM", "Confirm", 0 },
 };
 
+
 GBLDEF	err_ctl cmierrors_ctl = {
 	250,
 	"CMI",

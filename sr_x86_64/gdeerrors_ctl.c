@@ -102,8 +102,9 @@ LITDEF	err_msg gdeerrors[] = {
 	{ "STDNULLCOLLREQ", "Region !AD needs Standard Null Collation enabled because global !AD spans through it", 4 },
 	{ "GBLNAMCOLLVER", "Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL", 5 },
 	{ "GDEASYNCIONOMM", "!AD segment has ASYNCIO turned on. Cannot support MM access method.", 2 },
-	{ "NOPERCENTY", "^%Y* is a reserved global name in YDB", 0 },
+	{ "NOPERCENTY", "^%Y* is a reserved global name in YottaDB", 0 },
 };
+
 
 GBLDEF	err_ctl gdeerrors_ctl = {
 	248,

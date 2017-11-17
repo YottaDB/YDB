@@ -16,12 +16,13 @@
 
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>		/* needed for golevel.h */
+#include "rtnhdr.h"		/* needed for golevel.h */
 #include "error.h"
 #include "op.h"
 #include "stack_frame.h"	/* needed for golevel.h */
 #include "tp_frame.h"		/* needed for golevel.h */
 #include "golevel.h"
+#include "stringpool.h"
 #ifdef GTM_TRIGGER
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -75,9 +76,14 @@ void	goframes(int4 frames)
 				 * a return value from ZHALT. If other cases are added, the assert below may need to be
 				 * adjusted or removed.
 				 */
-				assert(((NULL != TREF(gtmci_retval) && (0 < TREF(gtmci_nested_level))))
-				       || (NULL == TREF(gtmci_retval)));
-				*ret_targ = *((NULL == TREF(gtmci_retval)) ? &literal_null : TREF(gtmci_retval));
+				assert((NULL == TREF(gtmci_retval)) || (0 < TREF(gtmci_nested_level)));
+				if (NULL == TREF(gtmci_retval))
+					*ret_targ = literal_null;
+				else
+				{
+					*ret_targ = *(TREF(gtmci_retval));
+					DBG_MARK_STRINGPOOL_USABLE;	/* Return mval now copied to a protected mval */
+				}
 				ret_targ->mvtype |= MV_RETARG;
 			}
 		}

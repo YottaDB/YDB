@@ -13,7 +13,7 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
- set $etrap="use $principal write $zstats,!! zshow ""*"" zhalt 1"
+ set $etrap="use $principal write $zstats,!! kill outmsg zshow ""*"" zhalt 1"
  New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up,vms
  Set severe("warning")=0
  Set severe("success")=1
@@ -189,13 +189,6 @@
  . use libydberrorsfn
  . for i=1:1:cnt write "#define YDB_ERR_",outmsg(i)," -",outmsg(i,"code"),!
  . close libydberrorsfn
- . ;
- . ; Generate assembler error definitions only if can't use ydbmerrors.h
- . ;
- . if ("Linux"=ydbplatform) do
- . . use ydbasmerrorsfn
- . . for i=1:1:cnt write "#define ERR_",outmsg(i)," ",outmsg(i,"code"),!
- . . close ydbasmerrorsfn
  Quit
 
 ;

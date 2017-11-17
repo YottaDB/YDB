@@ -13,7 +13,7 @@
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	GTM,246/PREFIX=ERR_
-	.TITLE	MERRORS	Error Messages for YDB
+	.TITLE	MERRORS	Error Messages for YottaDB
 !
 !   The code numbers for the errors that have been
 !   standardized by the MUMPS Development Committee are
@@ -138,7 +138,7 @@
 !   M111, Invalid number of days for date
 !   M112, Invalid number of seconds for time
 !
-!  List of messages which are not reported by YDB standard error routines(rts_error etc.) but
+!  List of messages which are not reported by YottaDB standard error routines(rts_error etc.) but
 !  by PRINTFs. NOTE: if the value of any these messages changes in future, all its non-standard
 !  usages should be reflected with the new value.
 !	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
@@ -163,7 +163,7 @@
 !	ERR_JOBINTRRETHROW	internal error (not displayed to users - drives rethrow of jobinterrupt)
 !	ERR_JOBINTRRQST		internal error (not displayed to users - drives jobinterrupt)
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
-!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YDB debugging
+!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YottaDB debugging
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_MUDESTROYSUC	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_REPEATERROR		internal error (not displayed to the users)
@@ -180,7 +180,7 @@
 !
 !
 !
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YDB since V4.2.
+!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
