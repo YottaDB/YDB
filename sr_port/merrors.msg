@@ -1229,7 +1229,7 @@ MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region 
 MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
 MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !UL database blocks to downgrade>/error/fao=3!/ansi=0
 MUDWNGRDTN	<Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
+MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
 MUUPGRDNRDY	<Database !AD has not been certified as being ready to upgrade to !AD format>/error/fao=4!/ansi=0
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
@@ -1382,7 +1382,7 @@ BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
-REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
@@ -1416,7 +1416,7 @@ INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supple
 NORESYNCSUPPLONLY	<NORESYNC only supported for Supplementary Instances>/error/fao=0!/ansi=0
 NORESYNCUPDATERONLY	<NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates>/error/fao=0!/ansi=0
 NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD>/error/fao=4!/ansi=0
-REPL2OLD	<Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
+REPL2OLD	<Instance !AD uses a GT.M/YottaDB version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
 EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=0
 MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/ansi=0
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
