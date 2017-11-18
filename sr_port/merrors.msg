@@ -443,7 +443,7 @@ MULTFORMPARM	<This formal parameter is multiply defined>/error/fao=0!/ansi=21
 QUITARGUSE	<Quit cannot take an argument in this context>/error/fao=0!/ansi=16
 NAMEEXPECTED	<A local variable name is expected in this context>/error/fao=0!/ansi=0
 FALLINTOFLST	<Fall-through to a label with formallist is not allowed>/error/fao=0!/ansi=11
-NOTEXTRINSIC	<Quit does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
+NOTEXTRINSIC	<QUIT/ZHALT does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
 GTMSECSHRREMSEMFAIL	<error removing semaphore errno = !UL>/error/fao=1!/ansi=0
 FMLLSTMISSING	<The formal list is absent from a label called with an actual list: !AD>/error/fao=2!/ansi=20
 ACTLSTTOOLONG	<More actual parameters than formal parameters: !AD>/error/fao=2!/ansi=58

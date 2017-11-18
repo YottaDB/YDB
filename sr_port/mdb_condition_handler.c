@@ -280,6 +280,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	assert(NULL == alias_retarg);
 	if (NULL != alias_retarg)
 		CLEAR_ALIAS_RETARG;
+	assert(NULL == TREF(gtmci_retval));
+	TREF(gtmci_retval) = NULL;		/* Clear any dangling set */
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of

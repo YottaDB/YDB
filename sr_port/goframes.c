@@ -47,6 +47,8 @@ GBLREF	tp_frame	*tp_pointer;
 
 LITREF mval             literal_null;
 
+error_def(ERR_NOTEXTRINSIC);
+
 #ifdef GTM_TRIGGER
 void	goframes(int4 frames, boolean_t unwtrigrframe, boolean_t fromzgoto)
 #else
@@ -54,6 +56,7 @@ void	goframes(int4 frames)
 #endif
 {
         mval            *ret_targ;
+	stack_frame	*ret_fp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -66,7 +69,7 @@ void	goframes(int4 frames)
 		}
 		if (0 == frames)
 		{
-			ret_targ = (mval *)get_ret_targ(NULL);
+			ret_targ = get_ret_targ(&ret_fp);
 			/* If alias_retarg is non-NULL, *ret_targ would have been already initialized so no need to set it.
 			 * Setting it to literal_null in that case would cause reference counts to not be decremented later
 			 * in op_unwind/mdb_condition_handler so it is actually necessary to skip it in that case.
@@ -76,6 +79,7 @@ void	goframes(int4 frames)
 				 * a return value from ZHALT. If other cases are added, the assert below may need to be
 				 * adjusted or removed.
 				 */
+				assert(NULL != ret_fp->ret_value);
 				assert((NULL == TREF(gtmci_retval)) || (0 < TREF(gtmci_nested_level)));
 				if (NULL == TREF(gtmci_retval))
 					*ret_targ = literal_null;
@@ -85,6 +89,13 @@ void	goframes(int4 frames)
 					DBG_MARK_STRINGPOOL_USABLE;	/* Return mval now copied to a protected mval */
 				}
 				ret_targ->mvtype |= MV_RETARG;
+			} else if ((NULL == ret_targ) && (NULL != TREF(gtmci_retval)))
+			{	/* No ret_targ was found but we have a return value set but evidently not expected */
+				assert(fromzgoto);
+				assert(NULL == ret_fp->ret_value);
+				DBG_MARK_STRINGPOOL_USABLE;
+				TREF(gtmci_retval) = NULL;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTEXTRINSIC);
 			}
 		}
 		skip_error_ret = TRUE;

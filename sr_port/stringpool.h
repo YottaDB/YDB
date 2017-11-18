@@ -46,10 +46,24 @@ GBLREF	spdesc		stringpool;
 #define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);								/* BYPASSOK */
 
 #ifdef DEBUG
+#define STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE	128
 GBLREF	boolean_t	stringpool_unusable;
+GBLREF	char		stringpool_unusable_set_at_buf[];
 GBLREF	boolean_t	stringpool_unexpandable;
-#define	DBG_MARK_STRINGPOOL_USABLE		{ assert(stringpool_unusable); stringpool_unusable = FALSE; }
-#define	DBG_MARK_STRINGPOOL_UNUSABLE		{ assert(!stringpool_unusable); stringpool_unusable = TRUE; }
+#define	DBG_MARK_STRINGPOOL_USABLE								\
+MBSTART {											\
+	assert(stringpool_unusable);								\
+	stringpool_unusable = FALSE;								\
+	snprintf(stringpool_unusable_set_at_buf, STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE, \
+		 "stringpool_unusable cleared by %s at line %d", __FILE__, __LINE__);		\
+} MBEND
+#define	DBG_MARK_STRINGPOOL_UNUSABLE								\
+MBSTART {											\
+	assert(!stringpool_unusable);								\
+	stringpool_unusable = TRUE;								\
+	snprintf(stringpool_unusable_set_at_buf, STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE, \
+		 "stringpool_unusable set by %s at line %d", __FILE__, __LINE__);		\
+} MBEND
 #define	DBG_MARK_STRINGPOOL_EXPANDABLE		{ assert(stringpool_unexpandable); stringpool_unexpandable = FALSE; }
 #define	DBG_MARK_STRINGPOOL_UNEXPANDABLE	{ assert(!stringpool_unexpandable); stringpool_unexpandable = TRUE; }
 #else

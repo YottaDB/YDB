@@ -236,6 +236,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 
 	SETUP_THREADGBL_ACCESS;
 	added = FALSE;
+	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
 	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
 	 * invoked after a ydb_exit
@@ -445,6 +446,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
+	assert(!stringpool_unusable);
 	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
@@ -565,6 +567,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
+	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
 	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
 	 * invoked after a ydb_exit
@@ -806,6 +809,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
+	assert(!stringpool_unusable);
 	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
