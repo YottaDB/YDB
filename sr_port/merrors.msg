@@ -13,7 +13,7 @@
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	GTM,246/PREFIX=ERR_
-	.TITLE	MERRORS	Error Messages for GTM
+	.TITLE	MERRORS	Error Messages for YottaDB
 !
 !   The code numbers for the errors that have been
 !   standardized by the MUMPS Development Committee are
@@ -138,7 +138,7 @@
 !   M111, Invalid number of days for date
 !   M112, Invalid number of seconds for time
 !
-!  List of messages which are not reported by GT.M standard error routines(rts_error etc.) but
+!  List of messages which are not reported by YottaDB standard error routines(rts_error etc.) but
 !  by PRINTFs. NOTE: if the value of any these messages changes in future, all its non-standard
 !  usages should be reflected with the new value.
 !	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
@@ -163,7 +163,7 @@
 !	ERR_JOBINTRRETHROW	internal error (not displayed to users - drives rethrow of jobinterrupt)
 !	ERR_JOBINTRRQST		internal error (not displayed to users - drives jobinterrupt)
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
-!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for GT.M debugging
+!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YottaDB debugging
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_MUDESTROYSUC	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_REPEATERROR		internal error (not displayed to the users)
@@ -180,7 +180,7 @@
 !
 !
 !
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
+!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
@@ -434,7 +434,7 @@ MUFILRNDWNFL	<File !AD rundown failed>/error/fao=2!/ansi=0
 JNLTMQUAL1	<Time qualifier BEFORE_TIME="!AZ" is less than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 FORCEDHALT	<Image HALTed by MUPIP STOP>/fatal/fao=0!/ansi=0
 LOADEOF		<Load error: EOF reached prior to BEGIN record !UL.  No records loaded.>/error/fao=1!/ansi=0
-WILLEXPIRE	<This copy of GT.M will expire within one week>/info/fao=0!/ansi=0
+WILLEXPIRE	<This copy of YottaDB will expire within one week>/info/fao=0!/ansi=0
 LOADEDBG	<Load error: END smaller than BEGIN.  No records loaded.>/error/fao=0!/ansi=0
 LABELONLY	<Routine !AD was compiled for label-only entry>/error/fao=2!/ansi=0
 MUREORGFAIL	<MUPIP REORG failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -443,7 +443,7 @@ MULTFORMPARM	<This formal parameter is multiply defined>/error/fao=0!/ansi=21
 QUITARGUSE	<Quit cannot take an argument in this context>/error/fao=0!/ansi=16
 NAMEEXPECTED	<A local variable name is expected in this context>/error/fao=0!/ansi=0
 FALLINTOFLST	<Fall-through to a label with formallist is not allowed>/error/fao=0!/ansi=11
-NOTEXTRINSIC	<Quit does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
+NOTEXTRINSIC	<QUIT/ZHALT does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
 GTMSECSHRREMSEMFAIL	<error removing semaphore errno = !UL>/error/fao=1!/ansi=0
 FMLLSTMISSING	<The formal list is absent from a label called with an actual list: !AD>/error/fao=2!/ansi=20
 ACTLSTTOOLONG	<More actual parameters than formal parameters: !AD>/error/fao=2!/ansi=58
@@ -1229,7 +1229,7 @@ MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region 
 MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
 MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !UL database blocks to downgrade>/error/fao=3!/ansi=0
 MUDWNGRDTN	<Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
+MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
 MUUPGRDNRDY	<Database !AD has not been certified as being ready to upgrade to !AD format>/error/fao=4!/ansi=0
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
@@ -1294,7 +1294,7 @@ RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
-GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
+GTMERREXIT	<YottaDB image has exited with errors>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
 COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
@@ -1382,7 +1382,7 @@ BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
-REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
@@ -1416,7 +1416,7 @@ INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supple
 NORESYNCSUPPLONLY	<NORESYNC only supported for Supplementary Instances>/error/fao=0!/ansi=0
 NORESYNCUPDATERONLY	<NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates>/error/fao=0!/ansi=0
 NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD>/error/fao=4!/ansi=0
-REPL2OLD	<Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
+REPL2OLD	<Instance !AD uses a GT.M/YottaDB version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
 EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=0
 MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/ansi=0
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0

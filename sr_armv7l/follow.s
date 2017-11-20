@@ -17,15 +17,12 @@
 	.title	follow.s
 	.sbttl	follow
 
-.include "linkage.si"
-.include "stack.si"
-.include "debug.si"
-
+	.include "linkage.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.text
-
-.extern	op_follow
-
+	.extern	op_follow
 
 ENTRY follow
 	push	{fp, lr}
@@ -41,4 +38,4 @@ done:
 	mov	sp, fp
 	pop	{fp, pc}
 
-.end
+	.end

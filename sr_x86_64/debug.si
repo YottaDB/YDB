@@ -3,6 +3,9 @@
 # Copyright (c) 2015 Fidelity National Information 		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -23,9 +26,6 @@
 #
 .macro	CHKSTKALIGN
 	.ifdef	DEBUG
-	.data
-	.extern ERR_GTMCHECK
-	.text
 	.extern rts_error
 	subq	$16, %rsp		# Create save area plus maintain 16 byte alignment
 	movq	%rax, 0(%rsp)		# Save %rax - potential arg reg used in some asm rtns
@@ -35,7 +35,7 @@
 	#
 	# Stack is not aligned - raise error
 	#
-	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$ERR_GTMCHECK, REG32_ARG1
 	movl	$1, REG32_ARG0
 	movb    $0, REG8_ACCUM		# Variable length argument
 	call	rts_error

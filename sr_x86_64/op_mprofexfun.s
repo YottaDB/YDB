@@ -15,7 +15,8 @@
 
 	.include "g_msf.si"
 	.include "linkage.si"
-	.include "debug.si"
+#	include "debug.si"
+
 #
 # Routine to set up the stack frame for a local (same routine) invocation. It can
 # be one of any of the following forms:
@@ -41,7 +42,6 @@
 #
 
 	.data
-	.extern	ERR_GTMCHECK
 	.extern	dollar_truth
 	.extern	frame_pointer
 
@@ -139,7 +139,7 @@ done:
 	ret
 
 error:
-	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$ERR_GTMCHECK, REG32_ARG1
 	movl	$1, REG32_ARG0
 	movb	$0, REG8_ACCUM             		# Variable length argument
 	call	rts_error

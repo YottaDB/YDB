@@ -16,9 +16,9 @@
 
 	.title	op_fnzextract.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_fnzextract
 
@@ -38,10 +38,8 @@ src	=	-12
 dest	=	-16
 
 	.text
-
-.extern	n2s
-.extern underr
-
+	.extern	n2s
+	.extern underr
 
 ENTRY op_fnzextract
 	stmfd   sp!, {r4, fp, r12, lr}
@@ -88,4 +86,4 @@ retlab:	mov	sp, fp
 	ldmfd   sp!, {r4, fp, r12, pc}
 
 
-.end
+	.end

@@ -14,21 +14,19 @@
 
 /* call.s */
 
-
 	.title	op_call.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_callb, op_callw, op_calll
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	copy_stack_frame
-
+	.extern	copy_stack_frame
 
 ENTRY op_calll
 ENTRY op_callw

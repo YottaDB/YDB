@@ -16,21 +16,20 @@
 
 	.title	op_startintrrpt.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_startintrrpt
 
 	.data
-.extern	frame_pointer
-.extern	neterr_pending
+	.extern	frame_pointer
+	.extern	neterr_pending
 
 	.text
-.extern	gvcmz_neterr
-.extern	async_action
-.extern	outofband_clear
-
+	.extern	gvcmz_neterr
+	.extern	async_action
+	.extern	outofband_clear
 
 ENTRY op_startintrrpt
 	putframe
@@ -47,5 +46,4 @@ l1:	mov	r0, #1
 	getframe
 	bx	lr
 
-
-.end
+	.end

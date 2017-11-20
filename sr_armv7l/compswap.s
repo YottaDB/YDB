@@ -27,7 +27,7 @@
 	.title	compswap.s
 	.sbttl	compswap
 
-.include "linkage.si"
+	.include "linkage.si"
 
 	.text
 
@@ -65,4 +65,4 @@ ENTRY compswap_unlock
 	str	r1, [r0]
 	bx	lr
 
-.end
+	.end

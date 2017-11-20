@@ -121,7 +121,7 @@ int f_text(oprtype *a, opctype op)
 				c = TREF(lexical_ptr) - STR_LIT_LEN("GTM$");
 				advancewindow();			/* parse to $ */
 				if (0 == memcmp(c, "GTM$", STR_LIT_LEN("GTM$")))
-				{	/* parse past GTM$DMOD or GTM$CI to prevent RPARENMISSING error */
+				{	/* parse past GTM$DMOD to prevent RPARENMISSING error */
 					advancewindow();		/* parse to end of ident */
 					len = TREF(lexical_ptr) - c - (TK_EOL == TREF(director_token) ? 0 : 1);
 					for (implicit_offset = 0; ARRAYSIZE(suppressed_values) > implicit_offset; implicit_offset++)

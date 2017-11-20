@@ -16,9 +16,9 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 	.include "error.si"
-	.include "debug.si"
+#	include "debug.si"
 
-	.DATA
+	.data
 	.extern	dollar_truth
 	.extern	xfer_table
 	.extern	frame_pointer

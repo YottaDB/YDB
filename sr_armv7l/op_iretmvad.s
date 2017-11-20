@@ -17,21 +17,21 @@
 	.title	op_iretmvad.s
 
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_iretmvad
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_unwind
+	.extern	op_unwind
 
-.global	op_iretmvad
-.func	op_iretmvad
- 
+	.global	op_iretmvad
+	.func	op_iretmvad
+
 ENTRY op_iretmvad
 	putframe
 	CHKSTKALIGN				/* Verify stack alignment */
@@ -41,4 +41,4 @@ ENTRY op_iretmvad
 	getframe				/* Pick up new stack frame regs and return address */
 	bx	lr
 
-.end
+	.end

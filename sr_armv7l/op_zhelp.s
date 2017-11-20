@@ -16,19 +16,18 @@
 
 	.title	op_zhelp.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl op_zhelp.s
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_zhelp_xfr
+	.extern	op_zhelp_xfr
 
- 
 ENTRY op_zhelp
 	CHKSTKALIGN					/* Verify stack alignment */
 	ldr	r12, [r5]
@@ -37,4 +36,4 @@ ENTRY op_zhelp
 	getframe
 	bx	lr
 
-.end
+	.end

@@ -45,25 +45,23 @@
 
 	.title	op_extjmp.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "gtm_threadgbl_deftypes_asm.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "gtm_threadgbl_deftypes_asm.si"
+#	include "debug.si"
 
 	.sbttl	op_extjmp
 
 	.data
-.extern	ERR_GTMCHECK
-.extern	ERR_LABELNOTFND
-.extern	frame_pointer
-.extern gtm_threadgbl
+	.extern	frame_pointer
+	.extern gtm_threadgbl
 
 	.text
-.extern	auto_zlink
-.extern auto_relink_check
-.extern	flush_jmp
-.extern	rts_error
-.extern	laberror
+	.extern	auto_zlink
+	.extern auto_relink_check
+	.extern	flush_jmp
+	.extern	rts_error
+	.extern	laberror
 
 
 /*
@@ -182,8 +180,7 @@ autorelink_check:
  * occurs
  */
 gtmcheck:
-	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
+	ldr	r1, =#ERR_GTMCHECK
 	mov	r0, #1
 	bl	rts_error
 	b	retlab
@@ -195,4 +192,4 @@ label_missing:
 	bl	laberror
 	b	retlab
 
-.end
+	.end

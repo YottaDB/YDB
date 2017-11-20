@@ -19,7 +19,7 @@
 #
 	.include "linkage.si"
 	.include "g_msf.si"
-	.include "debug.si"
+#	include "debug.si"
 
 	.data
 	.extern	frame_pointer

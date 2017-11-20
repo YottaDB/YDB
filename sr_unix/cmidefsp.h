@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,10 +39,6 @@ error_def(CMI_REASON_REJECT);
 error_def(CMI_REASON_OVERRUN);
 error_def(CMI_REASON_STATUS);
 error_def(CMI_REASON_CONFIRM);
-
-#define CMI_REASON_IODONE	0
-#define CMI_REASON_INTMSG	1
-#define CMI_REASON_CONNECT	2
 
 #define CMI_IO_WOULDBLOCK(iostatus)	(EWOULDBLOCK == (iostatus) || EAGAIN == (iostatus))
 

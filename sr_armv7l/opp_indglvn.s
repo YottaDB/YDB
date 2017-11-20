@@ -20,19 +20,18 @@
 
 	.title	opp_indglvn.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indglvn
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_indglvn
+	.extern	op_indglvn
 
- 
 ENTRY opp_indglvn
 	putframe
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -40,5 +39,4 @@ ENTRY opp_indglvn
 	getframe
 	bx	lr
 
-
-.end
+	.end

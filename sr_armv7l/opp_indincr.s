@@ -20,19 +20,18 @@
 
 	.title	opp_indincr.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indincr
 
 	.data
-.extern frame_pointer
+	.extern frame_pointer
 
 	.text
-.extern	op_indincr
+	.extern	op_indincr
 
- 
 ENTRY opp_indincr
 	putframe
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -40,5 +39,4 @@ ENTRY opp_indincr
 	getframe
 	bx	lr
 
-
-.end
+	.end

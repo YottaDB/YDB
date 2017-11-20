@@ -24,17 +24,17 @@
 
 	.title	op_equnul.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_equnul
 
 	.data
-.extern	undef_inhibit
+	.extern	undef_inhibit
 
 	.text
-.extern	underr
+	.extern	underr
 
 
 ENTRY op_equnul
@@ -63,6 +63,5 @@ l3:	ldr	r1, =undef_inhibit	/* not defined */
 	bl	underr			/* really undef */
 	pop	{r4, pc}
 
-
-.end
+	.end
 

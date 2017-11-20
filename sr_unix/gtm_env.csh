@@ -124,7 +124,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
 	setenv	gt_ld_options_gtmshr	""
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-	setenv gt_ld_ci_u_option	"-Wl,-u,gtm_ci -Wl,-u,gtm_is_main_thread"
+	setenv gt_ld_ci_u_option	"-Wl,-u,ydb_ci -Wl,-u,gtm_is_main_thread"
 
 	setenv gt_ld_extra_libs		""		# platform specific GT.M libraries
 

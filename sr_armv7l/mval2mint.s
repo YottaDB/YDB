@@ -16,19 +16,18 @@
 /*	Convert mval to mint	*/
 /*		on entry: r1 - pointer to mval to convert	*/
 
-
 	.title	mval2mint.s
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	mval2mint
 
 	.text
-.extern	mval2i
-.extern	s2n
-.extern underr
+	.extern	mval2i
+	.extern	s2n
+	.extern underr
 
 ENTRY mval2mint
 	push	{r6, lr}
@@ -41,5 +40,4 @@ ENTRY mval2mint
 	cmp	r0, #0
 	pop	{r6, pc}
 
-
-.end
+	.end

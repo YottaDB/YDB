@@ -21,8 +21,8 @@
 	.title	mint2mval.s
 	.sbttl	mint2mval
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.text
 
@@ -32,7 +32,6 @@ ENTRY mint2mval
 	bl	i2mval
 	pop	{r4, pc}
 
-
-.end
+	.end
 
 

@@ -23,18 +23,17 @@
  */
 	.title	opp_rterror.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_rterror
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_rterror
-
+	.extern	op_rterror
 
 ENTRY opp_rterror
 	putframe
@@ -43,5 +42,4 @@ ENTRY opp_rterror
 	getframe
 	bx	lr
 
-
-.end
+	.end

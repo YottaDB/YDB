@@ -98,11 +98,14 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #include <inttypes.h>
 #include <stdarg.h>
+
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 #include "gtm_sizeof.h"
 #include "gtm_threadgbl.h"
+#include "ydbmerrors.h"
+#include "ydberrors.h"
 
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */

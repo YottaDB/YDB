@@ -19,14 +19,13 @@
 
 	.title	pseudo_ret.s
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.sbttl	pseudo_ret
-
 
 ENTRY pseudo_ret
 	CHKSTKALIGN					/* Verify stack alignment */
 	bl	opp_ret
 
-.end
+	.end
