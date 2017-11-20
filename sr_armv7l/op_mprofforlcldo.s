@@ -16,17 +16,17 @@
 
 	.title	op_mprofforlcldo.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_mprofforlcldo
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	exfun_frame_sp
+	.extern	exfun_frame_sp
 
 	.sbttl	op_mprofforlcldob
 
@@ -44,4 +44,4 @@ ENTRY op_mprofforlcldow
 	ldr	r9, [r12, #msf_temps_ptr_off]
 	pop	{r4, pc}
 
-.end
+	.end

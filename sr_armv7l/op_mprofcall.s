@@ -16,17 +16,17 @@
 
 	.title	op_mprofcall.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_mprofcallb
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	copy_stack_frame_sp
+	.extern	copy_stack_frame_sp
 
 
 ENTRY op_mprofcallb
@@ -40,4 +40,4 @@ ENTRY op_mprofcalll
 	bl	copy_stack_frame_sp
 	pop	{r4, pc}
 
-.end
+	.end

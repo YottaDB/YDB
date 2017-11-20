@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2014 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,16 +28,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
 #include <dlfcn.h>
-#ifdef __osf__
-	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
-	 * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
-	 * the only exception and, in particular because the operating system does not support such an exception, the argv
-	 * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
-	 * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
-	 */
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
 
 #ifndef NOLIBGTMSHR
 /* for bta builds we link gtm_main() statically so we do not need to open the shared library */
@@ -74,24 +68,22 @@ char *private_getenv(const char *varname)
 #endif
 
 int main (int argc, char **argv, char **envp)
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
 {
 	int		status;
-#ifndef NOLIBGTMSHR
+#	ifndef NOLIBGTMSHR
 	char		gtmshr_file[GTM_PATH_MAX];
 	char_ptr_t	fptr;
 	int		dir_len;
 	void_ptr_t	handle;
 	gtm_main_t	gtm_main;
 	/* We fake the output of the following messages to appear as if they were reported by GT.M error
-	 * handlers (gtm_putmsg/rts_error) by prefixing every message with %GTM-E-* */
-	int		ERR_GTMDISTUNDEF = 150377714;
-	int		ERR_DISTPATHMAX = 150377682;
-	int		ERR_DLLNOOPEN = 150379250;
-	int		ERR_DLLNORTN = 150379258;
-
+	 * handlers (gtm_putmsg/rts_error) by prefixing every message with %GTM-E-*
+	 *
+	 *   ERR_GTMDISTUNDEF
+	 *   ERR_DISTPATHMAX
+	 *   ERR_DLLNOOPEN
+	 *   ERR_DLLNORTN
+	 */
 	if (!(fptr = (char_ptr_t)GETENV(GTM_DIST)))
 	{
 		FPRINTF(stderr, "%%GTM-E-GTMDISTUNDEF, Environment variable $gtm_dist is not defined\n");
@@ -127,7 +119,7 @@ int main (int argc, char **argv, char **envp)
 			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", fptr);
 		return ERR_DLLNORTN;
 	}
-#endif
+#	endif
 	status = gtm_main(argc, argv, envp);
 	return status;
 }

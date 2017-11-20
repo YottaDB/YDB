@@ -20,18 +20,17 @@
 
 	.title	opp_indlvarg.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indlvarg
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_indlvarg
-
+	.extern	op_indlvarg
 
 ENTRY opp_indlvarg
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_indlvarg
 	getframe
 	bx	lr
 
-
-.end
+	.end

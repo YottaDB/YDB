@@ -20,18 +20,17 @@
 
 	.title	opp_iretmval.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_iretmval
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_iretmval
-
+	.extern	op_iretmval
 
 ENTRY opp_iretmval
 	putframe
@@ -40,4 +39,4 @@ ENTRY opp_iretmval
 	getframe
 	bx	lr
 
-.end
+	.end

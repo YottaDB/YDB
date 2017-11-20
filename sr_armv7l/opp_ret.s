@@ -20,18 +20,17 @@
 
 	.title	opp_ret.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_ret
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_unwind
-
+	.extern	op_unwind
 
 ENTRY opp_ret
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -39,4 +38,4 @@ ENTRY opp_ret
 	getframe
 	bx	lr
 
-.end
+	.end

@@ -20,18 +20,17 @@
 
 	.title	opp_newintrinsic.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_newintrinsic
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_newintrinsic
-
+	.extern	op_newintrinsic
 
 ENTRY opp_newintrinsic
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_newintrinsic
 	getframe
 	bx	lr
 
-
-.end
+	.end

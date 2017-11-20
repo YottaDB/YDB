@@ -23,17 +23,15 @@
 
 	.title	op_neg.s
 
-
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_neg
 
 	.text
-
-.extern	s2n
-.extern underr
+	.extern	s2n
+	.extern underr
 
 save_ret1	= -8
 save_ret0	= -4
@@ -44,7 +42,6 @@ ENTRY op_neg
 	mov	fp, sp
 	sub	sp, #FRAME_SIZE				/* Stack remains 8 byte aligned */
 	CHKSTKALIGN					/* Verify stack alignment */
-
  	str	r0, [fp, #save_ret0]
 	mv_force_defined r1
 	mv_if_number r1, numer
@@ -75,4 +72,4 @@ done:
 	mov	sp, fp
 	pop	{fp, pc}
 
-.end
+	.end

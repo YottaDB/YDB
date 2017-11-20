@@ -15,6 +15,7 @@
 #################################################################
 
 	.sbttl	error.si
+
 #	PAGE	+
 #-----------------------------------------------
 # Mumps error condition handler macros
@@ -25,14 +26,14 @@ chnd_ch_active	 =	4
 chnd_ch		 =	12
 chnd_jmp	 =	16
 
-.data
-.extern	ctxt
-.extern	active_ch
+	.data
+	.extern	ctxt
+	.extern	active_ch
 
-.text
+	.text
 #	setjmp is really __sigsetjmp(env,0)
-.extern	__sigsetjmp
-.extern gtm_asm_establish
+	.extern	__sigsetjmp
+	.extern gtm_asm_establish
 
 	.sbttl	error.si    ESTABLISH
 

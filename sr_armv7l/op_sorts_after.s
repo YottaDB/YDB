@@ -34,15 +34,14 @@
  */
 	.title	op_sorts_after.s
 
-.include "linkage.si"
-.include "debug.si"
+	.include "linkage.si"
+#	include "debug.si"
 
 	.sbttl	op_sorts_after
 
 	.text
-.extern	sorts_after
+	.extern	sorts_after
 
- 
 ENTRY op_sorts_after
 	push	{r4, lr}				/* r4 is to maintain 8 byte stack alignment */
 	CHKSTKALIGN					/* Verify stack alignment */
@@ -50,5 +49,4 @@ ENTRY op_sorts_after
 	cmp	r0, #0					/* Set flags according to result from sorts_after */
 	pop	{r4, pc}
 
-
-.end
+	.end

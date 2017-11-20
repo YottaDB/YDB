@@ -16,18 +16,18 @@
 
 	.title	op_linefetch.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_linefetch
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	gtm_fetch
+	.extern	gtm_fetch
 
 ENTRY op_linefetch
 	CHKSTKALIGN					/* Verify stack alignment */

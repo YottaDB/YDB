@@ -1,5 +1,5 @@
-gtm_ci
-gtm_zstatus
+ydb_ci
+ydb_zstatus
 gtm_malloc
 gtm_free
 gtm_filename_to_id

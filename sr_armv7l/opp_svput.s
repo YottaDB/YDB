@@ -20,19 +20,18 @@
 
 	.title	opp_svput.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	opp_svput
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_svput
-
+	.extern	op_svput
 
 ENTRY opp_svput
 	mov	fp, sp					/* Save sp against potention adjustment */
@@ -43,5 +42,4 @@ ENTRY opp_svput
 	mov	sp, fp					/* Restore sp */
 	bx	lr
 
-
-.end
+	.end

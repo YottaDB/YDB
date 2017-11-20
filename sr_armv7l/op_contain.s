@@ -14,7 +14,6 @@
 
 /* op_contain.s */
 
-
 	.title	op_contain.s "'[' ('contains') operator"
 
 /*
@@ -32,16 +31,16 @@
 		r1 -> mval for rhs
 */
 
-.include "linkage.si"
-.include "mval_def.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+#	include "debug.si"
 
 	.sbttl	op_contain
 
 	.data
-.extern	matchc
-.extern	n2s
-.extern underr
+	.extern	matchc
+	.extern	n2s
+	.extern underr
 
 	.text
 sav_r0	=	-4
@@ -81,5 +80,4 @@ ENTRY op_contain
 	mov	sp, fp
 	ldmfd   sp!, {fp, pc}
 
-
-.end
+	.end

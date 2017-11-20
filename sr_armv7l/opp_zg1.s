@@ -20,18 +20,17 @@
 
 	.title	opp_zg1.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_zg1
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_zg1
-
+	.extern	op_zg1
 
 ENTRY opp_zg1
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_zg1
 	getframe
 	bx	lr
 
-
-.end
+	.end

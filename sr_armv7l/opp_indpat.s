@@ -20,18 +20,17 @@
 
 	.title	opp_indpat.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_indpat
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_indpat
-
+	.extern	op_indpat
 
 ENTRY opp_indpat
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_indpat
 	getframe
 	bx	lr
 
-
-.end
+	.end

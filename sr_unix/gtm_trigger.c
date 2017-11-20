@@ -649,7 +649,6 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		/* See if a MERGE launched the trigger. If yes, save some state so ZWRITE, ZSHOW and/or MERGE can be
 		 * run in the trigger we dispatch. */
 		PUSH_MVST_MRGZWRSV_IF_NEEDED;
-		mumps_status = 0;
 		run_time = TRUE;	/* Previous value saved just above restored when frame pops */
 	} else
 	{	/* Trigger base frame exists so reinitialize the symbol table for new trigger invocation */
@@ -669,12 +668,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		extnam_str.len = mv_st_ent->mv_st_cont.mvs_trigr.savextref.len;
 		if (extnam_str.len)
 			memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
-		mumps_status = 0;
 		assert(run_time);
 		/* Note we do not reset the handlers for parallel triggers - set one time only when enter first level
 		 * trigger. After that, whatever happens in trigger world, stays in trigger world.
 		 */
 	}
+	mumps_status = 0;			/* Reset later by dm_start - this is just clearing any setting that
+						 * is irrelevant in the trigger frame.
+						 */
 	assert(frame_pointer->type & SFT_TRIGR);
 #	ifdef DEBUG
 	gtm_trigdsc_last = trigdsc;

@@ -11,6 +11,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+/* Pull in error defs */
+#include "ydbcmerrors.h"
 
 #define	ZAREQUEST_SENT		16
 #define	LREQUEST_SENT		8

@@ -20,18 +20,17 @@
 
 	.title	opp_newvar.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	opp_newvar
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	op_newvar
-
+	.extern	op_newvar
 
 ENTRY opp_newvar
 	putframe
@@ -40,5 +39,4 @@ ENTRY opp_newvar
 	getframe
 	bx	lr
 
-
-.end
+	.end

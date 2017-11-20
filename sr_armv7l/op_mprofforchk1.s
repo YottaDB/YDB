@@ -20,17 +20,16 @@
 
 	.title	op_mprofforchk1.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_mprofforchk1
 
 	.data
 
 	.text
-.extern	forchkhandler
-
+	.extern	forchkhandler
 
 /*
  * This is the M profiling version which calls different routine(s) for M profiling purposes.
@@ -42,5 +41,4 @@ ENTRY op_mprofforchk1
 	bl	forchkhandler
 	pop	{r4, pc}
 
-
-.end
+	.end

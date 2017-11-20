@@ -16,7 +16,8 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
-	.include "debug.si"
+#	include "debug.si"
+
 #
 # op_extjmp transfers control to an external GT.M MUMPS routine with no arguments
 # by rewriting the existing M stack frame rather than stacking a new stack frame
@@ -50,8 +51,6 @@
 # macro so we need not save it separately.
 #
 	.data
-	.extern	ERR_GTMCHECK
-	.extern	ERR_LABELNOTFND
 	.extern	frame_pointer
 	.extern gtm_threadgbl
 
@@ -173,7 +172,7 @@ autorelink_check:
 # occurs
 #
 gtmcheck:
-	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$ERR_GTMCHECK, REG32_ARG1
 	movl	$1, REG32_ARG0
 	movb    $0, REG8_ACCUM             			# Variable length argument
 	call	rts_error

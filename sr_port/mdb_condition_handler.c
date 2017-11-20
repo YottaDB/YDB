@@ -280,6 +280,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	assert(NULL == alias_retarg);
 	if (NULL != alias_retarg)
 		CLEAR_ALIAS_RETARG;
+	assert(NULL == TREF(gtmci_retval));
+	TREF(gtmci_retval) = NULL;		/* Clear any dangling set */
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of
@@ -735,7 +737,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 					/* Note that trans_code will set error_frame appropriately for this condition */
 				}
 				if (SFT_CI & frame_pointer->type)
-				{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+				{ 	/* Unhandled errors from called-in routines should return to ydb_ci() with error status */
 					mumps_status = SIGNAL;
 					MUM_TSTART_FRAME_CHECK;
 					MUM_TSTART;
@@ -896,7 +898,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				/* note that trans_code will set error_frame appropriately for this condition */
 			}
 			if (SFT_CI & frame_pointer->type)
-			{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+			{ 	/* Unhandled errors from called-in routines should return to ydb_ci() with error status */
 				mumps_status = SIGNAL;
 				DBGEHND((stderr, "mdb_condition_handler: Call in base frame found - returning to callins\n"));
 				MUM_TSTART_FRAME_CHECK;

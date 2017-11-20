@@ -42,7 +42,7 @@
  *
  * Routine push_parm_ci(truth_value, parmblk_struct *ci_parms)
  *
- *   - Generally called from gtm_ci[p]() and from gtm_cij() to process parameters for a call-in to an M routine.
+ *   - Generally called from ydb_ci[p]() and from ydb_cij() to process parameters for a call-in to an M routine.
  *   - Parameters:
  *     - truth_value    - The current truth value to save and then restore when routine unwinds.
  *     - ci_parms       - Block that contains the return_mval address, the mask, the arg count and the parms.

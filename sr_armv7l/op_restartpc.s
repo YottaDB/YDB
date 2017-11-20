@@ -16,19 +16,19 @@
 
 	.title	op_restartpc.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+#	include "debug.si"
 
 	.sbttl	op_restartpc
 
 	.data
-.extern	restart_pc
-.extern restart_ctxt
-.extern frame_pointer
+	.extern	restart_pc
+	.extern restart_ctxt
+	.extern frame_pointer
 
 	.text
- 
+
 /*
  * Routine to save the address of the *start* of this call along with its context as the restart point should this
  * process encounter a restart situation (return from $ZTRAP or outofband call typically).
@@ -46,5 +46,4 @@ ENTRY op_restartpc
 	str	r4, [r2]
 	bx	lr
 
-
-.end
+	.end

@@ -232,6 +232,7 @@ THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* op_fnzsearch subscript constuctor 
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* op_fnzsearch temp for null subs control */
 THREADGBLDEF(fnzsearch_globbuf_ptr,		glob_t *)			/* op_fnzsearch temp for pointing to glob results */
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
+THREADGBLDEF(gtmci_retval,			mval *)				/* Pointer to return value from call-in */
 #ifdef GTMDBGFLAGS_ENABLED
 THREADGBLDEF(gtmdbgflags,			int)
 THREADGBLDEF(gtmdbgflags_freq,			int)

@@ -21,24 +21,23 @@
 
 	.title	op_retarg.s
 
-.include "linkage.si"
-.include "g_msf.si"
-.include "stack.si"
-.include "debug.si"
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "stack.si"
+#	include "debug.si"
 
 	.sbttl	op_retarg
 
 	.data
-.extern	frame_pointer
+	.extern	frame_pointer
 
 	.text
-.extern	unw_retarg
+	.extern	unw_retarg
 
- 
 ENTRY op_retarg
 	CHKSTKALIGN					/* Verify stack alignment */
 	bl	unw_retarg
 	getframe
 	bx	lr
 
-.end
+	.end
