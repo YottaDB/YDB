@@ -1,7 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2004 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*

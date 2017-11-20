@@ -126,7 +126,7 @@
    GT.M(TM) is a trademark of Fidelity Information Services, Inc.
 
    Copyright 2017 YottaDB LLC. All rights reserved.
-   
+
    YottaDB(TM) is a trademark of YottaDB LLC.
 
    Other trademarks are the property of their respective owners.
@@ -226,7 +226,7 @@
    facilitate debugging.
 
    +------------------------------------------------------------------------+
-   |                          YottaDB Debugging Tools                          |
+   |                          YottaDB Debugging Tools                       |
    |------------------------------------------------------------------------|
    |  EXTENSION  |                       EXPLANATION                        |
    |-------------+----------------------------------------------------------|
@@ -410,7 +410,7 @@
    |                      | an extrinsic special variable, it always        |
    | Quit *               | returns an alias container. For more            |
    |                      | information, refer to the description of QUIT * |
-   |                      | in "Quit".                               |
+   |                      | in "Quit".                                      |
    |----------------------+-------------------------------------------------|
    | ZWrite / ZSHow "V"   | Produces Alias Variables format output.         |
    |----------------------+-------------------------------------------------|
@@ -963,7 +963,7 @@
    |                        | Enables or disables automatic record          |
    |                        | termination. When the current record size     |
    | [NO]WRAP (USE)         | ($X) reaches the maximum WIDTH and the device |
-   |                        | has WRAP enabled, YottaDB starts a new record,   |
+   |                        | has WRAP enabled, YottaDB starts a new record,|
    |                        | as if the routine had issued a WRITE !        |
    |                        | command.                                      |
    |------------------------+-----------------------------------------------|
@@ -1748,8 +1748,8 @@
    |         | Mode for debugging.   | "",$ZStatus,!" which you can         |
    |         |                       | customize to suit your needs.        |
    |---------+--------------------------------------------------------------|
-   |         | YottaDB processes send error messages to stderr only under the  |
-   |         | following conditions:                                        |
+   |         | YottaDB processes send error messages to stderr only under   |
+   |         | the following conditions:                                    |
    |         |                                                              |
    |         |   * The error is fatal which means that the process is about |
    | stderr  |     to terminate                                             |
@@ -12556,7 +12556,7 @@
    the search types they support.
 
    +------------------------------------------------------+
-   |      YottaDB Commands and $ZROUTINES Search Types       |
+   |      YottaDB Commands and $ZROUTINES Search Types    |
    |------------------------------------------------------|
    |  SEARCH/   |   FILE    |                             |
    |  FUNCTION  | EXTENSION |         SEARCH TYPE         |
@@ -18883,7 +18883,7 @@
    |--------------+---------------------------------------------------------|
    |              | type int. If it returns zero then the call was          |
    | ydb_status_t | successful. If it is non-zero, when control returns to  |
-   |              | YottaDB, it issues a trappable error.                      |
+   |              | YottaDB, it issues a trappable error.                   |
    |--------------+---------------------------------------------------------|
    | ydb_long_t*  | Pointer to ydb_long_t. Good for returning integers.     |
    |--------------+---------------------------------------------------------|
