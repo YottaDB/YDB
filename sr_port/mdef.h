@@ -524,18 +524,30 @@ mval *underr_strict(mval *start, ...);
 */
 #define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
 MBSTART {					/* also requires threaddef DCL and SETUP*/				\
+	double			tmpdouble;										\
+															\
 	GBLREF uint4		dollar_tlevel;										\
 	GBLREF uint4		dollar_trestart;									\
-															\
 															\
 	MV_FORCE_NUM(TMV);												\
 	if (NO_M_TIMEOUT == TMV->m[1])											\
 		TMS = NO_M_TIMEOUT;											\
 	else														\
 	{														\
-		assert(MV_BIAS >= 1000);        	/* if formats change scale may need attention */		\
-		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */					\
-		TMS = (TMV->mvtype & MV_INT) ? ((0 > TMV->m[1]) ? 0 : TMV->m[1]) : (TMV->sgn ? 0 : MAXPOSINT4);		\
+		assert(MV_BIAS >= 1000);        /* if formats change scale may need attention */			\
+		if (TMV->mvtype & MV_INT)										\
+		{	/* TMV is an integer. m[1] directly has the # of milliseconds we want.				\
+			 * If it is negative though, set timeout to 0.							\
+			 */												\
+			TMS = TMV->m[1];										\
+			if (0 > TMS)											\
+				TMS = 0;										\
+		} else if (0 == TMV->sgn) 	/* if sign is 0 it means TMV is positive */				\
+		{	/* Cap positive timeout at MAXPOSINT4 */							\
+			tmpdouble = mval2double(TMV) * (double)1000;							\
+			TMS = ((double)MAXPOSINT4 >= tmpdouble) ? (int)tmpdouble : (int)MAXPOSINT4;			\
+		} else													\
+			TMS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
 	}														\
 	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
 		TPNOTACID_CHECK(NOTACID);										\
