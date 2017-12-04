@@ -558,7 +558,12 @@ if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
 if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; exit 1; fi
 rm -rf $tmpdir	# Now that install is successful, remove temporary directory
-echo YottaDB version $ydb_version installed successfully at $ydb_installdir
+if [ "Y" = "$gtm_gtm" ] ; then
+	product_name="GT.M"
+else
+	product_name="YottaDB"
+fi
+echo $product_name version $ydb_version installed successfully at $ydb_installdir
 
 # Create copies of environment scripts and gtm executable
 if [ -d "$gtm_linkenv" ] ; then
