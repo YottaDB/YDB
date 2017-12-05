@@ -28,7 +28,7 @@
 
 #include "cli.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "libyottadb.h"
@@ -472,12 +472,12 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				continue;
 			}
 			arg_ptr = &((lv_val *)(param_blk.retaddr))->v;
+			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = 1;
 			arg_type = entry->return_type;
 		} else
 		{
 			arg_ptr = &param_blk.args[i - 1]->v;
-			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = out_mask;
 			arg_type = entry->parms[i - 1];
 			out_mask >>= 1;
@@ -1152,3 +1152,36 @@ void gtmci_cleanup(void)
 	unatexit(gtm_exit_handler);
 }
 #endif
+
+/* The java plug-in has some very direct references to some of these routines that
+ * cannot be changed by the pre-processor so for now, we have some stub routines
+ * that take care of the translation. These routines are exported along with their
+ * ydb_* variants. First - get rid of the pre-processor redirection via #defines.
+ */
+#undef gtm_jinit
+#undef gtm_exit
+#undef gtm_cij
+#undef gtm_zstatus
+#ifdef GTM_PTHREAD
+ydb_status_t gtm_jinit()
+{
+	gtm_jvm_process = TRUE;
+	return ydb_init();
+}
+#endif
+
+ydb_status_t gtm_exit()
+{
+	return ydb_exit();
+}
+
+ydb_status_t gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types,
+		     unsigned int *io_vars_mask, unsigned int *has_ret_value)
+{
+	return ydb_cij(c_rtn_name, arg_blob, count, arg_types, io_vars_mask, has_ret_value);
+}
+
+void gtm_zstatus(char* msg, int len)
+{
+	ydb_zstatus(msg, len);
+}

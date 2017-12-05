@@ -758,8 +758,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	/* Entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
-	/* Detect a call-out to Java. */
-	if ((NULL != entry_ptr->call_name.addr) && !strncmp(entry_ptr->call_name.addr, "ydb_xcj", 7))
+	/* Detect a call-out to Java. The java plugin still has references to "gtm_xcj" (not "ydb_xcj") hence the below check. */
+	if ((NULL != entry_ptr->call_name.addr) && !strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
 	{
 		java = TRUE;
 		argcnt -= 2;
