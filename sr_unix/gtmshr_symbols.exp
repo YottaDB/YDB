@@ -6,6 +6,10 @@ ydb_cij
 ydb_cip
 ydb_exit
 ydb_zstatus
+gtm_jinit
+gtm_exit
+gtm_cij
+gtm_zstatus
 gtm_hiber_start
 gtm_hiber_start_wait_any
 gtm_start_timer

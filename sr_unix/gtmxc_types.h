@@ -12,7 +12,7 @@
 
 /* The current version of this header file is now called libyottadb.h. This header file contains those
  * definitions (based on the base types defined in libyottadb.h) that enable compatibility with exiting
- * GT.M shops supporting the gtm_* types and routines and even the deprecated xc_* types. This allows 
+ * GT.M shops supporting the gtm_* types and routines and even the deprecated xc_* types. This allows
  * shops used to GT.M to "just work" using previously supported type/routine names.
  */
 #ifndef GTMXC_TYPES_H
@@ -56,6 +56,19 @@ typedef ydb_double_t		gtm_jdouble_t;
 typedef ydb_char_t		gtm_jstring_t;
 typedef ydb_char_t		gtm_jbyte_array_t;
 typedef ydb_char_t		gtm_jbig_decimal_t;
+
+/* The java plug-in has some very direct references to some of these routines that
+ * cannot be changed by the pre-processor so for now, we have some stub routines
+ * that take care of the translation. These routines are exported along with their
+ * ydb_* variants.
+ */
+#ifdef GTM_PTHREAD
+ydb_status_t 	gtm_jinit(void);
+#endif
+ydb_status_t 	gtm_exit(void);
+ydb_status_t	gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
+		unsigned int *has_ret_value);
+void 		gtm_zstatus(char* msg, int len);
 
 /* Define backward compatibility routine name defines for GT.M entry points */
 #define gtm_ci				ydb_ci
