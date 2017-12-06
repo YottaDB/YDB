@@ -20,6 +20,22 @@
 #include <sys/types.h>	/* For intptr_t */
 #include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
 
+/* Maximum values */
+#define YDB_MAX_SUBS	MAX_LVSUBSCRIPTS	/* Maximum subscripts currently supported */
+
+/* Non-error return codes (all positive) */
+#define YDB_OK		0			/* Successful return code */
+
+/* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
+ * or values.
+ */
+#define LYDB_BUFFER_LITERAL(BUFFERP, LITERAL)					\
+{										\
+	(BUFFERP)->buf_addr = LITERAL;						\
+	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
+}
+
+/* Basic/standard types */
 typedef int		ydb_status_t;
 typedef	int		ydb_int_t;
 typedef unsigned int 	ydb_uint_t;
@@ -29,19 +45,34 @@ typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;
 typedef int		(*ydb_pointertofunc_t)();
+
 /* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
  * 'length' field. Note that for output-only ydb_string_t * arguments the 'length' field is set to the
  * preallocation size of the buffer pointed to by 'address', while the first character of the buffer is '\0'.
  */
 typedef struct
 {
-	ydb_long_t	length;
+	ydb_ulong_t	length;
 	ydb_char_t	*address;
-}	ydb_string_t;
+} ydb_string_t;
 
-typedef intptr_t	ydb_tid_t;
+/* Structure for interfacing with simple API routines. Meant to be used with the YDB_BUF* macros defined
+ * later in this header file.
+ */
+typedef struct
+{
+	ydb_uint_t	len_alloc;
+	ydb_uint_t	len_used;
+	ydb_char_t	*buf_addr;
+} ydb_buffer_t;
 
+typedef intptr_t	ydb_tid_t;		/* Timer id */
 typedef void		*ydb_fileid_ptr_t;
+
+/* Structure used to reduce name lookup for callins. The handle field (should be zeroed on first call) after
+ * the first call using ydb_cij() contains information that allows quick resolution of the routine for a
+ * faster call.
+ */
 typedef struct
 {
         ydb_string_t	rtn_name;
@@ -81,5 +112,8 @@ void		gtm_xcfileid_free(ydb_fileid_ptr_t fileid);
 int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
+
+/* Simple Interface routine declarations */
+int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 
 #endif /* LIBYOTTADB_TYPES_H */

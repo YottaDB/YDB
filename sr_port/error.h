@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -98,6 +101,7 @@ CONDITION_HANDLER(gvcmz_netopen_ch);
 CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch);
 CONDITION_HANDLER(gvcst_statsDB_init_ch);
 CONDITION_HANDLER(gvcst_statsDB_open_ch);
+CONDITION_HANDLER(gvn2gds_ch);
 CONDITION_HANDLER(gvzwrite_ch);
 CONDITION_HANDLER(hashtab_rehash_ch);
 CONDITION_HANDLER(io_init_ch);
@@ -116,6 +120,7 @@ CONDITION_HANDLER(mupip_recover_ch);
 CONDITION_HANDLER(mupip_set_jnl_ch);
 CONDITION_HANDLER(mur_multi_rehash_ch);
 CONDITION_HANDLER(ojch);
+CONDITION_HANDLER(op_fnzatransform_ch);
 CONDITION_HANDLER(region_init_ch);
 CONDITION_HANDLER(replication_ch);
 CONDITION_HANDLER(stp_gcol_ch);
@@ -126,11 +131,10 @@ CONDITION_HANDLER(trans_code_ch);
 CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
+CONDITION_HANDLER(ydb_simpleapi_ch);
 CONDITION_HANDLER(zro_ins_rec_fail_ch);
 CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);
-CONDITION_HANDLER(op_fnzatransform_ch);
-CONDITION_HANDLER(gvn2gds_ch);
 
 void mum_tstart();
 

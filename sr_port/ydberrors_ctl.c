@@ -22,6 +22,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "LIBYOTTAMISMTCH", "$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)", 4 },
 	{ "READONLYNOSTATS", "Read-only and Statistics sharing cannot both be enabled on database", 0 },
 	{ "READONLYLKFAIL", "Failed to get !AD lock on READ_ONLY database file !AD", 4 },
+	{ "VARNAMEINVALID", "Invalid local/global/ISV variable name supplied to API call", 0 },
+	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
 };
 
 
@@ -29,4 +31,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	5};
+	7};

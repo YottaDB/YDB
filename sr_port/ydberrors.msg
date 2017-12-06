@@ -26,3 +26,5 @@ MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/er
 LIBYOTTAMISMTCH	<$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)>/error/fao=4!/ansi=0
 READONLYNOSTATS	<Read-only and Statistics sharing cannot both be enabled on database>/error/fao=0!/ansi=0
 READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao=4!/ansi=0
+VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
+VALUEINVALID	<Invalid value specified to ydb_set_s() call>/error/fao=0
