@@ -87,7 +87,7 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	if ((0 > count) || (YDB_MAX_SUBS < count))
 	{
 		REVERT;
-		return YDB_ERR_INVVARNAME;	/* Might be bending the definition a bit but short of a new error.. */
+		return YDB_ERR_VARNAMEINVALID;	/* Might be bending the definition a bit but short of a new error.. */
 	}
 	VALIDATE_VALUE(value);			/* Value must exist for SET */
 	/* Separate actions depending on the type of SET being done */

@@ -82,7 +82,7 @@ MBSTART	{													\
  * checked and no further checking needs to be done.
  */
 
-/* A macro to check the entire MNAME for validity. Returns YDB_ERR_INVVARNAME otherwise */
+/* A macro to check the entire MNAME for validity. Returns YDB_ERR_VARNAMEINVALID otherwise */
 #define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN)	\
 MBSTART {						\
 	char ctype;					\
@@ -96,12 +96,12 @@ MBSTART {						\
 			/* Valid first character */	\
 			break;	       		 	\
 		default:				\
-			return YDB_ERR_INVVARNAME;	\
+			return YDB_ERR_VARNAMEINVALID;	\
 	}		       				\
 	VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN);	\
 } MBEND
 
-/* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_INVVARNAME otherwise */
+/* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_VARNAMEINVALID otherwise */
 #define VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN)						\
 MBSTART {											\
 	char 		ctype, *cptr, *ctop;							\
@@ -118,7 +118,7 @@ MBSTART {											\
 			case TK_DIGIT:								\
 				continue;							\
 			default:								\
-				return YDB_ERR_INVVARNAME;					\
+				return YDB_ERR_VARNAMEINVALID;					\
 		}		       								\
 	}											\
 } MBEND
@@ -128,7 +128,7 @@ MBSTART {											\
  *   - Non-NULL address
  *   - Determines the type of var (global, local, ISV)
  *
- * Any error in validation results in a return with code YDB_ERR_INVVARNAME.
+ * Any error in validation results in a return with code YDB_ERR_VARNAMEINVALID.
  */
 #define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX)									\
 MBSTART {														\
@@ -136,7 +136,7 @@ MBSTART {														\
 	int	index;													\
 															\
 	if ((0 == (VARNAMEP)->len_used) || (NULL == (VARNAMEP)->buf_addr))						\
-		return YDB_ERR_INVVARNAME;	  									\
+		return YDB_ERR_VARNAMEINVALID;	  									\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
 	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
 	switch(ctype)													\
@@ -155,11 +155,11 @@ MBSTART {														\
 			VARTYPE = LYDB_SET_ISV;										\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
 			if ((-1 == index) || (!svn_data[index].can_set)) 	     			     		\
-				return YDB_ERR_INVVARNAME;								\
+				return YDB_ERR_VARNAMEINVALID;								\
 			VARINDEX = index;										\
 			break;	   											\
 		default:												\
-			return YDB_ERR_INVVARNAME;									\
+			return YDB_ERR_VARNAMEINVALID;									\
 	}		       												\
 } MBEND
 
@@ -167,7 +167,7 @@ MBSTART {														\
 #define VALIDATE_VALUE(VARVALUE)						\
 MBSTART	{									\
 	if ((NULL == (VARVALUE)->buf_addr) && (0 != (VARVALUE)->len_used))	\
-		return YDB_ERR_INVVARVALUE;					\
+		return YDB_ERR_VALUEINVALID;					\
 } MBEND
 
 /* Macro to locate or create an entry in the symbol table for the specified base variable name */
