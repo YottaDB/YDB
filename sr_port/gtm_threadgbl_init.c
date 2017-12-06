@@ -102,6 +102,7 @@
 #include "nametabtyp.h"
 #include "gtm_reservedDB.h"
 #include "localvarmonitor.h"
+#include "libyottadb_int.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"

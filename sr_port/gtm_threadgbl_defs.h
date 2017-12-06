@@ -273,6 +273,7 @@ THREADGBLDEF(lab_proxy,				lab_tabent_proxy)		/* Placeholder storing lab_ln_ptr 
 										 * pointer and has_parms value, so they are
 										 * contiguous in memory */
 #endif
+THREADGBLDEF(libyottadb_active_rtn,		libyottadb_routines)		/* Which routine is currently active */
 THREADGBLDEF(mprof_alloc_reclaim,		boolean_t)			/* Flag indicating whether the temporarily allocated
 										 * memory should be reclaimed */
 THREADGBLDEF(mprof_chunk_avail_size,		int)				/* Number of mprof stack frames that can fit in
@@ -321,6 +322,8 @@ THREADGBLDEF(statshare_opted_in,		boolean_t)			/* Flag when true shared stats co
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
+THREADGBLDEF(ydb_error_code,			int)				/* Error reflected back to condition handler - it
+										 * is saved here so the ESTABLISHer has access */
 THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */

@@ -1513,6 +1513,6 @@ LITDEF	err_msg merrors[] = {
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
-	"YDB",
+	"GTM",
 	&merrors[0],
 	1491};

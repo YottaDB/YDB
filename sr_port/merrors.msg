@@ -176,8 +176,8 @@
 !	ERR_ZLINKBYPASS		to be documented when code is enabled
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
-!
-!
+!  Note new YottaDB error messages should be added to ydberrors.msg instead of to this file to avoid collisions with errors
+!  added here for GT.M by FIS.
 !
 !  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
 !
