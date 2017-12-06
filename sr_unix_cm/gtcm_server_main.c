@@ -72,7 +72,6 @@ int gtcm_server_main(int argc, char_ptr_t argv[], char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	ctxt = NULL;
 	common_startup_init(GTCM_SERVER_IMAGE, NULL);	/* The GTCM server does not have any command tables
 							 * so pass command array as NULL.
 							 */
@@ -85,7 +84,6 @@ int gtcm_server_main(int argc, char_ptr_t argv[], char **envp)
 	err_init(gtcm_exit_ch);
 	gtm_chk_dist(argv[0]);
 	omi_errno = OMI_ER_NO_ERROR;
-	ctxt = ctxt;
 	ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */
 	gtcm_init(argc, argv);
 	gtcm_ltime = gtcm_stime = (int4)time(0);
