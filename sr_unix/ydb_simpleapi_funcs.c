@@ -33,6 +33,33 @@ GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 
+/* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT)											\
+MBSTART	{															\
+	mval		*mvalp;													\
+	void		**parmp, **parmp_top;											\
+				 												\
+	/* Now for each subscript */												\
+	VAR_START(var, varname);												\
+	for (parmp = &plist.arg[1], parmp_top = parmp + (COUNT), mvalp = &plist_mvals[0]; parmp < parmp_top; parmp++, mvalp++)	\
+	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer */	    	     		\
+		subval = va_arg(var, ydb_buffer_t *);	       	    	       	   	     	    				\
+		if (NULL != subval)		  										\
+		{	/* A subscript has been specified - copy it to the associated mval and put its address			\
+			 * in the param list to pass to op_putindx()								\
+			 */													\
+			SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);								\
+		} else					   									\
+		{	/* No subscript specified - error */									\
+			va_end(var);		    	  									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
+		}				    		 								\
+		*parmp = mvalp;													\
+	}	       	 													\
+	plist.n = (COUNT) + 1;			/* Bump to include varname in parms */						\
+	va_end(var);														\
+} MBEND
+
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
  * is basically returned to the user as the negative of the errror to differentiate those errors from positive (success
  * or informative) return codes of this API.
@@ -68,11 +95,9 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	ydb_set_types	set_type;
 	int		set_svn_index, i;
 	lv_val		*lvvalp, *dst_lv;
-	mval		set_value;
+	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	boolean_t	error_encountered;
 	gparam_list	plist;
-	mval		plist_mvals[YDB_MAX_SUBS + 1], *mvalp;
-	void		**parmp, **parmp_top;
 	mname_entry	var_mname;
 	ht_ent_mname	*tabent;
 	ydb_buffer_t	*subval;
@@ -105,25 +130,7 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			 * op_putindx() to locate the mval associated with those subscripts that need to be set.
 			 */
 			plist.arg[0] = lvvalp;	/* First arg is lv_val of the base var */
-			/* Now for each subscript */
-			for (parmp = &plist.arg[1], parmp_top = parmp + count, mvalp = &plist_mvals[0];
-			     parmp < parmp_top;
-			     parmp++, mvalp++)
-			{	/* Pull each subscript descriptor out of param list and put in our parameter buffer */
-				subval = va_arg(var, ydb_buffer_t *);
-				if (NULL != subval)
-				{	/* A subscript has been specified - copy it to the associated mval and put its address
-					 * in the param list to pass to op_putindx()
-					 */
-					SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);
-				} else
-				{	/* No subscript specified - error */
-					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAME_INVALID);
-				}
-				*parmp = mvalp;
-			}
-			plist.n = count + 1;			/* Bump to include varname in parms */
+			COPY_PARMS_TO_CALLG_BUFFER(count);		/* Set up plist for callg invocation of op_putindx */
 			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Drive op_putindx to locate/create node */
 			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
 			SET_ACTIVE_LV(NULL, TRUE, actlv_ydb_set_s);	/* If get here, subscript set was successful so
@@ -131,7 +138,18 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 									 */
 			break;
 		case LYDB_SET_GLOBAL:
-			/* Set the given global variable with the given value */
+			/* Set the given global variable with the given value. We do this by:
+			 *   1. Drive op_gvname() with the global name and all subscripts to setup the key we need to global node.
+			 *   2. Drive op_gvput() to place value into target global node
+			 */
+			gvname.mvtype = MV_STR;
+			gvname.str.addr = varname->buf_addr + 1;	/* Point past '^' to var name */
+			gvname.str.len = varname->len_used - 1;
+			plist.arg[0] = &gvname;
+			COPY_PARMS_TO_CALLG_BUFFER(count);		/* Set up plist for callg invocation of op_putindx */
+			callg((callgfnptr)op_gvname, &plist);		/* Drive op_gvname() to create key */
+			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for op_gvput() */
+			op_gvput(&set_value);				/* Save the global value */
 			break;
 		case LYDB_SET_ISV:
 			/* Set the given ISV (subscripts not currently supported) with the given value */
