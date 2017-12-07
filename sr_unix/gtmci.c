@@ -571,6 +571,17 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
+	/* Do the "ydb_init" (if needed) first as it would set gtm_threadgbl etc. which is needed to use TREF later */
+	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
+	{
+		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
+			return status;
+		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE
+		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro
+		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".
+		 */
+		SETUP_THREADGBL_ACCESS;
+	}
 	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
 	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
@@ -581,11 +592,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
-	}
-	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
-	{
-		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
-			return status;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
