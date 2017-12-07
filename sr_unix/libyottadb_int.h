@@ -55,6 +55,11 @@ MBSTART	{													\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
 			return -status;			   	       		    				\
+		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE	\
+		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro	\
+		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".		\
+		 */												\
+		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
 	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
 	 * API calls.	      	 	    	       	   		     	       	       			\
