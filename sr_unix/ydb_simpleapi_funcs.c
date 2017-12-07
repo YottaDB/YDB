@@ -64,31 +64,30 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
  */
 int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 {
-	char			chr;
-	ydb_set_types		set_type;
-	int			set_svn_index, i;
-	lv_val			*lvvalp, *dst_lv;
-	mval			set_value;
-	boolean_t		error_encountered;
-	gparam_list		plist;
-	mval			plist_mvals[YDB_MAX_SUBS + 1], *mvalp;
-	void			**parmp, **parmp_top;
-	mname_entry		var_mname;
-	ht_ent_mname		*tabent;
-	ydb_buffer_t		*subval;
-	va_list			var;
+	char		chr;
+	ydb_set_types	set_type;
+	int		set_svn_index, i;
+	lv_val		*lvvalp, *dst_lv;
+	mval		set_value;
+	boolean_t	error_encountered;
+	gparam_list	plist;
+	mval		plist_mvals[YDB_MAX_SUBS + 1], *mvalp;
+	void		**parmp, **parmp_top;
+	mname_entry	var_mname;
+	ht_ent_mname	*tabent;
+	ydb_buffer_t	*subval;
+	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Verify entry conditions, make sure YDB CI environment is up, establish error handler, etc */
+	/* Verify entry conditions, make sure YDB CI environment is up, ESTABLISH error handler, etc */
 	LIBYOTTADB_INIT(LYDB_RTN_SET);
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, set_type, set_svn_index);
-	if ((0 > count) || (YDB_MAX_SUBS < count))
-	{
-		REVERT;
-		return YDB_ERR_VARNAMEINVALID;	/* Might be bending the definition a bit but short of a new error.. */
-	}
+	if (0 > count)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAME_INVALID);
+	if (YDB_MAX_SUBS < count)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	VALIDATE_VALUE(value);			/* Value must exist for SET */
 	/* Separate actions depending on the type of SET being done */
 	VAR_START(var, varname);
@@ -100,9 +99,7 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			if (0 == count)
 			{	/* We have a var with NO subscripts - simple case - just copy value pointers in and rebuffer */
 				SET_LVVAL_VALUE_FROM_BUFFER(lvvalp, value);
-				va_end(var);
-				REVERT;
-				return YDB_OK;
+				break;
 			}
 			/* We have some subscripts - load the varname and the subscripts into our array for callg so we can drive
 			 * op_putindx() to locate the mval associated with those subscripts that need to be set.
@@ -120,19 +117,18 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 					 */
 					SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);
 				} else
-				{	/* No subscript specified - send through a null/undefined mval for which op_putindx()
-					 * raises an undef error if appropriate.
-					 */
-					mvalp->mvtype = 0;	/* Undefined value */
-					mvalp->str.len = 0;	/* Null value */
+				{	/* No subscript specified - error */
+					va_end(var);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAME_INVALID);
 				}
 				*parmp = mvalp;
 			}
 			plist.n = count + 1;			/* Bump to include varname in parms */
-			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Drive op_putindx */
-			SET_ACTIVE_LV(NULL, FALSE, actlv_ydb_set_s);	/* If get here, subscript set was successful.
-									 * Clear active_lv to avoid later cleanup issues */
-			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);
+			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Drive op_putindx to locate/create node */
+			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
+			SET_ACTIVE_LV(NULL, TRUE, actlv_ydb_set_s);	/* If get here, subscript set was successful so
+									 * clear active_lv to avoid later cleanup issues.
+									 */
 			break;
 		case LYDB_SET_GLOBAL:
 			/* Set the given global variable with the given value */
@@ -142,7 +138,6 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			break;
 		default:
 			va_end(var);
-			REVERT;			/* This should be a hard-stop - remove our soft-landing handler */
 			assertpro(FALSE);
 	}
 	va_end(var);
