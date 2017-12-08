@@ -59,7 +59,7 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, set_type, set_svn_index);
 	if (0 > count)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAME_INVALID);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	VALIDATE_VALUE(value);			/* Value must exist for SET */
