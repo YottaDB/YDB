@@ -314,6 +314,8 @@ THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted
 THREADGBLDEF(save_zhist,			zro_hist *)			/* Temp storage for zro_hist blk so condition hndler
 										 * can get a hold of it if necessary to free it */
 #endif
+THREADGBLAR1DEF(sapi_mstrs_for_gc_ary,		mstr *, MAX_SAPI_MSTR_GC_INDX + 1)	/* SimpleAPI mstr array needed by GC */
+THREADGBLDEF(sapi_mstrs_for_gc_indx,		int)				/* Index into gc mstr array of next avail slot */
 THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTINES between
 										 * linking a routine and invoking it
 										 */

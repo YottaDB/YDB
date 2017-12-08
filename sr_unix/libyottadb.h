@@ -22,6 +22,7 @@
 
 /* Maximum values */
 #define YDB_MAX_SUBS	MAX_LVSUBSCRIPTS	/* Maximum subscripts currently supported */
+#define YDB_MAX_IDENT	MAX_MIDENT_LEN		/* Maximum size of global/local name (not including '^') */
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0			/* Successful return code */

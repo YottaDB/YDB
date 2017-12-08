@@ -181,10 +181,10 @@ MBSTART {														\
 		mstr	**curstr;						\
 										\
 		for (curstr = array; curstr < topstr; curstr++)			\
-			assert(*curstr != MSTR1);				\
+			assert(*curstr != (MSTR1));				\
 	)									\
 	assert(topstr < arraytop);						\
-	assert(0 < MSTR1->len);							\
+	assert(0 < (MSTR1)->len);						\
 	/* It would be nice to test for maxlen as well here but that causes	\
 	 * some usages of stringpool to fail as other types of stuff are	\
 	 * built into the stringppool besides strings.				\
@@ -466,7 +466,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
 	lvTreeNode		*node, *node_limit;
-	mstr			**cstr, *x;
+	mstr			**cstr, *x, **cstr_top;
 	mv_stent		*mvs;
 	mval			*m, **mm, **mmtop, *mtop;
 	intszofptr_t		lv_subs;
@@ -893,6 +893,18 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				for (restore_ent = tf->vars; restore_ent; restore_ent = restore_ent->next)
 					MSTR_STPG_ADD(&(restore_ent->key.var_name));
 				tf = tf->old_tp_frame;
+			}
+		}
+		/* Check for mstrs being used by the simple API */
+		if (0 < TREF(sapi_mstrs_for_gc_indx))
+		{	/* The simpleAPI has some mstrs in use it needs protected. Add the array's addresses to
+			 * our own array of mstrs.
+			 */
+			for (cstr = TADR(sapi_mstrs_for_gc_ary), cstr_top = cstr + TREF(sapi_mstrs_for_gc_indx);
+			     cstr < cstr_top;
+			     cstr++)
+			{
+				MSTR_STPG_PUT(*cstr);
 			}
 		}
 	}
