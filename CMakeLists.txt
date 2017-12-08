@@ -276,7 +276,7 @@ foreach(msg
     sr_port/cmerrors.msg
     sr_port/gdeerrors.msg
     sr_port/merrors.msg
-    sr_unix_gnp/cmierrors.msg
+    sr_port/cmierrors.msg
     )
   get_filename_component(name ${msg} NAME_WE)
   set(mumps_msg_args -run msg ${YDB_SOURCE_DIR}/${msg} unix)
