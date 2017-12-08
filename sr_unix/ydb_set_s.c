@@ -64,7 +64,6 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	VALIDATE_VALUE(value);			/* Value must exist for SET */
 	/* Separate actions depending on the type of SET being done */
-	VAR_START(var, varname);
 	switch(set_type)
 	{
 		case LYDB_SET_LOCAL:
@@ -116,10 +115,8 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			op_svput(set_svn_index, &set_value);
 			break;
 		default:
-			va_end(var);
 			assertpro(FALSE);
 	}
-	va_end(var);
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
