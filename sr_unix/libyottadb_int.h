@@ -53,6 +53,14 @@ typedef enum
 MBSTART	{													\
 	int	status;												\
 														\
+	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
+	 * API calls.	      	 	    	       	   		     	       	       			\
+	 */    													\
+	if (process_exiting)											\
+	{	/* YDB runtime environment not setup/available, no driving of errors */				\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);					\
+		return YDB_ERR_CALLINAFTERXIT;									\
+	}													\
 	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))						\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
@@ -63,14 +71,6 @@ MBSTART	{													\
 		 */												\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
-	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
-	 * API calls.	      	 	    	       	   		     	       	       			\
-	 */    													\
-	if (process_exiting)											\
-	{  													\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);					\
-		return YDB_ERR_CALLINAFTERXIT;									\
-	}													\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */				\
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);							\
@@ -91,22 +91,22 @@ MBSTART	{													\
  */
 
 /* A macro to check the entire MNAME for validity. Returns YDB_ERR_VARNAMEINVALID otherwise */
-#define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN)	\
-MBSTART {						\
-	char ctype;					\
-	     						\
-	ctype = ctypetab[(VARNAMESTR)[0]];		\
-	switch(ctype)					\
-	{						\
-		case TK_LOWER:				\
-		case TK_UPPER:				\
-		case TK_PERCENT: 			\
-			/* Valid first character */	\
-			break;	       		 	\
-		default:				\
-			return YDB_ERR_VARNAMEINVALID;	\
-	}		       				\
-	VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN);	\
+#define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN)						\
+MBSTART {											\
+	char ctype;										\
+	     											\
+	ctype = ctypetab[(VARNAMESTR)[0]];							\
+	switch(ctype)										\
+	{											\
+		case TK_LOWER:									\
+		case TK_UPPER:									\
+		case TK_PERCENT: 								\
+			/* Valid first character */						\
+			break;	       		 						\
+		default:									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);		\
+	}											\
+	VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN);						\
 } MBEND
 
 /* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_VARNAMEINVALID otherwise */
@@ -125,7 +125,7 @@ MBSTART {											\
 			case TK_DIGIT:								\
 				continue;							\
 			default:								\
-				return YDB_ERR_VARNAMEINVALID;					\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);	\
 		}		       								\
 	}											\
 } MBEND
@@ -166,11 +166,11 @@ MBSTART {														\
 			VARTYPE = LYDB_SET_ISV;										\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
 			if ((-1 == index) || (!svn_data[index].can_set)) 	     			     		\
-				return YDB_ERR_VARNAMEINVALID;								\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARINDEX = index;										\
 			break;	   											\
 		default:												\
-			return YDB_ERR_VARNAMEINVALID;									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
 	}		       												\
 } MBEND
 
@@ -178,7 +178,7 @@ MBSTART {														\
 #define VALIDATE_VALUE(VARVALUE)						\
 MBSTART	{									\
 	if ((NULL == (VARVALUE)->buf_addr) && (0 != (VARVALUE)->len_used))	\
-		return YDB_ERR_VALUEINVALID;					\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);	\
 } MBEND
 
 /* Macro to locate or create an entry in the symbol table for the specified base variable name */
