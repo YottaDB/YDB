@@ -189,6 +189,7 @@ MBSTART {															\
 																\
 	(VARMNAMEP)->var_name.addr = (VARNAMEP)->buf_addr;	/* Load up the imbedded varname with our base var name */	\
 	(VARMNAMEP)->var_name.len = (VARNAMEP)->len_used;	   	       			     	      	       		\
+	s2pool(&(VARMNAMEP)->var_name);		/* Rebuffer in stringpool for protection */					\
 	(VARMNAMEP)->marked = 0;												\
 	COMPUTE_HASH_MNAME((VARMNAMEP));			/* Compute its hash value */					\
 	added = add_hashtab_mname_symval(&curr_symval->h_symtab, (VARMNAMEP), NULL, &(VARTABENTP));				\
