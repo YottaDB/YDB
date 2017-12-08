@@ -24,6 +24,8 @@
 #include "send_msg.h"
 #include "stack_frame.h"
 
+#define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_SUBS	/* Max index in mstr array - holds varname ref plus subs */
+
 LITREF char		ctypetab[NUM_CHARS];
 LITREF nametabent	svn_names[];
 LITREF unsigned char	svn_index[];
@@ -70,6 +72,7 @@ MBSTART	{													\
 		return YDB_ERR_CALLINAFTERXIT;									\
 	}													\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
+	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */				\
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);							\
 	if (error_encountered)											\
 	{													\
@@ -119,7 +122,6 @@ MBSTART {											\
 		{										\
 			case TK_LOWER:								\
 			case TK_UPPER:								\
-			case TK_PERCENT:							\
 			case TK_DIGIT:								\
 				continue;							\
 			default:								\
@@ -147,14 +149,18 @@ MBSTART {														\
 	switch(ctype)													\
 	{														\
 		case TK_CIRCUMFLEX:											\
+			if (YDB_MAX_IDENT < ((VARNAMEP)->len_used - 1))							\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARTYPE = LYDB_SET_GLOBAL;									\
 			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
 			break;				      	   		      					\
 		case TK_LOWER:												\
 		case TK_UPPER:												\
 		case TK_PERCENT: 											\
+			if (YDB_MAX_IDENT < (VARNAMEP)->len_used)							\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARTYPE = LYDB_SET_LOCAL;									\
-			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr, (VARNAMEP)->len_used);					\
+			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
 			break;												\
 		case TK_DOLLAR:												\
 			VARTYPE = LYDB_SET_ISV;										\
@@ -202,8 +208,52 @@ MBSTART	{											\
 	((mval *)(LVVALP))->mvtype = MV_STR;							\
 	((mval *)(LVVALP))->str.addr = (BUFVALUE)->buf_addr;					\
 	((mval *)(LVVALP))->str.len = (BUFVALUE)->len_used;					\
-	s2pool(&((mval *)(LVVALP))->str);	/* Rebuffer in stringpool for protection */	\
 } MBEND
 
+/* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, REBUFFER)										\
+MBSTART	{															\
+	mval		*mvalp;													\
+	void		**parmp, **parmp_top;											\
+				 												\
+	/* Now for each subscript */												\
+	VAR_START(var, varname);												\
+	for (parmp = &plist.arg[1], parmp_top = parmp + (COUNT), mvalp = &plist_mvals[0]; parmp < parmp_top; parmp++, mvalp++)	\
+	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer */	    	     		\
+		subval = va_arg(var, ydb_buffer_t *);	       	    	       	   	     	    				\
+		if (NULL != subval)		  										\
+		{	/* A subscript has been specified - copy it to the associated mval and put its address			\
+			 * in the param list to pass to op_putindx()								\
+			 */													\
+			SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);								\
+			if (REBUFFER)												\
+			{													\
+				s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */				\
+				RECORD_MSTR_FOR_GC(&(mvalp->str));								\
+			}													\
+		} else					   									\
+		{	/* No subscript specified - error */									\
+			va_end(var);		    	  									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
+		}				    		 								\
+		*parmp = mvalp;													\
+	}	       	 													\
+	plist.n = (COUNT) + 1;			/* Bump to include varname in parms */						\
+	va_end(var);														\
+} MBEND
 
+/* Macro to record the address of a given mstr so garbage collection knows where to find it to fix it up if needbe */
+#define RECORD_MSTR_FOR_GC(MSTRP)										\
+MBSTART	{													\
+	mstr	*mstrp;												\
+														\
+	if (NULL == (mstrp = TREF(sapi_mstrs_for_gc_ary)))	/* Note assignment */				\
+	{													\
+		mstrp = TREF(sapi_mstrs_for_gc_ary) = malloc(SIZEOF(mstr) * (MAX_SAPI_MSTR_GC_INDX + 1));	\
+		TREF(sapi_mstrs_for_gc_indx) = 0;			    					\
+	}				       									\
+	assert(MAX_SAPI_MSTR_GC_INDX > TREF(sapi_mstrs_for_gc_indx));						\
+	if (0 < (MSTRP)->len)											\
+		TAREF1(sapi_mstrs_for_gc_ary, (TREF(sapi_mstrs_for_gc_indx))++) = MSTRP;			\
+} MBEND
 #endif /*  LIBYOTTADB_INT_H */

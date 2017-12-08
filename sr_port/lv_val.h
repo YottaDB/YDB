@@ -420,8 +420,7 @@ enum actlv_type
 	actlv_op_merge2,		/* = 19 */
 	actlv_tp_unwind_restart,	/* = 20 */
 	actlv_tp_unwind_rollback,	/* = 21 */
-	actlv_tp_unwind_commit,		/* = 22 */
-	actlv_ydb_set_s			/* = 23 */
+	actlv_tp_unwind_commit		/* = 22 */
 };
 
 #ifdef DEBUG
