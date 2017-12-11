@@ -822,9 +822,9 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					}
 					assert(half_timeout_done);
 					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferred. If the
-					 * stack trace takes more than REPL_FILTER_HALF_TIMEOUT seconds, the next timeout interrupt
-					 * will be deferred until gtm_system(BYPASSOK) returns. At which point timedout will be
-					 * TRUE and there will be no signal received by GT.M to interrupt the blocking read() at
+					 * stack trace takes more than REPL_FILTER_HALF_TIMEOUT seconds, the next timeout
+					 * interrupt is deferred until gtm_system(BYPASSOK) returns. At which point timedout is
+					 * TRUE and there is no signal received by GT.M to interrupt the blocking read() at
 					 * the begining of the loop.  So we handle the timeout now and skip the second stack trace.
 					 */
 					if (half_timeout_done && timedout)
