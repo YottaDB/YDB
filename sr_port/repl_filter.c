@@ -1340,7 +1340,7 @@ int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 		t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 		memcpy(cb, jb, t_len);
-		((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V17 and V24 due to new length */
+		((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V17 and V24 due to new length */
 		cb += t_len;
 		jb += t_len;
 		/* Initialize 8-byte "strm_seqno" (common to TCOM/NULL/SET/KILL/ZKILL/ZTRIG jnl records) to 0 */
@@ -1442,7 +1442,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V17 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V17 and V24 */
 			cb += t_len;
 			jb += t_len;
 			if (is_set_kill_zkill_ztrig)
@@ -1591,7 +1591,7 @@ int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -1784,7 +1784,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	promote_uupd_to_tupd = FALSE;
 	hasht_seen = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -1825,7 +1825,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V19 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V19 and V24 */
 			assert((jb + t_len - jstart) == OFFSETOF(struct_jrec_upd, strm_seqno));
 			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			{
@@ -1974,7 +1974,7 @@ int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -2167,7 +2167,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -2209,7 +2209,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V21 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V21 and V24 */
 			assert((jb + t_len - jstart) == OFFSETOF(struct_jrec_upd, strm_seqno));
 			if (IS_SET_KILL_ZKILL_ZTWORM_ZTRIG(rectype))
 			{
@@ -2355,7 +2355,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -2527,7 +2527,7 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -2704,7 +2704,7 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	promote_uupd_to_tupd = FALSE;
 	/* Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
 	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
-	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
+	 * jnl_v24TOv24 filter conversion function is invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
 	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
 	 * version corresponds to only ONE journal version.
 	 *	assert(is_src_server);
