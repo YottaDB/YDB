@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -183,7 +186,15 @@ void db_auto_upgrade(gd_region *reg)
 				udi = FILE_INFO(reg);
 				new_eof = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)csd->trans_hist.total_blks * csd->blk_size;
 				DEBUG_ONLY(file_size = gds_file_size(reg->dyn.addr->file_cntl);)
-				assert((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE));
+				/* Note that the last process to access this database in V63000A could have been in the middle of
+				 * a database file extension after having extended the database file size but before updating
+				 * the total_blks field in the file header etc. In that case, the "new_eof" value would be less
+				 * than "file_size". Hence the lack of "==" in the assert check below. In this situation though,
+				 * if the process going through "db_auto_upgrade" is a forward or backward MUPIP JOURNAL RECOVER
+				 * command, it would eventually invoke "mur_block_count_correct" which would fix this discrepancy
+				 * and ensure a later mupip integ is clean (no DBTOTBLK error).
+				 */
+				assert((file_size * DISK_BLOCK_SIZE) >= (new_eof + DISK_BLOCK_SIZE));
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
 				/* GT.M V63001 introduced reservedDBFlags */
 				csd->reservedDBFlags = 0; /* RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE */
