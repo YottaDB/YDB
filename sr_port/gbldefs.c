@@ -1193,7 +1193,7 @@ GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() 
 							 */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
 
-/* GT.CM OMI related global variables */
+/* Begin -- GT.CM OMI related global variables */
 GBLDEF	bool		neterr_pending;
 GBLDEF	int4		omi_bsent = 0;
 GBLDEF	int		psock = -1;		/* pinging socket */
@@ -1221,3 +1221,8 @@ GBLDEF	int		conn_timeout = TIMEOUT_INTERVAL;
 GBLDEF	int		history = 0;
 /* image_id....allows you to determine info about the server by using the strings command, or running dbx */
 GBLDEF	char		image_id[256]= "image_id";
+/* End -- GT.CM OMI related global variables */
+
+GBLDEF	int		ydb_repl_filter_timeout;	/* # of seconds that source server waits before issuing FILTERTIMEDOUT
+							 * error if it sees no response from the external filter program.
+							 */

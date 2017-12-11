@@ -385,7 +385,7 @@
 #define MORE_TO_TRANSFER -99
 #define DUMMY_TCOMMIT_LENGTH 3	/* A dummy commit is 09\n */
 
-#define FILTER_HALF_TIMEOUT_TIME	(32 * MILLISECS_IN_SEC)
+#define REPL_FILTER_HALF_TIMEOUT	((ydb_repl_filter_timeout * MILLISECS_IN_SEC) / 2)
 
 /* repl_filter_recv receive state */
 
@@ -449,6 +449,7 @@ GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	int			gtmsource_filter;
 GBLREF	int			gtmrecv_filter;
+GBLREF	int			ydb_repl_filter_timeout;
 
 LITREF	char			*trigger_subs[];
 
@@ -798,7 +799,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			assert(-1 != repl_filter_pid);
 			half_timeout_done = FALSE;
 			if (send_done)
-				TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
+				TIMEOUT_INIT(timedout, REPL_FILTER_HALF_TIMEOUT);
 			do
 			{
 				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
@@ -816,15 +817,15 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					{	/* Half-timeout : take C-stack of the filter program. */
 						half_timeout_done = TRUE;
 						TIMEOUT_DONE(timedout);
-						TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
+						TIMEOUT_INIT(timedout, REPL_FILTER_HALF_TIMEOUT);
 						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_HALF_TIME", process_id, repl_filter_pid, 0);
 					}
 					assert(half_timeout_done);
-					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferredd. If the
-					 * stack trace takes more than 32 seconds, the next timeout interrupt will be deferred
-					 * until gtm_system(BYPASSOK) returns. At which point timedout will be TRUE and there will
-					 * be no signal received by GT.M to interrupt the blocking read() at the begining of the
-					 * loop.  So we handle the timeout now and skip the second stack trace.
+					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferred. If the
+					 * stack trace takes more than REPL_FILTER_HALF_TIMEOUT seconds, the next timeout interrupt
+					 * will be deferred until gtm_system(BYPASSOK) returns. At which point timedout will be
+					 * TRUE and there will be no signal received by GT.M to interrupt the blocking read() at
+					 * the begining of the loop.  So we handle the timeout now and skip the second stack trace.
 					 */
 					if (half_timeout_done && timedout)
 					{	/* Full-timeout : take C-stack of the filter program. */
