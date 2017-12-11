@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,6 +51,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "cli.h"
+#include "repl_filter.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -83,6 +87,7 @@ GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for c
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
+GBLREF	int		ydb_repl_filter_timeout;/* # of seconds that source server waits before issuing FILTERTIMEDOUT */
 
 void	gtm_env_init(void)
 {
@@ -400,6 +405,18 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
+		/* See if ydb_repl_filter_timeout is specified */
+		val.addr = YDB_REPL_FILTER_TIMEOUT;
+		val.len = SIZEOF(YDB_REPL_FILTER_TIMEOUT) - 1;
+		ydb_repl_filter_timeout = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_DEF;
+		else if (REPL_FILTER_TIMEOUT_MIN > ydb_repl_filter_timeout)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MIN;
+		else if (REPL_FILTER_TIMEOUT_MAX < ydb_repl_filter_timeout)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MAX;
+		assert((REPL_FILTER_TIMEOUT_MIN <= ydb_repl_filter_timeout)
+				&& (REPL_FILTER_TIMEOUT_MAX >= ydb_repl_filter_timeout));
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

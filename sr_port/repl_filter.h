@@ -42,6 +42,10 @@
 #define	GTMNULL_TO_STDNULL_COLL		1
 #define	STDNULL_TO_GTMNULL_COLL		2
 
+#define	REPL_FILTER_TIMEOUT_MIN		32	/* in seconds */
+#define	REPL_FILTER_TIMEOUT_DEF		64	/* in seconds */
+#define	REPL_FILTER_TIMEOUT_MAX		131072	/* 2^17 seconds */
+
 typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
 
 /* The following is the list of filter-format version number versus the earliest GT.M version number that used it.
