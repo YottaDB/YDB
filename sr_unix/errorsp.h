@@ -99,6 +99,7 @@ GBLEXP int			severity, chnd_incr;
 #ifndef CHEXPAND
 GBLREF int4			error_condition;
 GBLREF err_ctl			merrors_ctl;
+GBLREF err_ctl			ydberrors_ctl;
 GBLREF void			(*restart)();
 GBLREF int			process_exiting;
 #endif
@@ -110,7 +111,12 @@ GBLREF int			process_exiting;
 #define SEVERE		4
 #define SEV_MSK		7
 
-#define IS_GTM_ERROR(err) ((err & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
+/* A YDB error code is one that is either in merrors.msg or in ydberrors.msg */
+#define IS_YDB_ERROR(err) (((err & FACMASK(merrors_ctl.facnum))							\
+					&& (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))		\
+				|| ((err & FACMASK(ydberrors_ctl.facnum))					\
+					&& (MSGMASK(err, ydberrors_ctl.facnum) <= ydberrors_ctl.msg_cnt)))
+
 #define CHECKHIGHBOUND(hptr)  assert(hptr < (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
 #define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1)) /* Low check for chnd - 1 in case last handler setup new handler */
 
@@ -548,7 +554,7 @@ error_def(ERR_OUTOFSPACE);
 				 || SIGNAL == (int)ERR_STACKOFLOW)
 
 /* true if above or SEVERE and GTM error (perhaps add some "system" errors) */
-#define DUMPABLE                ((SEVERITY == SEVERE) && IS_GTM_ERROR(SIGNAL)						\
+#define DUMPABLE                ((SEVERITY == SEVERE) && IS_YDB_ERROR(SIGNAL)						\
 					&& (SIGNAL != (int)ERR_OUTOFSPACE)						\
 					DEBUG_ONLY(&& (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)		\
 							? (SIGNAL != (int)ERR_MEMORY) : TRUE)))

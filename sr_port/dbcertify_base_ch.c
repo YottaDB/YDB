@@ -2,7 +2,7 @@
  *								*
  * Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ CONDITION_HANDLER(dbcertify_base_ch)
 		/* following is a hack to avoid FAO directives getting printed without expanding
 		 * in the error message during EXIT()
 		 */
-		if (IS_GTM_ERROR(SIGNAL))
+		if (IS_YDB_ERROR(SIGNAL))
 		        exi_condition = ERR_DBCNOFINISH;
 	)
 	UNSUPPORTED_PLATFORM_CHECK;
