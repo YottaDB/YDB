@@ -24,7 +24,7 @@
 #include "send_msg.h"
 #include "stack_frame.h"
 
-#define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_SUBS	/* Max index in mstr array - holds varname ref plus subs */
+#define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
 
 LITREF char		ctypetab[NUM_CHARS];
 LITREF nametabent	svn_names[];
@@ -165,9 +165,11 @@ MBSTART {														\
 		case TK_DOLLAR:												\
 			VARTYPE = LYDB_SET_ISV;										\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
-			if ((-1 == index) || (!svn_data[index].can_set)) 	     			     		\
+			if (-1 == index) 	     			     						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
-			VARINDEX = index;										\
+			if (!svn_data[index].can_set)									\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SVNOSET);					\
+			VARINDEX = svn_data[index].opcode;								\
 			break;	   											\
 		default:												\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
@@ -190,6 +192,7 @@ MBSTART {															\
 	(VARMNAMEP)->var_name.addr = (VARNAMEP)->buf_addr;	/* Load up the imbedded varname with our base var name */	\
 	(VARMNAMEP)->var_name.len = (VARNAMEP)->len_used;	   	       			     	      	       		\
 	s2pool(&(VARMNAMEP)->var_name);		/* Rebuffer in stringpool for protection */					\
+	RECORD_MSTR_FOR_GC(&(VARMNAMEP)->var_name);										\
 	(VARMNAMEP)->marked = 0;												\
 	COMPUTE_HASH_MNAME((VARMNAMEP));			/* Compute its hash value */					\
 	added = add_hashtab_mname_symval(&curr_symval->h_symtab, (VARMNAMEP), NULL, &(VARTABENTP));				\

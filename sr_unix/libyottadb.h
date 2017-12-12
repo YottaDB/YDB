@@ -30,7 +30,7 @@
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
  */
-#define LYDB_BUFFER_LITERAL(BUFFERP, LITERAL)					\
+#define YDB_STRLIT_TO_BUFFER(BUFFERP, LITERAL)					\
 {										\
 	(BUFFERP)->buf_addr = LITERAL;						\
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
@@ -57,8 +57,8 @@ typedef struct
 	ydb_char_t	*address;
 } ydb_string_t;
 
-/* Structure for interfacing with simple API routines. Meant to be used with the YDB_BUF* macros defined
- * later in this header file.
+/* Structure for interfacing with simple API routines. Meant to be used with the YDB_* macros defined
+ * above in this header file and with simple API calls.
  */
 typedef struct
 {
