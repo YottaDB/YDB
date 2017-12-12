@@ -106,7 +106,7 @@ MBSTART {											\
 		default:									\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);		\
 	}											\
-	VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN);						\
+	VALIDATE_MNAME_C2((VARNAMESTR + 1), (VARNAMELEN - 1));					\
 } MBEND
 
 /* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_VARNAMEINVALID otherwise */
