@@ -143,7 +143,7 @@ MBSTART {														\
 	int	index;													\
 															\
 	if ((0 == (VARNAMEP)->len_used) || (NULL == (VARNAMEP)->buf_addr))						\
-		return YDB_ERR_VARNAMEINVALID;	  									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
 	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
 	switch(ctype)													\
@@ -180,7 +180,7 @@ MBSTART {														\
 #define VALIDATE_VALUE(VARVALUE)						\
 MBSTART	{									\
 	if ((NULL == (VARVALUE)->buf_addr) && (0 != (VARVALUE)->len_used))	\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VALUEINVALID);	\
 } MBEND
 
 /* Macro to locate or create an entry in the symbol table for the specified base variable name */
