@@ -27,9 +27,6 @@
 #include "libyottadb_int.h"
 #include "libydberrors.h"
 
-GBLREF 	boolean_t	gtm_startup_active;
-GBLREF	symval		*curr_symval;
-
 /* Routine to set local, global and ISV values
  *
  * Parameters:
@@ -40,19 +37,25 @@ GBLREF	symval		*curr_symval;
  */
 int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 {
-	char		chr;
-	ydb_var_types	set_type;
-	int		set_svn_index, i;
-	lv_val		*lvvalp, *dst_lv;
-	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	boolean_t	error_encountered;
 	gparam_list	plist;
-	mname_entry	var_mname;
 	ht_ent_mname	*tabent;
+	int		set_svn_index;
+	lv_val		*lvvalp, *dst_lv;
+	mname_entry	var_mname;
+	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_var_types	set_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Verify entry conditions, make sure YDB CI environment is up, ESTABLISH error handler, etc */
-	LIBYOTTADB_INIT(LYDB_RTN_SET);
+	/* Verify entry conditions, make sure YDB CI environment is up etc. */
+	LIBYOTTADB_INIT(LYDB_RTN_SET);	/* Note: macro could "return" from this function in case of errors */
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{
+		REVERT;
+		return -(TREF(ydb_error_code));
+	}
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, set_type, set_svn_index);
 	if (0 > count)
@@ -69,17 +72,18 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			 * Note need to rebuffer EVERYTHING - the varname, subscripts and of course value are all potentially
 			 * copied via saving name and address.
 			 */
-			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val */
+			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val in curr_symval */
 			if (0 == count)
 				/* If no parameters, this is where to store the value */
 				dst_lv = lvvalp;
 			else
 			{	/* We have some subscripts - load the varname and the subscripts into our array for callg so
-				 * we can drive op_putindx() to locate the mval associated with those subscripts that need to
+				 * we can drive "op_putindx" to locate the mval associated with those subscripts that need to
 				 * be set.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
-				COPY_PARMS_TO_CALLG_BUFFER(count, TRUE);	/* Setup for callg invocation of op_putindx */
+				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
+				COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, TRUE);
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
@@ -88,18 +92,19 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Set the given global variable with the given value. We do this by:
-			 *   1. Drive op_gvname() with the global name and all subscripts to setup the key we need to access
+			 *   1. Drive "op_gvname" with the global name and all subscripts to setup the key we need to access
 			 *      the global node.
-			 *   2. Drive op_gvput() to place value into target global node
+			 *   2. Drive "op_gvput" to place value into target global node
 			 * Note no need to rebuffer the inputs here as they won't live in the stringpool once set.
 			 */
 			gvname.mvtype = MV_STR;
 			gvname.str.addr = varname->buf_addr + 1;	/* Point past '^' to var name */
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
-			COPY_PARMS_TO_CALLG_BUFFER(count, FALSE);	/* Set up plist for callg invocation of op_putindx */
-			callg((callgfnptr)op_gvname, &plist);		/* Drive op_gvname() to create key */
-			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for op_gvput() */
+			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
+			COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, FALSE);
+			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
+			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */
 			break;
 		case LYDB_VARREF_ISV:

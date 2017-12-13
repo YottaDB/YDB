@@ -21,7 +21,7 @@ GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	need_core;
 
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
- * is basically returned to the user as the negative of the errror to differentiate those errors from positive (success
+ * is basically returned to the user as the negative of the error to differentiate those errors from positive (success
  * or informative) return codes of this API.
  */
 CONDITION_HANDLER(ydb_simpleapi_ch)
@@ -34,7 +34,10 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		need_core = TRUE;
 		gtm_fork_n_core();
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
+	/* The mstrs that were part of the current ydb_*_s() call and were being protected from "stp_gcol" through a global
+	 * array no longer need that protection since we are about to exit from the ydb_*_s() call. So clear the global array index.
+	 */
+	TREF(sapi_mstrs_for_gc_indx) = 0;
 	error_loc.addr = "error at xxx";
 	error_loc.len = strlen(error_loc.addr);
 	set_zstatus(&error_loc, arg, NULL, FALSE);
