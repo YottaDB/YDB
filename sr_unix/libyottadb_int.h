@@ -19,6 +19,8 @@
 #include "libyottadb.h"
 #include "ydbmerrors.h"
 #include "toktyp.h"
+#include "nametabtyp.h"
+#include "compiler.h"	/* needed for funsvn.h */
 #include "funsvn.h"
 #include "error.h"
 #include "send_msg.h"
@@ -31,13 +33,12 @@ LITREF nametabent	svn_names[];
 LITREF unsigned char	svn_index[];
 LITREF svn_data_type	svn_data[];
 
-GBLREF stack_frame	*frame_pointer;
-
 typedef enum
 {
-	LYDB_RTN_GET = 1,		/* ydb_get_s() is running */
-	LYDB_RTN_SET,			/* ydb_set_s() is running */
-	LYDB_RTN_ZSTATUS		/* ydb_zstatus_s() is running */
+	LYDB_RTN_GET = 1,		/* "ydb_get_s" is running */
+	LYDB_RTN_SET,			/* "ydb_set_s" is running */
+	LYDB_RTN_ZSTATUS,		/* "ydb_zstatus_s" is running */
+	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
 } libyottadb_routines;
 
 typedef enum
@@ -52,7 +53,9 @@ typedef enum
 #define LIBYOTTADB_INIT(ROUTINE)										\
 MBSTART	{													\
 	int		status;											\
-	boolean_t	error_encountered;									\
+														\
+	GBLREF	stack_frame	*frame_pointer;									\
+	GBLREF 	boolean_t	gtm_startup_active;								\
 														\
 	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
 	 * API calls.	      	 	    	       	   		     	       	       			\
@@ -74,12 +77,6 @@ MBSTART	{													\
 	}		       											\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */				\
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);							\
-	if (error_encountered)											\
-	{													\
-		REVERT;												\
-		return -(TREF(ydb_error_code));									\
-	}													\
 	assert(MAX_LVSUBSCRIPTS == MAX_GVSUBSCRIPTS);	/* Verify so equating YDB_MAX_SUBS to MAX_LVSUBSCRIPTS	\
 							 * doesn't cause us a problem.				\
 							 */							\
@@ -190,6 +187,8 @@ MBSTART {															\
 	boolean_t	added;													\
 	lv_val		*lv;													\
 																\
+	GBLREF	symval		*curr_symval;											\
+																\
 	(VARMNAMEP)->var_name.addr = (VARNAMEP)->buf_addr;	/* Load up the imbedded varname with our base var name */	\
 	(VARMNAMEP)->var_name.len = (VARNAMEP)->len_used;	   	       			     	      	       		\
 	s2pool(&(VARMNAMEP)->var_name);		/* Rebuffer in stringpool for protection */					\
@@ -226,7 +225,7 @@ MBSTART	{													\
 } MBEND
 
 /* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
-#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, REBUFFER)										\
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, PLIST, PLIST_MVALS, REBUFFER)								\
 MBSTART	{															\
 	mval		*mvalp;													\
 	void		**parmp, **parmp_top;											\
@@ -235,7 +234,7 @@ MBSTART	{															\
 				 												\
 	/* Now for each subscript */												\
 	VAR_START(var, varname);												\
-	for (parmp = &plist.arg[1], parmp_top = parmp + (COUNT), mvalp = &plist_mvals[0]; parmp < parmp_top; parmp++, mvalp++)	\
+	for (parmp = &PLIST.arg[1], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0]; parmp < parmp_top; parmp++, mvalp++)	\
 	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer */	    	     		\
 		subval = va_arg(var, ydb_buffer_t *);	       	    	       	   	     	    				\
 		if (NULL != subval)		  										\
@@ -255,7 +254,7 @@ MBSTART	{															\
 		}				    		 								\
 		*parmp = mvalp;													\
 	}	       	 													\
-	plist.n = (COUNT) + 1;			/* Bump to include varname in parms */						\
+	PLIST.n = (COUNT) + 1;			/* Bump to include varname in parms */						\
 	va_end(var);														\
 } MBEND
 

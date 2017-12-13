@@ -21,7 +21,6 @@
 #include "op.h"
 #include "error.h"
 #include "nametabtyp.h"
-#include "compiler.h"
 #include "namelook.h"
 #include "stringpool.h"
 #include "libyottadb_int.h"
@@ -32,10 +31,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 
-GBLREF 	boolean_t	gtm_startup_active;
-GBLREF	symval		*curr_symval;
-GBLREF	gv_namehead	*gv_target;
-
 /* Routine to get local, global and ISV values
  *
  * Parameters:
@@ -44,26 +39,32 @@ GBLREF	gv_namehead	*gv_target;
  *   varname - Gives name of local, global or ISV variable
  *   subscrN - a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
  *
- * Note unlike ydb_set_s(), none of the inputs varname/subscript inputs need rebuffering in this routine
+ * Note unlike "ydb_set_s", none of the inputs varname/subscript inputs need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
 int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 {
-	char		chr;
-	ydb_var_types	get_type;
-	int		get_svn_index, i;
-	lv_val		*lvvalp, *src_lv;
-	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	boolean_t	error_encountered;
 	boolean_t	gotit;
 	gparam_list	plist;
-	mname_entry	var_mname;
 	ht_ent_mname	*tabent;
+	int		get_svn_index;
+	lv_val		*lvvalp, *src_lv;
+	mname_entry	var_mname;
+	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_var_types	get_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Verify entry conditions, make sure YDB CI environment is up, ESTABLISH error handler, etc */
-	LIBYOTTADB_INIT(LYDB_RTN_GET);
+	/* Verify entry conditions, make sure YDB CI environment is up etc. */
+	LIBYOTTADB_INIT(LYDB_RTN_GET);	/* Note: macro could "return" from this function in case of errors */
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{
+		REVERT;
+		return -(TREF(ydb_error_code));
+	}
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, get_type, get_svn_index);
 	if (0 > count)
@@ -77,20 +78,21 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
-			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val */
+			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val in curr_symval */
 			if (0 == count)
 				/* If no parameters, this is where to fetch the value from (if it exists) */
 				src_lv = lvvalp;
 
 			else
 			{	/* We have some subscripts - load the varname and the subscripts into our array for callg so
-				 * we can drive op_putindx() to locate the mval associated with those subscripts that need to
-				 * be set. Note op_getindx() raises ERR_UNDEF if node is not found. Note that even if a node
+				 * we can drive "op_putindx" to locate the mval associated with those subscripts that need to
+				 * be set. Note "op_getindx" raises ERR_UNDEF if node is not found. Note that even if a node
 				 * is found, it may not have a value associated with it which we need to detect and raise
 				 * an UNDEF error for.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
-				COPY_PARMS_TO_CALLG_BUFFER(count, TRUE);	/* Setup for callg invocation of op_getindx */
+				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
+				COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, TRUE);
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(lvvalp))
@@ -99,9 +101,9 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Fetch the given global variable value. We do this by:
-			 *   1. Drive op_gvname() with the global name and all subscripts to setup the key we need to access
+			 *   1. Drive "op_gvname" with the global name and all subscripts to setup the key we need to access
 			 *      the global node.
-			 *   2. Drive op_gvget() to fetch the value if the root exists (else drive an undef error).
+			 *   2. Drive "op_gvget" to fetch the value if the root exists (else drive an undef error).
 			 *
 			 * Note no need to rebuffer any of the inputs here as they won't live in the stringpool once set.
 			 */
@@ -109,8 +111,9 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			gvname.str.addr = varname->buf_addr + 1;	/* Point past '^' to var name */
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
-			COPY_PARMS_TO_CALLG_BUFFER(count, FALSE);	/* Set up plist for callg invocation of op_putindx */
-			callg((callgfnptr)op_gvname, &plist);		/* Drive op_gvname() to create key */
+			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
+			COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, FALSE);
+			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
 									 * if value not found (and undef_inhibit not set)
 									 */
