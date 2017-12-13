@@ -114,7 +114,8 @@ int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
 
-/* Simple Interface routine declarations */
+/* Simple API routine declarations */
+int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 
 #endif /* LIBYOTTADB_TYPES_H */
