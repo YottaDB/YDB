@@ -139,9 +139,6 @@ CONDITION_HANDLER(tp_restart_ch)
 	UNWIND(NULL, NULL);
 }
 
-/* Note that adding a new rts_error in "tp_restart" might need a change to the INVOKE_RESTART macro in tp.h and
- * TPRESTART_ARG_CNT in errorsp.h. See comment in tp.h for INVOKE_RESTART macro for the details.
- */
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	unsigned char		*cp;

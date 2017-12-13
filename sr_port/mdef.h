@@ -553,6 +553,9 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
 		TPNOTACID_CHECK(NOTACID);										\
 } MBEND
+
+#define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
+
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)

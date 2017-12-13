@@ -76,7 +76,6 @@ MBSTART	{													\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */				\
 	assert(MAX_LVSUBSCRIPTS == MAX_GVSUBSCRIPTS);	/* Verify so equating YDB_MAX_SUBS to MAX_LVSUBSCRIPTS	\
 							 * doesn't cause us a problem.				\
 							 */							\

@@ -26,6 +26,8 @@
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0			/* Successful return code */
+#define	YDB_TP_RESTART	1			/* TODO: Should this be a very high number or is it ok for it to be close to 0 */
+#define	YDB_TP_ROLLBACK	2			/* TODO: Should this be a very high number or is it ok for it to be close to 0 */
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
@@ -113,10 +115,6 @@ void		gtm_xcfileid_free(ydb_fileid_ptr_t fileid);
 int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
-
-#define	YDB_OK		0
-#define	YDB_RESTART	1
-#define	YDB_ROLLBACK	2
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfn_parm);
 

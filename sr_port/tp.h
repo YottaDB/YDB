@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -831,8 +834,6 @@ typedef enum
 #  define TP_ASSERT_ZTRIGGER_CYCLE_STATUS
 # endif	/* #ifdef DEBUG */
 #endif	/* #ifdef GTM_TRIGGER */
-
-#define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
 
 /* the following macros T_BEGIN_READ_NONTP_OR_TP and T_BEGIN_SETORKILL_NONTP_OR_TP are similar except for one difference
  * which is that for the SETORKILL case, sgm_info_ptr->update_trans needs to be set. They need to be maintained
