@@ -64,7 +64,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	if (error_encountered)
 	{
 		REVERT;
-		return -(TREF(ydb_error_code));
+		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, get_type, get_svn_index);

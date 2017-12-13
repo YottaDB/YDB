@@ -16,6 +16,8 @@
 
 #include "error.h"
 
+#define	ERROR_LOC_LIT	"error at xxx"		/* STEVETODO : come up with some way to signal where the error occurred */
+
 GBLREF	boolean_t	dont_want_core;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	need_core;
@@ -38,8 +40,8 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	 * array no longer need that protection since we are about to exit from the ydb_*_s() call. So clear the global array index.
 	 */
 	TREF(sapi_mstrs_for_gc_indx) = 0;
-	error_loc.addr = "error at xxx";
-	error_loc.len = strlen(error_loc.addr);
+	error_loc.addr = ERROR_LOC_LIT;
+	error_loc.len = STR_LIT_LEN(ERROR_LOC_LIT);
 	set_zstatus(&error_loc, arg, NULL, FALSE);
 	TREF(ydb_error_code) = arg;	/* Record error code for caller */
 	UNWIND(NULL, NULL); 		/* Return back to ESTABLISH_NORET() in caller */

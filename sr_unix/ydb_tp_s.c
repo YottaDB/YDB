@@ -47,57 +47,66 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	op_tstart(IMPLICIT_TSTART, TRUE, &literal_batch, 0);
 	assert(dollar_tlevel);
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	tpfn_status = YDB_OK;
 	if (error_encountered)
-	{	/* If we reach here, it means an error occurred and "ydb_simpliapi_ch" was invoked which did a "longjmp"/"UNWIND" */
-		if (ERR_TPRETRY != SIGNAL)
+	{	/* If we reach here, it means an error occurred and "ydb_simpleapi_ch" was invoked which did a "longjmp"/"UNWIND" */
+		tpfn_status = TREF(ydb_error_code);
+		assert(0 < tpfn_status);
+		if (ERR_TPRETRY == tpfn_status)
 		{
-			REVERT;
-			return -(TREF(ydb_error_code));
-		}
-		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
-		/* If we reach here, it means we have a TPRETRY error from the database engine */
-		if (save_dollar_tlevel)
-		{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
-			 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
+			assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
+			/* If we reach here, it means we have a TPRETRY error from the database engine */
+			if (save_dollar_tlevel)
+			{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
+				 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
+				 */
+				REVERT;
+				return YDB_TP_RESTART;
+			}
+			/* This is the outermost "ydb_tp_s" invocation. Do restart processing right here.
+			 * But before restarting the transaction cleanup database state of the partially completed transaction
+			 * using "preemptive_db_clnup". This is normally done by "mdb_condition_handler" in the case of YottaDB
+			 * runtime (since a TPRETRY is also an error) but that is not invoked by the simpleAPI and so we need this.
 			 */
-			REVERT;
-			return YDB_TP_RESTART;
+			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		}
-		/* This is the outermost "ydb_tp_s" invocation. Do restart processing right here.
-		 * The below code is very similar to that in "gvcst_put" for "tp_restart" handling.
-		 */
-		preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
-		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 	}
-	tpfn_status = (*tpfn)(tpfn_parm);
-	if (YDB_TP_RESTART == tpfn_status)
-	{	/* The user function has asked us to do a TP restart. Do it by issuing a TPRETRY error which will
-		 * invoke "ydb_simpliapi_ch" and transfer control to the "if (error_encountered)" block above.
+	if (YDB_OK == tpfn_status)
+	{
+		tpfn_status = (*tpfn)(tpfn_parm);
+		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
+	}
+	if (YDB_OK == tpfn_status)
+		op_tcommit();
+	else if (YDB_TP_RESTART == tpfn_status)
+	{	/* Need to do an implicit or explicit TP restart. Do it by issuing a TPRETRY error which will
+		 * invoke "ydb_simpleapi_ch" and transfer control to the "if (error_encountered)" block above.
 		 */
 		INVOKE_RESTART;
-	} else if (YDB_TP_ROLLBACK == tpfn_status)
-	{	/* The user function has asked us to do a TROLLBACK */
+		assert(FALSE);	/* control should never reach here */
+	} else
+	{	/* Some other error. Pass the error code back to user code (caller of "ydb_tp_s") */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
-		if (save_dollar_tlevel)
-		{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
-			 * So pass the TROLLBACK to the caller until we go back to the outermost "ydb_tp_s" invocation.
+		if (!save_dollar_tlevel)
+		{	/* This is the outermost "ydb_tp_s" invocation. Rollback the transaction and pass the error to user code.
+			 * See comment above about "preemptive_db_clnup" for why it is needed.
 			 */
-			REVERT;
-			return YDB_TP_ROLLBACK;
+			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+			OP_TROLLBACK(0);
+			assert(!dollar_tlevel);
+		} else
+		{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
+			 * So bubble the error back to the caller until we go back to the outermost "ydb_tp_s" invocation.
+			 */
 		}
-		/* This is the outermost "ydb_tp_s" invocation. Do rollback processing right here. */
-		OP_TROLLBACK(0);
-		assert(!dollar_tlevel);
-		REVERT;
-		return YDB_TP_ROLLBACK;
 	}
-	op_tcommit();
-	/* TODO; Check return value of op_tstart */
-	/* TODO; Pass TID */
-	/* TODO; Pass list of variable names to preserve */
-	/* TODO; Check return value of tpfn */
-	/* TODO; Check return value of op_tcommit */
-	/* TODO; (from updproc.c) : memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE); */
+	/* NARSTODO; Check return value of op_tstart */
+	/* NARSTODO; Pass TID */
+	/* NARSTODO; Pass list of variable names to preserve */
+	/* NARSTODO; Check return value of tpfn */
+	/* NARSTODO; Check return value of op_tcommit */
+	/* NARSTODO; (from updproc.c) : memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE); */
 	REVERT;
-	return YDB_OK;
+	return tpfn_status;
 }
