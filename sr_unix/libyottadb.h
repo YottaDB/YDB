@@ -25,9 +25,12 @@
 #define YDB_MAX_IDENT	MAX_MIDENT_LEN		/* Maximum size of global/local name (not including '^') */
 
 /* Non-error return codes (all positive) */
-#define YDB_OK		0			/* Successful return code */
-#define	YDB_TP_RESTART	1			/* TODO: Should this be a very high number or is it ok for it to be close to 0 */
-#define	YDB_TP_ROLLBACK	2			/* TODO: Should this be a very high number or is it ok for it to be close to 0 */
+#define YDB_OK		0		/* Successful return code */
+/* Keep the below YDB_* macros a very high positive error # to avoid intersection
+ * with system errors #s (e.g. EINTR etc. all of which are mostly <= 1024).
+ */
+#define	YDB_TP_RESTART	MAXINT4 - 1
+#define	YDB_TP_ROLLBACK	MAXINT4 - 2
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
