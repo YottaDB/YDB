@@ -26,25 +26,36 @@
 #include "stringpool.h"
 #include "libyottadb_int.h"
 #include "libydberrors.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 
 GBLREF 	boolean_t	gtm_startup_active;
 GBLREF	symval		*curr_symval;
+GBLREF	gv_namehead	*gv_target;
 
-/* Routine to set local, global and ISV values
+/* Routine to get local, global and ISV values
  *
  * Parameters:
- *   value   - Value to be set into local/global/ISV
+ *   value   - Value fetched from local/global/ISV variable stored here (if room)
  *   count   - Count of subscripts (if any else 0)
  *   varname - Gives name of local, global or ISV variable
  *   subscrN - a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *
+ * Note unlike ydb_set_s(), none of the inputs varname/subscript inputs need rebuffering in this routine
+ * as they are not ever being used to create a new node or are otherwise kept for any reason by the
+ * YottaDB runtime routines.
  */
-int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
+int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 {
 	char		chr;
-	ydb_var_types	set_type;
-	int		set_svn_index, i;
-	lv_val		*lvvalp, *dst_lv;
-	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_var_types	get_type;
+	int		get_svn_index, i;
+	lv_val		*lvvalp, *src_lv;
+	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	boolean_t	gotit;
 	gparam_list	plist;
 	mname_entry	var_mname;
 	ht_ent_mname	*tabent;
@@ -52,46 +63,47 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up, ESTABLISH error handler, etc */
-	LIBYOTTADB_INIT(LYDB_RTN_SET);
+	LIBYOTTADB_INIT(LYDB_RTN_GET);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, set_type, set_svn_index);
+	VALIDATE_VARNAME(varname, get_type, get_svn_index);
 	if (0 > count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	VALIDATE_VALUE(value);			/* Value must exist for SET */
-	/* Separate actions depending on the type of SET being done */
-	switch(set_type)
+	if ((NULL == value) || (NULL == value->buf_addr) || (0 == value->len_alloc))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOGETBUFFER);
+	/* Separate actions depending on type of GET being done */
+	switch(get_type)
 	{
 		case LYDB_VARREF_LOCAL:
-			/* Set the given local variable with the given value.
-			 *
-			 * Note need to rebuffer EVERYTHING - the varname, subscripts and of course value are all potentially
-			 * copied via saving name and address.
-			 */
+			/* Get the given local variable value storing it in the provided buffer (if it fits) */
 			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val */
 			if (0 == count)
-				/* If no parameters, this is where to store the value */
-				dst_lv = lvvalp;
+				/* If no parameters, this is where to fetch the value from (if it exists) */
+				src_lv = lvvalp;
+
 			else
 			{	/* We have some subscripts - load the varname and the subscripts into our array for callg so
 				 * we can drive op_putindx() to locate the mval associated with those subscripts that need to
-				 * be set.
+				 * be set. Note op_getindx() raises ERR_UNDEF if node is not found. Note that even if a node
+				 * is found, it may not have a value associated with it which we need to detect and raise
+				 * an UNDEF error for.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
-				COPY_PARMS_TO_CALLG_BUFFER(count, TRUE);	/* Setup for callg invocation of op_putindx */
-				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
+				COPY_PARMS_TO_CALLG_BUFFER(count, TRUE);	/* Setup for callg invocation of op_getindx */
+				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
-			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
-			s2pool(&(dst_lv->v.str));			/* Rebuffer in stringpool for protection */
-			RECORD_MSTR_FOR_GC(&(dst_lv->v.str));
+			if (!LV_IS_VAL_DEFINED(lvvalp))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNDEF);
+			SET_BUFFER_FROM_LVVAL_VALUE(value, src_lv);		/* Copy value to return buffer */
 			break;
 		case LYDB_VARREF_GLOBAL:
-			/* Set the given global variable with the given value. We do this by:
+			/* Fetch the given global variable value. We do this by:
 			 *   1. Drive op_gvname() with the global name and all subscripts to setup the key we need to access
 			 *      the global node.
-			 *   2. Drive op_gvput() to place value into target global node
-			 * Note no need to rebuffer the inputs here as they won't live in the stringpool once set.
+			 *   2. Drive op_gvget() to fetch the value if the root exists (else drive an undef error).
+			 *
+			 * Note no need to rebuffer any of the inputs here as they won't live in the stringpool once set.
 			 */
 			gvname.mvtype = MV_STR;
 			gvname.str.addr = varname->buf_addr + 1;	/* Point past '^' to var name */
@@ -99,23 +111,20 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			plist.arg[0] = &gvname;
 			COPY_PARMS_TO_CALLG_BUFFER(count, FALSE);	/* Set up plist for callg invocation of op_putindx */
 			callg((callgfnptr)op_gvname, &plist);		/* Drive op_gvname() to create key */
-			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for op_gvput() */
-			op_gvput(&set_value);				/* Save the global value */
+			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
+									 * if value not found (and undef_inhibit not set)
+									 */
+			assert(gotit);
+			SET_BUFFER_FROM_LVVAL_VALUE(value, &get_value);
 			break;
 		case LYDB_VARREF_ISV:
-			/* Set the given ISV (subscripts not currently supported) with the given value.
-			 *
-			 * Note need to rebuffer the input value as the addr/length are directly copied in many cases.
-			 */
-			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Setup mval with target value */
-			s2pool(&set_value.str);				/* Rebuffer in stringpool for protection */
-			RECORD_MSTR_FOR_GC(&set_value.str);
-			op_svput(set_svn_index, &set_value);
+			/* Fetch the given ISV value (no subscripts supported) */
+			op_svget(get_svn_index, &get_value);
+			SET_BUFFER_FROM_LVVAL_VALUE(value, &get_value);
 			break;
 		default:
 			assertpro(FALSE);
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
 }

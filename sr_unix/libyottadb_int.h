@@ -35,23 +35,24 @@ GBLREF stack_frame	*frame_pointer;
 
 typedef enum
 {
-	LYDB_RTN_GET = 1,	/* ydb_get_s() is running */
-	LYDB_RTN_SET,		/* ydb_set_s() is running */
-	LYDB_RTN_ZSTATUS	/* ydb_zstatus_s() is running */
+	LYDB_RTN_GET = 1,		/* ydb_get_s() is running */
+	LYDB_RTN_SET,			/* ydb_set_s() is running */
+	LYDB_RTN_ZSTATUS		/* ydb_zstatus_s() is running */
 } libyottadb_routines;
 
 typedef enum
 {
-	LYDB_SET_INVALID = 0,	/* Varname is invalid */
-	LYDB_SET_GLOBAL,	/* Setting a global variable */
-	LYDB_SET_LOCAL,		/* Setting a local variable */
-	LYDB_SET_ISV		/* Setting an ISV (Intrinsic Special Variable) */
-} ydb_set_types;
+	LYDB_VARREF_INVALID = 0,	/* Varname is invalid */
+	LYDB_VARREF_GLOBAL,		/* Referencing a global variable */
+	LYDB_VARREF_LOCAL,		/* Referencing a local variable */
+	LYDB_VARREF_ISV			/* Referencing an ISV (Intrinsic Special Variable) */
+} ydb_var_types;
 
 /* Initialization macro for most simpleAPI calls */
 #define LIBYOTTADB_INIT(ROUTINE)										\
 MBSTART	{													\
-	int	status;												\
+	int		status;											\
+	boolean_t	error_encountered;									\
 														\
 	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
 	 * API calls.	      	 	    	       	   		     	       	       			\
@@ -151,7 +152,7 @@ MBSTART {														\
 		case TK_CIRCUMFLEX:											\
 			if (YDB_MAX_IDENT < ((VARNAMEP)->len_used - 1))							\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
-			VARTYPE = LYDB_SET_GLOBAL;									\
+			VARTYPE = LYDB_VARREF_GLOBAL;									\
 			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
 			break;				      	   		      					\
 		case TK_LOWER:												\
@@ -159,11 +160,11 @@ MBSTART {														\
 		case TK_PERCENT: 											\
 			if (YDB_MAX_IDENT < (VARNAMEP)->len_used)							\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
-			VARTYPE = LYDB_SET_LOCAL;									\
+			VARTYPE = LYDB_VARREF_LOCAL;									\
 			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
 			break;												\
 		case TK_DOLLAR:												\
-			VARTYPE = LYDB_SET_ISV;										\
+			VARTYPE = LYDB_VARREF_ISV;										\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
 			if (-1 == index) 	     			     						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
@@ -200,18 +201,28 @@ MBSTART {															\
 	if (NULL == (VARTABENTP)->value)											\
 	{	    														\
 		assert(added);													\
-		lv_newname(tabent, curr_symval);										\
+		lv_newname((VARTABENTP), curr_symval);										\
 	}							 	      	  						\
-	assert(NULL != LV_GET_SYMVAL((lv_val *)tabent->value));									\
+	assert(NULL != LV_GET_SYMVAL((lv_val *)(VARTABENTP)->value));								\
 	VARLVVALP = (VARTABENTP)->value;											\
 } MBEND
 
 /* Macro to set a supplied ydb_buffer_t value into an mval/lv_val */
-#define SET_LVVAL_VALUE_FROM_BUFFER(LVVALP, BUFVALUE)						\
-MBSTART	{											\
-	((mval *)(LVVALP))->mvtype = MV_STR;							\
-	((mval *)(LVVALP))->str.addr = (BUFVALUE)->buf_addr;					\
-	((mval *)(LVVALP))->str.len = (BUFVALUE)->len_used;					\
+#define SET_LVVAL_VALUE_FROM_BUFFER(LVVALP, BUFVALUE)				\
+MBSTART	{									\
+	((mval *)(LVVALP))->mvtype = MV_STR;					\
+	((mval *)(LVVALP))->str.addr = (BUFVALUE)->buf_addr;			\
+	((mval *)(LVVALP))->str.len = (BUFVALUE)->len_used;			\
+} MBEND
+
+/* Macro to set a supplied ydb_buffer_t value from a supplied mval/lv_val */
+#define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)								\
+MBSTART	{													\
+	if (((mval *)(LVVALP))->str.len > (BUFVALUE)->len_alloc)						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);					\
+	if (0 < ((mval *)(LVVALP))->str.len)									\
+		memcpy((BUFVALUE)->buf_addr, ((mval *)(LVVALP))->str.addr, ((mval *)(LVVALP))->str.len);	\
+	(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;							\
 } MBEND
 
 /* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
@@ -219,6 +230,8 @@ MBSTART	{											\
 MBSTART	{															\
 	mval		*mvalp;													\
 	void		**parmp, **parmp_top;											\
+	ydb_buffer_t	*subval;												\
+	va_list		var;													\
 				 												\
 	/* Now for each subscript */												\
 	VAR_START(var, varname);												\
