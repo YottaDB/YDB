@@ -20,4 +20,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* READONLYLKFAIL */
 	   0,	/* VARNAMEINVALID */
 	   0,	/* VALUEINVALID */
+	   0,	/* NOGETBUFFER */
 	};

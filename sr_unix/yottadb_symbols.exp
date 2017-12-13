@@ -5,6 +5,7 @@ ydb_ci
 ydb_cij
 ydb_cip
 ydb_exit
+ydb_get_s
 ydb_set_s
 ydb_zstatus
 gtm_jinit
