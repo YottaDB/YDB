@@ -60,9 +60,6 @@
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
 
-/* Count of arguments the TPRETRY error will make available for tp_restart to use */
-#define TPRESTART_ARG_CNT 6
-
 typedef void	ch_ret_type;
 
 /* Note that the condition_handler structure layout is relied upon by assembly code (see chnd_size, chnd_* in error.si).

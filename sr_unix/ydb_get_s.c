@@ -59,6 +59,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_GET);	/* Note: macro could "return" from this function in case of errors */
+	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -128,6 +129,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 		default:
 			assertpro(FALSE);
 	}
+	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
 }
