@@ -675,6 +675,8 @@ foreach(f
   gtmgblstat.xc
   gtmxc_types.h
   libyottadb.h
+  libydberrors.h
+  libydberrors2.h
   main_pragma.h
   arch.gtc
   gtcm_run.gtc
