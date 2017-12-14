@@ -21,8 +21,8 @@
 #include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
 
 /* Maximum values */
-#define YDB_MAX_SUBS	MAX_LVSUBSCRIPTS	/* Maximum subscripts currently supported */
-#define YDB_MAX_IDENT	MAX_MIDENT_LEN		/* Maximum size of global/local name (not including '^') */
+#define YDB_MAX_SUBS	31	/* Maximum subscripts currently supported */
+#define YDB_MAX_IDENT	31	/* Maximum size of global/local name (not including '^') */
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
@@ -33,6 +33,17 @@
 #define YDB_INT_MAX	((int)2147483647)
 #define	YDB_TP_RESTART	(YDB_INT_MAX - 1)
 #define	YDB_TP_ROLLBACK	(YDB_INT_MAX - 2)
+
+/* Miscellaneous defines */
+#ifndef TRUE
+#  define TRUE 1
+#endif
+#ifndef FALSE
+#  define FALSE 0
+#endif
+#ifndef NULL
+#  define NULL ((void *)0)
+#endif
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.

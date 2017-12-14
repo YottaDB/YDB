@@ -76,10 +76,6 @@ MBSTART	{													\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	assert(MAX_LVSUBSCRIPTS == MAX_GVSUBSCRIPTS);	/* Verify so equating YDB_MAX_SUBS to MAX_LVSUBSCRIPTS	\
-							 * doesn't cause us a problem.				\
-							 */							\
-	assert(MAX_ACTUALS <= YDB_MAX_SUBS);		/* Make sure gparam_list is big enuf */			\
 } MBEND
 
 /* Macros to promote checking an mname as being a valid mname. There are two flavors - one where
@@ -223,6 +219,32 @@ MBSTART	{													\
 	(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;							\
 } MBEND
 
+/* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
+ * set DEBUG_LIBYOTTADB *prior* to including libyottadb_int.h
+ */
+#ifdef DEBUG_LIBYOTTADB
+#define DBG_DUMP_PLIST_STRUCT(PLIST)												\
+MBSTART	{															\
+	int		idx;													\
+	void		**parmp, **parmp_top;											\
+																\
+	printf("\n******** Dump of parameter list structure passed to runtime opcodes:\n");					\
+	fflush(stdout);														\
+	/* Note, skip the first entry as that is the lv_val address of the base var being referenced */				\
+	for (idx = 1, parmp = &PLIST.arg[1], parmp_top = parmp + PLIST.n - 1; parmp < parmp_top; idx++, parmp++)		\
+	{															\
+		printf("Index %d - parmp: 0x%08lx, parmp_top: 0x%08lx,  ", idx, (gtm_uint8)parmp, (gtm_uint8)parmp_top);	\
+		printf("mval (type %d) value: %.*s\n", ((mval *)(*parmp))->mvtype, ((mval *)(*parmp))->str.len,			\
+		       ((mval *)(*parmp))->str.addr);										\
+		fflush(stdout); \
+	}															\
+	printf("******** End of dump\n");											\
+	fflush(stdout);														\
+} MBEND
+#else
+#define DBG_DUMP_PLIST_STRUCT(PLIST)
+#endif
+
 /* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
 #define COPY_PARMS_TO_CALLG_BUFFER(COUNT, PLIST, PLIST_MVALS, REBUFFER)								\
 MBSTART	{															\
@@ -253,8 +275,9 @@ MBSTART	{															\
 		}				    		 								\
 		*parmp = mvalp;													\
 	}	       	 													\
-	PLIST.n = (COUNT) + 1;			/* Bump to include varname in parms */						\
+	PLIST.n = (COUNT) + 1;			/* Bump to include varname lv_val as 2nd parm (after count) */			\
 	va_end(var);														\
+	DBG_DUMP_PLIST_STRUCT(PLIST);												\
 } MBEND
 
 /* Macro to record the address of a given mstr so garbage collection knows where to find it to fix it up if needbe */

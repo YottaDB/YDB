@@ -15,6 +15,8 @@
 #include "gtm_string.h"
 #include <stdarg.h>
 
+/* #define DEBUG_LIBYOTTADB	/ * Uncomment to enable debugging - must be set prior to include of libyottadb.h */
+
 #include "lv_val.h"
 #include "hashtab_mname.h"
 #include "callg.h"
@@ -96,7 +98,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 				COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, TRUE);
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
-			if (!LV_IS_VAL_DEFINED(lvvalp))
+			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNDEF);
 			SET_BUFFER_FROM_LVVAL_VALUE(value, src_lv);		/* Copy value to return buffer */
 			break;
