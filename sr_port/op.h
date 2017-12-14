@@ -17,6 +17,7 @@
 #define OP_INCLUDED
 
 #include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
+#include "op_tstart.h"	/* for "op_tstart" prototype */
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
@@ -253,7 +254,6 @@ void	op_trestart(int newlevel);
 }
 
 void	op_trollback(int rb_levels);/*BYPASSOK*/
-void	op_tstart(int implicit_flag, ...);
 void	op_unlock(void);
 void	op_unwind(void);
 void	op_use(mval *v, mval *p);

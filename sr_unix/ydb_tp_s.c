@@ -21,6 +21,7 @@
 #include "cdb_sc.h"
 #include "tp_restart.h"
 #include "preemptive_db_clnup.h"
+#include "stringpool.h"
 
 GBLREF	uint4		dollar_tlevel;
 
@@ -34,19 +35,78 @@ GBLREF	uint4		dollar_tlevel;
  */
 int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpfn, void *tpfn_parm)
 {
-	boolean_t	error_encountered;
+	boolean_t	error_encountered, done;
+	char		*ptr, *ptr_top, *ptr_start;
 	mval		tid;
-	int		rc, save_dollar_tlevel, tpfn_status;
+	int		rc, save_dollar_tlevel, tpfn_status, varnamelist_len, ptr_len;
+	mval		varnamearray[LISTLOCAL_MAXNAMES], *mv;
+	int		varnamearray_len = 0;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_TP);	/* Note: macro could "return" from this function in case of errors */
 	save_dollar_tlevel = dollar_tlevel;
+	/* Ready "transid" for passing to "op_tstart" */
 	tid.mvtype = MV_STR;
-	tid.str.len = transid->len_used;
-	tid.str.addr = transid->buf_addr;
-	op_tstart(IMPLICIT_TSTART, TRUE, &tid, 0);
+	if (NULL == transid)
+		tid.str.len = 0;
+	else
+	{
+		tid.str.len = transid->len_used;
+		tid.str.addr = transid->buf_addr;
+	}
+	/* Ready "varnamelist" for passing to "op_tstart" */
+	if ((NULL == varnamelist) || !varnamelist->len_used)
+		op_tstart(IMPLICIT_TSTART, TRUE, &tid, 0);
+	else if ((1 == varnamelist->len_used) && ('*' == varnamelist->buf_addr[0]))
+	{	/* preserve all local variables */
+		op_tstart(IMPLICIT_TSTART, TRUE, &tid, ALLLOCAL);
+	} else
+	{	/* varnamelist is a comma-separated list of variable names that need to be preserved.
+		 * First do some error checking on input.
+		 */
+		varnamelist_len = 0;
+		for (ptr = varnamelist->buf_addr, ptr_top = ptr + varnamelist->len_used; ptr < ptr_top; ptr++)
+		{
+			if (LISTLOCAL_MAXNAMES == varnamelist_len)
+			{
+				/* NARSTODO: Issue new error where "ydb_tp_s" specifies > 256 variable names to preserve */
+			}
+			mv = &varnamearray[varnamearray_len++];
+			mv->mvtype = MV_STR;
+			ptr_start = ptr;
+			mv->str.addr = ptr_start;
+			done = FALSE;
+			do
+			{
+				if (',' == *ptr)
+					break;
+				ptr++;
+				if (ptr == ptr_top)
+				{
+					done = TRUE;
+					break;
+				}
+			} while (TRUE);
+			mv->str.len = ptr_len = ptr - ptr_start;
+			VALIDATE_MNAME_C1(ptr_start, ptr_len);
+			/* Note the variable name in the stringpool. Needed if this variable does not yet exist in the
+			 * current symbol table, a pointer to this string is added in op_tstart as part of the
+			 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program
+			 * which cannot be assumed to be stable for the rest of the lifetime of this process.
+			 */
+			s2pool(&mv->str);
+			if (!done)
+				continue;
+			break;
+		}
+		/* Now that no errors are detected, pass this array of mvals (containing the names of variables to be preserved)
+		 * to "op_tstart" with a special value (LISTLOCAL) so it knows this format and parses this differently from the
+		 * usual "op_tstart" invocations (where each variable name is a separate mval pointer in a var-args list).
+		 */
+		op_tstart(IMPLICIT_TSTART, TRUE, &tid, LISTLOCAL, varnamearray_len, varnamearray);
+	}
 	assert(dollar_tlevel);
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	tpfn_status = YDB_OK;
@@ -106,12 +166,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 			 */
 		}
 	}
-	/* NARSTODO; Check return value of op_tstart */
-	/* NARSTODO; Pass TID */
 	/* NARSTODO; Pass list of variable names to preserve */
-	/* NARSTODO; Check return value of tpfn */
-	/* NARSTODO; Check return value of op_tcommit */
-	/* NARSTODO; (from updproc.c) : memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE); */
 	REVERT;
 	assert(dollar_tlevel || (YDB_OK == tpfn_status));
 	return tpfn_status;

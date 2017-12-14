@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@
 #include "gtmimagename.h"
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #include "gtmcrypt.h"
+#include "op_tstart.h"
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
@@ -273,7 +274,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			mv.mvtype = MV_STR;
 			mv.str.len = 0;
 			mv.str.addr = NULL;
-			op_tstart(IMPLICIT_TSTART, TRUE, &mv, -1);
+			op_tstart(IMPLICIT_TSTART, TRUE, &mv, NORESTART);
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = 0;)
 			DEBUG_ONLY(forw_recov_lgtrig_only = TRUE;)	/* gets reset later if a non-LGTRIG record is seen */
 		}
