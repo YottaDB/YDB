@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -113,27 +116,26 @@ GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	uint4			update_trans;
 #endif
 
-#define NORESTART -1
-#define ALLLOCAL  -2
 #define TP_STACK_SIZE ((TP_MAX_NEST + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
 
 void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 {
 	boolean_t		serial;			/* whether SERIAL keyword was present */
+	boolean_t		do_presloop;
 	int			prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
 				pres, len;
 	char			*ptr;
 	lv_val			*lv;
 	mlk_pvtblk		*pre_lock;
 	mlk_tp			*lck_tp;
-	mval			*preserve,		/* list of names to save */
+	mval			*preserve, *preserve_array,	/* list of names to save */
 				*tid,			/* transaction id */
 				*mvname;
 	mv_stent		*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame		*fp, *fp_fix;
 	tp_frame		*tf;
 	unsigned char		*old_sp, *top, *tstack_ptr, *ptrstart, *ptrend, *ptrinvalidbegin;
-	va_list			varlst, lvname;
+	va_list			varlst;
 	tp_region		*tr, *tr_next;
 	sgm_info		*si;
 	tlevel_info		*tli, *new_tli, *prev_tli;
@@ -150,6 +152,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	boolean_t		tphold_noshift = FALSE, implicit_tstart;
 	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop, **lvptr;
 	GTMTRIG_ONLY(boolean_t	implicit_trigger;)
+#	ifdef DEBUG
+	va_list			lvname;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -305,17 +310,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	}
 	/* Either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
-	if (prescnt > 0)
-	{
-		VAR_COPY(lvname, varlst);
-		for (pres = 0;  pres < prescnt;  ++pres)
-		{
-			preserve = va_arg(lvname, mval *);
-			assert(MV_IS_STRING(preserve));		/* Check if this loop can be eliminated */
-			MV_FORCE_STR(preserve);
-		}
-		va_end(lvname);
-	}
 	if (NULL == gd_header)
 		gvinit();
 	assert(NULL != gd_header);
@@ -329,7 +323,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		msp -= shift_size;
 		if (msp <= stackwarn)
 		{
-			va_end(varlst);
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
@@ -497,13 +490,35 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;
 	tp_pointer = tf;
+	assert(ALLLOCAL < 0);
+	assert(LISTLOCAL < 0);
+#	ifdef DEBUG
 	if (prescnt > 0)
 	{
-		DBGRFCT((stderr, "\nop_tstart: Beginning processing of varname parameters\n"));
 		VAR_COPY(lvname, varlst);
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
+			assert(MV_IS_STRING(preserve));		/* Check if this loop can be eliminated */
+		}
+		va_end(lvname);
+	}
+#	endif
+	if (LISTLOCAL == prescnt)
+	{
+		prescnt = va_arg(varlst, int);
+		preserve_array = va_arg(varlst, mval *);
+	} else
+		preserve_array = NULL;
+	if (prescnt > 0)
+	{
+		DBGRFCT((stderr, "\nop_tstart: Beginning processing of varname parameters\n"));
+		for (pres = 0;  pres < prescnt;  ++pres)
+		{
+			if (NULL == preserve_array)
+				preserve = va_arg(varlst, mval *);
+			else
+				preserve = &preserve_array[pres];
 			/* Note: the assumption (according to the comment below) is that this mval points into the literal table
 			 * and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to
 			 * do MV_FORCE_STR on these variables. Future todo -- verify if that loop is needed. On the assumption
@@ -542,7 +557,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				}
 			}
 		}
-		va_end(lvname);
 		DBGRFCT((stderr, "\nop_tstart: Completed processing of varname parameters\n"));
 	} else if (ALLLOCAL == prescnt)
 	{	/* Preserve all variables */
