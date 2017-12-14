@@ -61,6 +61,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 				 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
 				 */
 				REVERT;
+				assert(dollar_tlevel);
 				return YDB_TP_RESTART;
 			}
 			/* This is the outermost "ydb_tp_s" invocation. Do restart processing right here.
@@ -70,6 +71,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 			 */
 			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
 		}
 	}
 	if (YDB_OK == tpfn_status)
@@ -78,8 +80,9 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
 	if (YDB_OK == tpfn_status)
+	{
 		op_tcommit();
-	else if (YDB_TP_RESTART == tpfn_status)
+	} else if (YDB_TP_RESTART == tpfn_status)
 	{	/* Need to do an implicit or explicit TP restart. Do it by issuing a TPRETRY error which will
 		 * invoke "ydb_simpleapi_ch" and transfer control to the "if (error_encountered)" block above.
 		 */
@@ -108,5 +111,6 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	/* NARSTODO; Check return value of op_tcommit */
 	/* NARSTODO; (from updproc.c) : memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE); */
 	REVERT;
+	assert(dollar_tlevel || (YDB_OK == tpfn_status));
 	return tpfn_status;
 }

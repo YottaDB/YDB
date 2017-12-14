@@ -26,11 +26,13 @@
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
-/* Keep the below YDB_* macros a very high positive error # to avoid intersection
- * with system errors #s (e.g. EINTR etc. all of which are mostly <= 1024).
+/* Keep the below YDB_* macros a very high positive error # to avoid intersection with system errors #s
+ * (e.g. EINTR etc. all of which are mostly <= 1024). Can use INT_MAX but not sure if that will change
+ * in the future to a higher value in <limits.h> so set YDB_INT_MAX to the hardcoded fixed value of ((2**31)-1).
  */
-#define	YDB_TP_RESTART	MAXINT4 - 1
-#define	YDB_TP_ROLLBACK	MAXINT4 - 2
+#define YDB_INT_MAX	((int)2147483647)
+#define	YDB_TP_RESTART	(YDB_INT_MAX - 1)
+#define	YDB_TP_ROLLBACK	(YDB_INT_MAX - 2)
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
