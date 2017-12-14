@@ -24,8 +24,6 @@
 
 GBLREF	uint4		dollar_tlevel;
 
-LITREF	mval		literal_batch;
-
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
  * Parameters:
@@ -37,6 +35,7 @@ LITREF	mval		literal_batch;
 int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpfn, void *tpfn_parm)
 {
 	boolean_t	error_encountered;
+	mval		tid;
 	int		rc, save_dollar_tlevel, tpfn_status;
 	DCL_THREADGBL_ACCESS;
 
@@ -44,7 +43,10 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_TP);	/* Note: macro could "return" from this function in case of errors */
 	save_dollar_tlevel = dollar_tlevel;
-	op_tstart(IMPLICIT_TSTART, TRUE, &literal_batch, 0);
+	tid.mvtype = MV_STR;
+	tid.str.len = transid->len_used;
+	tid.str.addr = transid->buf_addr;
+	op_tstart(IMPLICIT_TSTART, TRUE, &tid, 0);
 	assert(dollar_tlevel);
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	tpfn_status = YDB_OK;
