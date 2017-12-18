@@ -15,12 +15,14 @@
 #include "gtm_string.h"
 
 #include "error.h"
+#include "error_trap.h"
 
 #define	ERROR_LOC_LIT	"error at xxx"		/* STEVETODO : come up with some way to signal where the error occurred */
 
-GBLREF	boolean_t	dont_want_core;
-GBLREF	boolean_t	created_core;
-GBLREF	boolean_t	need_core;
+GBLREF	boolean_t		dont_want_core;
+GBLREF	boolean_t		created_core;
+GBLREF	boolean_t		need_core;
+GBLREF  dollar_ecode_type 	dollar_ecode;
 
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
  * is basically returned to the user as the negative of the error to differentiate those errors from positive (success
@@ -31,6 +33,8 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	mstr		error_loc;
 
 	START_CH(TRUE);
+	if (ERR_REPEATERROR == SIGNAL)
+		arg = SIGNAL = dollar_ecode.error_last_ecode;	/* Rethrown error. Get primary error code */
 	if ((DUMPABLE) && !SUPPRESS_DUMP)
 	{	/* Fatal errors need to create a core dump */
 		need_core = TRUE;

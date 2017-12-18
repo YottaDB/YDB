@@ -38,7 +38,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	boolean_t	error_encountered, done;
 	char		*ptr, *ptr_top, *ptr_start;
 	mval		tid;
-	int		rc, save_dollar_tlevel, tpfn_status, varnamelist_len, ptr_len;
+	int		rc, save_dollar_tlevel, tpfn_status, varnamelist_len, ptr_len, tstart_flag;
 	mval		varnamearray[LISTLOCAL_MAXNAMES], *mv;
 	int		varnamearray_len = 0;
 	DCL_THREADGBL_ACCESS;
@@ -57,11 +57,12 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 		tid.str.addr = transid->buf_addr;
 	}
 	/* Ready "varnamelist" for passing to "op_tstart" */
+	tstart_flag = IMPLICIT_TSTART | YDB_TP_S_TSTART;
 	if ((NULL == varnamelist) || !varnamelist->len_used)
-		op_tstart(IMPLICIT_TSTART, TRUE, &tid, 0);
+		op_tstart(tstart_flag, TRUE, &tid, 0);
 	else if ((1 == varnamelist->len_used) && ('*' == varnamelist->buf_addr[0]))
 	{	/* preserve all local variables */
-		op_tstart(IMPLICIT_TSTART, TRUE, &tid, ALLLOCAL);
+		op_tstart(tstart_flag, TRUE, &tid, ALLLOCAL);
 	} else
 	{	/* varnamelist is a comma-separated list of variable names that need to be preserved.
 		 * First do some error checking on input.
@@ -105,7 +106,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 		 * to "op_tstart" with a special value (LISTLOCAL) so it knows this format and parses this differently from the
 		 * usual "op_tstart" invocations (where each variable name is a separate mval pointer in a var-args list).
 		 */
-		op_tstart(IMPLICIT_TSTART, TRUE, &tid, LISTLOCAL, varnamearray_len, varnamearray);
+		op_tstart(tstart_flag, TRUE, &tid, LISTLOCAL, varnamearray_len, varnamearray);
 	}
 	assert(dollar_tlevel);
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
@@ -168,6 +169,5 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	}
 	/* NARSTODO; Pass list of variable names to preserve */
 	REVERT;
-	assert(dollar_tlevel || (YDB_OK == tpfn_status));
 	return tpfn_status;
 }

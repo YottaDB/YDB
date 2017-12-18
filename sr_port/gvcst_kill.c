@@ -170,7 +170,7 @@ void	gvcst_kill(boolean_t do_subtree)
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;
-		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);
+		op_tstart((IMPLICIT_TSTART | IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);
 		assert(!donot_INVOKE_MUMTSTART);
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		ESTABLISH_NORET(gvcst_kill_ch, est_first_pass);
