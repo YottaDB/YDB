@@ -753,7 +753,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			/* The bottommost mdb_condition handler better not be catching this restart if we did an implicit
 			 * tstart. mdb_condition_handler will try to unwind further, and the process will inadvertently exit.
 			 */
-			assert((&mdb_condition_handler != ch_at_trigger_init)
+			assert((&mdb_condition_handler != ch_at_trigger_init) || (&ydb_simpleapi_ch == ctxt->ch)
 				|| ((&mdb_condition_handler == ctxt->ch) && (&mdb_condition_handler == chnd[1].ch)
 				     && (!tp_pointer->implicit_tstart || (&chnd[1] < ctxt))));
 			INVOKE_RESTART;
