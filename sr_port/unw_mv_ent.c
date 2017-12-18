@@ -467,10 +467,11 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
 				/* same assert as in gtm_trigger.c */
 				assert(((0 == gtm_trigger_depth)
-						&& (((ch_at_trigger_init == ctxt->ch)
+						&& ((&ydb_simpleapi_ch == ctxt->ch)
+							|| (ch_at_trigger_init == ctxt->ch)
 							|| ((ch_at_trigger_init == (ctxt - 1)->ch)
 								&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-									|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+										|| (&gvcst_spr_kill_ch == ctxt->ch)))))
 					|| ((0 < gtm_trigger_depth)
 						&& (((&mdb_condition_handler == ctxt->ch)
 							|| ((&mdb_condition_handler == (ctxt - 1)->ch)

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,9 @@
 #define IMPLICIT_TRIGGER_TSTART	2	/* This TP frame was implicitly created for a trigger allowing slightly
 					 * different error handling for TP restarts under some conditions. This
 					 * flag is inherited by nested levels.
+					 */
+#define YDB_TP_S_TSTART		4	/* This TP frame was implicitly created by "ydb_tp_s".
+					 * This flag is NOT inherited by nested levels.
 					 */
 
 /* Macro to put a given lv_val on the TP local var restore list for the current tp frame. */
@@ -76,7 +82,11 @@ typedef struct tp_frame_struct
 	unsigned int			implicit_trigger : 1;	/* The implicit tstart is for a trigger which means some minor
 								 * deviations in dealing with TP restarts in some circumstances.
 								 */
-	unsigned int			filler : 24;
+	unsigned int			ydb_tp_s_tstart : 1;	/* This TP frame was set up by a call to "op_tstart"
+								 * from "ydb_tp_s". Used by "gtm_trigger_fini" to know whether to
+								 * do a "op_trollback" or not before returning to caller.
+								 */
+	unsigned int			filler : 23;
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;

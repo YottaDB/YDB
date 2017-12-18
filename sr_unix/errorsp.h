@@ -162,30 +162,37 @@ void ch_trace_point() {return;}
  * if proc_act_type is non-zero we set an error frame flag and getframe instead detours to error_return which deals with
  * the module appropriately.
  */
-#define MUM_TSTART		{												\
-					GBLREF unsigned short	proc_act_type;							\
-					GBLREF int		process_exiting;						\
-																\
-					intrpt_state_t		prev_intrpt_state;						\
-																\
-					assert(!multi_thread_in_use);								\
-					assert(!process_exiting);								\
-					CHTRACEPOINT;										\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
-					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
-					CHECKLOWBOUND(ctxt);									\
-					assert((ctxt->ch == &mdb_condition_handler)						\
-					       && (FALSE == ctxt->save_active_ch->ch_active));					\
-					/* Absolutely critical that this *never* occur hence assertpro() */			\
-					assertpro(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (0 != proc_act_type)	\
-						  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
-					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
-					ctxt->ch_active = FALSE; 								\
-					restart = mum_tstart;									\
-					active_ch = ctxt;									\
-					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
-					longjmp(ctxt->jmp, 1);									\
-				}
+#define MUM_TSTART	{												\
+				GBLREF unsigned short	proc_act_type;							\
+				GBLREF int		process_exiting;						\
+															\
+				intrpt_state_t		prev_intrpt_state;						\
+															\
+				assert(!multi_thread_in_use);								\
+				assert(!process_exiting);								\
+				CHTRACEPOINT;										\
+				if (ctxt->ch == &ydb_simpleapi_ch)							\
+				{	/* The CI environment was created by a simpleAPI call.				\
+					 * Return control back to that by triggering an error.				\
+					 */										\
+					rts_error(VARLSTCNT(1) ERR_REPEATERROR);					\
+					assert(FALSE);	/* the previous rts_error() should not return */		\
+				}											\
+				DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
+				for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
+				CHECKLOWBOUND(ctxt);									\
+				assert((ctxt->ch == &mdb_condition_handler)						\
+				       && (FALSE == ctxt->save_active_ch->ch_active));					\
+				/* Absolutely critical that this *never* occur hence assertpro() */			\
+				assertpro(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (0 != proc_act_type)	\
+					  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
+				DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
+				ctxt->ch_active = FALSE; 								\
+				restart = mum_tstart;									\
+				active_ch = ctxt;									\
+				ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
+				longjmp(ctxt->jmp, 1);									\
+			}
 
 /* Assumed that when this macro is used, interrupts are disabled. One case where that is not done exists which is in
  * sr_unix/gtm_asm_establish.c (called by assembler routines). Once the assembler ESTABLISH macros support doing the

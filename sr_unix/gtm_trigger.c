@@ -618,13 +618,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigprm_last_save = trigprm;
 #		endif
 		/* If this is a spanning node or spanning region update, a spanning node/region condition handler may be ahead.
-		 * However, the handler just behind it should be either mdb_condition_handler or ch_at_trigger_init.
+		 * However, the handler just behind it should be mdb_condition_handler or ch_at_trigger_init or ydb_simpleapi_ch.
 		 */
 		assert(((0 == gtm_trigger_depth)
-				&& (((ch_at_trigger_init == ctxt->ch)
+				&& ((&ydb_simpleapi_ch == ctxt->ch)
+					|| (ch_at_trigger_init == ctxt->ch)
 					|| ((ch_at_trigger_init == (ctxt - 1)->ch)
-						&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-							|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch)))))
 			|| ((0 < gtm_trigger_depth)
 				&& (((&mdb_condition_handler == ctxt->ch)
 					|| ((&mdb_condition_handler == (ctxt - 1)->ch)
@@ -853,8 +854,11 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 				DBGTRIGR((stderr, "gtm_trigger: cannot_commit flag set to TRUE\n"))
 				tp_pointer->cannot_commit = TRUE;
 			}
-			if ((tp_pointer->fp == frame_pointer) && tp_pointer->implicit_tstart)
-				OP_TROLLBACK(-1); /* We just unrolled the implicitly started TSTART so unroll what it did */
+			/* We just unrolled the implicitly started TSTART so unroll what it did. The only exception is if
+			 * this TP frame was created by a call from "ydb_tp_s". In that case, it will do the rollback itself.
+			 */
+			if ((tp_pointer->fp == frame_pointer) && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)
+				OP_TROLLBACK(-1);
 		}
 	}
 	DBGTRIGR((stderr, "gtm_trigger: Unwound to trigger invoking frame: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",

@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -243,7 +246,7 @@ typedef struct gvtr_invoke_parms_struct
 			assert(!jgbl.forw_phase_recovery);									\
 			LCL_TSTART = TRUE;											\
 			 /* 0 ==> save no locals but RESTART OK */ 								\
-			op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
+			op_tstart((IMPLICIT_TSTART | IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
 			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\
 			 * of MVST_TPHOLD type.											\
 			 */													\

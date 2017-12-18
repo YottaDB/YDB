@@ -118,7 +118,7 @@ GBLREF	uint4			update_trans;
 
 #define TP_STACK_SIZE ((TP_MAX_NEST + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
 
-void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
+void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 {
 	boolean_t		serial;			/* whether SERIAL keyword was present */
 	boolean_t		do_presloop;
@@ -159,12 +159,12 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 
 	SETUP_THREADGBL_ACCESS;
 	assert(NULL == reorg_encrypt_restart_csa);
-	implicit_tstart = 0 != (implicit_flag & IMPLICIT_TSTART);
-	GTMTRIG_ONLY(implicit_trigger = 0 != (implicit_flag & IMPLICIT_TRIGGER_TSTART));
+	implicit_tstart = 0 != (tstart_flag & IMPLICIT_TSTART);
+	GTMTRIG_ONLY(implicit_trigger = 0 != (tstart_flag & IMPLICIT_TRIGGER_TSTART));
 	GTMTRIG_ONLY(assert(!implicit_trigger || (implicit_trigger && implicit_tstart)));
 #	if ((defined(GTM_TRIGGER) && defined(DEBUG_TRIGR)) || defined(DEBUG_REFCNT))
-	DBGFPF((stderr, "\n\nop_tstart: Entered - dollar_tlevel: %d, implicit_flag: %d, mpc: 0x"lvaddr"\n", dollar_tlevel,
-		implicit_flag, frame_pointer->mpc));
+	DBGFPF((stderr, "\n\nop_tstart: Entered - dollar_tlevel: %d, tstart_flag: %d, mpc: 0x"lvaddr"\n", dollar_tlevel,
+		tstart_flag, frame_pointer->mpc));
 #	endif
 	assert(dollar_tlevel || implicit_tstart || !update_trans);
 	if (implicit_tstart)
@@ -198,7 +198,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPTOODEEP);
-	va_start(varlst, implicit_flag);	/* no argument count first */
+	va_start(varlst, tstart_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
 	prescnt = va_arg(varlst, int);
@@ -486,6 +486,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		tf->implicit_tstart = tp_pointer->implicit_tstart;
 		GTMTRIG_ONLY(tf->implicit_trigger = tp_pointer->implicit_trigger);
 	}
+	tf->ydb_tp_s_tstart = (0 != (tstart_flag & YDB_TP_S_TSTART));
 	GTMTRIG_ONLY(tf->cannot_commit = FALSE;)
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;

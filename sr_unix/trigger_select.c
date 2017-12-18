@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -640,7 +643,7 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 		 * below after a successful op_tcommit of the trigger select . We cannot check that dollar_tlevel is zero
 		 * since the op_tstart done below can be a nested sub-transaction
 		 */
-		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
+		op_tstart((IMPLICIT_TSTART | IMPLICIT_TRIGGER_TSTART), TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
 		/* The following for loop structure is similar to that in function "trigger_trgfile_tpwrap" and various
 		 * other places so any changes here might need to be reflected there as well.
 		 */
