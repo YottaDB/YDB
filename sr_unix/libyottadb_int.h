@@ -130,7 +130,7 @@ MBSTART {											\
  *
  * Any error in validation results in a return with code YDB_ERR_VARNAMEINVALID.
  */
-#define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX)									\
+#define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE)								\
 MBSTART {														\
 	char	ctype;													\
 	int	index;													\
@@ -156,11 +156,11 @@ MBSTART {														\
 			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
 			break;												\
 		case TK_DOLLAR:												\
-			VARTYPE = LYDB_VARREF_ISV;										\
+			VARTYPE = LYDB_VARREF_ISV;									\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
 			if (-1 == index) 	     			     						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
-			if (!svn_data[index].can_set)									\
+			if (UPDATE && !svn_data[index].can_set)								\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SVNOSET);					\
 			VARINDEX = svn_data[index].opcode;								\
 			break;	   											\

@@ -137,6 +137,7 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfn_parm);
 /* Simple API routine declarations */
 int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
+int ydb_subscript_next_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpfn, void *tpfn_parm);
 
 #endif /* LIBYOTTADB_TYPES_H */

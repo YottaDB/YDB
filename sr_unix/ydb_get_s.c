@@ -69,7 +69,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, get_type, get_svn_index);
+	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
 	if (0 > count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < count)
