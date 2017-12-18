@@ -12,6 +12,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "callg.h"
 #include "op.h"
 #include "libydberrors.h"
@@ -31,9 +33,9 @@ GBLREF	uint4		dollar_tlevel;
  *   transid     - Transaction id
  *   varnamelist - Comma-separated list of variable names that are preserved across restarts in this TP transaction
  *   tpfn        - Pointer to a function that executes user-specified code inside of the TSTART/TCOMMIT fence.
- *   tpfn_parm   - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
+ *   tpfnparm   - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
  */
-int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpfn, void *tpfn_parm)
+int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist)
 {
 	boolean_t	error_encountered, done;
 	char		*ptr, *ptr_top, *ptr_start;
@@ -53,14 +55,14 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 		tid.str.len = 0;
 	else
 	{
-		tid.str.len = transid->len_used;
-		tid.str.addr = transid->buf_addr;
+		tid.str.len = STRLEN(transid);
+		tid.str.addr = (char *)transid;
 	}
 	/* Ready "varnamelist" for passing to "op_tstart" */
 	tstart_flag = IMPLICIT_TSTART | YDB_TP_S_TSTART;
-	if ((NULL == varnamelist) || !varnamelist->len_used)
+	if (NULL == varnamelist)
 		op_tstart(tstart_flag, TRUE, &tid, 0);
-	else if ((1 == varnamelist->len_used) && ('*' == varnamelist->buf_addr[0]))
+	else if (('*' == varnamelist[0]) && ('\0' == varnamelist[1]))
 	{	/* preserve all local variables */
 		op_tstart(tstart_flag, TRUE, &tid, ALLLOCAL);
 	} else
@@ -68,7 +70,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 		 * First do some error checking on input.
 		 */
 		varnamelist_len = 0;
-		for (ptr = varnamelist->buf_addr, ptr_top = ptr + varnamelist->len_used; ptr < ptr_top; ptr++)
+		for (ptr = (char *)varnamelist, ptr_top = ptr + STRLEN(varnamelist); ptr < ptr_top; ptr++)
 		{
 			if (LISTLOCAL_MAXNAMES == varnamelist_len)
 			{
@@ -139,7 +141,7 @@ int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpf
 	}
 	if (YDB_OK == tpfn_status)
 	{
-		tpfn_status = (*tpfn)(tpfn_parm);
+		tpfn_status = (*tpfn)(tpfnparm);
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
 	if (YDB_OK == tpfn_status)
