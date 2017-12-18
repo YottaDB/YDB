@@ -132,12 +132,12 @@ int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
 
-typedef int	(*ydb_tpfnptr_t)(void *tpfn_parm);
+typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
 /* Simple API routine declarations */
 int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
 int ydb_subscript_next_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...);
-int ydb_tp_s(ydb_buffer_t *transid, ydb_buffer_t *varnamelist, ydb_tpfnptr_t tpfn, void *tpfn_parm);
+int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
 
 #endif /* LIBYOTTADB_TYPES_H */
