@@ -40,7 +40,8 @@ typedef enum
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
 	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
-	LYDB_RTN_ZSTATUS,		/* "ydb_zstatus_s" is running */
+	LYDB_RTN_STR2ZWR,		/* "ydb_str2zwr_s" is running */
+	LYDB_RTN_ZWR2STR,		/* "ydb_zwr2str_s" is running */
 } libyottadb_routines;
 
 typedef enum
