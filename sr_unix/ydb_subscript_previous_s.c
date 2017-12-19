@@ -54,13 +54,13 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 	int		get_svn_index;
 	lv_val		*lvvalp, *ord_lv;
 	mname_entry	var_mname;
-	mval		*subval, previoussub, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	mval		*subval, previoussub, *previoussub_mv, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	get_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_GET);	/* Note: macro could "return" from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_PREVIOUS);	/* Note: macro could "return" from this function in case of errors */
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
@@ -112,6 +112,8 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 					ord_lv = lvvalp;
 				subval = (mval *)plist.arg[plist.n];	/* Should give us subscript we didn't use above */
 				op_fnzprevious(ord_lv, subval, &previoussub);
+				previoussub_mv = &previoussub;
+				MV_FORCE_STR(previoussub_mv);
 			}
 			SET_BUFFER_FROM_LVVAL_VALUE(value, &previoussub);
 			break;
