@@ -75,7 +75,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((NULL == value) || (NULL == value->buf_addr) || (0 == value->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCN(4) ERR_NORETBUFFER, RTS_ERROR_LITERAL("ydb_get_s()"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, RTS_ERROR_LITERAL("ydb_get_s()"));
 	/* Separate actions depending on type of GET being done */
 	switch(get_type)
 	{
@@ -131,7 +131,6 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 		default:
 			assertpro(FALSE);
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
 }
