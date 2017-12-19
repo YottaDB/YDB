@@ -39,9 +39,12 @@
  *   varname	- Gives name of local or global variable
  *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
  *
- * Note unlike "ydb_set_s", none of the inputs varname/subscript inputs need rebuffering in this routine
+ * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines.
+ * YottaDB runtime routines. But the input varname does need rebuffering as it is possible the local
+ * varname does not yet exist in the current symbol table (curr_symval) in which case we do want
+ * that to store a name string pointing to the stringpool rather than user-pointed C program storage
+ * which could change after the current ydb_*_s() call.
  */
 int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 {
@@ -62,6 +65,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -140,6 +144,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 		default:
 			assertpro(FALSE);
 	}
+	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
 	REVERT;
 	return YDB_OK;
 }
