@@ -25,6 +25,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "VARNAMEINVALID", "Invalid local/global/ISV variable name supplied to API call", 0 },
 	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
 	{ "NORETBUFFER", "No output buffer provided for !AD call", 0 },
+	{ "LVUNDEF", "Undefined local variable: !AD", 2 },
 };
 
 

@@ -39,12 +39,9 @@
  *   varname	- Gives name of local or global variable
  *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
  *
- * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
+ * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines. But the input varname does need rebuffering as it is possible the local
- * varname does not yet exist in the current symbol table (curr_symval) in which case we do want
- * that to store a name string pointing to the stringpool rather than user-pointed C program storage
- * which could change after the current ydb_*_s() call.
+ * YottaDB runtime routines.
  */
 int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 {
@@ -61,7 +58,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_PREVIOUS);	/* Note: macro could "return" from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
+	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -97,7 +94,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 				 *   - If only one subscript, skip the call to op_srchindx() and just call op_fnorder() with
 				 *     the single supplied subscript.
 				 */
-				FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate base var lv_val in curr_symval */
+				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Find basevar lv_val */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
 				plist.n--;				/* Don't use last subscr in lookup */
 				if (1 < subs_used)
@@ -146,7 +143,6 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 		default:
 			assertpro(FALSE);
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
 	REVERT;
 	return YDB_OK;
 }
