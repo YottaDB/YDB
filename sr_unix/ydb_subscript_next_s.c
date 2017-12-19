@@ -112,8 +112,8 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 					ord_lv = lvvalp;
 				subval = (mval *)plist.arg[plist.n];	/* Should give us subscript we didn't use above */
 				op_fnorder(ord_lv, subval, &nextsub);
-				SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
 			}
+			SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
