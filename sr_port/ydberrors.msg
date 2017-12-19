@@ -29,3 +29,4 @@ READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao
 VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
 VALUEINVALID	<Invalid value specified to ydb_set_s() call>/error/fao=0
 NORETBUFFER	<No output buffer provided for !AD call>/error/fao=0
+LVUNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6

@@ -25,13 +25,16 @@
 #include "error.h"
 #include "send_msg.h"
 #include "stack_frame.h"
+#include "lv_val.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
 
-LITREF char		ctypetab[NUM_CHARS];
-LITREF nametabent	svn_names[];
-LITREF unsigned char	svn_index[];
-LITREF svn_data_type	svn_data[];
+GBLREF	symval		*curr_symval;		\
+
+LITREF	char		ctypetab[NUM_CHARS];
+LITREF	nametabent	svn_names[];
+LITREF	unsigned char	svn_index[];
+LITREF	svn_data_type	svn_data[];
 
 typedef enum
 {
@@ -161,7 +164,7 @@ MBSTART {														\
 			VARTYPE = LYDB_VARREF_ISV;									\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
 			if (-1 == index) 	     			     						\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);					\
 			if (UPDATE && !svn_data[index].can_set)								\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SVNOSET);					\
 			VARINDEX = svn_data[index].opcode;								\
@@ -178,13 +181,15 @@ MBSTART	{									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VALUEINVALID);	\
 } MBEND
 
-/* Macro to locate or create an entry in the symbol table for the specified base variable name */
-#define FIND_BASE_VAR(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP)								\
+/* Macro to locate or create an entry in the symbol table for the specified base variable name. There are
+ * two flavors:
+ *   1. FIND_BASE_VAR_UPD()   - var is being set so input names need rebuffering.
+ *   2. FIND_BASE_VAR_NOUPD() - is only fetching, not setting so no rebuffering of input names/vars is needed.
+ */
+#define FIND_BASE_VAR_UPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP)								\
 MBSTART {															\
 	boolean_t	added;													\
 	lv_val		*lv;													\
-																\
-	GBLREF	symval		*curr_symval;											\
 																\
 	(VARMNAMEP)->var_name.addr = (VARNAMEP)->buf_addr;	/* Load up the imbedded varname with our base var name */	\
 	(VARMNAMEP)->var_name.len = (VARNAMEP)->len_used;	   	       			     	      	       		\
@@ -199,7 +204,22 @@ MBSTART {															\
 		assert(added);													\
 		lv_newname((VARTABENTP), curr_symval);										\
 	}							 	      	  						\
-	assert(NULL != LV_GET_SYMVAL((lv_val *)(VARTABENTP)->value));								\
+	assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));								\
+	VARLVVALP = (VARTABENTP)->value;											\
+} MBEND
+/* Now the NOUPD version */
+#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP)								\
+MBSTART {															\
+	lv_val		*lv;													\
+																\
+	(VARMNAMEP)->var_name.addr = (VARNAMEP)->buf_addr;	/* Load up the imbedded varname with our base var name */	\
+	(VARMNAMEP)->var_name.len = (VARNAMEP)->len_used;	   	       			     	      	       		\
+	(VARMNAMEP)->marked = 0;												\
+	COMPUTE_HASH_MNAME((VARMNAMEP));			/* Compute its hash value */					\
+	(VARTABENTP) = lookup_hashtab_mname(&curr_symval->h_symtab, (VARMNAMEP));						\
+	if ((NULL == (VARTABENTP)) || (NULL == (lv_val *)((VARTABENTP)->value)))						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);								\
+	assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));								\
 	VARLVVALP = (VARTABENTP)->value;											\
 } MBEND
 
@@ -215,7 +235,10 @@ MBSTART	{									\
 #define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)								\
 MBSTART	{													\
 	if (((mval *)(LVVALP))->str.len > (BUFVALUE)->len_alloc)						\
+	{													\
+		(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;	/* Set len to what it needed to be */	\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);					\
+	}													\
 	if (0 < ((mval *)(LVVALP))->str.len)									\
 		memcpy((BUFVALUE)->buf_addr, ((mval *)(LVVALP))->str.addr, ((mval *)(LVVALP))->str.len);	\
 	(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;							\

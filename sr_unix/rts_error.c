@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,11 +35,13 @@
 #include "anticipatory_freeze.h"
 #include "toktyp.h"
 #include "cgp.h"
+#include "stack_frame.h"
 
 GBLREF	boolean_t 	created_core;
 GBLREF	boolean_t	dont_want_core;
 GBLREF	boolean_t	run_time;
 GBLREF	char		cg_phase;
+GBLREF	stack_frame	*frame_pointer;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int		gtm_errno;
@@ -117,6 +122,13 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
 	msgid = va_arg(var_dup, int);
+	if ((ERR_UNDEF == msgid) && (frame_pointer->type & SFT_CI))
+	{	/* We have an UNDEF (local var access) yet our top frame is a call-in base frame. This means we are
+		 * using the simpleAPI to access something. For this mode, we'd rather the message was ERR_LVUNDEF
+		 * instead (same error - different id).
+		 */
+		msgid = ERR_LVUNDEF;
+	}
 	/* If there was a previous fatal error that did not yet get printed, do it before overwriting the
 	 * util_output buffer with the about-to-be-handled nested error. This way one will see ALL the
 	 * fatal error messages (e.g. assert failures) in the order in which they occurred instead of

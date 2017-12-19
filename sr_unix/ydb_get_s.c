@@ -64,7 +64,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_GET);	/* Note: macro could "return" from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
+	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -85,7 +85,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
-			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val in curr_symval */
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Locate base var lv_val in curr_symval */
 			if (0 == subs_used)
 				/* If no subscripts, this is where to fetch the value from (if it exists) */
 				src_lv = lvvalp;
