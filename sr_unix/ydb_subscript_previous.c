@@ -112,8 +112,8 @@ int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *v
 					ord_lv = lvvalp;
 				subval = (mval *)plist.arg[plist.n];	/* Should give us subscript we didn't use above */
 				op_fnzprevious(ord_lv, subval, &previoussub);
-				SET_BUFFER_FROM_LVVAL_VALUE(value, &previoussub);
 			}
+			SET_BUFFER_FROM_LVVAL_VALUE(value, &previoussub);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
