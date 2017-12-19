@@ -24,7 +24,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "READONLYLKFAIL", "Failed to get !AD lock on READ_ONLY database file !AD", 4 },
 	{ "VARNAMEINVALID", "Invalid local/global/ISV variable name supplied to API call", 0 },
 	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
-	{ "NOGETBUFFER", "No output buffer provided for ydb_get_s() call", 0 },
+	{ "NORETBUFFER", "No output buffer provided for !AD call", 0 },
 };
 
 

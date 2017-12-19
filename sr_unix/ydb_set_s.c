@@ -30,12 +30,12 @@
 /* Routine to set local, global and ISV values
  *
  * Parameters:
- *   value   - Value to be set into local/global/ISV
- *   count   - Count of subscripts (if any else 0)
- *   varname - Gives name of local, global or ISV variable
- *   subscrN - a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *   value	- Value to be set into local/global/ISV
+ *   subs_used	- Count of subscripts (if any else 0)
+ *   varname	- Gives name of local, global or ISV variable
+ *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
  */
-int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
+int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -59,9 +59,9 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	}
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, set_type, set_svn_index, TRUE);
-	if (0 > count)
+	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
-	if (YDB_MAX_SUBS < count)
+	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	VALIDATE_VALUE(value);			/* Value must exist for SET */
 	/* Separate actions depending on the type of SET being done */
@@ -74,17 +74,17 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			 * copied via saving name and address.
 			 */
 			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val in curr_symval */
-			if (0 == count)
-				/* If no parameters, this is where to store the value */
+			if (0 == subs_used)
+				/* If no subscripts, this is where to store the value */
 				dst_lv = lvvalp;
 			else
-			{	/* We have some subscripts - load the varname and the subscripts into our array for callg so
-				 * we can drive "op_putindx" to locate the mval associated with those subscripts that need to
+			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
+				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
 				 * be set.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, TRUE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, TRUE);
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
@@ -103,7 +103,7 @@ int ydb_set_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, FALSE);
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */
