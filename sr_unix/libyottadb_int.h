@@ -38,14 +38,14 @@ typedef enum
 	LYDB_RTN_GET = 1,		/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
+	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
 	LYDB_RTN_ZSTATUS,		/* "ydb_zstatus_s" is running */
 } libyottadb_routines;
 
 typedef enum
 {
-	LYDB_VARREF_INVALID = 0,	/* Varname is invalid */
-	LYDB_VARREF_GLOBAL,		/* Referencing a global variable */
+	LYDB_VARREF_GLOBAL = 1,		/* Referencing a global variable */
 	LYDB_VARREF_LOCAL,		/* Referencing a local variable */
 	LYDB_VARREF_ISV			/* Referencing an ISV (Intrinsic Special Variable) */
 } ydb_var_types;

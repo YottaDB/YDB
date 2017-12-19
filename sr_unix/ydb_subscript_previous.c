@@ -31,10 +31,10 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 
-/* Routine to locate the next subscript at a given level.
+/* Routine to locate the previous subscript at a given level.
  *
  * Parameters:
- *   value	- The "next" subscript is stored/returned here.
+ *   value	- The "previous" subscript is stored/returned here.
  *   subs_used	- Count of subscripts (if any, else 0)
  *   varname	- Gives name of local or global variable
  *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
@@ -43,7 +43,7 @@
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
+int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -51,7 +51,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 	int		get_svn_index;
 	lv_val		*lvvalp, *ord_lv;
 	mname_entry	var_mname;
-	mval		*subval, nextsub, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	mval		*subval, previoussub, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	get_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -72,18 +72,18 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((NULL == value) || (NULL == value->buf_addr) || (0 == value->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_subscript_next_s()"));
-		/* Separate actions depending on type of variable for which the next subscript is being located */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_subscript_previous_s()"));
+		/* Separate actions depending on type of variable for which the previous subscript is being located */
 	switch(get_type)
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
 			if (0 == subs_used)
-			{	/* If no subscripts, use op_fnlvname() to locate the next local variable */
+			{	/* If no subscripts, use op_fnlvname() to locate the previous local variable */
 				varnamemv.mvtype = MV_STR;
 				varnamemv.str.addr = varname->buf_addr;
 				varnamemv.str.len = varname->len_used;
-				op_fnlvname(&varnamemv, FALSE, &nextsub);
+				op_fnlvprvname(&varnamemv, &previoussub);
 			} else
 			{	/* We have some subscripts - subcases are as follows:
 				 *   - If we have more than one subscript - load the varname lv_val and all the subscripts
@@ -107,15 +107,15 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 					/* We have a single subscript so use base var as input lv_val to op_fnorder() */
 					ord_lv = lvvalp;
 				subval = (mval *)plist.arg[plist.n];	/* Should give us subscript we didn't use above */
-				op_fnorder(ord_lv, subval, &nextsub);
-				SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
+				op_fnzprevious(ord_lv, subval, &previoussub);
+				SET_BUFFER_FROM_LVVAL_VALUE(value, &previoussub);
 			}
 			break;
 		case LYDB_VARREF_GLOBAL:
-			/* Global variable subscript-next processing is the same regardless of argument count:
+			/* Global variable subscript-previous processing is the same regardless of argument count:
 			 *   1. Drive "op_gvname" with the global name and all subscripts to setup the key we need to access
 			 *      the global node.
-			 *   2. Drive "op_gvorder" to fetch the next subscript at this level.
+			 *   2. Drive "op_gvorder" to fetch the previous subscript at this level.
 			 *
 			 * Note no need to rebuffer any of the inputs here as they won't live in the stringpool once set.
 			 */
@@ -129,9 +129,9 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
-				op_gvname(1, &gvname);			/* Single parm call to get next global */
-			op_gvorder(&nextsub);				/* Locate next subscript this level */
-			SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
+				op_gvname(1, &gvname);			/* Single parm call to get previous global */
+			op_zprevious(&previoussub);			/* Locate previous subscript this level */
+			SET_BUFFER_FROM_LVVAL_VALUE(value, &previoussub);
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */

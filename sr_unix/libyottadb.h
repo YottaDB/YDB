@@ -138,6 +138,7 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
 int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
 int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
+int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
 
 #endif /* LIBYOTTADB_TYPES_H */
