@@ -15,7 +15,7 @@
 #include "gtm_string.h"
 #include <stdarg.h>
 
-/* #define DEBUG_LIBYOTTADB	/ * Uncomment to enable debugging - must be set prior to include of libyottadb.h */
+#undef DEBUG_LIBYOTTADB		/* Change to #define to enable debugging - must be set prior to include of libyottadb_int.h */
 
 #include "lv_val.h"
 #include "hashtab_mname.h"
@@ -36,16 +36,16 @@
 /* Routine to get local, global and ISV values
  *
  * Parameters:
- *   value   - Value fetched from local/global/ISV variable stored here (if room)
- *   count   - Count of subscripts (if any else 0)
- *   varname - Gives name of local, global or ISV variable
- *   subscrN - a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *   value	- Value fetched from local/global/ISV variable stored here (if room)
+ *   subs_used	- Count of subscripts (if any else 0)
+ *   varname	- Gives name of local, global or ISV variable
+ *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
  *
  * Note unlike "ydb_set_s", none of the inputs varname/subscript inputs need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
+int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 {
 	boolean_t	error_encountered;
 	boolean_t	gotit;
@@ -70,32 +70,32 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 	}
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
-	if (0 > count)
+	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
-	if (YDB_MAX_SUBS < count)
+	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((NULL == value) || (NULL == value->buf_addr) || (0 == value->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOGETBUFFER);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCN(4) ERR_NORETBUFFER, RTS_ERROR_LITERAL("ydb_get_s()"));
 	/* Separate actions depending on type of GET being done */
 	switch(get_type)
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
 			FIND_BASE_VAR(varname, &var_mname, tabent, lvvalp);	/* Locate the base var lv_val in curr_symval */
-			if (0 == count)
-				/* If no parameters, this is where to fetch the value from (if it exists) */
+			if (0 == subs_used)
+				/* If no subscripts, this is where to fetch the value from (if it exists) */
 				src_lv = lvvalp;
 
 			else
-			{	/* We have some subscripts - load the varname and the subscripts into our array for callg so
-				 * we can drive "op_putindx" to locate the mval associated with those subscripts that need to
+			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
+				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
 				 * be set. Note "op_getindx" raises ERR_UNDEF if node is not found. Note that even if a node
 				 * is found, it may not have a value associated with it which we need to detect and raise
 				 * an UNDEF error for.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, TRUE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, TRUE);
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
@@ -115,7 +115,7 @@ int ydb_get_s(ydb_buffer_t *value, int count, ydb_buffer_t *varname, ...)
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(count, plist, plist_mvals, FALSE);
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
 									 * if value not found (and undef_inhibit not set)

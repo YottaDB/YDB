@@ -37,8 +37,9 @@ typedef enum
 {
 	LYDB_RTN_GET = 1,		/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
-	LYDB_RTN_ZSTATUS,		/* "ydb_zstatus_s" is running */
+	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
+	LYDB_RTN_ZSTATUS,		/* "ydb_zstatus_s" is running */
 } libyottadb_routines;
 
 typedef enum
