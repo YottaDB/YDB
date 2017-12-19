@@ -142,7 +142,6 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 		default:
 			assertpro(FALSE);
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
 }
