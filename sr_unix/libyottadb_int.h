@@ -271,38 +271,35 @@ MBSTART	{															\
 #endif
 
 /* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
-#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, PLIST, PLIST_MVALS, REBUFFER)								\
-MBSTART	{															\
-	mval		*mvalp;													\
-	void		**parmp, **parmp_top;											\
-	ydb_buffer_t	*subval;												\
-	va_list		var;													\
-				 												\
-	/* Now for each subscript */												\
-	VAR_START(var, varname);												\
-	for (parmp = &PLIST.arg[1], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0]; parmp < parmp_top; parmp++, mvalp++)	\
-	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer */	    	     		\
-		subval = va_arg(var, ydb_buffer_t *);	       	    	       	   	     	    				\
-		if (NULL != subval)		  										\
-		{	/* A subscript has been specified - copy it to the associated mval and put its address			\
-			 * in the param list to pass to op_putindx()								\
-			 */													\
-			SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);								\
-			if (REBUFFER)												\
-			{													\
-				s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */				\
-				RECORD_MSTR_FOR_GC(&(mvalp->str));								\
-			}													\
-		} else					   									\
-		{	/* No subscript specified - error */									\
-			va_end(var);		    	  									\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
-		}				    		 								\
-		*parmp = mvalp;													\
-	}	       	 													\
-	PLIST.n = (COUNT) + 1;			/* Bump to include varname lv_val as 2nd parm (after count) */			\
-	va_end(var);														\
-	DBG_DUMP_PLIST_STRUCT(PLIST);												\
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER)				\
+MBSTART	{													\
+	mval		*mvalp;											\
+	void		**parmp, **parmp_top;									\
+	ydb_buffer_t	*subval;										\
+				 										\
+	subval = (ydb_buffer_t *)SUBSARRAY;	 								\
+	if ((COUNT) && (NULL == subval))									\
+	{       /* count of subscripts is non-zero but no subscript specified - error */			\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
+	}													\
+	/* Now for each subscript */										\
+	for (parmp = &PLIST.arg[1], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];			\
+		parmp < parmp_top;										\
+			parmp++, mvalp++, subval++)								\
+	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
+		 * A subscript has been specified - copy it to the associated mval and put its address		\
+		 * in the param list										\
+		 */												\
+		SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);							\
+		if (REBUFFER)											\
+		{												\
+			s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */			\
+			RECORD_MSTR_FOR_GC(&(mvalp->str));							\
+		}												\
+		*parmp = mvalp;											\
+	}	       	 											\
+	PLIST.n = (COUNT) + 1;			/* Bump to include varname lv_val as 2nd parm (after count) */	\
+	DBG_DUMP_PLIST_STRUCT(PLIST);										\
 } MBEND
 
 /* Macro to record the address of a given mstr so garbage collection knows where to find it to fix it up if needbe */

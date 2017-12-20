@@ -13,7 +13,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include <stdarg.h>
 
 #include "lv_val.h"
 #include "hashtab_mname.h"
@@ -31,11 +30,11 @@
  *
  * Parameters:
  *   value	- Value to be set into local/global/ISV
- *   subs_used	- Count of subscripts (if any else 0)
  *   varname	- Gives name of local, global or ISV variable
- *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *   subs_used	- Count of subscripts (if any else 0)
+ *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
  */
-int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
+int ydb_set_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -85,7 +84,7 @@ int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, TRUE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE);
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
@@ -104,7 +103,7 @@ int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */
