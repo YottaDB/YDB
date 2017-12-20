@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +19,6 @@
 #include "lv_val.h"
 #include "undx.h"
 
-error_def(ERR_UNDEF);
-
 mval *underr_strict(mval *start, ...)
 {
 	mident_fixed    name;
@@ -28,6 +29,6 @@ mval *underr_strict(mval *start, ...)
 	va_start (var, start);
 	end = format_lvname((lv_val *)start, (uchar_ptr_t)name.c, SIZEOF(name));
 	va_end(var);
-	rts_error(VARLSTCNT(4) ERR_UNDEF, 2, ((char *)end - name.c), name.c);
+	rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, ((char *)end - name.c), name.c);
 	return (mval *)NULL; /* To keep compiler happy */
 }

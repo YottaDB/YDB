@@ -203,7 +203,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TXTSRCFMT", "$TEXT encountered an invalid source program file format", 0 },
 	{ "UIDMSG", "Unidentified message received", 0 },
 	{ "UIDSND", "Unidentified sender PID", 0 },
-	{ "UNDEF", "Undefined local variable: !AD", 2 },
+	{ "LVUNDEF", "Undefined local variable: !AD", 2 },
 	{ "UNIMPLOP", "Unimplemented construct encountered", 0 },
 	{ "VAREXPECTED", "Variable expected in this context", 0 },
 	{ "VARRECBLKSZ", "Blocksize must be at least record size + 4 bytes", 0 },

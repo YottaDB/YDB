@@ -367,7 +367,7 @@ JNI		<!AD>/error/fao=2!/ansi=0
 TXTSRCFMT	<$TEXT encountered an invalid source program file format>/error/fao=0!/ansi=0
 UIDMSG		<Unidentified message received>/error/fao=0!/ansi=0
 UIDSND		<Unidentified sender PID>/error/fao=0!/ansi=0
-UNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6
+LVUNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6
 UNIMPLOP	<Unimplemented construct encountered>/error/fao=0!/ansi=0
 VAREXPECTED	<Variable expected in this context>/error/fao=0!/ansi=39
 VARRECBLKSZ	<Blocksize must be at least record size + 4 bytes>/error/fao=0!/ansi=0

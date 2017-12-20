@@ -122,13 +122,6 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
 	msgid = va_arg(var_dup, int);
-	if ((ERR_UNDEF == msgid) && (frame_pointer->type & SFT_CI))
-	{	/* We have an UNDEF (local var access) yet our top frame is a call-in base frame. This means we are
-		 * using the simpleAPI to access something. For this mode, we'd rather the message was ERR_LVUNDEF
-		 * instead (same error - different id).
-		 */
-		msgid = ERR_LVUNDEF;
-	}
 	/* If there was a previous fatal error that did not yet get printed, do it before overwriting the
 	 * util_output buffer with the about-to-be-handled nested error. This way one will see ALL the
 	 * fatal error messages (e.g. assert failures) in the order in which they occurred instead of

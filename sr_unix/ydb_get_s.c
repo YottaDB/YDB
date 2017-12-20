@@ -93,9 +93,9 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 			else
 			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
 				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
-				 * be set. Note "op_getindx" raises ERR_UNDEF if node is not found. Note that even if a node
+				 * be set. Note "op_getindx" raises ERR_LVUNDEF if node is not found. Note that even if a node
 				 * is found, it may not have a value associated with it which we need to detect and raise
-				 * an UNDEF error for.
+				 * an LVUNDEF error for.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
@@ -103,7 +103,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNDEF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);
 			SET_BUFFER_FROM_LVVAL_VALUE(value, src_lv);		/* Copy value to return buffer */
 			break;
 		case LYDB_VARREF_GLOBAL:

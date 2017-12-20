@@ -201,7 +201,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TXTSRCFMT */
 	   0,	/* UIDMSG */
 	   0,	/* UIDSND */
-	   6,	/* UNDEF */
+	   6,	/* LVUNDEF */
 	   0,	/* UNIMPLOP */
 	  39,	/* VAREXPECTED */
 	   0,	/* VARRECBLKSZ */

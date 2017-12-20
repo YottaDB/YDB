@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +37,6 @@
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
 
-error_def(ERR_UNDEF);
-
 /* [Used by FOR, SET and $ORDER()] Looks up a saved local variable. */
 lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 {
@@ -59,7 +60,7 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	lvn_info->start_lvp = (lv_val *)tabent->value;
 	switch (oc)
 	{
-	case OC_RFRSHLVN: /* no UNDEF for $ORDER()/$GET() from srchindx nor bogus opcode, so borrow "impossible" opcode */
+	case OC_RFRSHLVN: /* no LVUNDEF for $ORDER()/$GET() from srchindx nor bogus opcode, so borrow "impossible" opcode */
 		return (lv_val *)callg((callgfnptr)op_srchindx, (gparam_list *)lvn_info);
 		break;
 	case OC_PUTINDX:
@@ -68,9 +69,9 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	case OC_SRCHINDX:
 		lv = (lv_val *)callg((callgfnptr)op_srchindx, (gparam_list *)lvn_info);
 		if (NULL == lv)
-		{	/* This path is currently only used by FOR. Issue UNDEF error even if NOUNDEF is enabled. */
+		{	/* This path is currently only used by FOR. Issue LVUNDEF error even if NOUNDEF is enabled. */
 			end = format_key_mvals(buff, SIZEOF(buff), lvn_info);
-			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+			rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, end - buff, buff);
 			assert(FALSE);
 		}
 		break;

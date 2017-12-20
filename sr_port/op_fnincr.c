@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2004, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +30,6 @@ void	op_fnincr(lv_val *local_var, mval *increment, mval *result)
 {
 	mval		*lv_mval;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
-
-	error_def(ERR_UNDEF);
 
 	MV_FORCE_NUM(increment); /* we do this operation in op_gvincr(), so it should be no different in op_fnincr() */
 	lv_mval = &local_var->v;
