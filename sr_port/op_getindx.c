@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +29,6 @@ GBLREF bool		undef_inhibit;
 
 LITREF mval		literal_null ;
 
-error_def(ERR_UNDEF);
 error_def(ERR_LVNULLSUBS);
 
 lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
@@ -106,7 +108,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			VAR_START(var, start);
 			end = undx(start, var, arg1, buff, SIZEOF(buff));
 			va_end(var);
-			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+			rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, end - buff, buff);
 		}
 	}
 	return (lv_val *)lv;

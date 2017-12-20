@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +55,6 @@ GBLREF	lv_val		*active_lv;
 
 error_def(ERR_LVNULLSUBS);
 error_def(ERR_MAXSTRLEN);
-error_def(ERR_UNDEF);
 
 #ifdef DEBUG
 void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)
@@ -195,7 +197,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			lv = (lv_val *)lvAvlTreeNodeInsert(lvt, key, parent);
 			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
 			/* maintain active_lv so we free this lv_val (and parent lv_vals as appropriate) in case of a
-			 * runtime error (e.g. UNDEF or LVNULLSUBS) in this for loop.
+			 * runtime error (e.g. LVUNDEF or LVNULLSUBS) in this for loop.
 			 */
 			SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
 		}

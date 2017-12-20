@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -130,8 +133,6 @@ GBLREF bool		undef_inhibit;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 
 LITREF	mval		literal_null;
-
-error_def(ERR_UNDEF);
 
 /* lv subscript usage notes:
  *  1. The sub field in lvzwrite_datablk is an array allocated at MAX_LVSUBSCRIPTS.
@@ -279,7 +280,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 				zwr_sub->subsc_list[n].actual = (mval *)NULL;
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				if (!undef_inhibit)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, end - buff, buff);
 			}
 		}
 	} else  if (lvt = LV_GET_CHILD(lv))
