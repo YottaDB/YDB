@@ -13,7 +13,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include <stdarg.h>
 
 #undef DEBUG_LIBYOTTADB		/* Change to #define to enable debugging - must be set prior to include of libyottadb_int.h */
 
@@ -37,9 +36,9 @@
  *
  * Parameters:
  *   value	- Value fetched from local/global/ISV variable stored here (if room)
- *   subs_used	- Count of subscripts (if any else 0)
  *   varname	- Gives name of local, global or ISV variable
- *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *   subs_used	- Count of subscripts (if any else 0)
+ *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
  *
  * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
@@ -48,7 +47,7 @@
  * that to store a name string pointing to the stringpool rather than user-pointed C program storage
  * which could change after the current ydb_*_s() call.
  */
-int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
+int ydb_get_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
 	boolean_t	error_encountered;
 	boolean_t	gotit;
@@ -99,7 +98,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, TRUE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE);
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
@@ -119,7 +118,7 @@ int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
 									 * if value not found (and undef_inhibit not set)

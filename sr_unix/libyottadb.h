@@ -135,10 +135,14 @@ void 		gtm_free(void *);
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
 /* Simple API routine declarations */
-int ydb_get_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
-int ydb_set_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
-int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
-int ydb_subscript_previous_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...);
+int ydb_get_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_set_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_subscript_previous_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_node_next_s(ydb_buffer_t *src_varname, int src_subs_used, ydb_buffer_t *src_subsarray,
+							int *dst_subs_used, ydb_buffer_t *dst_subsarray);
+int ydb_node_previous_s(ydb_buffer_t *src_varname, int src_subs_used, ydb_buffer_t *src_subsarray,
+							int *dst_subs_used, ydb_buffer_t *dst_subsarray);
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);

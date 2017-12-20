@@ -12,7 +12,6 @@
 
 #include "mdef.h"
 
-#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "lv_val.h"
@@ -35,15 +34,18 @@
  *
  * Parameters:
  *   value	- The "next" subscript is stored/returned here.
- *   subs_used	- Count of subscripts (if any, else 0)
  *   varname	- Gives name of local or global variable
- *   subscrN	- a list of 0 or more ydb_buffer_t subscripts follows varname in the parm list
+ *   subs_used	- Count of subscripts (if any, else 0)
+ *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
  *
- * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
+ * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines.
+ * YottaDB runtime routines. But the input varname does need rebuffering as it is possible the local
+ * varname does not yet exist in the current symbol table (curr_symval) in which case we do want
+ * that to store a name string pointing to the stringpool rather than user-pointed C program storage
+ * which could change after the current ydb_*_s() call.
  */
-int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varname, ...)
+int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -95,7 +97,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 				 *     the single supplied subscript.
 				 */
 				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Locate basevar lv_val */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE);
 				plist.n--;				/* Don't use last subscr in lookup */
 				if (1 < subs_used)
 				{	/* Drive op_srchindx() to find node at level prior to target level */
@@ -129,7 +131,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, int subs_used, ydb_buffer_t *varna
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, plist, plist_mvals, FALSE);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE);
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
