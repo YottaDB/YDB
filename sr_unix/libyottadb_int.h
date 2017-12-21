@@ -232,16 +232,21 @@ MBSTART	{									\
 } MBEND
 
 /* Macro to set a supplied ydb_buffer_t value from a supplied mval/lv_val */
-#define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)								\
-MBSTART	{													\
-	if (((mval *)(LVVALP))->str.len > (BUFVALUE)->len_alloc)						\
-	{													\
-		(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;	/* Set len to what it needed to be */	\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);					\
-	}													\
-	if (0 < ((mval *)(LVVALP))->str.len)									\
-		memcpy((BUFVALUE)->buf_addr, ((mval *)(LVVALP))->str.addr, ((mval *)(LVVALP))->str.len);	\
-	(BUFVALUE)->len_used = ((mval *)(LVVALP))->str.len;							\
+#define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)					\
+MBSTART	{										\
+	mval		*src;								\
+	ydb_buffer_t	*dst;								\
+											\
+	src = ((mval *)(LVVALP));							\
+	dst = BUFVALUE;									\
+	if (src->str.len > dst->len_alloc)						\
+	{										\
+		dst->len_used = src->str.len;	/* Set len to what it needed to be */	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);		\
+	}										\
+	if (src->str.len)								\
+		memcpy(dst->buf_addr, src->str.addr, src->str.len);			\
+	dst->len_used = src->str.len;							\
 } MBEND
 
 /* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
