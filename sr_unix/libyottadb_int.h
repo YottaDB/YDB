@@ -29,7 +29,7 @@
 
 #define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
 
-GBLREF	symval		*curr_symval;		\
+GBLREF	symval		*curr_symval;
 
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
@@ -38,10 +38,13 @@ LITREF	svn_data_type	svn_data[];
 
 typedef enum
 {
-	LYDB_RTN_GET = 1,		/* "ydb_get_s" is running */
+	LYDB_RTN_DATA = 1,		/* "ydb_data_s" is running */
+	LYDB_RTN_GET,			/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
 	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
+	LYDB_RTN_NODE_NEXT,		/* "ydb_node_next_s" is running */
+	LYDB_RTN_NODE_PREVIOUS,		/* "ydb_node_previous_s" is running */
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
 	LYDB_RTN_STR2ZWR,		/* "ydb_str2zwr_s" is running */
 	LYDB_RTN_ZWR2STR,		/* "ydb_zwr2str_s" is running */
@@ -321,4 +324,15 @@ MBSTART	{													\
 	if (0 < (MSTRP)->len)											\
 		TAREF1(sapi_mstrs_for_gc_ary, (TREF(sapi_mstrs_for_gc_indx))++) = MSTRP;			\
 } MBEND
+
+/* Macro to determine if the simple API environment is active. The check is to see if the top stack frame is
+ * a call-in base frame. This is the normal state for the simple API while the normal state (while in the
+ * runtime) for call-ins will have an executable frame on top. Care must be taken in the use of this macro
+ * though because if a call-in has returned to its caller in gtmci.c, but not yet to the call-in's caller,
+ * there is also no executable frame (and likewise during initialization of a call-in before the executable
+ * frame has been setup. As long as this macro is only used in places where we know we are dealing with a
+ * runtime call (i.e. op_*), then this macro is accurate.
+ */
+#define IN_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
+
 #endif /*  LIBYOTTADB_INT_H */
