@@ -237,19 +237,19 @@ MBSTART	{									\
 /* Macro to set a supplied ydb_buffer_t value from a supplied mval/lv_val */
 #define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)					\
 MBSTART	{										\
-	mval		*src;								\
-	ydb_buffer_t	*dst;								\
+	mval		*sRC;	/* named so to avoid name collision with caller */	\
+	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */	\
 											\
-	src = ((mval *)(LVVALP));							\
-	dst = BUFVALUE;									\
-	if (src->str.len > dst->len_alloc)						\
+	sRC = ((mval *)(LVVALP));							\
+	dST = BUFVALUE;									\
+	if (sRC->str.len > dST->len_alloc)						\
 	{										\
-		dst->len_used = src->str.len;	/* Set len to what it needed to be */	\
+		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */	\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);		\
 	}										\
-	if (src->str.len)								\
-		memcpy(dst->buf_addr, src->str.addr, src->str.len);			\
-	dst->len_used = src->str.len;							\
+	if (sRC->str.len)								\
+		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);			\
+	dST->len_used = sRC->str.len;							\
 } MBEND
 
 /* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
