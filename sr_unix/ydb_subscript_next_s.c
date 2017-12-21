@@ -33,10 +33,10 @@
 /* Routine to locate the next subscript at a given level.
  *
  * Parameters:
- *   value	- The "next" subscript is stored/returned here.
  *   varname	- Gives name of local or global variable
  *   subs_used	- Count of subscripts (if any, else 0)
  *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
+ *   ret_value	- The "next" subscript is stored/returned here.
  *
  * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
@@ -45,7 +45,7 @@
  * that to store a name string pointing to the stringpool rather than user-pointed C program storage
  * which could change after the current ydb_*_s() call.
  */
-int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
+int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -74,7 +74,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_us
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if ((NULL == value) || (NULL == value->buf_addr) || (0 == value->len_alloc))
+	if ((NULL == ret_value) || (NULL == ret_value->buf_addr) || (0 == ret_value->len_alloc))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_subscript_next_s()"));
 		/* Separate actions depending on type of variable for which the next subscript is being located */
 	switch(get_type)
@@ -114,7 +114,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_us
 				nextsub_mv = &nextsub;
 				MV_FORCE_STR(nextsub_mv);
 			}
-			SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
+			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &nextsub);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -136,7 +136,7 @@ int ydb_subscript_next_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_us
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvorder(&nextsub);				/* Locate next subscript this level */
-			SET_BUFFER_FROM_LVVAL_VALUE(value, &nextsub);
+			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &nextsub);
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
