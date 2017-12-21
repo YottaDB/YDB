@@ -21,11 +21,14 @@
 #include "tp_frame.h"
 #include "op_tcommit.h"
 #include "cdb_sc.h"
+#include "gdsroot.h"
 #include "tp_restart.h"
 #include "preemptive_db_clnup.h"
 #include "stringpool.h"
 
 GBLREF	uint4		dollar_tlevel;
+GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
+GBLREF	unsigned int	t_tries;
 
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
@@ -135,6 +138,12 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char
 			 * runtime (since a TPRETRY is also an error) but that is not invoked by the simpleAPI and so we need this.
 			 */
 			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+			if (cdb_sc_normal == t_fail_hist[t_tries])
+			{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
+				 * This is relied upon by an assert in "tp_restart".
+				 */
+				op_trestart_set_cdb_code();
+			}
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
 		}
