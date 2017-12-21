@@ -32,11 +32,6 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (0 == str->len_used)
-	{
-		zwr->len_used = 0;
-		return YDB_OK;
-	}
 	/* We want the zwrite representation to always have $C(x) where x < 256 and hence switch to M mode unconditionally */
 	save_gtm_utf8_mode = gtm_utf8_mode;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
