@@ -28,4 +28,4 @@ READONLYNOSTATS	<Read-only and Statistics sharing cannot both be enabled on data
 READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao=4!/ansi=0
 VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
 VALUEINVALID	<Invalid value specified to ydb_set_s() call>/error/fao=0
-NORETBUFFER	<No output buffer provided for !AD call>/error/fao=0
+NORETBUFFER	<No output buffer provided for !AD call>/error/fao=2
