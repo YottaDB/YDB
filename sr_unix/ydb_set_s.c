@@ -29,12 +29,12 @@
 /* Routine to set local, global and ISV values
  *
  * Parameters:
- *   value	- Value to be set into local/global/ISV
  *   varname	- Gives name of local, global or ISV variable
  *   subs_used	- Count of subscripts (if any else 0)
  *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
+ *   value	- Value to be set into local/global/ISV
  */
-int ydb_set_s(ydb_buffer_t *value, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
+int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
