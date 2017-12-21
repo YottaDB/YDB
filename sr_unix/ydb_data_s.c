@@ -39,7 +39,7 @@
  *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
  *   ret_value	- Value fetched from local/global/ISV variable stored/returned here (if room)
  *
- * Note unlike "ydb_set_s", none of the input varnam or subscripts need rebuffering in this routine
+ * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */

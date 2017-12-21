@@ -154,6 +154,7 @@ void jobchild_init(void)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{
+			base_addr = make_dmode();
 			transfer_addr = NULL;	/* Not used for call-ins */
 		} else /* direct mode */
 		{
@@ -168,7 +169,7 @@ void jobchild_init(void)
 	}
 	if (MUMPS_CALLIN & invocation_mode)
 	{
-		base_frame(NULL);			/* Filled in by following SET_CI_ENV macro */
+		base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
 		SET_CI_ENV(gtm_levl_ret_code);
 	} else
 		gtm_init_env(base_addr, transfer_addr);

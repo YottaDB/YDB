@@ -974,6 +974,7 @@ int ydb_init()
 	int			path_len;
 	struct stat		stat_buf;
 	Dl_info			shlib_info;
+	rhdtyp          	*base_addr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1097,7 +1098,8 @@ int ydb_init()
 		 */
 		if (dollar_tlevel)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
-		base_frame(NULL);			/* Filled in later */
+		base_addr = make_dmode();
+		base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
 		SET_CI_ENV(gtm_levl_ret_code);
 		gtmci_isv_save();
 		(TREF(gtmci_nested_level))++;
