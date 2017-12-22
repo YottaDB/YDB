@@ -31,33 +31,33 @@
 #include "gdsfhead.h"
 #include "mvalconv.h"
 
-/* Routine to return existance of given nodes and existence of descendants
+LITREF	mval	literal_one, literal_zero;
+
+/* Routine to atomically increment the value of a given node/glvn with an input increment value
  *
  * Parameters:
  *   varname	- Gives name of local or global variable
  *   subs_used	- Count of subscripts (if any else 0)
  *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
- *   ret_value	- $data of input local/global variable stored/returned here
- *
- * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
- * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines.
+ *   increment  - increment value (converted from string to number if needed)
+ *   ret_value	- Post-increment value of local/global variable stored/returned here (if room)
  */
-int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value)
+int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		data_svn_index;
-	lv_val		*lvvalp, *src_lv;
+	int		incr_svn_index;
+	lv_val		*lvvalp, *dst_lv;
 	mname_entry	var_mname;
-	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	ydb_var_types	data_type;
+	mval		gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	mval		*lv_mv, *increment_mv, increment_mval;
+	ydb_var_types	incr_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DATA);				/* Note: macro could return from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_INCR);				/* Note: macro could return from this function in case of errors */
 	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
@@ -67,33 +67,57 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, data_type, data_svn_index, FALSE);
+	VALIDATE_VARNAME(varname, incr_type, incr_svn_index, FALSE);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if (NULL == ret_value)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, RTS_ERROR_LITERAL("ydb_data_s()"));
-	/* Separate actions depending on type of GET being done */
-	switch(data_type)
+	if ((NULL == ret_value) || (NULL == ret_value->buf_addr) || (0 == ret_value->len_alloc))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_incr_s()"));
+	if ((NULL == increment) || !increment->len_used)
+		increment_mval = literal_one;
+	else
+	{
+		increment_mval.mvtype = MV_STR;
+		increment_mval.str.addr = increment->buf_addr;
+		increment_mval.str.len = increment->len_used;
+	}
+	increment_mv = &increment_mval;
+	MV_FORCE_NUM(increment_mv);
+	/* Separate actions depending on type of INCREMENT being done */
+	switch(incr_type)
 	{
 		case LYDB_VARREF_LOCAL:
-			/* Find status of the given local variable */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Locate base var lv_val in curr_symval */
+			/* Set the given local variable with the post-increment value. Create lvn if it does not already exist.
+			 *
+			 * Note need to rebuffer EVERYTHING - the varname, subscripts and value are all potentially
+			 * copied via saving name and address.
+			 */
+			FIND_BASE_VAR_UPD(varname, &var_mname, tabent, lvvalp);	/* Locate base var lv_val in curr_symval */
 			if (0 == subs_used)
-				/* If no subscripts, this is the node we are interested in */
-				src_lv = lvvalp;
+				/* If no subscripts, this is where to store the value */
+				dst_lv = lvvalp;
 			else
 			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
-				 * so we can drive "op_srchindx" to locate the mval associated with those subscripts that need to
+				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
 				 * be set.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
-				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE);
-				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
+				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE);
+				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
-			op_fndata(src_lv, &data_value);
+			/* If we created this node just now, fill it with a 0 value */
+			lv_mv = &dst_lv->v;
+			if (!MV_DEFINED(lv_mv))
+				*lv_mv = literal_zero;
+			op_add(lv_mv, increment_mv, lv_mv);
+			assert(!MV_IS_STRING(lv_mv));
+			MV_FORCE_STR(lv_mv);	/* this will compute the string and store it in the stringpool */
+			/* Since the above step will compute the string equivalent of the post-increment number and store it in the
+			 * stringpool, we do not need a s2pool and/or RECORD_MSTR_FOR_GC step like we needed in "ydb_set_s".
+			 */
+			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, lv_mv);	/* Copy value to return buffer */
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Find dstatus of the given global variable value. We do this by:
@@ -112,7 +136,6 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
-			op_gvdata(&data_value);				/* Fetch status into data_value */
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -121,9 +144,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		default:
 			assertpro(FALSE);
 	}
-	*ret_value = mval2i(&data_value);
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
-
 }

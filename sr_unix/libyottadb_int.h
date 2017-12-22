@@ -45,6 +45,7 @@ typedef enum
 	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
 	LYDB_RTN_NODE_NEXT,		/* "ydb_node_next_s" is running */
 	LYDB_RTN_NODE_PREVIOUS,		/* "ydb_node_previous_s" is running */
+	LYDB_RTN_INCR,			/* "ydb_incr_s" is running */
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
 	LYDB_RTN_STR2ZWR,		/* "ydb_str2zwr_s" is running */
 	LYDB_RTN_ZWR2STR,		/* "ydb_zwr2str_s" is running */

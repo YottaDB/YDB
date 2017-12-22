@@ -88,7 +88,6 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			if (0 == subs_used)
 				/* If no subscripts, this is where to fetch the value from (if it exists) */
 				src_lv = lvvalp;
-
 			else
 			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
 				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
