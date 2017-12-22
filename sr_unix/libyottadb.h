@@ -142,6 +142,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used, ydb_buffer_t *ret_subsarray);
 int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used, ydb_buffer_t *ret_subsarray);
+int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value);
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
