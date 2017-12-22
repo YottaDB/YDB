@@ -848,7 +848,14 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 					{	/* We have a trigger base frame, back up over it */
 						sf = *(stack_frame **)(sf + 1);
 						assert(sf);
-						assert(sf->old_frame_pointer);
+						/* Note that "sf->old_frame_pointer" could be NULL in case "sf" is a
+						 * frame created by a simpleAPI call. Handle that case.
+						 */
+						if (NULL == sf->old_frame_pointer)
+						{
+							assert(SFT_CI & sf->type);	/* simpleAPI uses the call-in stack frame */
+							break;
+						}
 					} else
 #					endif
 						break;
