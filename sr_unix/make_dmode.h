@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,20 +12,16 @@
  *								*
  ****************************************************************/
 
-#ifndef MAKE_MODE_INCLUDED
-#define MAKE_MODE_INCLUDED
+#ifndef MAKE_DMODE_INCLUDED
+#define MAKE_DMODE_INCLUDED
 
-rhdtyp *make_mode (int mode_index);
+rhdtyp *make_dmode(void);
 
 #define DM_MODE 0
-#define CI_MODE 1
 
 #define	CODE_LINES	3
-#if defined(__ia64)
-#define	CODE_SIZE	(CODE_LINES * CALL_SIZE +  EXTRA_INST_SIZE)
-#else
 #define	CODE_SIZE	(CODE_LINES * CALL_SIZE + SIZEOF(uint4) * EXTRA_INST)
-#endif /* __ia64 */
-#include <make_mode_sp.h>
+
+#include "make_dmode_sp.h"
 
 #endif
