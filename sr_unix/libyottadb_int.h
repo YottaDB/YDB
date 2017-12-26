@@ -30,6 +30,7 @@
 #define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
 
 GBLREF	symval		*curr_symval;
+GBLREF	stack_frame	*frame_pointer;
 
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
@@ -280,7 +281,7 @@ MBSTART	{															\
 #endif
 
 /* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
-#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER)				\
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER, STARTIDX)			\
 MBSTART	{													\
 	mval		*mvalp;											\
 	void		**parmp, **parmp_top;									\
@@ -292,7 +293,7 @@ MBSTART	{													\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
 	}													\
 	/* Now for each subscript */										\
-	for (parmp = &PLIST.arg[1], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];			\
+	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
 		parmp < parmp_top;										\
 			parmp++, mvalp++, subval++)								\
 	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
@@ -307,7 +308,7 @@ MBSTART	{													\
 		}												\
 		*parmp = mvalp;											\
 	}	       	 											\
-	PLIST.n = (COUNT) + 1;			/* Bump to include varname lv_val as 2nd parm (after count) */	\
+	PLIST.n = (COUNT) + (STARTIDX);		/* Bump to include varname lv_val as 2nd parm (after count) */	\
 	DBG_DUMP_PLIST_STRUCT(PLIST);										\
 } MBEND
 
@@ -334,6 +335,9 @@ MBSTART	{													\
  * frame has been setup. As long as this macro is only used in places where we know we are dealing with a
  * runtime call (i.e. op_*), then this macro is accurate.
  */
-#define IN_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
+#define IS_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
+
+void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray);
+void sapi_save_targ_key_subscr_nodes(void);
 
 #endif /*  LIBYOTTADB_INT_H */

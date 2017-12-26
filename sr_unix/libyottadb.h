@@ -33,6 +33,7 @@
 #define YDB_INT_MAX	((int)2147483647)
 #define	YDB_TP_RESTART	(YDB_INT_MAX - 1)
 #define	YDB_TP_ROLLBACK	(YDB_INT_MAX - 2)
+#define YDB_NODE_END	(YDB_INT_MAX - 3)
 
 /* Miscellaneous defines */
 #ifndef TRUE

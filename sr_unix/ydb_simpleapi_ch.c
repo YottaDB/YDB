@@ -44,6 +44,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	 * array no longer need that protection since we are about to exit from the ydb_*_s() call. So clear the global array index.
 	 */
 	TREF(sapi_mstrs_for_gc_indx) = 0;
+	TREF(sapi_query_node_subs_cnt) = 0;
 	error_loc.addr = ERROR_LOC_LIT;
 	error_loc.len = STR_LIT_LEN(ERROR_LOC_LIT);
 	set_zstatus(&error_loc, arg, NULL, FALSE);

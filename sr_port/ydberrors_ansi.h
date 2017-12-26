@@ -21,4 +21,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* VARNAMEINVALID */
 	   0,	/* VALUEINVALID */
 	   0,	/* NORETBUFFER */
+	   0,	/* INSUFFSUBS */
 	};

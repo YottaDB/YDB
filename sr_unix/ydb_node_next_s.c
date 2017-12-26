@@ -36,8 +36,13 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		    int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;
-	int		get_svn_index;
-	ydb_var_types	get_type;
+	gparam_list	plist;
+	ht_ent_mname	*tabent;
+	int		nodenext_svn_index;
+	lv_val		*lvvalp, *next_lv;
+	mname_entry	var_mname;
+	mval		*subval, nextsub, *nextsub_mv, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_var_types	nodenext_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -52,12 +57,64 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
+	VALIDATE_VARNAME(varname, nodenext_type, nodenext_svn_index, FALSE);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((0 == *ret_subs_used) || (NULL == ret_subsarray))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_node_next_s()"));
-	return 0;
+	/* Separate actions depending on type of variable for which the next subscript is being located */
+	switch(nodenext_type)
+	{
+		case LYDB_VARREF_LOCAL:
+			/* Get the given local variable value storing it in the provided buffer (if it fits) */
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Locate basevar lv_val */
+			varnamemv.mvtype = MV_STR;
+			varnamemv.str.addr = varname->buf_addr;
+			varnamemv.str.len = varname->len_used;
+			if (0 == subs_used)
+			{	/* If no subscripts, use op_fnlvname() to locate the next local variable */
+				op_fnquery(3, NULL, &varnamemv, lvvalp);
+			} else
+			{	/* We have some subscripts - feed them all to op_fnquery */
+				plist.arg[0] = NULL;			/* arg1: destination mval not supplied in simpleAPI mode */
+				plist.arg[1] = &varnamemv;		/* arg2: varname mval */
+				plist.arg[2] = lvvalp;			/* arg3: varname lv_val */
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3);
+				callg((callgfnptr)op_fnquery, &plist);	/* Drive "op_fnquery" to locate next node */
+			}
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray);
+			break;
+		case LYDB_VARREF_GLOBAL:
+			/* Global variable subscript-next processing is the same regardless of argument count:
+			 *   1. Drive "op_gvname" with the global name and all subscripts to setup the key we need to access
+			 *      the global node.
+			 *   2. Drive "op_gvquery" to fetch the next node in the tree of the given global.
+			 *
+			 * Note no need to rebuffer any of the inputs here as they won't live in the stringpool once set.
+			 */
+			gvname.mvtype = MV_STR;
+			gvname.str.addr = varname->buf_addr + 1;	/* Point past '^' to var name */
+			gvname.str.len = varname->len_used - 1;
+			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
+			if (0 < subs_used)
+			{
+				plist.arg[0] = &gvname;
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
+			} else
+				op_gvname(1, &gvname);			/* Single parm call to get next global */
+			op_gvquery(NULL);				/* Locate next subscript this level */
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray);
+			break;
+		case LYDB_VARREF_ISV:
+			/* ISV references are not supported for this call */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			break;
+		default:
+			assertpro(FALSE);
+	}
+	REVERT;
+	return YDB_OK;
 }

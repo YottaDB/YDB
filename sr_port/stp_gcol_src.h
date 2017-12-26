@@ -466,7 +466,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
 	lvTreeNode		*node, *node_limit;
-	mstr			**cstr, *x, **cstr_top;
+	mstr			**cstr, *x, **cstr_top, *mstrp, *mstrp_top;
 	mv_stent		*mvs;
 	mval			*m, **mm, **mmtop, *mtop;
 	intszofptr_t		lv_subs;
@@ -912,6 +912,15 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			     cstr++)
 			{
 				MSTR_STPG_PUT(*cstr);
+			}
+		}
+		if (0 < TREF(sapi_query_node_subs_cnt))
+		{	/* Another set of mstrs used to return subscripts from ydb_node_{next,previous}_s() */
+			for (mstrp = TREF(sapi_query_node_subs), mstrp_top = mstrp + TREF(sapi_query_node_subs_cnt);
+			     mstrp < mstrp_top;
+			     mstrp++)
+			{
+				MSTR_STPG_PUT(mstrp);
 			}
 		}
 	}
