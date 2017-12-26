@@ -53,6 +53,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
+		assert(0 == TREF(sapi_query_node_subs_cnt));	/* should have been cleared by "ydb_simpleapi_ch" */
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -69,7 +70,15 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Locate basevar lv_val */
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE); /* Locate base lv_val */
+			if (NULL == lvvalp)
+			{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
+				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
+				 * Return 0 for "ydb_node_next_s" result.
+				 */
+				*ret_subs_used = YDB_NODE_END;
+				break;
+			}
 			varnamemv.mvtype = MV_STR;
 			varnamemv.str.addr = varname->buf_addr;
 			varnamemv.str.len = varname->len_used;
@@ -115,6 +124,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		default:
 			assertpro(FALSE);
 	}
+	TREF(sapi_query_node_subs_cnt) = 0;
 	REVERT;
 	return YDB_OK;
 }

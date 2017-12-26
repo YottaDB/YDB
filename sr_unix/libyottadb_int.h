@@ -212,8 +212,12 @@ MBSTART {															\
 	assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));								\
 	VARLVVALP = (VARTABENTP)->value;											\
 } MBEND
+
+#define	LVUNDEF_OK_FALSE	FALSE
+#define	LVUNDEF_OK_TRUE		TRUE
+
 /* Now the NOUPD version */
-#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP)								\
+#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP, LVUNDEF_OK)						\
 MBSTART {															\
 	lv_val		*lv;													\
 																\
@@ -223,9 +227,16 @@ MBSTART {															\
 	COMPUTE_HASH_MNAME((VARMNAMEP));			/* Compute its hash value */					\
 	(VARTABENTP) = lookup_hashtab_mname(&curr_symval->h_symtab, (VARMNAMEP));						\
 	if ((NULL == (VARTABENTP)) || (NULL == (lv_val *)((VARTABENTP)->value)))						\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);								\
-	assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));								\
-	VARLVVALP = (VARTABENTP)->value;											\
+	{															\
+		if (LVUNDEF_OK)													\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);							\
+		else														\
+			VARLVVALP = NULL;											\
+	} else															\
+	{															\
+		assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));							\
+		VARLVVALP = (VARTABENTP)->value;										\
+	}															\
 } MBEND
 
 /* Macro to set a supplied ydb_buffer_t value into an mval/lv_val */

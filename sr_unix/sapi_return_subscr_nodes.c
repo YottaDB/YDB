@@ -34,16 +34,16 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Results from the lower level routine doing the work for our simpleAPI call should be in the global
-	 * output array TREF(sapi_query_node_subs). The mstrs here are know to G/C. Copy the mstr data to the
-	 * user's supplied buffers stopping when/if we hit an error to return what we have.
-	 */
-	outsubs = *ret_subs_used;
 	if (0 == TREF(sapi_query_node_subs_cnt))
 	{	/* No subscripts were returned - set to YDB_NODE_END */
 		*ret_subs_used = YDB_NODE_END;
 		return;
 	}
+	/* Results from the lower level routine doing the work for our simpleAPI call should be in the global
+	 * output array TREF(sapi_query_node_subs). The mstrs here are know to G/C. Copy the mstr data to the
+	 * user's supplied buffers stopping when/if we hit an error to return what we have.
+	 */
+	outsubs = *ret_subs_used;
 	*ret_subs_used = 0;
 	for (mstrp = TREF(sapi_query_node_subs), mstrp_top = mstrp + TREF(sapi_query_node_subs_cnt),
 		     outsubp = ret_subsarray, outsubp_top = outsubp + outsubs;
