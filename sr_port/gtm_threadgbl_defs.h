@@ -302,6 +302,9 @@ THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
+THREADGBLDEF(sapi_query_node_subs,		mstr *)				/* -> Array of YDB_MAX_SUBS mstrs holding subs
+										 * .. to return to ydb_node_*_s(). */
+THREADGBLDEF(sapi_query_node_subs_cnt,		int)				/* Count of subs filled in */
 THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */

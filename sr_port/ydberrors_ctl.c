@@ -25,6 +25,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "VARNAMEINVALID", "Invalid local/global/ISV variable name supplied to API call", 0 },
 	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
 	{ "NORETBUFFER", "No return/output buffer provided for !AD call", 2 },
+	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3 },
 };
 
 
@@ -32,4 +33,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	8};
+	9};
