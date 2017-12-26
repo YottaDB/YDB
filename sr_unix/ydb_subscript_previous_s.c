@@ -31,6 +31,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 
+LITREF	mval	literal_zero;
+
 /* Routine to locate the previous subscript at a given level.
  *
  * Parameters:
@@ -97,7 +99,15 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				 *   - If only one subscript, skip the call to op_srchindx() and just call op_fnorder() with
 				 *     the single supplied subscript.
 				 */
-				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);	/* Find basevar lv_val */
+				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE); /* Locate base lv_val */
+				if (NULL == lvvalp)
+				{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
+					 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
+					 * Return 0 for "ydb_subscript_previous_s" result.
+					 */
+					SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &literal_zero);
+					break;
+				}
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
 				plist.n--;				/* Don't use last subscr in lookup */
 				if (1 < subs_used)
