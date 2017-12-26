@@ -28,12 +28,10 @@
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 {
 	mval		src, dst;
-	boolean_t	error_encountered, save_gtm_utf8_mode;
+	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* We want the zwrite representation to always have $C(x) where x < 256 and hence switch to M mode unconditionally */
-	save_gtm_utf8_mode = gtm_utf8_mode;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_STR2ZWR);	/* Note: macro could "return" from this function in case of errors */
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
@@ -41,12 +39,11 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
-		gtm_utf8_mode = save_gtm_utf8_mode;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	if ((NULL == str->buf_addr) || (0 == str->len_alloc))
+	if ((NULL == zwr->buf_addr) || (0 == zwr->len_alloc))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_str2zwr()"));
 		/* Separate actions depending on type of variable for which the next subscript is being located */
 	src.mvtype = MV_STR;
@@ -58,7 +55,6 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	SET_BUFFER_FROM_LVVAL_VALUE(zwr, &dst);
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No need to protect "src.str" anymore */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
-	gtm_utf8_mode = save_gtm_utf8_mode;
 	REVERT;
 	return YDB_OK;
 }
