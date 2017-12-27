@@ -143,10 +143,6 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		default:
 			assertpro(FALSE);
 	}
-	MV_FORCE_STR(ret_mv);	/* this will compute the string and store it in the stringpool */
-	/* Since the above step will compute the string equivalent of the post-increment number and store it in the
-	 * stringpool, we do not need a s2pool and/or RECORD_MSTR_FOR_GC step like we needed in "ydb_set_s".
-	 */
 	SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv);	/* Copy value to return buffer */
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
