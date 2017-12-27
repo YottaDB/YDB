@@ -40,6 +40,7 @@ void op_gvquery(mval *v)
 	int4			size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;
  	boolean_t		currkey_has_special_meaning, found, ok_to_change_currkey, last_subsc_is_null;
+	boolean_t		is_simpleapi_mode;
 	enum db_acc_method 	acc_meth;
 	unsigned char		ch1, ch2, *extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
@@ -124,12 +125,17 @@ void op_gvquery(mval *v)
 			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 		}
 	}
-	v->mvtype = 0; /* so STP_GCOL (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
+	assert((is_simpleapi_mode && (NULL == v)) || (!is_simpleapi_mode && (NULL != v)));
+	if (!is_simpleapi_mode)
+		v->mvtype = 0;	/* so STP_GCOL (if invoked below) can free up space
+				 * currently occupied by this to-be-overwritten mval.
+				 */
 	if (found)
 	{
 		if (acc_meth != dba_usr)
 		{	/* We have a known access method - save the subscript path appropriately for the mode we are in */
-			if (!IS_SIMPLEAPI_MODE)
+			if (!is_simpleapi_mode)
 			{	/* MM/BG mode - do a normal ASCII format of the reference for return */
 				if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)) == 0)
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
@@ -144,11 +150,11 @@ void op_gvquery(mval *v)
 			}
 		} else
 		{
-			assert(!IS_SIMPLEAPI_MODE);
+			assert(!is_simpleapi_mode);
 			size = v->str.len - 1; /* exclude ^ */
 			glob_begin = (unsigned char *)v->str.addr + 1; /* skip ^ */
 		}
-		if (!IS_SIMPLEAPI_MODE)
+		if (!is_simpleapi_mode)
 		{	/* When returning the "normal" M code global reference string, we need to return a double-quote for
 			 * every single-quote; assume worst case. Account for ^ in both cases - extnam and no extnam.
 			 */
@@ -192,11 +198,11 @@ void op_gvquery(mval *v)
 			COPY_KEY(last_gvquery_key, gv_altkey);
 	} else /* !found */
 	{
-		if (!IS_SIMPLEAPI_MODE)
+		if (!is_simpleapi_mode)
 			v->str.len = 0;
 		last_gvquery_key->end = 0;
 	}
-	if (!IS_SIMPLEAPI_MODE)
+	if (!is_simpleapi_mode)
 		v->mvtype = MV_STR;	/* Initialize mvtype now that mval has been otherwise completely set up */
 	return;
 }
