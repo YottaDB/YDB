@@ -51,7 +51,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 	lv_val		*lvvalp, *dst_lv;
 	mname_entry	var_mname;
 	mval		gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	mval		*lv_mv, *increment_mv, increment_mval;
+	mval		*lv_mv, *increment_mv, increment_mval, *ret_mv, ret_mval;
 	ydb_var_types	incr_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -113,11 +113,8 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 				*lv_mv = literal_zero;
 			op_add(lv_mv, increment_mv, lv_mv);
 			assert(!MV_IS_STRING(lv_mv));
-			MV_FORCE_STR(lv_mv);	/* this will compute the string and store it in the stringpool */
-			/* Since the above step will compute the string equivalent of the post-increment number and store it in the
-			 * stringpool, we do not need a s2pool and/or RECORD_MSTR_FOR_GC step like we needed in "ydb_set_s".
-			 */
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, lv_mv);	/* Copy value to return buffer */
+			ret_mval = *lv_mv;
+			ret_mv = &ret_mval;
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Find dstatus of the given global variable value. We do this by:
@@ -136,6 +133,8 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
+			ret_mv = &ret_mval;
+			op_gvincr(increment_mv, ret_mv);
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -144,6 +143,11 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		default:
 			assertpro(FALSE);
 	}
+	MV_FORCE_STR(ret_mv);	/* this will compute the string and store it in the stringpool */
+	/* Since the above step will compute the string equivalent of the post-increment number and store it in the
+	 * stringpool, we do not need a s2pool and/or RECORD_MSTR_FOR_GC step like we needed in "ydb_set_s".
+	 */
+	SET_BUFFER_FROM_LVVAL_VALUE(ret_value, ret_mv);	/* Copy value to return buffer */
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;
