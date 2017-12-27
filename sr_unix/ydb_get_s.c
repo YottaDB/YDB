@@ -103,7 +103,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, src_lv);		/* Copy value to return buffer */
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v);		/* Copy value to return buffer */
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Fetch the given global variable value. We do this by:
@@ -124,12 +124,12 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 									 * if value not found (and undef_inhibit not set)
 									 */
 			assert(gotit);
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &get_value);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value);
 			break;
 		case LYDB_VARREF_ISV:
 			/* Fetch the given ISV value (no subscripts supported) */
 			op_svget(get_svn_index, &get_value);
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &get_value);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value);
 			break;
 		default:
 			assertpro(FALSE);

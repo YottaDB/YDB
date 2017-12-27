@@ -105,7 +105,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 					 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 					 * Return 0 for "ydb_subscript_previous_s" result.
 					 */
-					SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &literal_zero);
+					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero);
 					break;
 				}
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
@@ -125,7 +125,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				previoussub_mv = &previoussub;
 				MV_FORCE_STR(previoussub_mv);
 			}
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &previoussub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
@@ -147,7 +147,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get previous global */
 			op_zprevious(&previoussub);			/* Locate previous subscript this level */
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &previoussub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub);
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
