@@ -178,7 +178,6 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char
 			 */
 		}
 	}
-	/* NARSTODO; Pass list of variable names to preserve */
 	REVERT;
 	return tpfn_status;
 }
