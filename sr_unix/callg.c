@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,6 +19,7 @@
 
 #include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
+#include "op.h"
 
 #define VAR_ARGS4(ar)	ar[0], ar[1], ar[2], ar[3]
 
@@ -93,7 +97,10 @@ INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 		case 34:
 		case 35:
 		case 36:
-			assert(fnptr == (callgfnptr)push_parm); /* Only push_parm is aware of this extra space */
+			/* Only the below functions are aware of this extra space */
+			assert((fnptr == (callgfnptr)push_parm)
+				|| (fnptr == (callgfnptr)op_fnquery)
+				|| (fnptr == (callgfnptr)op_fnreversequery));
 			return (fnptr)(paramlist->n, VAR_ARGS36(paramlist->arg));
 		default:
 			assertpro(paramlist->n <= 36);

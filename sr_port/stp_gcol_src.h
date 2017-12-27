@@ -920,7 +920,8 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			     mstrp < mstrp_top;
 			     mstrp++)
 			{
-				MSTR_STPG_PUT(mstrp);
+				if (0 < mstrp->len)
+					MSTR_STPG_PUT(mstrp);
 			}
 		}
 	}

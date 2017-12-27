@@ -45,9 +45,7 @@ void sapi_save_targ_key_subscr_nodes(void)
 	assert(0 == TREF(sapi_query_node_subs_cnt));	/* Caller should have initialized */
 	/* Verify global subscript array is available and if not make it so */
 	if (NULL == TREF(sapi_query_node_subs))
-	{	/* Allocate mstr array we need */
-		TREF(sapi_query_node_subs) = malloc(SIZEOF(mstr) * YDB_MAX_SUBS);
-	}
+		TREF(sapi_query_node_subs) = malloc(SIZEOF(mstr) * YDB_MAX_SUBS);	/* Allocate mstr array we need */
 	subcur = TREF(sapi_query_node_subs);
 	subtop = subcur + TREF(sapi_query_node_subs_cnt);
 	gvkey_char_ptr = gv_altkey->base;
@@ -60,15 +58,15 @@ void sapi_save_targ_key_subscr_nodes(void)
 		;
 	/* The following asserts (in the for loop) assume that a global name will be able to fit in completely into any key. */
 	assert(gvkey_char_ptr <= gvkey_top_ptr);
-	if (0 == *gvkey_char_ptr)			/* No subscripts */
-		return;
-	for ( ; gvkey_char_ptr <= gvkey_top_ptr; subcur++, (TREF(sapi_query_node_subs_cnt))++)
+	for ( ; gvkey_char_ptr < gvkey_top_ptr; )
 	{
-		assert(gvkey_char_ptr <= gvkey_top_ptr);
-		if (0x01 == *gvkey_char_ptr)		/* This must be a null string which was adjusted by op_gvorder */
-		{					/* TODO (review) not sure if this check is needed as $order not involved */
+		if (SUBSCRIPT_STDCOL_NULL == *gvkey_char_ptr)	/* This is a null string in Standard Null Collation format */
+		{
 			subcur->addr = NULL;
 			subcur->len = 0;
+			gvkey_char_ptr++;
+			assert(KEY_DELIMITER == *gvkey_char_ptr);
+			gvkey_char_ptr++;
 		} else
 		{
 			opstr.addr = (char *)work_buff;
@@ -77,10 +75,13 @@ void sapi_save_targ_key_subscr_nodes(void)
 			subcur->addr = (char *)work_buff;
 			subcur->len = work_top - work_buff;
 			s2pool(subcur);		/* Rebuffer in stringpool so value survives return from this routine */
+			/* Advance until next null separator */
+			for ( ; *gvkey_char_ptr++ && (gvkey_char_ptr <= gvkey_top_ptr); )
+				;
 		}
-		/* Advance until next null separator */
-		for (; *gvkey_char_ptr++ && (gvkey_char_ptr <= gvkey_top_ptr);)
-			;
-		assertpro(gvkey_char_ptr > gvkey_top_ptr);
+		assert(gvkey_char_ptr <= gvkey_top_ptr);
+		subcur++;
 	}
+	TREF(sapi_query_node_subs_cnt) = subcur - TREF(sapi_query_node_subs);
+	return;
 }

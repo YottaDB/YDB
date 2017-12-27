@@ -78,7 +78,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
 	lvTree			*lvt;
 	int			i, j, nexti;
-	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str, push_v1;
+	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str, push_v1, is_simpleapi_mode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -91,9 +91,10 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	assert(v);
 	assert(LV_IS_BASE_VAR(v));
 	lvt = LV_GET_CHILD(v);
+	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
 	if (NULL == lvt)
 	{
-		if (IS_SIMPLEAPI_MODE)
+		if (is_simpleapi_mode)
 			return;				/* Array size of zero is the signal there is nothing else */
 		dst->mvtype = MV_STR;
 		dst->str.len = 0;
@@ -248,7 +249,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			assert(h1 >= &history[0]);
 			if (h1 == &history[0])
 			{
-				if (IS_SIMPLEAPI_MODE)
+				if (is_simpleapi_mode)
 					return;			/* Array size of zero is the signal there is nothing else */
 				dst->mvtype = MV_STR;
 				dst->str.len = 0;
@@ -288,7 +289,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	/* The actual return of the next node differs significantly depending on whether this is a $QUERY() call from
 	 * generated code or a ydb_node_next_s() call from the simpleAPI. Fork that difference here.
 	 */
-	if (IS_SIMPLEAPI_MODE)
+	if (is_simpleapi_mode)
 	{	/* SimpleAPI mode - return a list of subscripts in an array of ydb_buffer_t structures which have pre-allocated
 		 * buffers in them (no stringpool complications). Also, all values are returned as (unquoted) strings eliminating
 		 * some display formatting issues.
@@ -318,7 +319,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		if (NULL == TREF(sapi_query_node_subs))
 			/* Allocate mstr array we need */
 			TREF(sapi_query_node_subs) = malloc(SIZEOF(mstr) * YDB_MAX_SUBS);
-		for (h2 = &history[1], retsub = TREF(sapi_query_node_subs); h2 <= h1; h2++, retsub++)
+		for (h2 = &history[1], retsub = TREF(sapi_query_node_subs); h2 <= h1; h2++)
 		{
 			node = *h2;
 			assert(!LV_IS_BASE_VAR(node)); /* guarantees to us that "node" is a "lvTreeNode *" and not "lv_val *" */
@@ -372,8 +373,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				}
 			}
 			/* Save a copy of the mstr in our global subscript structure we'll return to our caller */
-			*retsub = v2->str;
-			retsub++;
+			*retsub++ = v2->str;
 			(TREF(sapi_query_node_subs_cnt))++;
 		}
 	} else

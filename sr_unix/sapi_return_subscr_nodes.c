@@ -68,6 +68,6 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 		 * when an error occurs this value is used as an INDEX to the broken subscript so we can only
 		 * increment it after the rebuffering is complete.
 		 */
-		*ret_subs_used++;
+		(*ret_subs_used)++;
 	}
 }
