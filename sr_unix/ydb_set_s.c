@@ -87,7 +87,7 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1);
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
-			SET_LVVAL_VALUE_FROM_BUFFER(dst_lv, value);	/* Set value into located/created node */
+			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
 			s2pool(&(dst_lv->v.str));			/* Rebuffer in stringpool for protection */
 			RECORD_MSTR_FOR_GC(&(dst_lv->v.str));
 			break;
@@ -105,7 +105,7 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
 			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
-			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Put value to set into mval for "op_gvput" */
+			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */
 			break;
 		case LYDB_VARREF_ISV:
@@ -113,7 +113,7 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			 *
 			 * Note need to rebuffer the input value as the addr/length are directly copied in many cases.
 			 */
-			SET_LVVAL_VALUE_FROM_BUFFER(&set_value, value);	/* Setup mval with target value */
+			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Setup mval with target value */
 			s2pool(&set_value.str);				/* Rebuffer in stringpool for protection */
 			RECORD_MSTR_FOR_GC(&set_value.str);
 			op_svput(set_svn_index, &set_value);

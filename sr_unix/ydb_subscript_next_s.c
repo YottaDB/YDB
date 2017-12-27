@@ -104,7 +104,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 					 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 					 * Return 0 for "ydb_subscript_next_s" result.
 					 */
-					SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &literal_zero);
+					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero);
 					break;
 				}
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
@@ -124,7 +124,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 				nextsub_mv = &nextsub;
 				MV_FORCE_STR(nextsub_mv);
 			}
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &nextsub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -146,7 +146,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvorder(&nextsub);				/* Locate next subscript this level */
-			SET_BUFFER_FROM_LVVAL_VALUE(ret_value, &nextsub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub);
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */

@@ -52,7 +52,7 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 	s2pool(&src.str);		/* Rebuffer in stringpool for protection */
 	RECORD_MSTR_FOR_GC(&src.str);
 	op_fnzwrite(TRUE, &src, &dst);
-	SET_BUFFER_FROM_LVVAL_VALUE(str, &dst);
+	SET_YDB_BUFF_T_FROM_MVAL(str, &dst);
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No need to protect "src.str" anymore */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 	REVERT;

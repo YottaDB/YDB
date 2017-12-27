@@ -239,22 +239,22 @@ MBSTART {															\
 	}															\
 } MBEND
 
-/* Macro to set a supplied ydb_buffer_t value into an mval/lv_val */
-#define SET_LVVAL_VALUE_FROM_BUFFER(LVVALP, BUFVALUE)				\
-MBSTART	{									\
-	((mval *)(LVVALP))->mvtype = MV_STR;					\
-	((mval *)(LVVALP))->str.addr = (BUFVALUE)->buf_addr;			\
-	((mval *)(LVVALP))->str.len = (BUFVALUE)->len_used;			\
+/* Macro to set a supplied ydb_buffer_t value into an mval */
+#define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)	\
+MBSTART	{						\
+	(MVALP)->mvtype = MV_STR;			\
+	(MVALP)->str.addr = (YDBBUFF)->buf_addr;	\
+	(MVALP)->str.len = (YDBBUFF)->len_used;		\
 } MBEND
 
-/* Macro to set a supplied ydb_buffer_t value from a supplied mval/lv_val */
-#define SET_BUFFER_FROM_LVVAL_VALUE(BUFVALUE, LVVALP)					\
+/* Macro to set a supplied ydb_buffer_t value from a supplied mval */
+#define SET_YDB_BUFF_T_FROM_MVAL(YDBBUFF, MVALP)					\
 MBSTART	{										\
 	mval		*sRC;	/* named so to avoid name collision with caller */	\
 	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */	\
 											\
-	sRC = ((mval *)(LVVALP));							\
-	dST = BUFVALUE;									\
+	sRC = MVALP;									\
+	dST = YDBBUFF;									\
 	if (sRC->str.len > dST->len_alloc)						\
 	{										\
 		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */	\
@@ -311,7 +311,7 @@ MBSTART	{													\
 		 * A subscript has been specified - copy it to the associated mval and put its address		\
 		 * in the param list										\
 		 */												\
-		SET_LVVAL_VALUE_FROM_BUFFER(mvalp, subval);							\
+		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subval);							\
 		if (REBUFFER)											\
 		{												\
 			s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */			\
