@@ -254,6 +254,11 @@ MBSTART	{										\
 	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */	\
 											\
 	sRC = MVALP;									\
+	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one	\
+	 * so convert incoming mval to a string and then copy it, if needed.		\
+	 */										\
+	MV_FORCE_STR(sRC);								\
+	assert(MV_IS_STRING(sRC));							\
 	dST = YDBBUFF;									\
 	if (sRC->str.len > dST->len_alloc)						\
 	{										\
