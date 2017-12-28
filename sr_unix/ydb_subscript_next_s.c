@@ -73,7 +73,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
 	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((NULL == ret_value) || (NULL == ret_value->buf_addr) || (0 == ret_value->len_alloc))

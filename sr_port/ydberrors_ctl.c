@@ -26,6 +26,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
 	{ "NORETBUFFER", "No return/output buffer provided for !AD call", 2 },
 	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3 },
+	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0 },
 };
 
 
@@ -33,4 +34,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	9};
+	10};
