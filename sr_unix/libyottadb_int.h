@@ -306,7 +306,7 @@ MBSTART	{													\
 	subval = (ydb_buffer_t *)SUBSARRAY;	 								\
 	if ((COUNT) && (NULL == subval))									\
 	{       /* count of subscripts is non-zero but no subscript specified - error */			\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SUBSARRAYNULL, 1, (COUNT));			\
 	}													\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
