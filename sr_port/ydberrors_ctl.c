@@ -27,6 +27,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "NORETBUFFER", "No return/output buffer provided for !AD call", 2 },
 	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3 },
 	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0 },
+	{ "SUBSARRAYNULL", "Non-zero # of subscripts [!UL] specified but subscript array parameter is NULL", 1 },
 };
 
 
@@ -34,4 +35,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	10};
+	11};
