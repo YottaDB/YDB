@@ -43,9 +43,8 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	if ((NULL == str->buf_addr) || (0 == str->len_alloc))
+	if ((NULL == str) || (NULL == str->buf_addr) || (0 == str->len_alloc))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_zwr2str()"));
-		/* Separate actions depending on type of variable for which the next subscript is being located */
 	src.mvtype = MV_STR;
 	src.str.len = zwr->len_used;
 	src.str.addr = zwr->buf_addr;
