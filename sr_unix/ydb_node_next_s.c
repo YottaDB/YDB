@@ -60,7 +60,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, nodenext_type, nodenext_svn_index, FALSE);
 	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if ((0 == *ret_subs_used) || (NULL == ret_subsarray))

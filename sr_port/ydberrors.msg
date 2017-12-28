@@ -30,3 +30,4 @@ VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/err
 VALUEINVALID	<Invalid value specified to ydb_set_s() call>/error/fao=0
 NORETBUFFER	<No return/output buffer provided for !AD call>/error/fao=2
 INSUFFSUBS	<Return subscript array for !AD call too small - needs at least !UL entries for this call>/error/fao=3
+MINNRSUBSCRIPTS	<Number of subscripts cannot be a negative number>/error/fao=0
