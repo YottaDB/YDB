@@ -23,11 +23,11 @@ LITDEF	err_msg ydberrors[] = {
 	{ "READONLYNOSTATS", "Read-only and Statistics sharing cannot both be enabled on database", 0 },
 	{ "READONLYLKFAIL", "Failed to get !AD lock on READ_ONLY database file !AD", 4 },
 	{ "VARNAMEINVALID", "Invalid local/global/ISV variable name supplied to API call", 0 },
-	{ "VALUEINVALID", "Invalid value specified to ydb_set_s() call", 0 },
+	{ "YDBBUFFTINVALID", "Invalid ydb_buffer_t structure specified in !AD call", 2 },
 	{ "NORETBUFFER", "No return/output buffer provided for !AD call", 2 },
 	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3 },
 	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0 },
-	{ "SUBSARRAYNULL", "Non-zero # of subscripts [!UL] specified but subscript array parameter is NULL", 1 },
+	{ "SUBSARRAYNULL", "Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL", 1 },
 };
 
 

@@ -78,6 +78,8 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		increment_mval = literal_one;
 	else
 	{
+		if (IS_INVALID_YDB_BUFF_T(increment))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_YDBBUFFTINVALID, 2, RTS_ERROR_LITERAL("ydb_incr_s()"));
 		increment_mval.mvtype = MV_STR;
 		increment_mval.str.addr = increment->buf_addr;
 		increment_mval.str.len = increment->len_used;

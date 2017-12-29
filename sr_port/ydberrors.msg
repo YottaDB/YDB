@@ -27,8 +27,8 @@ LIBYOTTAMISMTCH	<$ydb_dist/libyottadb.so (!AD) does not match the shared library
 READONLYNOSTATS	<Read-only and Statistics sharing cannot both be enabled on database>/error/fao=0!/ansi=0
 READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao=4!/ansi=0
 VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
-VALUEINVALID	<Invalid value specified to ydb_set_s() call>/error/fao=0
+YDBBUFFTINVALID	<Invalid ydb_buffer_t structure specified in !AD call>/error/fao=2
 NORETBUFFER	<No return/output buffer provided for !AD call>/error/fao=2
 INSUFFSUBS	<Return subscript array for !AD call too small - needs at least !UL entries for this call>/error/fao=3
 MINNRSUBSCRIPTS	<Number of subscripts cannot be a negative number>/error/fao=0
-SUBSARRAYNULL	<Non-zero # of subscripts [!UL] specified but subscript array parameter is NULL>/error/fao=1
+SUBSARRAYNULL	<Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL>/error/fao=1
