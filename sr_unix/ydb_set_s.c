@@ -43,6 +43,7 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	lv_val		*lvvalp, *dst_lv;
 	mname_entry	var_mname;
 	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_buffer_t	null_ydb_buff;
 	ydb_var_types	set_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -63,7 +64,14 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	VALIDATE_VALUE(value);			/* Value must exist for SET */
+	if (NULL == value)
+	{	/* Treat it as the null string */
+		null_ydb_buff.len_used = 0;
+		null_ydb_buff.buf_addr = NULL;
+		value = &null_ydb_buff;
+	}
+	if (IS_INVALID_YDB_BUFF_T(value))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_YDBBUFFTINVALID, 2, RTS_ERROR_LITERAL("ydb_set_s()"));
 	/* Separate actions depending on the type of SET being done */
 	switch(set_type)
 	{

@@ -179,13 +179,6 @@ MBSTART {														\
 	}		       												\
 } MBEND
 
-/* Macro to validate a supplied value - can be NULL but if length is non-zero, so must the address be */
-#define VALIDATE_VALUE(VARVALUE)						\
-MBSTART	{									\
-	if ((NULL == (VARVALUE)->buf_addr) && (0 != (VARVALUE)->len_used))	\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VALUEINVALID);	\
-} MBEND
-
 /* Macro to locate or create an entry in the symbol table for the specified base variable name. There are
  * two flavors:
  *   1. FIND_BASE_VAR_UPD()   - var is being set so input names need rebuffering.
@@ -238,6 +231,10 @@ MBSTART {															\
 		VARLVVALP = (VARTABENTP)->value;										\
 	}															\
 } MBEND
+
+/* Macro to check whether input to ydb_*_s() function from the user is a valid "ydb_buffer_t" structure */
+#define	IS_INVALID_YDB_BUFF_T(ydbBuff)	((ydbBuff->len_alloc < ydbBuff->len_used)				\
+						|| ((NULL == ydbBuff->buf_addr) && (0 != ydbBuff->len_used)))
 
 /* Macro to set a supplied ydb_buffer_t value into an mval */
 #define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)	\
