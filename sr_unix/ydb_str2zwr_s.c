@@ -43,15 +43,16 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Do some validation */
-	if ((NULL == zwr) || (NULL == zwr->buf_addr) || (0 == zwr->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_str2zwr()"));
+	if (NULL == zwr)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+						LEN_AND_LIT("NULL zwr"), LEN_AND_LIT("ydb_str2zwr()"));
 	src.mvtype = MV_STR;
 	src.str.len = str->len_used;
 	src.str.addr = str->buf_addr;
 	s2pool(&src.str);		/* Rebuffer in stringpool for protection */
 	RECORD_MSTR_FOR_GC(&src.str);
 	op_fnzwrite(FALSE, &src, &dst);
-	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst);
+	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst, "NULL zwr->buf_addr", "ydb_str2zwr_s()");
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No need to protect "src.str" anymore */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 	REVERT;

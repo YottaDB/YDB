@@ -19,8 +19,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* READONLYNOSTATS */
 	   0,	/* READONLYLKFAIL */
 	   0,	/* VARNAMEINVALID */
-	   0,	/* YDBBUFFTINVALID */
-	   0,	/* NORETBUFFER */
+	   0,	/* PARAMINVALID */
 	   0,	/* INSUFFSUBS */
 	   0,	/* MINNRSUBSCRIPTS */
 	   0,	/* SUBSARRAYNULL */

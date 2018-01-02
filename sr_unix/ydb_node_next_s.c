@@ -63,8 +63,9 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if ((0 == *ret_subs_used) || (NULL == ret_subsarray))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_node_next_s()"));
+	if (NULL == ret_subs_used)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_LIT("ydb_node_next_s()"));
 	/* Separate actions depending on type of variable for which the next subscript is being located */
 	switch(nodenext_type)
 	{
@@ -90,10 +91,10 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 				plist.arg[0] = NULL;			/* arg1: destination mval not supplied in simpleAPI mode */
 				plist.arg[1] = &varnamemv;		/* arg2: varname mval */
 				plist.arg[2] = lvvalp;			/* arg3: varname lv_val */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3, "ydb_node_next_s()");
 				callg((callgfnptr)op_fnquery, &plist);	/* Drive "op_fnquery" to locate next node */
 			}
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray);
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, "ydb_node_next_s()");
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -110,12 +111,12 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_node_next_s()");
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvquery(NULL);				/* Locate next subscript this level */
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray);
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, "ydb_node_next_s()");
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
