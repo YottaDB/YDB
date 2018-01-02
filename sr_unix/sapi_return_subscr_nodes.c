@@ -25,8 +25,9 @@
  *       on input:    Count of total available output subscripts for output
  *       on output:   Count of subscripts returned to user
  *   ret_subsarray - Address of an array of ydb_buffer_t subscript descriptors
+ *   ydb_caller_fn - Name of function that is invoking it. Used as a parameter to PARAMINVALID error if issued.
  */
-void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray)
+void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn)
 {
 	ydb_buffer_t	*outsubp, *outsubp_top;
 	mstr		*mstrp, *mstrp_top;
@@ -39,6 +40,9 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 		*ret_subs_used = YDB_NODE_END;
 		return;
 	}
+	if (NULL == ret_subsarray)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+							LEN_AND_LIT("NULL ret_subsarray"), LEN_AND_STR(ydb_caller_fn));
 	/* Results from the lower level routine doing the work for our simpleAPI call should be in the global
 	 * output array TREF(sapi_query_node_subs). The mstrs here are know to G/C. Copy the mstr data to the
 	 * user's supplied buffers stopping when/if we hit an error to return what we have.

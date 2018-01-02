@@ -69,9 +69,9 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		null_ydb_buff.len_used = 0;
 		null_ydb_buff.buf_addr = NULL;
 		value = &null_ydb_buff;
-	}
-	if (IS_INVALID_YDB_BUFF_T(value))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_YDBBUFFTINVALID, 2, RTS_ERROR_LITERAL("ydb_set_s()"));
+	} else if (IS_INVALID_YDB_BUFF_T(value))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+				LEN_AND_LIT("Invalid value"), LEN_AND_LIT("ydb_set_s()"));
 	/* Separate actions depending on the type of SET being done */
 	switch(set_type)
 	{
@@ -92,7 +92,7 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1, "ydb_set_s()");
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
@@ -111,14 +111,13 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_set_s()");
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */
 			break;
 		case LYDB_VARREF_ISV:
 			/* Set the given ISV (subscripts not currently supported) with the given value.
-			 *
 			 * Note need to rebuffer the input value as the addr/length are directly copied in many cases.
 			 */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Setup mval with target value */

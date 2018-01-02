@@ -237,34 +237,42 @@ MBSTART {															\
 						|| ((NULL == ydbBuff->buf_addr) && (0 != ydbBuff->len_used)))
 
 /* Macro to set a supplied ydb_buffer_t value into an mval */
-#define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)	\
-MBSTART	{						\
-	(MVALP)->mvtype = MV_STR;			\
-	(MVALP)->str.addr = (YDBBUFF)->buf_addr;	\
-	(MVALP)->str.len = (YDBBUFF)->len_used;		\
+#define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)							\
+MBSTART	{												\
+	assert(!IS_INVALID_YDB_BUFF_T(YDBBUFF)); /* caller should have issued error appropriately */	\
+	(MVALP)->mvtype = MV_STR;									\
+	(MVALP)->str.addr = (YDBBUFF)->buf_addr;							\
+	(MVALP)->str.len = (YDBBUFF)->len_used;								\
 } MBEND
 
-/* Macro to set a supplied ydb_buffer_t value from a supplied mval */
-#define SET_YDB_BUFF_T_FROM_MVAL(YDBBUFF, MVALP)					\
-MBSTART	{										\
-	mval		*sRC;	/* named so to avoid name collision with caller */	\
-	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */	\
-											\
-	sRC = MVALP;									\
-	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one	\
-	 * so convert incoming mval to a string and then copy it, if needed.		\
-	 */										\
-	MV_FORCE_STR(sRC);								\
-	assert(MV_IS_STRING(sRC));							\
-	dST = YDBBUFF;									\
-	if (sRC->str.len > dST->len_alloc)						\
-	{										\
-		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */	\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);		\
-	}										\
-	if (sRC->str.len)								\
-		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);			\
-	dST->len_used = sRC->str.len;							\
+/* Macro to set a supplied ydb_buffer_t value from a supplied mval.
+ * PARAM1 and PARAM2 are parameters supplied to the PARAMINVALID error if it needs to be issued.
+ */
+#define SET_YDB_BUFF_T_FROM_MVAL(YDBBUFF, MVALP, PARAM1, PARAM2)				\
+MBSTART	{											\
+	mval		*sRC;	/* named so to avoid name collision with caller */		\
+	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */		\
+												\
+	sRC = MVALP;										\
+	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one		\
+	 * so convert incoming mval to a string and then copy it, if needed.			\
+	 */											\
+	MV_FORCE_STR(sRC);									\
+	assert(MV_IS_STRING(sRC));								\
+	dST = YDBBUFF;										\
+	if (sRC->str.len > dST->len_alloc)							\
+	{											\
+		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */		\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);			\
+	}											\
+	if (sRC->str.len)									\
+	{											\
+		if (NULL == dST->buf_addr)							\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,	\
+						LEN_AND_LIT(PARAM1), LEN_AND_LIT(PARAM2));	\
+		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);				\
+	}											\
+	dST->len_used = sRC->str.len;								\
 } MBEND
 
 /* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
@@ -293,27 +301,36 @@ MBSTART	{															\
 #define DBG_DUMP_PLIST_STRUCT(PLIST)
 #endif
 
-/* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine */
-#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER, STARTIDX)			\
+/* Macro to pull subscripts out of caller's parameter list and buffer them for call to a runtime routine.
+ * PARAM2 is parameter # 2 supplied to the PARAMINVALID error if it needs to be issued.
+ */
+#define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER, STARTIDX, PARAM2)		\
 MBSTART	{													\
 	mval		*mvalp;											\
 	void		**parmp, **parmp_top;									\
-	ydb_buffer_t	*subval;										\
+	ydb_buffer_t	*subs;											\
+	char		buff[256];										\
 				 										\
-	subval = (ydb_buffer_t *)SUBSARRAY;	 								\
-	if ((COUNT) && (NULL == subval))									\
+	subs = (ydb_buffer_t *)SUBSARRAY;	 								\
+	if ((COUNT) && (NULL == subs))										\
 	{       /* count of subscripts is non-zero but no subscript specified - error */			\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SUBSARRAYNULL, 1, (COUNT));			\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, (COUNT), LEN_AND_LIT(PARAM2));	\
 	}													\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
 		parmp < parmp_top;										\
-			parmp++, mvalp++, subval++)								\
+			parmp++, mvalp++, subs++)								\
 	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
 		 * A subscript has been specified - copy it to the associated mval and put its address		\
-		 * in the param list										\
+		 * in the param list. But before that, do validity checks on input ydb_buffer_t.		\
 		 */												\
-		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subval);							\
+		if (IS_INVALID_YDB_BUFF_T(subs))								\
+		{												\
+			SPRINTF(buff, "Invalid subsarray (index %d)", subs - ((ydb_buffer_t *)SUBSARRAY));	\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
+							LEN_AND_STR(buff), LEN_AND_LIT(PARAM2));		\
+		}												\
+		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);								\
 		if (REBUFFER)											\
 		{												\
 			s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */			\
@@ -350,7 +367,7 @@ MBSTART	{													\
  */
 #define IS_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
 
-void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray);
+void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void sapi_save_targ_key_subscr_nodes(void);
 
 #endif /*  LIBYOTTADB_INT_H */

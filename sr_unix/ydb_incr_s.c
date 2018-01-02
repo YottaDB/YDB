@@ -72,14 +72,16 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if ((NULL == ret_value) || (NULL == ret_value->buf_addr) || (0 == ret_value->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_incr_s()"));
+	if (NULL == ret_value)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					LEN_AND_LIT("NULL ret_value"), LEN_AND_LIT("ydb_incr_s()"));
 	if ((NULL == increment) || !increment->len_used)
 		increment_mval = literal_one;
 	else
 	{
 		if (IS_INVALID_YDB_BUFF_T(increment))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_YDBBUFFTINVALID, 2, RTS_ERROR_LITERAL("ydb_incr_s()"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					LEN_AND_LIT("Invalid increment"), LEN_AND_LIT("ydb_incr_s()"));
 		increment_mval.mvtype = MV_STR;
 		increment_mval.str.addr = increment->buf_addr;
 		increment_mval.str.len = increment->len_used;
@@ -106,7 +108,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1, "ydb_incr_s()");
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			/* If we created this node just now, fill it with a 0 value */
@@ -131,7 +133,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_incr_s()");
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
@@ -145,7 +147,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		default:
 			assertpro(FALSE);
 	}
-	SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv);	/* Copy value to return buffer */
+	SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", "ydb_incr_s()"); /* Copy value to return buffer */
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
 	REVERT;
 	return YDB_OK;

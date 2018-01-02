@@ -77,8 +77,9 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if ((NULL == ret_value) || (NULL == ret_value->buf_addr) || (0 == ret_value->len_alloc))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NORETBUFFER, 2, RTS_ERROR_LITERAL("ydb_subscript_previous_s()"));
+	if (NULL == ret_value)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					LEN_AND_LIT("NULL ret_value"), LEN_AND_LIT("ydb_subscript_previous_s()"));
 		/* Separate actions depending on type of variable for which the previous subscript is being located */
 	switch(get_type)
 	{
@@ -105,10 +106,12 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 					 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 					 * Return 0 for "ydb_subscript_previous_s" result.
 					 */
-					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero);
+					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero,
+									"NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 					break;
 				}
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,		\
+								FALSE, 1, "ydb_subscript_previous_s()");
 				plist.n--;				/* Don't use last subscr in lookup */
 				if (1 < subs_used)
 				{	/* Drive op_srchindx() to find node at level prior to target level */
@@ -125,7 +128,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				previoussub_mv = &previoussub;
 				MV_FORCE_STR(previoussub_mv);
 			}
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
@@ -142,12 +145,13 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,		\
+								FALSE, 1, "ydb_subscript_previous_s()");
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get previous global */
 			op_zprevious(&previoussub);			/* Locate previous subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value", "ydb_subscript_previous_s()");
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
