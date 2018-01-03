@@ -207,7 +207,7 @@ uint4 mur_process_intrpt_recov()
 				csd->save_strm_reg_seqno[idx] = csd->strm_reg_seqno[idx];
 			csd->strm_reg_seqno[idx] = jnlrec->jrec_epoch.strm_seqno[idx];
 		}
-		assert(!FROZEN_CHILLED(csd));
+		assert(!FROZEN_CHILLED(csa));
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
 		assert(csa->ti->curr_tn == jctl->turn_around_tn);
 		if (jgbl.onlnrlbk)

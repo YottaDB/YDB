@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +38,10 @@
 
 GBLREF	boolean_t		in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUNOACTION);
+error_def(ERR_TEXT);
+
 /*
  * This reads file header and prints the semaphore/shared memory id
  * This is different than ftok utility.
@@ -57,14 +62,10 @@ void mupip_ftok (void)
 	gd_id		fid;
 	sm_uc_ptr_t	fid_ptr, fid_top;
 
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_TEXT);
-
 	fn_len = MAX_FN_LEN;
 	if (FALSE == cli_get_str("FILE", fn, &fn_len))
 	{
-		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		mupip_exit(ERR_MUPCLIERR);
 	}
 	fn[fn_len] = 0;
@@ -72,8 +73,8 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error))
-			GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
+			assertpro(NULL == instfilename);	/* rts_error should have been issued by repl_inst_get_name */
 		in_mupip_ftok = TRUE;
 		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		in_mupip_ftok = FALSE;

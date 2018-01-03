@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,14 +57,7 @@ void stpg_sort (mstr **base, mstr **top)
 		{
 			ix = l;
 			jx = r;
-			kx = l + ((int)(r - l) / 2);
-			kx = ((*ix)->addr > (*jx)->addr) ?
-				(((*jx)->addr > (*kx)->addr) ?
-					jx :
-					(((*ix)->addr > (*kx)->addr) ? kx : ix)) :
-				(((*jx)->addr < (*kx)->addr) ?
-					jx :
-					(((*ix)->addr > (*kx)->addr) ? ix : kx));
+			kx = l + ((int)(r - l) / 2);	/* kx is middle */
 			v = *kx;
 			*kx = *jx;
 			*jx = v;
@@ -74,11 +68,11 @@ void stpg_sort (mstr **base, mstr **top)
 				do
 				{
 					ix++;
-				} while ((*ix)->addr < tval);
+				} while (ix < r && (*ix)->addr < tval);
 				do
 				{
 					jx--;
-				} while ((*jx)->addr > tval);
+				} while (jx > l && (*jx)->addr > tval);
 				t = *ix;
 				*ix = *jx;
 				*jx = t;

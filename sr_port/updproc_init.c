@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,11 +39,11 @@
 #include "updproc.h"
 #include "repl_dbg.h"
 
-GBLREF	boolean_t	pool_init;
-GBLREF	gd_addr		*gd_header;
-GBLREF	recvpool_addrs	recvpool;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	FILE		*updproc_log_fp;
+GBLREF	int			pool_init;
+GBLREF	gd_addr			*gd_header;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	FILE			*updproc_log_fp;
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
@@ -59,10 +59,10 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	gld_dbname_list		*curr;
 
 	/* Do jnlpool_init ahead of recvpool_init so in case we have a ftok_counter_halted situation we have
-	 * jnlpool.repl_inst_filehdr initialized to set it to TRUE. This is later relied upon by "gtmsource_shutdown"
+	 * jnlpool->repl_inst_filehdr initialized to set it to TRUE. This is later relied upon by "gtmsource_shutdown"
 	 * or "gtmrecv_shutdown" when they do the "ftok_sem_release".
 	 */
-	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
+	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
 	recvpool_init(UPDPROC, FALSE);
 	/* The log file can be initialized only after having attached to the receive pool as the update process log file name
 	 * is derived from the receiver server log file name which is in turn available only in the receive pool.
@@ -82,9 +82,9 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 				RTS_ERROR_LITERAL("Receive pool semop error"), save_errno);
 	}
 	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
-			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
 	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
-			jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
+			jnlpool->repl_inst_filehdr->recvpool_shmid, jnlpool->repl_inst_filehdr->recvpool_semid);
 	/* Note: dpzgbini() is already called as part of gtm_startup which in turn is invoked by init_gtm.
 	 * So no need to do this initialization.
 	 */

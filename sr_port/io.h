@@ -41,6 +41,18 @@ error_def(ERR_UTF16ENDIAN);
 #define MAX_DEV_TYPE_LEN	7
 #define DD_BUFLEN		80
 
+#define ASCII_ESC 		27	/*	this ASCII value is needed on any platform	*/
+#define EBCDIC_ESC		39
+#define ASCII_CR		13
+#define EBCDIC_CR		13
+#define ASCII_LF		10
+#define EBCDIC_LF		37
+#define ASCII_FF		12
+#define EBCDIC_FF		12
+#define ASCII_BS		8
+#define EBCDIC_BS		22
+#define VT			11
+
 #define CHAR_FILTER 128
 #define ESC1 1
 #define ESC2 2
@@ -121,6 +133,8 @@ typedef struct io_desc_struct
 		unsigned char	zb[ESC_LEN];
  		char		key[DD_BUFLEN];
  		char		device[DD_BUFLEN];
+		char		*devicebuffer;
+		int		devicebufferlen;
 	}dollar;
 	unsigned char			esc_state;
 	void				*dev_sp;
@@ -436,7 +450,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 																\
 	intrpt_state_t		prev_intrpt_state;										\
 																\
-	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
@@ -456,7 +470,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 																\
 	intrpt_state_t		prev_intrpt_state;										\
 																\
-	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
@@ -487,4 +501,110 @@ LITREF unsigned char ebcdic_spaces_block[];
 	}															\
 }
 
+#define DEF_EXCEPTION(PP, P_OFF, IOD)					\
+MBSTART {								\
+	mval	MV;							\
+									\
+	MV.mvtype = MV_STR;						\
+	MV.str.len = (int)(*(PP->str.addr + P_OFF));			\
+	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
+	{								\
+		op_commarg(&MV, indir_linetail);			\
+		op_unwind();						\
+	}								\
+	IOD->error_handler = MV.str;					\
+	s2pool(&IOD->error_handler);					\
+} MBEND
+
+#define	ONE_COMMA		"1,"
+#define DEVICE_BUFFER_FULL	"dollar.device BUFFER FULL! CHECK dollar.devicebuffer"
+
+#define ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER_SET)			\
+MBSTART {											\
+	/* This macro checks if there's enough space in dollar.device[] buffer to accommodate	\
+	 * 	the error message (length = LEN). If not, it allocates dollar.devicebuffer, 	\
+	 * 	but first tries to reuse if allocated before, and LEN will fit in.		\
+	 * It then sets WRITEBUFFER_SET to the appropriate buffer to be written into. 		\
+	 */											\
+	if (DD_BUFLEN < LEN)	/* Won't fit into the buffer. allocate space. */		\
+	{											\
+		/* Reuse previously allocated buffer if the new STR fits in */			\
+		if (IOD->dollar.devicebuffer && (LEN > IOD->dollar.devicebufferlen))		\
+		{										\
+			free(IOD->dollar.devicebuffer);						\
+			IOD->dollar.devicebuffer = NULL;					\
+		}										\
+		if (!IOD->dollar.devicebuffer)							\
+		{										\
+			IOD->dollar.devicebuffer = malloc(LEN);					\
+			IOD->dollar.devicebufferlen = LEN;					\
+		}										\
+		WRITEBUFFER_SET = IOD->dollar.devicebuffer;					\
+		MEMCPY_LIT(&IOD->dollar.device[0], DEVICE_BUFFER_FULL);				\
+	} else											\
+		WRITEBUFFER_SET = &IOD->dollar.device[0];					\
+} MBEND
+
+#define SET_DOLLARDEVICE_ERRSTR(IOD, ERRSTR)							\
+MBSTART {											\
+	int errlen;										\
+	char *writebuffer;									\
+	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, errlen, writebuffer);			\
+	memcpy(writebuffer, ERRSTR, errlen);							\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRSTR)						\
+MBSTART {											\
+	char *writebuffer;									\
+	int errlen, prefixlen, len;								\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen;								\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], ERRSTR, errlen);					\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(IOD, ERRSTR1, ERRSTR2)			\
+MBSTART {											\
+	char *writebuffer;									\
+	int errlen1, errlen2, prefixlen, len;							\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errlen1 = STRLEN(ERRSTR1);	/* No NULL char */					\
+	errlen2 = STRLEN(ERRSTR2) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen1 + errlen2;							\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], ERRSTR1, errlen1);					\
+	memcpy(&writebuffer[prefixlen + errlen1], ERRSTR2, errlen2);				\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, ERRNO)						\
+MBSTART {											\
+	char *errstring, *writebuffer;								\
+	int errlen, prefixlen, len;								\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errstring = STRERROR(ERRNO);								\
+	errlen = STRLEN(errstring) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen;								\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], errstring, errlen);					\
+} MBEND
+
+#define PUT_DOLLAR_DEVICE_INTO_MSTR(IOD, MSTR)							\
+MBSTART {											\
+	if (memcmp(IOD->dollar.device, DEVICE_BUFFER_FULL, STR_LIT_LEN(DEVICE_BUFFER_FULL)))	\
+	{											\
+		MSTR->len = STRLEN(IOD->dollar.device);						\
+		MSTR->addr = IOD->dollar.device;						\
+	} else											\
+	{											\
+		assert(IOD->dollar.devicebuffer);						\
+		MSTR->addr = IOD->dollar.devicebuffer;						\
+		MSTR->len = STRLEN(IOD->dollar.devicebuffer);					\
+	}											\
+} MBEND
 #endif /* IO_H */

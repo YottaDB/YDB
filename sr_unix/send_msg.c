@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,9 @@
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	bool			caller_id_flag;
+GBLREF	boolean_t		caller_id_flag;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	volatile int4		exit_state;
 
@@ -57,10 +57,11 @@ void send_msg(int arg_count, ...)
 {
         va_list		var;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
+	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
         VAR_START(var, arg_count);
 	send_msg_va(csa, arg_count, var);
 	va_end(var);
@@ -86,6 +87,7 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
 	boolean_t	freeze_needed = FALSE, was_holder;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by CHECK_IF_FREEZE_ON_ERROR_NEEDED and FREEZE_INSTANCE_IF_NEEDED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -110,7 +112,7 @@ void send_msg_va(void *csa, int arg_count, va_list var)
         for (;;)
         {
                 msg_id = (int) va_arg(var, VA_ARG_TYPE);
-		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
                 --arg_count;
                 msg_string.addr = msg_buffer;
                 msg_string.len = SIZEOF(msg_buffer);
@@ -147,6 +149,6 @@ void send_msg_va(void *csa, int arg_count, va_list var)
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
 	DEBUG_ONLY(nesting_level--;)
-	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id);
+	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
 	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 }

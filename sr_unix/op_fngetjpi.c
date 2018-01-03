@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,10 +84,10 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	 * 	(ii) also, the current comparison relies on kwd->str.len which means a C would imply CPUTIM instead of CSTIME
 	 * 		or CUTIME this ambiguity should probably be removed by asking for an exact match of the full keyword
 	 */
-	while ((0 != memcmp(upcase, key[keywd_indx], kwd->str.len)) && keywd_indx < MAX_KEY)
+	while (key[keywd_indx][0] && (0 != STRNCMP_STR(upcase, key[keywd_indx], kwd->str.len)))
 		keywd_indx++;
 
-	if( keywd_indx == MAX_KEY )
+	if( !key[keywd_indx][0] )
         {
                  rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
         }

@@ -29,8 +29,8 @@
 #include "eintr_wrappers.h"
 
 #define	COREDUMPFILTERFN	"/proc/%i/coredump_filter"
-#define FILTERPARMSIZE		(7 + 2 + 1)			/* 7 bytes for number, 2 bytes for 0x, and 1 null terminator */
-#define FILTERENABLEBITS	0x0000073			/* Bits 0, 1, 4, 5, 6 - 32-bit can only handle 10 bytes total */
+#define FILTERPARMSIZE		(8 + 2 + 1)		/* 8 bytes for number (normally 7), 2 bytes for 0x, and 1 null terminator */
+#define FILTERENABLEBITS	0x0000073		/* Bits 0, 1, 4, 5, 6 - 32-bit can only handle 10 bytes total */
 
 GBLREF enum gtmImageTypes	image_type;
 GBLDEF char                    **gtmenvp;

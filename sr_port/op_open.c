@@ -38,6 +38,8 @@
 #include "setterm.h"
 #include "getzposition.h"
 #include "mmemory.h"
+#include "min_max.h"
+#include "mvalconv.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif

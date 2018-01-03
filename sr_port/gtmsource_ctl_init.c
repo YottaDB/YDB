@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;
 
-GBLREF jnlpool_addrs		jnlpool;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF seq_num			seq_num_zero;
 
 GBLREF gd_addr			*gd_header;
@@ -223,7 +223,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		{	/* Concurrent online rollback. Possible only if we are called from gtmsource_update_zqgblmod_seqno_and_tn
 			 * in which case we don't hold the gtmsource_srv_latch. Assert that.
 			 */
-			assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			assert(process_id != jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 			SYNC_ONLN_RLBK_CYCLES;
 			gtmsource_onln_rlbk_clnup();
 			if (!was_crit)
@@ -507,7 +507,7 @@ int gtmsource_set_lookback(void)
 	for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
 	{
 		if (((JNL_FILE_OPEN == ctl->file_state) || (JNL_FILE_CLOSED == ctl->file_state))
-				&& QWLE(jnlpool.gtmsource_local->read_jnl_seqno, ctl->seqno))
+				&& QWLE(jnlpool->gtmsource_local->read_jnl_seqno, ctl->seqno))
 			ctl->lookback = TRUE;
 		else
 			ctl->lookback = FALSE;

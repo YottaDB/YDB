@@ -36,6 +36,7 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
+#include "min_max.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +18,10 @@
 
 int  m_halt(void)
 {
+	triple	*triptr;
 
-	oprtype x;
-
-	newtriple(OC_HALT);
+	triptr = newtriple(OC_ZHALT);
+	triptr->operand[0] = put_ilit(0);				/* flag as HALT rather than ZHALT */
+	triptr->operand[1] = put_ilit(0);				/* return from HALT is always "success" */
 	return TRUE;
-
 }

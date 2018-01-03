@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,23 +94,22 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)
 }
 #endif
 
-lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
+lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 {
 	boolean_t 		is_canonical, is_base_var;
-	int			length, subs_level;
-	lv_val			*lv;
-	mval			*key, tmp_sbs;
-	va_list			var;
+	int			length, n_length, subs_level;
+	int4			t_length;
+	lv_val			*base_lv, *lv;
 	lvTree			*lvt;
 	lvTreeNode		*parent;
-	lv_val			*base_lv;
+	mident_fixed		name;
+	mval			*key, tmp_sbs;
+	va_list			var;
 	DEBUG_ONLY(int		orig_subs_level;)
-	VMS_ONLY(int		argcnt;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, start);
-	VMS_ONLY(va_count(argcnt);)
 	assert(0 < argcnt);
 	is_base_var = LV_IS_BASE_VAR(start);
 	/* If this variable is marked as a Transaction Processing protected variable, clone the tree.
@@ -128,6 +128,8 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		base_lv = LV_GET_BASE_VAR(start);
 		assert((NULL == base_lv->tp_var) || base_lv->tp_var->var_cloned);
 	}
+	t_length = SIZEOF(name) + 1;	/* assume maximum length name and include 1 for open paren */
+	n_length = 0;			/* actually unknown, but avoid unecessary lookup and only determine later if needed */
 	lv = start;
 	assert(NULL != lv);
 	LV_SBS_DEPTH(start, is_base_var, subs_level);
@@ -198,6 +200,29 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			 * runtime error (e.g. UNDEF or LVNULLSUBS) in this for loop.
 			 */
 			SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
+		}
+		/* the following check could be based on allowing the name and each subscript to be of maximum length; however,
+		 * then $QUERY() could produce a result greatly exceeding MAX_STRLEN, which, while it seems to work, should not
+		 * (although our testing coverage of all cases currently unknown) be consumable by other commands, functions or
+		 * operators; in addition, there seem to be issues with Linux system level I/O of gimundous strings causing hangs
+		 */
+		if (!(MV_CANONICAL & key->mvtype))
+			t_length += 2;					/* + 2 for the quotes if it's not canonical lvn */
+		else if (!(MV_STR & key->mvtype))
+			MV_FORCE_STR(key);				/* to ensure a length for the number */
+		if (MAX_STRLEN < (t_length += (key->str.len + 1)))	/* WARNING assignment */
+		{	/* + 1 above for the comma or close parenthesis */
+			if ((0 == n_length) && !((MAX_STRLEN + SIZEOF(name)) < t_length))
+			{	/* near max, so name length matters - adjust for it by replacing overestimate with actual length */
+				n_length = (char *)format_lvname((lv_val *)start, (uchar_ptr_t)name.c, SIZEOF(name)) - name.c;
+				t_length -= (SIZEOF(name) - n_length);
+			}
+			if (MAX_STRLEN < t_length)
+			{
+				va_end(var);
+				SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+			}
 		}
 	}
 	va_end(var);

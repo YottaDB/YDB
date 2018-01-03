@@ -18,9 +18,9 @@
 
 int4 gds_rundown(boolean_t cleanup_udi);
 
-#define CAN_BYPASS(SEMVAL, CSD, INST_IS_FROZEN)										\
-	(INST_IS_FROZEN || FROZEN_CHILLED(CSD)										\
-		|| (IS_GTM_IMAGE && CSD->mumps_can_bypass && (PROC_FACTOR * (num_additional_processors + 1) < SEMVAL))	\
+#define CAN_BYPASS(SEMVAL, CSA, INST_IS_FROZEN)											\
+	(INST_IS_FROZEN || FROZEN_CHILLED(CSA)											\
+		|| (IS_GTM_IMAGE && (CSA)->hdr->mumps_can_bypass && (PROC_FACTOR * (num_additional_processors + 1) < SEMVAL))	\
 		|| (((2 * DB_COUNTER_SEM_INCR) < SEMVAL) && (IS_LKE_IMAGE || IS_DSE_IMAGE)))
 
 #define CANCEL_DB_TIMERS(region, csa, cancelled_dbsync_timer)			\

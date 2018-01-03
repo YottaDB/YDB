@@ -56,6 +56,7 @@
 # include "min_max.h"
 # include "wbox_test_init.h"
 # include "get_fs_block_size.h"
+# include "min_max.h"
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__)
@@ -670,31 +671,6 @@ MBSTART {											\
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-} MBEND
-
-#define DOLLAR_DEVICE_SET(DEVPTR,STATUS)							\
-MBSTART {											\
-	len = SIZEOF(ONE_COMMA) - 1;								\
-	memcpy(DEVPTR->dollar.device, ONE_COMMA, len);					\
-	errptr = (char *)STRERROR(STATUS);							\
-	/* make sure there is room for the 1, and the null at the end */			\
-	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar.device) - SIZEOF(ONE_COMMA));	\
-	memcpy(&DEVPTR->dollar.device[len], errptr, errlen);				\
-	DEVPTR->dollar.device[len + errlen] = '\0';					\
-} MBEND
-
-#define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)						\
-MBSTART {										\
-	int	len;									\
-	int	errlen;									\
-	char	*errptr;								\
-	/* save error in $device */							\
-	if (EAGAIN == STATUS)								\
-	{										\
-		len = SIZEOF(ONE_COMMA_UNAVAILABLE);					\
-		memcpy(DEVPTR->dollar.device, ONE_COMMA_UNAVAILABLE, len);		\
-	} else										\
-		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
 } MBEND
 
 #define DOWRITERL_RM(RM, FBUFF, FBUFF_LEN, RLEN)								\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ int gtmsource_get_opt(void)
 	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
 	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
-	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
+	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF", including null terminator */
 	char		inst_name[MAX_FN_LEN + 1], *ip_end, *strtokptr;
 	char		secondary_sys[MAX_SECONDARY_LEN];
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
@@ -391,12 +391,13 @@ int gtmsource_get_opt(void)
 	}
 	if (gtmsource_options.statslog)
 	{
-		statslog_val_len = 4; /* max(strlen("ON"), strlen("OFF")) + 1 */
+		statslog_val_len = SIZEOF(statslog_val) - 1;
 		if (!cli_get_str("STATSLOG", statslog_val, &statslog_val_len))
 		{
 			util_out_print("Error parsing STATSLOG qualifier", TRUE);
 			return(-1);
 		}
+		statslog_val[statslog_val_len] = '\0';
 		cli_strupper(statslog_val);
 		if (0 == STRCMP(statslog_val, "ON"))
 			gtmsource_options.statslog = TRUE;
@@ -410,10 +411,11 @@ int gtmsource_get_opt(void)
 	}
 	if (cli_present("FREEZE") == CLI_PRESENT)
 	{
-		freeze_val_len = SIZEOF(freeze_val);
+		freeze_val_len = SIZEOF(freeze_val) - 1;
 		if (cli_get_str("FREEZE", freeze_val, &freeze_val_len))
 		{
 			gtmsource_options.setfreeze = TRUE;
+			freeze_val[freeze_val_len] = '\0';
 			cli_strupper(freeze_val);
 			if (0 == STRCMP(freeze_val, "ON"))
 				gtmsource_options.freezeval = TRUE;

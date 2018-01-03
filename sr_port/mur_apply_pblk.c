@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,13 +50,13 @@
 #include "interlock.h"
 #include "gtm_multi_proc.h"
 
-GBLREF	volatile int4	db_fsync_in_prog;		/* for DB_FSYNC macro usage */
-GBLREF	boolean_t	blocksig_initialized;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF	mur_gbls_t	murgbl;
-GBLREF	mur_opt_struct 	mur_options;
-GBLREF 	jnl_gbls_t	jgbl;
+GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
+GBLREF	boolean_t		blocksig_initialized;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	reg_ctl_list		*mur_ctl;
+GBLREF	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct 		mur_options;
+GBLREF 	jnl_gbls_t		jgbl;
 
 error_def(ERR_DBFSYNCERR);
 error_def(ERR_JNLBADRECFMT);
@@ -495,7 +495,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		if (!murgbl.incr_onln_rlbk_cycle)
 		{
 			murgbl.incr_onln_rlbk_cycle = TRUE;
-			assert(NULL != jnlpool.repl_inst_filehdr);
+			assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKNOSTP);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKNOSTP);
 			assert(blocksig_initialized); /* set to TRUE at process startup time */

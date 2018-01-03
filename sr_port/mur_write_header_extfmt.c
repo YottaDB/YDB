@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,9 +34,9 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 
-GBLREF 	mur_gbls_t	murgbl;
-GBLREF	mur_opt_struct	mur_options;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF 	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 /* If "fp" is NULL, use "op_write" else use "GTM_FWRITE".
  * "fname" is used only if "fp" is non-NULL.
@@ -88,8 +88,8 @@ void mur_write_header_extfmt(jnl_ctl_list *jctl, FILE *fp, char *fname, int recs
 			if (!mur_options.forward)
 			{
 				murgbl.extr_buff[extrlen++] = ' ';
-				assert(NULL != jnlpool.repl_inst_filehdr);
-				ptr = (char *)&jnlpool.repl_inst_filehdr->inst_info.this_instname[0];
+				assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
+				ptr = (char *)&jnlpool->repl_inst_filehdr->inst_info.this_instname[0];
 				tmplen = STRLEN(ptr);
 				memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
 				extrlen += tmplen;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,16 +48,16 @@
 #include "anticipatory_freeze.h"
 #include "wcs_wt.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-GBLREF uint4		process_id;
-GBLREF unsigned int	t_tries;
-GBLREF uint4		dollar_tlevel;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF boolean_t        mu_reorg_process;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF gd_region		*gv_cur_region;
+GBLREF uint4			process_id;
+GBLREF unsigned int		t_tries;
+GBLREF uint4			dollar_tlevel;
+GBLREF sgm_info			*sgm_info_ptr;
+GBLREF boolean_t        	mu_reorg_process;
 #ifdef UNIX
-GBLREF uint4 		update_trans;
-GBLREF jnlpool_addrs	jnlpool;
+GBLREF uint4 			update_trans;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 #endif
 
 #define	TRACE_AND_SLEEP(ocnt)				\
@@ -139,7 +139,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		}
 	}
 	assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
-	dont_flush_buff = reg->read_only || (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN);
+	dont_flush_buff = reg->read_only || (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans)
+			&& (DBG_ASSERT(!csa->jnlpool || (csa->jnlpool == jnlpool)) IS_REPL_INST_FROZEN));
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
 	asyncio = csd->asyncio;
 	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);

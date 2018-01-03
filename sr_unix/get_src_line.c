@@ -414,7 +414,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	}
 	if (found)
 	{
-		*base = *(base + 1);
+		if (srcrecs > 1)
+			*base = *(base + 1);
 		/* Ensure we have reached the end of the source file. If not, we need to issue a CHECKSUMFAIL
 		 * error. Most often the !eof_seen part of the check is not needed since the checksums will not
 		 * match. But if it so happens that the checksums do match, then this extra check helps us

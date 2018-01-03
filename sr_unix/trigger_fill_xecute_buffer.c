@@ -44,10 +44,8 @@
 #include "trigger_fill_xecute_buffer.h"
 #include "trigger_gbl_fill_xecute_buffer.h"
 #include "gtm_trigger_trc.h"
-#ifdef DEBUG
 #include "repl_msg.h"
-#include "gtmsource.h"			/* for jnlpool_addrs */
-#endif
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -57,8 +55,8 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 #ifdef DEBUG
 GBLREF	boolean_t		is_updproc;
-GBLREF	jnlpool_addrs		jnlpool;
 #endif
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int			tprestart_state;
@@ -151,11 +149,12 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	gv_namehead		*save_gv_target;
 	gd_region		*save_gv_cur_region;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 
 	assert(0 < dollar_tlevel);
 	assert(NULL != trigdsc);
-	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 
 	gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */
 	index = trigdsc - gvt_trigger->gv_trig_array + 1;	/* We now know our trigger index value */
@@ -188,8 +187,8 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 		 */
 		DBGTRIGR((stderr, "trigger_fill_xecute_buffer_read_trigger_source: stale trigger view\n"));
 		assert(CDB_STAGNATE > t_tries);
-		assert(!is_updproc || (jnlpool.repl_inst_filehdr->is_supplementary
-					&& !jnlpool.jnlpool_ctl->upd_disabled));
+		assert(!is_updproc || (jnlpool && jnlpool->repl_inst_filehdr->is_supplementary
+					&& !jnlpool->jnlpool_ctl->upd_disabled));
 		t_retry(cdb_sc_triggermod);
 	}
 	SET_GVTARGET_TO_HASHT_GBL(csa);
@@ -198,7 +197,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	/* Restore gv_target/gv_currkey which need to be kept in sync */
-	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	return;
 }
 #endif /* GTM_TRIGGER */

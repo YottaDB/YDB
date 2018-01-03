@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +19,6 @@
 
 int mlk_pvtblk_equ(mlk_pvtblk *a, mlk_pvtblk *b)
 {
-	return (a->ctlptr == b->ctlptr && a->total_length == b->total_length
-		&& (memcmp(a->value, b->value, a->total_length) == 0));
+	return (a->ctlptr == b->ctlptr && a->nref_length == b->nref_length
+		&& (memcmp(a->value, b->value, a->nref_length) == 0));
 }

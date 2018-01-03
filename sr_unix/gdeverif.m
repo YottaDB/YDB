@@ -89,9 +89,9 @@ gblname1:
 	. . . d chkcoll^GDEPARSE(sval,GBLNAME,gnams(GBLNAME,"COLLVER"))
 	. . e  d chkcoll^GDEPARSE(sval,GBLNAME)
 	; now that all gblnames and names have been read, do some checks between them
-	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  zg 0
 	d gblnameeditchecks^GDEPARSE("*",0)	; check all name specifications are good given the gblname collation settings
-	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  zg 0
 	q
 REGION
 	i '$d(regs(REGION)) k verified zm $$info(gdeerr("OBJNOTFND")):"Region":REGION q

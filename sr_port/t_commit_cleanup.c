@@ -28,11 +28,11 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "secshr_db_clnup.h"
 #include "t_commit_cleanup.h"
 #include "process_deferred_stale.h"
-#include "repl_msg.h"		/* for gtmsource.h */
-#include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "send_msg.h"
 #include "have_crit.h"
 #include "aswp.h"
@@ -50,8 +50,7 @@ GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the T
 GBLREF	tp_region		*tp_reg_list;	      /* List of tp_regions for this transaction */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
@@ -82,7 +81,7 @@ error_def(ERR_DBCOMMITCLNUP);
 	}								\
 }
 
-#define	T_COMMIT_CLEANUP_DB(CR_ARRAY, CR_ARRAY_INDEX, CS_ADDRS, UPDATE_TRANS, JNLPOOL_CTL, JGBL, RELEASE_CRIT, GV_CUR_REGION)	\
+#define	T_COMMIT_CLEANUP_DB(CR_ARRAY, CR_ARRAY_INDEX, CS_ADDRS, UPDATE_TRANS, JNLPOOL, JGBL, RELEASE_CRIT, GV_CUR_REGION)	\
 MBSTART {															\
 	cache_rec_ptr_t		*crArray;											\
 	sgmnt_addrs		*csa;												\
@@ -97,7 +96,7 @@ MBSTART {															\
 	csa = CS_ADDRS;														\
 	assert(!csa->t_commit_crit);												\
 	assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));							\
-	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, JNLPOOL_CTL); /* debug-only sanity check between				\
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, JNLPOOL); /* debug-only sanity check between				\
 								  * seqno of filehdr and jnlpool */				\
 	csd = csa->hdr;														\
 	/* Note: Below code is slightly similar to that in "mutex_salvage" */							\
@@ -136,8 +135,9 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
 	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit;
 	cache_rec_ptr_t			cr;
-	sgm_info			*si;
-	sgmnt_addrs			*csa;
+	sgm_info			*si, *jnlpool_si = NULL;
+	sgmnt_addrs			*csa, *jpl_csa = NULL, *jnlpool_csa = NULL;
+	jnlpool_addrs_ptr_t		save_jnlpool, save2_jnlpool, update_jnlpool = NULL;
 	tp_region			*tr;
 	char				*trstr;
 	gd_region			*xactn_err_region, *jpl_reg = NULL;
@@ -155,6 +155,12 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	 * the roll-back and one the roll-forward). update_underway is set to TRUE to indicate the commit is beyond rollback.
 	 */
 	update_underway = FALSE;
+	save_jnlpool = jnlpool;
+	if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))
+	{
+		jnlpool_csa = cs_addrs;
+		jnlpool = cs_addrs->jnlpool;
+	}
 	if (dollar_tlevel)
 	{
 		trstr = "TP";
@@ -177,11 +183,20 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			if (NULL != si->first_cw_set)
 			{
 				csa = si->tp_csa;
+				if (csa->jnlpool && (jnlpool != csa->jnlpool))
+				{
+					assert(!update_jnlpool || (!csa->jnlpool || (update_jnlpool == csa->jnlpool)));
+					jnlpool_si = si;
+					jnlpool_csa = csa;
+					jnlpool = csa->jnlpool;
+				}
 				if (T_UPDATE_UNDERWAY(csa))
 				{
 					update_underway = TRUE;
 					break;
 				}
+				if (!update_jnlpool && REPL_ALLOWED(csa))
+					update_jnlpool = jnlpool;
 			}
 		}
 	} else
@@ -191,6 +206,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		update_underway = T_UPDATE_UNDERWAY(cs_addrs);
 		if (NULL != gv_target)			/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0;	/* in case t_end() had set history's tn to be "valid_thru++", undo it */
+		update_jnlpool = cs_addrs->jnlpool ? cs_addrs->jnlpool : jnlpool;
 	}
 	if (!update_underway)
 	{	/* Rollback (undo) the transaction. the comments below refer to CMTxx step numbers described in secshr_db_clnup.
@@ -201,12 +217,14 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * to the error trap thereby avoiding any unintended crit hangs.
 		 */
 		release_crit = (0 == signal) ? NEED_TO_RELEASE_CRIT(t_tries, status) : TRUE;
-		if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+		assert(!dollar_tlevel || !update_jnlpool || !jnlpool_si || (!jnlpool || (update_jnlpool == jnlpool)));
+		if (update_jnlpool && update_jnlpool->jnlpool_dummy_reg && update_jnlpool->jnlpool_dummy_reg->open)
 		{
-			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			csa = &FILE_INFO(update_jnlpool->jnlpool_dummy_reg)->s_addrs;
 			if (csa->now_crit)
 			{	/* Undo Step CMT03. Note: The below code is similar to that in "mutex_salvage" for the jnlpool */
-				jpl = jnlpool.jnlpool_ctl;
+				assert(update_jnlpool->jnlpool_ctl);
+				jpl = update_jnlpool->jnlpool_ctl;
 				index1 = jpl->phase2_commit_index1;
 				index2 = jpl->phase2_commit_index2;
 				if (index1 != index2)
@@ -224,7 +242,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 					}
 				}
 				if (!csa->hold_onto_crit)
-					jpl_reg = jnlpool.jnlpool_dummy_reg;	/* note down to release crit later */
+					jpl_reg = update_jnlpool->jnlpool_dummy_reg;	/* note down to release crit later */
 			}
 		}
 		if (dollar_tlevel)
@@ -234,13 +252,15 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			 * we release crit on all the regions.
 			 */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
+			save2_jnlpool = jnlpool;
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
-				TP_CHANGE_REG(si->gv_cur_region);
+				TP_CHANGE_REG(si->gv_cur_region);		/* sets jnlpool */
 				/* Undo CMT06, CMT04 and CMT01 */
 				T_COMMIT_CLEANUP_DB(&si->cr_array[0], si->cr_array_index, cs_addrs, si->update_trans,	\
-									jnlpool_ctl, jgbl, release_crit, gv_cur_region);
+									jnlpool, jgbl, release_crit, gv_cur_region);
 			}
+			jnlpool = save2_jnlpool;
 			if (release_crit)
 			{	/* If final retry and released crit (in the above loop), do the following
 				 * Decrement t_tries to ensure that we don't have an out-of-design situation
@@ -272,11 +292,11 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		{
 			/* Undo CMT06, CMT04 and CMT01 */
 			T_COMMIT_CLEANUP_DB(cr_array, cr_array_index, cs_addrs, update_trans,			\
-							jnlpool_ctl, jgbl, release_crit, gv_cur_region);
+							jnlpool, jgbl, release_crit, gv_cur_region);
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT02) */
 		}
 #		ifdef DEBUG
-		csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		assert((NULL == csa) || !csa->now_crit || csa->hold_onto_crit);
 #		endif
 		/* Do any pending buffer flush (wcs_wtstart) if we missed a flush timer. We should do this ONLY if we don't hold
@@ -306,5 +326,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
 	}
+	if (jnlpool != save_jnlpool)
+		jnlpool = save_jnlpool;
 	return update_underway;
 }

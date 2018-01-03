@@ -12,10 +12,6 @@
 
 #include "mdef.h"
 
-#if defined(VMS) && defined(DEBUG)
-#include <descrip.h>
-#endif
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -54,12 +50,10 @@
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
-#ifdef UNIX
 #include "gvcst_protos.h"
 #include "gtmimagename.h"
 #include "caller_id.h"
 #include "mupip_reorg_encrypt.h"
-#endif
 #ifdef DEBUG
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -114,12 +108,10 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	uint4			process_id;
 #endif
 
-#ifdef UNIX
 GBLREF	boolean_t		is_updproc;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	sgmnt_addrs		*kip_csa;
-GBLREF	jnlpool_addrs		jnlpool;
-#endif
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVFAILCORE);
@@ -148,6 +140,7 @@ void t_retry(enum cdb_sc failure)
 	mstr			gvname_mstr, reg_mstr;
 	gd_region		*restart_reg;
 	mval			t_restart_entryref;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -169,6 +162,7 @@ void t_retry(enum cdb_sc failure)
 	DEBUG_ONLY(TREF(donot_commit) = FALSE;)
 	csa = cs_addrs;
 	cnl = csa ? csa->nl : NULL;	/* making sure we do not try to dereference a NULL pointer */
+	save_jnlpool = jnlpool;
 	if (!dollar_tlevel)
 	{
 #		ifdef DEBUG
@@ -176,15 +170,15 @@ void t_retry(enum cdb_sc failure)
 			t_tries_dbg = 0;
 		assert(ARRAYSIZE(t_fail_hist_dbg) > t_tries_dbg);
 		t_fail_hist_dbg[t_tries_dbg++] = (unsigned char)failure;
+		if (csa && csa->jnlpool)
+			jnlpool = csa->jnlpool;
 		TRACE_TRANS_RESTART(failure);
 #		endif
-#		ifdef UNIX
 		if (cdb_sc_instancefreeze == failure)
 		{
 			assert(REPL_ALLOWED(csa->hdr)); /* otherwise, a cdb_sc_instancefreeze retry would not have been signalled */
 			WAIT_FOR_REPL_INST_UNFREEZE(csa);
 		}
-#		endif
 		/* Even though rollback and recover operate standalone, there are certain kind of restarts that can still happen
 		 * either due to whitebox test cases or stomping on our own buffers causing cdb_sc_lostcr/cdb_sc_rmisalign. Assert
 		 * accordingly
@@ -303,6 +297,7 @@ void t_retry(enum cdb_sc failure)
 			 *	time in the final retry.
 			 */
 			assert(cdb_sc_optrestart != failure);
+			assert(cdb_sc_wcs_recover != failure);	/* This restart code is possible in final retry only in TP */
 			if (IS_FINAL_RETRY_CODE(failure))
 			{
 				/* t_tries should never be greater than t_tries_dbg. The only exception is if this is DSE or online
@@ -310,7 +305,7 @@ void t_retry(enum cdb_sc failure)
 				 * But that's possible only if white box test cases to induce Phase 1 and Phase 2 errors are set.
 				 * So, assert accordingly.
 				 */
-				assert((t_tries <= t_tries_dbg) UNIX_ONLY(|| (csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED)));
+				assert((t_tries <= t_tries_dbg) || (csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED));
 				/* Assert that the same kind of restart code can never occur more than once once we go to the
 				 * final retry. The only exception is cdb_sc_helpedout which can happen due to other processes
 				 * setting cnl->wc_blocked to TRUE without holding crit.
@@ -378,7 +373,6 @@ void t_retry(enum cdb_sc failure)
 				 * on the next restart.
 				 */
 			}
-#			ifdef UNIX
 			if (MISMATCH_ROOT_CYCLES(csa, cnl))
 			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
 				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat
@@ -401,17 +395,16 @@ void t_retry(enum cdb_sc failure)
 					redo_root_search_done = TRUE;
 				}
 			}
-#			endif
 			assert(csa->now_crit);
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			csd = cs_data;
 			if (CDB_STAGNATE == t_tries)
 			{
-				if (FROZEN_HARD(csd) && update_trans)
+				if (FROZEN_HARD(csa) && update_trans)
 				{	/* Final retry on an update transaction and region is frozen.
 					 * Wait for it to be unfrozen and only then grab crit.
 					 */
-					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, csd);
+					GRAB_UNFROZEN_CRIT(gv_cur_region, csa);
 				}
 			} else
 			{
@@ -437,15 +430,13 @@ void t_retry(enum cdb_sc failure)
 					assert(ERR_GVPUTFAIL == t_err);
 					t_err = ERR_GVINCRFAIL;	/* print more specific error message */
 				}
-				UNIX_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
-						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
+						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE);
 #				ifdef DEBUG
 				/* Core is not needed. We intentionally create this error. */
 				if (!gtm_white_box_test_case_enabled)
 #				endif
-				UNIX_ONLY(gtm_fork_n_core());
-				VMS_ONLY(send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist,
-						   ERR_GVIS, 2, end-buff, buff));
+				gtm_fork_n_core();
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist, ERR_GVIS, 2, end-buff,
 						buff);
 			}

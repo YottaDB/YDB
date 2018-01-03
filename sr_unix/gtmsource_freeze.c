@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +21,7 @@
 #include "filestruct.h"
 #include "util.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
@@ -33,10 +34,10 @@ int gtmsource_showfreeze(void)
 	boolean_t instance_frozen;
 
 	assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	instance_frozen = jnlpool.jnlpool_ctl->freeze;
+	instance_frozen = jnlpool->jnlpool_ctl->freeze;
 	util_out_print("Instance Freeze: !AZ", TRUE, instance_frozen ? "ON" : "OFF");
-	if (jnlpool.jnlpool_ctl->freeze)
-		util_out_print(" Freeze Comment: !AZ", TRUE, jnlpool.jnlpool_ctl->freeze_comment);
+	if (jnlpool->jnlpool_ctl->freeze)
+		util_out_print(" Freeze Comment: !AZ", TRUE, jnlpool->jnlpool_ctl->freeze_comment);
 	return (instance_frozen ? (SRV_ERR + NORMAL_SHUTDOWN) : NORMAL_SHUTDOWN);
 }
 
@@ -45,21 +46,21 @@ int gtmsource_setfreeze(void)
 	if (gtmsource_options.freezeval)
 	{
 		assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK); /* sets gtmsource_state */
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK); /* sets gtmsource_state */
 	} else
 		assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	jnlpool.jnlpool_ctl->freeze = gtmsource_options.freezeval;
+	jnlpool->jnlpool_ctl->freeze = gtmsource_options.freezeval;
 	if (gtmsource_options.setcomment)
-		STRNCPY_STR(jnlpool.jnlpool_ctl->freeze_comment, gtmsource_options.freeze_comment,
-			SIZEOF(jnlpool.jnlpool_ctl->freeze_comment));
+		STRNCPY_STR(jnlpool->jnlpool_ctl->freeze_comment, gtmsource_options.freeze_comment,
+			SIZEOF(jnlpool->jnlpool_ctl->freeze_comment));
 	if (gtmsource_options.freezeval)
 	{
-		send_msg(VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);
-		send_msg(VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		send_msg_csa(NULL, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool->repl_inst_filehdr->inst_info.this_instname);
+		send_msg_csa(NULL, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool->jnlpool_ctl->freeze_comment);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	} else
 	{
-		send_msg(VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);
+		send_msg_csa(NULL, VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1, jnlpool->repl_inst_filehdr->inst_info.this_instname);
 	}
 	return (NORMAL_SHUTDOWN);
 }

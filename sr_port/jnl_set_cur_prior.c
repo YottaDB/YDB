@@ -65,7 +65,7 @@ void jnl_set_fd_prior(int jnl_fd, sgmnt_addrs* csa, sgmnt_data* csd, jnl_file_he
 	if ((NULL != jfh_checked) && is_file_identical((char *)csa->region->dyn.addr->fname, (char *)jfh_checked->data_file_name))
 	{
 		jfh_checked->is_not_latest_jnl = TRUE;
-		JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jnl_fd, 0, jfh_checked, get_fs_block_size(jnl_fd), status1, status2);
+		JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jnl_fd, 0, jfh_checked, REAL_JNL_HDR_LEN, status1, status2);
 		assert(SS_NORMAL == status1);
 	}
 	JNL_FD_CLOSE(jnl_fd, status1);

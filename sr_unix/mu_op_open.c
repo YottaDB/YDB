@@ -72,8 +72,6 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 	MV_FORCE_STR(p);
 	if (mspace)
 		MV_FORCE_STR(mspace);
-	if (0 > t)
-		t = 0;
 	assert((unsigned char)*p->str.addr < n_iops);
 	naml = get_log_name(&v->str, INSERT);
 	if (0 != naml->iod)

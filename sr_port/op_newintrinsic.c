@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,8 +30,6 @@
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
-GBLREF mval		dollar_ztrap;
-GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_estack_delta;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_zgbldir;
@@ -53,7 +51,9 @@ void op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
 	boolean_t	stored_explicit_null, etrap_was_active;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	switch (intrtype)
 	{
 		case SV_ZTRAP:
@@ -61,20 +61,20 @@ void op_newintrinsic(int intrtype)
 			if (0 < gtm_trigger_depth)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
-			assert(!ztrap_explicit_null || (0 == dollar_ztrap.str.len));
+			assert(!ztrap_explicit_null || (0 == (TREF(dollar_ztrap)).str.len));
 			DEBUG_ONLY(stored_explicit_null = FALSE;)
-			if (ztrap_explicit_null && (0 == dollar_ztrap.str.len))
+			if (ztrap_explicit_null && (0 == (TREF(dollar_ztrap)).str.len))
 			{
 				DEBUG_ONLY(stored_explicit_null = TRUE;)
-				dollar_ztrap.str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* to be later used by unw_mv_ent() */
+				(TREF(dollar_ztrap)).str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* used later by unw_mv_ent() */
 			}
 			/* Intentionally omitted the "break" here */
 		case SV_ETRAP:
 			/* Save the active error trap to the stack if either of them is new'ed */
 			if (etrap_was_active = ETRAP_IN_EFFECT)
-				intrinsic = &dollar_etrap;
+				intrinsic = &(TREF(dollar_etrap));
 			else
-				intrinsic = &dollar_ztrap;
+				intrinsic = &(TREF(dollar_ztrap));
 			break;
 		case SV_ESTACK:
 			intrinsic = &dollar_estack_delta;
@@ -98,11 +98,11 @@ void op_newintrinsic(int intrtype)
 	{
 		ztrap_explicit_null = TRUE;
 		if(etrap_was_active)
-			NULLIFY_TRAP(dollar_etrap)
+			NULLIFY_TRAP(TREF(dollar_etrap));
 	} else if (SV_ETRAP == intrtype) {
 		ztrap_explicit_null = FALSE;
 		if(!etrap_was_active)
-			NULLIFY_TRAP(dollar_ztrap)
+			NULLIFY_TRAP(TREF(dollar_ztrap));
 	} else if (SV_ESTACK == intrtype)
 	{	/* Some extra processing for new of $ETRAP:
 		   The delta from $zlevel we keep for estack is kept in an mval for sake of

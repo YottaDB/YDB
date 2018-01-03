@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@
 #include "repl_log.h"
 #include "is_proc_alive.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 
 
@@ -56,26 +56,26 @@ seq_num gtmsource_checkforbacklog(void)
 	boolean_t		srv_alive;
 	uint4			gtmsource_pid;
 
-	jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
-	if (NULL != jnlpool.gtmsource_local)	/* Show backlog for a specific source server */
-		gtmsourcelocal_ptr = jnlpool.gtmsource_local;
+	jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+	if (NULL != jnlpool->gtmsource_local)	/* Show backlog for a specific source server */
+		gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 	else
-		gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 	for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 	{
 		if ('\0' == gtmsourcelocal_ptr->secondary_instname[0])
 		{
-			assert(NULL == jnlpool.gtmsource_local);
+			assert(NULL == jnlpool->gtmsource_local);
 			continue;
 		}
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
-		if ((NULL == jnlpool.gtmsource_local) && (0 == gtmsource_pid))
+		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
 			continue;
 		read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno;
 		/* jnl_seqno >= read_jnl_seqno is the most common case; see gtmsource_readpool() for when the rare case can occur */
 		seq_num = (jnl_seqno >= read_jnl_seqno) ? jnl_seqno - read_jnl_seqno : 0;
 		backlog_count += seq_num;
-		if (NULL != jnlpool.gtmsource_local)
+		if (NULL != jnlpool->gtmsource_local)
 			break;
 	}
 	return backlog_count;

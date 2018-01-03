@@ -32,6 +32,8 @@
 #include "gtcmd.h"
 #include "send_msg.h"
 #include "targ_alloc.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	cm_region_head		*reglist;
 GBLREF	gd_region		*gv_cur_region;

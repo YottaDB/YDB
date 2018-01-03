@@ -54,6 +54,7 @@
  *	cdb_sc_reorg_encrypt
  *	cdb_sc_optrestart
  *	cdb_sc_phase2waitfail
+ *	cdb_sc_wcs_recover
  */
 
 CDB_SC_NUM_ENTRY(  cdb_sc_normal,           FALSE,          0) /*  0   success */
@@ -68,7 +69,7 @@ CDB_SC_NUM_ENTRY(  cdb_sc_starrecord,       FALSE,          8) /*  8   star reco
 CDB_SC_NUM_ENTRY(  cdb_sc_extend,           FALSE,          9) /*  9   extend requested when none seemed needed - from gdsfilext */
 CDB_SC_NUM_ENTRY(  cdb_sc_jnlclose,         TRUE,          10) /* 10   journal file has been closed */
 
-CDB_SC_UCHAR_ENTRY(cdb_sc_wcs_recover,      FALSE, FALSE, 'A') /* 'A'  tp_hist/t_end found concurrent "wcs_recover" invocation */
+CDB_SC_UCHAR_ENTRY(cdb_sc_wcs_recover,      TRUE,  FALSE, 'A') /* 'A'  tp_hist/t_end found concurrent "wcs_recover" invocation */
 CDB_SC_UCHAR_ENTRY(cdb_sc_keyoflow,         FALSE, FALSE, 'B') /* 'B'  gvcst_expand_key or gvcst_search (3) found key overflow */
 CDB_SC_UCHAR_ENTRY(cdb_sc_rmisalign,        FALSE, FALSE, 'C') /* 'C'  Record misaligned from nearly everyone */
 CDB_SC_UCHAR_ENTRY(cdb_sc_r2small,          FALSE, FALSE, 'D') /* 'D'  gvcst_expand_key found record too small */

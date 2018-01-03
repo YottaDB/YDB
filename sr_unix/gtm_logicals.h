@@ -152,4 +152,5 @@
 #define GTM_LOCALE			"$gtm_locale"
 #define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
 #define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"
+#define GTM_STRPLLIM			"$gtm_string_pool_limit"
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,7 @@
 #include "repl_log.h"
 
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF  FILE			*gtmsource_log_fp;
 
 error_def(ERR_REPLCOMM);
@@ -67,7 +68,7 @@ int gtmsource_comm_init(void)
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	port_len = 0;
 	I2A(port_buffer, port_len,  gtmsource_local->secondary_port);
 	port_buffer[port_len] = '\0';

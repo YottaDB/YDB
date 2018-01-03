@@ -64,6 +64,7 @@
 #include "gtmcrypt.h"
 #include "is_proc_alive.h"
 #include "gtm_reservedDB.h"
+#include "min_max.h"
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			mu_ctrlc_occurred;
@@ -290,9 +291,9 @@ void mu_extract(void)
 	}
 	int_nlen = n_len;
 	lower_to_upper((uchar_ptr_t)format_buffer, (uchar_ptr_t)format_buffer, int_nlen);
-	if (0 == memcmp(format_buffer, ZWR_FORMAT_STRING, n_len))
+	if (0 == STRNCMP_LIT_LEN(format_buffer, ZWR_FORMAT_STRING, n_len))
 	        format = MU_FMT_ZWR;
-	else if (0 == memcmp(format_buffer, GO_FORMAT_STRING, n_len))
+	else if (0 == STRNCMP_LIT_LEN(format_buffer, GO_FORMAT_STRING, n_len))
 	{
 		if (gtm_utf8_mode)
 		{
@@ -300,7 +301,7 @@ void mu_extract(void)
 			mupip_exit(ERR_MUPCLIERR);
 		}
 		format = MU_FMT_GO;
-	} else if (0 == memcmp(format_buffer, BINARY_FORMAT_STRING, n_len))
+	} else if (0 == STRNCMP_LIT_LEN(format_buffer, BINARY_FORMAT_STRING, n_len))
 	{
 		format = MU_FMT_BINARY;
 		is_binary_format = TRUE;

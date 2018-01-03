@@ -32,6 +32,8 @@
 #include "op.h"
 #include "jobinterrupt_process.h"
 #include "gvcst_protos.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -40,6 +42,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
@@ -63,6 +66,7 @@ error_def(ERR_INVROLLBKLVL);
 {									\
 	gv_cur_region = save_cur_region;				\
 	TP_CHANGE_REG(gv_cur_region);					\
+	jnlpool = save_jnlpool;						\
 }
 
 void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
@@ -70,6 +74,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	boolean_t	lcl_implicit_trollback = FALSE, reg_reset;
 	uint4		newlevel;
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	gd_region	*curreg;
 	gv_key		*gv_orig_key_ptr;
 	sgmnt_addrs	*csa;
@@ -98,6 +103,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	save_cur_region = gv_cur_region;
+	save_jnlpool = jnlpool;
 	GTMTRIG_ONLY(assert(tstart_trigger_depth <= gtm_trigger_depth);) /* see similar assert in op_tcommit.c for why */
 	if (!newlevel)
 	{

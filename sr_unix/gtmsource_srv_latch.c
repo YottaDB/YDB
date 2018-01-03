@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@
 
 GBLREF	int4			process_id;
 GBLREF	int			num_additional_processors;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 #ifdef DEBUG
 GBLREF	node_local_ptr_t	locknl;
@@ -60,7 +60,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	char			scndry_msg[OUT_BUFF_SIZE];
 
 	assert(!have_crit(CRIT_HAVE_ANY_REG));
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	repl_csa = &udi->s_addrs;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	max_retries = max_timeout_in_secs * 4 * 1000; /* outer-loop : X minutes, 1 loop in 4 is sleep of 1 ms */
@@ -74,7 +74,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 				DEBUG_ONLY(locknl = repl_csa->nl); /* Use the journal pool to maintain lock history */
 				LOCK_HIST("OBTN", latch, process_id, retries);
 				DEBUG_ONLY(locknl = NULL);
-				if (jnlpool.repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
+				if (jnlpool->repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
 				{
 					/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until
 					 * the rollback command is re-run to bring the journal pool/file and instance file to a
@@ -88,7 +88,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
 						      ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				}
-				cycle_mismatch = (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle);
+				cycle_mismatch = (repl_csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle);
 				assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || !cycle_mismatch);
 				if ((HANDLE_CONCUR_ONLINE_ROLLBACK == onln_rlbk_action) && cycle_mismatch)
 				{
@@ -114,8 +114,8 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	}
 	DUMP_LOCKHIST();
 	assert(FALSE);
-	assert(jnlpool.gtmsource_local && jnlpool.gtmsource_local->gtmsource_pid);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, max_timeout_in_secs, jnlpool.gtmsource_local->gtmsource_pid);
+	assert(jnlpool->gtmsource_local && jnlpool->gtmsource_local->gtmsource_pid);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, max_timeout_in_secs, jnlpool->gtmsource_local->gtmsource_pid);
 	return FALSE; /* to keep the compiler happy */
 }
 
@@ -123,7 +123,7 @@ boolean_t	rel_gtmsource_srv_latch(sm_global_latch_ptr_t latch)
 {
 	sgmnt_addrs			*repl_csa;
 
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	DEBUG_ONLY(locknl = repl_csa->nl);
 	LOCK_HIST("RLSE", latch, process_id, 0);
 	DEBUG_ONLY(locknl = NULL);
@@ -134,5 +134,5 @@ boolean_t	rel_gtmsource_srv_latch(sm_global_latch_ptr_t latch)
 
 boolean_t	gtmsource_srv_latch_held_by_us()
 {
-	return (process_id == jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+	return (process_id == jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 }

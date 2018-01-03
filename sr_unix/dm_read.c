@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -754,8 +754,8 @@ void	dm_read (mval *v)
 					{	/* ctrl D - delete char */
 						if (0 == outlen)
 						{	/* line is empty new line and exit - Thanks to Sam Habiel */
-							op_wteol(1);
-							op_halt();
+							op_wteol(1);	/* below not restricted because of halt with return code */
+							op_zhalt(ERR_IOEOF, FALSE);
 						}
 						DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 						break;

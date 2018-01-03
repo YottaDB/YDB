@@ -44,6 +44,7 @@ error_def(ERR_NCTCOLLSPGBL);
 error_def(ERR_OFRZAUTOREL);
 error_def(ERR_OFRZCRITREL);
 error_def(ERR_OFRZCRITSTUCK);
+error_def(ERR_REPLINSTACC);
 error_def(ERR_REPLINSTMISMTCH);
 error_def(ERR_REPLINSTNOSHM);
 error_def(ERR_REPLREQROLLBACK);
@@ -105,7 +106,7 @@ typedef struct cache_rec_struct
 					 * before-image for wcs_recover to backup.
 					 */
 	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
-	uint4		stopped;	/* non-zero indicates to wcs_recover the pid that built the block using secshr_db_clnup */
+	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
 					   latch is used on those platforms where read_in_progress is not directly updated
 					   by atomic routines/instructions. As such there needs be no cache line padding between
@@ -327,7 +328,7 @@ MBSTART {										\
 	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);				\
 	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)					\
 		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));			\
-	if (NULL != old_KEY)								\
+	if ((NULL != old_KEY) && (PREV_KEY_NOT_COMPUTED != old_KEY->end))		\
 	{										\
 		/* Don't call GVKEY_INIT twice for same key. The only exception		\
 		 * is if we are called from COPY_PREV_KEY_TO_GVT_CLUE in a		\
@@ -337,7 +338,7 @@ MBSTART {										\
 		assert(TREF(donot_commit) | DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);	\
 		assert(KEYSIZE >= old_KEY->top);					\
 		assert(old_KEY->top > old_KEY->end);					\
-		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) + old_KEY->end);		\
+		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) - 1 + old_KEY->end);		\
 		free(old_KEY);								\
 	} else										\
 	{										\
@@ -561,7 +562,7 @@ MBSTART {											\
 	{													\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
 		if (!baseDBreg->open)										\
-			gv_init_reg(baseDBreg);									\
+			gv_init_reg(baseDBreg, NULL);								\
 		if (!statsDBreg->open)										\
 		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
@@ -948,6 +949,7 @@ MBSTART {													\
  */
 #define	TP_CHANGE_REG(reg)									\
 MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 	gv_cur_region = reg;									\
 	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
 	{											\
@@ -961,6 +963,8 @@ MBSTART {											\
 			case dba_bg:								\
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
 				cs_data = cs_addrs->hdr;					\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
 				break;								\
 			case dba_usr:								\
 			case dba_cm:								\
@@ -976,6 +980,7 @@ MBSTART {											\
 
 #define	TP_CHANGE_REG_IF_NEEDED(reg)								\
 MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 	assert(reg);										\
 	if (reg != gv_cur_region)								\
 	{											\
@@ -989,6 +994,8 @@ MBSTART {											\
 				cs_data = cs_addrs->hdr;					\
 				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
 					&& cs_addrs->hdr == cs_data);				\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
 				break;								\
 			case dba_usr:								\
 			case dba_cm:								\
@@ -1002,19 +1009,21 @@ MBSTART {											\
 	}											\
 } MBEND
 
-#define PUSH_GV_CUR_REGION(reg, sav_reg, sav_cs_addrs, sav_cs_data)				\
+#define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
 MBSTART {											\
-	sav_reg = gv_cur_region;								\
-	sav_cs_addrs = cs_addrs;								\
-	sav_cs_data = cs_data;									\
-	TP_CHANGE_REG(reg);									\
+	SAV_REG = gv_cur_region;								\
+	SAV_CS_ADDRS = cs_addrs;								\
+	SAV_CS_DATA = cs_data;									\
+	SAV_JNLPOOL = jnlpool;									\
+	TP_CHANGE_REG(REG);									\
 } MBEND
 
-#define POP_GV_CUR_REGION(sav_reg, sav_cs_addrs, sav_cs_data)					\
+#define POP_GV_CUR_REGION(SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)			\
 MBSTART {											\
-	gv_cur_region = sav_reg;								\
-	cs_addrs = sav_cs_addrs;								\
-	cs_data = sav_cs_data;									\
+	gv_cur_region = SAV_REG;								\
+	cs_addrs = SAV_CS_ADDRS;								\
+	cs_data = SAV_CS_DATA;									\
+	jnlpool = SAV_JNLPOOL;									\
 } MBEND
 
 /* The TP_TEND_CHANGE_REG macro is a special macro used in tp_tend.c to optimize out the unnecessary checks in
@@ -1171,7 +1180,7 @@ MBSTART {									\
 	}									\
 } MBEND
 
-#define	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(CR)										\
+#define	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(CR, CSA, CSD)									\
 {																\
 	cache_rec_ptr_t		cr_old;												\
 																\
@@ -1184,8 +1193,8 @@ MBSTART {									\
 		 * ready for replacement but "wcs_get_space/wcs_wtstart_fini/wcs_wtstart/wcs_wtfini" would not be able to flush	\
 		 * the new twin until the old twin has its "in_cw_set" cleared resulting in a livelock.				\
 		 */														\
-		assert(TWINNING_ON(csd));											\
-		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, CR->twin);	/* get old twin */				\
+		assert(TWINNING_ON(CSD));											\
+		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(CSA, CR->twin);	/* get old twin */				\
 		assert(!cr_old->bt_index);											\
 		assert(!cr_old->in_cw_set || cr_old->dirty);									\
 		assert(CR->bt_index);												\
@@ -1213,6 +1222,8 @@ MBSTART {									\
 #ifdef DEBUG
 #define ASSERT_CR_ARRAY_IS_UNPINNED(CSD, CRARRAY, CRARRAYINDEX)				\
 MBSTART {										\
+	GBLREF uint4		process_id;						\
+											\
 	int4			lcl_crarrayindex;					\
 	cache_rec_ptr_ptr_t	cr_ptr, cr_start;					\
 	cache_rec_ptr_t		cr;							\
@@ -1253,9 +1264,8 @@ MBSTART {										\
 
 #define VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, REG, JNLPOOL_USER, SCNDDBNOUPD_CHECK_NEEDED)					\
 MBSTART {															\
-	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;										\
 	GBLREF	boolean_t		is_updproc;										\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
 																\
 	unsigned char			instfilename_copy[MAX_FN_LEN + 1];							\
 	sm_uc_ptr_t			jnlpool_instfilename;									\
@@ -1271,7 +1281,7 @@ MBSTART {															\
 						&& ((GTMRELAXED != JNLPOOL_USER) || !IS_GTM_IMAGE));				\
 		if (!(SCNDDBNOUPD_CHECK_DONE & jnlpool_validate_check) && SCNDDBNOUPD_CHECK_NEEDED)				\
 		{														\
-			if (jnlpool_ctl->upd_disabled && !is_updproc)								\
+			if (jnlpool->jnlpool_ctl->upd_disabled && !is_updproc)							\
 			{	/* Updates are disabled in this journal pool. Issue error. Do NOT detach from journal pool	\
 				 * as that would cause us not to honor instance freeze (in case gtm_custom_errors env var is	\
 				 * non-null) for database reads that this process later does (for example reading a block	\
@@ -1284,9 +1294,9 @@ MBSTART {															\
 		}														\
 		if (do_REPLINSTMISMTCH_check)											\
 		{														\
-			jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;				\
+			jnlpool_instfilename = (sm_uc_ptr_t)jnlpool->jnlpool_ctl->jnlpool_id.instfilename;			\
 			if (STRCMP(CNL->replinstfilename, jnlpool_instfilename)							\
-				|| (CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid))				\
+				|| (CNL->jnlpool_shmid != jnlpool->repl_inst_filehdr->jnlpool_shmid))				\
 			{													\
 				/* Replication instance filename or jnlpool shmid mismatch. Two possibilities.			\
 				 * (a) Database has already been bound with a replication instance file name that is different	\
@@ -1298,15 +1308,12 @@ MBSTART {															\
 				 * Actually case (b) subsumes (a) so we assert that below. But in pro we handle both cases	\
 				 *	just in case.										\
 				 */												\
-				assert(CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid);				\
-				assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.instfilename));		\
+				assert(CNL->jnlpool_shmid != jnlpool->repl_inst_filehdr->jnlpool_shmid);			\
+				assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool->jnlpool_ctl->jnlpool_id.instfilename));	\
 				memcpy(&instfilename_copy[0], jnlpool_instfilename, SIZEOF(instfilename_copy));			\
 				assert(SIZEOF(jnlpool_shmid) == SIZEOF(CNL->jnlpool_shmid));					\
-				jnlpool_shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;					\
-				assert(NULL != jnlpool.jnlpool_ctl);								\
-				jnlpool_detach();										\
-				assert(NULL == jnlpool.jnlpool_ctl);								\
-				assert(FALSE == pool_init);									\
+				jnlpool_shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;					\
+				assert(NULL != jnlpool->jnlpool_ctl);								\
 				if (INVALID_SHMID == CNL->jnlpool_shmid)							\
 					rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_REPLINSTNOSHM, 2, DB_LEN_STR(REG));		\
 				else												\
@@ -1315,44 +1322,85 @@ MBSTART {															\
 						LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);			\
 			}													\
 			CSA->jnlpool_validate_check |= REPLINSTMISMTCH_CHECK_DONE;						\
+			CSA->jnlpool = jnlpool;											\
 		}														\
 	}															\
 } MBEND
 
-#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL)											\
+#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL, SCNDDBNOUPD_CHECK_NEEDED)								\
 MBSTART {															\
 	GBLREF	boolean_t		is_replicator;										\
-	GBLREF	boolean_t		pool_init;										\
 	GBLREF	gd_region		*gv_cur_region;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
+	jnlpool_addrs_ptr_t		lcl_jnlpool = NULL, jnlpool_save;							\
+	gd_id				replfile_gdid, *tmp_gdid;								\
+	replpool_identifier		replpool_id;										\
+	unsigned int			full_len;										\
+	int4				status = -1;										\
+	boolean_t			jnlpool_found = FALSE;									\
 																\
 	if (REPL_ALLOWED(CSD) && is_replicator)											\
 	{															\
-		if (!pool_init)													\
-			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);				\
-		assert(pool_init);												\
-		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_TRUE);				\
+		jnlpool_save = jnlpool;												\
+		if (CSA->jnlpool && ((jnlpool_addrs_ptr_t)(CSA->jnlpool))->pool_init)						\
+		{														\
+			lcl_jnlpool = jnlpool = (jnlpool_addrs_ptr_t)CSA->jnlpool;						\
+			jnlpool_found = TRUE;											\
+		} else if (IS_GTM_IMAGE && REPL_INST_AVAILABLE(CSA->gd_ptr))							\
+		{														\
+			status = filename_to_id(&replfile_gdid, replpool_id.instfilename);					\
+			if (SS_NORMAL != status)										\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, full_len, replpool_id.instfilename,\
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("could not get file id"), status);			\
+			for (lcl_jnlpool = jnlpool_head; NULL != lcl_jnlpool; lcl_jnlpool = lcl_jnlpool->next)			\
+			{													\
+				if (lcl_jnlpool->pool_init)									\
+				{												\
+					tmp_gdid = &FILE_ID(lcl_jnlpool->jnlpool_dummy_reg);					\
+					if (!gdid_cmp(tmp_gdid, &replfile_gdid))						\
+					{											\
+						jnlpool = CSA->jnlpool = lcl_jnlpool;						\
+						jnlpool_found = TRUE;								\
+						break;										\
+					}											\
+				}												\
+			}													\
+		} else														\
+		{														\
+			lcl_jnlpool = jnlpool;											\
+			if (lcl_jnlpool && lcl_jnlpool->pool_init)								\
+				jnlpool_found = TRUE;										\
+		}														\
+		if (!jnlpool_found || (NULL == lcl_jnlpool) || !lcl_jnlpool->pool_init)						\
+		{														\
+			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL, CSA->gd_ptr);			\
+			if (jnlpool && jnlpool->pool_init)									\
+				CSA->jnlpool = jnlpool;										\
+		}														\
+		assert(jnlpool && jnlpool->pool_init);										\
+		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_NEEDED);			\
 	}															\
 } MBEND
 
 #define ASSERT_VALID_JNLPOOL(CSA)										\
 MBSTART {													\
-	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;								\
-	GBLREF	jnlpool_addrs		jnlpool;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
 														\
 	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
-	assert(jnlpool_ctl && (jnlpool_ctl == jnlpool.jnlpool_ctl));						\
-	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(jnlpool && jnlpool->jnlpool_ctl);								\
+	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
 	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + JNLPOOL_CRIT_SPACE			\
 		+ SIZEOF(mutex_spin_parms_struct)));								\
-	assert(jnlpool_ctl->filehdr_off);									\
-	assert(jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);				\
-	assert(jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);			\
-	assert(jnlpool.repl_inst_filehdr == (repl_inst_hdr_ptr_t) ((sm_uc_ptr_t)jnlpool_ctl			\
-			+ jnlpool_ctl->filehdr_off));								\
-	assert(jnlpool.gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool_ctl				\
-			+ jnlpool_ctl->srclcl_array_off));							\
-	assert(jnlpool.gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool_ctl		\
-					+ jnlpool_ctl->sourcelocal_array_off));					\
+	assert(jnlpool->jnlpool_ctl->filehdr_off);								\
+	assert(jnlpool->jnlpool_ctl->srclcl_array_off > jnlpool->jnlpool_ctl->filehdr_off);			\
+	assert(jnlpool->jnlpool_ctl->sourcelocal_array_off > jnlpool->jnlpool_ctl->srclcl_array_off);		\
+	assert(jnlpool->repl_inst_filehdr == (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl		\
+			+ jnlpool->jnlpool_ctl->filehdr_off));							\
+	assert(jnlpool->gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl		\
+			+ jnlpool->jnlpool_ctl->srclcl_array_off));						\
+	assert(jnlpool->gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl	\
+			+ jnlpool->jnlpool_ctl->sourcelocal_array_off));					\
 } MBEND
 
 /* Explanation for why we need the following macro.
@@ -1783,19 +1831,19 @@ MBSTART {												\
 } MBEND
 
 #define FROZEN(CSD)				((CSD)->freeze || FALSE)
-#define FROZEN_HARD(CSD)			((CSD)->freeze && !(CSD)->freeze_online)
-#define FROZEN_CHILLED(CSD)			((CSD)->freeze && (CSD)->freeze_online)
+#define FROZEN_HARD(CSA)			((CSA)->hdr->freeze && !(CSA)->nl->freeze_online)
+#define FROZEN_CHILLED(CSA)			((CSA)->hdr->freeze && (CSA)->nl->freeze_online)
 #define FREEZE_LATCH_HELD(CSA)			(process_id == (CSA)->nl->freeze_latch.u.parts.latch_pid)
 #define CHILLED_AUTORELEASE_MASK		0x02
 #define CHILLED_AUTORELEASE_REPORT_MASK		0x04
-#define CHILLED_AUTORELEASE(CSD)		(((CSD)->freeze_online & CHILLED_AUTORELEASE_MASK) || FALSE)
-#define CHILLED_AUTORELEASE_REPORTED(CSD)	(((CSD)->freeze_online & CHILLED_AUTORELEASE_REPORT_MASK) || FALSE)
+#define CHILLED_AUTORELEASE(CSA)		(((CSA)->nl->freeze_online & CHILLED_AUTORELEASE_MASK) || FALSE)
+#define CHILLED_AUTORELEASE_REPORTED(CSA)	(((CSA)->nl->freeze_online & CHILLED_AUTORELEASE_REPORT_MASK) || FALSE)
 #define DO_CHILLED_AUTORELEASE(CSA, CSD)										\
 MBSTART {														\
 	GBLREF uint4	process_id;											\
 	boolean_t	was_latch;											\
 															\
-	if (CHILLED_AUTORELEASE(CSD) && !CHILLED_AUTORELEASE_REPORTED(CSD))						\
+	if (CHILLED_AUTORELEASE(CSA) && !CHILLED_AUTORELEASE_REPORTED(CSA))						\
 	{														\
 		was_latch = FREEZE_LATCH_HELD(CSA);									\
 		if (!was_latch)												\
@@ -1804,11 +1852,11 @@ MBSTART {														\
 			 */												\
 			grab_latch(&(CSA)->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);				\
 		}													\
-		if (CHILLED_AUTORELEASE(CSD) && !CHILLED_AUTORELEASE_REPORTED(CSD))					\
+		if (CHILLED_AUTORELEASE(CSA) && !CHILLED_AUTORELEASE_REPORTED(CSA))					\
 		{													\
 			(CSD)->freeze = FALSE;										\
 			(CSD)->image_count = 0;										\
-			(CSD)->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
+			(CSA)->nl->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
 			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_OFRZAUTOREL, 2, REG_LEN_STR((CSA)->region),		\
 					ERR_ERRCALL, 3, CALLFROM);							\
 		}													\
@@ -1889,7 +1937,7 @@ typedef struct sgmnt_data_struct
 	uint4		freeze;			/* for db freezing. Set to "getuid"     on Unix and "process_id"  on VMS */
 	int4		kill_in_prog;		/* counter for multi-crit kills that are not done yet */
 	int4		abandoned_kills;
-	uint4		freeze_online;		/* for online db freezing, a.k.a. chill.  */
+	uint4		unused_freeze_online_filler;	/* see field in node_local */
 	char		filler_320[4];
 	/************* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE ****************/
 	trans_num	tn_upgrd_blks_0;	/* TN when blks_to_upgrd becomes 0.
@@ -1946,7 +1994,6 @@ typedef struct sgmnt_data_struct
 	uint4		epoch_taper_time_pct;	/* in the last pct we start tapering for time */
 	uint4		epoch_taper_jnl_pct;	/* in the last pct we start tapering for jnl */
 	boolean_t	asyncio;		/* If TRUE, GT.M uses async I/O */
-	/* char		filler_512[0]; */
 	/************* FIELDS Used for update process performance improvement. Some may go away in later releases ********/
 	uint4		reserved_for_upd;	/* Percentage (%) of blocks reserved for update process disk read */
 	uint4		avg_blks_per_100gbl;	/* Number of blocks read on average for 100 global key read */
@@ -2115,7 +2162,8 @@ typedef struct sgmnt_data_struct
 	boolean_t	lock_crit_with_db;		/* flag controlling LOCK crit mechanism; see interlock.h */
 	uint4		basedb_fname_len;		/* byte length of filename stored in "basedb_fname[]" */
 	unsigned char	basedb_fname[256]; /* full path filaneme of corresponding baseDB if this is a statsDB */
-	char		filler_7k[444];
+	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
+	char		filler_7k[440];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -2367,6 +2415,11 @@ typedef struct gdr_name_struct
 	struct gd_addr_struct	*gd_ptr;
 } gdr_name;
 
+typedef struct gd_inst_info_struct
+{
+	char		instfilename[MAX_FN_LEN + 1];	/* + 1 for null */
+} gd_inst_info;
+
 typedef struct	gd_addr_struct
 {
 	struct gd_region_struct		*local_locks;
@@ -2380,6 +2433,7 @@ typedef struct	gd_addr_struct
 	struct gd_region_struct		*regions;
 	struct gd_segment_struct	*segments;
 	struct gd_gblname_struct	*gblnames;
+	struct gd_inst_info_struct	*instinfo;
 	struct gd_addr_struct		*link;
 	struct hash_table_mname_struct  *tab_ptr;
 	gd_id				*id;
@@ -2423,7 +2477,8 @@ typedef struct	gd_segment_struct
 	struct gd_region_struct	*repl_list;
 	uint4			is_encrypted;
 	boolean_t		asyncio;	/* copied over to csd->asyncio at db creation time */
-	char			filler[16];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	boolean_t		read_only;
+	char			filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_segment;
 
 typedef union
@@ -2641,6 +2696,9 @@ typedef struct	sgmnt_addrs_struct
 							 * Is a copy of reg->statsDB_setup_completed but is present in "csa"
 							 * too to handle was_open regions.
 							 */
+	gd_inst_info	*gd_instinfo;		/* global directory not gtm_repl_instance */
+	gd_addr		*gd_ptr;		/* global directory for region */
+	struct jnlpool_addrs_struct	*jnlpool;	/* NULL until put, kill, or other function requiring jnlpool */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3847,15 +3905,14 @@ MBSTART {									\
  */
 #define MAXHARDCRITS		31
 
-#define	WAIT_FOR_REGION_TO_UNFREEZE(CSA, CSD)		\
+#define	WAIT_FOR_REGION_TO_UNFREEZE(CSA)		\
 MBSTART {						\
 	int	lcnt1;					\
 							\
-	assert(CSA->hdr == CSD);			\
 	assert(!CSA->now_crit);				\
 	for (lcnt1 = 1; ; lcnt1++)			\
 	{						\
-		if (!FROZEN_HARD(CSD))			\
+		if (!FROZEN_HARD(CSA))			\
 			break;				\
 		if (MAXHARDCRITS < lcnt1)       	\
 			wcs_backoff(lcnt1);     	\
@@ -3870,9 +3927,9 @@ MBSTART {														\
 	assert((CSA)->hdr == (CSD));											\
 	for (lcnt1 = 1; ; lcnt1++)											\
 	{														\
-		if (!FROZEN_CHILLED(CSD))										\
+		if (!FROZEN_CHILLED(CSA))										\
 			break;												\
-		if (CHILLED_AUTORELEASE(CSD))										\
+		if (CHILLED_AUTORELEASE(CSA))										\
 		{													\
 			DO_CHILLED_AUTORELEASE(CSA, CSD);								\
 			break;												\
@@ -3894,21 +3951,21 @@ MBSTART {														\
  * don't need that functionality but it does not hurt them so we leave it at that instead of forking this
  * macro into two versions (one using "grab_crit" and another using "grab_crit_encr_cycle_sync").
  */
-#define	GRAB_UNFROZEN_CRIT(reg, csa, csd)				\
+#define	GRAB_UNFROZEN_CRIT(reg, csa)					\
 MBSTART {								\
 	int	lcnt;							\
 									\
-	assert(&FILE_INFO(reg)->s_addrs == csa && csa->hdr == csd);	\
+	assert(&FILE_INFO(reg)->s_addrs == csa);			\
 	assert(csa->now_crit);						\
 	for (lcnt = 0; ; lcnt++)					\
 	{								\
-		if (!FROZEN_HARD(csd))					\
+		if (!FROZEN_HARD(csa))					\
 			break;						\
 		rel_crit(reg);						\
-		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);			\
+		WAIT_FOR_REGION_TO_UNFREEZE(csa);			\
 		grab_crit_encr_cycle_sync(reg);				\
 	}								\
-	assert(!FROZEN_HARD(csd) && csa->now_crit);			\
+	assert(!FROZEN_HARD(csa) && csa->now_crit);			\
 } MBEND
 
 /* remove "csa" from list of open regions (cs_addrs_list) */
@@ -4635,7 +4692,7 @@ MBSTART {										\
 	GBLREF gv_namehead	*gv_target;						\
 											\
 	if (!REG->open)									\
-		gv_init_reg(REG);							\
+		gv_init_reg(REG, ADDR);							\
 	gvspan = GVNH_REG->gvspan;							\
 	assert(NULL != gvspan);								\
 	min_reg_index = gvspan->min_reg_index;						\
@@ -4681,10 +4738,11 @@ MBSTART {										\
 # define SYNC_ONLN_RLBK_CYCLES													\
 MBSTART {															\
 	GBLREF	sgmnt_addrs		*cs_addrs_list;										\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;										\
 	GBLREF	boolean_t		mu_reorg_process;									\
 																\
 	sgmnt_addrs			*lcl_csa;										\
+	jnlpool_addrs_ptr_t		lcl_jnlpool;										\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
@@ -4697,10 +4755,13 @@ MBSTART {															\
 			/* Online rollback increments csa->hdr->db_trigger_cycle forcing a mismatch to reload triggers */	\
 			lcl_csa->db_trigger_cycle = lcl_csa->hdr->db_trigger_cycle;						\
 		}														\
-		if (NULL != jnlpool.jnlpool_ctl)										\
+		for (lcl_jnlpool = jnlpool_head; NULL != lcl_jnlpool; lcl_jnlpool = lcl_jnlpool->next)				\
 		{														\
-			lcl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;						\
-			lcl_csa->onln_rlbk_cycle = jnlpool.jnlpool_ctl->onln_rlbk_cycle;					\
+			if (NULL != lcl_jnlpool->jnlpool_ctl)									\
+			{													\
+				lcl_csa = &FILE_INFO(lcl_jnlpool->jnlpool_dummy_reg)->s_addrs;					\
+				lcl_csa->onln_rlbk_cycle = lcl_jnlpool->jnlpool_ctl->onln_rlbk_cycle;				\
+			}													\
 		}														\
 	}															\
 } MBEND
@@ -5138,8 +5199,8 @@ void		grab_crit(gd_region *reg);
 boolean_t	grab_crit_encr_cycle_sync(gd_region *reg);
 boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
-void		gv_init_reg(gd_region *reg);
-void		gvcst_init(gd_region *greg);
+void		gv_init_reg(gd_region *reg, gd_addr *addr);
+void		gvcst_init(gd_region *greg, gd_addr *addr);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);
 enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_struct *cse, cache_rec_ptr_t cr);
 boolean_t	mupfndfil(gd_region *reg, mstr *mstr_addr, boolean_t log_error);

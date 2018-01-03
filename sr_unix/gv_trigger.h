@@ -499,7 +499,7 @@ typedef struct gvtr_invoke_parms_struct
 													\
 	assert(!IS_STATSDB_REGNAME(reg));	/* caller should have ensured this */			\
 	if (!reg->open)											\
-		gv_init_reg(reg);									\
+		gv_init_reg(reg, NULL);									\
 	gv_cur_region = reg;										\
 	change_reg(); /* TP_CHANGE_REG wont work as we need to set sgm_info_ptr */			\
 	if (NULL != cs_addrs)										\

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,8 @@
 
 GBLREF uint4            process_id;
 #ifdef DEBUG
-GBLREF  sgmnt_addrs     * cs_addrs;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF  sgmnt_addrs     *cs_addrs;
 #endif
 int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 {
@@ -31,13 +33,13 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 	int                     semop_pid, save_errno;
 	int                     last_sem_trace, rc;
 #	ifdef DEBUG
-	node_local_ptr_t        cnl;
+	node_local_ptr_t        cnl = NULL;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
-	if (NULL != cs_addrs)
+	if ((NULL != gv_cur_region) && gv_cur_region->open && (NULL != cs_addrs))
 		cnl = cs_addrs->nl;
 #	endif
 	stuckcnt = 0;
@@ -73,8 +75,11 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 						{
 							GET_C_STACK_FROM_SCRIPT("SEMOP_INFO", process_id, semop_pid, stuckcnt);
 							/* Got stack trace signal the first process to continue */
-							GTM_WHITE_BOX_TEST(WBTEST_SEMTOOLONG_STACK_TRACE,
-								cnl->wbox_test_seq_num, 3);
+#							ifdef DEBUG
+							if (cnl)
+								GTM_WHITE_BOX_TEST(WBTEST_SEMTOOLONG_STACK_TRACE,
+									cnl->wbox_test_seq_num, 3);
+#							endif
 						} else if (-1 == semop_pid)
 						{
 							rc = -1;

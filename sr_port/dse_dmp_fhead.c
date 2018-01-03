@@ -166,9 +166,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
 		util_out_print("  Freeze online                 !AD", FALSE, 11,
-					(csd->freeze_online) ? "       TRUE" : "      FALSE");
+					(cnl->freeze_online) ? "       TRUE" : "      FALSE");
 		util_out_print("  Freeze online autorelease    !AD", TRUE, 5,
-					(csd->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
+					(cnl->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
 		util_out_print("  Current transaction    0x!16@XQ", FALSE, &csa->ti->curr_tn);
 		util_out_print("  No. of writes/flush   !12UL", TRUE, csd->n_wrt_per_flu);
 		util_out_print("  Maximum TN             0x!16@XQ", FALSE, &csd->max_tn);
@@ -243,7 +243,8 @@ void dse_dmp_fhead (void)
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		util_out_print("  DB shares gvstats            !AD", TRUE, 5,
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
-		util_out_print("  LOCK shares DB critical section     !AD", TRUE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
+		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
+		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */

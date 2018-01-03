@@ -114,7 +114,7 @@ MBSTART {								\
 } MBEND
 
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			gtmDebugLevel;
@@ -264,6 +264,7 @@ unsigned char mu_cre_file(void)
 		return EXIT_ERR;
 	}
 	seg = gv_cur_region->dyn.addr;
+	seg->read_only = FALSE;
 	if (seg->asyncio)
 	{	/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
 		fsb_size = get_fs_block_size(mu_cre_file_fd);
@@ -294,7 +295,7 @@ unsigned char mu_cre_file(void)
 		 * to do the warning transformation in this case. The only exception to this is a statsdb
 		 * which is anyways not journaled so need not worry about INST_FREEZE_ON_ERROR_ENABLED.
 		 */
-		assert((NULL == jnlpool.jnlpool_ctl) || IS_AUTODB_REG(gv_cur_region));
+		assert(((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl)) || IS_AUTODB_REG(gv_cur_region));
 		if (avail_blocks < blocks_for_create)
 		{
 			PUTMSG_ERROR_CSA(cs_addrs, 6, ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create, &avail_blocks);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>	/* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"	/* for VSIG_ATOMIC_T type */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -35,7 +35,7 @@
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
 GBLREF	node_local_ptr_t	locknl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		jnlpool_init_needed;
@@ -71,6 +71,8 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		assert(0 == crit_count);
 		crit_count++;	/* prevent interrupts */
 		DEBUG_ONLY(locknl = csa->nl);	/* for DEBUG_ONLY LOCK_HIST macro */
+		assert(jnlpool && jnlpool->jnlpool_ctl);	/* pool_init not yet set when called from jnlpool_init */
+		assert(reg == jnlpool->jnlpool_dummy_reg);
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
 		/* This assumes that mutex_spin_parms_t is located immediately after the crit structures */
 		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
@@ -102,9 +104,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		 */
 		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
 		csa->nl->in_crit = process_id;
-		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
+		CRIT_TRACE(csa, crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
-		if (jnlpool.repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
+		if (jnlpool && jnlpool->repl_inst_filehdr && jnlpool->repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
 		{	/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until the rollback
 			 * command is re-run to bring the journal pool/file and instance file to a consistent state.
 			 */
@@ -131,10 +133,11 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		 * assert as it is valuable for replication servers (Source, Receiver and Update Process).
 		 */
 		assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action)
-		       || (csa->onln_rlbk_cycle == jnlpool.jnlpool_ctl->onln_rlbk_cycle) || IS_GTCM_GNP_SERVER_IMAGE
-		       || (jnlpool_init_needed && INST_FREEZE_ON_ERROR_POLICY));
+		       || (jnlpool && jnlpool->jnlpool_ctl && (csa->onln_rlbk_cycle == jnlpool->jnlpool_ctl->onln_rlbk_cycle))
+		       || IS_GTCM_GNP_SERVER_IMAGE || (jnlpool_init_needed && INST_FREEZE_ON_ERROR_POLICY));
 		if ((HANDLE_CONCUR_ONLINE_ROLLBACK == onln_rlbk_action)
-		    && (csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
+		    && (jnlpool && jnlpool->jnlpool_ctl
+		   	 && (csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle)))
 		{
 			assert(is_src_server);
 			SYNC_ONLN_RLBK_CYCLES;

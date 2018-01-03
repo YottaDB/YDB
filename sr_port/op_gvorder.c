@@ -32,19 +32,23 @@
 #include "mvalconv.h"
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
-#include "buddy_list.h"		/* needed for tp.h */
+#include "buddy_list.h"			/* needed for tp.h */
 #include "hashtab_int4.h"		/* needed for tp.h */
-#include "filestruct.h"		/* needed for jnl.h */
+#include "filestruct.h"			/* needed for jnl.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key		*gv_altkey, *gv_currkey;
-GBLREF gv_namehead	*gv_target;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF spdesc		stringpool;
+
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_key			*gv_altkey, *gv_currkey;
+GBLREF gv_namehead		*gv_target;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF sgm_info			*sgm_info_ptr;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF spdesc			stringpool;
 
 /* op_zprevious should generally be maintained in parallel */
 
@@ -65,6 +69,7 @@ void op_gvorder(mval *v)
 	mstr			opstr;
 	mval			tmpmval, *datamval;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -149,7 +154,7 @@ void op_gvorder(mval *v)
 		assert(gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
-		SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+		SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 		if (STR_SUB_ESCAPE == save_currkey->base[gv_currkey->end - 2])
 			save_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;	/* strip the byte added to get past curr */
 		gd_targ = TREF(gd_targ_addr);
@@ -166,7 +171,7 @@ void op_gvorder(mval *v)
 			if (IS_BASEDB_REGNAME(gv_cur_region))
 			{	/* Non-statsDB region */
 				if (!gv_cur_region->open)
-					gv_init_reg(gv_cur_region);
+					gv_init_reg(gv_cur_region, NULL);
 				change_reg();
 				/* Entries in directory tree of region could have empty GVT in which case move on to next entry */
 				acc_meth = REG_ACC_METH(gv_cur_region);
@@ -283,7 +288,7 @@ void op_gvorder(mval *v)
 		} else
 			v->str.len = 0;
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-		RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+		RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	}
 	return;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,17 +14,6 @@
 #include "gtm_utf8.h"
 #endif
 
-#define ASCII_ESC 		27	/*	this ASCII value is needed on any platform	*/
-#define EBCDIC_ESC		39
-#define ASCII_CR		13
-#define EBCDIC_CR		13
-#define ASCII_LF		10
-#define EBCDIC_LF		37
-#define ASCII_FF		12
-#define EBCDIC_FF		12
-#define ASCII_BS		8
-#define EBCDIC_BS		22
-#define VT			11
 
 #define ASCII_TTEOL		"\012"
 #define EBCDIC_TTEOL 		"\025"

@@ -64,8 +64,7 @@ GBLREF	tp_region		*grlist;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		mu_star_specified;
 GBLREF	boolean_t		donot_fflush_NULL;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		argumentless_rundown;
 GBLREF	semid_queue_elem	*keep_semids;
@@ -87,7 +86,8 @@ void mupip_rundown(void)
 {
 	int			exit_status, semid, shmid, save_errno, status;
 	boolean_t		region, file, arg_present, do_jnlpool_detach, jnlpool_sem_created, jnlpool_rndwn_required;
-	boolean_t		repl_inst_available, shm_removed = FALSE, anticipatory_freeze_available;
+	boolean_t		shm_removed = FALSE, anticipatory_freeze_available;
+	void			*repl_inst_available;
 	tp_region		*rptr, single;
 	replpool_identifier	replpool_id;
 	repl_inst_hdr		repl_instance;
@@ -144,7 +144,8 @@ void mupip_rundown(void)
 		anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
-			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE) /* sets replpool_id/full_len; note: assignment */
+			/* sets replpool_id/full_len; note: assignment */
+			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL))
 			{
 				instfilename = &replpool_id.instfilename[0];
 				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,
@@ -160,10 +161,10 @@ void mupip_rundown(void)
 					 * No need to do any instance file cleanup since there is nothing to rundown there
 					 * from either the journal pool or receive pool.
 					 */
-					assert((NULL == jnlpool_ctl) || anticipatory_freeze_available);
-					if ((NULL != jnlpool_ctl) && !anticipatory_freeze_available)
+					assert((!jnlpool || (NULL == jnlpool->jnlpool_ctl)) || anticipatory_freeze_available);
+					if ((jnlpool && (NULL != jnlpool->jnlpool_ctl)) && !anticipatory_freeze_available)
 					{
-						shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
+						shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;
 						JNLPOOL_SHMDT(jnlpool, status, save_errno);
 						if (0 > status)
 						{
@@ -173,7 +174,7 @@ void mupip_rundown(void)
 					}
 					exit_status = ERR_MUNOTALLSEC;
 				} else
-					do_jnlpool_detach = (NULL != jnlpool_ctl);
+					do_jnlpool_detach = (NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl);
 				ENABLE_FREEZE_ON_ERROR;
 			}
 		}
@@ -200,17 +201,17 @@ void mupip_rundown(void)
 		}
 		if (do_jnlpool_detach)
 		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 			assert(anticipatory_freeze_available && repl_inst_available);
-			assert(NULL != jnlpool_ctl);
+			assert(NULL != jnlpool->jnlpool_ctl);
 			/* Read the instance file to invalidate the journal pool semaphore ID and shared memory ID */
-			assert(NULL != jnlpool.jnlpool_dummy_reg);
-			assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_semid);
-			assert(INVALID_SHMID != jnlpool.repl_inst_filehdr->jnlpool_shmid);
-			assert(0 != jnlpool.repl_inst_filehdr->jnlpool_semid_ctime);
-			assert(0 != jnlpool.repl_inst_filehdr->jnlpool_shmid_ctime);
-			semid = jnlpool.repl_inst_filehdr->jnlpool_semid;
-			shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
+			assert(NULL != jnlpool->jnlpool_dummy_reg);
+			assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->jnlpool_semid);
+			assert(INVALID_SHMID != jnlpool->repl_inst_filehdr->jnlpool_shmid);
+			assert(0 != jnlpool->repl_inst_filehdr->jnlpool_semid_ctime);
+			assert(0 != jnlpool->repl_inst_filehdr->jnlpool_shmid_ctime);
+			semid = jnlpool->repl_inst_filehdr->jnlpool_semid;
+			shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;
 			/* Detach from the journal pool */
 			JNLPOOL_SHMDT(jnlpool, status, save_errno);
 			if (0 > status)
@@ -219,7 +220,7 @@ void mupip_rundown(void)
 				mupip_exit(ERR_MUNOTALLSEC);
 			}
 			/* Grab the ftok again */
-			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE))
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE))
 			{	/* CRITSEMFAIL is issued in case of an error */
 				assert(FALSE);
 				mupip_exit(ERR_MUNOTALLSEC);
@@ -308,7 +309,7 @@ void mupip_rundown(void)
 					mupip_exit(ERR_MUNOTALLSEC);
 				}
 			}
-			if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
+			if (!ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 			{	/* CRITSEMFAIL is issued in case of an error */
 				assert(FALSE);
 				mupip_exit(ERR_MUNOTALLSEC);

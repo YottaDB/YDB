@@ -42,31 +42,35 @@
 #include "xfer_enum.h"
 #include "code_address_type.h"
 #include "fix_xfer_entry.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF  uint4		dollar_tlevel;
-GBLREF	gd_addr		*gd_header;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	boolean_t	dollar_ztrigger_invoked;
-GBLREF	int4		gtm_trigger_depth;
-GBLREF	mstr		*dollar_ztname;
+GBLREF	sgmnt_data_ptr_t 	cs_data;
+GBLREF  uint4			dollar_tlevel;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	mstr			*dollar_ztname;
 #ifdef DEBUG
-GBLREF	boolean_t	donot_INVOKE_MUMTSTART;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
 
 LITREF	mval	literal_zero;
 LITREF	mval	literal_one;
 
-STATICDEF gv_key	save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-STATICDEF gd_addr	*save_gd_header;
-STATICDEF gv_key	*save_gv_currkey;
-STATICDEF gv_namehead	*save_gv_target;
-STATICDEF gd_region	*save_gv_cur_region;
-STATICDEF boolean_t	save_gv_last_subsc_null, save_gv_some_subsc_null;
+STATICDEF gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+STATICDEF gd_addr		*save_gd_header;
+STATICDEF gv_key		*save_gv_currkey;
+STATICDEF gv_namehead		*save_gv_target;
+STATICDEF gd_region		*save_gv_cur_region;
+STATICDEF boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
+STATICDEF jnlpool_addrs_ptr_t	save_jnlpool;
 #ifdef DEBUG
-STATICDEF boolean_t	in_op_fnztrigger;
+STATICDEF boolean_t		in_op_fnztrigger;
 #endif
 
 error_def(ERR_DZTRIGINTRIG);
@@ -115,6 +119,7 @@ LITDEF enum ztrprms ztrprm_data[] =
 		TP_CHANGE_REG(gv_cur_region);											\
 	}															\
 	gv_target = save_gv_target;												\
+	jnlpool = save_jnlpool;													\
 	if (NULL != save_gv_currkey)												\
 	{	/* gv_currkey->top could have changed if we opened a database with bigger keysize				\
 		 * inside the trigger* functions above. Therefore take care not to overwrite that				\
@@ -187,6 +192,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	save_gd_header = gd_header;
 	save_gv_target = gv_target;
 	save_gv_cur_region = gv_cur_region;
+	save_jnlpool = jnlpool;
 	if (NULL != gv_currkey)
 	{
 		save_gv_currkey = (gv_key *)&save_currkey[0];

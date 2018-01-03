@@ -71,9 +71,8 @@
 #define UPDHELPER_EARLY_EPOCH 5
 #define THRESHOLD_FOR_PAUSE 10
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	void			(*call_on_signal)();
-GBLREF	recvpool_addrs		recvpool;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
 GBLREF	int			updhelper_log_fd;
@@ -131,7 +130,7 @@ int updhelper_writer(void)
 				}
 				wcs_timer_start(reg, TRUE);
 				if ((cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0)
-						&& !FROZEN_CHILLED(csd))
+						&& !FROZEN_CHILLED(csa))
 				{
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, NULL, FALSE, dummy_errno);
 					flushed = TRUE;
@@ -147,7 +146,7 @@ int updhelper_writer(void)
 					SET_GBL_JREC_TIME;
 					assert(jgbl.gbl_jrec_time);
 					if (((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
-						 && !FROZEN_CHILLED(csd))
+						 && !FROZEN_CHILLED(csa))
 					{
 						DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
 						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE))

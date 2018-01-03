@@ -97,6 +97,11 @@ int f_select(oprtype *a, opctype op)
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
+			else if ((NULL != savechain)
+					/* the below guards against returning to a chain that should
+					 * be abandoned because of an error */
+					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);
 			return FALSE;
 		}
 		if (TK_COLON != TREF(window_token))
@@ -104,6 +109,11 @@ int f_select(oprtype *a, opctype op)
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
+			else if ((NULL != savechain)
+					/* the below guards against returning to a chain that should
+					 * be abandoned because of an error */
+					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);
 			stx_error(ERR_COLON);
 			return FALSE;
 		}
@@ -131,8 +141,9 @@ int f_select(oprtype *a, opctype op)
 			if (shifting)
 				setcurtchain(oldchain);
 			else if ((NULL != savechain)
-				/* the below guards against returning to a chain that should be abandoned because of an error */
-				&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+					/* the below guards against returning to a chain that should
+					 * be abandoned because of an error */
+					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
 				setcurtchain(savechain);
 			return FALSE;
 		}

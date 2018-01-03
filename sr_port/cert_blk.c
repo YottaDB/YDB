@@ -82,24 +82,35 @@ error_def(ERR_DBNONUMSUBS);
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
 #define BLOCK_WINDOW 8
-#define LEVEL_WINDOW 3
+#define LEVEL_WINDOW 2
 #define OFFSET_WINDOW 4
 
-#define TEXT1 ":     "
-#define TEXT2 " "
-#define TEXT3 ":"
-#define TEXT4 ", "
+#define TEXT0 "BLK=0x"
+#define TEXT1 " : OFF=0x"
+#define TEXT2 " : LVL=0x"
+#define TEXT3 " :              LVL=0x"
+#define TEXT4 ","
 
-#define MAX_UTIL_LEN 40
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF)									\
-{													\
-	if (gtmassert_on_error)										\
+#define MAX_UTIL_LEN STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)										\
+{														\
+	switch (ERROR_ACTION)											\
+	{													\
+	case ASSERTPRO_ON_CERT_FAIL:										\
+	case RTS_ERROR_ON_CERT_FAIL:										\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
+		/* WARNING fallthrough (because the message is INFO) */						\
+	case SEND_MSG_ON_CERT_FAIL:										\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
+		if ((ASSERTPRO_ON_CERT_FAIL != ERROR_ACTION) || (INFO == SEVMASK(ERR)))				\
+			break;											\
 		assertpro(0 == ERR);										\
-	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
+	default:												\
+		assert(ERROR_ACTION);										\
+	}													\
 }
 
-int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
-			boolean_t gtmassert_on_error, gv_namehead *gvt)
+int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int4 error_action, gv_namehead *gvt)
 {
 	block_id		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
@@ -138,17 +149,18 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 	blk_levl = bp->levl;
 	blk_size = bp->bsiz;
 	offset = (uint4)blk / bplmap;
-
 	util_len=0;
-	i2hex_blkfill(blk,&util_buff[util_len], BLOCK_WINDOW);
+	assert((STRLEN(TEXT1) + OFFSET_WINDOW + STRLEN(TEXT2)) == STRLEN(TEXT3));
+	MEMCPY_LIT(&util_buff[util_len], TEXT0);
+	util_len += STRLEN(TEXT0);
+	i2hexl(blk, &util_buff[util_len], BLOCK_WINDOW);
 	util_len += BLOCK_WINDOW;
-	MEMCPY_LIT(&util_buff[util_len], TEXT1); /* OFFSET_WINDOW + 1 spaces */
-	util_len += SIZEOF(TEXT3) - 1;
-	util_len += OFFSET_WINDOW +1;
-	i2hex_blkfill(blk_levl, &util_buff[util_len], LEVEL_WINDOW);
+	MEMCPY_LIT(&util_buff[util_len], TEXT3); /* Blanks for "OFF=" + OFFSET_WINDOW */
+	util_len += STRLEN(TEXT3);
+	i2hex(blk_levl, &util_buff[util_len], LEVEL_WINDOW);
 	util_len += LEVEL_WINDOW;
-	MEMCPY_LIT(&util_buff[util_len], TEXT2);
-	util_len += SIZEOF(TEXT2) - 1;
+	MEMCPY_LIT(&util_buff[util_len], TEXT4);
+	util_len += STRLEN(TEXT4);
 	util_buff[util_len] = 0;
 	chain = *(off_chain *)&blk;
 	/* Assert that if at all chain.flag is non-zero (i.e. a created block), we are in TP and not yet in the commit logic.
@@ -162,18 +174,18 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
 		{
-			RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_DBLVLINC), util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBLVLINC, util_buff, error_action);
 			return FALSE;
 		}
 		if (blk_size != BM_SIZE(bplmap))
 		{
-			RTS_ERROR_FUNC(csa, ERR_DBBMSIZE, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMSIZE, util_buff, error_action);
 			return FALSE;
 		}
 		mp = (sm_uc_ptr_t)bp + SIZEOF(blk_hdr);
 		if ((*mp & 1) != 0)
 		{	/* bitmap doesn't protect itself */
-			RTS_ERROR_FUNC(csa, ERR_DBBMBARE, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMBARE, util_buff, error_action);
 			return FALSE;
 		}
 		full = TRUE;
@@ -197,14 +209,13 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			mask1 &= chunk;				/* check against the original contents */
 			if (mask1 != 0)				/* busy and reused should never appear together */
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBBMINV, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBBMINV, util_buff, error_action);
 				return FALSE;
 			}
-
 		}
 		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, MM_ADDR(csd), MASTER_MAP_BITS_PER_LMAP)))
 		{
-			RTS_ERROR_FUNC(csa, ERR_DBBMMSTR, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBMMSTR, util_buff, error_action);
 			/* DSE CACHE -VERIFY used to fail occasionally with the DBBMMSTR error because of passing
 			 * an older twin global buffer that contained stale bitmap information. That is now fixed.
 			 * So we dont expect any more such failures. Assert accordingly.
@@ -216,37 +227,37 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 	}
 	if (blk_levl > MAX_BT_DEPTH)
 	{
-		RTS_ERROR_FUNC(csa, ERR_DBBLEVMX, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBLEVMX, util_buff, error_action);
 		return FALSE;
 	}
 	if (blk_levl < 0)
 	{
-		RTS_ERROR_FUNC(csa, ERR_DBBLEVMN, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBLEVMN, util_buff, error_action);
 		return FALSE;
 	}
 	if (blk_levl == 0)
 	{	/* data block */
 		if ((DIR_ROOT == blk) || (blk == root))
 		{	/* headed for where an index block should be */
-			RTS_ERROR_FUNC(csa, ERR_DBROOTBURN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBROOTBURN, util_buff, error_action);
 			return FALSE;
 		}
 		if (blk_size < (uint4)SIZEOF(blk_hdr))
 		{
-			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff, error_action);
 			return FALSE;
 		}
 	} else
 	{	/* index block */
 		if (blk_size < (uint4)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id)))
 		{	/* must have at least one record */
-			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff, error_action);
 			return FALSE;
 		}
 	}
 	if (blk_size > (uint4)csd->blk_size)
 	{
-		RTS_ERROR_FUNC(csa, ERR_DBBSIZMX, util_buff);
+		RTS_ERROR_FUNC(csa, ERR_DBBSIZMX, util_buff, error_action);
 		return FALSE;
 	}
 	is_directory = FALSE;
@@ -282,29 +293,17 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 		rec_num++;
 		GET_RSIZ(rec_size, rp);
 		rec_offset = (uint4)((sm_ulong_t)rp - (sm_ulong_t)bp);
-		/*add util_buff here*/
-
-		util_len=0;
-		i2hex_blkfill(blk,&util_buff[util_len], BLOCK_WINDOW);
-		util_len += BLOCK_WINDOW;
-		MEMCPY_LIT(&util_buff[util_len], TEXT1); /* OFFSET_WINDOW + 1 spaces */
-		util_len += SIZEOF(TEXT3) - 1;
-		i2hex_nofill(rec_offset, &util_buff[util_len], OFFSET_WINDOW);
-		util_len += OFFSET_WINDOW + 1;
-		i2hex_blkfill(blk_levl, &util_buff[util_len], LEVEL_WINDOW);
-		util_len += LEVEL_WINDOW;
-		MEMCPY_LIT(&util_buff[util_len], TEXT2);
-		util_len += SIZEOF(TEXT2) - 1;
-		util_buff[util_len] = 0;
-
+		MEMCPY_LIT(&util_buff[STRLEN(TEXT0) + BLOCK_WINDOW], TEXT1); /* insert offset between block and level */
+		i2hex_nofill(rec_offset, &util_buff[STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT1)], OFFSET_WINDOW);
+		MEMCPY_LIT(&util_buff[STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT1) + OFFSET_WINDOW], TEXT2);
 		if (rec_size <= (uint4)SIZEOF(rec_hdr))
 		{
-			RTS_ERROR_FUNC(csa, ERR_DBRSIZMN, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBRSIZMN, util_buff, error_action);
 			return FALSE;
 		}
 		if (rec_size > (uint4)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
 		{
-			RTS_ERROR_FUNC(csa, ERR_DBRSIZMX, util_buff);
+			RTS_ERROR_FUNC(csa, ERR_DBRSIZMX, util_buff, error_action);
 			return FALSE;
 		}
 		r_top = (rec_hdr_ptr_t)((sm_ulong_t)rp + rec_size);
@@ -313,7 +312,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 		{
 			if (rec_cmpc)
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBCMPNZRO, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBCMPNZRO, util_buff, error_action);
 				return FALSE;
 			}
 			if (0 == blk_levl)
@@ -321,7 +320,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 				ch = *((sm_uc_ptr_t)rp + SIZEOF(rec_hdr));
 				if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
 				{
-					RTS_ERROR_FUNC(csa, ERR_GVINVALID, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_GVINVALID, util_buff, error_action);
 					return FALSE;
 				}
 			}
@@ -330,12 +329,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 		{	/* star key */
 			if (rec_size != SIZEOF(rec_hdr) + SIZEOF(block_id))
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBSTARSIZ, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBSTARSIZ, util_buff, error_action);
 				return FALSE;
 			}
 			if (rec_cmpc)
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBSTARCMP, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBSTARCMP, util_buff, error_action);
 				return FALSE;
 			}
 			blk_id_ptr = (sm_uc_ptr_t)rp + SIZEOF(rec_hdr);
@@ -349,7 +348,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			{
 				if (rec_cmpc >= prior_expkeylen)
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBCMPMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBCMPMX, util_buff, error_action);
 					return FALSE;
 				}
 				for (b_ptr = prior_expkey; b_ptr < (prior_expkey + rec_cmpc); b_ptr++)
@@ -380,7 +379,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 					prev_char_is_delimiter = FALSE;
 				if (blk_id_ptr >= (sm_uc_ptr_t)r_top)
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBKEYMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBKEYMX, util_buff, error_action);
 					return FALSE;
 				}
 			}
@@ -391,7 +390,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 				if (is_gvt)
 				{	/* this is a contradiction. a block cannot be a directory and gvt at the same time.
 					 * gvt should contain all keys with the same global name */
-					RTS_ERROR_FUNC(csa, ERR_DBINVGBL, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBINVGBL, util_buff, error_action);
 					return FALSE;
 				}
 				is_directory = TRUE;	/* no need to do this if it was already TRUE but we save an if check */
@@ -401,19 +400,19 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 				if (is_directory)
 				{	/* this is a contradiction. a block cannot be a directory and gvt at the same time.
 					 * the directory tree should contain only name-level (i.e. unsubscripted) globals */
-					RTS_ERROR_FUNC(csa, ERR_DBDIRTSUBSC, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBDIRTSUBSC, util_buff, error_action);
 					return FALSE;
 				}
 				is_gvt = TRUE;	/* no need to do this if it was already TRUE but we save an if check */
 			}
 			if (MAX_GVSUBSCRIPTS <= num_subscripts)
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBMAXNRSUBS, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBMAXNRSUBS, util_buff, error_action);
 				return FALSE;
 			}
 			if (blk_levl && (key_size != (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr))))
 			{
-				RTS_ERROR_FUNC(csa, ERR_DBKEYMN, util_buff);
+				RTS_ERROR_FUNC(csa, ERR_DBKEYMN, util_buff, error_action);
 				return FALSE;
 			}
 			assert(first_key || (rec_cmpc < prior_expkeylen));
@@ -421,12 +420,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			{
 				if (prior_expkey[rec_cmpc] == key_base[0])
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBCMPBAD, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBCMPBAD, util_buff, error_action);
 					return FALSE;
 				}
 				if (((unsigned int)prior_expkey[rec_cmpc] >= (unsigned int)key_base[0]))
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBKEYORD, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBKEYORD, util_buff, error_action);
 					return FALSE;
 				}
 			}
@@ -434,7 +433,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			prior_expkeylen = rec_cmpc + key_size;
 			null_subscript_cnt = 0;
 			if (is_gvt && (0 == blk_levl))
-			{
+			{	/* The messages in this section detect mismatches between header settings and an existing
+				 * representation, but don't actually make the data inaccessible so they are "info-ised" in line
+				 * to prevent them from generating any assertpro.
+				 */
 				for (r_ptr = prior_expkey; *r_ptr != KEY_DELIMITER; r_ptr++)
 					;
 				for(;;)
@@ -459,9 +461,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 									MAX_ZWR_KEY_SZ, tmp_gvkey, TRUE);
 								fmtd_key_len = (int)(temp - key_buffer);
 								key_buffer[fmtd_key_len] = '\0';
-								rts_error_csa(CSA_ARG(csa) VARLSTCNT(4)
-									MAKE_MSG_INFO(ERR_DBNONUMSUBS), 2,
-									LEN_AND_STR(key_buffer));
+								RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_DBNONUMSUBS), util_buff,
+									error_action);
 								GVKEY_FREE_IF_NEEDED(tmp_gvkey);
 							}
 						}
@@ -472,28 +473,15 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 						}
 						if ((subscript == SUBSCRIPT_STDCOL_NULL) || (subscript == STR_SUB_PREFIX))
 								null_subscript_cnt++;
-						if (csd->null_subs)
-						{
-							if ((0 == csd->std_null_coll) ? (SUBSCRIPT_STDCOL_NULL == subscript) :
-								(STR_SUB_PREFIX == subscript))
-							{
-								if (csd->std_null_coll)
-									rts_error_csa(CSA_ARG(csa) VARLSTCNT(8)
-										MAKE_MSG_INFO(ERR_DBNULCOL), 6, rec_num, blk,
-										LEN_AND_STR(GTM_NULL_TEXT),
-										LEN_AND_STR(STD_NULL_TEXT));
-								else
-									rts_error_csa(CSA_ARG(csa) VARLSTCNT(8)
-										MAKE_MSG_INFO(ERR_DBNULCOL), 6, rec_num, blk,
-										LEN_AND_STR(STD_NULL_TEXT),
-										LEN_AND_STR(GTM_NULL_TEXT));
-							}
-						}
+						if ((csd->null_subs) && ((0 == csd->std_null_coll)
+								? (SUBSCRIPT_STDCOL_NULL == subscript)
+								:(STR_SUB_PREFIX == subscript)))
+							RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_DBNULCOL), util_buff, error_action);
 					}
 				}
 				if (0 < null_subscript_cnt && !csd->null_subs)
 				{
-					RTS_ERROR_FUNC(csa, ERR_NULSUBSC, util_buff);
+					RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_NULSUBSC), util_buff, error_action);
 				}
 			}
 		}
@@ -509,24 +497,24 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			{
 				if (child <= 0)
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff, error_action);
 					return FALSE;
 				}
 				if ((child > csa->ti->total_blks) && !mu_reorg_upgrd_dwngrd_in_prog && !mu_reorg_encrypt_in_prog)
 				{	/* REORG -UPGRADE/DOWNGRADE/ENCRYPT can update recycled blocks, which may contain children
 					 * beyond total_blks if a truncate happened sometime after the block was killed.
 					 */
-					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff, error_action);
 					return FALSE;
 				}
 				if (!(child % bplmap))
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBPTRMAP, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRMAP, util_buff, error_action);
 					return FALSE;
 				}
 				if (child == prev_child)
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBBDBALLOC, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBBDBALLOC, util_buff, error_action);
 					return FALSE;
 				}
 				prev_child = child;
@@ -534,7 +522,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root,
 			{
 				if ((blk_id_ptr != next_tp_child_ptr) && (NULL != next_tp_child_ptr))
 				{
-					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
+					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff, error_action);
 					return FALSE;
 				}
 				next_tp_child_ptr = blk_id_ptr + chain.next_off;

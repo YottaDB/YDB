@@ -18,6 +18,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include "io.h"
 #include "iormdef.h"
@@ -25,7 +26,6 @@
 #include "gtm_signal.h"
 #include "gtmio.h"
 #include "iosp.h"
-#include "string.h"
 #include "stringpool.h"
 #include "iotimer.h"
 #include "gt_timer.h"
@@ -53,6 +53,7 @@ void iorm_close(io_desc *iod, mval *pp)
 	unsigned char	c;
 	char		*path, *path2;
 	int		stat_res;
+	int		save_errno;
 	int		fstat_res;
 	struct stat	statbuf, fstatbuf;
 	int		p_offset;
@@ -118,23 +119,43 @@ void iorm_close(io_desc *iod, mval *pp)
 				path = iod->trans_name->dollar_io;
 				FSTAT_FILE(rm_ptr->fildes, &fstatbuf, fstat_res);
 				if (-1 == fstat_res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+				}
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+				}
 				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 					if (UNLINK(path) == -1)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+					{
+						save_errno = errno;
+						SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+					}
 				break;
 			case iop_rename:
 				path = iod->trans_name->dollar_io;
 				path2 = (char*)(pp->str.addr + p_offset + 1);
 				FSTAT_FILE(rm_ptr->fildes, &fstatbuf, fstat_res);
 				if (-1 == fstat_res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+				}
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+				}
 				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 				{
 					/* make a copy of path2 so we can null terminate it */
@@ -148,9 +169,17 @@ void iorm_close(io_desc *iod, mval *pp)
 					assert(stringpool.free >= stringpool.base);
 					assert(stringpool.free <= stringpool.top);
 					if (LINK(path, savepath2) == -1)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+					{
+						save_errno = errno;
+						SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+					}
 					if (UNLINK(path) == -1)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+					{
+						save_errno = errno;
+						SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
+					}
 				}
 				break;
 			case iop_destroy:
@@ -193,9 +222,11 @@ void iorm_close(io_desc *iod, mval *pp)
 			cur_position = lseek(rm_ptr->fildes, (off_t)0, SEEK_CUR);
 			if ((off_t)-1 == cur_position)
 			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 					      RTS_ERROR_LITERAL("lseek"),
-					      RTS_ERROR_LITERAL("iorm_close()"), CALLFROM, errno);
+					      RTS_ERROR_LITERAL("iorm_close()"), CALLFROM, save_errno);
 			} else
 				rm_ptr->file_pos = cur_position;
 		}
@@ -220,6 +251,11 @@ void iorm_close(io_desc *iod, mval *pp)
 		{
 			free(rm_ptr->tmp_buffer);
 			rm_ptr->tmp_buffer = NULL;
+		}
+		if (iod->dollar.devicebuffer)
+		{
+			free(iod->dollar.devicebuffer);
+			iod->dollar.devicebuffer = NULL;
 		}
 	}
 
@@ -275,10 +311,12 @@ void iorm_close(io_desc *iod, mval *pp)
 				} while (((pid_t)-1 == done_pid) && (EINTR == errno) && (!out_of_time));
 				if (((pid_t)-1 == done_pid) && (!out_of_time))
 				{
+					save_errno = errno;
 					if (use_timer)
 						cancel_timer(timer_id);
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						      RTS_ERROR_LITERAL("waitpid"), CALLFROM, errno);
+						      RTS_ERROR_LITERAL("waitpid"), CALLFROM, save_errno);
 				}
 				if (out_of_time || (!use_timer && (0 == done_pid)))
 				{

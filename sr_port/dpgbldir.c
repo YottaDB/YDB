@@ -177,7 +177,7 @@ gd_addr *gd_load(mstr *v)
 	trans_num		*array;
 #	ifdef DEBUG
 	boolean_t		prevMapIsSpanning, currMapIsSpanning, gdHasSpanGbls;
-	boolean_t		isSpannedReg[256];	/* currently we allow for a max of 256 regions in this dbg code */
+	boolean_t		isSpannedReg[512];	/* allow up to 256 (* 2 for implicit statsdb) regions in dbg logic */
 	gd_region		*base_reg, *stats_reg;
 	uint4			reg_index;
 	unsigned char		regname[MAX_MIDENT_LEN + 1];
@@ -218,6 +218,9 @@ gd_addr *gd_load(mstr *v)
 	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
 	table->segments = (struct gd_segment_struct *)((UINTPTR_T)table->segments + (UINTPTR_T)table);
 	table->gblnames = (struct gd_gblname_struct *)((UINTPTR_T)table->gblnames + (UINTPTR_T)table);
+	table->instinfo = (struct gd_inst_info_struct *)((UINTPTR_T)table->instinfo + (UINTPTR_T)table);
+	if (table == (gd_addr *)table->instinfo)
+		table->instinfo = NULL;
 	table->end = (table->end + (UINTPTR_T)table);
 	n_regions = table->n_regions;
 	for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
@@ -225,7 +228,7 @@ gd_addr *gd_load(mstr *v)
 		t_offset = reg->dyn.offset;
 		reg->dyn.addr = (gd_segment *)((char *)table + t_offset);
 #		ifdef DEBUG
-		assert((reg - table->regions) < ARRAYSIZE(isSpannedReg));
+		assert((reg - table->regions) <= ARRAYSIZE(isSpannedReg));
 		isSpannedReg[reg - table->regions] = FALSE;
 #		endif
 		reg->owning_gd = table; /* set backpointer from region to owning gbldir */

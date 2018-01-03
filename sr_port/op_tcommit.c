@@ -64,6 +64,8 @@
 #include "wcs_timer_start.h"
 #include "mupipbckup.h"
 #include "gvcst_protos.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 #include "db_snapshot.h"
 
@@ -105,6 +107,7 @@ GBLREF	int4			tstart_trigger_depth;
 #ifdef DEBUG
 GBLREF	boolean_t		forw_recov_lgtrig_only;
 #endif
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
@@ -203,6 +206,7 @@ enum cdb_sc	op_tcommit(void)
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	unsigned int		bsiz;
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	boolean_t		before_image_needed;
 	boolean_t		skip_invoke_restart;
 #	ifdef DEBUG
@@ -254,6 +258,7 @@ enum cdb_sc	op_tcommit(void)
 		}
 #		endif
 		save_cur_region = gv_cur_region;
+		save_jnlpool = jnlpool;
 #		ifdef DEBUG
 		/* With jgbl.forw_phase_recovery, it is possible gv_currkey is non-NULL and gv_target is NULL
 		 * (due to a MUR_CHANGE_REG) so do not invoke the below macro in that case.
@@ -564,6 +569,7 @@ enum cdb_sc	op_tcommit(void)
 		tp_clean_up(TP_COMMIT);
 		gv_cur_region = save_cur_region;
 		TP_CHANGE_REG(gv_cur_region);
+		jnlpool = save_jnlpool;
 #		ifdef DEBUG
 		/* See comment in similar code before tp_tend call above */
 		if (!forw_recov_lgtrig_only && (!jgbl.forw_phase_recovery || (NULL != gv_target)))

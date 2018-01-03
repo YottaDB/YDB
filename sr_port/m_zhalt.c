@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,29 +18,33 @@
 #include "cmd.h"
 #include "toktyp.h"
 
-LITREF mval	literal_zero;
-
-/* Halt the process similar to op_halt but allow a return code to be specified. If no return code
- * is specified, return code 0 is used as a default (making it identical to op_halt).
+/* Halt the process similar to HALT but ZHALT allows specification of a return code. If the command does not specify a return
+ * code, this uses 0 as a default, so that case appears the same to the shell as HALT. However, they are subject to different
+ * potential restrictions, so they use a flag that separates the two.
  */
 int m_zhalt(void)
 {
 	triple	*triptr;
-	oprtype ot;
+	oprtype	ot;
 	int	status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Let m_halt() handle the case of the missing return code */
 	if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
-		return m_halt();
-	switch (status = expr(&ot, MUMPS_NUM))		/* NOTE assignment */
+	{	/* no argument means return 0 */
+		triptr = newtriple(OC_ZHALT);
+		triptr->operand[0] = put_ilit(1);
+		triptr->operand[1] = put_ilit(0);
+		return TRUE;
+	}
+	switch (status = expr(&ot, MUMPS_INT))		/* NOTE assignment */
 	{
 		case EXPR_FAIL:
 			return FALSE;
 		case EXPR_GOOD:
 			triptr = newtriple(OC_ZHALT);
-			triptr->operand[0] = ot;
+			triptr->operand[0] = put_ilit(1);
+			triptr->operand[1] = ot;
 			return TRUE;
 		case EXPR_INDR:
 			make_commarg(&ot, indir_zhalt);

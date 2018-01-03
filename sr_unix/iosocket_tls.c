@@ -62,6 +62,8 @@ error_def(ERR_ZINTRECURSEIO);
 #define COLONBRACKET	": { "
 #define BRACKETSSEMIS	" }; };"
 #define RENEGOTIATE	"RENEGOTIATE"
+#define FLUSH_OUTPUT_ERROR	"unable to flush pending output"
+#define UNREAD_INPUT	"unread input"
 
 typedef enum
 {
@@ -188,13 +190,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if (NULL == (tls_ctx = (gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE))))
 			{
 				errp = gtm_tls_get_error();
-				len = SIZEOF(ONE_COMMA) - 1;
-				memcpy(iod->dollar.device, ONE_COMMA, len);
-				errlen = STRLEN(errp);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-				memcpy(&iod->dollar.device[len], errp, devlen + 1);
-				if (devlen < errlen)
-					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
 				if (NO_M_TIMEOUT != msec_timeout)
@@ -232,13 +228,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				socketptr->tlsenabled = FALSE;
 				free(extrastr);
 				errp = gtm_tls_get_error();
-				len = SIZEOF(ONE_COMMA) - 1;
-				memcpy(iod->dollar.device, ONE_COMMA, len);
-				errlen = STRLEN(errp);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-				memcpy(&iod->dollar.device[len], errp, devlen + 1);
-				if (devlen < errlen)
-					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
 			} else
@@ -256,13 +246,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{	/* error string available */
 				socketptr->tlsenabled = FALSE;
 				errp = gtm_tls_get_error();
-				len = SIZEOF(ONE_COMMA) - 1;
-				memcpy(iod->dollar.device, ONE_COMMA, len);
-				errlen = STRLEN(errp);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-				memcpy(&iod->dollar.device[len], errp, devlen + 1);
-				if (devlen < errlen)
-					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
 			}
@@ -272,13 +256,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		{
 			socketptr->tlsenabled = FALSE;
 			errp = gtm_tls_get_error();
-			len = SIZEOF(ONE_COMMA) - 1;
-			memcpy(iod->dollar.device, ONE_COMMA, len);
-			errlen = STRLEN(errp);
-			devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-			memcpy(&iod->dollar.device[len], errp, devlen + 1);
-			if (devlen < errlen)
-				iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 			if (NO_M_TIMEOUT != msec_timeout)
@@ -346,13 +324,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				} else
 					errp = STRERROR(save_errno);
 				socketptr->tlsenabled = FALSE;
-				len = SIZEOF(ONE_COMMA) - 1;
-				memcpy(iod->dollar.device, ONE_COMMA, len);
-				errlen = STRLEN(errp);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-				memcpy(&iod->dollar.device[len], errp, devlen + 1);
-				if (devlen < errlen)
-					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						ERR_TEXT, 2, errlen, errp);
@@ -419,14 +391,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		}
 		if ((0 < socketptr->buffered_length) || (0 < gtm_tls_cachedbytes((gtm_tls_socket_t *)socketptr->tlssocket)))
 		{	/* if anything in input buffer or ready to be read then error */
-			len = SIZEOF(ONE_COMMA) - 1;
-			memcpy(iod->dollar.device, ONE_COMMA, len);
-			errp = "unread input";
-			errlen = STRLEN(errp);
-			devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-			memcpy(&iod->dollar.device[len], errp, devlen + 1);
-			if (devlen < errlen)
-				iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+			errp = UNREAD_INPUT;
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					ERR_TEXT, 2, errlen, errp);
@@ -440,22 +406,12 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			iosocket_flush(iod);
 			if (0 < socketptr->obuffer_length)
 			{ /* get obuffer_error as additional ERR_TEXT */
-				len = SIZEOF(ONE_COMMA) - 1;
-				memcpy(iod->dollar.device, ONE_COMMA, len);
-				errp = "unable to flush pending output";
-				errlen = STRLEN(errp);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-				memcpy(&iod->dollar.device[len], errp, devlen + 1);
-				len += devlen;
+				errp = FLUSH_OUTPUT_ERROR;
 				if (-1 == socketptr->obuffer_errno)
 					errp2 = gtm_tls_get_error();
 				else
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
-				errlen2 = STRLEN(errp2);
-				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen2);
-				memcpy(&iod->dollar.device[len], errp2, devlen + 1);
-				if (devlen < errlen2)
-					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errp2);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
 						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
@@ -505,13 +461,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = gtm_tls_get_error();
 			else
 				errp = STRERROR(tls_errno);
-			len = SIZEOF(ONE_COMMA) - 1;
-			memcpy(iod->dollar.device, ONE_COMMA, len);
-			errlen = STRLEN(errp);
-			devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-			memcpy(&iod->dollar.device[len], errp, devlen + 1);
-			if (devlen < errlen)
-				iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					ERR_TEXT, 2, errlen, errp);

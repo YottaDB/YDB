@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 
 #include <errno.h>
 #ifdef USE_POLL
-#include <poll.h>
+#include "gtm_poll.h"
 #else
 #include "gtm_select.h"
 #endif
@@ -131,20 +131,15 @@ void iosocket_buffer_error(socket_struct *socketptr)
 	if (socketptr->tlsenabled)
 	{
 		iod->dollar.za = 9;
-		memcpy(iod->dollar.device, ONE_COMMA, SIZEOF(ONE_COMMA));
 		if (-1 == socketptr->obuffer_errno)
 			errptr = gtm_tls_get_error();
 		else
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);
-		errlen = STRLEN(errptr);
-		devlen = MIN((SIZEOF(iod->dollar.device) - SIZEOF(ONE_COMMA)), errlen);
-		memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, devlen + 1);
-		if (devlen < errlen)
-			iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
 		socketptr->obuffer_errno = 0;
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
-				ERR_TEXT, 2, errlen, errptr);
+				ERR_TEXT, 2, STRLEN(errptr), errptr);
 	} else
 #	endif
 	{

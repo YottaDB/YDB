@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,6 @@
 GBLREF	unsigned char	*stackbase, *stacktop;
 GBLREF	unsigned short	proc_act_type;
 GBLREF	mstr		*err_act;
-GBLREF	mval		dollar_ztrap;
 
 unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine)
 {
@@ -30,7 +30,9 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 	lnr_tabent	*line_table, *last_line;
 	int4		len, ct, offset, in_addr_offset;
 	boolean_t	mpc_reset_to_linestart;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (!ADDR_IN_CODE(in_addr, routine))
 		return out;
 	routine = CURRENT_RHEAD_ADR(routine);
@@ -44,7 +46,7 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		);
 	assert(routine->labtab_len >= 0);
 	assert(routine->lnrtab_len >= 0);
-	if ((SFT_DEV_ACT == proc_act_type) || ((SFT_ZTRAP == proc_act_type) && (err_act == &dollar_ztrap.str)))
+	if ((SFT_DEV_ACT == proc_act_type) || ((SFT_ZTRAP == proc_act_type) && (err_act == &((TREF(dollar_ztrap)).str))))
 	{	/* This means we got an error while trying to compile the device-exception or ZTRAP string as
 		 * part of handling yet another primary error. The primary error would have reset fp->mpc to
 		 * the beginning of the line so note this down.

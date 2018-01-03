@@ -264,6 +264,7 @@ void mucregini(int4 blk_init_size)
 	NUM_CRIT_ENTRY(csd) = seg->mutex_slots;
 	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	csd->defer_allocate = seg->defer_allocate;
+	csd->read_only = seg->read_only;
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	csd->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */

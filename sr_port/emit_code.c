@@ -300,7 +300,7 @@ void trip_gen(triple *ct)
 			}
 		} else
 		{
-			assert((0 < tsp) && (511 >= *tsp));
+			assert((NULL != tsp) && (511 >= *tsp));
 			tsp = emit_vax_inst((short *)tsp, &saved_opr[0], sopr);
 #			ifdef DEBUG
 			if (CGP_ASSEMBLY == cg_phase)

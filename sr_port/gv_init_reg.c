@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
 
-void gv_init_reg (gd_region *reg)
+void gv_init_reg (gd_region *reg, gd_addr *addr)
 {
 #	ifdef NOLICENSE
 	licensed = TRUE;
@@ -49,10 +50,10 @@ void gv_init_reg (gd_region *reg)
 		case dba_mm:
 		case dba_bg:
 			if (!reg->open)
-				gvcst_init(reg);
+				gvcst_init(reg, addr);
 			break;
 		default:
-			GTMASSERT;
+		assertpro(reg->dyn.addr->acc_meth != reg->dyn.addr->acc_meth);
 	}
 	assert(reg->open);
 	return;

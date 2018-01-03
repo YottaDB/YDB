@@ -24,6 +24,8 @@
 #include "util.h"
 #include "gv_rundown.h"
 #include "print_exit_stats.h"
+#include "repl_msg.h"		/* needed for jnlpool_addrs_ptr_t */
+#include "gtmsource.h"		/* needed for jnlpool_addrs_ptr_t */
 #include "secshr_db_clnup.h"
 #include "gtmimagename.h"
 #include "dpgbldir.h"

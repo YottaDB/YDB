@@ -209,6 +209,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 			++char_len;
 		}
 	}
+	assert(MAX_STRLEN >= dstlen);
 	MV_INIT_STRING(dst, dstlen, (char *)dstbase);
 	assert(dst->str.len <= size);
 	dst->mvtype |= MV_UTF_LEN; /* set character length since we know it */

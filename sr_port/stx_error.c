@@ -53,6 +53,7 @@ error_def(ERR_PATNOTFOUND);
 error_def(ERR_SRCLIN);
 error_def(ERR_SRCLOC);
 error_def(ERR_SRCNAM);
+error_def(ERR_TEXT);
 
 void stx_error(int in_error, ...)
 {
@@ -106,6 +107,15 @@ void stx_error_va(int in_error, va_list args)
 		}
 		if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))
 			FOR_POP(BLOWN_FOR);
+		if (&(TREF(dollar_etrap)) == TREF(ind_source))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("in $gtm_etrap" ));
+		#	ifdef GTM_TRIGGER
+		if (&(TREF(gtm_trigger_etrap)) == TREF(ind_source))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2,
+				RTS_ERROR_TEXT("in $gtm_trigger_etrap" ));
+#		endif
+		if (&(TREF(dollar_zstep)) == TREF(ind_source))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("in $gtm_zstep" ));
 		if (ERR_BADCHAR == in_error)
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);

@@ -64,9 +64,7 @@ GBLREF	uint4			log_interval;
 GBLREF	volatile time_t		gtmrecv_now;
 GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
 GBLREF	repl_conn_info_t	*remote_side;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLCOMM);
@@ -492,7 +490,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		/* Reset last_rcvd_histinfo, last_valid_histinfo etc. as they reflect context from unprocessed data
 		 * in the receive pool and those are no longer valid because we have drained the receive pool.
 		 */
-		GTMRECV_CLEAR_CACHED_HISTINFO(recvpool.recvpool_ctl, jnlpool, jnlpool_ctl, INSERT_STRM_HISTINFO_FALSE);
+		GTMRECV_CLEAR_CACHED_HISTINFO(recvpool.recvpool_ctl, jnlpool, INSERT_STRM_HISTINFO_FALSE);
 		if (UPDPROC_START == upd_proc_local->start_upd)
 		{
 			/* Attempt starting the update process */
@@ -537,10 +535,10 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			gtmrecv_wait_for_jnl_seqno = TRUE;/* set this to TRUE to break out and go back to a fresh "do_main_loop" */
 			if (onln_rlbk_flg_set)
 			{
-				assert(NULL != jnlpool_ctl);
+				assert(jnlpool && (NULL != jnlpool->jnlpool_ctl));
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Closing connection due to ONLINE ROLLBACK\n");
  				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
- 						jnlpool_ctl->jnl_seqno);
+ 						jnlpool->jnlpool_ctl->jnl_seqno);
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",
 						recvpool_ctl->jnl_seqno);
 				repl_close(&gtmrecv_sock_fd);
@@ -553,9 +551,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				 * just syncing the journal pool cycles as the databases are not opened. But, to be safe, grab
 				 * the lock and sync the cycles.
 				 */
-				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 				SYNC_ONLN_RLBK_CYCLES;
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 				return_status = STOP_POLL;
 				recvpool_ctl->jnl_seqno = 0;
 			} else

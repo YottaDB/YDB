@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -263,6 +263,27 @@ typedef struct pte_csh_struct {
 		UPDATE_CUR_PTE_CSH(cur_pte_csh_array, cur_pte_csh_size, cur_pte_csh_entries_per_len, cur_pte_csh_tail_count);	\
 	}															\
 }
+
+#define	ENSURE_PAT_IN_TABLE(CODE)									\
+MBSTART {												\
+	char 	BUF[CHAR_CLASSES];									\
+	uint4	BIT, BYTELEN, MBIT;									\
+													\
+	if (!(CODE & pat_allmaskbits))									\
+	{	/* current table has no characters with this pattern code */				\
+		BYTELEN = 0;										\
+		for (BIT = 0; BIT < PAT_MAX_BITS; BIT++)						\
+		{											\
+			MBIT = (1 << BIT);								\
+			if ((MBIT & CODE & PATM_LONGFLAGS) && !(MBIT & pat_allmaskbits))		\
+				BUF[BYTELEN++] = codelist[patmaskseq(MBIT)];				\
+		}											\
+		if (run_time)										\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATNOTFOUND, 2, BYTELEN, BUF);	\
+		TREF(source_error_found) = ERR_PATNOTFOUND;						\
+		return FALSE;										\
+	}												\
+} MBEND
 
 int	do_patalt(
 		uint4		*firstalt,

@@ -22,6 +22,8 @@
 
 LITREF octabstruct	oc_tab[];
 
+error_def(ERR_NUMOFLOW);
+
 void unary_tail(oprtype *opr)
 {	/* collapse any string of unary operators that cam be simplified
 	 * opr is a pointer to a operand structure to process
@@ -125,7 +127,15 @@ void unary_tail(oprtype *opr)
 						} else if (MV_NM & mv->mvtype)
 							mv->sgn = !mv->sgn;
 					} else
+					{
 						s2n(mv);
+						if (!(MV_NM & mv->mvtype))
+						{
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+							assert(TREF(rts_error_in_parse));
+							return;
+						}
+					}
 					n2s(mv);
 					v = mv;
 					put_lit_s(v, t);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #ifdef DEBUG
 #  define PARM_POOL_INIT_CAP		2				/* Initial debug capacity */
 #  define MAX_SET_COUNT			3				/* Max parameter sets stored at one time */
-#  define MAX_TOTAL_SLOTS		(MAX_SET_COUNT * MAX_ACTUALS)	/* Max total slots allowed in the pool */
+#  define MAX_TOTAL_SLOTS		129	/* CAPACITY_ROUND_UP2(PARM_POOL_INIT_CAP, (MAX_SET_COUNT * MAX_ACTUALS) + 1) */
 #else
 #  define PARM_POOL_INIT_CAP		8				/* Initial pro capacity */
 #endif

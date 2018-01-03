@@ -24,10 +24,11 @@ GBLREF	uint4		process_id;
 /* yield processor macro - if argument is 0 or the (pseudo-)random value whose limit the argument defines is 0 just yield
  * otherwise do a microsleep
  */
-#if (defined(_AIX) || defined(sparc))
-/* For pSeries and SPARC, the "yield" system call seems a better match for
+#if defined(_AIX)
+/* For pSeries the "yield" system call seems a better match for
  * yields to ALLprocesses instead of just those on the local processor queue.
  */
+void yield(void);		/* AIX doesn't have this in a header, so use prototype from the man page. */
 #define RELQUANT yield()
 #else
 #define RELQUANT sched_yield()	/* avoiding pthread_yield() avoids unnecessary linking with libpthreads */

@@ -81,6 +81,7 @@ getfields(fldarray,dbname)
 	if $zlength(fhead)'=8192 do
 	. write "GETFIELDS: Error - unable to read fileheader from ",dbname,!
 	. write:0'=$data(fhead) "GETFIELDS: Read only ",$zlength(fhead)," bytes",!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Determine if this is a valid database header. Note that we don't
@@ -90,6 +91,7 @@ getfields(fldarray,dbname)
 	set label=$$formatfld($zextract(fhead,1,12),"char")
 	if (label'["GDSDYNUNX02")&(label'["GDSDYNUNX03") do
 	. write "GETFIELDS: Error - invalid fileheader format from ",dbname,!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Now parse out the fields
@@ -119,6 +121,7 @@ eof
 	close dbname
 badopen
 	write "The file """,dbname,""" had error: "
+	set $etrap="zgoto 0"
 	zmessage +$zstatus
 	zhalt 1
 

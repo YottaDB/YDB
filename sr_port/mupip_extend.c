@@ -112,7 +112,7 @@ void mupip_extend(void)
 		assert((FILE_INFO(gv_cur_region))->grabbed_access_sem); /* we should have standalone access */
 	}
 #	endif
-	gvcst_init(gv_cur_region);
+	gvcst_init(gv_cur_region, NULL);
 	if (gv_cur_region->was_open)
 	{	/* This should not happen as extend works on only one region at a time, but handle for safety */
 		gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));
@@ -158,7 +158,7 @@ void mupip_extend(void)
 		case dba_bg:
 		case dba_mm:
 			grab_crit(gv_cur_region);
-			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
+			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs);
 			old_total = cs_addrs->ti->total_blks;
 			if ((uint4)NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 			{

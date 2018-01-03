@@ -508,22 +508,36 @@ uint4	mur_back_phase1(reg_ctl_list *rctl)
 		 */
 		if ((JRT_EOF != rectype) && (JRT_EPOCH != rectype) && (jnlrec->prefix.time < jgbl.mur_tp_resolve_time))
 		{
-			rctl->jctl_error = jctl;
-			/* Assert that the new about-to-be-set TP resolve time does not differ by more than
-			 * twice the idle-EPOCH interval (which is defined by TIM_DEFER_DBSYNC). Twice is not a magic
-			 * number, but just to allow for some relaxation. The only exception is if this is an
-			 * interrupted recovery in which case the difference could be significant. One reason we
-			 * know why this could happen is because mur_close_files calls gds_rundown on all regions
-			 * AFTER resetting csd->intrpt_recov_tp_resolve_time to 0. So, if we get killed at
-			 * right AFTER doing gds_rundown on one region, but BEFORE doing gds_rundown on other
-			 * regions, then a subsequent ROLLBACK finds a higher TP resolve time on one region and
-			 * sets the value to jgbl.mur_tp_resolve_time but later finds other regions with records
-			 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
-			 */
-			assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
-					|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == gtm_white_box_test_case_number)
-						&& murgbl.intrpt_recovery));
-			return ERR_CHNGTPRSLVTM;
+			for ( ; JRT_PFIN == rectype; )
+			{	/* Skip over PFIN records at the end of the journal */
+				if (SS_NORMAL != (status = mur_prev(jctl, 0)))
+					break;
+				jnlrec = mur_desc->jnlrec;      /* keep jnlrec uptodate */
+				jctl->rec_offset -= mur_desc->jreclen;
+				assert(jctl->rec_offset >= mur_desc->cur_buff->dskaddr);
+				assert(JNL_HDR_LEN <= jctl->rec_offset);
+				rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+			}
+			assertpro(JRT_EOF != rectype); /* Cannot find an EOF anywhere but the last record of the journal */
+			if (JRT_EPOCH != rectype)
+			{
+				rctl->jctl_error = jctl;
+				/* Assert that the new about-to-be-set TP resolve time does not differ by more than
+				 * twice the idle-EPOCH interval (which is defined by TIM_DEFER_DBSYNC). Twice is not a magic
+				 * number, but just to allow for some relaxation. The only exception is if this is an
+				 * interrupted recovery in which case the difference could be significant. One reason we
+				 * know why this could happen is because mur_close_files calls gds_rundown on all regions
+				 * AFTER resetting csd->intrpt_recov_tp_resolve_time to 0. So, if we get killed at
+				 * right AFTER doing gds_rundown on one region, but BEFORE doing gds_rundown on other
+				 * regions, then a subsequent ROLLBACK finds a higher TP resolve time on one region and
+				 * sets the value to jgbl.mur_tp_resolve_time but later finds other regions with records
+				 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
+				 */
+				assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
+						|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == gtm_white_box_test_case_number)
+							&& murgbl.intrpt_recovery));
+				return ERR_CHNGTPRSLVTM;
+			}
 		}
 	}
 	/* Do intializations before invoking "mur_back_processing_one_region" function */

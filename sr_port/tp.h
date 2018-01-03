@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TP_H__
-#define __TP_H__
+#ifndef TP_H
+#define TP_H
 
 #include <sys/types.h>
 
@@ -400,13 +400,13 @@ typedef struct trans_restart_hist_struct
 
 # define TRACE_TRANS_RESTART(RETRY_CODE)								\
 {													\
-	GBLREF	jnlpool_addrs	jnlpool;								\
-	GBLREF	unsigned int	t_tries;								\
-	GBLREF	unsigned int	dollar_tlevel;								\
-	GBLREF	sgmnt_addrs	*cs_addrs;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;							\
+	GBLREF	unsigned int		t_tries;							\
+	GBLREF	unsigned int		dollar_tlevel;							\
+	GBLREF	sgmnt_addrs		*cs_addrs;							\
 													\
-	uint4			curidx;									\
-	trans_restart_hist_t	*this_restart_hist;							\
+	uint4				curidx;								\
+	trans_restart_hist_t		*this_restart_hist;						\
 													\
 	assert(dollar_tlevel || (NULL != cs_addrs));							\
 	curidx = ++(TREF(trans_restart_hist_index));							\
@@ -417,8 +417,8 @@ typedef struct trans_restart_hist_struct
 	this_restart_hist->dollar_tlevel = dollar_tlevel;						\
 	this_restart_hist->retry_code = RETRY_CODE;							\
 	this_restart_hist->call_from = (caddr_t)caller_id();						\
-	if (NULL != jnlpool.jnlpool_ctl)								\
-		this_restart_hist->seq_or_tn.jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;		\
+	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))						\
+		this_restart_hist->seq_or_tn.jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;		\
 	else												\
 		this_restart_hist->seq_or_tn.curr_tn = (NULL != cs_addrs) ? cs_addrs->ti->curr_tn : 0;	\
 	this_restart_hist->csa = dollar_tlevel ? NULL : cs_addrs;					\
@@ -939,31 +939,33 @@ GBLREF	unsigned int	t_tries;
 	}															\
 }
 
-#define SAVE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR)	\
-MBSTART {									\
-	SAVE_TARGET = gv_target;						\
-	SAVE_CUR_REG = gv_cur_region;						\
-	SAVE_SI_PTR = sgm_info_ptr;						\
-	assert(NULL != gv_currkey);						\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
-	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
+#define SAVE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
+MBSTART {											\
+	SAVE_TARGET = gv_target;								\
+	SAVE_CUR_REG = gv_cur_region;								\
+	SAVE_SI_PTR = sgm_info_ptr;								\
+	SAVE_JNLPOOL = jnlpool;									\
+	assert(NULL != gv_currkey);								\
+	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));				\
+	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);			\
 } MBEND
-#define RESTORE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR)	\
-MBSTART {									\
-	gv_target = SAVE_TARGET;						\
-	sgm_info_ptr = SAVE_SI_PTR;						\
-	/* check no keysize expansion occurred inside gvcst_root_search */	\
-	assert(gv_currkey->top == SAVE_KEY[0].top);				\
-	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
-	if (NULL != SAVE_CUR_REG)						\
-	{									\
-		TP_CHANGE_REG_IF_NEEDED(SAVE_CUR_REG);				\
-	} else									\
-	{									\
-		gv_cur_region = NULL;						\
-		cs_data = NULL;							\
-		cs_addrs = NULL;						\
-	}									\
+#define RESTORE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
+MBSTART {											\
+	gv_target = SAVE_TARGET;								\
+	sgm_info_ptr = SAVE_SI_PTR;								\
+	/* check no keysize expansion occurred inside gvcst_root_search */			\
+	assert(gv_currkey->top == SAVE_KEY[0].top);						\
+	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);			\
+	if (NULL != SAVE_CUR_REG)								\
+	{											\
+		TP_CHANGE_REG_IF_NEEDED(SAVE_CUR_REG);						\
+	} else											\
+	{											\
+		gv_cur_region = NULL;								\
+		cs_data = NULL;									\
+		cs_addrs = NULL;								\
+	}											\
+	jnlpool = SAVE_JNLPOOL;									\
 } MBEND
 
 /* Any retry transition where the destination state is the 3rd retry, we don't want to release crit, i.e. for 2nd to 3rd retry

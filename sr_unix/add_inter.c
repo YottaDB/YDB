@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,8 +61,13 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 			   not changed (SE 08/2007)
 			*/
 			assert(0 == OFFSETOF(global_latch_t, u.parts.latch_pid));
-			IA64_ONLY(cswpsuccess = compswap_unlock(RECAST(sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval));
-			NON_IA64_ONLY(cswpsuccess = compswap((sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval));
+#			if defined(_AIX)
+			cswpsuccess = compswap_unlock(RECAST(sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval);
+#			elif defined(__linux__)
+			cswpsuccess = compswap((sm_global_latch_ptr_t)cntrval_p, cntrval, newcntrval);
+#			else
+#			error "Don't know how to compswap on this platform"
+#			endif
 			if (cswpsuccess)
 			{
 				--fast_lock_count;

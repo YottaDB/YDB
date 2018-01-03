@@ -51,6 +51,8 @@
 #include "targ_alloc.h"
 #include "util.h"		/* for util_out_print prototype */
 #include "wcs_flu.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 #define	REORG_CONTINUE	1
 #define	REORG_BREAK	2
@@ -198,7 +200,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			continue;
 		}
 		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
-		gvcst_init(reg);
+		gvcst_init(reg, NULL);
 		mu_reorg_process = FALSE;
 		assert(update_array != NULL);
 		/* access method stored in global directory and database file header might be different in which case
@@ -372,7 +374,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			if (NULL == bml_lcl_buff)
 				bml_lcl_buff = malloc(BM_SIZE(BLKS_PER_LMAP));
 			memcpy(bml_lcl_buff, (blk_hdr_ptr_t)bml_sm_buff, BM_SIZE(BLKS_PER_LMAP));
-			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, FALSE, NULL))
+			if (FALSE == cert_blk(reg, curbmp, (blk_hdr_ptr_t)bml_lcl_buff, 0, RTS_ERROR_ON_CERT_FAIL, NULL))
 			{	/* certify the block while holding crit as cert_blk uses fields from file-header (shared memory) */
 				assert(FALSE);	/* in pro, skip ugprading/downgarding all blks in this unreliable local bitmap */
 				rel_crit(reg);

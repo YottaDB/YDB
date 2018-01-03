@@ -110,7 +110,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			num_additional_processors;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 boolean_t mu_truncate(int4 truncate_percent)
 {
@@ -309,7 +309,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	for (;;)
 	{ /* wait for FREEZE, we don't want to truncate a frozen database */
 		grab_crit(gv_cur_region);
-		if (FROZEN_CHILLED(cs_data))
+		if (FROZEN_CHILLED(cs_addrs))
 			DO_CHILLED_AUTORELEASE(csa, cs_data);
 		if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
 			break;
@@ -317,7 +317,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 		while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
 		{
 			hiber_start(1000);
-			if (FROZEN_CHILLED(cs_data) && CHILLED_AUTORELEASE(cs_data))
+			if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))
 				break;
 		}
 	}

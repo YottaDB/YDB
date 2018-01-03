@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +44,7 @@
 #include "repl_log.h"
 #include "is_proc_alive.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
@@ -58,16 +59,16 @@ int gtmsource_showbacklog(void)
 	uint4			gtmsource_pid;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
-	if (NULL != jnlpool.gtmsource_local)	/* Show backlog for a specific source server */
-		gtmsourcelocal_ptr = jnlpool.gtmsource_local;
+	jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+	if (NULL != jnlpool->gtmsource_local)	/* Show backlog for a specific source server */
+		gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 	else
-		gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 	for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 	{
 		if ('\0' == gtmsourcelocal_ptr->secondary_instname[0])
 		{
-			assert(NULL == jnlpool.gtmsource_local);
+			assert(NULL == jnlpool->gtmsource_local);
 			continue;
 		}
 		/* If SHOWBACKLOG on a specific secondary instance is requested, print the backlog information irrespective
@@ -75,7 +76,7 @@ int gtmsource_showbacklog(void)
 		 * print backlog information only for those instances that have an active or passive source server alive.
 		 */
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
-		if ((NULL == jnlpool.gtmsource_local) && (0 == gtmsource_pid))
+		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
 			continue;
 		repl_log(stderr, TRUE, TRUE,
 			"Initiating SHOWBACKLOG operation on source server pid [%d] for secondary instance [%s]\n",
@@ -100,7 +101,7 @@ int gtmsource_showbacklog(void)
 		else if ((gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_PASSIVE)
 				|| (gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED))
 			util_out_print("WARNING - Source Server is in passive mode, transactions are not being replicated", TRUE);
-		if (NULL != jnlpool.gtmsource_local)
+		if (NULL != jnlpool->gtmsource_local)
 			break;
 	}
 	return (NORMAL_SHUTDOWN);

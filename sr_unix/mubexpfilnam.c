@@ -46,7 +46,7 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 		}
 	} else
 	{	/* Replication instance region */
-		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error))
+		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error, NULL))
 			assertpro(FALSE);	/* rts_error should have been issued by repl_inst_get_name */
 	}
 	for (c1 = file.addr + file.len; (*c1 != '/') && (c1 != file.addr); c1--)

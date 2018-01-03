@@ -38,8 +38,8 @@ GBLREF	boolean_t	dont_want_core;
 GBLREF	boolean_t	run_time;
 GBLREF	char		cg_phase;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int		gtm_errno;
-GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	void		(*stx_error_va_fptr)(int in_error, ...);	/* Function pointer for stx_error_va() so this can avoid
 								 	 * pulling stx_error() into gtmsecshr.
 								 	 */
@@ -69,10 +69,11 @@ int rts_error(int argcnt, ...)
 {
 	va_list		var;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
+	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
