@@ -31,9 +31,21 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 
-/* */
+/* Routine to locate the next node at any level (i.e. forward $query).
+ *
+ * Parameters:
+ *   varname	    - Gives name of local or global variable
+ *   subs_used	    - Count of subscripts (if any else 0) in input node
+ *   subsarray	    - an array of "subs_used" subscripts in input node (not looked at if "subs_used" is 0)
+ *   ret_subs_used  - Count of subscripts in returned/next node
+ *   ret_subsarray  - an array of "*ret_subs_used" subscripts in returned/next node (not looked at if "*ret_subs_used" is 0)
+ *
+ * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
+ * as they are not ever being used to create a new node or are otherwise kept for any reason by the
+ * YottaDB runtime routines.
+ */
 int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
-		    int *ret_subs_used, ydb_buffer_t *ret_subsarray)
+						int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -48,12 +60,14 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_NODE_NEXT);	/* Note: macro could "return" from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 		assert(0 == TREF(sapi_query_node_subs_cnt));	/* should have been cleared by "ydb_simpleapi_ch" */
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -125,6 +139,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		default:
 			assertpro(FALSE);
 	}
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	TREF(sapi_query_node_subs_cnt) = 0;
 	REVERT;
 	return YDB_OK;

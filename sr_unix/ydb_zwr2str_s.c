@@ -34,7 +34,9 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_ZWR2STR);	/* Note: macro could "return" from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No mstrs reserved yet */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -54,7 +56,6 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 	op_fnzwrite(TRUE, &src, &dst);
 	SET_YDB_BUFF_T_FROM_MVAL(str, &dst, "NULL str->buf_addr", "ydb_zwr2str_s()");
 	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No need to protect "src.str" anymore */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 	REVERT;
 	return YDB_OK;
 }
