@@ -134,7 +134,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			/* Fetch the given ISV value (no subscripts supported) */
 			op_svget(get_svn_index, &get_value);
 			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value", "ydb_get_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", "ydb_get_s()");
 			break;
 		default:
 			assertpro(FALSE);

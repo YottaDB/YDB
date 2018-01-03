@@ -152,7 +152,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get previous global */
 			op_zprevious(&previoussub);			/* Locate previous subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value", "ydb_subscript_previous_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
