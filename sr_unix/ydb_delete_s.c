@@ -31,7 +31,20 @@
 #include "gdsfhead.h"
 #include "mvalconv.h"
 
-/* */
+/* Routine to delete/kill an lvn/gvn.
+ *
+ * Parameters:
+ *   varname	    - Gives name of local or global variable
+ *   subs_used	    - Count of subscripts (if any else 0) in input node
+ *   subsarray	    - an array of "subs_used" subscripts in input node (not looked at if "subs_used" is 0)
+ *   delete_method  - Is one of the below choices
+ *			LYDB_DEL_TREE (kills the subtree underneath i.e. KILL command in M)
+ *			LYDB_DEL_NODE (kills only the node and not the subtree underneath i.e. ZKILL/ZWITHDRAW command in M)
+ *
+ * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
+ * as they are not ever being used to create a new node or are otherwise kept for any reason by the
+ * YottaDB runtime routines.
+ */
 int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method)
 {
 	boolean_t	error_encountered;
@@ -46,8 +59,10 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DELETE);			/* Note: macro could return from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
+	LIBYOTTADB_INIT(LYDB_RTN_DELETE);		/* Note: macro could return from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -75,8 +90,13 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Find status of the given local variable. Locate base var lv_val in curr_symval */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_TRUE);
-			assert(lvvalp);
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE);
+			if (NULL == lvvalp)
+			{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
+				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro). Nothing to kill. Return right away.
+				 */
+				break;
+			}
 			if (0 == subs_used)
 				/* If no subscripts, this is the node we are interested in */
 				src_lv = lvvalp;
@@ -142,7 +162,7 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 		default:
 			assertpro(FALSE);
 	}
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	REVERT;
 	return YDB_OK;
 }
