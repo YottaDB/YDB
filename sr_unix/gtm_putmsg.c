@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@
 #include "interlock.h"
 
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 /*  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
  *  =======	zero MUST be specified if there are no parameters.
@@ -41,12 +41,13 @@ void gtm_putmsg(int argcnt, ...)
 {
 	boolean_t	was_holder;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	boolean_t	release_latch;
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
+	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);	/* get multi-process lock if needed */
@@ -79,12 +80,13 @@ void gtm_putmsg_noflush(int argcnt, ...)
 {
 	boolean_t	was_holder;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	boolean_t	release_latch;
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = PTHREAD_CSA_FROM_GV_CUR_REGION;
+	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);	/* get multi-process lock if needed */

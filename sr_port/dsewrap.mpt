@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2012, 2013 Fidelity Information Services, Inc.    	;
+; Copyright (c) 2012-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -146,7 +147,7 @@ parsefhead(output,active)
 	new error,debug,fcnt,field,file,i,line,parsed,region,value
 	set error=0
 	if $data(%DSEWRAP("debug")) set debug=$increment(%DSEWRAP("debug"))
-	if $length($etrap)=0 set $etrap="use $p zshow ""*"" halt"
+	if $length($etrap)=0 set $etrap="use $principal zshow ""*"" set $etrap=""zgoto 0"" zhalt 1"
 	;
 	for i=1:1 read line(i):5 quit:error  quit:$zeof  quit:$select($data(active)=0:0,line(i)["DSE>":1,1:0)  do
 	. if ($test=0)&($length(line(i))=0) write !
@@ -212,12 +213,12 @@ addfield(var,region,field,value)
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 errtrap
 	use $p
-	set $etrap="use $principal write $zstatus,! zhalt 1"
+	set $etrap="use $principal write $zstatus,! set $etrap=""zgoto 0"" zhalt 1"
 	set userecode=$piece($ecode,",",2)
 	set errtext=$select(userecode?1"U"3N:$text(@userecode),1:"")
 	if $length(errtext) write $text(+0),@$piece(errtext,";",2),!
 	else  write $zstatus,!
-	if $zlevel<5 zhalt +$extract(userecode,2,$length(userecode))
+	if $zlevel<5 set $etrap="zgoto 0" zhalt +$extract(userecode,2,$length(userecode))
 	quit
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -36,6 +36,8 @@
 #define RESTRICT_DSE			"DSE"
 #define RESTRICT_DIRECT_MODE		"DIRECT_MODE"
 #define RESTRICT_ZCMDLINE		"ZCMDLINE"
+#define RESTRICT_HALT			"HALT"
+#define RESTRICT_ZHALT			"ZHALT"
 #define MAX_READ_SZ			1024	/* Restrict Mnemonic shouldn't exceed this limit */
 #define MAX_FACILITY_LEN		64
 #define MAX_GROUP_LEN			64
@@ -57,7 +59,7 @@ error_def(ERR_TEXT);
 
 void restrict_init(void)
 {
-	char		rfpath[GTM_PATH_MAX], linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group[MAX_GROUP_LEN];
+	char		rfpath[GTM_PATH_MAX], linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group[MAX_GROUP_LEN+1];
 	int		save_errno, fields, status, lineno;
 	FILE		*rfp;
 	boolean_t	restrict_one, restrict_all = FALSE;
@@ -133,7 +135,6 @@ void restrict_init(void)
 							restrict_all = TRUE;	/* Parse error - restrict everything */
 							break;
 						}
-
 						if (0 == STRNCASECMP(facility, RESTRICT_BREAK, SIZEOF(RESTRICT_BREAK)))
 							restrictions.break_op = restrict_one;
 						else if (0 == STRNCASECMP(facility, RESTRICT_ZBREAK, SIZEOF(RESTRICT_ZBREAK)))
@@ -155,6 +156,10 @@ void restrict_init(void)
 							restrictions.dmode = restrict_one;
 						else if (0 == STRNCASECMP(facility, RESTRICT_ZCMDLINE, SIZEOF(RESTRICT_ZCMDLINE)))
 							restrictions.zcmdline = restrict_one;
+						else if (0 == STRNCASECMP(facility, RESTRICT_HALT, SIZEOF(RESTRICT_HALT)))
+							restrictions.halt_op = restrict_one;
+						else if (0 == STRNCASECMP(facility, RESTRICT_ZHALT, SIZEOF(RESTRICT_ZHALT)))
+							restrictions.zhalt_op = restrict_one;
 						else
 						{	/* Parse error - restrict everything */
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RESTRICTSYNTAX, 3,
@@ -181,6 +186,8 @@ void restrict_init(void)
 			restrictions.dse = TRUE;
 			restrictions.dmode = TRUE;
 			restrictions.zcmdline = TRUE;
+			restrictions.halt_op = TRUE;
+			restrictions.zhalt_op = TRUE;
 		}
 	}
 	restrict_initialized = TRUE;

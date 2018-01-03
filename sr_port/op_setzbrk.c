@@ -99,8 +99,12 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		zr_remove_zbrks(NULL, NOBREAKMSG);
 	else
 	{
-		GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
+#		ifdef GTM_TRIGGER
+		IS_TRIGGER_RTN(&rtn->str, is_trigger);
+		if (is_trigger && (RESTRICTED(trigger_mod)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 		DBGIFTRIGR((stderr, "op_setzbrk: Setting/clearing a zbreak in a trigger\n"));
+#		endif
 		flush_pio();
 		if (WANT_CURRENT_RTN(rtn))
 			routine = CURRENT_RHEAD_ADR(frame_pointer->rvector);

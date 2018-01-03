@@ -94,6 +94,7 @@ void	gtm_env_init(void)
 	mstr			val, trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
+	int4			temp_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -400,6 +401,12 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
+		/* See if $gtm_string_pool_limit is set */
+		val.addr = GTM_STRPLLIM;
+		val.len = SIZEOF(GTM_STRPLLIM) - 1;
+		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
+		if (0 < temp_gtm_strpllim)
+			TREF(gtm_strpllim) = temp_gtm_strpllim;
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

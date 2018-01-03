@@ -293,6 +293,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
+#define MAX_INT_IN_BYTE		255
 
 #ifndef _AIX
 #	ifndef __sparc
@@ -501,9 +502,15 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 		TMS = NO_M_TIMEOUT;											\
 	else														\
 	{														\
-		assert(MV_BIAS >= 1000);        	/* if formats change scale may need attention */		\
+		assert(MV_BIAS >= 1000);	/* if formats change scale may need attention */			\
 		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */					\
-		TMS = (TMV->mvtype & MV_INT) ? ((0 > TMV->m[1]) ? 0 : TMV->m[1]) : (TMV->sgn ? 0 : MAXPOSINT4);		\
+		if (!(TMV->mvtype & MV_INT))										\
+			TMV->e += 3;	/* for non-ints, bump exponent to get millisecs from MV_FORCE_INT */		\
+		TMS = ((TMV->mvtype & MV_INT) ? TMV->m[1] : MIN(MAXPOSINT4, MV_FORCE_INT(TMV)));			\
+		if (!(TMV->mvtype & MV_INT))										\
+			TMV->e -= 3;	/* if we messed with the exponent, restore it to its original value */		\
+		if (0 > TMS)												\
+			TMS = 0;											\
 	}														\
 	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
 		TPNOTACID_CHECK(NOTACID);										\

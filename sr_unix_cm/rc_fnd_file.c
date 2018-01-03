@@ -106,7 +106,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = fpath2.len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch1, RC_SUCCESS);
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set
@@ -206,7 +206,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch2, RC_SUCCESS);
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set

@@ -19,8 +19,6 @@
 # NOTE: This script requires the GNU wget program to download
 # distribution files that are not on the local file system.
 
-# CAUTION - this script is still experimental.
-
 # Revision history
 #
 # 2011-02-15  0.01 K.S. Bhaskar - Initial version for internal use
@@ -34,6 +32,8 @@
 # 2011-10-25  0.12 K.S. Bhaskar - Support option to delete .o files on shared library platforms
 # 2014-08-13  0.13 K.S. Bhaskar - Add verbosity around getting latest version and tarball, if requested
 # 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
+# 2017-06-05  0.15 GT.M Staff	- GT.M install script should set RemoveIPC no in systemd linux distributions
+# 2017-09-19  0.16 GT.M Staff	- Treat i686 as i586; Fix an interaction bug in gtminstall resulting from the above change
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -79,6 +79,7 @@ dump_info()
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
     if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
+    if [ -n "$gtm_prompt_for_sys_reconfig" ] ; then echo gtm_prompt_for_sys_reconfig " : " $gtm_prompt_for_sys_reconfig ; fi
     if [ -n "$gtm_sf_dirname" ] ; then echo gtm_sf_dirname " : " $gtm_sf_dirname ; fi
     if [ -n "$gtm_tmp" ] ; then echo gtm_tmp " : " $gtm_tmp ; fi
     if [ -n "$gtm_user" ] ; then echo gtm_user " : " $gtm_user ; fi
@@ -109,6 +110,7 @@ err_exit()
     echo "$m1"
     echo "--linkenv dirname - create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--linkexec dirname - create link in dirname to gtm script; incompatible with copyexec"
+    echo "--noprompt-for-sys-cfg - do not prompt to adjust OS configuration files"
     echo "--overwrite-existing - install into an existing directory, overwriting contents; defaults to requiring new directory"
     m1="--prompt-for-group - * GT.M installation "
     m1="$m1""script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
@@ -142,7 +144,7 @@ read_yes_no()
 {
 	read resp
 	response=`echo $resp | tr '[a-z]' '[A-Z]'`
-	if [ "Y" = $response -o "YES" = $response ] ; then
+	if [ "Y" = "$response" -o "YES" = "$response" ] ; then
 		echo "yes"
 	else
 		echo "no"
@@ -157,6 +159,7 @@ if [ -z "$gtm_group_restriction" ] ; then gtm_group_restriction="N" ; fi
 if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
 if [ -z "$gtm_overwrite_existing" ] ; then gtm_overwrite_existing="N" ; fi
 if [ -z "$gtm_prompt_for_group" ] ; then gtm_prompt_for_group="N" ; fi
+if [ -z "$gtm_prompt_for_sys_reconfig" ] ; then gtm_prompt_for_sys_reconfig="Y" ; fi
 if [ -z "$gtm_verbose" ] ; then gtm_verbose="N" ; fi
 
 # Initializing internal flags
@@ -229,6 +232,7 @@ while [ $# -gt 0 ] ; do
             fi
             unset gtm_copyexec
             shift ;;
+        --noprompt-for-sys-cfg) gtm_prompt_for_sys_reconfig="N" ; shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
         --prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
         --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
@@ -283,7 +287,7 @@ case ${gtm_hostos}_${gtm_arch} in
         gtm_shlib_support="N" ;;
     linux_i686) gtm_sf_dirname="GT.M-x86-Linux"
         gtm_ftp_dirname="linux"
-        gtm_flavor="i686"
+        gtm_flavor="i586"
         gtm_install_flavor="x86"
         gtm_shlib_support="N" ;;
     linux_ia64) # no Source Forge dirname
@@ -444,23 +448,29 @@ if [ "" != "$issystemd" ] ; then
 		echo "   $ipcline2"
 		echo "And issue the below command to restart systemd-logind"
 		echo "   $ipccmd"
-		echo -n "Do you wish to proceed (Y/N)? "
-		answer=`read_yes_no`
-		if [ "yes" != "$answer" ] ; then
-			echo "Will abort installation"
-			echo $ipcissue1
-			echo $ipcissue2
-			echo "Please add the below two lines to $logindconf"
-			echo "   $ipcline1"
-			echo "   $ipcline2"
-			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
-			echo "   $ipccmd"
-			echo "and retry GT.M installation"
-			exit 1
+		if [ "N" != "$gtm_prompt_for_sys_reconfig" ]; then
+			echo -n "Do you wish to proceed (Y/N)? "
+			answer=`read_yes_no`
+			if [ "yes" != "$answer" ] ; then
+				echo "Will abort installation"
+				echo $ipcissue1
+				echo $ipcissue2
+				echo "Please add the below two lines to $logindconf"
+				echo "   $ipcline1"
+				echo "   $ipcline2"
+				echo "and restart systemd-logind using the below command, for example or by rebooting the system"
+				echo "   $ipccmd"
+				echo "and retry GT.M installation"
+				exit 1
+			fi
+			echo $ipcline1 >> $logindconf
+			echo $ipcline2 >> $logindconf
+			$ipccmd
+		else
+			echo "==============================================================="
+			echo "Installation directed to not change systemd configuration files"
+			echo "==============================================================="
 		fi
-		echo $ipcline1 >> $logindconf
-		echo $ipcline2 >> $logindconf
-		$ipccmd
 	fi
 fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning defaults ; dump_info ; fi

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,8 @@
 #include "have_crit.h"
 #include "gvcst_protos.h"
 #include "gtmimagename.h"
+#include "is_file_identical.h"
+#include "anticipatory_freeze.h"
 
 LITREF	mval	literal_null;
 
@@ -83,7 +85,7 @@ GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	int			tprestart_state;
@@ -152,7 +154,7 @@ void op_ztrigger(void)
 		 */
 		ztwormhole_used = FALSE;
 	}
-	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
+	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVZTRIGFAIL);

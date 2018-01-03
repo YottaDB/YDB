@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,26 +155,25 @@ typedef struct
 #define	INSERT_STRM_HISTINFO_FALSE	FALSE
 #define	INSERT_STRM_HISTINFO_TRUE	TRUE
 
-#define	GTMRECV_CLEAR_CACHED_HISTINFO(RECVPOOL_CTL, JNLPOOL, JNLPOOL_CTL, INSERT_STRM_HISTINFO)				\
-{															\
-	memset(&RECVPOOL_CTL->last_rcvd_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_rcvd_histinfo));				\
-	memset(&RECVPOOL_CTL->last_valid_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_valid_histinfo));			\
-	assert(NULL != JNLPOOL.repl_inst_filehdr);									\
-	assert(NULL != JNLPOOL.jnlpool_ctl);										\
-	assert(JNLPOOL_CTL == JNLPOOL.jnlpool_ctl);									\
-	if (JNLPOOL.repl_inst_filehdr->is_supplementary && JNLPOOL_CTL->upd_disabled)					\
-	{	/* The below fields are used only in case of a supplementary instance where updates are disabled.	\
-		 * So avoid initializing them in any other case.							\
-		 */													\
-		memset(&RECVPOOL_CTL->last_rcvd_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_rcvd_strm_histinfo));	\
-		memset(&RECVPOOL_CTL->last_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_valid_strm_histinfo));	\
-		memset(&RECVPOOL_CTL->is_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->is_valid_strm_histinfo));	\
-		RECVPOOL_CTL->max_strm_histinfo = 0;									\
-		assert((0 == RECVPOOL_CTL->jnl_seqno)									\
-			|| (0 < RECVPOOL_CTL->jnl_seqno) && (RECVPOOL_CTL->jnl_seqno >= JNLPOOL_CTL->jnl_seqno));	\
-		assert(0 < JNLPOOL_CTL->jnl_seqno);									\
-		RECVPOOL_CTL->insert_strm_histinfo = INSERT_STRM_HISTINFO;						\
-	}														\
+#define	GTMRECV_CLEAR_CACHED_HISTINFO(RECVPOOL_CTL, JNLPOOL, INSERT_STRM_HISTINFO)						\
+{																\
+	memset(&RECVPOOL_CTL->last_rcvd_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_rcvd_histinfo));					\
+	memset(&RECVPOOL_CTL->last_valid_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_valid_histinfo));				\
+	assert((NULL != JNLPOOL) && (NULL != JNLPOOL->repl_inst_filehdr));							\
+	assert(NULL != JNLPOOL->jnlpool_ctl);											\
+	if (JNLPOOL->repl_inst_filehdr->is_supplementary && JNLPOOL->jnlpool_ctl->upd_disabled)					\
+	{	/* The below fields are used only in case of a supplementary instance where updates are disabled.		\
+		 * So avoid initializing them in any other case.								\
+		 */														\
+		memset(&RECVPOOL_CTL->last_rcvd_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_rcvd_strm_histinfo));		\
+		memset(&RECVPOOL_CTL->last_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_valid_strm_histinfo));		\
+		memset(&RECVPOOL_CTL->is_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->is_valid_strm_histinfo));		\
+		RECVPOOL_CTL->max_strm_histinfo = 0;										\
+		assert((0 == RECVPOOL_CTL->jnl_seqno)										\
+			|| (0 < RECVPOOL_CTL->jnl_seqno) && (RECVPOOL_CTL->jnl_seqno >= JNLPOOL->jnlpool_ctl->jnl_seqno));	\
+		assert(0 < JNLPOOL->jnlpool_ctl->jnl_seqno);									\
+		RECVPOOL_CTL->insert_strm_histinfo = INSERT_STRM_HISTINFO;							\
+	}															\
 }
 
 /*

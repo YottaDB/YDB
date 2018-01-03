@@ -34,17 +34,21 @@
 #include "process_deferred_stale.h"
 #include "jnl.h"
 #include "wcs_wt.h"
+#include "repl_msg.h"
+#include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
 
-GBLREF	boolean_t	unhandled_stale_timer_pop;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	int		process_exiting;
-GBLREF	jnl_gbls_t	jgbl;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	int			process_exiting;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 void process_deferred_stale(void)
 {
 	gd_region	*r_cur, *r_top, *save_gv_cur_region;
 	gd_addr		*addr_ptr;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	int4		status;
 
 	assert(unhandled_stale_timer_pop);
@@ -58,6 +62,7 @@ void process_deferred_stale(void)
 	if (process_exiting)
 		return;
         save_gv_cur_region = gv_cur_region;
+	save_jnlpool = jnlpool;
 	for (addr_ptr = get_next_gdr(NULL); NULL != addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (r_cur = addr_ptr->regions, r_top = r_cur + addr_ptr->n_regions; r_cur < r_top; r_cur++)
@@ -85,7 +90,7 @@ void process_deferred_stale(void)
 					UNIX_ONLY(|| jgbl.onlnrlbk || (NULL == gv_target) || (DIR_ROOT == gv_target->root)));
 				if (UNIX_ONLY(!jgbl.onlnrlbk && )csa->now_crit)
 					continue;
-				if (csa->stale_defer && !FROZEN_CHILLED(csa->hdr))
+				if (csa->stale_defer && !FROZEN_CHILLED(csa))
 				{
 					gv_cur_region = r_cur;
 					tp_change_reg();
@@ -99,4 +104,6 @@ void process_deferred_stale(void)
 	unhandled_stale_timer_pop = FALSE;
 	gv_cur_region = save_gv_cur_region;
 	tp_change_reg();
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 }

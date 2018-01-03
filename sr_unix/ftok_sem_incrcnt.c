@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "gtmmsg.h"
 
 GBLREF	gd_region		*ftok_sem_reg;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 
@@ -60,7 +60,7 @@ boolean_t ftok_sem_incrcnt(gd_region *reg, const char *file_type_str, boolean_t 
 	 * Assert this as it is relied upon by the "ERANGE" code below.
 	 */
 	assert(!MEMCMP_LIT(file_type_str, FILE_TYPE_REPLINST));
-	assert(reg == jnlpool.jnlpool_dummy_reg);	/* this is assumed by the code below */
+	assert((NULL != jnlpool) && (reg == jnlpool->jnlpool_dummy_reg));	/* this is assumed by the code below */
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	assert(!csa->now_crit);
@@ -92,7 +92,7 @@ boolean_t ftok_sem_incrcnt(gd_region *reg, const char *file_type_str, boolean_t 
 			if (repl_instance.qdbrundown)
 			{
 				issue_error = FALSE;
-				if (!jnlpool.jnlpool_ctl->ftok_counter_halted)
+				if (!jnlpool->jnlpool_ctl->ftok_counter_halted)
 					repl_inst_ftok_counter_halted(udi);
 			}
 			if (is_rcvr_server)

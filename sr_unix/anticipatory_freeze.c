@@ -63,8 +63,7 @@ error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_TEXT);
 error_def(ERR_INSTFRZDEFER);
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 #ifdef DEBUG
@@ -152,8 +151,8 @@ boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 {
 	const err_ctl		*ctl;
 	int			idx;
+	jnlpool_addrs_ptr_t	local_jnlpool;
 
-	assert(NULL != jnlpool.jnlpool_ctl);
 	/* Certain error messages should NOT trigger a freeze even if they are so configured in the custom errors file as they might
 	 * result in instance freezes that can be set indefinitely. Currently, we know of at least 3 such messages:
 	 * 1. ENOSPCQIODEFER and INSTFRZDEFER : To ensure we don't set anticipatory freeze if we don't/can't hold crit
@@ -171,8 +170,10 @@ boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 	if (NULL != ctl)
 	{
 		GET_MSG_IDX(msg_id, ctl, idx);
-		assert(idx < ARRAYSIZE(jnlpool_ctl->merrors_array));
-		if (jnlpool_ctl->merrors_array[idx] & AFREEZE_MASK)
+		local_jnlpool = csa->jnlpool ? csa->jnlpool : jnlpool;
+		assert(local_jnlpool && local_jnlpool->jnlpool_ctl);
+		assert(idx < ARRAYSIZE(local_jnlpool->jnlpool_ctl->merrors_array));
+		if (local_jnlpool->jnlpool_ctl->merrors_array[idx] & AFREEZE_MASK)
 			return TRUE;
 	}
 	return FALSE;
@@ -184,29 +185,40 @@ void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 	boolean_t			was_crit;
 	sgmnt_addrs			*repl_csa;
 	const err_msg			*msginfo;
+	jnlpool_addrs_ptr_t		save_jnlpool;
 
 	assert(is_anticipatory_freeze_needed(csa, msg_id));
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool != jnlpool))
+		jnlpool = csa->jnlpool;
+	assert(jnlpool && jnlpool->jnlpool_ctl);
+	assert(jnlpool->jnlpool_dummy_reg);	/* other asserts in is anticipatory_freeze_needed */
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	assert(NULL != repl_csa);
 	was_crit = repl_csa->now_crit;
 	if (!was_crit)
 	{
 		if (csa->now_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
-		else if (FALSE == grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		else if (FALSE == grab_lock(jnlpool->jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
 		{
 			MSGID_TO_ERRMSG(msg_id, msginfo);
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSTFRZDEFER, 4, LEN_AND_STR(msginfo->tag),
 				     REG_LEN_STR(csa->region));
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
 			return;
 		}
 	}
 	/* Now that we hold necessary locks, set the freeze and the comment field */
-	jnlpool.jnlpool_ctl->freeze = TRUE;
-	GENERATE_INST_FROZEN_COMMENT(jnlpool.jnlpool_ctl->freeze_comment, SIZEOF(jnlpool.jnlpool_ctl->freeze_comment), msg_id);
+	jnlpool->jnlpool_ctl->freeze = TRUE;
+	GENERATE_INST_FROZEN_COMMENT(jnlpool->jnlpool_ctl->freeze_comment,
+			SIZEOF(jnlpool->jnlpool_ctl->freeze_comment), msg_id);
 	/* TODO : Do we need a SHM_WRITE_MEMORY_BARRIER ? */
 	if (!was_crit)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 }
 
 /* initialize jnlpool_ctl->merrors_array to set up the list of errors that should trigger anticipatory freeze errors */
@@ -226,7 +238,8 @@ boolean_t		init_anticipatory_freeze_errors()
 	 * to check if cmerrors/cmierrors also need to be included in this list or not.
 	 */
 	assert(IS_MUPIP_IMAGE); 				/* is_src_server is not initialized at this point */
-	assert(jnlpool_ctl && !jnlpool_ctl->instfreeze_environ_inited);	/* invoke when not previously initialized */
+	/* invoke when not previously initialized */
+	assert(jnlpool && jnlpool->jnlpool_ctl && !jnlpool->jnlpool_ctl->instfreeze_environ_inited);
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		/* should hold journal pool access control semaphore */
 	/* Now, read the custom errors file and populate the journal pool */
 	custom_err_file = TREF(gtm_custom_errors);
@@ -307,7 +320,7 @@ boolean_t		init_anticipatory_freeze_errors()
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
 				return FALSE;
 			}
-			jnlpool_ctl->merrors_array[offset] |= AFREEZE_MASK; /* duplicate entries are not considered an error */
+			jnlpool->jnlpool_ctl->merrors_array[offset] |= AFREEZE_MASK; /* duplicate entries are not an error */
 		}
 		assert(ISSPACE_ASCII(*buffptr) || (COMMENT_DELIMITER == *buffptr));
 		if (EOL_REACHED == (buffptr = scan_space(handle, buff, buffptr, buff_top)))
@@ -351,7 +364,7 @@ boolean_t		init_anticipatory_freeze_errors()
 				custom_err_file.addr, save_errno);
 		return FALSE;
 	}
-	jnlpool_ctl->instfreeze_environ_inited = TRUE;
+	jnlpool->jnlpool_ctl->instfreeze_environ_inited = TRUE;
 	return TRUE;
 }
 
@@ -363,7 +376,9 @@ void clear_fake_enospc_if_master_dead(void)
 	sgmnt_addrs			*csa;
 
 	assert(!multi_thread_in_use);	/* fake-enospc would not have been set if in threaded-code */
-	if((jnlpool_ctl->jnlpool_creator_pid != process_id) && !is_proc_alive(jnlpool_ctl->jnlpool_creator_pid, 0))
+	assert(jnlpool && jnlpool->jnlpool_ctl);
+	if((jnlpool->jnlpool_ctl->jnlpool_creator_pid != process_id)
+		&& !is_proc_alive(jnlpool->jnlpool_ctl->jnlpool_creator_pid, 0))
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{

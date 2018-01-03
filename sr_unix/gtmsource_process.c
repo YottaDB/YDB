@@ -191,7 +191,7 @@ GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	volatile time_t		gtmsource_now;
 GBLREF	int			gtmsource_sock_fd;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
@@ -437,7 +437,7 @@ void gtmsource_recv_ctl(void)
 		else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 			break;
 	}
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	if ((SS_NORMAL == status) && (0 != recvd_len))
 	{	/* Process the received control message */
 		assert(MIN_REPL_MSGLEN == recvd_len);
@@ -690,16 +690,16 @@ int gtmsource_process(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	DEBUG_ONLY(
-		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
 		ASSERT_VALID_JNLPOOL(repl_csa);
 	)
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
-	jctl = jnlpool.jnlpool_ctl;
-	gtmsource_local = jnlpool.gtmsource_local;
+	jctl = jnlpool->jnlpool_ctl;
+	gtmsource_local = jnlpool->gtmsource_local;
 	gtmsource_msgp = NULL;
 	gtmsource_msgbufsiz = MAX_REPL_MSGLEN;
 	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
@@ -751,7 +751,7 @@ int gtmsource_process(void)
 	 *                    |                               |
 	 *                    \--------------------->---------/
 	 */
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	/* Before entering the loop find the max EPOCH interval (for use in lock waits) */
 	max_epoch_interval = 0;
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
@@ -780,7 +780,7 @@ int gtmsource_process(void)
 				repl_close(&gtmsource_sock_fd);
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 			}
-			jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+			jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : "INT8_FMT"\n",
 					jnl_seqno);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno sent : "INT8_FMT"\n",
@@ -896,11 +896,11 @@ int gtmsource_process(void)
 		}
 		rollback_first = FALSE;
 		secondary_ahead = FALSE;
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			continue;
 		local_jnl_seqno = jctl->jnl_seqno;
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 		/* Take care to set the flush parameter in repl_log calls below to FALSE until at least the first message
 		 * gets sent back. This is so the fetchresync rollback on the other side does not timeout before receiving
 		 * a response. */
@@ -929,7 +929,7 @@ int gtmsource_process(void)
 		 * next_histinfo_seqno. Note that we are fetching the value of "num_histinfo" without holding a lock on the instance
 		 * file but that is ok since all we care about is if it is 0 or not. We do not rely on the actual value.
 		 */
-		num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
+		num_histinfo = jnlpool->repl_inst_filehdr->num_histinfo;
 		assert(0 <= num_histinfo);
 		assert(num_histinfo || jctl->upd_disabled);
 		gtmsource_local->next_histinfo_num = -1;/* Initial value. Reset by the call to "gtmsource_set_next_histinfo_seqno"
@@ -949,7 +949,7 @@ int gtmsource_process(void)
 					return (SS_NORMAL);
 				else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					break; /* Break this loop */
-				num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
+				num_histinfo = jnlpool->repl_inst_filehdr->num_histinfo;
 				if (num_histinfo)	/* Number of histinfos is non-zero */
 					break;
 			} while (TRUE);
@@ -992,7 +992,7 @@ int gtmsource_process(void)
 					skip_last_histinfo_check = TRUE;
 				else
 				{
-					assert(jnlpool.repl_inst_filehdr->num_histinfo); /* should be at least 1 history record */
+					assert(jnlpool->repl_inst_filehdr->num_histinfo); /* should be at least 1 history record */
 					/* If -updateresync is specified and receiver instance seqno is exactly equal to the
 					 * start_seqno of the earliest history record in the instance file, then skip last
 					 * histinfo check. Note that in case both source and receiver instances are supplementary,
@@ -1000,12 +1000,12 @@ int gtmsource_process(void)
 					 * the 0th history record in the instance file corresponds to the 0th stream. So it is
 					 * safe to look at the start_seqno of just the 0th history record in all cases.
 					 */
-					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+					grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						continue;
 					status = repl_inst_histinfo_get(0, &local_histinfo);
 					assert(0 == status); /* Since we pass histinfo_num of 0 which is >=0 and < num_histinfo */
-					rel_lock(jnlpool.jnlpool_dummy_reg);
+					rel_lock(jnlpool->jnlpool_dummy_reg);
 					if (local_histinfo.start_seqno == recvd_seqno)
 						skip_last_histinfo_check = TRUE;
 					else
@@ -1016,14 +1016,14 @@ int gtmsource_process(void)
 		}
 		if (!skip_last_histinfo_check)
 		{	/* Find histinfo record in the local instance file corresponding to seqno "recvd_seqno-1" */
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				continue;
 			assert(recvd_seqno <= local_jnl_seqno);
 			assert(recvd_seqno <= jctl->jnl_seqno);
 			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
 			status = repl_inst_histinfo_find_seqno(recvd_seqno, strm_index, &local_histinfo);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			assert((0 != status) || (local_histinfo.start_seqno < recvd_seqno));
 			if (0 != status)
 			{	/* If recvd_seqno is the earliest history record's start_seqno and -udpateresync was
@@ -1076,7 +1076,7 @@ int gtmsource_process(void)
 					 * (i.e. not rollback) and if we still intend on sending a REPL_WILL_RESTART_WITH_INFO
 					 * message.
 					 */
-					assert(this_side->is_supplementary == jnlpool.repl_inst_filehdr->is_supplementary);
+					assert(this_side->is_supplementary == jnlpool->repl_inst_filehdr->is_supplementary);
 					if (this_side->is_supplementary && remote_side->is_supplementary
 							&& (REPL_START_JNL_SEQNO == recvd_msg_type)
 							&& !rollback_first && !secondary_ahead)
@@ -1103,7 +1103,7 @@ int gtmsource_process(void)
 		reply_msgp->len = MIN_REPL_MSGLEN;
 		reply_msgp->proto_ver = REPL_PROTO_VER_THIS;
 		reply_msgp->node_endianness = NODE_ENDIANNESS;
-		reply_msgp->is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
+		reply_msgp->is_supplementary = jnlpool->repl_inst_filehdr->is_supplementary;
 		assert((1 != recvd_seqno) || !rollback_first);
 		if ((GTMSOURCE_SEARCHING_FOR_RESTART == gtmsource_state) || (REPL_START_JNL_SEQNO == recvd_msg_type))
 		{
@@ -1240,14 +1240,14 @@ int gtmsource_process(void)
 		/* After having established connection, initialize a few fields in the gtmsource_local
 		 * structure and flush those changes to the instance file on disk.
 		 */
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			continue;
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
 		gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
 		/* Now that "connect_jnl_seqno" has been updated, flush it to corresponding gtmsrc_lcl on disk */
 		repl_inst_flush_gtmsrc_lcl();	/* this requires the jnlpool lock to be held */
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 		if (REPL_WILL_RESTART_WITH_INFO != reply_msgp->type)
 		{
 			assert(reply_msgp->type == REPL_RESYNC_SEQNO || reply_msgp->type == REPL_ROLLBACK_FIRST);
@@ -1257,8 +1257,8 @@ int gtmsource_process(void)
 					INT8_FMT" "INT8_FMTX"\n",
 					(*(seq_num *)&reply_msgp->start_seqno[0]), (*(seq_num *)&reply_msgp->start_seqno[0]));
 				region_top = gd_header->regions + gd_header->n_regions;
-				assert(NULL != jnlpool.jnlpool_dummy_reg);
-				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				assert(NULL != jnlpool->jnlpool_dummy_reg);
+				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					continue;
 				zqgblmod_seqno = jctl->max_zqgblmod_seqno;
@@ -1274,7 +1274,7 @@ int gtmsource_process(void)
 					jctl->send_losttn_complete = FALSE;
 					gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
 				}
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 				REPL_DPRINT2("BEFORE FINDING RESYNC - zqgblmod_seqno is "INT8_FMT, zqgblmod_seqno);
 				REPL_DPRINT2(", curr_seqno is "INT8_FMT"\n", jctl->jnl_seqno);
 				if (zqgblmod_seqno > resync_seqno)
@@ -1439,11 +1439,11 @@ int gtmsource_process(void)
 				losttncomplete_msg.len = MIN_REPL_MSGLEN;
 				gtmsource_repl_send((repl_msg_ptr_t)&losttncomplete_msg, "REPL_LOSTTNCOMPLETE",
 					MAX_SEQNO, INVALID_SUPPL_STRM);
-				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					break; /* the outerloop will continue */
 				gtmsource_local->send_losttn_complete = FALSE;
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 			}
 			if (gtmsource_local->send_new_histrec)
 			{	/* We are at the beginning of a new histinfo record boundary. Send a REPL_HISTREC message
@@ -1673,7 +1673,7 @@ int gtmsource_process(void)
 					 * case of a multisite scenario, it is always the receiver server that tells the
 					 * sequence number from where the source server should start sending. So, even if
 					 * the source server notes down a higher value of journal sequence number in
-					 * jnlpool.gtmsource_local->read_jnl_seqno, it is not a problem since the receiver
+					 * jnlpool->gtmsource_local->read_jnl_seqno, it is not a problem since the receiver
 					 * server will communicate the appropriate sequence number as part of the histinfo
 					 * exchange.
 					 */
@@ -1723,16 +1723,16 @@ int gtmsource_process(void)
 					if (intfilter_error)
 					{	/* Now that we are done sending whatever buffer was filter converted, issue
 						 * the error. This will bring down the source server (due to the rts_error).
-						 * At this point, jnlpool.gtmsource_local->read_jnl_seqno could effectively
+						 * At this point, jnlpool->gtmsource_local->read_jnl_seqno could effectively
 						 * be behind the receiver server's journal sequence number. But, that is
 						 * okay since as part of reconnection (when the source server comes back up),
-						 * the receiever server will communicate the appropriate sequence number as
+						 * the receiver server will communicate the appropriate sequence number as
 						 * part of the histinfo exchange.
 						 */
 						assert(filter_seqno <= post_read_seqno);
 						INT_FILTER_RTS_ERROR(filter_seqno, repl_errno); /* no return */
 					}
-					jnlpool.gtmsource_local->read_jnl_seqno = post_read_seqno;
+					jnlpool->gtmsource_local->read_jnl_seqno = post_read_seqno;
 					repl_source_cmp_sent += (qw_num)send_tr_len;
 					repl_source_msg_sent += (qw_num)pre_cmpmsglen;
 					repl_source_data_sent += (qw_num)(pre_cmpmsglen)
@@ -1830,10 +1830,10 @@ int gtmsource_process(void)
 								 * in immediate mode (second parameter FALSE below). If not
 								 * available, then try again next iteration.
 								 */
-								if (grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+								if (grab_lock(jnlpool->jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
 								{
-									repl_phase2_cleanup(&jnlpool);
-									rel_lock(jnlpool.jnlpool_dummy_reg);
+									repl_phase2_cleanup(jnlpool);
+									rel_lock(jnlpool->jnlpool_dummy_reg);
 									phase2_commit_wait_cnt = 0;
 								} else
 									phase2_commit_wait_cnt--; /* Try again next iteration */

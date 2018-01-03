@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +24,15 @@
 #include "nametabtyp.h"
 #include "stringpool.h"
 #include "namelook.h"
+#include "op.h"
+#include "indir_enum.h"
 
 LITREF nametabent filter_names[];
 LITREF unsigned char filter_index[27];
 LITREF unsigned char io_params_size[];
+
+error_def(ERR_TTINVFILTER);
+error_def(ERR_DEVPARMNEG);
 
 void ionl_use(io_desc *iod, mval *pp)
 {
@@ -36,10 +42,9 @@ void ionl_use(io_desc *iod, mval *pp)
 	io_desc		*d_in, *d_out;
 	char		*tab;
 	int		p_offset;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_TTINVFILTER);
-	error_def(ERR_DEVPARMNEG);
-
+	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
 	d_in = iod->pair.in;
 	d_out = iod->pair.out;
@@ -49,16 +54,14 @@ void ionl_use(io_desc *iod, mval *pp)
 		switch (ch = *(pp->str.addr + p_offset++))
 		{
 		case iop_exception:
-			iod->error_handler.len = *(pp->str.addr + p_offset);
-			iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&iod->error_handler);
+			DEF_EXCEPTION(pp, p_offset, iod);
 			break;
 		case iop_filter:
 			len = *(pp->str.addr + p_offset);
 			tab = pp->str.addr + p_offset + 1;
 			if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 			{
-				rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
 				return;
 			}
 			switch (fil_type)
@@ -83,13 +86,13 @@ void ionl_use(io_desc *iod, mval *pp)
 		case iop_length:
 			GET_LONG(length, pp->str.addr + p_offset);
 			if (length < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 			d_out->length = length;
 			break;
 		case iop_width:
 			GET_LONG(width, pp->str.addr + p_offset);
 			if (width < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 			if (width == 0)
 			{
 				d_out->wrap = FALSE;
@@ -133,8 +136,8 @@ void ionl_use(io_desc *iod, mval *pp)
 		}
 		case iop_ipchset:
 			{
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-				if ( (iconv_t)0 != iod->input_conv_cd )
+#if defined(KEEP_zOS_EBCDIC)
+				if ((iconv_t)0 != iod->input_conv_cd)
 				{
 					ICONV_CLOSE_CD(iod->input_conv_cd);
 				}
@@ -142,12 +145,12 @@ void ionl_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->in_code_set)
 					ICONV_OPEN_CD(iod->input_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
 #endif
-                        	break;
+				break;
 			}
-                case iop_opchset:
+		case iop_opchset:
 			{
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-				if ( (iconv_t) 0 != iod->output_conv_cd )
+#if defined(KEEP_zOS_EBCDIC)
+				if ( (iconv_t) 0 != iod->output_conv_cd)
 				{
 					ICONV_CLOSE_CD(iod->output_conv_cd);
 				}
@@ -155,7 +158,7 @@ void ionl_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->out_code_set)
 					ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
 #endif
-                        	break;
+				break;
 			}
 		}
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?

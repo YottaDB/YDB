@@ -31,7 +31,7 @@ void io_rundown (int rundown_type)
 
 	if (NULL == io_root_log_name)
 		return;
-	for (l = io_root_log_name;  NULL != l; l = io_root_log_name)
+	for (l = io_root_log_name;  NULL != l; free(l), l = io_root_log_name)
 	{
 		io_root_log_name = l->next;
 		if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))

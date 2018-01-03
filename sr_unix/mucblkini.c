@@ -75,6 +75,7 @@ void mucblkini(void)
 	bml_busy(DIR_DATA, bmp + SIZEOF(blk_hdr));
 	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
 	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);
+	free(bmp);
 	if (0 != status)
 	{
 		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out first bitmap"),
@@ -95,6 +96,7 @@ void mucblkini(void)
 	bp2->bsiz = SIZEOF(blk_hdr);
 	bp2->tn = 0;
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_ROOT, (uchar_ptr_t)bp1, cs_addrs->hdr->desired_db_format, status);
+	free(bp1);
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)
@@ -107,6 +109,7 @@ void mucblkini(void)
 		}
 	}
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_DATA, (uchar_ptr_t)bp2, cs_addrs->hdr->desired_db_format, status);
+	free(bp2);
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)

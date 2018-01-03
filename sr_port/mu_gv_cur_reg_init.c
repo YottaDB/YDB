@@ -24,6 +24,8 @@
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gd_region	*ftok_sem_reg;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	sgmnt_data	*cs_data;
 
 void mu_gv_cur_reg_init(void)
 {
@@ -58,6 +60,8 @@ void mu_gv_cur_reg_free(void)
 		ftok_sem_reg = NULL;
 	}
 	gv_cur_region = NULL; /* Now that gv_cur_region is going to be freed, make it inaccessible before starting the free */
+	cs_addrs = NULL;
+	cs_data = NULL;
 	basedb_seg = basedb_reg->dyn.addr;
 	FILE_CNTL_FREE(basedb_seg);
 	statsdb_reg = basedb_reg + 1;
@@ -69,6 +73,12 @@ void mu_gv_cur_reg_free(void)
 	{
 		free(gdhdr->id);
 		gdhdr->id = NULL;
+	}
+	if (NULL != gdhdr->tab_ptr)
+	{
+		free_hashtab_mname(gdhdr->tab_ptr);
+		free(gdhdr->tab_ptr);
+		gdhdr->tab_ptr = NULL;
 	}
 	free(gdhdr);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,6 @@ XFER(xf_fnchar, op_fnchar),
 XFER(xf_fnfind, op_fnfind),
 XFER(xf_indset, opp_indset),
 XFER(xf_fnascii, op_fnascii),
-XFER(xf_halt, op_halt),
 XFER(xf_mul, op_mul),
 XFER(xf_indtext, opp_indtext),
 XFER(xf_indglvn, opp_indglvn),

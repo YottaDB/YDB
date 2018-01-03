@@ -67,8 +67,8 @@ gd_addr *create_dummy_gbldir(void)
 #	endif
 
 	/* The below code might need corresponding changes if ever the gld format changes hence the GDE_LABEL_LITERAL assert */
-	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX111"));)
-	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX011"));)
+	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX112"));)
+	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX012"));)
 	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE);
 	memset(addr, 0, DUMMY_GBLDIR_SIZE);
 	addr->max_rec_size = 256;

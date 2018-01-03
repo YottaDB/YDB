@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,7 @@
 #include "cli.h"
 #include "iosp.h"
 #include "jnl.h"
+#include "min_max.h"
 
 #define DOT		'.'
 #define UNDERSCORE	'_'
@@ -80,13 +82,13 @@ void	mupip_set_journal_fname(jnl_create_info *jnl_info)
 #endif
 		if (0 == ext_name_len) /* file name ended with DOT */
 			jnl_info->jnl[jnl_info->jnl_len++] = UNDERSCORE;
-		else if (0 != memcmp(ext_name, DEF_DB_EXT_NAME, ext_name_len))
+		else if (0 != STRNCMP_LIT_LEN(ext_name, DEF_DB_EXT_NAME, ext_name_len))
 		{
 			jnl_info->jnl[jnl_info->jnl_len++] = UNDERSCORE;
 			memcpy(jnl_info->jnl + jnl_info->jnl_len, ext_name, ext_name_len);
 			jnl_info->jnl_len += ext_name_len;
 		}
-		memcpy(jnl_info->jnl + jnl_info->jnl_len, DEF_JNL_EXT_NAME, SIZEOF(DEF_JNL_EXT_NAME) - 1);
+		MEMCPY_LIT(jnl_info->jnl + jnl_info->jnl_len, DEF_JNL_EXT_NAME);
 		jnl_info->jnl_len = jnl_info->jnl_len + SIZEOF(DEF_JNL_EXT_NAME) - 1;
 	} else
 	{

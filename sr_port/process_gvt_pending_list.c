@@ -47,8 +47,9 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 	gv_namehead		*old_gvt, *new_gvt, *gvtarg;
 	int4			db_max_key_size;
 	boolean_t		added, first_wasopen;
-	ht_ent_mname		*stayent;
+	ht_ent_mname		*stayent, *old_gvt_ent;
 	hash_table_mname	*gvt_hashtab;
+	gd_addr			*gd_iter;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -124,6 +125,12 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 				*gvtc->gvt_ptr2 = new_gvt;
 			}
 			assert(1 == old_gvt->regcnt); /* assert that TARG_FREE will happen below */
+			for (gd_iter = get_next_gdr(NULL); gd_iter; gd_iter = get_next_gdr(gd_iter))
+			{	/* If gd_iter->tab_ptr still has old_gvt, remove it before freeing old_gvt. */
+				old_gvt_ent = (ht_ent_mname *)lookup_hashtab_mname(gd_iter->tab_ptr, &old_gvt->gvname);
+				if (old_gvt_ent)
+					delete_hashtab_ent_mname(gd_iter->tab_ptr, old_gvt_ent);
+			}
 			TARG_FREE_IF_NEEDED(old_gvt);
 		}
 		/* else: new_gvt is NULL which means old_gvt stays as is */

@@ -187,8 +187,7 @@ GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
 GBLREF	qw_num			trans_recvd_cnt, last_log_tr_recvd_cnt;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mur_gbls_t		murgbl;
@@ -357,13 +356,13 @@ static	boolean_t	repl_cmp_solve_timer_set;
 {										\
 	sgmnt_addrs	*repl_csa;						\
 										\
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;		\
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;		\
 	assert(repl_csa->now_crit);						\
-	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);				\
-	if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)		\
+	assert(NULL != jnlpool->jnlpool_ctl);					\
+	if (repl_csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle)	\
 	{									\
 		SYNC_ONLN_RLBK_CYCLES;						\
-		rel_lock(jnlpool.jnlpool_dummy_reg);				\
+		rel_lock(jnlpool->jnlpool_dummy_reg);				\
 		gtmrecv_onln_rlbk_clnup();					\
 		if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)	\
 			return;							\
@@ -703,7 +702,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	 */
 	assert(remote_side == &gtmrecv_local->remote_side);
 	remote_side->proto_ver = REPL_PROTO_VER_UNINITIALIZED;
-	jnlpool_ctl->primary_instname[0] = '\0';
+	jnlpool->jnlpool_ctl->primary_instname[0] = '\0';
 	while (TRUE)
 	{
 		while (TRUE)
@@ -975,8 +974,8 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-	grab_lock_needed = is_rcvr_srvr || ((NULL != jnlpool_ctl) && !repl_csa->hold_onto_crit);
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	grab_lock_needed = is_rcvr_srvr || (jnlpool && (NULL != jnlpool->jnlpool_ctl) && !repl_csa->hold_onto_crit);
 	remote_side_is_supplementary = need_instinfo_msg->is_supplementary;
 	remote_side->is_supplementary = remote_side_is_supplementary;
 	assert(remote_side->endianness_known); /* ensure remote_side->cross_endian is reliable */
@@ -1005,7 +1004,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	log_fp = !is_rcvr_srvr ? stdout : gtmrecv_log_fp;
 	repl_log(log_fp, TRUE, TRUE, "Received REPL_NEED_INSTINFO message from primary instance [%s]\n",
 		need_instinfo_msg->instname);
-	inst_hdr = jnlpool.repl_inst_filehdr;
+	inst_hdr = jnlpool->repl_inst_filehdr;
 	assert(NULL != inst_hdr);
 	/* The fact that we came here (REPL_NEED_INSTINFO message) implies the source server understands the
 	 * supplementary protocol. In that case, make sure -UPDATERESYNC if specified at receiver server startup
@@ -1024,15 +1023,15 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	 */
 	assert(inst_hdr->lms_group_info.created_time
 		|| need_instinfo_msg->lms_group_info.created_time || !need_instinfo_msg->is_rootprimary);
-	assert((is_rcvr_srvr && (NULL != jnlpool_ctl)) || (!is_rcvr_srvr && (NULL == jnlpool_ctl)) || jgbl.onlnrlbk
-			|| (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
+	assert((is_rcvr_srvr && (NULL != jnlpool->jnlpool_ctl)) || (!is_rcvr_srvr && (NULL == jnlpool->jnlpool_ctl))
+			|| jgbl.onlnrlbk || (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 	/* If this instance is supplementary and the journal pool exists (to indicate whether updates are enabled or not
 	 * which in turn helps us know whether this is an originating instance or not) do some additional checks.
 	 */
 	if (is_rcvr_srvr && inst_hdr->is_supplementary)
 	{
-		assert(NULL != jnlpool_ctl);
-		if (!jnlpool_ctl->upd_disabled)
+		assert(NULL != jnlpool->jnlpool_ctl);
+		if (!jnlpool->jnlpool_ctl->upd_disabled)
 		{	/* this supplementary instance was started with -UPDOK. Issue error if source is also supplementary */
 			if (need_instinfo_msg->is_supplementary)
 			{
@@ -1056,7 +1055,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	 * supplementary instance and have the LMS group info filled in. Exception is if this a FETCHRESYNC
 	 * ROLLBACK run on an instance which was once primary (not necessarily a supplementary one).
 	 */
-	assert((NULL == jnlpool_ctl) || jnlpool_ctl->upd_disabled
+	assert((NULL == jnlpool->jnlpool_ctl) || jnlpool->jnlpool_ctl->upd_disabled
 		|| inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info)
 		|| jgbl.onlnrlbk || (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 	/* Check if primary and secondary are in same LMS group. Otherwise issue error. An exception is if the group info has
@@ -1128,14 +1127,14 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		 */
 		if (grab_lock_needed)
 		{
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			if (is_rcvr_srvr)
 				GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 		}
 		inst_hdr->lms_group_info = need_instinfo_msg->lms_group_info;
 		repl_inst_flush_filehdr();
 		if (grab_lock_needed)
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 	}
 	/* If this instance is supplementary and remote side is not, then find out which stream # the non-supplementary source
 	 * corresponds to. Issue error if the source LMS group is unknown in the instance file. If this is non-supplementary,
@@ -1154,7 +1153,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		 */
 		if (grab_lock_needed)
 		{
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			if (is_rcvr_srvr)
 				GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 		}
@@ -1175,7 +1174,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 			}
 			if (strm_info == strm_top)
 			{	/* -REUSE specified an instance name that is not present in any of the 15 strm_group slots */
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2,
 					  LEN_AND_LIT("Instance name in REUSE does not match any of 15 slots in instance file"));
 			}
@@ -1214,14 +1213,14 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				else
 				{
 					if (grab_lock_needed)
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("No empty slot found. Specify REUSE to choose one for reuse"));
 				}
 			} else
 			{
 				if (grab_lock_needed)
-					rel_lock(jnlpool.jnlpool_dummy_reg);
+					rel_lock(jnlpool->jnlpool_dummy_reg);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSUNKNOWN, 4,
 						LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 						LEN_AND_STR((char *)need_instinfo_msg->instname));
@@ -1244,13 +1243,13 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		} else if ((gtmrecv_options.resume_specified) && (gtmrecv_options.resume_strm_num != strm_index))
 		{	/* If -RESUME was specified, then the slot it matched must be same as slot found without its use */
 			assert(is_rcvr_srvr);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESUMESTRMNUM, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
 				"group is found in instance file but RESUME specifies different stream number"));
 		} else if (reuse_slot && (reuse_slot != strm_index))
 		{	/* If -REUSE was specified, then the slot it matched must be same as slot found without its use */
 			assert(is_rcvr_srvr);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
 				"group is found in instance file but REUSE specifies different instance name"));
 		}
@@ -1266,7 +1265,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				 * Since mixing of multiple stream journal records in the same receive pool confuses the
 				 * update process, issue error. Note: This limitation "might" be removed in the future.
 				 */
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RCVRMANYSTRMS, 2,
 						strm_index, recvpool.gtmrecv_local->strm_index);
 			}
@@ -1275,7 +1274,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 					"Determined non-supplementary source Stream # = %d\n", strm_index);
 			assert(IS_REPL_INST_UUID_NON_NULL(need_instinfo_msg->lms_group_info));
 			recvpool.gtmrecv_local->remote_lms_group = need_instinfo_msg->lms_group_info;
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 		} else
 			repl_log(stdout, TRUE, TRUE, "Determined non-supplementary source Stream # = %d\n", strm_index);
 		/* Compute non-zero strm_jnl_seqno to send across in the REPL_INSTINFO message.
@@ -1313,7 +1312,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 						strm_jnl_seqno = recvpool.gtmrecv_local->updresync_jnl_seqno;
 					else
 					{
-						strm_jnl_seqno = jnlpool_ctl->strm_seqno[gtmrecv_options.resume_strm_num];
+						strm_jnl_seqno = jnlpool->jnlpool_ctl->strm_seqno[gtmrecv_options.resume_strm_num];
 						/* It is possible for the strm_seqno to be 0. This implies the stream has
 						 * had no updates. In that case, ideally this value should have been 1.
 						 * But because we want to differentiate a stream that has had updates from
@@ -1325,21 +1324,21 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 							strm_jnl_seqno = 1;
 					}
 				} else
-					strm_jnl_seqno = jnlpool_ctl->strm_seqno[strm_index];
+					strm_jnl_seqno = jnlpool->jnlpool_ctl->strm_seqno[strm_index];
 				assert(0 == GET_STRM_INDEX(strm_jnl_seqno));
 			}
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending Stream Seqno = "INT8_FMT" "INT8_FMTX"\n",
 										strm_jnl_seqno, strm_jnl_seqno);
 		} else
 		{
-			if (jnlpool.repl_inst_filehdr->crash)
+			if (jnlpool->repl_inst_filehdr->crash)
 				strm_jnl_seqno = mur_get_max_strm_reg_seqno(strm_index);
 			else
 			{
-				assert((NULL == jnlpool_ctl) || jgbl.onlnrlbk);
-				assert((NULL == jnlpool_ctl)
-					|| (jnlpool_ctl->strm_seqno[strm_index] == inst_hdr->strm_seqno[strm_index]));
-				strm_jnl_seqno = jnlpool.repl_inst_filehdr->strm_seqno[strm_index];
+				assert((NULL == jnlpool->jnlpool_ctl) || jgbl.onlnrlbk);
+				assert((NULL == jnlpool->jnlpool_ctl)
+					|| (jnlpool->jnlpool_ctl->strm_seqno[strm_index] == inst_hdr->strm_seqno[strm_index]));
+				strm_jnl_seqno = jnlpool->repl_inst_filehdr->strm_seqno[strm_index];
 			}
 			repl_log(stdout, TRUE, TRUE, "Sending Stream Seqno = "INT8_FMT" "INT8_FMTX"\n",
 										strm_jnl_seqno, strm_jnl_seqno);
@@ -1370,13 +1369,13 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	memcpy(instinfo_msg.instname, inst_hdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
 	if (grab_lock_needed)
 	{
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 		if (is_rcvr_srvr)
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 	}
 	instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
 	if (grab_lock_needed)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	if (!is_rcvr_srvr)
 		murgbl.was_rootprimary = instinfo_msg.was_rootprimary;
 	instinfo_msg.strm_jnl_seqno = strm_jnl_seqno;
@@ -1404,7 +1403,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	if ((!inst_hdr->is_supplementary || remote_side_is_supplementary)
 		&& !need_instinfo_msg->is_rootprimary
 		&& (instinfo_msg.was_rootprimary
-			|| (is_rcvr_srvr && jnlpool_ctl->max_zqgblmod_seqno)))
+			|| (is_rcvr_srvr && jnlpool->jnlpool_ctl->max_zqgblmod_seqno)))
 	{
 		if (is_rcvr_srvr)
 		{
@@ -1417,7 +1416,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		assert(FALSE);
 	}
 	if (is_rcvr_srvr)
-		memcpy(jnlpool_ctl->primary_instname, need_instinfo_msg->instname, MAX_INSTNAME_LEN - 1);
+		memcpy(jnlpool->jnlpool_ctl->primary_instname, need_instinfo_msg->instname, MAX_INSTNAME_LEN - 1);
 }
 
 STATICFNDEF int	gtmrecv_start_onln_rlbk(void)
@@ -1474,8 +1473,8 @@ void	gtmrecv_onln_rlbk_clnup(void)
 	boolean_t		connection_already_reset;
 
 	assert(NULL != gtmrecv_log_fp);
-	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "---> ONLINE ROLLBACK. Current Jnlpool Seqno : "INT8_FMT"\n", jnlpool_ctl->jnl_seqno);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "---> ONLINE ROLLBACK. Current Jnlpool Seqno : "INT8_FMT"\n",
+			jnlpool->jnlpool_ctl->jnl_seqno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Waiting for update process to set recvpool_ctl->onln_rlbk_flag\n");
 	connection_already_reset = repl_connection_reset;
 	assert(!gtmrecv_wait_for_jnl_seqno);
@@ -1511,8 +1510,8 @@ void gtmrecv_send_histinfo(repl_histinfo *cur_histinfo)
 	/* If sending history from a supplementary to a non-supplementary version, assert that the history record
 	 * particularly the "strm_seqno" is 0 as a non-zero value is not understood by a non-supplementary instance.
 	 */
-	assert((NULL == this_side) || (this_side->is_supplementary == jnlpool.repl_inst_filehdr->is_supplementary));
-	assert(!jnlpool.repl_inst_filehdr->is_supplementary || remote_side->is_supplementary || !cur_histinfo->strm_seqno);
+	assert((NULL == this_side) || (this_side->is_supplementary == jnlpool->repl_inst_filehdr->is_supplementary));
+	assert(!jnlpool->repl_inst_filehdr->is_supplementary || remote_side->is_supplementary || !cur_histinfo->strm_seqno);
 	remote_proto_ver = remote_side->proto_ver;
 	assert(REPL_PROTO_VER_MULTISITE <= remote_proto_ver);
 	assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
@@ -1966,7 +1965,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 			 * recvpool.recvpool_ctl->last_rcvd_strm_histinfo[] are unused and hence no need to reset them.
 			 */
 			assert(!remote_side->is_supplementary);	/* assert that we are not a propagating primary supplementary */
-			assert(jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool_ctl->upd_disabled);
+			assert(jnlpool->repl_inst_filehdr->is_supplementary && !jnlpool->jnlpool_ctl->upd_disabled);
 		}
 		if (is_new_histrec)
 		{
@@ -2034,8 +2033,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				pool_histinfo = &pool_histrec->histcontent;
 				assert(pool_histinfo->start_seqno == recvpool_ctl->jnl_seqno);
 				assert(pool_histinfo->start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
-				assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-				if (jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool_ctl->upd_disabled)
+				if (jnlpool->repl_inst_filehdr->is_supplementary && !jnlpool->jnlpool_ctl->upd_disabled)
 				{	/* Modify the history record to reflect the stream # */
 					assert((0 <= recvpool.gtmrecv_local->strm_index)
 						&& (MAX_SUPPL_STRMS > recvpool.gtmrecv_local->strm_index));
@@ -2104,7 +2102,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 					/* Copy 0th stream history record into receive pool first */
 					rcvd_strm_histjrec[num_strm_histinfo].jrec_type = JRT_HISTREC;
 					rcvd_strm_histjrec[num_strm_histinfo].forwptr = SIZEOF(repl_histrec_jnl_t);
-					cur_histinfo->strm_seqno = jnlpool_ctl->strm_seqno[0];
+					cur_histinfo->strm_seqno = jnlpool->jnlpool_ctl->strm_seqno[0];
 					rcvd_strm_histjrec[num_strm_histinfo++].histcontent = *cur_histinfo;
 					/* Copy non-zero stream history records if they exist */
 					for (idx = 1; idx < max_strm_histinfo; idx++)
@@ -2126,7 +2124,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 							 * set it to 1 in that case.
 							 */
 							rcvd_strm_histjrec[num_strm_histinfo].histcontent.strm_seqno
-								= jnlpool_ctl->strm_seqno[idx] ? jnlpool_ctl->strm_seqno[idx] : 1;
+								= jnlpool->jnlpool_ctl->strm_seqno[idx]
+									? jnlpool->jnlpool_ctl->strm_seqno[idx] : 1;
 							num_strm_histinfo++;
 							/* Do not reset recvpool_ctl->is_valid_strm_histinfo[idx] to FALSE
 							 * as this reflects reality and staying this way helps later
@@ -2411,11 +2410,11 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 				/* above macro will "return" if repl_connection_reset OR gtmrecv_wait_for_jnl_seqno is set */
 			status = repl_inst_wrapper_histinfo_find_seqno(need_strminfo_seqno, INVALID_SUPPL_STRM, &histinfo);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			if (0 != status)
 			{	/* Close the connection */
 				assert(ERR_REPLINSTNOHIST == status);
@@ -2519,11 +2518,11 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 		{	/* The history record needs to be found in the receiver side instance file */
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 				/* above macro will "return" if repl_connection_reset OR gtmrecv_wait_for_jnl_seqno is set */
 			status = repl_inst_histinfo_get(need_histinfo_num, histinfo);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			if (0 != status)
 			{	/* Close the connection */
 				assert(ERR_REPLINSTNOHIST == status);
@@ -2605,20 +2604,20 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 		{	/* The seqno has been processed by the update process. Hence the histinfo
 			 * for this will be found in the instance file. Search there.
 			 */
-			assert(NULL != jnlpool.jnlpool_dummy_reg);
+			assert(NULL != jnlpool->jnlpool_dummy_reg);
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 			status = repl_inst_wrapper_histinfo_find_seqno(need_histinfo_seqno, need_histinfo_strm_num, histinfo);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			if (0 != status)
 			{	/* Close the connection */
 				assert(ERR_REPLINSTNOHIST == status);
 				gtmrecv_autoshutdown();	/* should not return */
 			}
-			assert((histinfo->histinfo_num != (jnlpool.repl_inst_filehdr->num_histinfo - 1))
-				|| (histinfo->start_seqno == jnlpool_ctl->last_histinfo_seqno));
+			assert((histinfo->histinfo_num != (jnlpool->repl_inst_filehdr->num_histinfo - 1))
+				|| (histinfo->start_seqno == jnlpool->jnlpool_ctl->last_histinfo_seqno));
 			if (0 < need_histinfo_strm_num)
 			{	/* About to send to a non-supplementary instance. It does not understand strm_seqnos.
 				 * So convert it back to a format it understands.
@@ -2766,8 +2765,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	gtmrecv_local = recvpool.gtmrecv_local;
 	gtmrecv_wait_for_jnl_seqno = FALSE;
 
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	assert((NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	DEBUG_ONLY(
 		assert(!repl_csa->hold_onto_crit);
 		ASSERT_VALID_JNLPOOL(repl_csa);
@@ -2805,8 +2804,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		 * the jnlpool talks about the merged stream of jnl_seqnos (including any local updates). Therefore we
 		 * cannot compare the two at all.
 		 */
-		assert((!jnlpool_ctl->upd_disabled && jnlpool.repl_inst_filehdr->is_supplementary)
-			|| (recvpool_ctl->jnl_seqno >= jnlpool_ctl->jnl_seqno));
+		assert((!jnlpool->jnlpool_ctl->upd_disabled && jnlpool->repl_inst_filehdr->is_supplementary)
+			|| (recvpool_ctl->jnl_seqno >= jnlpool->jnlpool_ctl->jnl_seqno));
 		assert(request_from);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Requesting transactions from JNL_SEQNO "INT8_FMT" "INT8_FMTX"\n",
 			request_from, request_from);
@@ -2860,7 +2859,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		msgp->jnl_ver = this_side->jnl_ver;
 		msgp->proto_ver = REPL_PROTO_VER_THIS;
 		msgp->node_endianness = NODE_ENDIANNESS;
-		msgp->is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
+		msgp->is_supplementary = jnlpool->repl_inst_filehdr->is_supplementary;
 		msgp->len = send_cross_endian ? GTM_BYTESWAP_32(MIN_REPL_MSGLEN) : MIN_REPL_MSGLEN;
 		msg_len = MIN_REPL_MSGLEN;
 		REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msg_len, REPL_POLL_NOWAIT)
@@ -3173,12 +3172,12 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 												msg_len - REPL_MSG_HDRLEN);
 						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_OLD_NEED_INSTANCE_INFO message"
 							" from primary instance [%s]\n", old_need_instinfo_msg->instname);
-						if (jnlpool.repl_inst_filehdr->is_supplementary)
+						if (jnlpool->repl_inst_filehdr->is_supplementary)
 						{	/* Issue REPL2OLD error because this is a supplementary instance and remote
 							 * side runs a GT.M version that does not know the supplementary protocol */
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
 								LEN_AND_STR(old_need_instinfo_msg->instname),
-								LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+								LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 						}
 						/* The source server does not understand the supplementary protocol.
 						 * So make sure -UPDATERESYNC if specified at receiver server startup
@@ -3201,11 +3200,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						/*************** Send REPL_OLD_INSTANCE_INFO message ***************/
 						memset(&old_instinfo_msg, 0, SIZEOF(old_instinfo_msg));
 						memcpy(old_instinfo_msg.instname,
-							jnlpool.repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
-						grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+							jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
+						grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 						old_instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 						gtmrecv_repl_send((repl_msg_ptr_t)&old_instinfo_msg, REPL_OLD_INSTANCE_INFO,
 								MIN_REPL_MSGLEN, "REPL_OLD_INSTANCE_INFO", MAX_SEQNO);
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -3213,8 +3212,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						/* Do not allow an instance which was formerly a root primary or which still
 						 * has a non-zero value of "zqgblmod_seqno" to start up as a tertiary.
 						 */
-						assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-						if ((old_instinfo_msg.was_rootprimary || jnlpool_ctl->max_zqgblmod_seqno)
+						if ((old_instinfo_msg.was_rootprimary || jnlpool->jnlpool_ctl->max_zqgblmod_seqno)
 								&& !old_need_instinfo_msg->is_rootprimary)
 						{
 							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
@@ -3222,7 +3220,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							gtmrecv_autoshutdown();	/* should not return */
 							assert(FALSE);
 						}
-						memcpy(jnlpool_ctl->primary_instname, old_need_instinfo_msg->instname,
+						memcpy(jnlpool->jnlpool_ctl->primary_instname, old_need_instinfo_msg->instname,
 							MAX_INSTNAME_LEN - 1);
 					}
 					break;
@@ -3394,7 +3392,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					{	/*  Issue REPL2OLD error because primary is dual-site */
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
 								LEN_AND_STR(UNKNOWN_INSTNAME),
-								LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+								LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 					}
 					/* Assert that endianness_known and cross_endian have already been initialized.
 					 * This ensures that remote_side->cross_endian is reliable */
@@ -3443,7 +3441,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 								gtmrecv_autoshutdown(); /* should not return */
 								assert(FALSE);
 							}
-							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+							grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 							GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 							/* The ONLINE ROLLBACK did not change the physical or the logical state.
 							 * Otherwise the above macro would have returned to the caller. Since we
@@ -3451,7 +3449,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							 * flow from this point on. Return to the calling function to continue
 							 * reconnecting.
 							 */
-							rel_lock(jnlpool.jnlpool_dummy_reg);
+							rel_lock(jnlpool->jnlpool_dummy_reg);
 							return;
 						} else
 						{
@@ -3463,7 +3461,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						break;
 					}
 					/* Handle REPL_WILL_RESTART_WITH_INFO case now */
-					if (jnlpool.repl_inst_filehdr->was_rootprimary && jnlpool.jnlpool_ctl->upd_disabled)
+					if (jnlpool->repl_inst_filehdr->was_rootprimary && jnlpool->jnlpool_ctl->upd_disabled)
 					{	/* This is the first time an instance that was formerly a root primary
 						 * is brought up as an immediate secondary of the new root primary. Once
 						 * fetchresync rollback has happened and the receiver and source server
@@ -3473,11 +3471,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						 * database file headers henceforth controls whether this instance can
 						 * be brought up as a tertiary or not. Flush changes to file on disk.
 						 */
-						grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+						grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
-						jnlpool.repl_inst_filehdr->was_rootprimary = FALSE;
+						jnlpool->repl_inst_filehdr->was_rootprimary = FALSE;
 						repl_inst_flush_filehdr();
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 					}
 					assert(REPL_WILL_RESTART_WITH_INFO == msg_type);
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_WILL_RESTART_WITH_INFO message"
@@ -3538,11 +3536,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					}
 					/* Don't send any more stopsourcefilter message */
 					gtmrecv_options.stopsourcefilter = FALSE;
-					assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
 					assert(QWEQ(recvd_jnl_seqno, request_from)
-							|| (jnlpool.repl_inst_filehdr->is_supplementary
-								&& !jnlpool_ctl->upd_disabled && strm_index));
-					assert(this_side->is_supplementary == jnlpool.repl_inst_filehdr->is_supplementary);
+							|| (jnlpool->repl_inst_filehdr->is_supplementary
+								&& !jnlpool->jnlpool_ctl->upd_disabled && strm_index));
+					assert(this_side->is_supplementary == jnlpool->repl_inst_filehdr->is_supplementary);
 					if (this_side->is_supplementary && !remote_side->is_supplementary)
 					{
 						/* For the non-supplementary -> supplementary replication connection that happens

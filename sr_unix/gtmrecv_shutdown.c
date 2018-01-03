@@ -49,7 +49,7 @@
 
 #define GTMRECV_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1s */
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
@@ -197,15 +197,15 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		/* repl_inst_recvpool_reset inturn invokes repl_inst_flush_filehdr which expects the caller to grab journal pool
 		 * lock if journal pool is available.
 		*/
-		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		if ((NULL != jnlpool->jnlpool_ctl) && !was_crit)
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 		repl_inst_recvpool_reset();
-		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+		if ((NULL != jnlpool->jnlpool_ctl) && !was_crit)
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 	}
-	assert(NULL != jnlpool.jnlpool_ctl);
+	assert(NULL != jnlpool->jnlpool_ctl);
 	if (!ftok_sem_release(recvpool.recvpool_dummy_reg,
-					!jnlpool.jnlpool_ctl->ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
+					!jnlpool->jnlpool_ctl->ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	return (exit_status);
 }

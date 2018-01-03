@@ -88,7 +88,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 		mu_int_skipreg_cnt++;
 		return;
 	}
-	gvcst_init(gv_cur_region);
+	gvcst_init(gv_cur_region, NULL);
 	if (gv_cur_region->was_open)
 	{	/* already open under another name */
 		gv_cur_region->open = FALSE;
@@ -190,7 +190,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 			ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-			assert(!FROZEN_HARD(csd)); /* Ensure region is unfrozen before returning from ss_initiate */
+			assert(!FROZEN_HARD(csa)); /* Ensure region is unfrozen before returning from ss_initiate */
 			assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 			return;
 		}

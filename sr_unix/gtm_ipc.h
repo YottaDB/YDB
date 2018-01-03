@@ -27,15 +27,19 @@
 
 #define	JNLPOOL_CLEAR_FIELDS(JNLPOOL)				\
 {								\
-	GBLREF	boolean_t	pool_init;			\
+	GBLREF	int		pool_init;			\
 								\
-	jnlpool_ctl = JNLPOOL.jnlpool_ctl = NULL;		\
-	JNLPOOL.gtmsrc_lcl_array = NULL;			\
-	JNLPOOL.gtmsource_local_array = NULL;			\
-	JNLPOOL.jnldata_base = NULL;				\
-	JNLPOOL.repl_inst_filehdr = NULL;			\
-	JNLPOOL.jnlpool_dummy_reg->open = FALSE;		\
-	pool_init = FALSE;					\
+	assert(NULL != JNLPOOL);				\
+	JNLPOOL->jnlpool_ctl = NULL;				\
+	JNLPOOL->gtmsrc_lcl_array = NULL;			\
+	JNLPOOL->gtmsource_local_array = NULL;			\
+	JNLPOOL->jnldata_base = NULL;				\
+	JNLPOOL->repl_inst_filehdr = NULL;			\
+	JNLPOOL->jnlpool_dummy_reg->open = FALSE;		\
+	JNLPOOL->gd_ptr = NULL;					\
+	if (JNLPOOL->pool_init && (0 < pool_init))		\
+		pool_init--;					\
+	JNLPOOL->pool_init = JNLPOOL->recv_pool = FALSE;	\
 }
 
 #define JNLPOOL_SHMDT(JNLPOOL, RC, SAVE_ERRNO)			\
@@ -44,10 +48,11 @@
 	intrpt_state_t		prev_intrpt_state;		\
 								\
 	SAVE_ERRNO = 0; /* clear any left-over value */		\
-	assert(NULL != jnlpool_ctl);				\
-	assert(jnlpool_ctl == JNLPOOL.jnlpool_ctl);		\
+	assert(NULL != JNLPOOL);				\
+	assert(NULL != JNLPOOL->jnlpool_ctl);			\
 	DEFER_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);	\
-	save_jnlpool_ctl = JNLPOOL.jnlpool_ctl;			\
+	save_jnlpool_ctl = JNLPOOL->jnlpool_ctl;		\
+	JNLPOOL->jnlpool_ctl = NULL;		\
 	RC = SHMDT(save_jnlpool_ctl);				\
 	SAVE_ERRNO = errno;					\
 	JNLPOOL_CLEAR_FIELDS(JNLPOOL);				\

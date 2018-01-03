@@ -92,8 +92,8 @@ void mupip_size(void)
 	SETUP_THREADGBL_ACCESS;
 	mu_outofband_setup();
 	error_mupip = FALSE;
-	memset(mu_int_adj, 0, ARRAYSIZE(mu_int_adj));
-	memset(mu_int_adj_prev, 0, ARRAYSIZE(mu_int_adj_prev));
+	memset(mu_int_adj, 0, SIZEOF(mu_int_adj));
+	memset(mu_int_adj_prev, 0, SIZEOF(mu_int_adj_prev));
 	/* Region qualifier */
 	grlist = NULL;
 	if (CLI_PRESENT == cli_present("REGION"))

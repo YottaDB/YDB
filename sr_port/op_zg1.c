@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,9 +48,11 @@ error_def(ERR_ZGOTOTOOBIG);
 void op_zg1(int4 level)
 {
 	stack_frame	*fp, *fpprev;
-	int4		unwframes, unwlevels, unwtrglvls, curlvl;
+	int4		curlvl, exi_cond, unwframes, unwlevels, unwtrglvls;
 	mval		zposition;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	curlvl = dollar_zlevel();
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
@@ -65,18 +67,23 @@ void op_zg1(int4 level)
 			/* Couldn't get to the level we were trying to unwind to */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
-	/* For ZGOTO 0, if we are running in GTM's runtime (via mumps executable), we allow this to proceed with the
-	 * unwind and return back to the caller. However if this is MUPIP, we will exit after sending an oplog message
-	 * recording the uncommon exit method.
+	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
+	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
 	 */
-	if ((0 == level) && !IS_GTM_IMAGE)
+	if (0 == level)
 	{
-		zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
-		getzposition(&zposition);
-		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
-			 ERR_PROCTERM, zposition.str.len, zposition.str.addr);
-		EXIT(ERR_PROCTERM);
+		exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
+		if (IS_MUPIP_IMAGE)
+		{
+			zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
+			getzposition(&zposition);
+			assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), "ZGOTO 0", exi_cond,
+				zposition.str.len, zposition.str.addr);
+			EXIT(ERR_PROCTERM);
+		}
+		assert(IS_GTM_IMAGE);
+		EXIT(exi_cond);
 	}
 	/* Find the frame we are unwinding to while counting the frames we need to unwind (which we will feed to
 	 * GOFRAMES(). As we unwind, keep track of how many trigger base frames we encounter (if triggers are supported)

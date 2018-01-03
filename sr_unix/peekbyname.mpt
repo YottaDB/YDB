@@ -43,6 +43,7 @@
 	set anindexval="an index value",aregname="a region name"
 	set first=$piece(field,".",1)
 	set rest=$piece(field,".",2,$length(field,"."))
+	if ("sgmnt_data"=first)&("freeze_online"=rest) set first="node_local" ; cough, cough, kludge, kludge - temporarily hide move
 	do:""=rest error("NOFIELD")
 	set digits=$select("x86"=$p($zver," ",4):8,1:16)
 	set regindex=$get(regindex)

@@ -516,7 +516,6 @@ OC_GVZWRITE:	jsb 	xfer.xf_restartpc
 		pushl	val.3
 		pushl	val.2
 		calls	val.1,xfer.xf_gvzwrite
-OC_HALT:	calls	#0,xfer.xf_halt
 OC_HANG:	jsb 	xfer.xf_restartpc
 		pushab	val.1
 		calls	#1,xfer.xf_hang
@@ -896,8 +895,9 @@ OC_ZGOTO:	pushl	val.1
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_zgoto
-OC_ZHALT:	pushab	val.1
-		calls	#1,xfer.xf_zhalt
+OC_ZHALT:	pushl	val.1
+		pushl	val.2
+		calls	#2,xfer.xf_zhalt
 OC_ZHELP:	pushab	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_zhelp

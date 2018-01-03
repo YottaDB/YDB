@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@
 #include "gtmsource_heartbeat.h"
 #include "relqop.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
@@ -65,7 +65,8 @@ void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 	assert(0 != gtmsource_now);
 	UNIX_ONLY(assert(*interval_ptr == heartbeat_period);)	/* interval_len and interval_ptr are dummies on VMS */
 	gtmsource_now += heartbeat_period;			/* cannot use *interval_ptr on VMS */
-	REPL_DPRINT4("Repeating heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
+	REPL_DPRINT4("Repeating heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period,
+					gtmsource_now, time(NULL));
 	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
 }
@@ -77,8 +78,8 @@ int gtmsource_init_heartbeat(void)
 
 	assert(NULL == repl_heartbeat_que_head);
 
-	heartbeat_period = jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
-	heartbeat_max_wait = jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
+	heartbeat_period = jnlpool->gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
+	heartbeat_max_wait = jnlpool->gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
 	num_q_entries = DIVIDE_ROUND_UP(heartbeat_max_wait, heartbeat_period) + 2;
 	REPL_DPRINT4("Initialized heartbeat, heartbeat_period = %d s, heartbeat_max_wait = %d s, num_q_entries = %d\n",
 			heartbeat_period, heartbeat_max_wait, num_q_entries);
@@ -105,7 +106,8 @@ int gtmsource_init_heartbeat(void)
 	 */
 	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
-	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
+	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n",
+			heartbeat_period, gtmsource_now, time(NULL));
 	heartbeat_stalled = FALSE;
 	earliest_sent_time = 0;
 	return (SS_NORMAL);
@@ -113,7 +115,8 @@ int gtmsource_init_heartbeat(void)
 
 int gtmsource_stop_heartbeat(void)
 {
-	REPL_DPRINT4("Stopping heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period, gtmsource_now, time(NULL));
+	REPL_DPRINT4("Stopping heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n",
+			heartbeat_period, gtmsource_now, time(NULL));
 	cancel_timer((TID)gtmsource_heartbeat_timer);
 	if (NULL != repl_heartbeat_que_head)
 		free(repl_heartbeat_que_head);
@@ -172,7 +175,7 @@ int gtmsource_send_heartbeat(time_t *now)
 	heartbeat_element = (repl_heartbeat_que_entry_t *)remqh((que_ent_ptr_t)repl_heartbeat_free_head);
 	if (NULL == heartbeat_element) /* Too many pending heartbeats, send later */
 		return (SS_NORMAL);
-	QWASSIGN(*(seq_num *)&heartbeat_element->heartbeat.ack_seqno[0], jnlpool.jnlpool_ctl->jnl_seqno);
+	QWASSIGN(*(seq_num *)&heartbeat_element->heartbeat.ack_seqno[0], jnlpool->jnlpool_ctl->jnl_seqno);
 	*(gtm_time4_t *)&heartbeat_element->heartbeat.ack_time[0] = (gtm_time4_t)(*now);
 
 	heartbeat_element->heartbeat.type = REPL_HEARTBEAT;
@@ -202,7 +205,7 @@ int gtmsource_send_heartbeat(time_t *now)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
 				status, STRERROR(status));
 		repl_close(&gtmsource_sock_fd);
-		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return (SS_NORMAL);
 	}
 	if (EREPL_SEND == repl_errno)

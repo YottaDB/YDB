@@ -124,11 +124,11 @@ GBLREF  int		process_exiting;		/* Process is on it's way out */
 
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -162,6 +162,7 @@ error_def(ERR_NOTRNDMACC);
 error_def(ERR_OFRZACTIVE);
 error_def(ERR_PERMGENFAIL);
 error_def(ERR_PREVJNLLINKCUT);
+error_def(ERR_REPLINSTUNDEF);
 error_def(ERR_REPLJNLCNFLCT);
 error_def(ERR_REPLPOOLINST);
 error_def(ERR_REPLREQROLLBACK);
@@ -169,6 +170,7 @@ error_def(ERR_REPLSTATE);
 error_def(ERR_REPLSTATEERR);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+error_def(ERR_FILENAMETOOLONG);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 static char	* const jnl_parms[] =
@@ -220,7 +222,7 @@ void mupip_backup(void)
 	char			*tempfilename, *ptr;
 	uint4			status, ret, kip_count;
 	unsigned short		s_len, length;
-	int4			size, crit_counter, save_errno, rv;
+	int4			size, crit_counter, save_errno, rv, orig_buff_size;
 	uint4			ustatus, reg_count;
 	trans_num		tn;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
@@ -245,21 +247,24 @@ void mupip_backup(void)
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
 	boolean_t		sync_io, sync_io_specified;
-	boolean_t		dummy_ftok_counter_halted, repl_inst_available;
+	boolean_t		dummy_ftok_counter_halted;
+	void			*repl_inst_available;
 	struct stat		stat_buf;
 	int			fstat_res, fclose_res, tmpfd;
 	gd_segment		*seg;
-	char			instfilename[MAX_FN_LEN + 1], *errptr, scndry_msg[OUT_BUFF_SIZE];
+	char			*errptr, scndry_msg[OUT_BUFF_SIZE];
 	unsigned int		full_len;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
 	repl_inst_hdr		repl_instance, *save_inst_hdr;
-	unsigned char		*cmdptr, command[MAX_FN_LEN * 2 + 5]; /* 5 == SIZEOF("cp") + 2 (space) + 1 (NULL) */
+	unsigned char		*cmdptr;
+	unsigned char 		command[(GTM_PATH_MAX) * 2 + 5]; /*2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
 	struct shmid_ds		shm_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
 	int4			shm_id, sem_id;
 	replpool_identifier	replpool_id;
+	DEBUG_ONLY(jnlpool_addrs_ptr_t	jnlpool_save);
 	sm_uc_ptr_t		start_addr;
 	int			user_id;
 	int			group_id;
@@ -491,6 +496,8 @@ void mupip_backup(void)
 	size = ROUND_UP(SIZEOF_FILE_HDR_MAX, DISK_BLOCK_SIZE);
 	ESTABLISH(mu_freeze_ch);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	orig_buff_size = SIZEOF(tempdir_full_buffer);
+	tempdir_full.len = orig_buff_size;
 	if (TRUE == online)
 	{
 		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME;
@@ -532,7 +539,7 @@ void mupip_backup(void)
 			continue;
 		}
 		gv_cur_region = rptr->reg;
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		if (gv_cur_region->was_open)
 		{
 			gv_cur_region->open = FALSE;
@@ -580,9 +587,19 @@ void mupip_backup(void)
 					ptr--;
 				if (ptr > rptr->backup_file.addr)
 				{
-					memcpy(tempdir_trans_buffer, rptr->backup_file.addr,
-						(tempdir_trans.len = INTCAST(ptr - rptr->backup_file.addr + 1)));
-					tempdir_trans_buffer[tempdir_trans.len] = '\0';
+					tempdir_trans.len = INTCAST(ptr - rptr->backup_file.addr + 1);
+					if (SIZEOF(tempdir_trans_buffer) >= tempdir_trans.len)
+					{
+						memcpy(tempdir_trans_buffer, rptr->backup_file.addr, tempdir_trans.len);
+						tempdir_trans_buffer[tempdir_trans.len] = '\0';
+					}
+					else
+					{
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2,
+						  rptr->backup_file.len, rptr->backup_file.addr);
+                                		mubclnup(rptr, need_to_del_tempfile);
+                                		mupip_exit(ERR_FILENAMETOOLONG);
+					}
 				} else
 				{
 					tempdir_trans_buffer[0] = '.';
@@ -590,6 +607,8 @@ void mupip_backup(void)
 					tempdir_trans.len = 1;
 				}
 			}
+			 /* Reset length , since gtm_file_stat expects the full buffer length as input */
+                        tempdir_full.len = orig_buff_size;
 			/* verify the accessibility of the tempdir */
 			if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &ustatus)))
 			{
@@ -597,6 +616,14 @@ void mupip_backup(void)
 						tempdir_trans.addr, ustatus);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
+			}
+			/*creating temp filename here , check if we have the required space*/
+			if (orig_buff_size <= (tempdir_full.len + strlen(tempnam_prefix) + SIZEOF(uint4)))
+			{
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempdir_trans.len,
+						tempdir_trans.addr);
+				mubclnup(rptr, need_to_del_tempfile);
+				mupip_exit(ERR_FILENAMETOOLONG);
 			}
 			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
@@ -721,43 +748,51 @@ void mupip_backup(void)
 		/* Attach to jnlpool if backup of replication instance file is needed and "jnlpool_init" did not happen as part of
 		 * "gvcst_init" (e.g. if CUSTOM_ERRORS_AVAILABLE is FALSE).
 		 */
-		repl_inst_available = REPL_INST_AVAILABLE;
+		repl_inst_available = REPL_INST_AVAILABLE(NULL);
 		if (!pool_init && repl_inst_available)
-			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);	/* will set "pool_init" if successful */
+			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
 		if (!pool_init)
-		{
-			if (NULL == jnlpool.jnlpool_dummy_reg)
+		{	/* pool_init is only set if the source server has setup shared memory */
+			assert(NULL != jnlpool);
+			if (!repl_inst_available)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTUNDEF);
+			if (!jnlpool)
+			{	/* jnlpool_init should have provided but be safe */
+				jnlpool = malloc(SIZEOF(jnlpool_addrs));
+				memset((uchar_ptr_t)jnlpool, 0, SIZEOF(jnlpool_addrs));
+				assert(NULL == jnlpool_head);
+			}
+			if (NULL == jnlpool->jnlpool_dummy_reg)
 			{
 				r_save = gv_cur_region;
 				mu_gv_cur_reg_init();
-				jnlpool.jnlpool_dummy_reg = reg = gv_cur_region;
+				jnlpool->jnlpool_dummy_reg = reg = gv_cur_region;
 				gv_cur_region = r_save;
 				ASSERT_IN_RANGE(MIN_RN_LEN, SIZEOF(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
 				MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
 				reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 				reg->rname[reg->rname_len] = '\0';
-				assertpro(repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error));
-					/* rts_error should have been issued by repl_inst_get_name in case of 0 return */
 				udi = FILE_INFO(reg);
 				seg = reg->dyn.addr;
-				memcpy((char *)seg->fname, instfilename, full_len);
+				memcpy((char *)seg->fname, replpool_id.instfilename, full_len);
 				udi->fn = (char *)seg->fname;
 				seg->fname_len = full_len;
 				seg->fname[full_len] = '\0';
 				udi->ftok_semid = INVALID_SEMID;
 			} else
 			{	/* Possible if jnlpool_init did mu_gv_cur_reg_init but returned prematurely due to NOJNLPOOL */
-				assert(!jnlpool.jnlpool_dummy_reg->open);
-				reg = jnlpool.jnlpool_dummy_reg;
+				assert(!jnlpool->jnlpool_dummy_reg->open);
+				reg = jnlpool->jnlpool_dummy_reg;
 				/* Since mu_gv_cur_reg_init is already done, ensure that the reg->rname is correct */
 				assert(0 == MEMCMP_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME));
 				assert(reg->rname_len == STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME));
 				assert('\0' == reg->rname[reg->rname_len]);
 				udi = FILE_INFO(reg);
 			}
+			DEBUG_ONLY(jnlpool_save = jnlpool);
 			do
 			{
-				if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &dummy_ftok_counter_halted))
+				if (!ftok_sem_get(jnlpool->jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &dummy_ftok_counter_halted))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 					error_mupip = TRUE;
@@ -776,18 +811,19 @@ void mupip_backup(void)
 				 * journal pool. Attach to it after releasing the ftok lock. We expect this situation to be
 				 * rare that we keep retrying.
 				 */
-				ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
-				jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
+				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+				jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
 					/* "jnlpool_init" will set "pool_init" if successful */
 				if (pool_init)
 					break;
+				assert(jnlpool_save == jnlpool);	/* should be reusing incomplete structure */
 			} while (TRUE);
 		}
 		if (pool_init)
 		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 			assert(INVALID_SEMID != udi->ftok_semid);
-			if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE))
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 				error_mupip = TRUE;
@@ -795,14 +831,14 @@ void mupip_backup(void)
 			}
 			/* (Re-)read the instance file header now that we have the ftok lock */
 			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-			if (jnlpool_ctl->ftok_counter_halted)
+			if (jnlpool->jnlpool_ctl->ftok_counter_halted)
 				udi->counter_ftok_incremented = FALSE;	/* so we do not inadvertently delete the ftok semaphore */
 		}
-		assert(NULL != jnlpool.jnlpool_dummy_reg);
-		assert(!pool_init || (NULL != jnlpool_ctl));
+		assert(NULL != jnlpool->jnlpool_dummy_reg);
+		assert(!pool_init || ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)));
 		shm_id = repl_instance.jnlpool_shmid;
 		sem_id = repl_instance.jnlpool_semid;
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 		if (INVALID_SEMID != sem_id)
 		{
 			assert(pool_init);
@@ -876,12 +912,12 @@ repl_inst_bkup_done1:
 				grab_crit(gv_cur_region);
 				DEBUG_ONLY(reg_count++);
 			}
-			if (FROZEN_CHILLED(cs_data))
+			if (FROZEN_CHILLED(cs_addrs))
 			{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
 				 * shared memory up. Either autorelease, if enabled, or error out.
 				 */
 				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-				if (FROZEN_CHILLED(cs_data))
+				if (FROZEN_CHILLED(cs_addrs))
 				{
 					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
 					rptr->not_this_time = give_up_before_create_tempfile;
@@ -990,9 +1026,10 @@ repl_inst_bkup_done1:
 				 */
 				goto repl_inst_bkup_done2;
 			}
-			assert(udi == FILE_INFO(jnlpool.jnlpool_dummy_reg));
-			seg = jnlpool.jnlpool_dummy_reg->dyn.addr; /* re-initialize (for pool_init == TRUE case) */
+			assert(udi == FILE_INFO(jnlpool->jnlpool_dummy_reg));
+			seg = jnlpool->jnlpool_dummy_reg->dyn.addr; /* re-initialize (for pool_init == TRUE case) */
 			cmdptr = &command[0];
+			assert(SIZEOF(command) >= (5 + seg->fname_len + mu_repl_inst_reg_list->backup_file.len));
 			memcpy(cmdptr, "cp ", 3);
 			cmdptr += 3;
 			memcpy(cmdptr, seg->fname, seg->fname_len);
@@ -1036,17 +1073,17 @@ repl_inst_bkup_done1:
 					 */
 					csa = &udi->s_addrs;
 					assert(csa->critical
-						== (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));
-					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-					jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
-					if (repl_instance.num_histinfo != jnlpool.repl_inst_filehdr->num_histinfo)
+						== (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));
+					grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+					jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+					if (repl_instance.num_histinfo != jnlpool->repl_inst_filehdr->num_histinfo)
 					{
-						repl_instance = *jnlpool.repl_inst_filehdr;
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+						repl_instance = *jnlpool->repl_inst_filehdr;
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 						continue;	/* redo the "cp" */
 					}
-					save_inst_hdr = jnlpool.repl_inst_filehdr;
-					jnlpool.repl_inst_filehdr = &repl_instance;
+					save_inst_hdr = jnlpool->repl_inst_filehdr;
+					jnlpool->repl_inst_filehdr = &repl_instance;
 					assert(0 != jnl_seqno);
 					/* All the cleanup we want is exactly done by the "repl_inst_histinfo_truncate" function.
 					 * But we don't want to clean the instance file. We want to instead clean the backed up
@@ -1060,13 +1097,13 @@ repl_inst_bkup_done1:
 					COPY_JCTL_STRMSEQNO_TO_INSTHDR_IF_NEEDED;
 					repl_inst_histinfo_truncate(jnl_seqno);	/* Flush updated file header to
 										 * backed up instance file */
-					rel_lock(jnlpool.jnlpool_dummy_reg);
+					rel_lock(jnlpool->jnlpool_dummy_reg);
 					udi->fn = (char *)seg->fname; /* Restore */
-					/* Now that instance file truncate is done, restore jnlpool.repl_inst_filehdr to its
+					/* Now that instance file truncate is done, restore jnlpool->repl_inst_filehdr to its
 					 * original value
 					 */
 					assert(NULL != save_inst_hdr);
-					jnlpool.repl_inst_filehdr = save_inst_hdr;
+					jnlpool->repl_inst_filehdr = save_inst_hdr;
 				} else
 				{	/* We are guaranteed that NO one is actively accessing the instance file. So, no need to
 					 * truncate the backed up instance file.
@@ -1085,7 +1122,7 @@ repl_inst_bkup_done2:
 					assertpro(SS_NORMAL == rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM));
 				}
 				if (udi->grabbed_ftok_sem)
-					ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+					ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			}
 			if (!error_mupip)
 			{

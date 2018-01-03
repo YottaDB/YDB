@@ -39,18 +39,20 @@
 #include "error.h"
 #include "send_msg.h"
 #include "get_fs_block_size.h"
+#include "op.h"
+#include "indir_enum.h"
 
 /* Only want to do fstat() once on this file, not on every use. */
 #define FSTAT_CHECK(GETMODE)										\
-        if (!(GETMODE) || !(fstat_done))								\
-        {												\
+	if (!(GETMODE) || !(fstat_done))								\
+	{												\
 		FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);					\
 		if (-1 == fstat_res)									\
 		{											\
 			save_errno = errno;								\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
-				RTS_ERROR_LITERAL("fstat"),            					\
-			CALLFROM, save_errno);							        \
+				RTS_ERROR_LITERAL("fstat"),						\
+			CALLFROM, save_errno);								\
 		}											\
 		fstat_done = TRUE;									\
 	}												\
@@ -203,7 +205,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 	boolean_t	ch_set, def_recsize_before;
 	int		disk_block_multiple;
 	size_t		fwrite_buffer_size;
+	unsigned char	*ch, ct, *end;
+	int		chown_res;
+	uic_struct	uic;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -227,8 +234,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		switch (c = *(pp->str.addr + p_offset++))
 		{
 		case iop_exception:
-			GET_LEN_AND_ADDR(iod->error_handler.addr, iod->error_handler.len);
-			s2pool(&iod->error_handler);
+			DEF_EXCEPTION(pp, p_offset, iod);
 			break;
 		case iop_fixed:
 			if (iod->state != dev_open)
@@ -295,7 +301,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_recordsize:
 			if (dev_open != iod->state || (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)) ||
-			    (!rm_ptr->done_1st_read && !rm_ptr->done_1st_write))
+				(!rm_ptr->done_1st_read && !rm_ptr->done_1st_write))
 			{	/* only if not open, not UTF, or no reads or writes yet */
 				GET_LONG(recordsize, (pp->str.addr + p_offset));
 				if (recordsize <= 0)
@@ -306,7 +312,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->def_recsize = FALSE;
 				/* for sequential device in fixed M mode, recordsize defines initial width */
 				if (dev_open != iod->state && rm_ptr->fixed && (!rm_ptr->fifo && !rm_ptr->is_pipe) &&
-				    (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)))
+					(!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)))
 					iod->width = recordsize;
 			}
 			break;
@@ -329,12 +335,10 @@ void	iorm_use(io_desc *iod, mval *pp)
 				if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-						      RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
+						RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
-
 				/* need to do FSTAT_FILE to get file size if not already done */
 				FSTAT_CHECK(FALSE);
-
 				/* if file size is not zero then not at end of file */
 				if (0 != statbuf.st_size)
 					iod->dollar.zeof = FALSE;
@@ -389,7 +393,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 				int fc_res;
 				FILE *newstr;
 				int newfd;
-
 				/* don't truncate unless it is a regular file */
 				FSTAT_CHECK(TRUE);
 				if (!(S_IFREG & mode))
@@ -398,24 +401,23 @@ void	iorm_use(io_desc *iod, mval *pp)
 				 * or the end of the file, unless there have been no writes.
 				 */
 				if ((0 != rm_ptr->file_pos) && (!iod->dollar.zeof)
-				    && rm_ptr->output_encrypted && rm_ptr->write_occurred)
+					&& rm_ptr->output_encrypted && rm_ptr->write_occurred)
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOTRUNC, 2,
-						      dev_name->len, dev_name->dollar_io);
+						dev_name->len, dev_name->dollar_io);
 				}
 				/* If already open, truncate, close, and reopen the device. */
 				if (dev_open == iod->state)
 				{
 					/* if last operation was a write then set file_pos to position after write */
 					if (RM_WRITE == rm_ptr->lastop)
-					{
-						/* need to do an lseek to get current location in file */
+					{	/* need to do an lseek to get current location in file */
 						cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 						if ((off_t)-1 == cur_position)
 						{
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-								      RTS_ERROR_LITERAL("lseek"),
-								      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+								RTS_ERROR_LITERAL("lseek"),
+								RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 						} else
 							rm_ptr->file_pos = cur_position;
 					}
@@ -423,10 +425,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 					if (0 != ftruncate_res)
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("ftruncate"),
-							      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+							RTS_ERROR_LITERAL("ftruncate"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
-
 					/* the following is only necessary for a non-split device */
 					if (iod->pair.in == iod->pair.out)
 					{
@@ -436,8 +437,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						} while (-1 == newfd && EINTR == errno);
 						if (-1 == newfd)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);
-
+								RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);
 						if (TRUE == rm_ptr->read_only)
 						{
 							FDOPEN(newstr,newfd,"r");
@@ -446,28 +446,26 @@ void	iorm_use(io_desc *iod, mval *pp)
 							FDOPEN(newstr,newfd,"w");
 						} else
 							FDOPEN(newstr,newfd,"r+");
-
 						CLOSE(rm_ptr->fildes,fc_res);
 						FCLOSE(rm_ptr->filstr,fc_res);
 						rm_ptr->filstr = newstr;
 						rm_ptr->fildes = newfd;
 					}
 				}
-
 				/* the following it only necessary for a non-split device */
 				if (iod->pair.in == iod->pair.out)
 				{
 					if ((off_t)-1 == fseeko(rm_ptr->filstr, rm_ptr->file_pos, SEEK_SET))
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("fseeko"),
-							      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+							RTS_ERROR_LITERAL("fseeko"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
 				}
 				if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-						      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+						RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 				}
 				/* if not open then do the truncate here */
 				if (dev_open != iod->state)
@@ -476,10 +474,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 					if (0 != ftruncate_res)
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("ftruncate"),
-							      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+							RTS_ERROR_LITERAL("ftruncate"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
-
 				}
 				/* If we have truncated to the beginning of the file, we are starting afresh, so even a different
 				 * KEY or IV may be specified (hence ...was_encrypted is being set to FALSE).
@@ -520,10 +517,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_uic:
 		{
-			unsigned char	*ch, ct, *end;
-			int		chown_res;
-			uic_struct	uic;
-
 			ch = (unsigned char *)pp->str.addr + p_offset;
 			ct = *ch++;
 			end = ch + ct;
@@ -571,10 +564,10 @@ void	iorm_use(io_desc *iod, mval *pp)
 					break;		/* ignore wrap if BINARY specified */
 			} else
 			{	/* already open so check what conversion is in use  */
-#ifdef __MVS__
+#				ifdef __MVS__
 				if (CHSET_BINARY == iod->process_chset)
 					break;
-#endif
+#				endif
 			}
 			iod->wrap = TRUE;
 			seen_wrap = TRUE;	/* Don't allow WIDTH=0 to override WRAP */
@@ -584,40 +577,38 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_ipchset:
 		{
-#ifdef KEEP_zOS_EBCDIC
-			if ( (iconv_t)0 != iod->input_conv_cd )
+#			ifdef KEEP_zOS_EBCDIC
+			if ((iconv_t)0 != iod->input_conv_cd)
 			{
 				ICONV_CLOSE_CD(iod->input_conv_cd);
 			}
 			SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
 			if (DEFAULT_CODE_SET != iod->in_code_set)
 				ICONV_OPEN_CD(iod->input_conv_cd, (char *)(pp->str.addr + p_offset + 1),
-					      INSIDE_CH_SET);
-#endif
+					INSIDE_CH_SET);
+#			endif
 			if (chset_allowed)
 			{
 				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
 				SET_ENCODING(temp_chset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 					break;	/* ignore UTF chsets if not utf8_mode */
-
 				CHECK_UTF16_VARIANT_AND_SET_CHSET(rm_ptr->ichset_utf16_variant, iod->ichset, temp_chset);
 				ichset_specified = TRUE;
 			}
 		}
 		break;
-                case iop_opchset:
+		case iop_opchset:
 		{
-#ifdef KEEP_zOS_EBCDIC
-			if ( (iconv_t) 0 != iod->output_conv_cd )
+#			ifdef KEEP_zOS_EBCDIC
+			if ((iconv_t) 0 != iod->output_conv_cd)
 			{
 				ICONV_CLOSE_CD(iod->output_conv_cd);
 			}
 			SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
 			if (DEFAULT_CODE_SET != iod->out_code_set)
-				ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
-					      (char *)(pp->str.addr + p_offset + 1));
-#endif
+				ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
+#			endif
 			if (chset_allowed)
 			{
 				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
@@ -631,7 +622,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 		}
 		break;
-                case iop_chset:
+		case iop_chset:
 		{
 			if (chset_allowed)
 			{
@@ -694,7 +685,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				/* need to do FSTAT_FILE to get file size if not already done */
 				FSTAT_CHECK(FALSE);
-
 				/* if file size is not zero then process seek request */
 				if (0 != statbuf.st_size)
 				{
@@ -706,8 +696,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 						if ((off_t)-1 == cur_position)
 						{
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-								      RTS_ERROR_LITERAL("lseek"),
-								      RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
+								RTS_ERROR_LITERAL("lseek"),
+								RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 						} else
 							rm_ptr->file_pos = cur_position;
 					}
@@ -720,8 +710,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 					 * beginning of the file and read the potential BOM.
 					 */
 					if ((!rm_ptr->bom_checked) && (!rm_ptr->no_destroy) && (!rm_ptr->fifo) && (!rm_ptr->is_pipe)
-					    && (!rm_ptr->input_encrypted) && (2 < rm_ptr->fildes) && (0 < statbuf.st_size)
-					    && IS_UTF_CHSET(iod->ichset) && !rm_ptr->write_only)
+						&& (!rm_ptr->input_encrypted) && (2 < rm_ptr->fildes) && (0 < statbuf.st_size)
+						&& IS_UTF_CHSET(iod->ichset) && !rm_ptr->write_only)
 					{
 						assert(UTF16BE_BOM_LEN < UTF8_BOM_LEN);
 						if ((CHSET_UTF8 == iod->ichset) && (statbuf.st_size >= UTF8_BOM_LEN))
@@ -734,15 +724,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 						{
 							if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-									      RTS_ERROR_LITERAL("lseek"),
-									      RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
+									RTS_ERROR_LITERAL("lseek"),
+									RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 							rm_ptr->bom_num_bytes = open_get_bom(iod, bom_size_toread);
-
 							/* move back to previous file position */
 							if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-									      RTS_ERROR_LITERAL("lseek"),
-									      RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
+									RTS_ERROR_LITERAL("lseek"),
+									RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 						}
 						rm_ptr->bom_checked = TRUE;
 					}
@@ -770,63 +759,56 @@ void	iorm_use(io_desc *iod, mval *pp)
 						OUTPUT_SDSEEKERR(seek_str);
 					if ('\0' != *endptr)
 						OUTPUT_SDSEEKERR(seek_str);
-
 					if (SEEK_MINUS == seek_type)
 						seek_value = -seek_value;
-
 					/* if fixed then convert record offset to byte offset in file */
 					if (rm_ptr->fixed)
 					{
 						if (IS_UTF_CHSET(iod->ichset))
 						{
 							/* utf reads recordsize so if we only processed part of the record
-							   adjust it back to the beginning of the record. */
+							 * adjust it back to the beginning of the record.
+							 */
 							if (rm_ptr->inbuf_top - rm_ptr->inbuf_off)
 							{
 								current_offset = rm_ptr->file_pos - rm_ptr->recordsize;
 							} else
 								current_offset = rm_ptr->file_pos;
-
 							if (!rm_ptr->bom_num_bytes)
 								seek_value *= rm_ptr->recordsize; /* no bom to deal with */
 							else
 							{
 								/* account for bom if absolute seek or relative positive seek
-								   and we are at the beginning of the file*/
-								if ((seek_type == SEEK_ABS) ||
-								    ((0 == current_offset) && (0 < seek_value)))
-									seek_value = seek_value * rm_ptr->recordsize +
-										rm_ptr->bom_num_bytes;
+								 * and we are at the beginning of the file
+								 */
+								if ((seek_type == SEEK_ABS)
+										|| ((0 == current_offset) && (0 < seek_value)))
+									seek_value = seek_value * rm_ptr->recordsize
+										+ rm_ptr->bom_num_bytes;
 								else
 								{
 									if (0 == current_offset)
-									{
-										/* zero or less seek from the
-										   beginning of the file */
+									{	/* zero or less seek from beginning of the file */
 										seek_value = -1; /* new_position will be 0 below */
 									} else
 										seek_value *= rm_ptr->recordsize;
 								}
-
 							}
 						} else
 						{
 							current_offset = (rm_ptr->file_pos / iod->width) * iod->width;
 							/* Need to adjust current_offset so we land on a record boundary.
-							   If the current_offset is in the middle of the record then adjust
-							   it so that a relative +0 lands at the beginning of the record */
+							 * If the current_offset is in the middle of the record then adjust
+							 * it so that a relative +0 lands at the beginning of the record
+							 */
 							seek_value *= iod->width;
 						}
 					} else
 						current_offset = rm_ptr->file_pos;
-
 					if (seek_type == SEEK_ABS)
 						new_position = seek_value;
 					else
-					{
 						new_position = current_offset + seek_value;
-					}
-
 					/* limit the range of the new calculated position from zero to the file size */
 					if (0 > new_position)
 						new_position = 0;
@@ -836,8 +818,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 					{
 						save_errno = errno;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("lseek"),
-							      RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
+							RTS_ERROR_LITERAL("lseek"),
+							RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
 					}
 					if (statbuf.st_size == new_position) /* at end of file */
 						iod->dollar.zeof = TRUE;
@@ -908,8 +890,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		default:
 			break;
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[c]) ?
-			     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[c]);
+		p_offset += ((IOP_VAR_SIZE == io_params_size[c])
+			? (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[c]);
 	}
 	if (dev_open != iod->state || ichset_specified || ochset_specified)
 	{
@@ -943,13 +925,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
 		}
 	}
-
 	/* Now that recordsize and CHSET parms have been handled (if any), set WIDTH if necessary */
 	if (rm_ptr->def_width && (recsize_before != rm_ptr->recordsize || def_recsize_before != rm_ptr->def_recsize))
 	{	/* record size was specified even if the same value */
 		SET_WIDTH_BYTES;
 		assert(width_bytes <= rm_ptr->recordsize);	/* or else RECSIZENOTEVEN error would have been issued */
-		iod->width = rm_ptr->recordsize;	/* this width will hold at least one character due to above check */
+		iod->width = rm_ptr->recordsize;		/* this width will hold at least one character due to above check */
 	}
 	if (dev_closed == iod->state)
 	{
@@ -1002,11 +983,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 		rm_ptr->outbuf = malloc(rm_ptr->outbufsize);
 		rm_ptr->out_bytes = 0;
 	}
-
 	assert(((!rm_ptr->input_encrypted) && (!rm_ptr->output_encrypted)) || (dev_open == iod->state) || rm_ptr->no_destroy);
 	assert((!rm_ptr->input_encrypted) || (0 != rm_ptr->input_key.len));
 	assert((!rm_ptr->output_encrypted) || (0 != rm_ptr->output_key.len));
-
 	if (rm_ptr->input_encrypted)
 	{	/* Device's input already encrypted. */
 		if (input_key_entry_present)
@@ -1055,7 +1034,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
 		}
 	}
-
 	if (rm_ptr->output_encrypted)
 	{	/* Device's output already encrypted. */
 		if (output_key_entry_present)
@@ -1107,7 +1085,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	assert((!reset_input_encryption) || rm_ptr->input_encrypted);
 	assert((!reset_output_encryption) || rm_ptr->output_encrypted);
 	if ((rm_ptr->input_encrypted || init_input_encryption || reset_input_encryption
-	     || rm_ptr->output_encrypted || init_output_encryption || reset_output_encryption) && seek_specified)
+			|| rm_ptr->output_encrypted || init_output_encryption || reset_output_encryption) && seek_specified)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOSEEK, 2, dev_name->len, dev_name->dollar_io);
 	if (init_input_encryption || init_output_encryption)
 	{	/* First time the device is getting encryption turned on. Initialize encryption and setup the keys. */
@@ -1134,7 +1112,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	} else if (reset_input_encryption)
 	{
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_DECRYPT, rm_ptr->input_key, rm_ptr->input_iv,
-				    rm_ptr->input_cipher_handle, dev_name);
+			rm_ptr->input_cipher_handle, dev_name);
 	}
 	if (reset_output_encryption && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
 	{
@@ -1155,7 +1133,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	} else if (reset_output_encryption)
 	{
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_ENCRYPT, rm_ptr->output_key, rm_ptr->output_iv,
-				    rm_ptr->output_cipher_handle, dev_name);
+			rm_ptr->output_cipher_handle, dev_name);
 	}
 	if (init_input_encryption || reset_input_encryption || init_output_encryption || reset_output_encryption)
 	{	/* Setup an encryption private buffer of size equal to record size. */

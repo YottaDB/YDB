@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +14,6 @@
 #include "gtm_savetraps.h"
 #include "gtm_newintrinsic.h"
 
-GBLREF mval		dollar_ztrap;
-GBLREF mval		dollar_etrap;
 GBLREF boolean_t	ztrap_explicit_null;
 
 /* Routine called when we need to save the current Xtrap (etrap or ztrap) but
@@ -23,11 +22,13 @@ GBLREF boolean_t	ztrap_explicit_null;
 void gtm_savetraps(void)
 {
 	mval	*intrinsic;
+	DCL_THREADGBL_ACCESS;
 
-	if (dollar_ztrap.str.len || ztrap_explicit_null)
-		intrinsic = &dollar_ztrap;
+	SETUP_THREADGBL_ACCESS;
+	if ((TREF(dollar_ztrap)).str.len || ztrap_explicit_null)
+		intrinsic = &(TREF(dollar_ztrap));
 	else
-		intrinsic = &dollar_etrap;
+		intrinsic = &(TREF(dollar_etrap));
 	gtm_newintrinsic(intrinsic);
         return;
 }

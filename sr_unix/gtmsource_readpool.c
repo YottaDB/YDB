@@ -48,7 +48,7 @@
 #include "min_max.h"
 #include "repl_instance.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_state_t	gtmsource_state;
 
 int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at)
@@ -67,14 +67,14 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 	boolean_t		trim_this_seqno;
 	uchar_ptr_t		trim_buff;
 
-	jctl = jnlpool.jnlpool_ctl;
+	jctl = jnlpool->jnlpool_ctl;
 	jnlpool_size = jctl->jnlpool_size;
 	DEBUG_ONLY(jnl_seqno = jctl->jnl_seqno;) /* jnl_seqno is used in an assert below. jnl_seqno is a local variable for
 						  * debugging purposes since shared memory can change from the time the assert
 						  * fails to the time the core gets created
 						  */
-	jnldata_base = jnlpool.jnldata_base;
-	gtmsource_local = jnlpool.gtmsource_local;
+	jnldata_base = jnlpool->jnldata_base;
+	gtmsource_local = jnlpool->gtmsource_local;
 	do
 	{
 		read = gtmsource_local->read;
@@ -240,7 +240,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 					/* Before sending the seqnos, check if a new histinfo got concurrently written */
 					assert(gtmsource_local->next_histinfo_num <= gtmsource_local->num_histinfo);
 					if ((gtmsource_local->next_histinfo_num == gtmsource_local->num_histinfo)
-						&& (gtmsource_local->num_histinfo != jnlpool.repl_inst_filehdr->num_histinfo))
+						&& (gtmsource_local->num_histinfo != jnlpool->repl_inst_filehdr->num_histinfo))
 					{	/* We are sending seqnos of the last histinfo (that is open-ended) and
 						 * there has been at least one histinfo concurrently added to this instance
 						 * file compared to what is in our private memory. Set the next histinfo's

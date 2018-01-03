@@ -78,7 +78,7 @@ GBLDEF	boolean_t		last_seen_freeze_flag = FALSE;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	boolean_t		is_src_server;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
@@ -130,7 +130,6 @@ int gtmsource()
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
@@ -140,7 +139,7 @@ int gtmsource()
 		if (gtmsource_options.zerobacklog)
 		{
 			gtmsource_options.shut_down = FALSE; /* for getbacklog need init but can't hold ftok for time */
-			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator);
+			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
 			gtmsource_options.shut_down = TRUE; /* restore actual value after the jnlpool_init */
 			if (0 < gtmsource_options.shutdown_time)
 			{
@@ -194,10 +193,11 @@ int gtmsource()
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 	}
-	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator);
+	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
 	/* is_jnlpool_creator == TRUE ==> this process created the journal pool
 	 * is_jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.
 	 */
+	assert(jnlpool && jnlpool->pool_init);
 	if (gtmsource_options.shut_down)
 		gtmsource_exit(gtmsource_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.activate)
@@ -230,9 +230,9 @@ int gtmsource()
 	assert(gtmsource_options.start);
 #	ifndef REPL_DEBUG_NOBACKGROUND
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	FORK(pid);
 	if (0 > pid)
 	{
@@ -259,11 +259,11 @@ int gtmsource()
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 			/* If the child source server process got a ftok counter overflow, it would have recorded that in
-			 * jnlpool.jnlpool_ctl->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
+			 * jnlpool->jnlpool_ctl->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
 			 * child process got a counter overflow.
 			 */
-			ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented
-									&& !jnlpool.jnlpool_ctl->ftok_counter_halted, TRUE);
+			ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented
+									&& !jnlpool->jnlpool_ctl->ftok_counter_halted, TRUE);
 		} else
 		{	/* Child source server process errored out at startup and is no longer alive.
 			 * If we were the one who created the journal pool, let us clean it up.
@@ -358,19 +358,22 @@ int gtmsource()
 					             "more database files that are replicated"));
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
+		if ((NULL == csa->jnlpool) && REPL_ALLOWED(csa) && jnlpool->pool_init)
+			csa->jnlpool = jnlpool;
 	}
 	/* Initialize source server alive/dead state related fields in "gtmsource_local" before the ftok semaphore is released */
 	gtmsource_local->gtmsource_pid = process_id;
 	gtmsource_local->gtmsource_state = GTMSOURCE_START;
 	if (is_jnlpool_creator)
 	{
-		DEBUG_ONLY(jnlpool.jnlpool_ctl->jnlpool_creator_pid = process_id);
+		assert(jnlpool && jnlpool->jnlpool_ctl);
+		DEBUG_ONLY(jnlpool->jnlpool_ctl->jnlpool_creator_pid = process_id);
 		gtmsource_seqno_init(this_side_std_null_coll);
 		if (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary)
 		{	/* Created the journal pool as a root primary. Append a history record to the replication instance file.
 			 * Invoke the function "gtmsource_rootprimary_init" to do that.
 			 */
-			gtmsource_rootprimary_init(jnlpool.jnlpool_ctl->jnl_seqno);
+			gtmsource_rootprimary_init(jnlpool->jnlpool_ctl->jnl_seqno);
 		}
 	}
 	/* after this point we can no longer have the case where all the regions are unreplicated/non-journaled. */
@@ -381,7 +384,8 @@ int gtmsource()
 	 * for the replication instance file. But the source server process (the child) that comes here would not have done
 	 * that. Do that while the parent is still holding on to the ftok semaphore waiting for our okay.
 	 */
-	if (!ftok_sem_incrcnt(jnlpool.jnlpool_dummy_reg, FILE_TYPE_REPLINST, &ftok_counter_halted))
+	assert(jnlpool && jnlpool->pool_init);
+	if (!ftok_sem_incrcnt(jnlpool->jnlpool_dummy_reg, FILE_TYPE_REPLINST, &ftok_counter_halted))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Increment the source server count semaphore */
 	status = incr_sem(SOURCE, SRC_SERV_COUNT_SEM);
@@ -413,10 +417,10 @@ int gtmsource()
 	if (is_jnlpool_creator)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Created jnlpool with shmid = [%d] and semid = [%d]\n",
-			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
 	} else
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
-			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
 	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 #	ifdef GTM_TLS
 	if (REPL_TLS_REQUESTED)
@@ -425,12 +429,12 @@ int gtmsource()
 		assert(REPL_TLS_REQUESTED || PLAINTEXT_FALLBACK);
 	}
 #	endif
-	if (jnlpool.jnlpool_ctl->freeze)
+	if (jnlpool->jnlpool_ctl->freeze)
 	{
-		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
-		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);
+		last_seen_freeze_flag = jnlpool->jnlpool_ctl->freeze;
+		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool->repl_inst_filehdr->inst_info.this_instname);
 		repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
-		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
+		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool->jnlpool_ctl->freeze_comment);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 	}
 	add_safe_timer_handler(1, gtmsource_heartbeat_timer);
@@ -472,27 +476,27 @@ int gtmsource()
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
-		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		{
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
-					jnlpool.jnlpool_ctl->jnl_seqno);
+					jnlpool->jnlpool_ctl->jnl_seqno);
 			continue;
 		}
 		GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
 		gtmsource_local->read_state = gtmsource_local->jnlfileonly ? READ_FILE : READ_POOL;
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
-		assert(read_jnl_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);
-		if (read_jnl_seqno < jnlpool.jnlpool_ctl->jnl_seqno)
+		assert(read_jnl_seqno <= jnlpool->jnlpool_ctl->jnl_seqno);
+		if (read_jnl_seqno < jnlpool->jnlpool_ctl->jnl_seqno)
 		{
 			gtmsource_local->read_state = READ_FILE;
-			QWASSIGN(gtmsource_save_read_jnl_seqno, jnlpool.jnlpool_ctl->jnl_seqno);
+			QWASSIGN(gtmsource_save_read_jnl_seqno, jnlpool->jnlpool_ctl->jnl_seqno);
 			gtmsource_pool2file_transition = TRUE; /* so that we read the latest gener jnl files */
 		}
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);

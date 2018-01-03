@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef __ZTRAP_FORM_INIT_H__
-#define __ZTRAP_FORM_INIT_H__
+#ifndef __TRAP_ENV_INIT_H__
+#define __TRAP_ENV_INIT_H__
 
-void ztrap_form_init(void);
+void trap_env_init(void);
 
 #endif

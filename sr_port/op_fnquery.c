@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,11 +35,11 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
 
+error_def(ERR_LVNULLSUBS);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
-error_def(ERR_LVNULLSUBS);
 
-void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
+void op_fnquery(int sbscnt, mval *dst, ...)
 {
 	int			length;
 	mval		 	tmp_sbs;
@@ -51,14 +52,12 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
 	lvTree			*lvt;
 	int			i, j;
-	VMS_ONLY(int		sbscnt;)
 	boolean_t		found, is_num, last_sub_null, nullify_term, is_str;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, dst);
-	VMS_ONLY(va_count(sbscnt));
-		assert(3 <= sbscnt);
+	assert(3 <= sbscnt);
 	sbscnt -= 3;
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
@@ -331,6 +330,7 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			 * not yet initialized with current subscript (in the M-stack).
 			 */
 			v2->mvtype = MV_STR;
+			assert(MAX_STRLEN >= v2->str.len); /* check in op_putindx should assure this */
 			mval_lex(v2, &format_out);
 			if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
 			{	/* We must put the string on the string pool ourself - mval_lex didn't do it

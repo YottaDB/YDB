@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 			done_l = FALSE,
 			done_r = FALSE,
 			done_s = FALSE,
+			done_t = FALSE,
 			done_v = FALSE;
 	int		i;
   	zshow_out	output;
@@ -75,6 +76,8 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 			case 'r':
 			case 'S':
 			case 's':
+			case 'T':
+			case 't':
 			case 'V':
 			case 'v':
 				continue;
@@ -152,7 +155,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				done_g = TRUE;
 				output.code = 'G';
 				output.line_num = 0;	/* G statistics start at 0 for <*,*> output and not 1 like the others */
-				zshow_gvstats(&output);
+				zshow_gvstats(&output, FALSE);
 				break;
 			case 'I':
 			case 'i':
@@ -169,7 +172,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				done_l = TRUE;
 				output.code = 'L';
 				output.line_num = 0;	/* L statistics start at 0 for <LUS,LUF> output and not 1 like the others */
-				zshow_locks(&output);
+				zshow_locks(&output, FALSE);
 				break;
 			case 'R':
 			case 'r':
@@ -186,6 +189,18 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				done_s = TRUE;
 				output.code = 'S';
 				zshow_stack(&output, FALSE);	/* show_checksum = FALSE */
+				break;
+			case 'T':
+			case 't':
+				if (done_t)
+					break;
+				done_t = TRUE;
+				output.code = 'G';
+				output.line_num = 0;	/* G statistics start at 0 for <*,*> output and not 1 like the others */
+				zshow_gvstats(&output, TRUE);
+				output.code = 'L';
+				output.line_num = 0;	/* L statistics start at 0 for <LUS,LUF> output and not 1 like the others */
+				zshow_locks(&output, TRUE);
 				break;
 			case 'V':
 			case 'v':

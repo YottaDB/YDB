@@ -459,6 +459,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 			return FALSE;
 		}
+		seg->read_only = tsd->read_only;
 		SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, tsd, ((node_local_ptr_t)NULL));
 		if (!IS_AIO_DBGLDMISMATCH(seg, tsd))
 			break;
@@ -562,12 +563,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		return FALSE;
 	}
 	override_present = (cli_present("OVERRIDE") == CLI_PRESENT);
-	if (FROZEN_CHILLED(tsd) && !standalone && !override_present)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
-		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-		return FALSE;
-	}
 	csa->hdr = tsd;
 	csa->region = gv_cur_region;
 	/* At this point, we have not yet attached to the database shared memory so we do not know if the ftok counter got halted
@@ -822,7 +817,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					db_ipcs.shmid = tsd->shmid;
 					db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 					if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len,
-											MAX_TRANS_NAME_LEN, &status_msg))
+											GTM_PATH_MAX, &status_msg))
 					{
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) status_msg);
 						RNDWN_ERR("!AD -> get_full_path failed.", reg);
@@ -884,7 +879,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		}
 		assert(!standalone);
 		ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
-		DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
+		if (!tsd->read_only)
+			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
+		else
+			status = 0;
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
@@ -1220,6 +1218,21 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 				return FALSE;
 			}
+			if (FROZEN_CHILLED(csa) && !override_present)
+			{	/* If there is an online freeze, we can't do the file writes, so autorelease or give up. */
+				DO_CHILLED_AUTORELEASE(csa, csd);
+				if (FROZEN_CHILLED(csa))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
+					MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+					return FALSE;
+				}
+			}
+			/* If there was an online freeze and it was autoreleased, we don't want to take down the shared memory
+			 * and lose the freeze_online state.
+			 */
+			if (CHILLED_AUTORELEASE(csa) && !override_present)
+				remove_shmid = FALSE;
 			db_common_init(reg, csa, csd); /* do initialization common to "db_init" and "mu_rndwn_file" */
 			do_crypt_init = USES_ENCRYPTION(csd->is_encrypted);
 			crypt_warning = FALSE;

@@ -35,8 +35,7 @@
 #include "copy.h"
 #include "sleep.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_replicator;
 
@@ -54,6 +53,7 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 	uint4			dstlen, rlen;
 	uint4			jnlpool_size, tot_jrec_len;
 	uchar_ptr_t		jnlrecptr;
+	jnlpool_addrs_ptr_t	local_jnlpool;
 	jnlpool_ctl_ptr_t	jctl;
 	jpl_rsrv_struct_t	*jrs;
 	uint4			write, write_total;
@@ -61,13 +61,15 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 	gtm_int64_t		wait_write_addr;	/* needed signed because of subtraction happening below */
 
 	assert(is_replicator);
+	assert(NULL != csa);
+	local_jnlpool = JNLPOOL_FROM(csa);
+	assert(NULL != local_jnlpool);
 	assert(NULL != jnl_rec);
 	assert(IS_VALID_RECTYPES_RANGE(rectype) && IS_REPLICATED(rectype));
 	assert(JNL_ENABLED(csa) || REPL_WAS_ENABLED(csa));
-	jctl = jnlpool.jnlpool_ctl;
-	assert(jctl == jnlpool_ctl);
+	jctl = local_jnlpool->jnlpool_ctl;
 	assert(NULL != jctl); /* ensure we haven't yet detached from the jnlpool */
-	jrs = &jnlpool.jrs;
+	jrs = &local_jnlpool->jrs;
 	jnlpool_size = jctl->jnlpool_size;
 	tot_jrec_len = jrs->tot_jrec_len;
 	DEBUG_ONLY(jgbl.cu_jnl_index++;)
@@ -129,7 +131,7 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 				 * calls by concurrent processes at same time. If we see a lot of the "jnl_pool_write_sleep"
 				 * counter value then this will become a priority. For now we expect that counter to be ~ 0.
 				 */
-				repl_phase2_cleanup(&jnlpool);
+				repl_phase2_cleanup(local_jnlpool);
 			}
 			/* If the database is encrypted, then at this point jfb->buff will contain encrypted
 			 * data which we don't want to to push into the jnlpool. Instead, we make use of the
@@ -146,11 +148,11 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 			assert(rlen < jnlpool_size);	/* Because of "if (tot_jrec_len <= jnlpool_size)" above */
 			/* Inspite of the above assert, do a "rlen < jnlpool_size" check below in pro to be safe */
 			if (rlen <= dstlen)		/* dstlen & srclen >= rlen  (most frequent case) */
-				memcpy(jnlpool.jnldata_base + write, jnlrecptr, rlen);
+				memcpy(local_jnlpool->jnldata_base + write, jnlrecptr, rlen);
 			else if (rlen < jnlpool_size)	/* dstlen < rlen <= jnlpool_size */
 			{
-				memcpy(jnlpool.jnldata_base + write, jnlrecptr, dstlen);
-				memcpy(jnlpool.jnldata_base, jnlrecptr + dstlen, rlen - dstlen);
+				memcpy(local_jnlpool->jnldata_base + write, jnlrecptr, dstlen);
+				memcpy(local_jnlpool->jnldata_base, jnlrecptr + dstlen, rlen - dstlen);
 			}
 		} else
 			jrs->memcpy_skipped = TRUE;

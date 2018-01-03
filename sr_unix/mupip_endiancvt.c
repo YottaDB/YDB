@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -691,6 +691,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(mutex_spin_parms.mutex_hard_spin_count);	/* gdsbt.h */
 	SWAP_SD4(mutex_spin_parms.mutex_sleep_spin_count);
 	SWAP_SD4(mutex_spin_parms.mutex_spin_sleep_mask);
+	SWAP_SD4(mutex_spin_parms.mutex_que_entry_space_size);
 	SWAP_SD4(max_update_array_size);
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
@@ -724,7 +725,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
 	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
-	new->freeze_online = 0;		/* should be zero when db is not open so reset it unconditionally */
 	SWAP_SD4(kill_in_prog);
 	SWAP_SD4(abandoned_kills);
 	/************* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE ****************/

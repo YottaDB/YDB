@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2016 Fidelity National Information		#
+# Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -69,6 +69,7 @@ set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script
 set(gtm_dep   "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 
 set(libgtmshr_link "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
+set(libgtmshr_link "${libgtmshr_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
 set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
 set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
 

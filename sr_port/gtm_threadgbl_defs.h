@@ -217,10 +217,13 @@ THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gt
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */
+THREADGBLDEF(dollar_etrap,			mval)				/* $etrap - standard error action */
 THREADGBLDEF(dollar_zmode,			mval)				/* run mode indicator */
 THREADGBLDEF(dollar_zonlnrlbk,			int)				/* ISV (incremented for every online rollback) */
 THREADGBLDEF(dollar_zclose,			int)				/* ISV (set to close status for PIPE device) */
 THREADGBLDEF(dollar_zroutines,			mstr)				/* routine search list */
+THREADGBLDEF(dollar_zstep,			mval)				/* $zstep - zstep action */
+THREADGBLDEF(dollar_ztrap,			mval)				/* $ztrap - recursive try error action */
 THREADGBLDEF(error_on_jnl_file_lost,		unsigned int)			/* controls error handling done by jnl_file_lost.
 										 * 0 (default) : Turn off journaling and continue.
 										 * 1 : Keep journaling on, throw rts_error */
@@ -240,6 +243,9 @@ THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development e
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
 THREADGBLDEF(gtm_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
+THREADGBLDEF(gtm_strpllim,			int4)				/* if non-zero, sets limit on stringpool */
+THREADGBLDEF(gtm_strpllimwarned,		boolean_t)			/* already hit limit on stringpool  */
+THREADGBLDEF(gtm_trigger_etrap,			mval)				/* $etrap - for use in triggers */
 THREADGBLDEF(gtm_trctbl_cur,			trctbl_entry *)			/* Current gtm trace table entry */
 THREADGBLDEF(gtm_trctbl_end,			trctbl_entry *)			/* End of gtm trace table (last entry + 1) */
 THREADGBLDEF(gtm_trctbl_groups,			unsigned int)			/* Trace group mask (max 31 groups) */
@@ -315,6 +321,7 @@ THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */
 THREADGBLDEF(zsearch_var,			lv_val *)			/* UNIX $zsearch() lookup variable */
+THREADGBLDEF(ztrap_form,			int4)				/* ztrap type indicator */
 THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
 THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
 THREADGBLDEF(socket_handle_counter,		int)				/* Counter for generated socket handles */

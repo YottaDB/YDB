@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@
 	return -1;														\
 }
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnl_gbls_t		jgbl;
@@ -75,9 +75,13 @@ int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_typ
 	SETUP_THREADGBL_ACCESS;
 #	endif
 	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
-	replreg = jnlpool.jnlpool_dummy_reg;
-	DEBUG_ONLY(udi = FILE_INFO(jnlpool.jnlpool_dummy_reg));
+	assert(!jnlpool || (NULL != jnlpool->jnlpool_dummy_reg) && (jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
+	if (jnlpool && (NULL != jnlpool->jnlpool_dummy_reg))
+		replreg = jnlpool->jnlpool_dummy_reg;
+	else
+		replreg = recvpool.recvpool_dummy_reg;
+	assert(NULL != replreg);
+	DEBUG_ONLY(udi = FILE_INFO(replreg));
 	assert(udi->grabbed_ftok_sem || jgbl.mur_rollback); /* Rollback already holds standalone access so no need for ftok lock */
 	instfilename = (char *)replreg->dyn.addr->fname;
 	instfilelen = replreg->dyn.addr->fname_len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,10 +89,11 @@ error_def(ERR_NULSUBSC);
 error_def(ERR_DBDUPNULCOL);
 
 #define	BIN_PUT		0
-#define BIN_BIND	1
-#define ERR_COR		2
-#define BIN_KILL	3
+#define	BIN_BIND	1
+#define	ERR_COR		2
+#define	BIN_KILL	3
 #define	BIN_PUT_GVSPAN	4
+#define	TEXT1		"Record discarded because"
 
 # define GC_BIN_LOAD_ERR(GTMCRYPT_ERRNO)											\
 {																\
@@ -978,8 +979,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					temp = (unsigned char *)format_targ_key(&key_buffer[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 					fmtd_key_len = (int)(temp - key_buffer);
 					key_buffer[fmtd_key_len] = '\0';
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_NULSUBSC, 2, gvnh_reg->gd_reg->rname_len,
-						&gvnh_reg->gd_reg->rname[0], ERR_GVIS, 2, fmtd_key_len, &key_buffer[0]);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_NULSUBSC, 2, STRLEN(TEXT1),
+						TEXT1, ERR_GVIS, 2, fmtd_key_len, &key_buffer[0]);
 					ok_to_put = FALSE;
 				}
 				discard_nullcoll_mismatch_record = FALSE;

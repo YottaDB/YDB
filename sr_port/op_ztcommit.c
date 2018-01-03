@@ -32,13 +32,13 @@
 #include "jnl_get_checksum.h"
 #include "iosp.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
 GBLREF  jnl_fence_control       jnl_fence_ctl;
 GBLREF  uint4			dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TRANSMINUS);
@@ -50,6 +50,7 @@ void    op_ztcommit(int4 n)
 	uint4				jnl_status;
         sgmnt_addrs			*csa, *csa_next, *new_fence_list, *tcsa, **tcsa_insert;
 	gd_region			*save_gv_cur_region;
+	jnlpool_addrs_ptr_t		save_jnlpool;
 	jnl_private_control		*jpc;
 	sgmnt_data_ptr_t		csd;
 	jnl_buffer_ptr_t		jbp;
@@ -110,6 +111,7 @@ void    op_ztcommit(int4 n)
 		*tcsa_insert = csa;
 	}
 	save_gv_cur_region = gv_cur_region; /* we change gv_cur_region in the loop below, so save for later restore */
+	save_jnlpool = jnlpool;
 	DEBUG_ONLY(prev_index = 0;)
 	jnl_fence_ctl.fence_list = new_fence_list;
 	/* Note that only those regions that are actively journaling will appear in the following list: */
@@ -147,6 +149,7 @@ void    op_ztcommit(int4 n)
 	}
 	gv_cur_region = save_gv_cur_region; /* restore original */
 	tp_change_reg(); /* bring cs_* in sync with gv_cur_region */
+	jnlpool = save_jnlpool;
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	if (replication) /* instance is replicated */
 	{

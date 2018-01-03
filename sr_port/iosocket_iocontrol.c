@@ -227,16 +227,11 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 void	iosocket_dlr_device(mstr *d)
 {
 	io_desc		*iod;
-	int		len;
 	boolean_t	ch_set;
 
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
- 	len = STRLEN(iod->dollar.device);
-	/* verify internal buffer has enough space for $DEVICE string value */
-	assert((int)d->len > len);
-	memcpy(d->addr, iod->dollar.device, len);
-	d->len = len;
+	PUT_DOLLAR_DEVICE_INTO_MSTR(iod, d);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -976,7 +976,11 @@ STATICFNDEF void remove_timer(TID tid)
 		if (tprev)
 			tprev->next = tp->next;
 		else
+		{
 			timeroot = tp->next;
+			if (NULL == timeroot)
+				deferred_timers_check_needed = FALSE;	/* assert in fast path of "clear_timers" relies on this */
+		}
 		if (tp->safe)
 			safe_timer_cnt--;
 		tp->next = (GT_TIMER *)timefree;	/* place element on free queue */

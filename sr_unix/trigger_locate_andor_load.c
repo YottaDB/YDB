@@ -35,6 +35,8 @@
 #include "tp_frame.h"
 #include "gvnh_spanreg.h"
 #include "trigger_read_andor_locate.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -44,6 +46,7 @@ GBLREF	tp_frame		*tp_pointer;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 LITREF	mval	literal_batch;
 
@@ -92,6 +95,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	gvt_trigger_t		*gvt_trigger;
 	rtn_tabent		*rttabent;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	rhdtyp			*rtn_vector;
 	sgmnt_addrs		*csa, *regcsa;
 	sgmnt_data_ptr_t	csd;
@@ -161,7 +165,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		rtn_vector = NULL;
 	DBGTRIGR((stderr, "trigger_locate_andor_load: routine was %sfound (1)\n", (NULL == rtn_vector)?"not ":""));
 	/* If we have the trigger routine header, do some validation on it, else keep looking */
-	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	runtime_disambiguator_specified = ('#' != trigname->addr[trigname->len - 1]);
 	if (!runtime_disambiguator_specified && (NULL != reg))
 	{	/* Region-name has been specified and no runtime-disambiguator specified. Need to further refine the
@@ -171,7 +175,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		rtn_name.len = MIN(trigname->len, MAX_MIDENT_LEN);
 		rtn_name.addr = trigname->addr;
 		if (!reg->open)
-			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
+			gv_init_reg(reg, NULL);	/* Open the region before obtaining "csa" */
 		regcsa = &FILE_INFO(reg)->s_addrs;
 		assert('#' == rtn_name.addr[rtn_name.len - 1]);
 		for ( ; rttabent <= rtn_names_end; rttabent++)
@@ -217,7 +221,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		if (runtime_disambiguator_specified
 			|| (TRIG_FAILURE_RC == trigger_source_read_andor_verify(trigname, &rtn_vector)))
 		{
-			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 			ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 			return TRIG_FAILURE_RC;
 		}
@@ -242,10 +246,11 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 			 * treat it as a failure to find the trigger.
 			 */
 			if (!reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			if (&FILE_INFO(reg)->s_addrs != csa)
 			{
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -257,7 +262,8 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
 			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 			{
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -266,7 +272,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	}
 	DBGTRIGR((stderr, "trigger_locate_andor_load: leaving with source from rtnhdr 0x%lx\n",
 		  (*rtn_vec) ? (*((rhdtyp **)rtn_vec))->trigr_handle : NULL));
-	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	assert(NULL != rtn_vector);
 	assert(trigdsc == rtn_vector->trigr_handle);
 	*rtn_vec = rtn_vector;

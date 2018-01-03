@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "ftok_sems.h"
 #include "repl_inst_ftok_counter_halted.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_JNLPOOLSETUP);
 error_def(ERR_NOMORESEMCNT);
@@ -40,21 +40,23 @@ error_def(ERR_TEXT);
 void	repl_inst_ftok_counter_halted(unix_db_info *udi)
 {
 	assert(udi->grabbed_ftok_sem);	/* this ensures we have a lock before we modify the instance file header */
-	assert(NULL != jnlpool.jnlpool_ctl);
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-	assert(!jnlpool.jnlpool_ctl->ftok_counter_halted);
-	if (!jnlpool.repl_inst_filehdr->qdbrundown)
+	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 	{
-		rel_lock(jnlpool.jnlpool_dummy_reg);
-		if (udi->grabbed_access_sem)
-			rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
-		udi->grabbed_access_sem = FALSE;
-		udi->counter_acc_incremented = FALSE;
-		ftok_sem_release(jnlpool.jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("Error incrementing the ftok semaphore counter"), ERANGE);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+		assert(!jnlpool->jnlpool_ctl->ftok_counter_halted);
+		if (!jnlpool->repl_inst_filehdr->qdbrundown)
+		{
+			rel_lock(jnlpool->jnlpool_dummy_reg);
+			if (udi->grabbed_access_sem)
+				rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("Error incrementing the ftok semaphore counter"), ERANGE);
+		}
+		jnlpool->jnlpool_ctl->ftok_counter_halted = TRUE;
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	}
-	jnlpool.jnlpool_ctl->ftok_counter_halted = TRUE;
-	rel_lock(jnlpool.jnlpool_dummy_reg);
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_NOMORESEMCNT, 5, LEN_AND_LIT("ftok"), FILE_TYPE_REPLINST, LEN_AND_STR(udi->fn));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 GBLDEF	uint4			lseekwrite_target;
 #endif
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int4			exit_state;
 GBLREF	int4			exi_condition;
 GBLREF	int4			forced_exit_err;
@@ -49,6 +49,8 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	boolean_t	freeze_cleared;
 	char		wait_comment[MAX_FREEZE_COMMENT_LEN];
 	sgmnt_addrs	*repl_csa;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	intrpt_state_t	prev_intrpt_state;
 #	ifdef DEBUG
 		uint4	lcl_lseekwrite_target;
@@ -61,13 +63,21 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		/* Reset global to safe state after noting it down in a local (just in case there are errors in this function) */
 		lcl_lseekwrite_target = lseekwrite_target; lseekwrite_target = LSEEKWRITE_IS_TO_NONE;
 #	endif
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (jnlpool != csa->jnlpool))
+		jnlpool = csa->jnlpool;
 	/* If anticipatory freeze scheme is not in effect, or if this database does not care about it,
 	 * or DSKNOSPCAVAIL is not configured as a custom error, return right away.
 	 */
-	if (!INST_FREEZE_ON_NOSPC_ENABLED(csa))
+	if (!INST_FREEZE_ON_NOSPC_ENABLED(csa, local_jnlpool))
+	{
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
 		return;
+	}
 	fn_len = STRLEN(fn);
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	assert(NULL != jnlpool);
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	was_crit = repl_csa->now_crit;
 	reg = csa->region;
 	if (!was_crit)
@@ -82,16 +92,18 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		 * case, a normal grab_lock is fine (is_blocking_wait = TRUE).
 		 */
 		if (csa->now_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
-		else if (FALSE == grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		else if (FALSE == grab_lock(jnlpool->jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ENOSPCQIODEFER, 2, fn_len, fn);
 			*save_errno = ERR_ENOSPCQIODEFER;
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
 			return;
 		}
 	}
 	/* We either came into this function holding journal pool lock or grab_lock() succeeded */
-	assert(NULL != jnlpool.jnlpool_ctl);
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	assert(NULL != fn);	/* if "csa" is non-NULL, fn better be non-NULL as well */
 	/* The "send_msg" of DSKNOSPCAVAIL done below will set instance freeze (the configuration file includes it). After that, we
 	 * will keep retrying the IO waiting for disk space to become available. If yes, we will clear the freeze. Until that is
@@ -127,7 +139,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		/* If some other process froze the instance and changed the comment, a retry of the
 		 * LSEEKWRITE may not be appropriate, so just loop waiting for the freeze to be lifted.
 		 */
-		if (IS_REPL_INST_FROZEN && (STRCMP(wait_comment, jnlpool.jnlpool_ctl->freeze_comment) != 0))
+		if (IS_REPL_INST_FROZEN && (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) != 0))
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
 			WAIT_FOR_REPL_INST_UNFREEZE(csa)
@@ -143,14 +155,17 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	/* Report that we were able to continue whether we are still frozen or not. */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKSPCAVAILABLE, 2, fn_len, fn);
 	/* Only report if we were the process to set the current freeze comment; otherwise someone else reported it. */
-	if (STRCMP(wait_comment, jnlpool.jnlpool_ctl->freeze_comment) == 0)
+	if (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) == 0)
 	{
 		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
 		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
 	}
 	*save_errno = tmp_errno;
+	local_jnlpool = jnlpool;
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	ENABLE_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE, prev_intrpt_state);
 	if (!was_crit)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(local_jnlpool->jnlpool_dummy_reg);
 	return;
 }

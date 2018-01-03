@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,7 +160,6 @@ GBLREF	uint4			dollar_tlevel;
 		if (pRec > pTop)
 		{
 			INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_blklenerr;
 		}
 		if (0 != (nTargLen = nMatchCnt))
@@ -258,7 +257,6 @@ GBLREF	uint4			dollar_tlevel;
 				if (pRec > pTop)	/* If record goes off the end, then block must be bad */
 				{
 					INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-					assert(CDB_STAGNATE > t_tries);
 					return cdb_sc_blklenerr;
 				}
 				nTargLen = 0;
@@ -277,7 +275,6 @@ GBLREF	uint4			dollar_tlevel;
 			if (0 == nRecLen)	/* If record length is 0, then block must be bad */
 			{
 				INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_badoffset;
 			}
 			pPrevRec = pRecBase;

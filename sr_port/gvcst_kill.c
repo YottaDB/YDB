@@ -49,6 +49,8 @@
 #include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
+#include "is_file_identical.h"
+#include "anticipatory_freeze.h"
 
 /* Include prototypes */
 #include "gvcst_kill_blk.h"
@@ -72,6 +74,7 @@
 #include "have_crit.h"
 #include "error.h"
 #include "gtmimagename.h" /* needed for spanning nodes */
+#include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
@@ -83,11 +86,13 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	stack_frame		*frame_pointer;
@@ -253,7 +258,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 			ztwormhole_used = FALSE;
 		}
 	)
-	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
+	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
 	if (!dollar_tlevel)
 	{
 		kill_set_head.next_kill_set = NULL;
@@ -267,6 +272,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 		prev_update_trans = sgm_info_ptr->update_trans;
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	DISALLOW_MULTIINST_UPDATE_IN_TP(dollar_tlevel, jnlpool_head, csa, first_sgm_info, FALSE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);

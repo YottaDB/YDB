@@ -1148,7 +1148,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTDLNOOPEN */
 	   0,	/* CRYPTNOV4 */
 	   0,	/* CRYPTNOMM */
-	   0,	/* UNUSEDMSG1319 */
+	   0,	/* READONLYNOBG */
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
@@ -1206,7 +1206,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
-	   0,	/* UNUSEDMSG1377 */
+	   0,	/* LSINSERTED */
 	   0,	/* BOOLSIDEFFECT */
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
@@ -1218,7 +1218,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
-	   0,	/* UNUSEDMSG1389 */
+	   0,	/* REPLMULTINSTUPDATE */
 	   0,	/* DBSHMNAMEDIFF */
 	   0,	/* SHMREMOVED */
 	   0,	/* DEVICEWRITEONLY */
@@ -1498,4 +1498,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLBUFFPHS2SALVAGE */
 	   0,	/* JNLPOOLPHS2SALVAGE */
 	   0,	/* MURNDWNARGLESS */
+	   0,	/* DBFREEZEON */
+	   0,	/* DBFREEZEOFF */
+	   0,	/* STPCRIT */
+	   0,	/* STPOFLOW */
 	};

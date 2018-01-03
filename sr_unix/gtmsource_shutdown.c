@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,16 +48,14 @@
 #include "gtm_threadgbl.h"
 #endif
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_srv_count;
 GBLREF	gtmsource_options_t	gtmsource_options;
-GBLREF	int4			jnlpool_shmid;
 GBLREF	boolean_t		is_src_server;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 GBLREF	gd_addr			*gd_header;
 
 error_def(ERR_JNLPOOLSETUP);
@@ -89,22 +87,23 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 */
 	call_on_signal = NULL;		/* Don't reenter on error */
 	assert(pool_init);	/* should have attached to the journal pool before coming here */
-	udi = (unix_db_info *)FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert(NULL != jnlpool);
+	udi = (unix_db_info *)FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	if (!auto_shutdown)
 	{	/* ftok semaphore and jnlpool access semaphore should already be held from the previous call to "jnlpool_init" */
 		assert(udi->grabbed_ftok_sem);
 		assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-		if (NULL != jnlpool.gtmsource_local)
+		if (NULL != jnlpool->gtmsource_local)
 		{	/* Shutdown source server for the secondary instance specified in the command line */
-			savepid[0] = jnlpool.gtmsource_local->gtmsource_pid;
+			savepid[0] = jnlpool->gtmsource_local->gtmsource_pid;
 			/* Set flag to signal concurrently running source server to shutdown */
-			jnlpool.gtmsource_local->shutdown = SHUTDOWN;
+			jnlpool->gtmsource_local->shutdown = SHUTDOWN;
 			repl_log(stdout, TRUE, TRUE, "Initiating SHUTDOWN operation on source server pid [%d] for secondary"
-				" instance [%s]\n", savepid[0], jnlpool.gtmsource_local->secondary_instname);
+				" instance [%s]\n", savepid[0], jnlpool->gtmsource_local->secondary_instname);
 			maxindex = 1;	/* Only one process id to check */
 		} else
 		{	/* Shutdown ALL source servers that are up and running */
-			gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+			gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 			for (maxindex = 0, index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 			{
 				savepid[index] = gtmsourcelocal_ptr->gtmsource_pid;
@@ -185,12 +184,12 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 				{
 					lcnt++;
 					GET_C_STACK_FROM_SCRIPT("ERR_SHUTDOWN", process_id, savepid[index], lcnt);
-					if (NULL != jnlpool.gtmsource_local)
+					if (NULL != jnlpool->gtmsource_local)
 					{
 						assert(0 == index);
-						gtmsourcelocal_ptr = jnlpool.gtmsource_local;
+						gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 					} else
-						gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[index];
+						gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[index];
 					repl_log(stderr, FALSE, FALSE,
 						" ---> Source server pid [%d] for secondary instance [%s] is still alive\n",
 						savepid[index], gtmsourcelocal_ptr->secondary_instname);
@@ -271,12 +270,12 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		first_time = TRUE;
 		for (index = 0; index < maxindex; index++)
 		{
-			if (NULL != jnlpool.gtmsource_local)
+			if (NULL != jnlpool->gtmsource_local)
 			{
 				assert(0 == index);
-				gtmsourcelocal_ptr = jnlpool.gtmsource_local;
+				gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 			} else
-				gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[index];
+				gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[index];
 			exit_status = gtmsourcelocal_ptr->shutdown;
 			if (SHUTDOWN == exit_status)
 			{
@@ -302,14 +301,14 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 * other error occurs in that function causing it to return ABNORMAL_SHUTDOWN, then we should return ABNORMAL_SHUTDOWN
 	 * from this function as well.
 	 */
-	ftok_counter_halted = jnlpool.jnlpool_ctl->ftok_counter_halted;	/* Note down before jnlpool.jnlpool_ctl is NULLed */
+	ftok_counter_halted = jnlpool->jnlpool_ctl->ftok_counter_halted;	/* Copy before jnlpool->jnlpool_ctl is NULLed */
 	if (FALSE == gtmsource_ipc_cleanup(auto_shutdown, &exit_status, &num_src_servers_running))
 		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 	else
 	{	/* Journal Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
 		repl_inst_jnlpool_reset();
 	}
-	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
+	if (!ftok_sem_release(jnlpool->jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
 	return (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);

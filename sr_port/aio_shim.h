@@ -23,7 +23,15 @@
 #elif !defined(USE_LIBAIO)    /* USE_NOAIO */
 #define AIO_SHIM_WRITE(UNUSED, AIOCBP, RET)	MBSTART { RET = aio_write(AIOCBP); } MBEND
 #define AIO_SHIM_RETURN(AIOCBP, RET)	 	MBSTART { RET = aio_return(AIOCBP);} MBEND
-#define AIO_SHIM_ERROR(AIOCBP, RET)		MBSTART { RET = aio_error(AIOCBP); } MBEND
+#define AIO_SHIM_ERROR(AIOCBP, RET)							\
+MBSTART {										\
+	intrpt_state_t		prev_intrpt_state;					\
+											\
+	/* Defer interrupts around aio_error() to prevent pthread mutex deadlock. */	\
+	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);			\
+	RET = aio_error(AIOCBP); 							\
+	ENABLE_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);			\
+} MBEND
 #define SIGNAL_ERROR_IN_WORKER_THREAD(gdi, err_str, errno)	/* no-op, N/A */
 #define CHECK_ERROR_IN_WORKER_THREAD(reg, udi)			/* no-op, N/A */
 

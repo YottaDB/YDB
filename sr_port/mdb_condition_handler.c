@@ -93,7 +93,7 @@
 # include "gtm_trigger.h"
 #endif
 
-GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, pool_init, run_time;
+GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;
@@ -101,13 +101,14 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	int			mumps_status;
+GBLREF	int			mumps_status, pool_init;
 GBLREF	int4			exi_condition;
 GBLREF	io_desc			*active_device, *gtm_err_dev;
 GBLREF	io_pair			io_std_device, io_curr_device;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	mstr			*err_act;
-GBLREF	mval			*alias_retarg, dollar_etrap, dollar_zstatus, dollar_zerror, dollar_ztrap;
+GBLREF	mval			*alias_retarg, dollar_zstatus, dollar_zerror;
 GBLREF	mv_stent		*mv_chain;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -266,6 +267,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	tp_region		*tr;
 	gd_region		*reg_top, *reg_save, *reg_local;
 	gd_addr			*addr_ptr;
+	jnlpool_addrs_ptr_t	local_jnlpool;
 	sgmnt_addrs		*csa;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
@@ -603,26 +605,27 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 #		ifdef UNIX
 		/* Release FTOK lock on the replication instance file if holding it (possible if error in jnlpool_init) */
-		assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open || !pool_init);
-		if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			assert(NULL != udi);
-			if (NULL != udi)
+		for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
+			if ((NULL != local_jnlpool->jnlpool_dummy_reg) && local_jnlpool->jnlpool_dummy_reg->open)
 			{
-				if (udi->grabbed_ftok_sem)
-					ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE);
-				assert(!udi->grabbed_ftok_sem);
+				udi = FILE_INFO(local_jnlpool->jnlpool_dummy_reg);
+				assert(NULL != udi);
+				if (NULL != udi)
+				{
+					if (udi->grabbed_ftok_sem)
+						ftok_sem_release(local_jnlpool->jnlpool_dummy_reg, FALSE, FALSE);
+					assert(!udi->grabbed_ftok_sem);
+				}
 			}
-		}
 #		endif
 		/* Release crit lock on journal pool if holding it */
-		if (pool_init) /* atleast one region replicated and we have done jnlpool init */
-		{
-			csa = (sgmnt_addrs *)&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-			if (csa && csa->now_crit)
-				rel_lock(jnlpool.jnlpool_dummy_reg);
-		}
+		for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
+			if (local_jnlpool->pool_init)
+			{
+				csa = (sgmnt_addrs *)&FILE_INFO(local_jnlpool->jnlpool_dummy_reg)->s_addrs;
+				if (csa && csa->now_crit)
+					rel_lock(local_jnlpool->jnlpool_dummy_reg);
+			}
 		TREF(in_op_fnnext) = FALSE;			/* in case we were in $NEXT */
 		/* Global values that may need cleanups */
 		if (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)
@@ -739,7 +742,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 * will be rethrown one level down as $ETRAP normally does. Note in case of a rethrow, we avoid resetting
 			 * mpc/ctxt as those values are only appropriate for the level in which they were saved.
 			 */
-			if (!repeat_error && ((0 != dollar_ztrap.str.len) || ztrap_explicit_null))
+			if (!repeat_error && ((0 != (TREF(dollar_ztrap)).str.len) || ztrap_explicit_null))
 			{	/* Verify not indirect or that context is unchanged before reset context */
 				assert(NULL != restart_pc);
 				assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
@@ -766,11 +769,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 */
 				goerrorframe();	/* unwind back to error_frame */
 				proc_act_type = 0;
-			} else if ((0 != dollar_etrap.str.len) || (0 != dollar_ztrap.str.len))
+			} else if ((0 != (TREF(dollar_etrap)).str.len) || (0 != (TREF(dollar_ztrap)).str.len))
 			{
 				assert(!ztrap_explicit_null);
 				proc_act_type = SFT_ZTRAP;
-				err_act = (0 != dollar_etrap.str.len) ? &dollar_etrap.str : &dollar_ztrap.str;
+				err_act = (0 != (TREF(dollar_etrap)).str.len)
+					? &((TREF(dollar_etrap)).str) : &((TREF(dollar_ztrap)).str);
 			} else
 			{	/* Either $ETRAP is empty-string or ztrap_explicit_null is set
 				 *
@@ -785,7 +789,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				etrap_handling = TRUE;
 				if (ztrap_explicit_null)
 				{
-					assert(0 == dollar_etrap.str.len);
+					assert(0 == (TREF(dollar_etrap)).str.len);
 					for (level = dollar_zlevel() - 1; level > 0; level--)
 					{
 						GOLEVEL(level, FALSE);
@@ -809,7 +813,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				} else if (etrap_handling)
 				{
 					proc_act_type = SFT_ZTRAP;
-					err_act = &dollar_etrap.str;
+					err_act = &((TREF(dollar_etrap)).str);
 				} else
 				{
 					PRN_ERROR;
@@ -924,15 +928,15 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 "re-dispatching error frame\n"));
 			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;	/* unwind the current C-stack and restart executing from the top of the current M-stack */
-		} else if ((0 != dollar_etrap.str.len) || (0 != dollar_ztrap.str.len))
+		} else if ((0 != (TREF(dollar_etrap)).str.len) || (0 != (TREF(dollar_ztrap)).str.len))
 		{
 			assert(!ztrap_explicit_null);
 			proc_act_type = SFT_ZTRAP;
-			err_act = (0 != dollar_etrap.str.len) ? &dollar_etrap.str : &dollar_ztrap.str;
+			err_act = (0 != (TREF(dollar_etrap)).str.len) ? &((TREF(dollar_etrap)).str) : &((TREF(dollar_ztrap)).str);
 			DBGEHND((stderr, "mdb_condition_handler: Dispatching %s error handler [%.*s]\n",
-				 (0 != dollar_etrap.str.len) ? "$ETRAP" : "$ZTRAP", err_act->len, err_act->addr));
+				 (0 != (TREF(dollar_etrap)).str.len) ? "$ETRAP" : "$ZTRAP", err_act->len, err_act->addr));
 			/* Reset mpc to beginning of the current line (to retry after invoking $ZTRAP) */
-			if (0 != dollar_ztrap.str.len)
+			if (0 != (TREF(dollar_ztrap)).str.len)
 				reset_mpc = TRUE;
 		} else
 		{	/* Either $ETRAP is empty string or ztrap_explicit_null is set.
@@ -950,7 +954,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				GTMTRIG_ONLY(assert(0 == gtm_trigger_depth));	/* Should never happen in a trigger */
 				DBGEHND((stderr, "mdb_condition_handler: ztrap_explicit_null set - unwinding till find handler\n"));
-				assert(0 == dollar_etrap.str.len);
+				assert(0 == (TREF(dollar_etrap)).str.len);
 				for (level = dollar_zlevel() - 1; level > 0; level--)
 				{
 					GOLEVEL(level, FALSE);
@@ -976,7 +980,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			} else if (etrap_handling)
 			{
 				proc_act_type = SFT_ZTRAP;
-				err_act = &dollar_etrap.str;
+				err_act = &((TREF(dollar_etrap)).str);
 				DBGEHND((stderr, "mdb_condition_handler: $ETRAP handler being dispatched [%.*s]\n", err_act->len,
 					 err_act->addr));
 			}

@@ -49,6 +49,9 @@ void tp_set_sgm(void)
 	csa = cs_addrs;
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
 	si = csa->sgm_info_ptr;
+	assert(NULL != si);
+	if (NULL == si)
+		return;		/* not expected but be safe */
 	assert(si->tp_csa == csa);
 	assert(si->tp_csd == cs_data);
 	assert(csa->hdr == cs_data);

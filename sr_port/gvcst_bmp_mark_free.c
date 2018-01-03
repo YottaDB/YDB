@@ -138,7 +138,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			/* Scan for the next local bitmap */
 			updptr = (block_id *)update_array_ptr;
 			for (nextblk = blk;
-				(0 == nextblk->flag) && (nextblk < blk_top) && ((block_id)nextblk->block < next_bm);
+				(nextblk < blk_top) && (0 == nextblk->flag) && ((block_id)nextblk->block < next_bm);
 				++nextblk)
 			{
 				assert((block_id)nextblk->block - bit_map);

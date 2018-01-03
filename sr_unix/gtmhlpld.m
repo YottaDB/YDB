@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2002-2016 Fidelity National Information		;
+; Copyright (c) 2002-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -49,6 +49,7 @@ err	;
 	use file
 	zshow "*"
 	close file
+	set $etrap="zgoto 0"
 	zhalt 1
 	;
 UCASE(string)

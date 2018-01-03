@@ -446,13 +446,14 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	if (-1 == CHDIR(P_tmpdir))	/* Switch to temporary directory as CWD */
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
 		EXIT(UNABLETOCHDIR);
 	}
 	umask(0);
 	if (0 != gtmsecshr_pathname_init(SERVER, *rundir, *rundir_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server path"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server path"),
+			process_id);
 	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
 		secshr_sem = INVALID_SEMID;
@@ -473,7 +474,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	SEMOP(secshr_sem, sop, 2, semop_res, NO_WAIT);
 	if (0 > semop_res)
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
 		/* If gtm_tmp is not defined, show default path */
@@ -485,7 +486,8 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}
 	if (0 != gtmsecshr_sock_init(SERVER))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server"),
+			process_id);
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
@@ -1017,7 +1019,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 	lnln = STRLEN(cmdbuf);
 	/* Look from the end backwards to find the last '/' to isolate the directory */
 	for (cptr = cmdbuf + lnln - 1; (cptr >= cmdbuf) && ('/' != *cptr); cptr--)
@@ -1051,7 +1053,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 #	endif
 	return 0;
 }

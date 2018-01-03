@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,8 +19,8 @@
 
 #include "mdef.h"
 
-#include <signal.h>
 #include <stddef.h>
+#include "gtm_signal.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
@@ -33,6 +33,8 @@
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 error_def(ERR_CTRLC);
+
+mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head);
 
 void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 {
@@ -83,7 +85,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 		return TRUE;
 	}
 	node = start[0]
-	     = tree;
+	     = mlk_shrblk_sort(tree);
 	subscript_offset[0] = 0;
 
 	for (;;)
@@ -120,7 +122,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 			/* This node has children, so move down */
 			++depth;
 			node = start[depth]
-			     = (mlk_shrblk_ptr_t)R2A(node->children);
+			     = mlk_shrblk_sort((mlk_shrblk_ptr_t)R2A(node->children));
 			subscript_offset[depth] = name.len;
 		}
 		if (util_interrupt)

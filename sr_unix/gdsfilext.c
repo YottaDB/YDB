@@ -80,22 +80,22 @@ MBSTART {															\
 
 #define SUSPICIOUS_EXTEND 	(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)
 
-GBLREF	sigset_t	blockalrm;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF	unsigned char	cw_set_depth;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	inctn_opcode_t	inctn_opcode;
-GBLREF	boolean_t	mu_reorg_process;
-GBLREF	uint4		process_id;
-GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	unsigned int	t_tries;
-GBLREF	jnl_gbls_t	jgbl;
-GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
-GBLREF	uint4		gtmDebugLevel;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	sigset_t		blockalrm;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	 cs_data;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	uint4			process_id;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	unsigned int		t_tries;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	boolean_t		gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILEXT);
@@ -148,6 +148,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	cache_rec_ptr_t         cr;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -202,7 +203,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			{
 				if (blocks > (uint4)avail_blocks)
 				{
-					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs))
+					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs, local_jnlpool))
 						return (uint4)(NO_FREE_SPACE);
 					else
 						send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
@@ -237,7 +238,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	 *	op_tcommit to invoke bm_getfree->gdsfilext, then we would have come here with a frozen region on which
 	 *	we hold crit.
 	 */
-	assert(!was_crit || !FROZEN_HARD(cs_data) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
+	assert(!was_crit || !FROZEN_HARD(cs_addrs) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
 	/*
 	 * If we are in the final retry and already hold crit, it is possible that csa->nl->wc_blocked is also set to TRUE
 	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
@@ -251,19 +252,20 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		for ( ; ; )
 		{
 			grab_crit(gv_cur_region);
-			if (FROZEN_CHILLED(cs_data))
+			if (FROZEN_CHILLED(cs_addrs))
 				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+			assert(FROZEN(cs_data) || !cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
 			if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
 				break;
 			rel_crit(gv_cur_region);
 			while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
 			{
 				hiber_start(1000);
-				if (FROZEN_CHILLED(cs_data) && CHILLED_AUTORELEASE(cs_data))
+				if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))
 					break;
 			}
 		}
-	} else if (FROZEN_HARD(cs_data) && dollar_tlevel)
+	} else if (FROZEN_HARD(cs_addrs) && dollar_tlevel)
 	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
 		 * op_tcommit will recognize (as a cdb_sc_needcrit/cdb_sc_instancefreeze type of restart) and restart accordingly.
 		 */
@@ -272,6 +274,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		return (uint4)FINAL_RETRY_FREEZE_PROG;
 	} else
 		WAIT_FOR_REGION_TO_UNCHILL(cs_addrs, cs_data);
+	assert(!cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
 	if (IS_REPL_INST_FROZEN && trans_in_prog)
 	{
 		assert(CDB_STAGNATE <= t_tries);

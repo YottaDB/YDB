@@ -61,8 +61,6 @@ GBLREF gv_namehead		*gv_target;
 GBLREF gd_addr			*gd_header;
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
-GBLREF mval			dollar_etrap;
-GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zgbldir;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -127,19 +125,19 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	{
 		case MVST_MSAV:
 			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
-			if (&dollar_etrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
+			if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
 				ztrap_explicit_null = FALSE;
-				dollar_ztrap.str.len = 0;
-			} else if (&dollar_ztrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
+				(TREF(dollar_ztrap)).str.len = 0;
+			} else if (&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
-				if (STACK_ZTRAP_EXPLICIT_NULL == dollar_ztrap.str.len)
+				if (STACK_ZTRAP_EXPLICIT_NULL == (TREF(dollar_ztrap)).str.len)
 				{
-					dollar_ztrap.str.len = 0;
+					(TREF(dollar_ztrap)).str.len = 0;
 					ztrap_explicit_null = TRUE;
 				} else
 					ztrap_explicit_null = FALSE;
-				dollar_etrap.str.len = 0;
+				(TREF(dollar_etrap)).str.len = 0;
 				if (tp_timeout_deferred UNIX_ONLY( && !dollar_zininterrupt))
 					/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and we are not in a
 					 * job interrupt, the timeout can no longer be deferred and needs to be recognized.
@@ -453,8 +451,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			gtm_trigger_depth = mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save;
 			if (0 == gtm_trigger_depth)
 			{	/* Only restore error handling environment if returning out of trigger-world */
-				dollar_etrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
-				dollar_ztrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
+				TREF(dollar_etrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
+				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
 			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);

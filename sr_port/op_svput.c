@@ -28,9 +28,6 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "zroutines.h"
-#ifdef VMS
-#include <fab.h>		/* needed for dbgbldir_sysops.h */
-#endif
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "gtmmsg.h"
@@ -54,13 +51,9 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
 GBLREF io_pair		io_curr_device;
-GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zgbldir;
-GBLREF mval		dollar_zstep;
 GBLREF mval		dollar_zsource;
-GBLREF int		ztrap_form;
-GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
@@ -84,6 +77,7 @@ GBLREF int4		tstart_trigger_depth;
 GBLREF uint4		dollar_tlevel;
 #endif
 
+LITREF mval		default_etrap;
 #ifdef GTM_TRIGGER
 LITREF mval		gvtr_cmd_mval[GVTR_CMDTYPES];
 #endif
@@ -103,6 +97,7 @@ void op_svput(int varnum, mval *v)
 {
 	int	i, ok, state;
 	char	*vptr;
+	int4	previous_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -132,7 +127,7 @@ void op_svput(int varnum, mval *v)
 			MV_FORCE_STR(v);
 			op_commarg(v,indir_linetail);
 			op_unwind();
-			dollar_zstep = *v;
+			TREF(dollar_zstep) = *v;
 			break;
 		case SV_ZGBLDIR:
 			MV_FORCE_STR(v);
@@ -190,24 +185,28 @@ void op_svput(int varnum, mval *v)
 			MV_FORCE_STR(v);
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
-			dollar_ztrap.mvtype = MV_STR;
-			dollar_ztrap.str = v->str;
-			/* Setting either $ZTRAP or $ETRAP to empty causes any current error trapping to be canceled */
 			if (!v->str.len)
-			{
-				dollar_etrap.mvtype = MV_STR;
-				dollar_etrap.str = v->str;
+			{	/* Setting either $ZTRAP to empty causes any current error trapping to be canceled */
+				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
+				(TREF(dollar_etrap)).str = (TREF(dollar_ztrap)).str = v->str;
 				ztrap_explicit_null = TRUE;
 			} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
 			{
 				ztrap_explicit_null = FALSE;
-				if (dollar_etrap.str.len > 0)
+				if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))
 				{
-					gtm_newintrinsic(&dollar_etrap);
-					NULLIFY_TRAP(dollar_etrap);
+					op_commarg(v, indir_linetail);
+					op_unwind();
 				}
+				if ((TREF(dollar_etrap)).str.len > 0)
+				{
+					gtm_newintrinsic(&(TREF(dollar_etrap)));
+					NULLIFY_TRAP(TREF(dollar_etrap));
+				}
+				(TREF(dollar_ztrap)).mvtype = MV_STR;
+				(TREF(dollar_ztrap)).str = v->str;
 			}
-			if (ztrap_form & ZTRAP_POP)
+			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();
 			if (tp_timeout_deferred && !dollar_zininterrupt)
 				/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and no job interrupt is in
@@ -289,16 +288,19 @@ void op_svput(int varnum, mval *v)
 			break;
 		case SV_ETRAP:
 			MV_FORCE_STR(v);
-			dollar_etrap.mvtype = MV_STR;
-			dollar_etrap.str = v->str;
-			/* Setting either $ZTRAP or $ETRAP to empty causes any current error trapping to be canceled */
-			if (!v->str.len)
-			{
-				dollar_ztrap.mvtype = MV_STR;
-				dollar_ztrap.str = v->str;
-			} else if (dollar_ztrap.str.len > 0)
-				NULLIFY_TRAP(dollar_ztrap)
 			ztrap_explicit_null = FALSE;
+			if ((TREF(dollar_ztrap)).str.len > 0)
+			{	/* replacing ZTRAP with ETRAP */
+				NULLIFY_TRAP(TREF(dollar_ztrap));
+				(TREF(dollar_etrap))= default_etrap;	/* want change, so use default value in case of bad value */
+			}
+			if (v->str.len)
+			{	/* check we have valid code */
+				op_commarg(v, indir_linetail);
+				op_unwind();
+			}	/* set $etrap="" clears any current value, but doesn't cancal all trapping the way $ZTRAP="" does */
+			(TREF(dollar_etrap)).mvtype = MV_STR;
+			(TREF(dollar_etrap)).str = v->str;
 			break;
 		case SV_ZERROR:
 			MV_FORCE_STR(v);
@@ -382,6 +384,13 @@ void op_svput(int varnum, mval *v)
 #			else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
+		case SV_ZSTRPLLIM:
+			previous_gtm_strpllim = TREF(gtm_strpllim);
+			MV_FORCE_NUM(v);
+			TREF(gtm_strpllim) = MV_FORCE_INT(v);
+			if ((TREF(gtm_strpllim) <= 0) || (TREF(gtm_strpllim) >= previous_gtm_strpllim))
+				TREF(gtm_strpllimwarned) =  FALSE;
+			break;
 		default:
 			assertpro(FALSE && varnum);
 	}

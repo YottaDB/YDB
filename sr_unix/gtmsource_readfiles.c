@@ -117,7 +117,7 @@ MBSTART {														\
 } MBEND
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	repl_rctl_elem_t	*repl_rctl_list;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
@@ -1579,7 +1579,8 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	cumul_read = 0;
 	*brkn_trans = TRUE;
 	assert(repl_ctl_list->next != NULL);
-	jctl = jnlpool.jnlpool_ctl;
+	assert(NULL != jnlpool);
+	jctl = jnlpool->jnlpool_ctl;
 	/* For each region */
 	assert(repl_ctl_list->next == repl_rctl_list->ctl_start);
 	for (repl_rctl = repl_rctl_list; (NULL != repl_rctl) && !trans_read; repl_rctl = repl_rctl->next)
@@ -1932,8 +1933,8 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	boolean_t		stop_bunching;
 	gtmsource_state_t	gtmsource_state_sav;
 
-	jctl = jnlpool.jnlpool_ctl;
-	gtmsource_local = jnlpool.gtmsource_local;
+	jctl = jnlpool->jnlpool_ctl;
+	gtmsource_local = jnlpool->gtmsource_local;
 	jnlpool_size = jctl->jnlpool_size;
 	max_read_seqno = jctl->jnl_seqno;
 	/* Note that we are fetching the value of "jctl->jnl_seqno" without a lock on the journal pool. This means we could
@@ -2040,7 +2041,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 		TIMEOUT_DONE(stop_bunching);
 		assert(read_jnl_seqno <= max_read_seqno);
 		if ((gtmsource_local->next_histinfo_num < gtmsource_local->num_histinfo)
-			|| (gtmsource_local->num_histinfo == jnlpool.repl_inst_filehdr->num_histinfo))
+			|| (gtmsource_local->num_histinfo == jnlpool->repl_inst_filehdr->num_histinfo))
 		{	/* We are either sending seqnos of a histinfo that is not the last one in the instance file OR
 			 * we are sending seqnos of the last histinfo (that is open-ended) but there has been no more histinfo
 			 * records concurrently added to this instance file compared to what is in our private memory. In either
@@ -2068,7 +2069,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 		 * condition happens frequently with replicating instances and instances with infrequent updates.
 		 */
 		if (jctl->write_addr < read_addr)
-			repl_phase2_cleanup(&jnlpool);
+			repl_phase2_cleanup(jnlpool);
 		assert(jctl->write_addr >= read_addr);
 		gtmsource_local->read = (uint4)(read_addr % jnlpool_size) ;
 		gtmsource_local->read_state = read_state = READ_POOL;
@@ -2170,7 +2171,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 			grab_crit(ctl->reg);
 		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 		{
-			assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			assert(process_id != jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 			SYNC_ONLN_RLBK_CYCLES;
 			gtmsource_onln_rlbk_clnup(); /* would have set gtmsource_state accordingly */
 			if (!was_crit)
@@ -2184,18 +2185,18 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 		if (max_zqgblmod_seqno < start_seqno)
 			max_zqgblmod_seqno = start_seqno;
 	}
-	assert(!jnlpool.jnlpool_ctl->max_zqgblmod_seqno || jnlpool.jnlpool_ctl->max_zqgblmod_seqno > resync_seqno);
+	assert(!jnlpool->jnlpool_ctl->max_zqgblmod_seqno || jnlpool->jnlpool_ctl->max_zqgblmod_seqno > resync_seqno);
 	assert(0 < max_zqgblmod_seqno);
 	assert(resync_seqno >= max_zqgblmod_seqno);
-	assert(!(FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs.now_crit));
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	assert(!(FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs.now_crit));
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 	{
-		assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+		assert(process_id != jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 		return -1; /* gtmsource_ctl_close will be done by gtmsource_process */
 	}
-	jnlpool.jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
-	rel_lock(jnlpool.jnlpool_dummy_reg);
+	jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	gtmsource_ctl_close(); /* close all structures now that we are done; if we have to read from journal files; we'll open
 				* the structures again */
 	return (SS_NORMAL);

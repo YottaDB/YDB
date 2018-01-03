@@ -79,6 +79,7 @@
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
 #include "localvarmonitor.h"
+#include "is_file_identical.h"	/* Needed for JNLPOOL_INIT_IF_NEEDED */
 
 STATICFNDCL void lvmon_release(void);
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
@@ -111,6 +112,8 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		dmterm_default;
+GBLREF mstr			extnam_str;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
@@ -435,7 +438,9 @@ void	op_view(int numarg, mval *keyword, ...)
 			 * will fail if the entry is not present.  So make sure that the global exists before
 			 * a YDIRTREE update is performed
 			 */
+			size = extnam_str.len;		/* internal use of op_gvname should not disturb extended reference */
 			op_gvname(VARLSTCNT(1) parmblk.value);
+			extnam_str.len = size;
 			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
 			if (NULL != arg)
 			{
@@ -863,6 +868,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 {
 	boolean_t		was_crit;
 	gd_region		*reg, *r_top, *save_reg;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	int			icnt, lcnt, save_errno, status;
 	int4			nbuffs;
 	jnl_buffer_ptr_t	jb;
@@ -874,6 +880,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 	if (NULL == gd_header)		/* Open gbldir */
 		gvinit();
 	save_reg = gv_cur_region;
+	save_jnlpool = jnlpool;
 	if (NULL == parmblkptr->gv_ptr)
 	{	/* Operate on all regions */
 		reg = gd_header->regions;
@@ -885,13 +892,17 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 		if (IS_STATSDB_REG(reg))
 			continue;	/* Skip statsdb regions for the VIEW command */
 		if (!reg->open)
-			gv_init_reg(reg);
+			gv_init_reg(reg, NULL);
 		TP_CHANGE_REG(reg);
+		/* note that the jnlpool needs to be initialized and validated for options which could write to the database
+		 * so instance freeze can be honored.  No data is writtern just file header, etc. so OK on secondary
+		 */
 		switch(keycode)
 		{
 			case VTK_DBFLUSH:
 				if (!reg->read_only)
 				{
+					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
 					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
 					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, NULL, FALSE, dummy_errno);
 				}
@@ -901,6 +912,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				{
 					csa = cs_addrs;
 					udi = FILE_INFO(reg);
+					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
 					DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno);
 					if (0 != save_errno)
 					{
@@ -912,8 +924,9 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				break;
 			case VTK_EPOCH:
 			case VTK_FLUSH:
-				if (!reg->read_only  && !FROZEN_CHILLED(cs_data))
+				if (!reg->read_only  && !FROZEN_CHILLED(cs_addrs))
 				{
+					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
 					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
 					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
 					 * of a TP transaction. In this case, we likely have pointers to non-dirty global buffers
@@ -957,6 +970,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				csd = csa->hdr;
 				if (JNL_ENABLED(csd))
 				{
+					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
 					was_crit = csa->now_crit;
 					if (!was_crit)
 						grab_crit(reg);
@@ -997,5 +1011,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 	}
 	gv_cur_region = save_reg;
 	change_reg();
+	if (save_jnlpool && (save_jnlpool != jnlpool))
+		jnlpool = save_jnlpool;
 	return;
 }

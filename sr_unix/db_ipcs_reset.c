@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,11 +42,11 @@
 #include "do_semop.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	uint4		process_id;
-GBLREF	ipcs_mesg	db_ipcs;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	jnl_gbls_t	jgbl;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	ipcs_mesg		db_ipcs;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def (ERR_TEXT);
 error_def (ERR_CRITSEMFAIL);
@@ -180,7 +180,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
 			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (!csa->read_only_fs)
+			if (!csa->read_only_fs && !csd->read_only)
 			{
 				status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 				if (0 != status)

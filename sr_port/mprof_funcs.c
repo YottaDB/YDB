@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -976,6 +976,8 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	spt = &(TREF(mprof_ptr))->subsc[0];
 	spt->mvtype = MV_STR;
 	spt->str.addr = mpsp;
+	if (c_ref >= c_top)
+		RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	ch = *mpsp++ = *c_ref++;
 	if (!ISALPHA_ASCII(ch) && ('%' != ch))
 		RTS_ERROR_VIEWNOTFOUND("Invalid global name");

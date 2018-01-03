@@ -52,12 +52,18 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtm_reservedDB.h"
+#include "is_file_identical.h"
+#include "anticipatory_freeze.h"
+#include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 
 GBLREF	boolean_t		dollar_ztrigger_invoked;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			dollar_tlevel;
@@ -331,6 +337,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	gd_region		*save_gv_cur_region, *lgtrig_reg;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	mval			trig_gbl;
 	mval			*trigger_count;
 	char			trigvn[MAX_MIDENT_LEN + 1];
@@ -395,6 +402,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		if (NULL == csa)	/* not BG or MM access method */
 			continue;
 		/* gv_target now points to ^#t in region "reg" */
+		DISALLOW_MULTIINST_UPDATE_IN_TP(dollar_tlevel, jnlpool_head, csa, first_sgm_info, TRUE);
 		/* To write the LGTRIG logical jnl record, choose some region that has journaling enabled */
 		if (!reg->read_only && !jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 			lgtrig_reg = reg;
@@ -409,7 +417,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			{
 				if (reg->read_only)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
-				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 				ptr = trig_gbl.str.addr;
 				trigvn_len = MIN(trig_gbl.str.len, MAX_MIDENT_LEN);
 				STRNLEN(ptr, trigvn_len, trigvn_len);
@@ -482,7 +490,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					}
 				}
 				trigger_count->mvtype = 0; /* allow stp_gcol to release the current contents if necessary */
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				triggers_deleted++;
 			}
 			if (!wildcard)
@@ -510,7 +519,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		 * case this is a NO-OP trigger operation that wont update any ^#t records and we still
 		 * want to write a TLGTRIG/ULGTRIG journal record. Hence the need to do this.
 		 */
-		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);
+		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl, SCNDDBNOUPD_CHECK_TRUE);
 		assert(dollar_tlevel);
 		/* below is needed to set update_trans TRUE on this region even if NO db updates happen to ^#t nodes */
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);
@@ -811,6 +820,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 		if (NULL == csa)	/* not BG or MM access method */
 			continue;
 		/* gv_target now points to ^#t in region "reg" */
+		DISALLOW_MULTIINST_UPDATE_IN_TP(dollar_tlevel, jnlpool_head, csa, first_sgm_info, TRUE);
 		/* To write the LGTRIG logical jnl record, choose some region that has journaling enabled */
 		if (!reg->read_only && !jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 			lgtrig_reg = reg;
@@ -937,7 +947,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 		 */
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(lgtrig_reg);
 		csa = cs_addrs;
-		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);	/* see previous usage for comment on why it is needed */
+		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl, SCNDDBNOUPD_CHECK_TRUE);	/* see previous use for why it is needed */
 		assert(dollar_tlevel);
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
 									 * even if NO db updates happen to ^#t nodes. */
