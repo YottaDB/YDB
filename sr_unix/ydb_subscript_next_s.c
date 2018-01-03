@@ -151,7 +151,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvorder(&nextsub);				/* Locate next subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub, "NULL ret_value", "ydb_subscript_next_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub, "NULL ret_value->buf_addr", "ydb_subscript_next_s()");
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
