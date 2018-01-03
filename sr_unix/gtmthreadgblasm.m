@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2014-2016 Fidelity National Information		;
+; Copyright (c) 2014-2017 Fidelity National Information		;
 ;  Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -56,6 +56,7 @@
 	set gtmhdwr=$ZPiece(gtmzv," ",4)
 	if (0=$get(platform(gtmos,gtmhdwr))) do
 	. write "gtmthreadgblasm: Not running on a recognized platform",!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	set platform=platform(gtmos,gtmhdwr)
 	set fmtrtn="formatrecfor"_platform
@@ -65,6 +66,7 @@
 	if ($zlength($zcmdline," ")'=3) do
 	. write "gtmthreadgblasm: Invalid arguments ",!
 	. write "gtmthreadgblasm: $gtm_tools/gtm_threadgbl_asm_access.txt <input file name>.in <output file name>.si",!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Read in variable list to make available to assembler routines
@@ -144,6 +146,7 @@ verify(line)
 	if (""=var) do
 	. use $principal
 	. write "gtmthreadgblasm: invalid character(s) in variable specification on line "_i,!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	set var=$zpiece(var,"#",1)			; Isolate variable name
 	set line=var

@@ -376,10 +376,11 @@ MBSTART {										\
 MBSTART {												\
 	qw_off_t	rsrv_write_addr;								\
 													\
-	assert((&FILE_INFO(JNLPOOL.jnlpool_dummy_reg)->s_addrs)->now_crit);          			\
-	rsrv_write_addr = JNLPOOL.jnlpool_ctl->rsrv_write_addr;						\
+	assert(JNLPOOL && JNLPOOL->jnlpool_dummy_reg && JNLPOOL->jnlpool_ctl && GTMSOURCE_LOCAL);	\
+	assert((&FILE_INFO(JNLPOOL->jnlpool_dummy_reg)->s_addrs)->now_crit);          			\
+	rsrv_write_addr = JNLPOOL->jnlpool_ctl->rsrv_write_addr;					\
 	GTMSOURCE_LOCAL->read_addr = rsrv_write_addr;							\
-	GTMSOURCE_LOCAL->read = rsrv_write_addr % JNLPOOL.jnlpool_ctl->jnlpool_size;			\
+	GTMSOURCE_LOCAL->read = rsrv_write_addr % JNLPOOL->jnlpool_ctl->jnlpool_size;			\
 } MBEND
 
 #define	SET_JPL_WRITE_ADDR(JPL, NEW_WRITE_ADDR)										\
@@ -537,7 +538,7 @@ typedef struct
 /* The below structure has various fields that point to different sections of the journal pool
  * and a few fields that point to private memory.
  */
-typedef struct
+typedef struct jnlpool_addrs_struct
 {
 	jnlpool_ctl_ptr_t	jnlpool_ctl;		/* pointer to the journal pool control structure */
 	gd_region		*jnlpool_dummy_reg;	/* some functions need gd_region */
@@ -547,7 +548,15 @@ typedef struct
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;	/* pointer to the gtmsrc_lcl array section in the journal pool */
 	sm_uc_ptr_t		jnldata_base;		/* pointer to the start of the actual journal record data */
 	jpl_rsrv_struct_t	jrs;
+	boolean_t		pool_init;		/* this jnlpool_addrs is active */
+	boolean_t		recv_pool;		/* this jnlpool is the same instance as recvpool */
+	boolean_t		relaxed;		/* created with jnlpool_user GTMRELAXED */
+	struct jnlpool_addrs_struct	*next;
+	gd_inst_info		*gd_instinfo;		/* global directory not gtm_repl_instance */
+	gd_addr			*gd_ptr;		/* pointer to global directory */
 } jnlpool_addrs;
+
+#define JNLPOOL_FROM(CSA)	(!IS_GTM_IMAGE ? jnlpool : (!(CSA) ? NULL : ((CSA)->jnlpool ? (CSA)->jnlpool : jnlpool)))
 
 #define	UPDATE_JPL_RSRV_WRITE_ADDR(JPL, JNLPOOL, TN_JRECLEN)							\
 MBSTART {													\
@@ -557,8 +566,9 @@ MBSTART {													\
 														\
 	GBLREF	uint4		process_id;									\
 														\
-	assert(JPL == JNLPOOL.jnlpool_ctl);									\
-	assert((&FILE_INFO(JNLPOOL.jnlpool_dummy_reg)->s_addrs)->now_crit);					\
+	assert((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_dummy_reg));					\
+	assert(JPL == JNLPOOL->jnlpool_ctl);									\
+	assert((&FILE_INFO(JNLPOOL->jnlpool_dummy_reg)->s_addrs)->now_crit);					\
 	/* Allocate a slot. But before that, check if the slot array is full.					\
 	 * endIndex + 1 == first_index implies full.								\
 	 * endIndex     == first_index implies empty.								\
@@ -570,7 +580,7 @@ MBSTART {													\
 	{	/* Slot array is full. Wait for phase2 to finish. */						\
 		do												\
 		{												\
-			repl_phase2_cleanup(&JNLPOOL);								\
+			repl_phase2_cleanup(JNLPOOL);								\
 			if (nextIndex != JPL->phase2_commit_index1)						\
 				break;										\
 			JPL_TRACE_PRO(JPL, jnl_pool_write_sleep);						\
@@ -591,15 +601,15 @@ MBSTART {													\
 	phs2cmt->tot_jrec_len = TN_JRECLEN;									\
 	phs2cmt->prev_jrec_len = JPL->lastwrite_len;								\
 	phs2cmt->write_complete = FALSE;									\
-	JNLPOOL.jrs.start_write_addr = rsrv_write_addr;								\
-	JNLPOOL.jrs.cur_write_addr = rsrv_write_addr + SIZEOF(jnldata_hdr_struct);				\
-	JNLPOOL.jrs.tot_jrec_len = TN_JRECLEN;									\
-	JNLPOOL.jrs.write_total = SIZEOF(jnldata_hdr_struct);	/* will be incremented as we copy		\
+	JNLPOOL->jrs.start_write_addr = rsrv_write_addr;								\
+	JNLPOOL->jrs.cur_write_addr = rsrv_write_addr + SIZEOF(jnldata_hdr_struct);				\
+	JNLPOOL->jrs.tot_jrec_len = TN_JRECLEN;									\
+	JNLPOOL->jrs.write_total = SIZEOF(jnldata_hdr_struct);	/* will be incremented as we copy		\
 								 * each jnlrec into jnlpool in phase2		\
 								 */						\
-	JNLPOOL.jrs.memcpy_skipped = FALSE;									\
-	JNLPOOL.jrs.phase2_commit_index = endIndex;								\
-	JNLPOOL.jrs.num_tcoms = 0;										\
+	JNLPOOL->jrs.memcpy_skipped = FALSE;									\
+	JNLPOOL->jrs.phase2_commit_index = endIndex;								\
+	JNLPOOL->jrs.num_tcoms = 0;										\
 	/* Note: "mutex_salvage" and "repl_phase2_cleanup" rely on the below order of sets */			\
 	JPL->lastwrite_len = TN_JRECLEN;									\
 	JPL->rsrv_write_addr = rsrv_write_addr + TN_JRECLEN;							\
@@ -620,29 +630,29 @@ MBSTART {													\
 	GBLREF	uint4		process_id;									\
 	GBLREF	jnl_gbls_t	jgbl;										\
 														\
-	tot_jrec_len = JNLPOOL.jrs.tot_jrec_len;								\
+	tot_jrec_len = JNLPOOL->jrs.tot_jrec_len;								\
 	assert(tot_jrec_len);											\
-	index = JNLPOOL.jrs.phase2_commit_index;								\
+	index = JNLPOOL->jrs.phase2_commit_index;								\
 	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(index, JPL_PHASE2_COMMIT_ARRAY_SIZE);				\
-	phs2cmt = &JNLPOOL.jnlpool_ctl->phase2_commit_array[index];						\
+	phs2cmt = &JNLPOOL->jnlpool_ctl->phase2_commit_array[index];						\
 	assert(phs2cmt->process_id == process_id);								\
 	assert(FALSE == phs2cmt->write_complete);								\
 	assert(phs2cmt->tot_jrec_len == tot_jrec_len);								\
 	assert(jgbl.cumul_index == jgbl.cu_jnl_index);								\
-	if (!JNLPOOL.jrs.memcpy_skipped)									\
+	if (!JNLPOOL->jrs.memcpy_skipped)									\
 	{													\
-		assert(JNLPOOL.jrs.start_write_addr >= JNLPOOL.jnlpool_ctl->write_addr);			\
-		assert(JNLPOOL.jrs.start_write_addr < JNLPOOL.jnlpool_ctl->rsrv_write_addr);			\
-		jnl_header = (jnldata_hdr_ptr_t)(JNLPOOL.jnldata_base						\
-				+ (JNLPOOL.jrs.start_write_addr % JNLPOOL.jnlpool_ctl->jnlpool_size));		\
+		assert(JNLPOOL->jrs.start_write_addr >= JNLPOOL->jnlpool_ctl->write_addr);			\
+		assert(JNLPOOL->jrs.start_write_addr < JNLPOOL->jnlpool_ctl->rsrv_write_addr);			\
+		jnl_header = (jnldata_hdr_ptr_t)(JNLPOOL->jnldata_base						\
+				+ (JNLPOOL->jrs.start_write_addr % JNLPOOL->jnlpool_ctl->jnlpool_size));		\
 		jnl_header->jnldata_len = tot_jrec_len;								\
 		assert(0 == (phs2cmt->prev_jrec_len % JNL_REC_START_BNDRY));					\
 		jnl_header->prev_jnldata_len = phs2cmt->prev_jrec_len;						\
-		DEBUG_ONLY(prefix = (jrec_prefix *)(JNLPOOL.jnldata_base					\
-					+ (JNLPOOL.jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
-							% JNLPOOL.jnlpool_ctl->jnlpool_size));			\
+		DEBUG_ONLY(prefix = (jrec_prefix *)(JNLPOOL->jnldata_base					\
+					+ (JNLPOOL->jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
+							% JNLPOOL->jnlpool_ctl->jnlpool_size));			\
 		assert(JRT_BAD != prefix->jrec_type);								\
-		if ((JNLPOOL.jrs.write_total != tot_jrec_len)							\
+		if ((JNLPOOL->jrs.write_total != tot_jrec_len)							\
 			DEBUG_ONLY(|| ((0 != TREF(gtm_test_jnlpool_sync))					\
 					&& (0 == (phs2cmt->jnl_seqno % TREF(gtm_test_jnlpool_sync))))))		\
 		{	/* This is an out-of-sync situation. "tot_jrec_len" (computed in phase1) is not equal	\
@@ -658,17 +668,17 @@ MBSTART {													\
 			 * "prefix" below would end up going outside the jnlpool range hence a simple		\
 			 * (jnl_header + 1) would not work to set prefix (and instead the % needed below).	\
 			 */											\
-			prefix = (jrec_prefix *)(JNLPOOL.jnldata_base						\
-					+ (JNLPOOL.jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
-							% JNLPOOL.jnlpool_ctl->jnlpool_size);			\
+			prefix = (jrec_prefix *)(JNLPOOL->jnldata_base						\
+					+ (JNLPOOL->jrs.start_write_addr + SIZEOF(jnldata_hdr_struct))		\
+							% JNLPOOL->jnlpool_ctl->jnlpool_size);			\
 			prefix->jrec_type = JRT_BAD;								\
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLRECOVERY, 4,				\
-				tot_jrec_len, JNLPOOL.jrs.write_total,						\
-				&phs2cmt->jnl_seqno, JNLPOOL.jnlpool_ctl->jnlpool_id.instfilename);		\
+				tot_jrec_len, JNLPOOL->jrs.write_total,						\
+				&phs2cmt->jnl_seqno, JNLPOOL->jnlpool_ctl->jnlpool_id.instfilename);		\
 			/* Now that JRT_BAD is set, fix cur_write_addr so it is set back in sync		\
 			 * (so later assert can succeed).							\
 			 */											\
-			DEBUG_ONLY(JNLPOOL.jrs.cur_write_addr = (JNLPOOL.jrs.start_write_addr + tot_jrec_len));	\
+			DEBUG_ONLY(JNLPOOL->jrs.cur_write_addr = (JNLPOOL->jrs.start_write_addr + tot_jrec_len));	\
 		}												\
 		/* Need to make sure the writes of jnl_header->jnldata_len & jnl_header->prev_jnldata_len	\
 		 * happen BEFORE the write of phs2cmt->write_complete in that order. Hence need the write	\
@@ -680,14 +690,14 @@ MBSTART {													\
 		 */												\
 		SHM_WRITE_MEMORY_BARRIER;									\
 	}													\
-	assert((JNLPOOL.jrs.start_write_addr + tot_jrec_len) == JNLPOOL.jrs.cur_write_addr);			\
+	assert((JNLPOOL->jrs.start_write_addr + tot_jrec_len) == JNLPOOL->jrs.cur_write_addr);			\
 	phs2cmt->write_complete = TRUE;										\
-	JNLPOOL.jrs.tot_jrec_len = 0;	/* reset needed to prevent duplicate calls (e.g. "secshr_db_clnup") */	\
+	JNLPOOL->jrs.tot_jrec_len = 0;	/* reset needed to prevent duplicate calls (e.g. "secshr_db_clnup") */	\
 	/* Invoke "repl_phase2_cleanup" sparingly as it calls "grab_latch". So we do it twice.			\
 	 * Once at half-way mark and once when a wrap occurs.							\
 	 */													\
 	if (!index || ((JPL_PHASE2_COMMIT_ARRAY_SIZE / 2) == index))						\
-		repl_phase2_cleanup(&JNLPOOL);									\
+		repl_phase2_cleanup(JNLPOOL);									\
 } MBEND
 
 #if defined(__osf__) && defined(__alpha)
@@ -799,7 +809,7 @@ void		gtmsource_stop(boolean_t exit);
 void		gtmsource_sigstop(void);
 boolean_t	jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, qw_num read_addr);
 void		jnlpool_detach(void);
-void		jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator);
+void		jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator, gd_addr *gd_ptr);
 int		gtmsource_init_heartbeat(void);
 int		gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg);
 int		gtmsource_send_heartbeat(time_t *now);

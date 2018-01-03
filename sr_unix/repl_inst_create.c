@@ -84,7 +84,7 @@ void repl_inst_create(void)
 	uint4			status2;
 	jnl_tm_t		now;
 
-	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error)); /* rts_error should prevent
+	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error, NULL)); /* rts_error should prevent
 												* return if there is a problem.
 												*/
 	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot

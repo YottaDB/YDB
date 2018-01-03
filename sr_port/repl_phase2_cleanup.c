@@ -59,8 +59,10 @@ void	repl_phase2_cleanup(jnlpool_addrs *jpa)
 	jnlpool_ctl_ptr_t	jpl;
 	boolean_t		was_latch_owner;
 
+	assert(jpa && jpa->jnlpool_dummy_reg);
 	csa = &FILE_INFO(jpa->jnlpool_dummy_reg)->s_addrs;
 	jpl = jpa->jnlpool_ctl;
+	assert(jpl);
 	/* It is possible we already own the latch in case we are in timer-interrupt or process-exit code hence the below check */
 	was_latch_owner = GLOBAL_LATCH_HELD_BY_US(&jpl->phase2_commit_latch);
 	if (!was_latch_owner)

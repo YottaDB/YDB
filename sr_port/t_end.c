@@ -99,8 +99,7 @@ GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err, process_id;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned char		rdfail_detail;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_one;
 GBLREF	boolean_t		mu_reorg_process;
@@ -124,7 +123,7 @@ GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		block_is_free;
 GBLREF	boolean_t		gv_play_duplicate_kills;
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int4			strm_index;
@@ -188,6 +187,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp, jbbp; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa, *repl_csa;
+	DEBUG_ONLY(sgmnt_addrs	*jnlpool_csa = NULL;)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
@@ -198,6 +198,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	uint4			total_jnl_rec_size, tmp_cw_set_depth, prev_cw_set_depth;
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
 	jnlpool_ctl_ptr_t	jpl;
+	jnlpool_addrs_ptr_t	save_jnlpool, tmp_jnlpool;
 	boolean_t		replication = FALSE;
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
 	seq_num			strm_seqno, next_strm_seqno;
@@ -254,6 +255,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	is_mm = (dba_mm == csd->acc_meth);
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (jnlpool != csa->jnlpool))
+	{
+		DEBUG_ONLY(jnlpool_csa = csa);
+		jnlpool = csa->jnlpool;
+	}
+	tmp_jnlpool = jnlpool;
 	DEBUG_ONLY(in_mu_truncate = (cnl != NULL && process_id == cnl->trunc_pid);)
 	TREF(rlbk_during_redo_root) = FALSE;
 	status = cdb_sc_normal;
@@ -364,14 +372,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * database to a state back in time, and we can complete the read.
 			 */
 			assert(!csa->now_crit);
+			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 			grab_crit(reg);
 			rel_crit(reg);
+			assert(tmp_jnlpool == jnlpool);
 		}
 		if (MISMATCH_ROOT_CYCLES(csa, cnl))
 		{	/* If a root block has moved, we might have started the read from the wrong root block, in which
 			 * case we cannot trust the entire search. Need to redo root search.
 			 * If an online rollback concurrently finished, we will come into this "if" block and restart.
 			 */
+			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 			was_crit = csa->now_crit;
 			if (!was_crit)
 				grab_crit(reg);
@@ -387,6 +398,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				SYNC_ROOT_CYCLES(csa);
 			if (!was_crit)
 				rel_crit(reg);
+			assert(tmp_jnlpool == jnlpool);
 			goto failed_skip_revert;
 		}
 		if (start_tn <= cnl->last_wcs_recover_tn)
@@ -398,15 +410,23 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
 		assert(!TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 		assert(!TREF(donot_commit));    /* We should never commit a transaction that was determined restartable */
+		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		if (csa->now_crit && !csa->hold_onto_crit)
 			rel_crit(reg);
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
+		assert(tmp_jnlpool == jnlpool);
 		CWS_RESET;
 		assert(!csa->now_crit || csa->hold_onto_crit); /* shouldn't hold crit unless asked to */
 		t_tries = 0;	/* commit was successful so reset t_tries */
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
+		assert(tmp_jnlpool == jnlpool);
+		if (save_jnlpool != jnlpool)
+		{
+			assert(!jnlpool_csa || (jnlpool_csa == csa));
+			jnlpool = save_jnlpool;
+		}
 		return cti->curr_tn;
 	}
 	assert(update_trans);
@@ -456,6 +476,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below
 	 	 * only if (cw_depth), these variables should be used below only within an if (cw_depth).
 		 */
+		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		lcl_ss_in_prog = SNAPSHOTS_IN_PROG(csa); /* store in local variable to avoid pointer access */
 		reorg_ss_in_prog = (mu_reorg_process && lcl_ss_in_prog); /* store in local variable if both snapshots and MUPIP
 									  * REORG are in progress */
@@ -487,6 +508,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 								end = &buff[MAX_ZWR_KEY_SZ - 1];
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
 									ERR_GVIS, 2, end - buff, buff);
+							if (save_jnlpool != jnlpool)
+							{
+								assert(!jnlpool_csa || (jnlpool_csa == csa));
+								jnlpool = save_jnlpool;
+							}
 							rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
 									ERR_GVIS, 2, end - buff, buff);
 						}
@@ -502,7 +528,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				else
 				{
 					block_is_free = WAS_FREE(cs->blk_prior_state);
+					DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
+					assert(tmp_jnlpool == jnlpool);
 					old_block = (blk_hdr_ptr_t)cs->old_block;
 					if (NULL == old_block)
 					{
@@ -551,7 +579,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				{
 					block_is_free = TRUE; /* To tell t_qread that the block it's trying to read is
 							       * actually a FREE block */
+					DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
+					assert(tmp_jnlpool == jnlpool);
 					if (NULL == cs->old_block)
 					{
 						status = (enum cdb_sc)rdfail_detail;
@@ -561,6 +591,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				}
 			}
 		}
+		assert(tmp_jnlpool == jnlpool);
 	}
 	if (JNL_ENABLED(csa))
 	{	/* compute the total journal record size requirements before grab_crit.
@@ -601,14 +632,21 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		/* Get more space if needed. This is done outside crit so that any necessary IO has a chance of occurring
 		 * outside crit. The available space must be double-checked inside crit.
 		 */
+		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
 			assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
+		assert(tmp_jnlpool == jnlpool);
 		for (;;)
 		{
+			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 			grab_crit(reg);	/* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
-			if (!FROZEN_HARD(csd))
+			if (!FROZEN_HARD(csa))
+			{
+				assert(tmp_jnlpool == jnlpool);
 				break;
+			}
 			rel_crit(reg);
+			assert(tmp_jnlpool == jnlpool);
 			/* We are about to wait for freeze. Assert that we are not in phase2 of a bitmap free operation
 			 * (part of an M-kill or REORG operation). Most freeze operations (e.g. MUPIP FREEZE) wait for the
 			 * phase2 to complete. Some (e.g. MUPIP EXTRACT -FREEZE) don't. The cnl->freezer_waited_for_kip flag
@@ -616,8 +654,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 */
 			assert(!cnl->freezer_waited_for_kip
 				|| (inctn_bmp_mark_free_gtm != inctn_opcode) && (inctn_bmp_mark_free_mu_reorg != inctn_opcode));
-			while (FROZEN_HARD(csd))
+			while (FROZEN_HARD(csa))
 				hiber_start(1000);
+			assert(tmp_jnlpool == jnlpool);
 		}
 	} else
 	{	/* We expect the process to be in its final retry as it is holding crit. The only exception is if hold_onto_crit
@@ -626,7 +665,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * about whether we are about to update a frozen db. DSE is the only utility allowed to update frozen databases.
 		 */
 		assert((CDB_STAGNATE == t_tries) || csa->hold_onto_crit || IS_DSE_IMAGE);
-		if (FROZEN_HARD(csd) && !IS_DSE_IMAGE)
+		if (FROZEN_HARD(csa) && !IS_DSE_IMAGE)
 		{	/* We are about to update a frozen database. This is possible in rare cases even though
 			 * we waited for the freeze to be lifted in t_retry (see GTM-7004). Restart in this case.
 			 */
@@ -635,7 +674,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 	}
 	/* We should never proceed to update a frozen database. Only exception is DSE */
-	assert(!FROZEN_HARD(csd) || IS_DSE_IMAGE);
+	assert(!FROZEN_HARD(csa) || IS_DSE_IMAGE);
 	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 	 * here in the forward phase
@@ -644,6 +683,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	if (MISMATCH_ROOT_CYCLES(csa, cnl))
 	{
 		status = cdb_sc_gvtrootmod2;
+		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		if (MISMATCH_ONLN_RLBK_CYCLES(csa, cnl))
 		{
 			assert(!mupip_jnl_recover);
@@ -653,6 +693,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				SYNC_ROOT_CYCLES(NULL);
 		} else
 			SYNC_ROOT_CYCLES(csa);
+		assert(tmp_jnlpool == jnlpool);
 		goto failed;
 	}
 	/* We should never proceed to commit if the global variable - only_reset_clues_if_onln_rlbk - is TRUE AND if the prior
@@ -685,7 +726,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * (2) Journal recover operates in standalone mode. So, it should NOT see any concurrent
 			 * trigger changes as well
 			 */
-			assert(!is_updproc || jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled);
+			assert(!is_updproc || (csa->jnlpool && (csa->jnlpool == jnlpool)));
+			assert(!is_updproc || (jnlpool && jnlpool->repl_inst_filehdr->is_supplementary
+				&& !jnlpool->jnlpool_ctl->upd_disabled));
 			assert(!jgbl.forw_phase_recovery);
 			assert(cycle > csa->db_trigger_cycle);
 			/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle in t_retry */
@@ -755,6 +798,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 	}
 	/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
+	DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
 	{
 		assert(cnl->wc_blocked);	/* only reason we currently know why wcs_get_space could fail */
@@ -762,8 +806,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 		BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 		SET_CACHE_FAIL_STATUS(status, csd);
+		assert(tmp_jnlpool == jnlpool);
 		goto failed;
 	}
+	assert(tmp_jnlpool == jnlpool);
 	if (inctn_invalid_op != inctn_opcode)
 	{
 		assert(cw_set_depth || mu_reorg_process);
@@ -1196,6 +1242,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		GTM_WHITE_BOX_TEST(WBTEST_T_END_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 		if (0 != jnl_status)
 		{
+			if (save_jnlpool != jnlpool)
+			{
+				assert(!jnlpool_csa || (jnlpool_csa == csa));
+				jnlpool = save_jnlpool;
+			}
 			if (SS_NORMAL != jpc->status)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
 						DB_LEN_STR(reg), jpc->status);
@@ -1239,7 +1290,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		if (MAXUINT4 == jbp->next_epoch_time)
 			jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
 		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
-						&& !FROZEN_CHILLED(csd))
+						&& !FROZEN_CHILLED(csa))
 		{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 			if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE))
 			{
@@ -1253,19 +1304,19 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	/* At this point, we are done with validation and so we need to assert that donot_commit is set to FALSE */
 	assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
-	assert(jnlpool_ctl == jnlpool.jnlpool_ctl);
 	jrs = NULL;
-	if (REPL_ALLOWED(csa) && (NULL != (jpl = jnlpool.jnlpool_ctl)))	/* note: assignment of "jpl" */
+	if (REPL_ALLOWED(csa) && ((NULL != jnlpool) && (NULL != (jpl = jnlpool->jnlpool_ctl))))	/* note: assignment of "jpl" */
 	{
-		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		assert(!csa->jnlpool || (csa->jnlpool == jnlpool));
+		repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		if (!repl_csa->hold_onto_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);	/* Step CMT02 */
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);	/* Step CMT02 */
 		assert(repl_csa->now_crit);
 		jnlpool_crit_acquired = TRUE;
 		/* With jnlpool lock held, check instance freeze, and retry if set. */
 		if (jpl->freeze)
 		{
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			status = cdb_sc_instancefreeze;
 			goto failed;
 		}
@@ -1279,7 +1330,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				supplementary = TRUE;
 				assert(0 <= strm_index);
 				strm_seqno = jpl->strm_seqno[strm_index];
-				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
+				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index, jnlpool);
 				jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
 			} else
 			{	/* Note: "supplementary == FALSE" if strm_seqno is 0 is relied upon by "mutex_salvage" */
@@ -1609,7 +1660,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK; /* Step CMT11 */
 	assert(cdb_sc_normal == status);
 	/* should never increment curr_tn on a frozen database except if DSE */
-	assert(!(FROZEN_HARD(csd) || (replication && jnlpool.jnlpool_ctl->freeze)) || IS_DSE_IMAGE);
+	assert(!(FROZEN_HARD(csa) || (replication && jnlpool && jnlpool->jnlpool_ctl->freeze)) || IS_DSE_IMAGE);
 	/* To avoid confusing concurrent processes, MM requires a barrier before incrementing db TN. For BG, cr->in_tend
 	 * serves this purpose so no barrier is needed. See comment in tp_tend.
 	 */
@@ -1623,7 +1674,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * otherwise do it here every HEADER_UPDATE_COUNT transactions.
 	 */
 	assert(!JNL_ENABLED(csa) || (jbp == csa->jnl->jnl_buff));
-	if (!JNL_ENABLED(csa) && !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)) && !FROZEN_CHILLED(csd))
+	if (!JNL_ENABLED(csa) && !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)) && !FROZEN_CHILLED(csa))
 		fileheader_sync(reg);
 	assert((MUSWP_INCR_ROOT_CYCLE != TREF(in_mu_swap_root_state)) || need_kip_incr);
 	if (need_kip_incr)		/* increment kill_in_prog */
@@ -1651,14 +1702,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 */
 	if (jnlpool_crit_acquired)
 	{
-		assert((NULL != jnlpool_ctl) && repl_csa->now_crit && REPL_ALLOWED(csa));
-		rel_lock(jnlpool.jnlpool_dummy_reg);	/* Step CMT15 */
+		assert((NULL != jnlpool->jnlpool_ctl) && repl_csa->now_crit && REPL_ALLOWED(csa));
+		rel_lock(jnlpool->jnlpool_dummy_reg);	/* Step CMT15 */
 	}
 	/* If BG, check that we have not pinned any more buffers than we are updating */
 	DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(csd, is_mm, cr_array, cr_array_index);
 	assert((NULL == jrs) || JNL_ALLOWED(csa));
-	assert((NULL == jrs) || !jrs->tot_jrec_len || !replication || jnlpool.jrs.tot_jrec_len);
-	assert((NULL == jrs) || jrs->tot_jrec_len || !replication || !jnlpool.jrs.tot_jrec_len);
+	assert((NULL == jrs) || !jrs->tot_jrec_len || !replication || jnlpool->jrs.tot_jrec_len);
+	assert((NULL == jrs) || jrs->tot_jrec_len || !replication || !jnlpool->jrs.tot_jrec_len);
 	if (NEED_TO_FINISH_JNL_PHASE2(jrs))
 		NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(csa, jrs, replication, jnlpool);	/* Step CMT16 & CMT17 */
 	if (cw_set_depth)
@@ -1751,6 +1802,11 @@ skip_cr_array:
 	if (unhandled_stale_timer_pop)
 		process_deferred_stale();
 	wcs_timer_start(reg, TRUE);
+	if (save_jnlpool != jnlpool)
+	{
+		assert(!jnlpool_csa || (jnlpool_csa == csa));
+		jnlpool = save_jnlpool;
+	}
 	return dbtn;
 failed:
 	assert(cdb_sc_normal != status);
@@ -1799,5 +1855,10 @@ failed_skip_revert:
 	CWS_RESET;
 	cw_map_depth = 0;
 	assert(0 == cr_array_index);
+	if (save_jnlpool != jnlpool)
+	{
+		assert(!jnlpool_csa || (jnlpool_csa == csa));
+		jnlpool = save_jnlpool;
+	}
 	return 0;
 }

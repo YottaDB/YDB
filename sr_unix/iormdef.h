@@ -20,9 +20,10 @@
 #define DEF_RM_LENGTH		66
 #define CHUNK_SIZE		BUFSIZ
 
-#define	ONE_COMMA		"1,"
 #define	ONE_COMMA_UNAVAILABLE	"1,Resource temporarily unavailable"
-#define	ONE_COMMA_DEV_DET_EOF	"1,Device detected EOF"
+#define ONE_COMMA_DEV_DET_EOF	"1,Device detected EOF"
+#define	ONE_COMMA_DEV_DET_EOF_DOLLARDEVICE	"1,Device detected EOF ..... Now just exceed this line to more than DD_BUFLEN (80)."
+#define	ONE_COMMA_CRYPTBADWRTPOS	"1,Encrypted WRITE disallowed from a position different than where the last WRITE completed"
 
 #define	DEF_RM_PADCHAR		' '	/* SPACE */
 
@@ -165,7 +166,10 @@ error_def(ERR_CRYPTBADWRTPOS);
 				stop_image_no_core();							\
 			}										\
 		}											\
-		DOLLAR_DEVICE_WRITE(IOD, write_status);							\
+		if (EAGAIN == write_status)								\
+			SET_DOLLARDEVICE_ERRSTR(IOD, ONE_COMMA_UNAVAILABLE);		\
+		else											\
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, write_status);		\
 		IOD->dollar.za = 9;									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) write_status);					\
 	}												\
@@ -283,6 +287,7 @@ typedef struct
 	gtm_chset_t	ochset_utf16_variant;		/* Used to determine UTF16 variant when CHSET is changed b/w UTF16 & M. */
 	uint4		fsblock_buffer_size;		/* I/O buffer size; 1 == default size; 0 == no buffering */
 	char		*fsblock_buffer;		/* I/O buffer for, erm, buffered I/O */
+	boolean_t	crlastbuff;			/* Whether CR was last char of the buffer */
 } d_rm_struct;	/*  rms		*/
 
 #ifdef KEEP_zOS_EBCDIC

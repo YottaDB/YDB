@@ -39,7 +39,7 @@
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF 	jnl_gbls_t		jgbl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
@@ -75,6 +75,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	uint4			aligned_tot_jrec_size, count;
 	uint4			jnl_fs_block_size, read_write_size;
 	unix_db_info		*udi;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -135,7 +136,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					 * we will freeze the instance and wait for space to become available and keep
 					 * retrying the writes. Therefore, we make the NOSPACEEXT a warning in this case.
 					 */
-					if (!INST_FREEZE_ON_NOSPC_ENABLED(csa))
+					if (!INST_FREEZE_ON_NOSPC_ENABLED(csa, local_jnlpool))
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
 								JNL_LEN_STR(csd), new_blocks, avail_blocks);

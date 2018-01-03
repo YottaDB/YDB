@@ -46,9 +46,9 @@
 
 #define	ITERATIONS_100K	100000
 
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	uint4		process_id;
-GBLREF	uint4		image_count;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	uint4			image_count;
 
 error_def(ERR_JNLACCESS);
 error_def(ERR_JNLCNTRL);
@@ -176,6 +176,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	uint4			prev_freeaddr;
 	unsigned int		lcnt, prev_lcnt, cnt;
 	sgmnt_addrs		*csa;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	unsigned int		status;
 	boolean_t		was_crit, jnlfile_lost, exact_check;
 	DCL_THREADGBL_ACCESS;
@@ -183,6 +184,9 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	SETUP_THREADGBL_ACCESS;
 	jb = jpc->jnl_buff;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool != jnlpool))
+		jnlpool = csa->jnlpool;
 	was_crit = csa->now_crit;
 
 	/* If holding crit and input threshold matches jb->rsrv_freeaddr, then we need to wait in the loop as long as dskaddr
@@ -239,6 +243,8 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			 * turned OFF (due to disk space issues etc.)
 			 */
 			jpc->status = SS_NORMAL;
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
 			return SS_NORMAL;
 		}
 		if (SS_NORMAL == status)
@@ -284,14 +290,21 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			if (!jnlfile_lost)
 				continue;
 			else
+			{
+				if (save_jnlpool != jnlpool)
+					jnlpool = save_jnlpool;
 				return status;
+			}
 		}
-		if ((ERR_JNLWRTDEFER == status) && IS_REPL_INST_FROZEN)
-		{	/* Check if the write was deferred because the instance is frozen.
-			 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
-			 * in jnl_qio.
-			 */
-			 WAIT_FOR_REPL_INST_UNFREEZE(csa);
+		if (ERR_JNLWRTDEFER == status)
+		{
+			if (DBG_ASSERT(!csa->jnlpool || (csa->jnlpool == jnlpool)) IS_REPL_INST_FROZEN_JPL(csa->jnlpool))
+			{	/* Check if the write was deferred because the instance is frozen.
+				 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
+				* in jnl_qio.
+				*/
+				WAIT_FOR_REPL_INST_UNFREEZE(csa);
+			}
 		}
 		if ((ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status))
 		{	/* If holding crit, then jnl_sub_write_attempt would have invoked jnl_file_lost which would have
@@ -317,5 +330,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			}
 		}
 	}
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	return SS_NORMAL;
 }

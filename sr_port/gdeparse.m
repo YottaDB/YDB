@@ -96,6 +96,9 @@ GBLNAME
 	i $l(GBLNAME)'=$zl(GBLNAME) zm gdeerr("NONASCII"):GBLNAME:"gblname"		; error if the name is non-ascii
 	i $zl(GBLNAME)>PARNAMLN zm gdeerr("VALTOOLONG"):GBLNAME:PARNAMLN:"gblname"
 	q
+INSTANCE
+	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):"instance"
+	q
 NAME
 	k NAME
 	n c,len,j,k,tokname,starti,endi,subcnt,nsubs,gblname,type,rangeprefix,nullsub,lsub
@@ -495,6 +498,7 @@ SHOW
 	n mapreg
 	i gqual="MAP",ntoktype'="TKEOL" d getqual s mapreg=$g(lquals("REGION"))
 	i 't,"COMMANDS"=gqual,ntoktype'="TKEOL" d getqual s cfile=$g(lquals("FILE"))
+	i 't,"INSTANCE"=gqual,ntoktype="TKEOL" d INSTANCE^GDESHOW q
 	d @gqual:t,matchtok("TKEOL","End of line"),@gqual^GDESHOW
 	q
 VERIFY
@@ -504,7 +508,7 @@ VERIFY
 	n verified s verified=1
 	i ntoktype="TKEOL" d
 	. d @("ALL"_$ze(gqual,1,3))^GDEVERIF
-	e  i "NAMEGBLNAMEREGIONSEGMENT"[gqual d
+	e  i "NAMEGBLNAMEREGIONSEGMENTINSTANCE"[gqual d
 	. d @gqual,@gqual^GDEVERIF
 	e  zm gdeerr("NOVALUE"):gqual
 	i $d(verified) zm gdeerr("VERIFY"):$s(verified:"OK",1:"FAILED") w !

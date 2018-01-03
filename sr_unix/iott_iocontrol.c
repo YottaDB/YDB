@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,14 +28,9 @@ void	iott_iocontrol(mstr *mn, int4 argcnt, va_list args)
 void	iott_dlr_device(mstr *d)
 {
 	io_desc		*iod;
-	int		len;
 
 	iod = io_curr_device.in;
-	len = STRLEN(iod->dollar.device);
-	/* verify internal buffer has enough space for $DEVICE string value */
-	assert((int)d->len > len);
-	memcpy(d->addr, iod->dollar.device, len);
-	d->len = len;
+	PUT_DOLLAR_DEVICE_INTO_MSTR(iod, d);
 	return;
 }
 

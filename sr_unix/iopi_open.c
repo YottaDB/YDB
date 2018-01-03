@@ -42,6 +42,8 @@
 #endif
 #include "send_msg.h"
 #include "wbox_test_init.h"
+#include "op.h"
+#include "indir_enum.h"
 
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
@@ -69,51 +71,51 @@ enum
 int parse_pipe(char *cmd_string, char *ret_token);
 
 /* The parse_pipe routine is to used to determine if all the commands in a pipe string are valid commands so
-   the iopi_open() routine can detect the problem prior to a fork.
-
-   Command Parsing Limitations:
-
-   All commands will be searched for in $PATH and in $gtm_dist and if not found will trap.  Most pipe strings can be
-   entered with some minor exceptions.  First, no parentheses around commands are allowed. An example of this which would
-   fail is:
-
-	o p:(comm="(cd; pwd)":writeonly)::"pipe"
-
-   This produces nothing different from:
-
-	o p:(comm="cd; pwd":writeonly)::"pipe"
-
-   This restriction does not include parentheses embedded in character strings as in:
-
-	o p:(comm="echo ""(test)""":writeonly)::"pipe"       (which would output: (test) )
-
-   or as parameters to a command as in:
-
-	o p:(comm="tr -d '()'":writeonly)::"pipe"     (which if passed (test) would output: test )
-
-   Second, commands must be valid commands - not aliases.  Third, no shell built-in commands are allowed (unless a version
-   is found in the $PATH and $gtm_dist); with the exception of nohup and cd.  In the case of nohup, the next token will be
-   the command to be looked for in $PATH and $gtm_dist.  "cd" will be allowed, but no parsing for a command will occur
-   until the next "|" token - if there is one.  In addition, environment variables may be used to define a path, or actual
-   paths may be given.
-
-   The following are examples of valid open commands:
-
-   1.   o a:(comm="tr e j | echoback":stderr=e:exception="g BADOPEN")::"pipe"
-   2.   o a:(comm="/bin/cat |& nl")::"pipe"
-   3.   o a:(comm="mupip integ mumps.dat")::"pipe"
-   4.   o a:(comm="$gtm_dist/mupip integ mumps.dat")::"pipe"
-   5.   o a:(comm="nohup cat")::"pipe"
-   6.   o p:(comm="cd ..; pwd | tr -d e":writeonly)::"pipe"
-
-   In the first example the commands parsed are "tr" and "echoback".  "echoback" is in the current directory which is
-   included in the $PATH.  In the second example an explicit path is given for "cat", but "nl" is found via $PATH.
-   In the third example mupip will be found if it is in the $PATH or in $gtm_dist.  In the fourth example the
-   $gtm_dist environment variable is explicitly used to find mupip.  In the fifth example the "cat" after "nohup"
-   is used as the command looked up in $PATH.  In the sixth example the default directory is moved up a level and
-   pwd is executed with the output piped to the tr command.  The pwd command is not checked for existence, but the
-   "tr" command after the "|" is checked.
-*/
+ * the iopi_open() routine can detect the problem prior to a fork.
+ *
+ * Command Parsing Limitations:
+ *
+ * All commands will be searched for in $PATH and in $gtm_dist and if not found will trap.  Most pipe strings can be
+ * entered with some minor exceptions.  First, no parentheses around commands are allowed. An example of this which would
+ * fail is:
+ *
+ *	o p:(comm="(cd; pwd)":writeonly)::"pipe"
+ *
+ * This produces nothing different from:
+ *
+ *	o p:(comm="cd; pwd":writeonly)::"pipe"
+ *
+ * This restriction does not include parentheses embedded in character strings as in:
+ *
+ *	o p:(comm="echo ""(test)""":writeonly)::"pipe"       (which would output: (test) )
+ *
+ * or as parameters to a command as in:
+ *
+ *	o p:(comm="tr -d '()'":writeonly)::"pipe"     (which if passed (test) would output: test )
+ *
+ * Second, commands must be valid commands - not aliases.  Third, no shell built-in commands are allowed (unless a version
+ * is found in the $PATH and $gtm_dist); with the exception of nohup and cd.  In the case of nohup, the next token will be
+ * the command to be looked for in $PATH and $gtm_dist.  "cd" will be allowed, but no parsing for a command will occur
+ * until the next "|" token - if there is one.  In addition, environment variables may be used to define a path, or actual
+ * paths may be given.
+ *
+ * The following are examples of valid open commands:
+ *
+ * 1.   o a:(comm="tr e j | echoback":stderr=e:exception="g BADOPEN")::"pipe"
+ * 2.   o a:(comm="/bin/cat |& nl")::"pipe"
+ * 3.   o a:(comm="mupip integ mumps.dat")::"pipe"
+ * 4.   o a:(comm="$gtm_dist/mupip integ mumps.dat")::"pipe"
+ * 5.   o a:(comm="nohup cat")::"pipe"
+ * 6.   o p:(comm="cd ..; pwd | tr -d e":writeonly)::"pipe"
+ *
+ * In the first example the commands parsed are "tr" and "echoback".  "echoback" is in the current directory which is
+ * included in the $PATH.  In the second example an explicit path is given for "cat", but "nl" is found via $PATH.
+ * In the third example mupip will be found if it is in the $PATH or in $gtm_dist.  In the fourth example the
+ * $gtm_dist environment variable is explicitly used to find mupip.  In the fifth example the "cat" after "nohup"
+ * is used as the command looked up in $PATH.  In the sixth example the default directory is moved up a level and
+ * pwd is executed with the output piped to the tr command.  The pwd command is not checked for existence, but the
+ * "tr" command after the "|" is checked.
+ */
 int parse_pipe(char *cmd_string, char *ret_token)
 {
 	char *str1, *str2, *str3;
@@ -145,7 +147,6 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		path = path_buff;
 		dir_in_path = (char *)malloc(GTM_PATH_MAX);
 	}
-
 	cmd_string_size = STRLEN(cmd_string) + 1;
 	pathsize = GTM_PATH_MAX + cmd_string_size;
 	buf = (char *)malloc(pathsize);
@@ -153,27 +154,23 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	command2 = (char *)malloc(cmd_string_size);
 	temp = (char *)malloc(pathsize);
 	memcpy(copy_cmd_string, cmd_string, cmd_string_size);
-
 	/* guaranteed at least one token when we get here because it is checked right after iop_eol loop and
-	 before this code is executed. */
+	 * before this code is executed.
+	 */
 	for (str1 = copy_cmd_string; FALSE == notfound ; str1 = NULL)
-	{
-		/* separate into tokens in a pipe */
+	{	/* separate into tokens in a pipe */
 		token1 = STRTOK_R(str1, "|", &saveptr1);
 		if (NULL == token1)
 			break;
-
 		/* separate into tokens using space as delimiter */
 		/* if the first token is a non-alpha-numeric or if it is nohup then skip it */
 		/* and use the next one as a command to find */
 		memcpy(command2, token1, STRLEN(token1) + 1);
-
 		for (str2 = command2; ; str2 = NULL)
 		{
 			token2 = STRTOK_R(str2, " >&;", &saveptr2);
 			if (NULL != token2 && !strcmp(token2, "cd"))
-			{
-				/* if the command is cd then skip the rest before the next pipe */
+			{	/* if the command is cd then skip the rest before the next pipe */
 				token2 = NULL;
 				break;
 			}
@@ -182,31 +179,26 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			if (NULL == token2)
 				break;
 		}
-
 		if (NULL == token2)
 			continue;
-
 		notfound = TRUE;
 		if (NULL != strchr(token2, '/'))
 		{
 			/* if the first character is a $ sign then assume it is an environment variable used
-			   like $gtm_dist/mupip.  Get the environment variable and substitute it. */
+			 * like $gtm_dist/mupip.  Get the environment variable and substitute it.
+			 */
 			notfound = TRUE;
 			temp[0] = '\0';
 			if ('$' == *token2)
 			{
 				for (env_inc = 1; '/' != *(token2 + env_inc); env_inc++)
-				{
 					temp[env_inc - 1] = *(token2 + env_inc);
-				}
 				temp[env_inc - 1] = '\0';
 				env_var = GETENV(temp);
 				if (NULL != env_var)
-				{
-					/* build a translated path to command */
+				{	/* build a translated path to command */
 					assert(pathsize > (STRLEN(token2 + env_inc) + STRLEN(env_var)));
 					SPRINTF(temp, "%s%s", env_var, token2 + env_inc);
-
 					/* The command must be a regular file and executable */
 					STAT_FILE(temp, &sb, ret_stat);
 					if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
@@ -219,11 +211,9 @@ int parse_pipe(char *cmd_string, char *ret_token)
 					notfound = FALSE;
 			}
 		} else
-		{
-			/* look in $gtm_dist in case not explicitly listed or not in the $PATH variable */
+		{	/* look in $gtm_dist in case not explicitly listed or not in the $PATH variable */
 			if (gtm_dist_ok_to_use)
-			{
-				/* build a translated path to command */
+			{	/* build a translated path to command */
 				SPRINTF(temp, "%s/%s", gtm_dist, token2);
 				STAT_FILE(temp, &sb, ret_stat);
 				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
@@ -231,10 +221,8 @@ int parse_pipe(char *cmd_string, char *ret_token)
 				else
 					notfound = TRUE;
 			}
-
-			/* search all the directories in the $PATH if defined */
 			if (NULL != path)
-			{
+			{	/* search all the directories in the $PATH if defined */
 				memcpy(dir_in_path, path, path_len + 1);
 				for (str3 = dir_in_path; TRUE == notfound; str3 = NULL)
 				{
@@ -285,7 +273,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 {
 	io_desc		*iod;
 	io_desc		*stderr_iod;
- 	d_rm_struct	*d_rm;
+	d_rm_struct	*d_rm;
 	io_log_name	*stderr_naml;				/* logical record for stderr device */
 	unsigned char	ch;
 	int		param_cnt = 0;
@@ -327,22 +315,17 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
-#	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	endif
 	iod = dev_name->iod;
-
 	while (iop_eol != *(pp->str.addr + p_offset))
 	{
 		assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 		switch ((ch = *(pp->str.addr + p_offset++)))
 		{
 			case iop_exception:
-				dev_name->iod->error_handler.len = *(pp->str.addr + p_offset);
-				dev_name->iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-				s2pool(&dev_name->iod->error_handler);
+				DEF_EXCEPTION(pp, p_offset, iod);
 				break;
 			case iop_shell:
 				slen[PSHELL] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
@@ -731,13 +714,12 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			io_desc		*io_ptr;
 			d_rm_struct	*in_d_rm;
 
-			io_ptr = ( stderr_iod->pair.in);
+			io_ptr = (stderr_iod->pair.in);
 			if (!(in_d_rm = (d_rm_struct *) io_ptr->dev_sp))
 			{
 				io_ptr->dev_sp = (void*)malloc(SIZEOF(d_rm_struct));
 				memset(io_ptr->dev_sp, 0, SIZEOF(d_rm_struct));
 				in_d_rm = (d_rm_struct *) io_ptr->dev_sp;
-				memcpy(io_ptr->dollar.device, "0", SIZEOF("0"));
 				io_ptr->state = dev_closed;
 				in_d_rm->stream = d_rm->stream;
 				io_ptr->width = iod->width;
@@ -749,6 +731,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				io_ptr->dollar.zb[0] = 0;
 				io_ptr->dollar.key[0] = 0;
 				io_ptr->dollar.device[0] = 0;
+				if (io_ptr->dollar.devicebuffer)
+					free(io_ptr->dollar.devicebuffer);
+				io_ptr->dollar.devicebuffer = NULL;
 				io_ptr->disp_ptr = iod->disp_ptr;
 				in_d_rm->fixed = d_rm->fixed;
 				in_d_rm->read_only = TRUE;
@@ -762,9 +747,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			io_ptr->type = rm;
 			status_read = iorm_open(stderr_naml, pp, file_des_read_stderr, mspace, timeout);
 			if (TRUE == status_read)
-				( stderr_iod->pair.in)->state = dev_open;
+				(stderr_iod->pair.in)->state = dev_open;
 			else if (dev_open == ( stderr_iod->pair.out)->state)
-				( stderr_iod->pair.in)->state = dev_closed;
+				(stderr_iod->pair.in)->state = dev_closed;
 		}
 		d_rm->stderr_child = stderr_iod;
 	}

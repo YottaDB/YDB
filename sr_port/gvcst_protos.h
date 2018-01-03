@@ -40,7 +40,7 @@ boolean_t	gvcst_gblmod(mval *v);
 boolean_t	gvcst_get(mval *v);
 boolean_t	gvcst_get2(mval *v, unsigned char *sn_ptr);
 void		gvcst_incr(mval *increment, mval *result);
-void		gvcst_init(gd_region *greg);
+void		gvcst_init(gd_region *greg, gd_addr *addr);
 void		gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init);
 void		gvcst_kill(boolean_t do_subtree);
 void		gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks);

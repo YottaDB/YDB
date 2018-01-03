@@ -28,7 +28,6 @@
 #include "gtmsource.h"
 #include "jnl_get_checksum.h"
 
-GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */

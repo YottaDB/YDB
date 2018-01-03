@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -32,6 +32,8 @@
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)		/* BYPASSOK */
 /* Make sure that SIZEOF(SOURCE) > 0 or SOURCE != NULL before running. */
 #define	STRNCMP_LIT_FULL(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL))	/* BYPASSOK */
+#define STRNCMP_LIT_LEN(SOURCE, LITERAL, LENGTH)	\
+		strncmp((const char *)(SOURCE), (const char *)(LITERAL), MIN(SIZEOF(LITERAL), LENGTH))	/* BYPASSOK */
 #define	STRNCMP_STR(SOURCE, STRING, LEN) strncmp(SOURCE, STRING, LEN)
 /* Ensure that our uses of STRTOK and STRTOK_R are not called inside a timer handler */
 #define STRTOK_R(STR, DELIM, SAVE)	(DBG_ASSERT(FALSE == timer_in_handler) strtok_r(STR, DELIM, SAVE))

@@ -113,9 +113,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 			iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
 		}
 	}
-	len = SIZEOF(ONE_COMMA) - 1;
-	memcpy(iod->dollar.device, ONE_COMMA, len);
-	memcpy(&iod->dollar.device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG);
 }
 #endif
 
@@ -902,19 +900,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		if (0 == chars_read)
 			iod->dollar.x = 0;
 		iod->dollar.za = 9;
-		len = SIZEOF(ONE_COMMA) - 1;
-		memcpy(iod->dollar.device, ONE_COMMA, len);
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled && (0 > real_errno))
 			errptr = (char *)gtm_tls_get_error();
 		else	/* TLS not enabled or system call error */
 #		endif
 			errptr = (char *)STRERROR(real_errno);
-		errlen = STRLEN(errptr);
-		devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
-		memcpy(&iod->dollar.device[len], errptr, devlen + 1);
-		if (devlen < errlen)
-			iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
 		if (io_curr_device.in == io_std_device.in)
 		{
 			if (!prin_in_dev_failure)
@@ -929,7 +921,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		{
 			iod->dollar.zeof = TRUE;
 			if (socketptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, STRLEN(errptr), errptr);
 		} else
 			iod->dollar.zeof = TRUE;
 	}

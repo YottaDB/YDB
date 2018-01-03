@@ -59,6 +59,8 @@
 #include "gvnh_spanreg.h"
 #include "min_max.h"
 #include "io.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -67,6 +69,7 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	int			tprestart_state;
 GBLREF	tp_frame		*tp_pointer;
@@ -317,6 +320,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	rhdtyp			*rtn_vector;
 	rtn_tabent		*rttabent;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	sgmnt_addrs		*csa, *regcsa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload = FALSE;
@@ -326,7 +330,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	DBGTRIGR((stderr, "trigger_source_raov: Entered\n"));
 	/* Before we try to save anything, see if there is something to save and initialize stuff if not */
-	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	if (NULL != *rtn_vec)
 		rtn_vector = *rtn_vec;
 	else if (find_rtn_tabent(&rttabent, trigname))
@@ -346,7 +350,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		rtn_name.len = MIN(trigname->len, MAX_MIDENT_LEN);
 		rtn_name.addr = trigname->addr;
 		if (!reg->open)
-			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
+			gv_init_reg(reg, NULL);	/* Open the region before obtaining "csa" */
 		regcsa = &FILE_INFO(reg)->s_addrs;
 		assert('#' == rtn_name.addr[rtn_name.len - 1]);
 		for ( ; rttabent <= rtn_names_end; rttabent++)
@@ -390,7 +394,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		if (runtime_disambiguator_specified
 			|| (TRIG_FAILURE == trigger_source_raov_trigload(trigname, &trigdsc, reg)))
 		{
-			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 			ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 			return TRIG_FAILURE_RC;
 		}
@@ -415,10 +419,11 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			 * treat it as a failure to find the trigger.
 			 */
 			if (!reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			if (&FILE_INFO(reg)->s_addrs != csa)
 			{
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -430,7 +435,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
 			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
 			{
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -449,7 +455,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 					&& (NULL == rtn_vector->source_code))
 			{
 				/* A reload failed (deleted or ^#t busted) and there is nothing cached, issue an error */
-				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
+							save_jnlpool);
 				ISSUE_TRIGNAMENF_ERROR_IF_APPROPRIATE(trigname);
 				return TRIG_FAILURE_RC;
 			}
@@ -462,7 +469,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		if (NULL != trigdsc->rtn_desc.rt_adr)
 		{
 			DBGTRIGR((stderr, "trigger_source_raov: trigger already compiled, all done\n"));
-			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 			*rtn_vec = rtn_vector;
 			return 0;
 		}
@@ -498,7 +505,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	{
 		assert(rtn_vector && (NULL !=rtn_vector->source_code));
 	}
-	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	assert(rtn_vector);
 	assert(trigdsc == rtn_vector->trigr_handle);
 	*rtn_vec = rtn_vector;

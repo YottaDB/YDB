@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,10 +49,20 @@ struct aiocb {
 }
 
 #define AIO_ERROR(AIOCBP, STATUS)						\
-{										\
-	while ((STATUS = aio_error((AIOCBP)->aio_handle)) == EINPROGRESS)	\
+MBSTART	{									\
+	intrpt_state_t          prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);		\
+	STATUS = aio_error((AIOCBP)->aio_handle);				\
+	while(STATUS == EINPROGRESS)						\
+	{									\
+		ENABLE_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);	\
 		SHORT_SLEEP(AIO_POLL_SLEEP_TIME);				\
-}
+		DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);	\
+		STATUS = aio_error((AIOCBP)->aio_handle);			\
+	}									\
+	ENABLE_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);      	\
+} MBEND
 
 #define AIO_RETURN(AIOCBP, STATUS)			\
 {							\
@@ -64,20 +74,31 @@ struct aiocb {
 #define AIO_READ(FD, AIOCBP, STATUS1, STATUS2) 		\
 {							\
 	STATUS2 = SS_NORMAL;				\
-        AIOCBP->aio_fildes = FD;       			\
-        do                                      	\
-        {                                       	\
-                STATUS1 = aio_read(AIOCBP);          	\
-        } while(-1 == STATUS1 && EAGAIN == errno);    	\
+	AIOCBP->aio_fildes = FD;       			\
+	do						\
+	{						\
+		STATUS1 = aio_read(AIOCBP);		\
+	} while(-1 == STATUS1 && EAGAIN == errno);	\
 	if (-1 == STATUS1)				\
 		STATUS1 = errno;			\
 }
 
-#define AIO_ERROR(AIOCBP, STATUS)					\
-{									\
-	while ((STATUS = aio_error(AIOCBP)) == EINPROGRESS)		\
-		SHORT_SLEEP(AIO_POLL_SLEEP_TIME);			\
-}
+#define AIO_ERROR(AIOCBP, STATUS)						\
+MBSTART {									\
+	intrpt_state_t          prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);       	\
+	STATUS = aio_error(AIOCBP);						\
+	while(STATUS == EINPROGRESS)						\
+	{									\
+		ENABLE_INTERRUPTS(prev_intrpt_state, INTRPT_IN_AIO_ERROR);	\
+		SHORT_SLEEP(AIO_POLL_SLEEP_TIME);				\
+		DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);	\
+		STATUS = aio_error(AIOCBP);					\
+	}									\
+	ENABLE_INTERRUPTS(prev_intrpt_state, INTRPT_IN_AIO_ERROR);		\
+} MBEND
+
 
 #define AIO_RETURN(AIOCBP, STATUS)			\
 {							\

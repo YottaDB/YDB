@@ -12,10 +12,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef _ANTICIPATORY_FREEZE_H
-#define _ANTICIPATORY_FREEZE_H
-
-#ifdef UNIX
+#ifndef ANTICIPATORY_FREEZE_H
+#define ANTICIPATORY_FREEZE_H
 
 #include "gtm_time.h"			/* needed for GET_CUR_TIME */
 #include "gdsroot.h"
@@ -41,7 +39,7 @@ typedef void		(*set_anticipatory_freeze_t)(sgmnt_addrs *csa, int msg_id);
 
 GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
-GBLREF	boolean_t				pool_init;
+GBLREF	int					pool_init;
 GBLREF	boolean_t				mupip_jnl_recover;
 #ifdef DEBUG
 GBLREF	uint4					lseekwrite_target;
@@ -65,13 +63,15 @@ error_def(ERR_TEXT);
 	}													\
 }
 
-#define CHECK_IF_FREEZE_ON_ERROR_NEEDED(CSA, MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID)					\
+#define CHECK_IF_FREEZE_ON_ERROR_NEEDED(CSA, MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID, LCL_JNLPOOL)				\
 {															\
-	GBLREF	jnlpool_addrs		jnlpool;									\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;									\
 															\
-	if (!FREEZE_NEEDED && CUSTOM_ERRORS_LOADED && (NULL != is_anticipatory_freeze_needed_fnptr))			\
+	if (!FREEZE_NEEDED && CSA && CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL)						\
+		&& (NULL != is_anticipatory_freeze_needed_fnptr))							\
 	{	/* NOT gtmsecshr */											\
-		if (IS_REPL_INST_UNFROZEN && (*is_anticipatory_freeze_needed_fnptr)((sgmnt_addrs *)CSA, MSG_ID))	\
+		if (IS_REPL_INST_UNFROZEN_JPL(LCL_JNLPOOL)								\
+			&& (*is_anticipatory_freeze_needed_fnptr)((sgmnt_addrs *)CSA, MSG_ID))				\
 		{													\
 			FREEZE_NEEDED = TRUE;										\
 			FREEZE_MSG_ID = MSG_ID;										\
@@ -79,38 +79,37 @@ error_def(ERR_TEXT);
 	}														\
 }
 
-#define FREEZE_INSTANCE_IF_NEEDED(CSA, FREEZE_NEEDED, FREEZE_MSG_ID)								\
+#define FREEZE_INSTANCE_IF_NEEDED(CSA, FREEZE_NEEDED, FREEZE_MSG_ID, LCL_JNLPOOL)						\
 {																\
-	GBLREF	jnlpool_addrs		jnlpool;										\
-																\
 	if (FREEZE_NEEDED)													\
 	{															\
 		assert(NULL != set_anticipatory_freeze_fnptr);									\
 		(*set_anticipatory_freeze_fnptr)((sgmnt_addrs *)CSA, FREEZE_MSG_ID);						\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,							\
-				jnlpool.repl_inst_filehdr->inst_info.this_instname);						\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);	\
+				LCL_JNLPOOL->repl_inst_filehdr->inst_info.this_instname);					\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1,						\
+				LCL_JNLPOOL->jnlpool_ctl->freeze_comment);							\
 	}															\
 }
 
 #define CLEAR_ANTICIPATORY_FREEZE(FREEZE_CLEARED)									\
 {															\
-	GBLREF	jnlpool_addrs		jnlpool;									\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;									\
 															\
 	if (IS_REPL_INST_FROZEN)											\
 	{														\
-		jnlpool.jnlpool_ctl->freeze = 0;									\
+		jnlpool->jnlpool_ctl->freeze = 0;									\
 		FREEZE_CLEARED = TRUE;											\
 	}														\
 }
 
 #define REPORT_INSTANCE_UNFROZEN(FREEZE_CLEARED)										\
 {																\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
 																\
 	if (FREEZE_CLEARED)													\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,						\
-				jnlpool.repl_inst_filehdr->inst_info.this_instname);						\
+				jnlpool->repl_inst_filehdr->inst_info.this_instname);						\
 }
 
 #define AFREEZE_MASK				0x01
@@ -122,9 +121,17 @@ error_def(ERR_TEXT);
  * Use INST_FREEZE_ON_ERROR_POLICY to select alternative journal pool attach/detach behavior.
  */
 #define CUSTOM_ERRORS_AVAILABLE			(0 != (TREF(gtm_custom_errors)).len)
-#define CUSTOM_ERRORS_LOADED			((NULL != jnlpool.jnlpool_ctl)							\
-							&& jnlpool.jnlpool_ctl->instfreeze_environ_inited)
-#define INST_FREEZE_ON_ERROR_POLICY		(CUSTOM_ERRORS_AVAILABLE || CUSTOM_ERRORS_LOADED)
+#define CUSTOM_ERRORS_LOADED			((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)				\
+							&& jnlpool->jnlpool_ctl->instfreeze_environ_inited)
+#define CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL)								\
+(														\
+					(LCL_JNLPOOL = JNLPOOL_FROM((sgmnt_addrs *)CSA))				\
+						&& (NULL != LCL_JNLPOOL->jnlpool_ctl)				\
+						&& LCL_JNLPOOL->jnlpool_ctl->instfreeze_environ_inited		\
+)
+#define INST_FREEZE_ON_ERROR_POLICY	(CUSTOM_ERRORS_AVAILABLE || CUSTOM_ERRORS_LOADED)
+#define INST_FREEZE_ON_ERROR_POLICY_CSA(CSA, LCL_JNLPOOL)	(CUSTOM_ERRORS_AVAILABLE					\
+									|| CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL))
 
 /* INSTANCE_FREEZE_HONORED determines whether operations on a particular database can trigger an instance freeze.
  * INST_FREEZE_ON_ERROR_ENABLED() determines whether operations on a particular database can trigger an instance freeze in the
@@ -135,26 +142,32 @@ error_def(ERR_TEXT);
  * 	trigger an instance freeze.
  * Note that it is possible for these macros to be invoked while in "gvcst_cre_autoDB" in which case CSA->nl would be NULL
  *	hence the check for NULL before trying to access onln_rlbk_pid.
+ *	These macros set LCL_JNLPOOL to the assocaited jnlpool if TRUE otherwise to NULL
  */
-#define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
-							((NULL != jnlpool.jnlpool_ctl)						\
+#define INSTANCE_FREEZE_HONORED(CSA, LCL_JNLPOOL)	(DBG_ASSERT((NULL != CSA))						\
+							(LCL_JNLPOOL = JNLPOOL_FROM((sgmnt_addrs *)CSA))			\
+							&& ((NULL != LCL_JNLPOOL->jnlpool_ctl)					\
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
 									|| mupip_jnl_recover	/* recover or rollback */	\
 									|| (NULL != ((sgmnt_addrs *)CSA)->nl)			\
 										&& (((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid))))
-#define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)							\
-							&& CUSTOM_ERRORS_LOADED							\
+#define INST_FREEZE_ON_ERROR_ENABLED(CSA, LCL_JNLPOOL)	(INSTANCE_FREEZE_HONORED(CSA, LCL_JNLPOOL)				\
+							&& CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL)				\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
-#define INST_FREEZE_ON_MSG_ENABLED(CSA, MSG)	(INST_FREEZE_ON_ERROR_ENABLED(CSA)						\
+#define INST_FREEZE_ON_MSG_ENABLED(CSA, MSG, LCL_JNLPOOL)	(INST_FREEZE_ON_ERROR_ENABLED(CSA, LCL_JNLPOOL)			\
 							&& (NULL != is_anticipatory_freeze_needed_fnptr)			\
 							&& (*is_anticipatory_freeze_needed_fnptr)(CSA, MSG))
-#define INST_FREEZE_ON_NOSPC_ENABLED(CSA)	INST_FREEZE_ON_MSG_ENABLED(CSA, ERR_DSKNOSPCAVAIL)
+#define INST_FREEZE_ON_NOSPC_ENABLED(CSA, LCL_JNLPOOL)	INST_FREEZE_ON_MSG_ENABLED(CSA, ERR_DSKNOSPCAVAIL, LCL_JNLPOOL)
 
 /* IS_REPL_INST_FROZEN is TRUE if we know that the instance is frozen.
  * IS_REPL_INST_UNFROZEN is TRUE if we know that the instance is not frozen.
  */
-#define IS_REPL_INST_FROZEN			((NULL != jnlpool.jnlpool_ctl) && jnlpool.jnlpool_ctl->freeze)
-#define IS_REPL_INST_UNFROZEN			((NULL != jnlpool.jnlpool_ctl) && !jnlpool.jnlpool_ctl->freeze)
+#define IS_REPL_INST_FROZEN			IS_REPL_INST_FROZEN_JPL(jnlpool)
+#define IS_REPL_INST_UNFROZEN			IS_REPL_INST_UNFROZEN_JPL(jnlpool)
+#define IS_REPL_INST_FROZEN_JPL(JNLPOOL)	((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl)				\
+							&& JNLPOOL->jnlpool_ctl->freeze)
+#define IS_REPL_INST_UNFROZEN_JPL(JNLPOOL)	((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl)				\
+							&& !JNLPOOL->jnlpool_ctl->freeze)
 
 #define INST_FROZEN_COMMENT			"PID %d encountered %s; Instance frozen"
 
@@ -186,27 +199,28 @@ error_def(ERR_TEXT);
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE(CSA)											\
 {																\
-	gd_region	*reg;													\
-	char		time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */						\
+	gd_region		*reg;												\
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INSTANCE_FREEZE_HONORED */						\
+	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */					\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
 	assert(NULL != CSA);													\
-	if (INSTANCE_FREEZE_HONORED(CSA))											\
+	if (INSTANCE_FREEZE_HONORED(CSA, local_jnlpool))									\
 	{															\
 		reg = ((sgmnt_addrs *)CSA)->region;										\
 		if (!IS_GTM_IMAGE)												\
 		{														\
 			GET_CUR_TIME(time_str);											\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, &time_str[0],		\
-					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
+					local_jnlpool->repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));		\
 		}														\
-		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;										\
+		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(local_jnlpool);								\
 		if (!IS_GTM_IMAGE)												\
 		{														\
 			GET_CUR_TIME(time_str);											\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTUNFROZEN, 5, CTIME_BEFORE_NL, &time_str[0],		\
-					jnlpool.repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));			\
+					local_jnlpool->repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));		\
 		}														\
 	}															\
 }
@@ -217,10 +231,12 @@ error_def(ERR_TEXT);
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_SAFE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA)		\
 {							\
-	GBLREF	jnlpool_addrs	jnlpool;		\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;	\
+	jnlpool_addrs_ptr_t	local_jnlpool;		\
 							\
 	assert(NULL != CSA);				\
-	if (IS_REPL_INST_FROZEN)			\
+	local_jnlpool = JNLPOOL_FROM(CSA);		\
+	if (IS_REPL_INST_FROZEN_JPL(local_jnlpool))	\
 		WAIT_FOR_REPL_INST_UNFREEZE(CSA);	\
 }
 
@@ -228,13 +244,17 @@ error_def(ERR_TEXT);
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_NOCSA) is thread-safe */
 #define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA						\
 {											\
-	GBLREF	jnlpool_addrs	jnlpool;						\
-	GBLREF	int4		exit_state;						\
-	GBLREF	int4		exi_condition;						\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
+	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(jnlpool);					\
+}
+#define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(JPL)					\
+{											\
+	GBLREF	int4			exit_state;					\
+	GBLREF	int4			exi_condition;					\
 											\
-	assert(NULL != jnlpool.jnlpool_ctl);						\
+	assert((NULL != JPL) && (NULL != JPL->jnlpool_ctl));				\
 	/* If this region is not replicated, do not care for instance freezes */	\
-	while (jnlpool.jnlpool_ctl->freeze)						\
+	while (JPL->jnlpool_ctl->freeze)						\
 	{										\
 		if (exit_state != 0)							\
 		{									\
@@ -247,7 +267,7 @@ error_def(ERR_TEXT);
 }
 #define WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_SAFE		\
 {							\
-	GBLREF	jnlpool_addrs	jnlpool;		\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;	\
 							\
 	if (IS_REPL_INST_FROZEN)			\
 		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;	\
@@ -259,36 +279,42 @@ error_def(ERR_TEXT);
  * GTM_REPL_INST_FSYNC is different in that we currently don't care about instance freeze for replication
  * instance file writes.
  */
-#define GTM_DB_FSYNC(CSA, FD, RC)						\
-{										\
-	GBLREF	jnlpool_addrs		jnlpool;				\
-	node_local_ptr_t		cnl;					\
-										\
-	assert((NULL != CSA) || (NULL == jnlpool.jnlpool_ctl));			\
-	if (NULL != CSA)							\
-	{									\
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);				\
-		cnl = (CSA)->nl;						\
-		if (NULL != cnl)						\
-			INCR_GVSTATS_COUNTER((CSA), cnl, n_db_fsync, 1);	\
-	}									\
-	GTM_FSYNC(FD, RC);							\
+#define GTM_DB_FSYNC(CSA, FD, RC)							\
+{											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
+	jnlpool_addrs_ptr_t		local_jnlpool;					\
+	node_local_ptr_t		cnl;						\
+	sgmnt_addrs			*local_csa;					\
+											\
+	local_csa = CSA;								\
+	local_jnlpool = JNLPOOL_FROM(local_csa);					\
+	assert(local_csa || (!local_jnlpool || !local_jnlpool->jnlpool_ctl));		\
+	if (NULL != local_csa)								\
+	{										\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(local_csa);				\
+		cnl = local_csa->nl;							\
+		if (NULL != cnl)							\
+			INCR_GVSTATS_COUNTER(local_csa, cnl, n_db_fsync, 1);		\
+	}										\
+	GTM_FSYNC(FD, RC);								\
 }
 
-#define GTM_JNL_FSYNC(CSA, FD, RC)						\
-{										\
-	GBLREF	jnlpool_addrs		jnlpool;				\
-	node_local_ptr_t		cnl;					\
-										\
-	assert((NULL != CSA) || (NULL == jnlpool.jnlpool_ctl));			\
-	if (NULL != CSA)							\
-	{									\
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);				\
-		cnl = (CSA)->nl;						\
-		if (NULL != cnl)						\
-			INCR_GVSTATS_COUNTER((CSA), cnl, n_jnl_fsync, 1);	\
-	}									\
-	GTM_FSYNC(FD, RC);							\
+#define GTM_JNL_FSYNC(CSA, FD, RC)							\
+{											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
+		jnlpool_addrs_ptr_t	local_jnlpool;					\
+	node_local_ptr_t		cnl;						\
+											\
+	local_jnlpool = JNLPOOL_FROM(CSA);						\
+	assert(CSA || (!local_jnlpool || !local_jnlpool->jnlpool_ctl));			\
+	if (NULL != CSA)								\
+	{										\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);					\
+		cnl = (CSA)->nl;							\
+		if (NULL != cnl)							\
+			INCR_GVSTATS_COUNTER((CSA), cnl, n_jnl_fsync, 1);		\
+	}										\
+	GTM_FSYNC(FD, RC);								\
 }
 
 #define GTM_REPL_INST_FSYNC(FD, RC)	GTM_FSYNC(FD, RC)
@@ -302,7 +328,7 @@ error_def(ERR_TEXT);
 #ifdef DEBUG
 #define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)							\
 MBSTART {															\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
 	GBLREF	boolean_t		multi_thread_in_use;									\
 																\
 	if ((NULL != CSA) && !multi_thread_in_use) /* Do not manipulate fake-enospc (global variable) while in threaded code */	\
@@ -319,7 +345,8 @@ MBSTART {															\
 					     LEN_AND_LIT("Turning on fake ENOSPC for exit status test"));			\
 			}													\
 		} else if (!IS_DSE_IMAGE /*DSE does not freeze so let it work as normal */					\
-			   && ((NULL != jnlpool.jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl))				\
+			   && (!CSA->jnlpool || (CSA->jnlpool == jnlpool))							\
+			   && (jnlpool && jnlpool->jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl)				\
 			   && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)							\
 		{														\
 			LCL_STATUS = ENOSPC;											\
@@ -343,7 +370,7 @@ MBSTART {														\
 	sgmnt_addrs	*CSA_LOCAL = CSA;										\
 															\
 	assert(!CSA_LOCAL || !CSA_LOCAL->region || FILE_INFO(CSA_LOCAL->region)->grabbed_access_sem			\
-			|| !FROZEN_CHILLED(CSA_LOCAL->hdr) || !(CSA_LOCAL)->nl || FREEZE_LATCH_HELD(CSA_LOCAL));	\
+			|| !(CSA_LOCAL)->nl || !FROZEN_CHILLED(CSA_LOCAL) || FREEZE_LATCH_HELD(CSA_LOCAL));	\
 	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
 	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB);		\
 } MBEND
@@ -379,16 +406,17 @@ MBSTART {														\
 /* #GTM_THREAD_SAFE : The below macro (DO_LSEEKWRITE) is thread-safe */
 #define DO_LSEEKWRITE(CSA, FNPTR, FD, OFFSET, BUFF, SIZE, STATUS, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)				\
 MBSTART {															\
-	int	lcl_status;													\
+	int		lcl_status;												\
+	sgmnt_addrs	*local_csa = CSA;											\
 																\
-	if (NULL != CSA)													\
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA);										\
+	if (NULL != local_csa)													\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(local_csa);									\
 	LSEEKWRITE(FD, OFFSET, BUFF, SIZE, lcl_status);										\
-	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, lcl_status);							\
+	FAKE_ENOSPC(local_csa, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, lcl_status);						\
 	if (ENOSPC == lcl_status)												\
 	{															\
-		wait_for_disk_space(CSA, (char *)FNPTR, FD, (off_t)OFFSET, (char *)BUFF, (size_t)SIZE, &lcl_status);		\
-		assert((NULL == CSA) || (NULL == ((sgmnt_addrs *)CSA)->nl) || !((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC	\
+		wait_for_disk_space(local_csa, (char *)FNPTR, FD, (off_t)OFFSET, (char *)BUFF, (size_t)SIZE, &lcl_status);	\
+		assert((NULL == local_csa) || (NULL == local_csa->nl) || !local_csa->nl->FAKE_WHICH_ENOSPC			\
 		       || (ENOSPC != lcl_status));										\
 	}															\
 	STATUS = lcl_status;													\
@@ -419,15 +447,7 @@ MBSTART {															\
  */
 #define	REPL_INST_LSEEKWRITE	LSEEKWRITE
 
-#define REPL_INST_AVAILABLE	(repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename), \
-							return_on_error))
+#define REPL_INST_AVAILABLE(GD_PTR)	(repl_inst_get_name((char *)replpool_id.instfilename, &full_len, \
+						SIZEOF(replpool_id.instfilename), return_on_error, GD_PTR))
 
-#else	/* #ifdef UNIX */
-#	define INST_FREEZE_ON_ERROR_POLICY			FALSE
-#	define INST_FREEZE_ON_ERROR_ENABLED(CSA)		FALSE
-#	define REPL_INST_AVAILABLE				FALSE
-#	define WAIT_FOR_REPL_INST_UNFREEZE
-#	define WAIT_FOR_REPL_INST_UNFREEZE_SAFE
-#endif	/* #ifdef UNIX */
-
-#endif	/* #ifndef _ANTICIPATORY_FREEZE_H */
+#endif	/* #ifndef ANTICIPATORY_FREEZE_H */

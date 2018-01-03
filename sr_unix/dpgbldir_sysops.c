@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +81,7 @@ void *open_gd_file(mstr *v)
 
 {
 	file_pointer	*fp;
+	mstr		temp;
 	ZOS_ONLY(int	realfiletag;)
 
 	fp = (file_pointer*)malloc(SIZEOF(*fp));
@@ -88,15 +90,25 @@ void *open_gd_file(mstr *v)
 	memcpy(fp->v.addr, v->addr, v->len);
 	*((char*)((char*)fp->v.addr + v->len)) = 0;	/* Null terminate string */
 	if (FD_INVALID == (fp->fd = OPEN(fp->v.addr, O_RDONLY)))
-	{
-		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == fp->v.len)
-							&& !memcmp(dollar_zgbldir.str.addr, fp->v.addr, fp->v.len)))
+	{	/* v gets passed down through a few levels, but should be freed */
+		/* Copy the values into the stringpool so they get cleaned up later */
+		ENSURE_STP_FREE_SPACE(fp->v.len);
+		memcpy(stringpool.free, fp->v.addr, fp->v.len);
+		temp.addr = (char*)stringpool.free;
+		temp.len = fp->v.len;
+		stringpool.free += fp->v.len;
+		free(v->addr);
+		free(v);
+		free(fp->v.addr);
+		free(fp);
+		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == temp.len)
+							&& !memcmp(dollar_zgbldir.str.addr, temp.addr, temp.len)))
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr,
 				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), errno);
 			assert(FALSE);
 		}
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr, LEN_AND_LIT(".  Retaining "),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr, LEN_AND_LIT(".  Retaining "),
 			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	}
 #ifdef __MVS__

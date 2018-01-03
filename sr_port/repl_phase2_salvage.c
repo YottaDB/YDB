@@ -40,7 +40,7 @@ void	repl_phase2_salvage(jnlpool_addrs *jpa, jnlpool_ctl_ptr_t jpl, jpl_phase2_i
 	jnldata_hdr_ptr_t	jnl_header;
 	sm_uc_ptr_t		jnldata_base;
 
-	assert(jpl == jpa->jnlpool_ctl);
+	assert(jpa && jpl && (jpl == jpa->jnlpool_ctl));
 	assert((&FILE_INFO(jpa->jnlpool_dummy_reg)->s_addrs)->now_crit);
 	assert(!is_proc_alive(deadCmt->process_id, 0));
 	/* This commit entry was added by UPDATE_JPL_RSRV_WRITE_ADDR in t_end/tp_tend. Just like "jnl_phase2_salvage", we

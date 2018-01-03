@@ -3,10 +3,10 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * Copyright (c) 2017-2018 Stephen L Johnson.			*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -326,6 +326,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
+#define MAX_INT_IN_BYTE		255
 
 #ifndef _AIX
 #	ifndef __sparc

@@ -43,8 +43,8 @@
 #include "anticipatory_freeze.h"
 #include "jnl.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	int			pool_init;
 GBLREF	int			gtmrecv_srv_count;
 
 GBLREF	recvpool_addrs		recvpool;
@@ -86,9 +86,10 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	 * around, and we will need the journal pool attached so that we can check for instance freeze in database rundown.
 	 * In that case, the detach will happen automatically when the process terminates.
 	 */
+	assert(NULL != jnlpool);
 	if (IS_REPL_INST_FROZEN)
 		return FALSE;
-	udi = (unix_db_info *)FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	udi = (unix_db_info *)FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	assert(INVALID_SHMID != udi->shmid);
 	if (attempt_ipc_cleanup)
 	{
@@ -104,11 +105,11 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 			*exit_status = ABNORMAL_SHUTDOWN;
 		} else if (INVALID_SHMID != udi->shmid)
 		{
-			if (INVALID_SEMID != jnlpool.repl_inst_filehdr->recvpool_semid DEBUG_ONLY(&&
+			if (INVALID_SEMID != jnlpool->repl_inst_filehdr->recvpool_semid DEBUG_ONLY(&&
 						!(gtm_white_box_test_case_enabled &&
 							(WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number))))
 				repl_log(stderr, TRUE, TRUE, "Receiver pool semaphore IDs were not removed\n");
-			if ((INVALID_SHMID != jnlpool.repl_inst_filehdr->recvpool_shmid) DEBUG_ONLY(&&
+			if ((INVALID_SHMID != jnlpool->repl_inst_filehdr->recvpool_shmid) DEBUG_ONLY(&&
 						!(gtm_white_box_test_case_enabled &&
 							 (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number))))
 							 repl_log(stderr, TRUE, TRUE, "Receiver pool shared memory not removed\n");

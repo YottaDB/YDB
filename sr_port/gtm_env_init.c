@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,6 +99,7 @@ void	gtm_env_init(void)
 	mstr			val, trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
+	int4			temp_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -405,6 +406,12 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
+		/* See if $gtm_string_pool_limit is set */
+		val.addr = GTM_STRPLLIM;
+		val.len = SIZEOF(GTM_STRPLLIM) - 1;
+		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
+		if (0 < temp_gtm_strpllim)
+			TREF(gtm_strpllim) = temp_gtm_strpllim;
 		/* See if ydb_repl_filter_timeout is specified */
 		val.addr = YDB_REPL_FILTER_TIMEOUT;
 		val.len = SIZEOF(YDB_REPL_FILTER_TIMEOUT) - 1;

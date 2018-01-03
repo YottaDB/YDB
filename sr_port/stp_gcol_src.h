@@ -92,8 +92,8 @@ GBLREF io_log_name		*io_root_log_name;
 GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
-GBLREF mval			dollar_etrap, dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus, dollar_zstep;
-GBLREF mval			dollar_ztrap, dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
+GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
+GBLREF mval			dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
 GBLREF mv_stent			*mv_chain;
 GBLREF sgm_info			*first_sgm_info;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -118,6 +118,8 @@ OS_PAGE_SIZE_DECLARE
 static mstr			**topstr, **array, **arraytop;
 
 error_def(ERR_STPEXPFAIL);
+error_def(ERR_STPCRIT);
+error_def(ERR_STPOFLOW);
 
 /* See comment inside LV_NODE_KEY_STPG_ADD macro for why the ASSERT_LV_NODE_MSTR_EQUIVALENCE macro does what it does */
 #define ASSERT_LV_NODE_MSTR_EQUIVALENCE										\
@@ -701,14 +703,14 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				}
 			}
 		}
-		MVAL_STPG_ADD(&dollar_etrap);
+		MVAL_STPG_ADD(&(TREF(dollar_etrap)));
 		MVAL_STPG_ADD(&dollar_system);
 		MVAL_STPG_ADD(&dollar_zsource);
-		MVAL_STPG_ADD(&dollar_ztrap);
+		MVAL_STPG_ADD(&(TREF(dollar_ztrap)));
 		MVAL_STPG_ADD(&dollar_zstatus);
 		MVAL_STPG_ADD(&dollar_zgbldir);
 		MVAL_STPG_ADD(&dollar_zinterrupt);
-		MVAL_STPG_ADD(&dollar_zstep);
+		MVAL_STPG_ADD(&(TREF(dollar_zstep)));
 		MVAL_STPG_ADD(&zstep_action);
 		MVAL_STPG_ADD(&dollar_zerror);
 		MVAL_STPG_ADD(&dollar_ztexit);
@@ -983,6 +985,10 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			expansion_failed = FALSE;	/* will be set to TRUE by condition handler if can't get memory */
 			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
 			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
+			if ((TREF(gtm_strpllimwarned)) /* previously warned */
+				&& (0 < TREF(gtm_strpllim)) /* watching a stp limit */
+				&& ((stp_incr + stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* expanding larger */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
 #			ifdef DEBUG
 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
@@ -1096,5 +1102,11 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		lvmon_compare_value_slots(1, 2);		/* Make sure they are the same */
 	}
 #	endif	/* !STP_MOVE */
+	if ((0 < TREF(gtm_strpllim)) /* monitoring stp limit */
+		&& ((stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* past the stp limit */
+	{
+		TREF(gtm_strpllimwarned) =  TRUE;
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPCRIT);
+	}
 	return;
 }

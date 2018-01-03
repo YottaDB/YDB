@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -837,7 +837,7 @@ endforeach()
 if (GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m
+  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/gtmhelp.dat_noro
   COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${YDB_BINARY_DIR}
@@ -850,6 +850,56 @@ add_custom_command(
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
+
+foreach(help gtm gde mupip dse lke)
+  set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	  "SET -ACC=MM -READ_ONLY -reg \"*\"
+exit")
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
+                 ${YDB_BINARY_DIR}/${help}help.in3)
+  set(env
+    -D gtm_dist=${YDB_BINARY_DIR}
+    -D gtmroutines=.
+    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
+    )
+  add_custom_command(
+    OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_ro
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+            ${YDB_BINARY_DIR}/${help}help.in3
+	    ${help}help.dat ${help}help.gld ${help}help.dat_noro
+    COMMAND ${CMAKE_COMMAND} ${env}
+      -D mumps=$<TARGET_FILE:mupip>
+      -D input_file=${YDB_BINARY_DIR}/${help}help.in3
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+    list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_ro)
+endforeach()
+
+foreach(help gtm gde mupip dse lke)
+  set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	  "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
+exit")
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
+                 ${YDB_BINARY_DIR}/${help}help.in4)
+  set(env
+    -D gtm_dist=${YDB_BINARY_DIR}
+    -D gtmroutines=.
+    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
+    )
+  add_custom_command(
+    OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_noro
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+            ${YDB_BINARY_DIR}/${help}help.in4
+	    ${help}help.dat ${help}help.gld
+    COMMAND ${CMAKE_COMMAND} ${env}
+      -D mumps=$<TARGET_FILE:mupip>
+      -D input_file=${YDB_BINARY_DIR}/${help}help.in4
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+    list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_noro)
+endforeach()
 #-----------------------------------------------------------------------------
 
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
@@ -878,4 +928,4 @@ foreach(d COPYING README.md)
 endforeach()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
-
+add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)

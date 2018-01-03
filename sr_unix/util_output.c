@@ -61,8 +61,8 @@ GBLREF	io_pair			io_std_device;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	boolean_t		err_same_as_out;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	gd_addr			*gd_header;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	boolean_t		is_updproc;
@@ -647,7 +647,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	uint4			ustatus;
 	int4			status;
 	unsigned int		bufsize, file_name_len, *fn_len;
-	boolean_t		ret;
+	boolean_t		ret, inst_from_gld;
 	repl_inst_hdr		replhdr;
 	int			fd;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
@@ -706,16 +706,15 @@ void	util_out_send_oper(char *addr, unsigned int len)
 				assertpro(FALSE);
 		}
 		BUILD_FACILITY(img_type);
-		if (NULL != jnlpool_ctl)
+		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl) && (NULL != jnlpool->repl_inst_filehdr))
 		{	/* Read instace file name from jnlpool */
 			INSERT_MARKER;
-			BUILD_FACILITY((char *)jnlpool.repl_inst_filehdr->inst_info.this_instname);
+			BUILD_FACILITY((char *)jnlpool->repl_inst_filehdr->inst_info.this_instname);
 		} else
 		{	/* Read instance name from instance file */
 			fn_len = &file_name_len;
 			bufsize = MAX_FN_LEN + 1;
-			log_nam.addr = GTM_REPL_INSTANCE;
-			log_nam.len = SIZEOF(GTM_REPL_INSTANCE) - 1;
+			SETUP_INST_INFO(gd_header, log_nam, inst_from_gld);	/* set log_nam from GLD or environment variable */
 			trans_name.addr = temp_inst_fn;
 			ret = FALSE;
 			GET_INSTFILE_NAME(dont_sendmsg_on_log2long, return_on_error);

@@ -133,17 +133,14 @@ void	lke_show(void)
 				ls_free *= 100;	/* Scale to [0-100] range. (couldn't do this inside util_out_print) */
 				if (ls_free < 1) /* No memory? Notify user. */
 					gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
-				if (ls_free < 1 || memory)
-				{
-					if (ctl->subtop > ctl->subfree)
-						gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-							   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-							   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
-					else
-						gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-							   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-							   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
-				}
+				if (ctl->subtop > ctl->subfree)
+					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
+				else
+					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
 				free(ctl);
 			} else
 			{

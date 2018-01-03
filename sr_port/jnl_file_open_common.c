@@ -45,8 +45,7 @@
 #include "get_fs_block_size.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 GBLREF  jnl_process_vector      *prc_vec;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;

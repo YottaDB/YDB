@@ -26,23 +26,24 @@ MBSTART {								\
 	}								\
 } MBEND
 
-#define	BREAK_TWIN(csr, csa)											\
+#define	BREAK_TWIN(CSR, CSA)											\
 MBSTART {													\
 	cache_rec_ptr_t		cr_new;										\
 														\
-	assert(csr->twin && csa->now_crit); 	/* We need crit to break twin connections. */			\
-	assert(!csr->bt_index);	/* It has to be an OLDER twin. It cannot be a NEWER twin because		\
-				 * as long as the OLDER twin exists in the WIP queue, the NEWER			\
-				 * twin write would not have been issued by "wcs_wtstart".			\
-				 */										\
-	assert(!csr->in_cw_set);	/* no other process should be needing this buffer */			\
-	cr_new = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin); /* Get NEWER twin cr */			\
-	assert((void *)&((cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_new->twin))->state_que == (void *)csr);	\
+	assert((CSR)->twin && (CSA)->now_crit); 	/* We need crit to break twin connections. */		\
+	assert(!(CSR)->bt_index);	/* It has to be an OLDER twin. It cannot be a NEWER twin because	\
+					 * as long as the OLDER twin exists in the WIP queue, the NEWER		\
+					 * twin write would not have been issued by "wcs_wtstart".		\
+					 */									\
+	assert(!(CSR)->in_cw_set);	/* no other process should be needing this buffer */			\
+	cr_new = (cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), (CSR)->twin); /* Get NEWER twin cr */			\
+	assert((void *)&((cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), cr_new->twin))->state_que == (void *)(CSR));	\
 	assert(cr_new->dirty); /* NEWER twin should be in ACTIVE queue */					\
-	csr->cycle++;	/* increment cycle whenever blk number changes (tp_hist needs it) */			\
-	csr->blk = CR_BLKEMPTY;											\
+	(CSR)->cycle++;	/* increment cycle whenever blk number changes (tp_hist needs it) */			\
+	(CSR)->blk = CR_BLKEMPTY;										\
 	assert(CR_BLKEMPTY != cr_new->blk);	/* NEWER twin should have a valid block number */		\
-	cr_new->twin = csr->twin = 0;	/* Break the twin link */						\
+	cr_new->twin = (CSR)->twin = 0;	/* Break the twin link */						\
+	cr_new->backup_cr_is_twin = FALSE;									\
 } MBEND
 /* "wcs_wtfini" is called with a second parameter which indicates whether it has to do "is_proc_alive" check or not.
  * In places where we know for sure we do not need this check, we pass FALSE. In places where we would benefit from a check

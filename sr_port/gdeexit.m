@@ -16,7 +16,7 @@ EXIT
 	i '$$ALL^GDEVERIF  s $zstatus=gdeerr("NOEXIT") zm gdeerr("NOEXIT") d:3>$zlevel GETOUT^GDEEXIT q
 	i '$$GDEPUT^GDEPUT  q	 ; zm is issued in GDEPUT.m
 	d GETOUT^GDEEXIT
-	h
+	zg 0
 GETOUT	; Routine executed just before exiting from GDE. This tries to restore the mumps process context
 	;	to what it was at entry into GDE and then does a quit to the parent mumps program.
 	; This context would have been saved in the "gdeEntryState" variable. It is possible this variable
@@ -24,7 +24,7 @@ GETOUT	; Routine executed just before exiting from GDE. This tries to restore th
 	; In that case, there is nothing available to do the restore so skip the restore and "halt" out of
 	; the process to be safe (or else the parent mumps program could get confused).
 	;
-	i '$data(gdeEntryState) h
+	i '$data(gdeEntryState) zg 0
 	n nullsubs
 	s nullsubs=+gdeEntryState("nullsubs")
 	u gdeEntryState("io"):(exception="")	; restore $io with no exception (as otherwise it would be CTRL^GDE)
@@ -37,6 +37,6 @@ GETOUT	; Routine executed just before exiting from GDE. This tries to restore th
 	k (gdeEntryStateZlvl,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct)
 	i $$set^%LCLCOL(gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct) ; restores local variable collation characteristics
 	; If GDE was invoked from the shell, exit to shell with proper exit status else use ZGOTO to go to parent mumps invocation
-	if gdeEntryStateZlvl=0 zhalt +$zstatus
+	if gdeEntryStateZlvl=0 set $etrap="zgoto 0" zhalt +$zstatus
 	zg gdeEntryStateZlvl ; this should exit GDE and return control to parent mumps process invocation
-	h  ; to be safe in case control ever reaches here
+	zg 0  ; to be safe in case control ever reaches here

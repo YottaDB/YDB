@@ -30,7 +30,6 @@
 #include "gtmmsg.h"
 
 GBLREF mval		dollar_zstatus, dollar_zerror;
-GBLREF mval		dollar_ztrap, dollar_etrap;
 GBLREF stack_frame	*zyerr_frame, *frame_pointer;
 GBLREF mstr             *err_act;
 

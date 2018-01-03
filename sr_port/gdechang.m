@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -49,4 +50,14 @@ GBLNAME
 	i $d(namrangeoverlap) d namcoalesce^GDEMAP
 	s update=1
 	s gnams(GBLNAME,"COLLATION")=lquals("COLLATION")
+	q
+INSTANCE
+	i '$d(lquals("FILE_NAME")) zm gdeerr("QUALREQD"):"File Name"
+	i $zl(lquals("FILE_NAME"))=0 d:$d(inst("FILE_NAME"))  q
+	. kill inst
+	. s update=1,inst=0
+	i $d(inst("FILE_NAME")),inst("FILE_NAME")=lquals("FILE_NAME") d
+	. i inst("FILE_NAME")'=$g(inst("envvar")) zm gdeerr("OBJNOTCHG"):"instance":""
+	s update=1
+	s inst=1,inst("FILE_NAME")=lquals("FILE_NAME")
 	q

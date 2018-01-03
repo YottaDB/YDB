@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -90,9 +90,6 @@ GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	symval			*curr_symval;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
-GBLREF	mval			dollar_etrap;
-GBLREF	mval			dollar_ztrap;
-GBLREF	mval			gtm_trigger_etrap;
 GBLREF	mstr			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata;
 GBLREF	mval			*dollar_ztdelim;
@@ -522,7 +519,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	uint4		dollar_tlevel_start;
 	stack_frame	*fp;
 	intrpt_state_t	prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(trigdsc);
 	assert(trigprm);
@@ -635,14 +634,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save = gtm_trigger_depth;
 		if (0 == gtm_trigger_depth)
 		{	/* Only back up $*trap settings when initiating the first trigger level */
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save = dollar_etrap;
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save = dollar_ztrap;
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save = TREF(dollar_etrap);
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save = TREF(dollar_ztrap);
 			mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save = ztrap_explicit_null;
-			dollar_ztrap.str.len = 0;
+			(TREF(dollar_ztrap)).str.len = 0;
 			ztrap_explicit_null = FALSE;
-			if (NULL != gtm_trigger_etrap.str.addr)
+			if (NULL != (TREF(gtm_trigger_etrap)).str.addr)
 				/* An etrap was defined for the trigger environment - Else existing $etrap persists */
-				dollar_etrap = gtm_trigger_etrap;
+				TREF(dollar_etrap) = TREF(gtm_trigger_etrap);
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save = mumps_status;
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;
@@ -885,7 +884,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	int		size;
 	stack_frame	*fp;
 
-	/* TODO: We don't expect the trigger source to exist now the gtm_trigger cleans it up ASAP. Remove it after a few releases */
+	/* TODO: We don't expect the trigger source to exist now gtm_trigger cleans it up ASAP. Remove it after a few releases */
 	assert (0 == trigdsc->xecute_str.str.len);
 	/* First thing to do is release trigger source field if it exists */
 	if (0 < trigdsc->xecute_str.str.len)

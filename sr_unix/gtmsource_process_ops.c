@@ -105,7 +105,7 @@ GBLREF	int			gtmsource_msgbufsiz;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	repl_msg_ptr_t		gtmsource_cmpmsgp;
@@ -146,7 +146,7 @@ int gtmsource_est_conn()
 	sockaddr_ptr		secondary_sa;
 	gtmsource_local_ptr_t	gtmsource_local;
 
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 #	ifdef GTM_TLS
 	assert(!repl_tls.enabled); /* Set after REPL_NEED_TLS_INFO/REPL_TLS_INFO messages are exchanged. */
 	assert(REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state);
@@ -428,7 +428,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 
 	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
-	assert(remote_side == &jnlpool.gtmsource_local->remote_side);
+	assert(remote_side == &jnlpool->gtmsource_local->remote_side);
 	DEBUG_ONLY(*msg_type = -1);
 	for (log_waitmsg = TRUE; SS_NORMAL == status; )
 	{
@@ -574,7 +574,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			} else
 			{	/* Issue REPL2OLD error because receiver is dual-site */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
-					LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+					LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 			}
 			assert(*start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
 			remote_side->jnl_ver = ((repl_start_msg_ptr_t)&msg)->jnl_ver;
@@ -599,7 +599,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			remote_side->tls_requested = (*start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
 			if (REPL_PROTO_VER_REMOTE_LOGPATH > remote_side->proto_ver)
 				return SS_NORMAL; /* Remote side doesn't support REPL_LOGFILE_INFO message */
-			SEND_REPL_LOGFILE_INFO(jnlpool.gtmsource_local->log_file, logfile_msg);
+			SEND_REPL_LOGFILE_INFO(jnlpool->gtmsource_local->log_file, logfile_msg);
 			log_waitmsg = FALSE;
 		} else if (REPL_FETCH_RESYNC == msg.type)
 		{	/* Determine the protocol version of the receiver side.
@@ -622,7 +622,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				"%llu [0x%llx]\n", INT8_PRINT(*recvd_jnl_seqno), INT8_PRINT(*recvd_jnl_seqno));
 			if (REPL_PROTO_VER_REMOTE_LOGPATH > remote_side->proto_ver)
 				return SS_NORMAL; /* Remote side doesn't support REPL_LOGFILE_INFO message */
-			SEND_REPL_LOGFILE_INFO(jnlpool.gtmsource_local->log_file, logfile_msg);
+			SEND_REPL_LOGFILE_INFO(jnlpool->gtmsource_local->log_file, logfile_msg);
 			log_waitmsg = FALSE;
 		} else if (REPL_XOFF_ACK_ME == msg.type)
 		{
@@ -649,7 +649,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			assert(FALSE);
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return (SS_NORMAL);
 		}
 	}
@@ -668,9 +668,9 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 
-	jctl = jnlpool.jnlpool_ctl;
+	jctl = jnlpool->jnlpool_ctl;
 	jnlpool_size = jctl->jnlpool_size;
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	assert(recvd_jnl_seqno <= jctl->jnl_seqno);
 	cur_read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 	if (recvd_jnl_seqno > cur_read_jnl_seqno)
@@ -690,11 +690,11 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		 */
 		if ((READ_FILE != gtmsource_local->read_state) || (recvd_jnl_seqno > gtmsource_save_read_jnl_seqno))
 		{
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			gtmsource_local->read_state = READ_FILE;
 			gtmsource_save_read_jnl_seqno = jctl->jnl_seqno;
 			GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 		}
 	} else if (READ_POOL == gtmsource_local->read_state)
 	{	/* Follow the back-chain in the Journal Pool to find whether or not recvd_jnl_seqno is in the Pool */
@@ -747,7 +747,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 				 * That will bring jctl->write_addr more uptodate. And then redo the read_addr/write_addr check.
 				 */
 				if (jctl->write_addr != jctl->rsrv_write_addr)
-					repl_phase2_cleanup(&jnlpool);
+					repl_phase2_cleanup(jnlpool);
 				if (QWEQ(cur_read_addr, jctl->write_addr))
 				{	/* We caught a GTM process writing cur_read_jnl_seqno + 1,
 					 * we cannot rely on lastwrite_len as it may or may not have changed.
@@ -763,7 +763,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 						 * That will bring jctl->write_addr more uptodate.
 						 */
 						if (jctl->write_addr != jctl->rsrv_write_addr)
-							repl_phase2_cleanup(&jnlpool);
+							repl_phase2_cleanup(jnlpool);
 					}
 					repl_log(gtmsource_log_fp, TRUE, FALSE, "SEARCHING RESYNC POINT IN POOL : "
 						"GTM process finished writing journal records to the pool\n");
@@ -775,7 +775,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 						QWGT(cur_read_jnl_seqno, jctl->start_jnl_seqno))
 		{
 			assert(cur_read + SIZEOF(jnldata_hdr_struct) <= jnlpool_size);
-			prev_tr_size = ((jnldata_hdr_ptr_t)(jnlpool.jnldata_base + cur_read))->prev_jnldata_len;
+			prev_tr_size = ((jnldata_hdr_ptr_t)(jnlpool->jnldata_base + cur_read))->prev_jnldata_len;
 			if ((prev_tr_size <= cur_read_addr) &&
 				jnlpool_hasnt_overflowed(jctl, jnlpool_size, cur_read_addr - prev_tr_size))
 			{
@@ -873,8 +873,8 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
-	jctl = jnlpool.jnlpool_ctl;
-	gtmsource_local = jnlpool.gtmsource_local;
+	jctl = jnlpool->jnlpool_ctl;
+	gtmsource_local = jnlpool->gtmsource_local;
 	jnl_seqno = jctl->jnl_seqno;
 	read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 	read_addr = gtmsource_local->read_addr;
@@ -889,7 +889,7 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 			assert((0 <= index1) && (JPL_PHASE2_COMMIT_ARRAY_SIZE > index1));
 			if ((index1 != jctl->phase2_commit_index2) && jctl->phase2_commit_array[index1].write_complete
 					&& (LOCK_AVAILABLE == jctl->phase2_commit_latch.u.parts.latch_pid))
-				repl_phase2_cleanup(&jnlpool);
+				repl_phase2_cleanup(jnlpool);
 			/* Now that write_addr is uptodate, go ahead and read jnl records */
 			write_addr = jctl->write_addr;
 			assert((0 != write_addr) || (read_jnl_seqno <= jctl->start_jnl_seqno));
@@ -1030,7 +1030,7 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 					msgtypestr, status, STRERROR(status));
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return;
 		}
 		if (EREPL_SEND == repl_errno)
@@ -1107,7 +1107,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 						msgtypestr, status, STRERROR(status));
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-					gtmsource_state = jnlpool.gtmsource_local->gtmsource_state =
+					gtmsource_state = jnlpool->gtmsource_local->gtmsource_state =
 						GTMSOURCE_WAITING_FOR_CONNECTION;
 					return FALSE;
 				} else
@@ -1160,7 +1160,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK", MAX_SEQNO, INVALID_SUPPL_STRM);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 			return FALSE;	/* "gtmsource_repl_send" did not complete */
-		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_RESTART;
+		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_RESTART;
 		return FALSE;
 	} else if (msgtype != msg->type)
 	{
@@ -1169,7 +1169,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 							 ". Closing connection.\n", msg->type, msgtype);
 		repl_close(&gtmsource_sock_fd);
 		SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return FALSE;
 	} else
 	{
@@ -1353,7 +1353,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 					"Status = %d; %s\n", status, STRERROR(status));
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return FALSE;
 		}
 		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
@@ -1364,7 +1364,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
 	repl_close(&gtmsource_sock_fd);
 	SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-	gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+	gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 	CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
 	return FALSE;
 }
@@ -1381,8 +1381,8 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 	repl_old_instinfo_msg_t	old_instinfo_msg;
 	repl_old_needinst_msg_t	old_needinst_msg;
 
-	gtmsource_local = jnlpool.gtmsource_local;
-	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */
+	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));	/* journal pool should be set up */
+	gtmsource_local = jnlpool->gtmsource_local;
 	assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 	if (REPL_PROTO_VER_SUPPLEMENTARY > remote_side->proto_ver)
 	{	/* Use pre-supplementary protocol to communicate */
@@ -1390,10 +1390,10 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		memset(&old_needinst_msg, 0, SIZEOF(old_needinst_msg));
 		old_needinst_msg.type = REPL_OLD_NEED_INSTANCE_INFO;
 		old_needinst_msg.len = MIN_REPL_MSGLEN;
-		memcpy(old_needinst_msg.instname, jnlpool.repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
+		memcpy(old_needinst_msg.instname, jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
 		old_needinst_msg.proto_ver = REPL_PROTO_VER_THIS;
 		old_needinst_msg.node_endianness = NODE_ENDIANNESS;
-		old_needinst_msg.is_rootprimary = !(jnlpool.jnlpool_ctl->upd_disabled);
+		old_needinst_msg.is_rootprimary = !(jnlpool->jnlpool_ctl->upd_disabled);
 		gtmsource_repl_send((repl_msg_ptr_t)&old_needinst_msg, "REPL_OLD_NEED_INSTANCE_INFO",
 										MAX_SEQNO, INVALID_SUPPL_STRM);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
@@ -1405,19 +1405,19 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 			return FALSE; /* recv did not succeed */
 		assert(REPL_OLD_INSTANCE_INFO == old_instinfo_msg.type);
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Received secondary instance name is [%s]\n", old_instinfo_msg.instname);
-		if (jnlpool.repl_inst_filehdr->is_supplementary)
+		if (jnlpool->repl_inst_filehdr->is_supplementary)
 		{	/* Issue REPL2OLD error because this is a supplementary instance and remote side runs
 			 * on a GT.M version that does not understand the supplementary protocol */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(old_instinfo_msg.instname),
-				LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+				LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 		}
 		/* Check if instance name in the REPL_OLD_INSTANCE_INFO message matches that in the source server command line */
-		if (STRCMP(old_instinfo_msg.instname, jnlpool.gtmsource_local->secondary_instname))
+		if (STRCMP(old_instinfo_msg.instname, jnlpool->gtmsource_local->secondary_instname))
 		{	/* Instance name obtained from the receiver does not match what was specified in the
 			 * source server command line. Issue error.
 			 */
 			sgtm_putmsg(print_msg, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
-				LEN_AND_STR(old_instinfo_msg.instname), LEN_AND_STR(jnlpool.gtmsource_local->secondary_instname));
+				LEN_AND_STR(old_instinfo_msg.instname), LEN_AND_STR(jnlpool->gtmsource_local->secondary_instname));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			status = gtmsource_shutdown(TRUE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN;
 			gtmsource_exit(status);
@@ -1429,8 +1429,8 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		memset(&needinst_msg, 0, SIZEOF(needinst_msg));
 		needinst_msg.type = REPL_NEED_INSTINFO;
 		needinst_msg.len = SIZEOF(needinst_msg);
-		memcpy(needinst_msg.instname, jnlpool.repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
-		needinst_msg.lms_group_info = jnlpool.repl_inst_filehdr->lms_group_info;
+		memcpy(needinst_msg.instname, jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
+		needinst_msg.lms_group_info = jnlpool->repl_inst_filehdr->lms_group_info;
 		/* Need to byteswap a few multi-byte fields to take into account the receiver endianness */
 		assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
 		/* Starting GT.M V62001, the receiver server expects an endian converted lms_group_info. So endian
@@ -1440,8 +1440,8 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		if (remote_side->cross_endian && (REPL_PROTO_VER_XENDIANFIXES <= remote_side->proto_ver))
 			ENDIAN_CONVERT_REPL_INST_UUID(&needinst_msg.lms_group_info);
 		needinst_msg.proto_ver = REPL_PROTO_VER_THIS;
-		needinst_msg.is_rootprimary = !(jnlpool.jnlpool_ctl->upd_disabled);
-		needinst_msg.is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
+		needinst_msg.is_rootprimary = !(jnlpool->jnlpool_ctl->upd_disabled);
+		needinst_msg.is_supplementary = jnlpool->repl_inst_filehdr->is_supplementary;
 		needinst_msg.jnl_ver = JNL_VER_THIS;
 		gtmsource_repl_send((repl_msg_ptr_t)&needinst_msg, "REPL_NEED_INSTINFO", MAX_SEQNO, INVALID_SUPPL_STRM);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
@@ -1455,15 +1455,15 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Received secondary instance name is [%s]\n", instinfo_msg.instname);
 		if (!remote_side->is_supplementary)
 		{	/* Remote side is non-supplementary */
-			if (jnlpool.repl_inst_filehdr->is_supplementary)
+			if (jnlpool->repl_inst_filehdr->is_supplementary)
 			{	/* Issue SECNOTSUPPLEMENTARY error because this is a supplementary primary and secondary
 				 * is not a supplementary instance.
 				 */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SECNOTSUPPLEMENTARY, 4,
-					LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname),
+					LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname),
 					LEN_AND_STR(instinfo_msg.instname));
 			}
-		} else if (!jnlpool.repl_inst_filehdr->is_supplementary)
+		} else if (!jnlpool->repl_inst_filehdr->is_supplementary)
 		{	/* Remote side is supplementary and Local side is non-supplementary.
 			 * The REPL_INSTINFO message would have a non-zero "strm_jnl_seqno" field.
 			 * Pass it back on to the caller.
@@ -1475,12 +1475,12 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 			*strm_jnl_seqno = instinfo_msg.strm_jnl_seqno;
 		}
 		/* Check if instance name in the REPL_INSTINFO message matches that in the source server command line */
-		if (STRCMP(instinfo_msg.instname, jnlpool.gtmsource_local->secondary_instname))
+		if (STRCMP(instinfo_msg.instname, jnlpool->gtmsource_local->secondary_instname))
 		{	/* Instance name obtained from the receiver does not match what was specified in the
 			 * source server command line. Issue error.
 			 */
 			sgtm_putmsg(print_msg, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
-				LEN_AND_STR(instinfo_msg.instname), LEN_AND_STR(jnlpool.gtmsource_local->secondary_instname));
+				LEN_AND_STR(instinfo_msg.instname), LEN_AND_STR(jnlpool->gtmsource_local->secondary_instname));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			status = gtmsource_shutdown(TRUE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN;
 			gtmsource_exit(status);
@@ -1540,7 +1540,7 @@ boolean_t	gtmsource_get_remote_histinfo(seq_num seqno, repl_histinfo *histinfo)
 				histinfo2_msg.start_seqno, histinfo2_msg.start_seqno);
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return FALSE;
 		}
 		memset(histinfo, 0, SIZEOF(*histinfo));
@@ -1598,11 +1598,11 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 		return FALSE; /* recv did not succeed */
 	assert(REPL_STRMINFO == strminfo_msg.type);
 	/* Verify that the list of known streams is identical on both sides */
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return FALSE;	/* concurrent online rollback happened */
 	status = repl_inst_histinfo_find_seqno(seqno, INVALID_SUPPL_STRM, &local_histinfo);
-	rel_lock(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	assert(0 == status);	/* we are guaranteed to find this since we have already verified 0th stream matches */
 	/* Fix last_histinfo_num[] in local side to include "local_histinfo" too (which could have strm_index > 0) */
 	if (0 < local_histinfo.strm_index)
@@ -1653,12 +1653,12 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 			return FALSE; /* recv did not succeed */
 		assert(REPL_HISTINFO == histinfo_msg.type);
 		/* Find corresponding history record on LOCAL side */
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			return FALSE;	/* concurrent online rollback happened */
 		status = repl_inst_histinfo_get(lcl_histinfo_num, &local_histinfo);
 		assert(0 == status); /* Since we pass histinfo_num of 0 which is >=0 and < num_histinfo */
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 		/* Compare the two history records. If they are not identical for even one stream, signal rollback on receiver */
 		if (!gtmsource_is_histinfo_identical(&histinfo_msg.history, &local_histinfo, seqno, OK_TO_LOG_TRUE))
 			*rollback_first = TRUE;
@@ -1677,9 +1677,9 @@ void	gtmsource_histinfo_get(int4 index, repl_histinfo *histinfo)
 	int4		status;
 	repl_msg_t	instnohist_msg;
 
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));	/* journal pool should be set up */
+	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	assert(udi->s_addrs.now_crit);
-	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */
 	status = repl_inst_histinfo_get(index, histinfo);
 	assert((0 == status) || (INVALID_HISTINFO_NUM == index));
 	assert((0 != status) || (index == histinfo->histinfo_num));
@@ -1700,7 +1700,7 @@ void	gtmsource_histinfo_get(int4 index, repl_histinfo *histinfo)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above REPLINSTNOHIST error\n");
 		repl_close(&gtmsource_sock_fd);
 		SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 	}
 }
 
@@ -1764,9 +1764,9 @@ seq_num	gtmsource_find_resync_seqno(repl_histinfo *local_histinfo, repl_histinfo
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
 	DEBUG_ONLY(seq_num	min_start_seqno;)
 
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 	)
 	DEBUG_ONLY(prev_remote_histinfo_num = remote_histinfo->prev_histinfo_num;)
@@ -1796,11 +1796,11 @@ seq_num	gtmsource_find_resync_seqno(repl_histinfo *local_histinfo, repl_histinfo
 		{	/* Need to get the previous histinfo record on the primary */
 			local_histinfo_num = local_histinfo->prev_histinfo_num;
 			assert(0 <= local_histinfo->histinfo_num);
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				return MAX_SEQNO;
 			gtmsource_histinfo_get(local_histinfo_num, local_histinfo);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				return MAX_SEQNO;	/* Connection got reset in "gtmsource_histinfo_get" due to REPLINSTNOHIST */
 		}
@@ -1840,12 +1840,12 @@ void	gtmsource_send_new_histrec()
 	int4			zero_histinfo_num;
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
 
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 	)
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	assert(gtmsource_local->send_new_histrec);
 	assert(gtmsource_local->read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
 	first_histrec_send = (-1 == gtmsource_local->next_histinfo_num);
@@ -1853,7 +1853,7 @@ void	gtmsource_send_new_histrec()
 	if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 		return;	/* "gtmsource_set_next_histinfo_seqno" encountered REPLINSTNOHIST or concurrent online rollback occurred */
 	/*************** Read histinfo (to send) from instance file first ***************/
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
 	assert(1 <= gtmsource_local->next_histinfo_num);
@@ -1885,7 +1885,7 @@ void	gtmsource_send_new_histrec()
 		gtmsource_histinfo_get(zero_histinfo_num, &zero_histinfo);
 	} else
 		zero_histinfo_num = INVALID_HISTINFO_NUM;
-	rel_lock(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 	{
 		assert(FALSE);
@@ -1970,21 +1970,21 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
 
-	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 	)
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
-	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */
-	gtmsource_local = jnlpool.gtmsource_local;
+	assert(NULL != jnlpool->repl_inst_filehdr);	/* journal pool should be set up */
+	gtmsource_local = jnlpool->gtmsource_local;
 	next_histinfo_num = gtmsource_local->next_histinfo_num;
 	/* assert((-1 == next_histinfo_num) || (gtmsource_local->next_histinfo_seqno >= gtmsource_local->read_jnl_seqno)); */
 	read_seqno = gtmsource_local->read_jnl_seqno;
 	assert(gtmsource_local->next_histinfo_seqno >= read_seqno);
-	num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
+	num_histinfo = jnlpool->repl_inst_filehdr->num_histinfo;
 	if (!detect_new_histinfo)
 	{
 		if (-1 == next_histinfo_num)
@@ -1993,7 +1993,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 			 * across i.e. "gtmsource_local->read_jnl_seqno". The below function will return the history record
 			 * just BEFORE read_jnl_seqno. So fetch the immediately next history record to get the desired record.
 			 */
-			assert(read_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);
+			assert(read_seqno <= jnlpool->jnlpool_ctl->jnl_seqno);
 			status = repl_inst_histinfo_find_seqno(read_seqno, INVALID_SUPPL_STRM, &prev_histinfo);
 			if (0 != status)
 			{
@@ -2007,7 +2007,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 					 */
 					NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", read_seqno - 1));
 					GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", read_seqno - 1));
-					udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+					udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
 							LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 					/* Send error status to the receiver server before closing the connection. This way the
@@ -2019,7 +2019,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 					memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
 					gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST",
 											MAX_SEQNO, INVALID_SUPPL_STRM);
-					rel_lock(jnlpool.jnlpool_dummy_reg);
+					rel_lock(jnlpool->jnlpool_dummy_reg);
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 						"Connection reset due to above REPLINSTNOHIST error\n");
 					repl_close(&gtmsource_sock_fd);
@@ -2038,7 +2038,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 					if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 					{
 						assert(FALSE);
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 						return;	/* Connection got reset in "gtmsource_histinfo_get" due to REPLINSTNOHIST */
 					}
 					assert(next_histinfo.start_seqno >= read_seqno);
@@ -2078,7 +2078,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		{
 			assert(FALSE);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 			return;	/* Connection got reset in "gtmsource_histinfo_get" due to REPLINSTNOHIST */
 		}
 		assert(next_histinfo.start_seqno >= read_seqno);
@@ -2087,5 +2087,5 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 		gtmsource_local->next_histinfo_seqno = MAX_SEQNO;
 	gtmsource_local->next_histinfo_num = next_histinfo_num;
 	gtmsource_local->num_histinfo = num_histinfo;
-	rel_lock(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 }

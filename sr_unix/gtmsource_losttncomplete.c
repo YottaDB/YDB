@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,7 @@
 #include "cli.h"
 #include "repl_log.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
 int gtmsource_losttncomplete(void)
@@ -43,20 +44,20 @@ int gtmsource_losttncomplete(void)
 	uint4			exit_status;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	assert(NULL == jnlpool.gtmsource_local);
+	assert((NULL != jnlpool) && (NULL == jnlpool->gtmsource_local));
 	repl_log(stderr, TRUE, TRUE, "Initiating LOSTTNCOMPLETE operation on instance [%s]\n",
-		jnlpool.repl_inst_filehdr->inst_info.this_instname);
+		jnlpool->repl_inst_filehdr->inst_info.this_instname);
 	/* If this is a root primary instance, propagate this information to secondaries as well so they reset zqgblmod_seqno to 0.
 	 * If propagating primary, no need to send this to tertiaries as the receiver on the tertiary cannot have started with
 	 * non-zero "zqgblmod_seqno" to begin with (PRIMARYNOTROOT error would have been issued).
 	 */
-	if (!jnlpool.jnlpool_ctl->upd_disabled)
+	if (!jnlpool->jnlpool_ctl->upd_disabled)
 	{
-		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-		jnlpool.jnlpool_ctl->send_losttn_complete = TRUE;
-		gtmsourcelocal_ptr = jnlpool.gtmsource_local_array;
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+		jnlpool->jnlpool_ctl->send_losttn_complete = TRUE;
+		gtmsourcelocal_ptr = jnlpool->gtmsource_local_array;
 		for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
 		{
 			if (('\0' == gtmsourcelocal_ptr->secondary_instname[0])
@@ -65,7 +66,7 @@ int gtmsource_losttncomplete(void)
 				continue;
 			gtmsourcelocal_ptr->send_losttn_complete = TRUE;
 		}
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	}
 	/* Reset zqgblmod_seqno and zqgblmod_tn to 0 in this instance as well */
 	exit_status = repl_inst_reset_zqgblmod_seqno_and_tn();

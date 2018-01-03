@@ -78,10 +78,12 @@ void op_zsystem(mval *v)
 		cmd_buf[v->str.len] = '\0';
 	} else
 	{
-		cmd_buf = GETENV("SHELL");;
+		cmd_buf = GETENV("SHELL");
 		cmd_buf = (NULL == cmd_buf || '\0' == *cmd_buf) ? "/bin/sh" : cmd_buf;
 	}
 	dollar_zsystem = SYSTEM(cmd_buf);
+	if (v->str.len)
+		free(cmd_buf);
 	if (-1 == dollar_zsystem)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
 #ifdef _BSD

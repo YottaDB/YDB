@@ -61,6 +61,8 @@
 #include "gtm_c_stack_trace.h"
 #include "wcs_wt.h"
 #include "recover_truncate.h"
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
 
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -74,6 +76,7 @@ GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_exiting;
@@ -111,6 +114,7 @@ void wcs_recover(gd_region *reg)
 	cache_rec_ptr_t		cr, cr_alt, cr_lo, cr_hi, hash_hdr, cr_old, cr_new;
 	cache_que_head_ptr_t	active_head, hq, wip_head, wq;
 	gd_region		*save_reg;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	que_ent_ptr_t		back_link; /* should be crit & not need interlocked ops. */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -127,6 +131,9 @@ void wcs_recover(gd_region *reg)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	sgm_info		*si;
+#	ifdef DEBUG
+	blk_hdr_ptr_t		cr_old_buff, cr_new_buff;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -139,11 +146,13 @@ void wcs_recover(gd_region *reg)
 	if (is_src_server)
 		return;
 	save_reg = gv_cur_region;	/* protect against [at least] M LOCK code which doesn't maintain cs_addrs and cs_data */
+	save_jnlpool = jnlpool;
 	TP_CHANGE_REG(reg);		/* which are needed by called routines such as wcs_wtstart and wcs_mm_recover */
 	if (dba_mm == reg->dyn.addr->acc_meth)	 /* MM uses wcs_recover to remap the database in case of a file extension */
 	{
 		wcs_mm_recover(reg);
 		TP_CHANGE_REG(save_reg);
+		jnlpool = save_jnlpool;
 		TREF(wcs_recover_done) = TRUE;
 		return;
 	}
@@ -345,7 +354,10 @@ void wcs_recover(gd_region *reg)
 		if (!asyncio)
 			cr->epid = 0;
 		if (0 != cr->twin)
+		{
 			cr->twin = 0; /* Clean up "twin" link. We will set it afresh further down below */
+			cr->backup_cr_is_twin = FALSE;
+		}
 		if (JNL_ENABLED(csd) && cr->dirty)
 		{
 			if (cr->jnl_addr > jbp->rsrv_freeaddr)
@@ -375,7 +387,7 @@ void wcs_recover(gd_region *reg)
 		if (cr->stopped && (CR_BLKEMPTY != cr->blk))
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */
 			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
-			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, FALSE, NULL))
+			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, RTS_ERROR_ON_CERT_FAIL, NULL))
 			{	/* always check the block and return - no assertpro, so last argument is FALSE */
 				if (!jgbl.mur_rollback)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->stopped, cr->stopped,
@@ -396,9 +408,12 @@ void wcs_recover(gd_region *reg)
 			if (CR_NOTVALID != bt->cache_index)
 			{	/* the bt already identifies another cache entry with this block */
 				cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-				assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-					>= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+#				ifdef DEBUG
+				cr_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr));
+				cr_alt_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr));
+				assert(cr_buff->tn >= cr_alt_buff->tn);
 				assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
+#				endif
 				cr_alt->bt_index = 0;				/* cr is more recent */
 				assert((LATCH_CLEAR <= WRITE_LATCH_VAL(cr_alt)) && (LATCH_CONFLICT >= WRITE_LATCH_VAL(cr_alt)));
 				if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt))
@@ -439,14 +454,18 @@ void wcs_recover(gd_region *reg)
 					cr_alt->jnl_addr = 0;
 					cr_alt->refer = FALSE;
 					cr_alt->twin = 0;
+					cr_alt->backup_cr_is_twin = FALSE;
 					ADD_ENT_TO_FREE_QUE_CNT(cnl);
 					if (0 != cr->twin)
 					{	/* inherited a WIP twin from cr_alt, transfer the twin's affections */
 						cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
-						assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-							> ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+#						ifdef DEBUG
+						cr_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr));
+						cr_alt_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr));
+						assert(cr_buff->tn > cr_alt_buff->tn);
 						assert(LATCH_CONFLICT == WRITE_LATCH_VAL(cr_alt)); /* semaphore for wip twin */
 						assert(0 == cr_alt->bt_index);
+#						endif
 						cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
 					}
 				}	/* if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt)) */
@@ -600,9 +619,12 @@ void wcs_recover(gd_region *reg)
 				cr_old = cr;
 				cr_new = cr_alt;
 			}
-			assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_old->buffaddr))->tn
-				< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_new->buffaddr))->tn);
+#			ifdef DEBUG
+			cr_old_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_old->buffaddr));
+			cr_new_buff = ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_new->buffaddr));
+			assert(cr_old_buff->tn < cr_new_buff->tn);
 			assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
+#			endif
 			cr_old->bt_index = 0;
 			cr_new->bt_index = GDS_ANY_ABS2REL(csa, bt);
 			cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
@@ -634,7 +656,7 @@ void wcs_recover(gd_region *reg)
 	if (GDS_CREATE_BLK_MAX != cnl->highest_lbm_blk_changed)
 	{
 		csd->trans_hist.mm_tn++;
-		if (!reg->read_only && !FROZEN_CHILLED(csd))
+		if (!reg->read_only && !FROZEN_CHILLED(csa))
 			fileheader_sync(reg);
 	}
 	assert((cnl->wcs_active_lvl + cnl->wcs_wip_lvl + cnl->wc_in_free) == csd->n_bts);
@@ -677,7 +699,7 @@ void wcs_recover(gd_region *reg)
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	SIGNAL_WRITERS_TO_RESUME(cnl);
 	in_wcs_recover = FALSE;
-	if (!reg->read_only && !FROZEN_CHILLED(csd))
+	if (!reg->read_only && !FROZEN_CHILLED(csa))
 	{
 		dummy_errno = wcs_wtstart(reg, 0, NULL, NULL);
 		/* Note: Just like in "db_csh_getn" (see comment there for more details), we do not rely on the call to
@@ -691,6 +713,7 @@ void wcs_recover(gd_region *reg)
 		}
 	}
 	TP_CHANGE_REG(save_reg);
+	jnlpool = save_jnlpool;
 	TREF(wcs_recover_done) = TRUE;
 	return;
 }

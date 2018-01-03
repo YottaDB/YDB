@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,16 +42,16 @@
 #include "gtmsource.h"
 #include "gtmio.h"
 
-GBLREF 	spdesc 		stringpool;
-GBLREF 	tp_region 	*grlist;
-GBLREF	tp_region	*halt_ptr;
-GBLREF	bool		online;
-GBLREF  bool            error_mupip;
-GBLREF	boolean_t	backup_interrupted;
+GBLREF 	spdesc 			stringpool;
+GBLREF 	tp_region 		*grlist;
+GBLREF	tp_region		*halt_ptr;
+GBLREF	bool			online;
+GBLREF  bool            	error_mupip;
+GBLREF	boolean_t		backup_interrupted;
 
-GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	boolean_t	jnlpool_init_needed;
+GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	boolean_t		jnlpool_init_needed;
 
 error_def(ERR_FORCEDHALT);
 
@@ -152,15 +152,16 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 		break;					/* NOTREACHED */
 	}
 	/* Release FTOK lock on the replication instance file if holding it */
-	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);
-	if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+	assert((NULL == jnlpool) || (NULL == jnlpool->jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);
+	if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg)
+			&& jnlpool->jnlpool_dummy_reg->open)
 	{
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 		assert(NULL != udi);
 		if (NULL != udi)
 		{	/* See gv_rundown.c comment for why ftok_sem_release 2nd parameter is FALSE below */
 			if (udi->grabbed_ftok_sem)
-				ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE);
+				ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, TRUE);
 			assert(!udi->grabbed_ftok_sem);
 		}
 	}

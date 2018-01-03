@@ -91,6 +91,7 @@ uint4 dbfilop(file_control *fc)
 			assertpro((1 != fc->op_pos) || ((0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))
 					&& (0 != ((sgmnt_data_ptr_t)fc->op_buff)->acc_meth)));
 			assert((1 != fc->op_pos) || (fc->op_len <= SIZEOF_FILE_HDR(fc->op_buff)));
+			assert(!gv_cur_region->read_only);
 			offset = (off_t)(fc->op_pos - 1) * DISK_BLOCK_SIZE;
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, fc->op_buff, fc->op_len, save_errno);
 			if (0 != save_errno)

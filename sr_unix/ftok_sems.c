@@ -62,7 +62,7 @@
 GBLREF	uint4			process_id;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_CRITSEMFAIL);
@@ -142,7 +142,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	 * and then get the access semaphore). The only exception is MUPIP JOURNAL -ROLLBACK -BACKWARD due to an issue
 	 * that is documented in C9F10-002759. Assert that below.
 	 */
-	assert((reg != jnlpool.jnlpool_dummy_reg)
+	assert(((NULL == jnlpool) || (reg != jnlpool->jnlpool_dummy_reg))
 		|| (jgbl.mur_rollback && !jgbl.mur_options_forward) || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	udi = FILE_INFO(reg);
 	assert(!udi->grabbed_ftok_sem && !udi->grabbed_access_sem);
@@ -187,7 +187,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
 	 * and then get the access semaphore). The only exception is MUPIP JOURNAL -ROLLBACK -BACKWARD due to an issue
 	 * that is documented in C9F10-002759. Assert that below.
 	 */
-	assert((reg != jnlpool.jnlpool_dummy_reg)
+	assert(((NULL == jnlpool) || (reg != jnlpool->jnlpool_dummy_reg))
 		|| (jgbl.mur_rollback && !jgbl.mur_options_forward) || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;

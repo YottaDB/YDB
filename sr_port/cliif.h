@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +46,7 @@ int		cli_present(char *entry);		/***type int added***/
 void		cli_str_setup(int length, char *addr);
 void		cli_strupper(char *sp);
 int		cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_num, uint4 *second_num);
+boolean_t	cli_get_defertime(char *entry, int4 *dst);
 #ifdef __osf__
 	/* N.B. argv is passed in from main (in gtm.c) almost straight from the operating system.  */
 #pragma pointer_size (save)

@@ -50,6 +50,11 @@ void iosocket_destroy (io_desc *ciod)
 		else
 			lpp = &lp->next;
 	}
+	if (ciod->dollar.devicebuffer)
+	{
+		free(ciod->dollar.devicebuffer);
+		ciod->dollar.devicebuffer = NULL;
+	}
 	free(dsocketptr);
 	free(ciod);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -107,6 +107,7 @@ LITDEF nametabent svn_names[] =
 	,{ 3, "ZSO*" }
 	,{ 2, "ZS" }, { 4, "ZSTA*" }
 	,{ 5, "ZSTEP"}
+	,{ 5, "ZSTRP*"}
 	,{ 3, "ZSY*"}
 	,{ 4, "ZTCO*"}
 	,{ 4, "ZTDA*"}
@@ -132,7 +133,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 99	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 100	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -195,6 +196,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }
 	,{ SV_ZSTATUS, TRUE, ALL_SYS }, { SV_ZSTATUS, TRUE, ALL_SYS }
 	,{ SV_ZSTEP, TRUE, ALL_SYS }
+	,{ SV_ZSTRPLLIM, TRUE, ALL_SYS }
 	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
 	,{ SV_ZTCODE, FALSE, TRIGGER_OS }
 	,{ SV_ZTDATA, FALSE, TRIGGER_OS }
@@ -552,7 +554,7 @@ int expritem(oprtype *a)
 			if (TK_LPAREN == TREF(director_token))
 			{
 				index = namelook(fun_index, fun_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
-				if (!gtm_utf8_mode)
+				if ((-1 != index) && !gtm_utf8_mode)
 				{	/** When possible, update opcodes rather than mess with xfer table */
 					switch (fun_data[index].opcode)
 					{

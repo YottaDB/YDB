@@ -73,7 +73,7 @@ GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	boolean_t		is_updproc;

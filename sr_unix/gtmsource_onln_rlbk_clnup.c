@@ -35,8 +35,7 @@
 #include "tp_frame.h"
 
 GBLREF	gtmsource_state_t	gtmsource_state;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	uint4			process_id;
 
@@ -46,8 +45,8 @@ void	gtmsource_onln_rlbk_clnup()
 	boolean_t		was_crit;
 	sgmnt_addrs		*repl_csa;
 
-	gtmsource_local = jnlpool.gtmsource_local;
-	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	gtmsource_local = jnlpool->gtmsource_local;
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	was_crit = repl_csa->now_crit;
 	assert(!repl_csa->hold_onto_crit);
 	assert(was_crit || (process_id == gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid)
@@ -78,15 +77,15 @@ void	gtmsource_onln_rlbk_clnup()
 		 */
 		gtmsource_local->gtmsource_state = gtmsource_state = GTMSOURCE_HANDLE_ONLN_RLBK;
 		if (!was_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		/* We have to let the read files logic know that until we have sent data "upto" the current journal sequence number
 		 * at this point, we cannot rely on the journal pool. Indicate this through the gtmsource_save_read_jnl_seqno global
 		 * variable
 		 */
-		gtmsource_save_read_jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		gtmsource_save_read_jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 		GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
 		if (!was_crit)
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			rel_lock(jnlpool->jnlpool_dummy_reg);
 	}
 	return;
 }

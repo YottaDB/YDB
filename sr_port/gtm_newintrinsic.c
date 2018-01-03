@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,6 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
-GBLREF mval		dollar_etrap;
 #ifdef GTM_TRIGGER
 GBLREF mval		dollar_ztwormhole;
 #endif
@@ -43,7 +43,9 @@ void gtm_newintrinsic(mval *intrinsic)
 	unsigned char	*old_sp, *top;
 	int		indx;
 	int4		shift_size;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(intrinsic);
 	if (frame_pointer->type & SFT_COUNT)
 	{	/* Current (youngest) frame is NOT an indirect frame.
@@ -147,7 +149,7 @@ void gtm_newintrinsic(mval *intrinsic)
 		mv_st_ent->mv_st_cont.mvs_msav.addr = intrinsic;
 	}
 	/* Clear the intrinsic var's current value if not $ZTWORMHOLE or $ETRAP */
-	if ((&dollar_etrap != intrinsic) GTMTRIG_ONLY(&& (&dollar_ztwormhole != intrinsic)))
+	if ((&(TREF(dollar_etrap)) != intrinsic) GTMTRIG_ONLY(&& (&dollar_ztwormhole != intrinsic)))
 	{
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;

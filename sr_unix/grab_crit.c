@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>	/* for VSIG_ATOMIC_T type */
+#include "gtm_signal.h"	/* for VSIG_ATOMIC_T type */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -44,7 +44,7 @@ GBLREF	short			crash_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
 #ifdef DEBUG
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
 #endif
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -61,7 +61,10 @@ void	grab_crit(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
-	DEBUG_ONLY(sgmnt_addrs	*jnlpool_csa;)
+#	ifdef DEBUG
+	sgmnt_addrs		*jnlpool_csa;
+	jnlpool_addrs_ptr_t	local_jnlpool, save_jnlpool;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -70,6 +73,9 @@ void	grab_crit(gd_region *reg)
 	csd = csa->hdr;
 	cnl = csa->nl;
 #	ifdef DEBUG
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool != jnlpool))
+		jnlpool = csa->jnlpool;
 	if (gtm_white_box_test_case_enabled
 		&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number)
 		&& (0 == cnl->wbox_test_seq_num))
@@ -86,12 +92,14 @@ void	grab_crit(gd_region *reg)
 	if (!csa->now_crit)
 	{
 #		ifdef DEBUG
-		if (NULL != jnlpool.jnlpool_ctl)
+		local_jnlpool = csa->jnlpool;
+		assert((NULL == local_jnlpool) || (local_jnlpool == jnlpool));
+		if ((NULL != local_jnlpool) && (NULL != local_jnlpool->jnlpool_ctl))
 		{	/* We should never request crit on a database region while already holding the lock on the journal pool.
 			 * Not following the protocol (obtaining lock on journal pool AFTER obtaining crit on database region),
 			 * can lead to potential deadlocks
 			 */
-			jnlpool_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			jnlpool_csa = &FILE_INFO(local_jnlpool->jnlpool_dummy_reg)->s_addrs;
 			assert(!jnlpool_csa->now_crit);
 		}
 #		endif
@@ -101,6 +109,7 @@ void	grab_crit(gd_region *reg)
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
 		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE);
+		assert((NULL == local_jnlpool) || (local_jnlpool == jnlpool));
 #		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled
 			&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number)
@@ -116,6 +125,10 @@ void	grab_crit(gd_region *reg)
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{
+#		ifdef DEBUG
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
+#		endif
 			crit_count = 0;
 			TREF(grabbing_crit) = NULL;
 			switch(status)
@@ -136,7 +149,7 @@ void	grab_crit(gd_region *reg)
 		 */
 		assert((0 == cnl->in_crit) || (FALSE == is_proc_alive(cnl->in_crit, 0)));
 		cnl->in_crit = process_id;
-		CRIT_TRACE(crit_ops_gw);	/* see gdsbt.h for comment on placement */
+		CRIT_TRACE(csa, crit_ops_gw);	/* see gdsbt.h for comment on placement */
 		TREF(grabbing_crit) = NULL;
 		crit_count = 0;
 	}
@@ -147,5 +160,9 @@ void	grab_crit(gd_region *reg)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
 	if (cnl->wc_blocked)
 		wcs_recover(reg);
+#	ifdef DEBUG
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
+#	endif
 	return;
 }

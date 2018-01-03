@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +46,7 @@ int mval2fao(
 	{
 		MV_FORCE_DEFINED(fao);
 		while (*message != '!')
-			message++;
+			DBG_ASSERT(*message) message++;
 		/* A length for the fao parameter (consisting of digits). */
 		for (n = 0; (*++message > 47) && (*message < 58); n++)
 			;

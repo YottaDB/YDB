@@ -45,7 +45,7 @@ error_def(ERR_SYSCALL);
 void iorm_wteol(int4 x,io_desc *iod)
 {
 	int		i, fixed_pad, fixed_pad_bytes, bytes_per_char, avail_bytes, pad_size, res_size;
-	int		status, outbytes;
+	int		status, outbytes, len;
 	char		*outstr, temppad, temppadarray[2], *out_ptr;
 	d_rm_struct	*rm_ptr;
 	unsigned int	*dollarx_ptr;
@@ -94,11 +94,15 @@ void iorm_wteol(int4 x,io_desc *iod)
 				if (-1 == fstat_res)
 				{
 					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 						CALLFROM, save_errno);
 				}
 				if (0 != statbuf.st_size)
+				{
+					SET_DOLLARDEVICE_ERRSTR(iod, ONE_COMMA_CRYPTBADWRTPOS);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+				}
 			}
 		}
 	}

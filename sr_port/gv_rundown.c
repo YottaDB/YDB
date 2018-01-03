@@ -53,10 +53,10 @@
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	boolean_t		pool_init;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	int			pool_init;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	jnlpool_ctl_ptr_t      	jnlpool_ctl;
 GBLREF	gd_region		*ftok_sem_reg;
 #ifdef DEBUG
 GBLREF	boolean_t		is_jnlpool_creator;
@@ -66,22 +66,26 @@ error_def(ERR_NOTALLDBRNDWN);
 
 void gv_rundown(void)
 {
-	gd_region	*r_top, *r_save, *r_local;
-	gd_addr		*addr_ptr;
-	sgm_info	*si;
-	int4		rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
-	unix_db_info	*udi;
-#	ifdef DEBUG
-	sgmnt_addrs	*csa;
-#	endif
+	gd_region		*r_top, *r_save, *r_local;
+	gd_addr			*addr_ptr;
+	jnlpool_addrs_ptr_t	local_jnlpool, save_jnlpool;
+	sgm_info		*si;
+	int4			rundown_status = EXIT_NRM;	/* if gds_rundown went smoothly */
+	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r_save = gv_cur_region;		/* Save for possible core dump */
+	save_jnlpool = jnlpool;
 	gvcmy_rundown();
 	ENABLE_AST
 	if (pool_init)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+	{
+		for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
+			if (local_jnlpool->pool_init)
+				rel_lock(local_jnlpool->jnlpool_dummy_reg);
+	}
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
@@ -94,9 +98,11 @@ void gv_rundown(void)
 			 	 */
 #				ifdef DEBUG
 				if (is_jnlpool_creator
-					&& INST_FREEZE_ON_NOSPC_ENABLED(REG2CSA(r_local)) && TREF(gtm_test_fake_enospc))
+					&& INST_FREEZE_ON_NOSPC_ENABLED(REG2CSA(r_local), local_jnlpool)
+					&& TREF(gtm_test_fake_enospc))
 				{	/* Clear ENOSPC faking now that we are running down */
 					csa = REG2CSA(r_local);
+					assert((NULL == csa->jnlpool) || (jnlpool == csa->jnlpool));
 					if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
 					{
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT,
@@ -107,6 +113,9 @@ void gv_rundown(void)
 				}
 #				endif
 				gv_cur_region = r_local;
+				csa = REG2CSA(r_local);
+				if (csa->jnlpool && (jnlpool != csa->jnlpool))
+					jnlpool = csa->jnlpool;
 			        tp_change_reg();
 				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE);
 			}
@@ -115,19 +124,21 @@ void gv_rundown(void)
 	}
 	rc_close_section();
 	gv_cur_region = r_save;		/* Restore value for dumps but this region is now closed and is otherwise defunct */
+	jnlpool = save_jnlpool;
 	cs_addrs = NULL;
 	gtmsecshr_sock_cleanup(CLIENT);
 #	ifndef MUTEX_MSEM_WAKE
 	mutex_sock_cleanup();
 #	endif
-	jnlpool_detach();
+	for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
+		jnlpool_detach();
 	/* Clean up any left-over ftok semaphores. This part of the code can be reached by almost all of the exit handling routines.
 	 * If the ftok semaphore is grabbed, but not released, ftok_sem_reg will have a non-null value and grabbed_ftok_sem will be
 	 * TRUE. We cannot rely on gv_cur_region always as it is used in so many places in so many ways.
 	 * Note: Typically, it should suffice to check for ftok_sem_reg being non-null and pass that to ftok_sem_release. But, there
-	 * are some cases where ftok_sem_reg can be NULL and yet jnlpool.jnlpool_dummy_reg is non-null and the process holds an ftok
-	 * semaphore. For instance, if GT.M opened a particular region and then did a jnlpool_init which ended up with an rts_error
-	 * (after obtaining the ftok semaphore on jnlpool_dummy_reg), gds_rundown done above (to rundown the database) sets
+	 * are some cases where ftok_sem_reg can be NULL and yet jnlpool->jnlpool_dummy_reg is non-null and the process holds an
+	 * ftok semaphore. For instance, if GT.M opened a particular region and then did a jnlpool_init which ended up with an
+	 * rts_erro (after obtaining the ftok semaphore on jnlpool_dummy_reg), gds_rundown done above (to rundown the database) sets
 	 * ftok_sem_reg to NULL (as part of ftok_sem_release). But, jnlpool_dummy_reg is still non-null and the lingering ftok
 	 * should be released. So, even though a subset of the below conditions should be enough, we check for all there cases just
 	 * to be safe.
@@ -144,12 +155,13 @@ void gv_rundown(void)
 		assert(udi->grabbed_ftok_sem);
 		ftok_sem_release(ftok_sem_reg, FALSE, TRUE);
 	}
-	if (NULL != jnlpool.jnlpool_dummy_reg)
-	{
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE);
-	}
+	for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
+		if (jnlpool->jnlpool_dummy_reg && jnlpool->pool_init)
+		{
+			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
+			if (udi->grabbed_ftok_sem)
+				ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, TRUE);
+		}
 	if (NULL != recvpool.recvpool_dummy_reg)
 	{
 		udi = FILE_INFO(recvpool.recvpool_dummy_reg);

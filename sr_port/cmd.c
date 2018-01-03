@@ -289,6 +289,8 @@ LITDEF struct
 		advancewindow();
 	else if ((TK_EOL != TREF(window_token)) || !cmd_data[x].eol_ok)
 	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
@@ -301,6 +303,8 @@ LITDEF struct
 		{	advancewindow();
 			if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 			{
+				if (NULL != oldchain)
+					setcurtchain(oldchain);
 				stx_error(ERR_EXPR);
 				return FALSE;
 			}

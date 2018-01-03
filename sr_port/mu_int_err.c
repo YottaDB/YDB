@@ -74,7 +74,7 @@ void	mu_int_err(
 	unsigned char	temp_bot;
 	unsigned char	key_buffer[MAX_KEY_SZ];
 	unsigned char	*temp;
-	gv_key		*tmp_gvkey = NULL;
+
 	if (!mu_int_errknt)
 		util_out_print("!/Block:Offset Level", TRUE);
 	mu_int_errknt++;
@@ -96,27 +96,6 @@ void	mu_int_err(
 	if (sndata->sn_type)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) err, 3, LEN_AND_STR((char*)util_buff),
 				(SPAN_NODE == sndata->sn_type) ? (sndata->span_prev_blk + 2) : (sndata->span_blk_cnt));
-	else if (null_coll_type_err)
-	{
-		if (null_coll_type)
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 6, rec_num, blk_id,
-					LEN_AND_STR(GTM_NULL_TEXT), LEN_AND_STR(STD_NULL_TEXT));
-		else
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 6, rec_num, blk_id,
-					LEN_AND_STR(STD_NULL_TEXT), LEN_AND_STR(GTM_NULL_TEXT));
-	} else if (nct_err_type)
-	{
-		assert(NULL == tmp_gvkey);
-		GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));
-		memcpy(tmp_gvkey->base, bot, rec_len);
-		tmp_gvkey->end = rec_len - 1;
-		temp = (unsigned char*)format_targ_key(key_buffer,
-				MAX_ZWR_KEY_SZ, tmp_gvkey, TRUE);
-		fmtd_key_len = (int)(temp - key_buffer);
-		key_buffer[fmtd_key_len] = '\0';
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, LEN_AND_STR(key_buffer));
-		GVKEY_FREE_IF_NEEDED(tmp_gvkey);
-	}
 	else
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
 	if (do_path)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,8 +59,7 @@
 #include "mutex.h"
 #include "do_semop.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gd_region		*ftok_sem_reg;
@@ -137,7 +136,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	assert(56 == OFFSETOF(replpool_identifier, instfilename[0]));
 	assert(256 == SIZEOF(((replpool_identifier *)NULL)->instfilename));
 	/* End asserts */
-	jnlpool.jnlpool_dummy_reg = reg;
+	if (NULL != jnlpool)
+		jnlpool->jnlpool_dummy_reg = reg;
 	recvpool.recvpool_dummy_reg = reg;
 	instfilename = replpool_id->instfilename;
 	reg->dyn.addr->fname_len = strlen(instfilename);
@@ -179,7 +179,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				repl_instance.jnlpool_shmid = shm_id = INVALID_SHMID;
 				repl_instance.jnlpool_shmid_ctime = 0;
 			}
-			assert((INVALID_SHMID != shm_id) || ((NULL == jnlpool.jnlpool_ctl) && (NULL == jnlpool_ctl)));
+			assert((INVALID_SHMID != shm_id) || ((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl)));
 			ipc_rmvd = TRUE;
 			if (INVALID_SHMID != shm_id)
 			{
@@ -192,8 +192,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 							(jnlpool_stat ? ERR_MUJPOOLRNDWNFL : ERR_MUJPOOLRNDWNSUC),
 							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
 			}
-			assert(ipc_rmvd || (NULL != jnlpool_ctl) || !mur_options.rollback);
-			assert((NULL == jnlpool.jnlpool_ctl) || (SS_NORMAL == jnlpool_stat) || jgbl.onlnrlbk);
+			assert(ipc_rmvd || (jnlpool && (NULL != jnlpool->jnlpool_ctl)) || !mur_options.rollback);
+			assert((!jnlpool || (NULL == jnlpool->jnlpool_ctl)) || (SS_NORMAL == jnlpool_stat) || jgbl.onlnrlbk);
 			assert((INVALID_SHMID != repl_instance.jnlpool_shmid) || (0 == repl_instance.jnlpool_shmid_ctime));
 			assert((INVALID_SHMID == repl_instance.jnlpool_shmid) || (0 != repl_instance.jnlpool_shmid_ctime));
 			assert(INVALID_SEMID != sem_id);
@@ -201,7 +201,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 			{	/* Invoked by MUPIP RUNDOWN in which case the semaphores needs to be removed. But, remove the
 				 * semaphore ONLY if we created it here OR the journal pool was successfully removed.
 				 */
-				if (NULL == jnlpool_ctl)
+				if ((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl))
 				{
 					remove_sem = (sem_created || ((SS_NORMAL == jnlpool_stat) && ipc_rmvd));
 					if (!remove_sem)
@@ -309,24 +309,24 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 								LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
 								ERR_SEMREMOVED, 1, sem_id);
 					}
-					if (NULL != jnlpool_ctl)
+					if (jnlpool && (NULL != jnlpool->jnlpool_ctl))
 					{	/* Journal pool is not yet removed. So, grab lock before resetting semid/shmid
 						 * fields in the file header as the function expects the caller to hold crit
 						 * if the journal pool is available
 						 */
 						assert(INVALID_SHMID != repl_instance.jnlpool_shmid);
-						repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+						repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 						assert(!repl_csa->now_crit);
 						assert(!repl_csa->hold_onto_crit);
 						was_crit = repl_csa->now_crit;
 						/* Since we do grab_lock, below, we need to do a per-process initialization. */
 						mutex_per_process_init();
 						if (!was_crit)
-							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+							grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 					}
 					repl_inst_recvpool_reset();
-					if ((NULL != jnlpool_ctl) && !was_crit)
-						rel_lock(jnlpool.jnlpool_dummy_reg);
+					if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && !was_crit)
+						rel_lock(jnlpool->jnlpool_dummy_reg);
 				}
 				assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 			}
@@ -339,38 +339,40 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 					LEN_AND_STR(instfilename));
 		}
 	}
-	assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || (NULL == jnlpool.repl_inst_filehdr));
+	assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr)));
 	if (mur_options.rollback && (SS_NORMAL == jnlpool_stat) && (SS_NORMAL == recvpool_stat))
 	{
 		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((INVALID_SHMID == repl_instance.jnlpool_shmid)
 			&& (INVALID_SHMID == repl_instance.recvpool_shmid)));
-		/* Initialize jnlpool.repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
+		/* Initialize jnlpool->repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
 		decr_cnt = FALSE;
-		if (NULL == jnlpool.repl_inst_filehdr)
+		if ((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr))
 		{	/* Possible if there is NO journal pool in the first place. In this case, malloc the structure here and
 			 * copy the file header from repl_instance structure.
 			 */
-			jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(SIZEOF(repl_inst_hdr));
-			memcpy(jnlpool.repl_inst_filehdr, &repl_instance, SIZEOF(repl_inst_hdr));
+			SET_JNLPOOL_FROM_RECVPOOL_P(jnlpool);
+			jnlpool->repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(SIZEOF(repl_inst_hdr));
+			memcpy(jnlpool->repl_inst_filehdr, &repl_instance, SIZEOF(repl_inst_hdr));
 		} else
 		{
-			assert(repl_instance.jnlpool_semid == jnlpool.repl_inst_filehdr->jnlpool_semid);
-			assert(repl_instance.jnlpool_semid_ctime == jnlpool.repl_inst_filehdr->jnlpool_semid_ctime);
-			assert(repl_instance.jnlpool_shmid == jnlpool.repl_inst_filehdr->jnlpool_shmid);
-			assert(repl_instance.jnlpool_shmid_ctime == jnlpool.repl_inst_filehdr->jnlpool_shmid_ctime);
+			assert(repl_instance.jnlpool_semid == jnlpool->repl_inst_filehdr->jnlpool_semid);
+			assert(repl_instance.jnlpool_semid_ctime == jnlpool->repl_inst_filehdr->jnlpool_semid_ctime);
+			assert(repl_instance.jnlpool_shmid == jnlpool->repl_inst_filehdr->jnlpool_shmid);
+			assert(repl_instance.jnlpool_shmid_ctime == jnlpool->repl_inst_filehdr->jnlpool_shmid_ctime);
 			/* If the ONLINE ROLLBACK command is run on the primary when the source server is up and running,
-			 * jnlpool.repl_inst_filehdr->recvpool_semid will be INVALID because there is NO receiver server
+			 * jnlpool->repl_inst_filehdr->recvpool_semid will be INVALID because there is NO receiver server
 			 * running. However, ROLLBACK creates semaphores for both journal pool and receive pool and writes
 			 * it to the instance file header. Copy this information to the file header copy in the jnlpool
 			 * as well
 			 */
-			jnlpool.repl_inst_filehdr->recvpool_semid = repl_instance.recvpool_semid;
-			jnlpool.repl_inst_filehdr->recvpool_semid_ctime = repl_instance.recvpool_semid_ctime;
+			jnlpool->repl_inst_filehdr->recvpool_semid = repl_instance.recvpool_semid;
+			jnlpool->repl_inst_filehdr->recvpool_semid_ctime = repl_instance.recvpool_semid_ctime;
 		}
 		/* Flush changes to the replication instance file header to disk */
 		repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	} else /* for MUPIP RUNDOWN, semid fields in the file header are reset and is written in mu_replpool_release_sem() above */
-		decr_cnt = (NULL == jnlpool_ctl); /* for anticipatory freeze, "mupip_rundown" releases the ftok semaphore */
+		/* for anticipatory freeze, "mupip_rundown" releases the ftok semaphore */
+		decr_cnt = (NULL == (jnlpool ? jnlpool->jnlpool_ctl : NULL));
 	REVERT;
 	udi->counter_ftok_incremented = !ftok_counter_halted;	/* Restore counter_ftok_incremented before release */
 	/* Release replication instance ftok semaphore lock. Do not decrement the counter if ROLLBACK */
@@ -386,7 +388,9 @@ CONDITION_HANDLER(mu_rndwn_repl_instance_ch)
 	gd_region	*reg;
 
 	START_CH(TRUE);
-	reg = jnlpool.jnlpool_dummy_reg;
+	reg = jnlpool ? jnlpool->jnlpool_dummy_reg : NULL;
+	if (NULL == reg)
+		reg = recvpool.recvpool_dummy_reg;
 	assert(NULL != reg);
 	if (NULL != reg)
 	{

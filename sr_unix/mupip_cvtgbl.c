@@ -35,6 +35,7 @@
 #include "muextr.h"
 #include <regex.h>
 #include "op.h"
+#include "min_max.h"
 
 GBLREF	int		gv_fillfactor;
 GBLREF	bool		mupip_error_occurred;
@@ -148,11 +149,11 @@ void mupip_cvtgbl(void)
 		} else
 		{
 			lower_to_upper(buff, buff, len);
-			if (!memcmp(buff, "STOP", len))
+			if (!STRNCMP_LIT_LEN(buff, "STOP", len))
 				onerror = ONERROR_STOP;
-			else if (!memcmp(buff, "PROCEED", len))
+			else if (!STRNCMP_LIT_LEN(buff, "PROCEED", len))
 				onerror = ONERROR_PROCEED;
-			else if (!memcmp(buff, "INTERACTIVE", len))
+			else if (!STRNCMP_LIT_LEN(buff, "INTERACTIVE", len))
 			{
 				if (isatty(0)) /*if stdin is a terminal*/
 					onerror = ONERROR_INTERACTIVE;
@@ -179,27 +180,27 @@ void mupip_cvtgbl(void)
 		else
 		{
 		        lower_to_upper(buff, buff, len);
-			if (!memcmp(buff, "ZWR", len))
+			if (!STRNCMP_LIT_LEN(buff, "ZWR", len))
 			{	/* If the label did not determine a format let them specify ZWR and they can sort out the result */
 				if ((MU_FMT_ZWR == file_format) || (MU_FMT_UNRECOG == file_format))
 					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
 						MU_FMT_ZWR, utf8, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			} else if (!memcmp(buff, "BINARY", len))
+			} else if (!STRNCMP_LIT_LEN(buff, "BINARY", len))
 			{
 				if (MU_FMT_BINARY == file_format)
 					bin_load(begin, end, line1_ptr, line1_len);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			} else if (!memcmp(buff, "GO", len))
+			} else if (!STRNCMP_LIT_LEN(buff, "GO", len))
 			{	/* If the label did not determine a format let them specify GO and they can sort out the result */
 				if ((MU_FMT_GO == file_format) || (MU_FMT_UNRECOG == file_format))
 					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
 						MU_FMT_GO, utf8, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
-			} else if (!memcmp(buff, "GOQ", len))
+			} else if (!STRNCMP_LIT_LEN(buff, "GOQ", len))
 			{	/* get_load_format doesn't recognize GOQ labels' */
 				if (MU_FMT_UNRECOG == file_format)
 					goq_load();
@@ -245,7 +246,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 	ret = MU_FMT_UNRECOG;		/* actually means as yet undetermined; used to decide if still trying to find a format */
 	if (0 < *line1_len)
 	{
-		if (0 == memcmp(line1 + 6, "BINARY", STR_LIT_LEN("BINARY"))) /* If file is binary do not look further */
+		if (0 == STRNCMP_LIT(line1 + 6, "BINARY")) /* If file is binary do not look further */
 			return MU_FMT_BINARY;
 		for (line2_len = 0, c = line1, ctop = c + *line1_len; c < ctop; c++)
 		{	/* that 1st read is fixed length, so look for a terminator */

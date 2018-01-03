@@ -198,8 +198,11 @@ void db_auto_upgrade(gd_region *reg)
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
 				/* GT.M V63001 introduced reservedDBFlags */
 				csd->reservedDBFlags = 0; /* RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE */
-				break;
 			case GDSMV63001:
+				/* GT.M V63003 introduced read-only databases */
+				csd->read_only = 0;
+				break;
+			case GDSMV63003:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

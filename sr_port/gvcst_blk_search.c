@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -30,6 +30,7 @@
 #include "min_max.h"
 #include "gvcst_expand_key.h"
 #include "send_msg.h"
+#include "cert_blk.h"
 
 /*
  * -------------------------------------------------------------------
@@ -135,24 +136,33 @@ error_def(ERR_TEXT);
 
 static	void	gvcst_search_fail(srch_blk_status *pStat)
 {
-	char	buff[1024], crbuff[256], regbuff[512];
+	char		buff[1024], crbuff[256], regbuff[512];
+	uint4		len;
 
 	assert(CDB_STAGNATE <= t_tries);
 	assert((NULL != pStat) && ((NULL != pStat->cr) || (dba_mm == gv_cur_region->dyn.addr->acc_meth)) && (NULL != cs_addrs));
 	if (NULL != pStat)
 	{
 		if (NULL != pStat->cr)
+		{
 			SPRINTF(crbuff, ": crbuff = 0x%lX", pStat->cr->buffaddr);
-		else
+			cert_blk(gv_cur_region, pStat->cr->blk, (blk_hdr_ptr_t)GDS_ANY_REL2ABS(cs_addrs, pStat->cr->buffaddr),
+				0,  SEND_MSG_ON_CERT_FAIL, NULL);
+		} else
 			crbuff[0] = '\0';
+		len = (6 * SIZEOF(long unsigned int)) + gv_cur_region->rname_len + 1
+			+ STRLEN("Possible data corruption in region ")
+			+ STRLEN(" : blk = 0x : buff = 0x : cr = 0x%  : csa = 0x% : csalock = 0x%");
 		memcpy(regbuff, gv_cur_region->rname, gv_cur_region->rname_len);
 		regbuff[gv_cur_region->rname_len] = '\0';
-		SPRINTF(buff, "Possible data corruption in region %s : blk = 0x%X : buff = 0x%lX : cr = 0x%lX %s : "
-				"csa = 0x%lX : csalock = 0x%lX", regbuff, pStat->blk_num, (long unsigned int) pStat->buffaddr,
-				(long unsigned int) pStat->cr, crbuff, (long unsigned int) cs_addrs,
-				(long unsigned int) cs_addrs->lock_addrs[0]);
+		SNPRINTF(buff, len, "Possible data corruption in region %s : blk = 0x%lX : buff = 0x%lX : cr = 0x%lX %s : "
+				"csa = 0x%lX : csalock = 0x%lX",
+				regbuff, (long unsigned int)pStat->blk_num, (long unsigned int)pStat->buffaddr,
+				(long unsigned int)pStat->cr, crbuff, (long unsigned int)cs_addrs,
+				(long unsigned int)cs_addrs->lock_addrs[0]);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
 	}
+	assert(t_tries);				/* assert here so we don't have to do it when this returns */
 }
 
 #define GVCST_SEARCH_EXPAND_PREVKEY

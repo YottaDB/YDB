@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -55,7 +55,6 @@ GBLREF	mval			*alias_retarg;
 GBLREF	boolean_t		tp_timeout_deferred;
 GBLREF	dollar_ecode_type	dollar_ecode;
 GBLREF	boolean_t		ztrap_explicit_null;
-GBLREF	mval			dollar_ztrap;
 GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	boolean_t		dollar_truth;
 

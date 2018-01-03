@@ -159,7 +159,7 @@ void	mupip_freeze(void)
 			continue;
 		}
 		gv_cur_region = rptr->reg;
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		if (gv_cur_region->was_open)	/* Already open under another name.  Region will not be marked open*/
 		{
 			gv_cur_region->open = FALSE;
@@ -190,14 +190,14 @@ void	mupip_freeze(void)
 			util_out_print("WARNING: The region !AD to be frozen contains abandoned kills",
 				TRUE, REG_LEN_STR(gv_cur_region));
 		}
-		if (freeze && FROZEN_CHILLED(cs_data))
+		if (freeze && FROZEN_CHILLED(cs_addrs))
 		{
 			util_out_print("FREEZE region !AD already has an online freeze", TRUE, REG_LEN_STR(rptr->reg));
 			PRINT_FREEZEERR;
 			cs_addrs->persistent_freeze = TRUE;	/* Prevent removal of existing freeze */
 			continue;
 		}
-		if (!cs_data->freeze && cs_data->freeze_online)
+		if (!cs_data->freeze && cs_addrs->nl->freeze_online)
 		{
 			util_out_print("WARNING: The region !AD had an online freeze, but it was autoreleased.",
 					TRUE, REG_LEN_STR(gv_cur_region));

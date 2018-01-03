@@ -474,9 +474,14 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			rel_crit(gv_cur_region);
 	}
 	if (si->start_tn <= cnl->last_wcs_recover_tn)
-	{
+	{	/* Note that it is possible that gvt->clue.end is non-zero even in the final retry (e.g. if we encounter
+		 * this gvt for the first time in the final retry). If so, t1->tn would be set (by "gvcst_search" done in
+		 * the caller) to the tn when the clue got set which could be stale compared to cnl->last_wcs_recover_tn
+		 * (if this gvt was never accessed after the most recent "wcs_recover"). In that case, t1->tn would get
+		 * copied over to si->start_tn above and we will reach here. We should restart in this situation
+		 * (i.e. cdb_sc_wcs_recover is a valid final retry restart code in TP).
+		 */
 		status = cdb_sc_wcs_recover;
-		assert(CDB_STAGNATE > t_tries);
 	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);

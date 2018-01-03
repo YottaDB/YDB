@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +90,7 @@ GBLREF	int			gtmrecv_listen_sock_fd, gtmrecv_sock_fd;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		repl_connection_reset;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
@@ -223,7 +224,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	assert(resync_msg.resync_seqno);
 	resync_msg.proto_ver = REPL_PROTO_VER_THIS;
 	resync_msg.node_endianness = NODE_ENDIANNESS;
-	resync_msg.is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
+	resync_msg.is_supplementary = jnlpool->repl_inst_filehdr->is_supplementary;
 	remote_side->endianness_known = FALSE;
 	remote_side->cross_endian = FALSE;
 	gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, REPL_FETCH_RESYNC, MIN_REPL_MSGLEN,
@@ -270,22 +271,22 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		switch(msg.type)
 		{
 			case REPL_OLD_NEED_INSTANCE_INFO:
-				assert(NULL != jnlpool.repl_inst_filehdr);
+				assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
 				old_need_instinfo_msg = (repl_old_needinst_msg_ptr_t)&msg;
 				repl_log(stdout, TRUE, TRUE, "Received REPL_OLD_NEED_INSTANCE_INFO message from primary "
 					"instance [%s]\n", old_need_instinfo_msg->instname);
-				if (jnlpool.repl_inst_filehdr->is_supplementary)
+				if (jnlpool->repl_inst_filehdr->is_supplementary)
 				{	/* Issue REPL2OLD error because this is a supplementary instance and remote side runs
 					 * on a GT.M version that does not understand the supplementary protocol */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
 							LEN_AND_STR(old_need_instinfo_msg->instname),
-							LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+							LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 				}
 				remote_side->proto_ver = old_need_instinfo_msg->proto_ver;
 				assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 				assert(REPL_PROTO_VER_SUPPLEMENTARY > remote_side->proto_ver);
 				memset(&old_instinfo_msg, 0, SIZEOF(old_instinfo_msg));
-				memcpy(old_instinfo_msg.instname, jnlpool.repl_inst_filehdr->inst_info.this_instname,
+				memcpy(old_instinfo_msg.instname, jnlpool->repl_inst_filehdr->inst_info.this_instname,
 					MAX_INSTNAME_LEN - 1);
 				old_instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
 				murgbl.was_rootprimary = old_instinfo_msg.was_rootprimary;
@@ -337,7 +338,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for "
 						"Seqno %llu [0x%llx]\n", histinfo_seqno, histinfo_seqno);
 				assert(REPL_PROTO_VER_UNINITIALIZED != remote_side->proto_ver);
-				assert(NULL != jnlpool.jnlpool_dummy_reg);
+				assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg));
 				/* repl_inst_wrapper_triple_find_seqno needs the ftok lock on the replication instance file. But,
 				 * But, ROLLBACK already holds JNLPOOL and RECVPOOL access semaphores and so asking for ftok lock
 				 * can result in potential deadlocks. Since we hold the JNLPOOL and RECVPOOL semaphores, no one
@@ -379,9 +380,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				repl_log(stdout, TRUE, TRUE, "Received REPL_RESYNC_SEQNO message\n");
 				if (REPL_PROTO_VER_UNINITIALIZED == remote_side->proto_ver)
 				{	/*  Issue REPL2OLD error because primary is dual-site */
-					assert(NULL != jnlpool.repl_inst_filehdr);
+					assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
-						LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname));
+						LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 				}
 				assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 				/* The following fields dont need to be initialized since they are needed (for internal filter
@@ -466,6 +467,6 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	 * only 100 + 1. So the unified jnl_seqno 101 is a lot less than the strm_seqno of 1,000,001. This is a valid scenario
 	 * and there is nothing in the code that otherwise requires this ordering for their correct operation.
 	 */
-	assert((*resync_seqno <= max_reg_seqno) || jnlpool.repl_inst_filehdr->is_supplementary);
+	assert((*resync_seqno <= max_reg_seqno) || jnlpool->repl_inst_filehdr->is_supplementary);
 	return SS_NORMAL;
 }

@@ -24,10 +24,11 @@
 #include "min_max.h"		/* needed for gdsblkops.h */
 #include "gdsblkops.h"
 #include "sec_shr_blk_build.h"
+#include "repl_msg.h"		/* needed for jnlpool_addrs_ptr_t */
+#include "gtmsource.h"		/* needed for jnlpool_addrs_ptr_t */
 #include "secshr_db_clnup.h"
 
-int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
-			cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
+void	sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	unsigned char	*ptr;
@@ -39,6 +40,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	assert(csa->now_crit || (ctn < csd->trans_hist.curr_tn));
 	assert(!csa->now_crit || (ctn == csd->trans_hist.curr_tn));
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
+	assert(array->len);
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
 
@@ -65,5 +67,4 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			memmove(ptr, seg->addr, seg->len);
 		}
 	}
-	return TRUE;
 }

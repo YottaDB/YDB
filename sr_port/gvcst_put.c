@@ -53,8 +53,11 @@
 #include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
+#include "is_file_identical.h"
+#include "anticipatory_freeze.h"
 
 /* Include prototypes */
+#include "wbox_test_init.h"
 #include "t_write.h"
 #include "t_write_root.h"
 #include "t_end.h"
@@ -78,6 +81,7 @@
 #ifdef DEBUG
 #include "mvalconv.h"
 #endif
+#include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 
 #ifdef GTM_TRIGGER
 LITREF	mval	literal_null;
@@ -106,7 +110,8 @@ GBLREF	int4			prev_first_off, prev_next_off;
 GBLREF	uint4			update_trans;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			process_id;
 GBLREF	uint4			update_array_size, cumul_update_array_size;	/* the current total size of the update array */
@@ -136,6 +141,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	mval			*post_incr_mval;
 GBLREF	mval			increment_delta_mval;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	enum gtmImageTypes	image_type;
@@ -561,7 +567,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		ztwormhole_used = FALSE;
 	}
 #	endif
-	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
+	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
 	blk_size = csd->blk_size;
 	blk_reserved_bytes = parms->blk_reserved_bytes;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
@@ -596,6 +602,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		|| (IS_STATSDB_REGNAME(gv_cur_region) && !gv_cur_region->read_only && csa->orig_read_write));
 #	endif
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	DISALLOW_MULTIINST_UPDATE_IN_TP(dollar_tlevel, jnlpool_head, csa, first_sgm_info, FALSE);
 	/* this needs to be initialized before any code that does a "goto retry" since this gets used there */
 	save_targ = gv_target;
 	gbl_target_was_set = (INVALID_GV_TARGET != reset_gv_target);

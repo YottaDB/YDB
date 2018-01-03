@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2014 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,16 +79,16 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 		 * op_bindparm happen without a push_parm in between, do not attempt to use a previously utilized
 		 * parameter set.
 		 */
-		if ((PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer) || (SAFE_TO_OVWRT <= prev_count))
+		if ((0 == (TREF(parm_pool_ptr))->start_idx) || (SAFE_TO_OVWRT <= prev_count)
+				|| (DBG_ASSERT(2 <= (TREF(parm_pool_ptr))->start_idx)
+					(PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer)))
 			actc = 0;
 		else
 		{	/* Acquire mask, actual count, and pointer to actual list from the parameter pool. */
+			assert(1 <= (TREF(parm_pool_ptr))->start_idx);
 			mask = (*(curr_slot - 1)).mask_and_cnt.mask;
 			actc = prev_count;
-			if (0 == (TREF(parm_pool_ptr))->start_idx)
-				actp = &((*(TREF(parm_pool_ptr))->parms).actuallist);
-			else
-				actp = &((*(curr_slot - SLOTS_NEEDED_FOR_SET(actc))).actuallist);
+			actp = &((*(curr_slot - SLOTS_NEEDED_FOR_SET(actc))).actuallist);
 		}
 	} else
 		/* If the parameter pool is uninitialized, there are no parameters we can bind. */

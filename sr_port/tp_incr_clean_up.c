@@ -377,6 +377,7 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 			temp_kill_set = si->kill_set_head;
 			FREE_KILL_SET(temp_kill_set);
 			si->kill_set_head = si->kill_set_tail = NULL;
+			assert(NULL == si->kip_csa);
 		}
 		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, FALSE);
 		DEBUG_ONLY(invalidate = FALSE;)
@@ -385,24 +386,24 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 			deleted = delete_hashtab_int4(si->blks_in_use, (uint4 *)&th->blk_num);
 			assert(deleted);
 			si->num_of_blks--;
-			DEBUG_ONLY(
-				/* this is prior code which is no longer deemed necessary since invalidating clues of all
-				 * blk_targets is now done above and the directory tree should also be covered by that.
-				 * hence the DEBUG_ONLY surrounding for the statements below. --- nars -- 2002/07/26
-				 */
-				if ((csa->dir_tree->read_local_tn == local_tn) && !invalidate)
+#			ifdef DEBUG
+			/* this is prior code which is no longer deemed necessary since invalidating clues of all
+			 * blk_targets is now done above and the directory tree should also be covered by that.
+			 * hence the DEBUG_ONLY surrounding for the statements below. --- nars -- 2002/07/26
+			 */
+			if ((csa->dir_tree->read_local_tn == local_tn) && !invalidate)
+			{
+				for (tp_srch_status = csa->dir_tree->hist.h;
+					HIST_TERMINATOR != (blk = tp_srch_status->blk_num); tp_srch_status++)
 				{
-					for (tp_srch_status = csa->dir_tree->hist.h;
-						HIST_TERMINATOR != (blk = tp_srch_status->blk_num); tp_srch_status++)
+					if (tp_srch_status->first_tp_srch_status == th)
 					{
-						if (tp_srch_status->first_tp_srch_status == th)
-						{
-							invalidate = TRUE;
-							break;
-						}
+						invalidate = TRUE;
+						break;
 					}
 				}
-			)
+			}
+#			endif
 		}
 		assert(!invalidate || (0 == csa->dir_tree->clue.end));
 		si->last_tp_hist = tli->tlvl_tp_hist_info;
@@ -413,6 +414,7 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 		temp_kill_set = si->kill_set_head;
 		FREE_KILL_SET(temp_kill_set);
 		si->kill_set_head = si->kill_set_tail = NULL;
+		assert(NULL == si->kip_csa);
 		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, TRUE);
 		reinitialize_hashtab_int4(si->blks_in_use);
 		si->num_of_blks = 0;

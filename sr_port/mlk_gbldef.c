@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,10 @@
  *								*
  ****************************************************************/
 
-#ifndef LK_CHECK_OWN_INCLUDED
-#define LK_CHECK_OWN_INCLUDED
+#include "mdef.h"
+#include "mlkdef.h"
 
-boolean_t lk_check_own(mlk_pvtblk *x);
-
-#endif /* LK_CHECK_OWN_INCLUDED */
+GBLDEF bool remlkreq=FALSE;
+GBLDEF mlk_pvtblk *mlk_pvt_root = 0;
+GBLDEF unsigned short lks_this_cmd;
+GBLDEF unsigned char cm_action;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,6 +158,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		if (NULL == ks)		/* Allocate first kill set to sgm_info_ptr block */
 		{
 			ks = sgm_info_ptr->kill_set_tail = sgm_info_ptr->kill_set_head = (kill_set *)malloc(SIZEOF(kill_set));
+			assert(NULL == sgm_info_ptr->kip_csa);
 			ks->used = 0;
 			ks->next_kill_set = NULL;
 		}

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,13 +18,17 @@
 #include "op.h"
 #include "io.h"
 #include "fix_xfer_entry.h"
+#include "restrict.h"
 
 GBLREF stack_frame	*frame_pointer;
-GBLREF mval 		zstep_action;
+GBLREF int4		gtm_trigger_depth;
 GBLREF xfer_entry_t	xfer_table[];
+GBLREF mval 		zstep_action;
 
 void op_zst_break(void)
 {
+	if ((0 < gtm_trigger_depth) && (RESTRICTED(trigger_mod)))
+		return;
 	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
 	FIX_XFER_ENTRY(xf_linestart, op_linestart);
 	FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);

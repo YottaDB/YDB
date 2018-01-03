@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,7 @@ char *s2n (mval *u)
 	}
 	digit = (0 != z) || (0 != y) || (0 != zero);
 	x = 0;
-	exp = ('E' == *c) && digit;
+	exp = (c < eos) && ('E' == *c) && digit;
 	if (exp && ((c + 1) < eos))
 	{
 		w = c;	/* save pointer to return in case expression following E is not a valid exponent */

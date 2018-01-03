@@ -558,8 +558,8 @@
    -FR[EEZE]=value
    -FU[LLY_UPGRADED]=boolean
    -GV[STATSRESET]
-   -HARD_SPIN_CPUNT=Mutex-hard-spin-sount
-   -[HEXLOCATION]=value
+   -HA[RD_SPIN_COUNT]=Mutex-hard-spin-count
+   -HE[XLOCATION]=value
    -INT[ERRUPTED_RECOV]=boolean
    -JNL_YIELD_LIMIT=journal-yeild-limit
    -KE[Y_MAX_SIZE]=key-max-size
@@ -710,9 +710,9 @@
    -AB[ANDONED_KILLS]=value
 
    Changes the value of the Abandoned Kills field. The value can be "NONE" or
-   a positive integer.
+   a decimal positive integer.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -BLK[_SIZE]=block_size
 
@@ -735,7 +735,7 @@
 
    -BLO[CKS_FREE]=free blocks
 
-   Changes the free blocks field of the current file.
+   Changes the hexidecimal free blocks field of the current file.
 
    Use this to correct a value that MUPIP INTEG reports as needing a
    correction, but note that the "correct" value reported by INTEG may go
@@ -755,15 +755,15 @@
 
    -D[ATABASE]=transaction_number
 
-   Changes the transaction number in the file header of the last
+   Changes the hexidecimal transaction number in the file header of the last
    comprehensive backup to the value specified. Use this qualifier only in
    conjunction with the -FILEHEADER qualifier. For compatibility issues with
    prior versions, this can still be specified as -B_COMPREHENSIVE.
 
    -B_R[ECORD]=transaction_number
 
-   Changes the transaction number in the file header field that maintains
-   this information about the last -RECORD backup.
+   Changes the hexidecimal transaction number in the file header field that
+   maintains this information about the last -RECORD backup.
 
    -CO[RRUPT_FILE]=boolean
 
@@ -787,14 +787,14 @@
 
    -COM[MITWAIT_SPIN_COUNT]=value
 
-   Specifies the number of times a GT.M process waiting for control of a
-   block to complete a block update should spin before yielding the CPU when
-   GT.M runs on SMP machines. When run on a uniprocessor system, GT.M ignores
-   this parameter. On SMP systems, when a process needs a critical section
-   that another process has, if critical sections are short (as they are by
-   design in GT.M), spinning a little with the expectation that the process
-   with the critical section will release it shortly provides a way to
-   enhance performance at the cost of increased CPU usage. Eventually, a
+   Specifies the decimal number of times a GT.M process waiting for control
+   of a block to complete a block update should spin before yielding the CPU
+   when GT.M runs on SMP machines. When run on a uniprocessor system, GT.M
+   ignores this parameter. On SMP systems, when a process needs a critical
+   section that another process has, if critical sections are short (as they
+   are by design in GT.M), spinning a little with the expectation that the
+   process with the critical section will release it shortly provides a way
+   to enhance performance at the cost of increased CPU usage. Eventually, a
    process awaiting a critical section yields the CPU if spinning for a
    little does not get it the needed critical section. Note that on heavily
    loaded systems, increasing COMMITWAIT_SPIN_COUNT may not trade off CPU for
@@ -808,7 +808,7 @@
 
    -CU[RRENT_TN]=transaction_number
 
-   Changes the current transaction number for the current region.
+   Changes the hexidecimal current transaction number for the current region.
 
      o Raising the -CURRENT_TN can correct "block transaction number too
        large" errors
@@ -821,10 +821,10 @@
 
    -DECLOCATION
 
-   Specifies an offset with the file header. If -VALUE is specified, GT.M
-   puts it at that location.
+   Specifies an offset with the file header. If -VALUE is specified (in
+   decimal), GT.M puts it at that location.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -E[NCRYPTION_HASH]
 
@@ -886,10 +886,10 @@
 
    -HEXLOCATION
 
-   Specifies an offset with the file header. If -VALUE is specified, GT.M
-   puts it at that location.
+   Specifies a hexadecimal offset with the file header. If -VALUE is
+   specified, GT.M puts it at that location.
 
-   Use only with: -FILEHEADER; hexadecimal
+   Use only with: -FILEHEADER
 
    -INT[ERRUPTED_RECOV]=boolean
 
@@ -910,14 +910,14 @@
    region. This prepares for future MUPIP CREATEs and performs a consistency
    check on the key and record size values.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -KI[LL_IN_PROG]=value
 
    Changes the value of the KILLs in progress field. The value can be "NONE"
-   or a positive integer.
+   or a positive decimal integer.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -N[ULL_SUBSCRIPTS]=value
 
@@ -976,52 +976,64 @@
 
    -RESYNC_S[EQNO]=sequence-number
 
-   In an LMS environment, this sets the "Resync Seqno" field.
+   In an LMS environment, this sets the hexidecimal value of the "Resync
+   Seqno" field.
 
    -RESYNC_T[N]=sequence-number
 
-   In an LMS environment, this sets the "Resync transaction" field.
+   In an LMS environment, this sets the hexidecimal value ofthe "Resync
+   transaction" field.
 
    -SPIN_SLEEP_MASK]=hexadecimal-mask
 
-   Changes the Spin sleep time mask that controls the maximum time in
-   nanoseconds the process sleeps on a sleep spin; zero (0), the default
-   causes the process to just yield to the OS scheduler.
+   Changes the hexadecimal Spin sleep time mask that controls the maximum
+   time in nanoseconds the process sleeps on a sleep spin; zero (0), the
+   default causes the process to just yield to the OS scheduler.
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
 
    -SLEE[P_SPIN_COUNT]=integer
 
-   Changes the Mutex Sleep Spin Count that controls the number of times a
-   process waiting on a shared resource (usually a database) suspends its
-   activity after exhausting its Mutex Hard Spin Count and before enquing
+   Changes the hexadecimal Mutex Sleep Spin Count that controls the number of
+   times a process waiting on a shared resource (usually a database) suspends
+   its activity after exhausting its Mutex Hard Spin Count and before enquing
    itself to be awakened by a process releasing the resource
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
+
+   -[NO]STD[NULLCOL]
+
+   Changes the collation of empty string ("NULL") subscripts for the database
+   file. Although it is not the default, STDNULLCOLL is required with certain
+   other characteristics, and highly recommended in any case. If you change
+   this when there are existing "NULL" subscripts the results may be
+   problematic. FIS recommends you establish this characteristic with GDE and
+   load data with a consistent setting.
+
+   Use only with: -FILEHEADER
 
    -STRM_NUM=stream-number -STRM_R[EG_SEQNO]=str_num's_region_sequence_number
 
-   Changes the Stream and its Reg Seqno. Use -STRM_NUM and -STRM_REG_SEQNO
-   together as part of the same CHANGE -FILEHEADER command.
+   Changes the hexadecimal values of Stream and its Reg Seqno. Use -STRM_NUM
+   and -STRM_REG_SEQNO together as part of the same CHANGE -FILEHEADER
+   command.
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
 
    -TI[MERS_PENDING]=timers_pending
 
-   -TI[MERS_PENDING]=timers_pending
-
-   Sets a field that tracks the number of processes considering a timed
-   flush. Proper values are 0, 1, and 2.
+   Sets a field that tracks the decimal number of processes considering a
+   timed flush. Proper values are 0, 1, and 2.
 
    Use the CHANGE -TIMERS_PENDING qualifier only upon receiving instructions
    from FIS.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -TO[TAL_BLKS]=total_blocks
 
-   Changes the total blocks field of the current file. Use only with:
-   -FILEHEADER; decimal
+   Changes the hexidecimal total blocks field of the current file. Use only
+   with: -FILEHEADER
 
    **Caution**
 
@@ -2963,7 +2975,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-001 of the
+   This help file is a concise representation of revision V6.3-003 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

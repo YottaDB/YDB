@@ -74,8 +74,6 @@
 #define ACCEPT_COMPLETE		"ACCEPT_COMPLETE"
 #define PROTOCOL_ERROR		"Protocol Error"
 
-#define DOLLAR_DEVICE_PREFIX	"1,"
-
 GBLREF	d_socket_struct		*socket_pool;
 GBLREF	io_pair			io_std_device;
 GBLREF	int4			gtm_max_sockets;
@@ -282,11 +280,10 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 			cancel_timer(timer_id);
 		iod->dollar.za = 9;
 		errptr = PROTOCOL_ERROR;
-		errlen = STR_LIT_LEN(PROTOCOL_ERROR);
-		MEMCPY_LIT(iod->dollar.device, DOLLAR_DEVICE_PREFIX);
-		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, ERR_TEXT, 2, errlen, errptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, ERR_TEXT, 2, STR_LIT_LEN(PROTOCOL_ERROR),
+				errptr);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
@@ -314,10 +311,7 @@ ioerr:
 	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
 	iod->dollar.za = 9;
-	errptr = (char *)STRERROR(save_errno);
-	errlen = strlen(errptr);
-	MEMCPY_LIT(iod->dollar.device, DOLLAR_DEVICE_PREFIX);
-	memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
+	SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 	if (socketptr->ioerror)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, save_errno, 0);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -449,11 +443,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	{
 		iod->dollar.za = 9;
 		errptr = PROTOCOL_ERROR;
-		errlen = STR_LIT_LEN(PROTOCOL_ERROR);
-		MEMCPY_LIT(iod->dollar.device, DOLLAR_DEVICE_PREFIX);
-		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, STR_LIT_LEN(PROTOCOL_ERROR),
+				errptr);
 	}
 	cmsg = CMSG_FIRSTHDR(&msg);
 	while((cmsg != NULL) && ((SOL_SOCKET != cmsg->cmsg_level) || (SCM_RIGHTS != cmsg->cmsg_type)))
@@ -556,11 +549,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		}
 		iod->dollar.za = 9;
 		errptr = PROTOCOL_ERROR;
-		errlen = STR_LIT_LEN(PROTOCOL_ERROR);
-		MEMCPY_LIT(iod->dollar.device, DOLLAR_DEVICE_PREFIX);
-		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, STR_LIT_LEN(PROTOCOL_ERROR),
+				errptr);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
@@ -612,10 +604,7 @@ ioerr:
 	if ((EINTR != save_errno) || outofband)
 	{
 		iod->dollar.za = 9;
-		errptr = (char *)STRERROR(save_errno);
-		errlen = strlen(errptr);
-		MEMCPY_LIT(iod->dollar.device, DOLLAR_DEVICE_PREFIX);
-		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
+		SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKACCEPT, 0, save_errno, 0);
 	}

@@ -64,9 +64,8 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF  gld_dbname_list		*upd_db_files;
-GBLREF	boolean_t	        pool_init;
-GBLREF	jnlpool_addrs	        jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	int		        pool_init;
+GBLREF	jnlpool_addrs_ptr_t     jnlpool;
 GBLREF	void                    (*call_on_signal)();
 GBLREF	FILE			*updproc_log_fp;
 
@@ -83,15 +82,15 @@ void  updproc_stop(boolean_t exit)
 	call_on_signal = NULL;	/* Don't reenter on error */
 	if (pool_init)
 	{
-		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);
-		jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		jnlpool_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-			jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
+			jnlpool_strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];
 		log_seqno = recvpool.recvpool_ctl->jnl_seqno;
 		log_seqno1 = recvpool.upd_proc_local->read_jnl_seqno;
 		strm_idx = recvpool.gtmrecv_local->strm_index;
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 		{
@@ -105,12 +104,13 @@ void  updproc_stop(boolean_t exit)
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
 		if (!INST_FREEZE_ON_ERROR_POLICY)
 		{
-			mutex_cleanup(jnlpool.jnlpool_dummy_reg);
+			mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 			JNLPOOL_SHMDT(jnlpool, status, save_errno);
 			if (0 > status)
 				repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", STRERROR(save_errno));
 			assert(!pool_init);
 		}
+		pool_init--;
 	}
 	recvpool.upd_proc_local->upd_proc_shutdown = NORMAL_SHUTDOWN;
 	/* The receiver server needs to do a WAITPID on the update process so that the STOPed update process can be

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 GBLREF	int			num_additional_processors;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			process_exiting;
 GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 GBLREF	gv_namehead		*gv_target_list;
@@ -192,6 +192,17 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	{
 		change_reg();
 		gvusr_rundown();
+		return EXIT_NRM;
+	}
+	/* If this is a read-only database, simply return */
+	if (cs_data->read_only)
+	{
+		if (0 != sem_rmid(udi->semid))
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
+		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
+		udi->grabbed_access_sem = FALSE;
+		udi->counter_acc_incremented = FALSE;
 		return EXIT_NRM;
 	}
 	/* If this region has a corresponding statsdb region that is open, close that first. This is needed to ensure
@@ -300,7 +311,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 				      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
 		}
-		may_bypass_ftok = CAN_BYPASS(ftok_semval, csd, inst_is_frozen); /* Do we need a blocking wait? */
+		may_bypass_ftok = CAN_BYPASS(ftok_semval, csa, inst_is_frozen); /* Do we need a blocking wait? */
 		/* We need to guarantee that no one else access database file header when semid/shmid fields are reset.
 		 * We already have created ftok semaphore in db_init or mu_rndwn_file and did not remove it. So just lock it.
 		 */
@@ -344,7 +355,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 					      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
 			}
-			bypassed_access = CAN_BYPASS(semval, csd, inst_is_frozen) || onln_rlbk_pid || csd->file_corrupt;
+			bypassed_access = CAN_BYPASS(semval, csa, inst_is_frozen) || onln_rlbk_pid || csd->file_corrupt;
 			/* Before attempting again in the blocking mode, see if the holding process is an online rollback.
 			 * If so, it is likely we won't get the access control semaphore anytime soon. In that case, we
 			 * are better off skipping rundown and continuing with sanity cleanup and exit.
@@ -403,9 +414,14 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	/* If we bypassed any of the semaphores, activate safe mode.
 	 * Also, if the replication instance is frozen and this db has replication turned on (which means
 	 * no flushes of dirty buffers to this db can happen while the instance is frozen) activate safe mode.
+	 * Similarly, if there is an online freeze in place, we need to avoid writing to the file, so we need
+	 * to keep shared memory around.
+	 * Or if an online freeze has been autoreleased, we need to keep shared memory around so that it can be
+	 * reported and cleaned up by a subsequent MUPIP FREEZE -OFF.
 	 */
 	ok_to_write_pfin = !(bypassed_access || bypassed_ftok || inst_is_frozen);
-	safe_mode = !ok_to_write_pfin || ftok_counter_halted || access_counter_halted || FROZEN_CHILLED(csd);
+	safe_mode = !ok_to_write_pfin || ftok_counter_halted || access_counter_halted || FROZEN_CHILLED(csa)
+			|| CHILLED_AUTORELEASE(csa);
 	/* At this point we are guaranteed no one else is doing a db_init/rundown as we hold the access control semaphore */
 	assert(csa->ref_cnt);	/* decrement private ref_cnt before shared ref_cnt decrement. */
 	csa->ref_cnt--;
@@ -446,7 +462,11 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 			      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
 	if (NULL != csa->ss_ctx)
+	{
 		ss_destroy_context(csa->ss_ctx);
+		free(csa->ss_ctx);
+		csa->ss_ctx = NULL;
+	}
 	/* SS_MULTI: If multiple snapshots are supported, then we have to run through each of the snapshots */
 	assert(1 == MAX_SNAPSHOTS);
 	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
@@ -471,7 +491,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * consistent state.
 	 * Or if we have an Online Freeze, skip flushing, as that will be handled when the freeze is removed.
 	 */
-	if (!cnl->donotflush_dbjnl && !reg->read_only && !vermismatch && !FROZEN_CHILLED(csd))
+	if (!cnl->donotflush_dbjnl && !reg->read_only && !vermismatch)
 	{	/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover. Do it ONLY
 		 * if there is NO concurrent online rollback running (as we need crit to set wc_blocked)
 		 */
@@ -527,7 +547,13 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 * In this case, since we are running down, we don't have any such option.
 			 * If we are in safe_mode, we won't get here, so no need to check for online freeze.
 			 */
-			cnl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+			if (!FROZEN_CHILLED(csa))
+				cnl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+			else
+			{
+				jnl_wait(reg);
+				cnl->remove_shm = FALSE;
+			}
 			if (!cnl->remove_shm)
 			{	/* If "wcs_flu" call fails, then we should not remove shm or reset anything in the db fileheader.
 				 * So reset "we_are_last_writer" variable itself as that makes it more safer to fall through to
@@ -566,7 +592,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 */
 			db_needs_flushing = (cnl->last_wcsflu_tn < csa->ti->curr_tn);
 			if (db_needs_flushing)
-				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+				if (!FROZEN_CHILLED(csa))
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+				else
+					jnl_wait(reg);
 			/* Same as above "wcs_flu" */
 			IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
 			assert(is_mm || (csd == cs_data));
@@ -578,23 +607,24 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			jpc = csa->jnl;
 			jbp = jpc->jnl_buff;
 			if (jbp->fsync_in_prog_latch.u.parts.latch_pid == process_id)
-                        {
-                                assert(FALSE);
-                                COMPSWAP_UNLOCK(&jbp->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
-                        }
-                        if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
-                        {
-                                assert(FALSE);
-                                COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, LOCK_AVAILABLE);
-                        }
+			{
+				assert(FALSE);
+				COMPSWAP_UNLOCK(&jbp->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
+			}
+			if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
+			{
+				assert(FALSE);
+				COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, LOCK_AVAILABLE);
+			}
 			/* If we are last writer, it is possible cnl->remove_shm is set to FALSE from the "wcs_flu" call
 			 * above (e.g. we are source server and "wcs_flu" noticed a phase2 commit that need to be cleaned up
 			 * which needs a "wcs_recover" call but that is a no-op for the source server). So check that
 			 * additionally. Thankfully "we_are_last_writer" would have already factored that into account above
 			 * ("we_are_last_writer && cnl->remove_shm" code block above). So no additional check needed below.
 			 */
-			if ((((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
-			     || we_are_last_writer && (0 != cnl->jnl_file.u.inode)) && ok_to_write_pfin)
+			if (ok_to_write_pfin && !FROZEN_CHILLED(csa)
+					&& (((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
+							|| (we_are_last_writer && (0 != cnl->jnl_file.u.inode))))
 			{	/* We need to close the journal file cleanly if we have the latest generation journal file open
 				 *	or if we are the last writer and the journal file is open in shared memory (not necessarily
 				 *	by ourselves e.g. the only process that opened the journal got shot abnormally)
@@ -674,12 +704,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				}
 			}
 		}
-		if (we_are_last_writer)		/* Flush the fileheader last and harden the file to disk */
-		{
+		if (we_are_last_writer && !FROZEN_CHILLED(csa))
+		{	/* Flush the fileheader last and harden the file to disk */
 			if (!was_crit)
 				grab_crit(reg);			/* To satisfy crit requirement in fileheader_sync() */
 			memset(csd->machine_name, 0, MAX_MCNAMELEN); /* clear the machine_name field */
-			if (we_are_last_user)
+			if (we_are_last_user && !CHILLED_AUTORELEASE(csa))
 			{
 				csd->shmid = INVALID_SHMID;
 				csd->gt_shm_ctime.ctime = 0;
@@ -807,7 +837,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * If cnl->donotflush_dbjnl is TRUE, it means we can safely remove shared memory without compromising data
 	 * integrity as a reissue of recover will restore the database to a consistent state.
 	 */
-	remove_shm = !vermismatch && (cnl->remove_shm || cnl->donotflush_dbjnl);
+	remove_shm = !vermismatch && (cnl->remove_shm || cnl->donotflush_dbjnl) && !CHILLED_AUTORELEASE(csa);
 	/* We are done with online rollback on this region. Indicate to other processes by setting the onln_rlbk_pid to 0.
 	 * Do it before releasing crit (t_end relies on this ordering when accessing cnl->onln_rlbk_pid).
 	 */
@@ -864,7 +894,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			{
 				if (0 != sem_rmid(udi->semid))
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
+						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
 				udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
@@ -872,7 +902,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (is_statsDB)
 			{
 				STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
-				assert(baseDBreg->open);
 				baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 				baseDBnl = baseDBcsa->nl;
 				baseDBnl->statsdb_rundown_clean = TRUE;

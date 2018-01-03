@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,9 @@
 #include "stringpool.h"
 
 LITREF octabstruct	oc_tab[];
+
+error_def(ERR_NUMOFLOW);
+error_def(ERR_PATNOTFOUND);
 
 void bx_boollit(triple *t)
 /* search the Boolean in t (recursively) for literal leaves; the logic is similar to bx_tail
@@ -100,8 +103,17 @@ void bx_boollit(triple *t)
 					} else if (MV_NM & mv->mvtype)
 						mv->sgn = !mv->sgn;
 				} else
+				{
 					s2n(mv);
+					if (!(MV_NM & mv->mvtype))
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+						assert(TREF(rts_error_in_parse));
+						return;
+					}
+				}
 				n2s(mv);
+				assert((MV_NM & mv->mvtype) && (MV_STR & mv->mvtype));
 				v[j] = mv;
 				assert(ref0 == optrip[j]);
 				put_lit_s(v[j], ref0);
@@ -126,23 +138,12 @@ void bx_boollit(triple *t)
 	} else if (OC_LIT == optrip[1]->opcode)
 		j = 1;
 	if (2 == j)
-	{	/* Both sides are literals; remove them */
+	{
 		for (j = 0;  j < ARRAYSIZE(v); j++)
-		{	/* both arguments are literals, so do the operation at compile time */
-			/* We don't need any COBOOLs, and all the negatives/coms should be out */
-			for (ref0 = t->operand[j].oprval.tref; ref0 != optrip[j]; ref0 = ref0->operand[0].oprval.tref)
-			{
-				assert((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode));
-				dqdel(ref0, exorder);
-				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
-			}
+		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
 			tv[j] = (0 != v[j]->m[1]);
-			unuse_literal(v[j]);
-			optrip[j]->opcode = OC_NOOP;	/* shouldn't dqdel be safe? */
-			optrip[j]->operand[0].oprclass = NO_REF;
 		}
-		t->operand[1].oprclass = NO_REF;
 		switch (t->opcode)
 		{	/* optimize the Boolean operations here */
 		case OC_NAND:
@@ -178,13 +179,11 @@ void bx_boollit(triple *t)
 			break;
 		case OC_NPATTERN:
 		case OC_PATTERN:
+			if (TREF(xecute_literal_parse))
+				return;
 			tvr = !(*(uint4 *)v[1]->str.addr) ? do_pattern(v[0], v[1]) : do_patfixed(v[0], v[1]);
-			/* It is possible "do_patfixed" is invoked above and has a compile-time error. In that case,
-			 * "ins_errtriple" would be invoked which does a "dqdelchain" that could remove "t" from
-			 * the "t_orig" triple execution chain and so it is no longer safe to play with "t".
-			 * Hence the RETURN_IF_RTS_ERROR check below.
-			 */
-			RETURN_IF_RTS_ERROR;
+			if (ERR_PATNOTFOUND == TREF(source_error_found))
+				return;
 			break;
 		case OC_NSORTS_AFTER:
 		case OC_SORTS_AFTER:
@@ -193,6 +192,20 @@ void bx_boollit(triple *t)
 		default:
 			assertpro(FALSE);
 		}
+		for (j = 0;  j < ARRAYSIZE(v); j++)
+		{	/* finish cleaning up the original triples */
+			/* We don't need any COBOOLs, and all the negatives/coms should be out */
+			for (ref0 = t->operand[j].oprval.tref; ref0 != optrip[j]; ref0 = ref0->operand[0].oprval.tref)
+			{
+				assert((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode));
+				dqdel(ref0, exorder);
+				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
+			}
+			unuse_literal(v[j]);
+			optrip[j]->opcode = OC_NOOP;	/* shouldn't dqdel be safe? */
+			optrip[j]->operand[0].oprclass = NO_REF;
+		}
+		t->operand[1].oprclass = NO_REF;
 		if (OCT_NEGATED & oc_tab[t->opcode].octype)
 			tvr = !tvr;
 		ref0 = maketriple(OC_LIT);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -264,7 +264,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(ss_lock_held_by_us(reg));
 	ss_release_lock(reg);
 	/* For a readonly database for the current process, we better have the region frozen */
-	assert(!reg->read_only || FROZEN_HARD(csd));
+	assert(!reg->read_only || FROZEN_HARD(csa));
 	/* ============================ STEP 1 : Shadow file name construction ==============================
 	 *
 	 * --> Directory is taken from GTM_SNAPTMPDIR, if available, else GTM_BAK_TEMPDIR_LOG_NAME_UC, if available,
@@ -289,6 +289,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	tempdir_log.addr = GTM_SNAPTMPDIR;
 	tempdir_log.len = STR_LIT_LEN(GTM_SNAPTMPDIR);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	tempdir_full.len = SIZEOF(tempdir_full_buffer);
 	/* Check if the  environment variable is defined or not.
 	 * Side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether TRANS_LOG_NAME
 	 * succeeded or not.

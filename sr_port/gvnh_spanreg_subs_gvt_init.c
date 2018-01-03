@@ -85,7 +85,7 @@ void gvnh_spanreg_subs_gvt_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, viewparm *p
 			 * as we are going to add it to the gvt_pending_list anyways.
 			 */
 			if ((NULL == parmblk) && !reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			gvt = (gv_namehead *)targ_alloc(reg->max_key_size, &name_gvt->gvname, reg);
 			COPY_ACT_FROM_GVNH_REG_TO_GVT(gvnh_reg, gvt, reg);
 			/* See comment in GVNH_REG_INIT macro for why the below assignment is

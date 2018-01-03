@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,10 +23,14 @@
 #include "mlkdef.h"
 #include "filestruct.h"
 #include "lockdefs.h"
-#include "lk_check_own.h"
+#include "mlk_check_own.h"
 #include "is_proc_alive.h"
+#include "interlock.h"
 
-GBLREF	short	crash_count;
+GBLREF	short		crash_count;
+#ifdef DEBUG
+GBLREF	unsigned int	t_tries;
+#endif
 
 /*
  * ------------------------------------------------
@@ -38,7 +42,7 @@ GBLREF	short	crash_count;
  *	FALSE - otherwise
  * ------------------------------------------------
  */
-boolean_t	lk_check_own(mlk_pvtblk *x)
+boolean_t	mlk_check_own(mlk_pvtblk *x)
 {
 	int4		status;
 	int4		icount, time[2];
@@ -48,11 +52,8 @@ boolean_t	lk_check_own(mlk_pvtblk *x)
 	if (!x->blocked)
 		return FALSE;
 	csa = &FILE_INFO(x->region)->s_addrs;
-	if (csa->critical)
-		crash_count = csa->critical->crashcnt;
-	was_crit = csa->now_crit;
-	if (!was_crit)
-		grab_crit(x->region);           /* check on process that owns lock */
+	GRAB_LOCK_CRIT(csa, x->region, was_crit);
+	assert((csa->lock_crit_with_db) || !csa->now_crit || (CDB_STAGNATE <= t_tries));
 	ret_val = FALSE;
 	if (x->blocked->owner)
 	{	/* There is an owner for the blocking node */
@@ -69,7 +70,6 @@ boolean_t	lk_check_own(mlk_pvtblk *x)
 		}
 	} else
 		ret_val = TRUE;	/* There is no owner. Take credit for freeing it.. */
-	if (!was_crit)
-		rel_crit(x->region);
+	REL_LOCK_CRIT(csa, x->region, was_crit);
 	return ret_val;
 }

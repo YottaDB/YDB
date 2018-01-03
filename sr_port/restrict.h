@@ -25,6 +25,8 @@ struct restrict_facilities
 	boolean_t	dse;
 	boolean_t	dmode;
 	boolean_t	zcmdline;
+	boolean_t	halt_op;
+	boolean_t	zhalt_op;
 };
 
 GBLREF	struct restrict_facilities	restrictions;

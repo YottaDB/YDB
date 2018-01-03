@@ -58,7 +58,13 @@
 
    In the YottaDB programming environment, source routines are generated and
    stored as standard UNIX files. They are created and edited with standard
-   UNIX text editors.
+   UNIX text editors. YottaDB accepts source lines of up to 8192 bytes. When
+   YottaDB encounters a line with a length greater than 8192 bytes in a source
+   file, it emits a %GTM-W-LSEXPECTED warning. This warning identifies cases
+   where a line greater than 8192 bytes is split into multiple lines, which
+   causes statements beyond the character prior to the limit to execute
+   irrespective of any starting IF, ELSE or FOR commands. The 8192 byte limit
+   applies to XECUTE command arguments and Direct Mode input as well.
 
    YottaDB is designed to work with the operating system utilities and enhances
    them when beneficial. The following sections describe the process of
@@ -2795,7 +2801,9 @@
    defined above. If, at run-time, the pattern codes come into use and no
    pattern definitions are available, YottaDB issues a run-time error
    (PATNOTFOUND). YottaDB does not currently implement a mechanism for Y and Z
-   patterns and continues to treat those as compile-time syntax errors.
+   patterns and continues to treat those as compile-time syntax errors. YottaDB
+   defers literal optimizations involving patterns within an XECUTE as well
+   as evaluations that encounter issues with the pattern table.
 
    Example:
 
@@ -2889,16 +2897,17 @@
    M provides timeouts as a tool to retain program control over commands of
    indefinite duration. A timeout consists of a colon (:) delimiter on an
    argument, followed by a numeric expression specifying the number of
-   seconds for M to attempt to execute the command. When the timeout is zero
-   (0), M makes a single attempt to complete the command.
+   seconds to millisecond (three decimal place) precision for M to attempt to
+   execute the command. When the timeout is zero (0), M makes a single
+   attempt to complete the command.
 
-   YottaDB has been designed to allow large timeout values, and to protect
-   against arithmetic overflow when converting large timeout values to
-   internal representations. When a command has a timeout, M maintains the
-   $TEST intrinsic special variable as the command completes. If the command
-   completes successfully, M sets $TEST to TRUE (1). If the command times out
-   before successful completion, M sets $TEST to FALSE (0). When a command
-   argument does not specify a timeout, M does not maintain $TEST.
+   YottaDB caps the maximum timeout to 999,999.999 seconds (about 11.5 days),
+   and converts values greater than the maximum timeout to that cap. When a
+   command has a timeout, M maintains the $TEST intrinsic special variable as
+   the command completes. If the command completes successfully, M sets $TEST
+   to TRUE (1). If the command times out before successful completion, M sets
+   $TEST to FALSE (0). When a command argument does not specify a timeout, M
+   does not maintain $TEST.
 
      o LOCK
      o JOB
@@ -3045,9 +3054,9 @@
 
    **Note**
 
-   While most commands and functions that use entryrefs permit argument
-   indirection, M does not accept indirection that resolves to a combination
-   of label and offset or offset and routine name.
+   YottaDB accepts an offset without a label (for example +3^RTN) for an
+   entryref argument to DO, GOTO and ZGOTO but prohibits the same during
+   paramter passing with the JOB command.
 
    Offsets provide an extremely useful tool for debugging. However, avoid
    their use in production code because they generally produce maintenance
@@ -3593,6 +3602,8 @@
     SET ^ID(NEXT)=RECORD,^XID(ZIP,NEXT)=""
     TCOMMIT
 
+   %GTM-I-TPRESTART, Database /gbls/dtx/dtx.dat; code: L; blk: 0x00BA13DD in glbl: ^DTX; pvtmods: 0, blkmods: 1, blklvl: 1, type: 4, readset: 3, writeset: 1, local_tn: 0x00000000000002D0, zpos: LABEL+108^ROUTINENAME
+
      * pvtmods - Is always less than or equal to blkmods. This means it can
        be 1 only if "blkmods" is also 1. If it is 1, it means that process P1
        was planning to UPDATE (not just READ) the block number (indicated as
@@ -3611,8 +3622,8 @@
      * type - A value of 0,1,2,4 shows the restart occurred in the TP
        transaction BEFORE executing TCOMMIT; whether it is a 0 or 1 or 2 or 4
        should not matter to the user. These values would typically be used
-       for debugging by Fidelity. A value of 3 shows the restart occurred at
-       TCOMMIT time.
+       for debugging by your YottaDB support channel. A value of 3 shows the
+       restart occurred at TCOMMIT time.
      * readset - The number of GDS blocks that accessed as part of this TP
        transaction in the region containing the global ("glbl: ..." in the
        TPRESTART message).
@@ -3626,6 +3637,20 @@
        local_tn values of two messages from the same process indicates the
        number of TP transactions done by that process in the time interval
        between the two messages.
+
+   **Note**
+
+     o Use VIEW [NO]LOGT[PRESTART][=intexpr] to enable or disable the logging
+       of TPRESTART messages. Note that you can use the
+       gtm_tprestart_log_delta and gtm_tprestart_log_first environment
+       variables to set the frequency of TPRESTART messages.
+     o Use VIEW [NO]LOGN[ONTP][=intexpr] to enable or disable the logging of
+       NONTPRESTART messages. This facility is the analog of TPRESTART
+       tracking, but for non-TP mini-transacstions. Note that you can use the
+       gtm_nontprestart_log_delta and gtm_nontprestart_log_first environment
+       variables to set the frequency of the NONTPRESTART messages.
+     o For more information, refer to "Key Words" and the Environment
+       Variables section of YottaDB Administration and Operations Guide.
 
 1 Commands
    Commands
@@ -4297,6 +4322,14 @@
    The format of the LOCK command is:
 
    L[OCK][:tvexpr] [[-|+]nref|(nref[,...])[:numexpr] [,...]]
+
+   Currently, LOCK of an argument within a parenthetical list where the
+   argument includes an extrinsic function that performs LOCK, ZALLOCATE or
+   ZDEALLOCATE actions produces a BADLOCKNEST error except where there is
+   only one such argument, it is the first argument in the list and the
+   LOCK'ng as a consequence of the extrinsic function(s) is simple. Note that
+   this pattern may still produce some unintended outcomes, so FIS recommends
+   against its use.
 
 2 Merge
    Merge
@@ -6644,6 +6677,9 @@
 
    S: displays the YottaDB invocation stack
 
+   T: displays the cross-region summary (total) lines associated with G and L
+   codes
+
    V: displays local and alias variables
 
    * displays all possible types of ZSHOW information
@@ -7059,15 +7095,21 @@
 
    Example:
 
-   GTM>ZSYSTEM "ls *.m"
+   GTM>zsystem "ls *.m"
 
    This uses ZSYSTEM to fork a process that then performs the ls command with
    *.m as an argument to ls. Once the command completes, the forked process
    terminates.
 
+   GTM>zsystem "echo 'hello world'"
+   hello world
+
+   This examples show a possible use of quoting with ZSYSTEM to run the echo
+   command.
+
    Example:
 
-   GTM>ZSYSTEM
+   GTM>zsystem
    $
 
    This ZSYSTEM has no argument so the forked process prompts for input.
@@ -8664,16 +8706,14 @@
    |                   |              | that the global directory defines   |
    |                   |              | no additional regions.              |
    |-------------------+--------------+-------------------------------------|
-   |                   |              | When                                |
-   |                   |              |                                     |
-   |                   |              | read-only processes are the active  |
-   |                   |              | in a database, they cannot update   |
-   |                   |              | the database including the file     |
-   | "GVSTAT"          | region       | header where GVSTATS are stored.    |
-   |                   |              | Therefore their counts are only     |
-   |                   |              | stored in associated shared memory  |
-   |                   |              | and must be flushed to the file     |
-   |                   |              | header by a process with write      |
+   |                   |              | When read-only processes are the    |
+   |                   |              | active in a database, they cannot   |
+   |                   |              | update the database including the   |
+   |                   |              | file header where GVSTATS are       |
+   | "GVSTAT"          | region       | stored. Therefore their counts are  |
+   |                   |              | only stored in associated shared    |
+   |                   |              | memory and must be flushed to the   |
+   |                   |              | file header by a process with write |
    |                   |              | access, which might be a MUPIP      |
    |                   |              | RUNDOWN.                            |
    |-------------------+--------------+-------------------------------------|
@@ -9502,7 +9542,7 @@
 2 $ZDATA()
    $ZDATA()
 
-   Extends $DATA() to reflects the current alias state of the lvn or name
+   Extends $DATA() to reflect the current alias state of the lvn or name
    argument to identify alias and alias container variables. It treats
    variables joined through pass-by-reference as well as TP RESTART variables
    within a transaction as alias variables. However, it does not distinguish
@@ -12404,9 +12444,9 @@
 
    When the environment variable gtmroutines is defined, YottaDB initializes
    $ZROUTINES to the value of gtmroutines. Otherwise, YottaDB initializes
-   $ZROUTINES to a null value. When $ZROUTINES is null, YottaDB attempts to
-   locate all source and object files in the current working directory.
-   $ZROUTINES="" is equivalent to $ZROUTINES=".".
+   $ZROUTINES to ".". When $ZROUTINES is ".", YottaDB attempts to locate all
+   source and object files in the current working directory. $ZROUTINES="" is
+   equivalent to $ZROUTINES=".".
 
    Commands or functions such as DO, GOTO, ZGOTO, ZBREAK, ZPRINT, and $TEXT
    may auto-ZLINK and thereby indirectly use $ZROUTINES. If their argument
@@ -12853,6 +12893,21 @@
 
    This example sets $ZSTEP to code that displays the contents of the next
    line to execute, and then enters Direct Mode.
+
+2 $ZSTRPllim
+   $ZSTRPllim
+
+   $ZSTRP[LLIM] provides a way for a process to limit its process private
+   memory used for local variable and scratch storage. When the value is 0 or
+   negative, the default, there is no limit. A positive value specifies a
+   byte limit. When a request for additional memory exceeds the limit, YottaDB
+   does the expansion and then produces an STPCRIT error. By default, a later
+   request for memory produces an STPOFLOW, unless subsequent to STPCRIT ,
+   $ZSTRPLLIM has been set to the same or higher limit. Note that YottaDB
+   allocates memory in large blocks so the interaction of $ZSTRPLLIM with
+   memory growth is not exact. When the gtm_string_pool_limit environment
+   variable specifies a positive value, YottaDB uses it for the initial value of
+   $ZSTRPLLIM.
 
 2 $ZSYstem
    $ZSYstem
@@ -14293,7 +14348,7 @@
      open a:(command="nestin":independent)::"PIPE"
      use a
      set key=$KEY
-     write "Show ntestin still running after CLOSE of a",!
+     write "Show nestin still running after CLOSE of a",!
      write "The parent process of 1 shows the parent shell has exited after CLOSE of a"
      read line1,line2
      use $principal
@@ -14311,9 +14366,9 @@
      close c
      quit
 
-   This demonstrates that the created process nestin keeps running as an
+   This demonstrates that the created sub process nestin keeps running as an
    INDEPENDENT process after the YottaDB process CLOSEs the pipe. This YottaDB
-   process uses another PIPE device to return the process id of ntestin and
+   process uses another PIPE device to return the process id of nestin and
    READ it into pid so that it may be killed by this or another process,
    should that be appropriate.
 
@@ -14398,69 +14453,6 @@
    returns to the original WRITE loop to retry the failed line and continue
    with the WRITEs to the pipe. Depending upon the configuration of the
    environment, it may trap several times before processing all lines.
-
-   Example:
-
-   sh> mumps -run pipexample induceEAGAIN
-   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample" STDERR="piperr"
-   $ZSTATUS="11,pipexample+9^pipexample,%SYSTEM-E-ENO11, Resource temporarily unavailable"
-
-   sh> mumps -run retry^pipexample induceEAGAIN
-   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample 0" STDERR="piperr"
-   ...Failed to perform non-blocked writes... Retrying write # 54
-   ...Failed to perform non-blocked writes... Retrying write # 63
-   ...Failed to perform non-blocked writes... Retrying write # 69
-   ...Failed to perform non-blocked writes... Retrying write # 78
-       Writes completed
-
-
-   This example demonstrates handling WRITE errors, like ENO11 or EAGAIN,
-   that do not terminate the PIPE device. The PIPE device does non-blocking
-   writes. If a process tries to WRITE to a full PIPE and the WRITE would
-   block, the device implicitly tries to complete the operation up to a
-   default of 10 times. YottaDB sleeps 100 micro seconds between each retry.
-   When dealing with programs that can take a while to process input, it's a
-   good idea to either schedule a delay between WRITEs or come up with a
-   mechanism to back off the WRITEs when the buffer fills up.
-
-   sh> mumps -run pipexample induceEPIPE
-   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample" STDERR="piperr"
-       stdout:My PID is 12808
-       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
-   $ZSTATUS="32,pipexample+9^pipexample,%SYSTEM-E-ENO32, Broken pipe"
-
-   sh> mumps -run retry^pipexample induceEPIPE
-   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 0" STDERR="piperr"
-   ...Caught on try 0, write 49... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
-       stdout:My PID is 16252
-       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
-   Try 1   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 1" STDERR="piperr"
-   ...Caught on try 1, write 697... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
-       stdout:My PID is 16403
-       stdout:$ZSTATUS="150373210,induceEPIPE+5^pipexample,%GTM-E-DIVZERO, Attempt to divide by zero"
-   Try 2   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 2" STDERR="piperr"
-       Writes completed
-
-
-   This example demonstrates how to create a separate STDERR pipe device from
-   which to read the STDERR output of the program(s) inside the pipe. Reading
-   the STDERR is important when dealing with failures from Unix programs. It
-   is possible to read the errors without creating a STDERR pipe device,
-   however the error messages are commingled with the output of the programs
-   inside the pipe which could make diagnosis of the underlying problem
-   harder. Notice that YottaDB writes fatal errors, GTM-F types, to STDERR, but
-   all others go to STDOUT.
-
-   Additionally, this example demonstrates handling errors that terminate the
-   PIPE device. In this example, the PIPE device is terminated when a program
-   inside the pipe terminates before reading all of the driving MUMPS
-   program's output causing an EPIPE or ENO32, a broken pipe. In such a
-   situation the MUMPS program must capture the error that caused the
-   termination and respond accordingly. The program may need to call out to
-   other programs to determine the status of a service it is using or to
-   alert the operator of an error with an external program or service. To
-   operate successfully, the program must recreate the pipe and retry the
-   operation.
 
    Example:
 
@@ -14567,6 +14559,69 @@
 
    This example demonstrates how to handle PIPE device errors, whether with
    the device itself or from programs inside the PIPE device.
+
+   Example:
+
+   sh> mumps -run pipexample induceEAGAIN
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample" STDERR="piperr"
+   $ZSTATUS="11,pipexample+9^pipexample,%SYSTEM-E-ENO11, Resource temporarily unavailable"
+
+   sh> mumps -run retry^pipexample induceEAGAIN
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample 0" STDERR="piperr"
+   ...Failed to perform non-blocked writes... Retrying write # 54
+   ...Failed to perform non-blocked writes... Retrying write # 63
+   ...Failed to perform non-blocked writes... Retrying write # 69
+   ...Failed to perform non-blocked writes... Retrying write # 78
+       Writes completed
+
+
+   This example demonstrates handling WRITE errors, like ENO11 or EAGAIN,
+   that do not terminate the PIPE device. The PIPE device does non-blocking
+   writes. If a process tries to WRITE to a full PIPE and the WRITE would
+   block, the device implicitly tries to complete the operation up to a
+   default of 10 times. YottaDB sleeps 100 micro seconds between each retry.
+   When dealing with programs that can take a while to process input, it's a
+   good idea to either schedule a delay between WRITEs or come up with a
+   mechanism to back off the WRITEs when the buffer fills up.
+
+   sh> mumps -run pipexample induceEPIPE
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample" STDERR="piperr"
+       stdout:My PID is 12808
+       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
+   $ZSTATUS="32,pipexample+9^pipexample,%SYSTEM-E-ENO32, Broken pipe"
+
+   sh> mumps -run retry^pipexample induceEPIPE
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 0" STDERR="piperr"
+   ...Caught on try 0, write 49... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
+       stdout:My PID is 16252
+       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
+   Try 1   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 1" STDERR="piperr"
+   ...Caught on try 1, write 697... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
+       stdout:My PID is 16403
+       stdout:$ZSTATUS="150373210,induceEPIPE+5^pipexample,%GTM-E-DIVZERO, Attempt to divide by zero"
+   Try 2   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 2" STDERR="piperr"
+       Writes completed
+
+
+   This example demonstrates how to create a separate STDERR pipe device from
+   which to read the STDERR output of the program(s) inside the pipe. Reading
+   the STDERR is important when dealing with failures from Unix programs. It
+   is possible to read the errors without creating a STDERR pipe device,
+   however the error messages are commingled with the output of the programs
+   inside the pipe which could make diagnosis of the underlying problem
+   harder. Notice that YottaDB writes fatal errors, GTM-F types, to STDERR, but
+   all others go to STDOUT.
+
+   Additionally, this example demonstrates handling errors that terminate the
+   PIPE device. In this example, the PIPE device is terminated when a program
+   inside the pipe terminates before reading all of the driving MUMPS
+   program's output causing an EPIPE or ENO32, a broken pipe. In such a
+   situation the MUMPS program must capture the error that caused the
+   termination and respond accordingly. The program may need to call out to
+   other programs to determine the status of a service it is using or to
+   alert the operator of an error with an external program or service. To
+   operate successfully, the program must recreate the pipe and retry the
+   operation.
 
 3 PIPE_Deviceparameter_Summary
    PIPE Deviceparameter Summary
@@ -14923,11 +14978,11 @@
    operations in either direction on the socket before issuing a CLOSE.
 
    Note that the receiving process must establish desired deviceparameters
-   (e.g., DELIMITER) either by ATTACHing it to a SOCKET device that provides
-   the characteristic for all its sockets, or by a subsequent USE that
-   specifies the appropriate deviceparameter(s). YottaDB transfers only the
-   socket connection itself, the socket handle, and buffered socket data (if
-   any).
+   (e.g., DELIMITER) for a socket either by ATTACHing it to a SOCKET device
+   that provides the characteristic for all its sockets, or by a subsequent
+   USE that specifies the appropriate deviceparameter(s). YottaDB transfers only
+   the socket connection itself, the socket handle, and buffered socket data
+   (if any).
 
    WRITE /TLS(option[,[timeout][,tlsid[,cfg-file-options]])
 
@@ -14958,9 +15013,10 @@
        specified by the gtmcrypt_config environment variable. If tlsid is not
        specified with the "renegotiate" option and cfg-file-options are
        specified, YottaDB creates a virtual section by appending "-RENEGOTIATE"
-       to the tlsid used to enable TLS on the socket. If no section named
-       tlsid is present in the configuration file, YottaDB creates a virtual
-       section with that name for the life of the process.
+       to the tlsid used to enable TLS on the socket. For the renegotiate
+       option, if no section named tlsid is present in the configuration
+       file, YottaDB creates a virtual section with that name for the life of
+       the process.
      o cfg-file-options specifies configuration file options. Note
        cfg-file-options override those options if they are already specified
        in the configuration file except ssl-options and verify-level which
@@ -15021,36 +15077,76 @@
    +------------------------------------------------------------------------+
 
    +------------------------------------------------------------------------+
-   |                        Format Deviceparameters                         |
+   |                   Socket Management Deviceparameters                   |
    |------------------------------------------------------------------------|
    |     DEVICEPARAMETER     | COMMAND |              COMMENT               |
    |-------------------------+---------+------------------------------------|
-   |                         |         | strexpr specifies socket           |
-   | [NO]DELIMITER[=strexpr] | O/U     | delimiter(s); use a colon (:) to   |
-   |                         |         | separate a list.                   |
+   |                         |         | With OPEN, ATTACH assigns expr as  |
+   |                         |         | the handle name to the newly       |
+   |                         |         | created socket                     |
+   | ATTACH=strexpr          | O/U     |                                    |
+   |                         |         | With USE, expr specifies the       |
+   |                         |         | handle of a socket in the          |
+   |                         |         | socketpool.                        |
    |-------------------------+---------+------------------------------------|
-   | [NO]FILTER[=strexpr]    | U       | strexpr specifies character        |
-   |                         |         | filtering for socket output.       |
+   |                         |         | Creates a client connection with a |
+   | CONNECT                 | O/U     | server, which is located by the    |
+   |                         |         | information provided by expr.      |
    |-------------------------+---------+------------------------------------|
-   | LENGTH=intexpr or       |         | Sets virtual page length for       |
-   |                         | U       | socket device.                     |
-   | ZLENGTH=intexpr         |         |                                    |
+   |                         |         | Establishes or replaces the list   |
+   | [NO]DELIMITER[=strexpr] | O/U     | of delimiters used by the newly    |
+   |                         |         | created socket.                    |
    |-------------------------+---------+------------------------------------|
-   | ICHSET=strexpr          | O/U/C   | strexpr specifies input character  |
-   |                         |         | set                                |
+   |                         |         | Removes the socket identified by   |
+   |                         |         | expr from the current socket       |
+   | DETACH                  | U       | device, without affecting any      |
+   |                         |         | existing connection of that        |
+   |                         |         | socket, and places it in the       |
+   |                         |         | socketpool.                        |
    |-------------------------+---------+------------------------------------|
-   | OCHSET=strexpr          | O/U/C   | strexpr specifies output character |
-   |                         |         | set                                |
+   | LISTEN=expr             | O/U     | Allocate a new socket to listen    |
+   |                         |         | for a connection.                  |
    |-------------------------+---------+------------------------------------|
-   | [NO]WRAP                | O/U     | Controls handling of records       |
-   |                         |         | longer than the device width.      |
+   |                         |         | The polling interval (in           |
+   | MOREREADTIME=intexpr    | O/U     | milliseconds) that a SOCKET device |
+   |                         |         | uses to check for arriving packet  |
    |-------------------------+---------+------------------------------------|
-   | WIDTH=intexpr           | U       | Controls the maximum length of an  |
-   |                         |         | output message.                    |
+   |                         |         | Makes the socket specified by the  |
+   | SOCKET=expr             | U       | handle named in expr the current   |
+   |                         |         | socket for the Socket device.      |
    |-------------------------+---------+------------------------------------|
-   |                         |         | Controls whether and what          |
-   | Z[NO]FF[=strexpr]       | O/U     | characters to send in response to  |
-   |                         |         | a WRITE #.                         |
+   |                         |         | Controls buffering of data packets |
+   |                         |         | by the system TCP stack using the  |
+   | Z[NO]DELAY              | U       | TCP_NODELAY option to the          |
+   |                         |         | setsockopt system call. ZNODELAY   |
+   |                         |         | must be fully spelled out.         |
+   +------------------------------------------------------------------------+
+
+   +------------------------------------------------------------------------+
+   |                        Format Deviceparameters                         |
+   |------------------------------------------------------------------------|
+   |   DEVICEPARAMETER    | COMMAND |                COMMENT                |
+   |----------------------+---------+---------------------------------------|
+   | [NO]FILTER[=strexpr] | U       | strexpr specifies character filtering |
+   |                      |         | for socket output.                    |
+   |----------------------+---------+---------------------------------------|
+   | LENGTH=intexpr or    |         | Sets virtual page length for socket   |
+   |                      | U       | device.                               |
+   | ZLENGTH=intexpr      |         |                                       |
+   |----------------------+---------+---------------------------------------|
+   | ICHSET=strexpr       | O/U/C   | strexpr specifies input character set |
+   |----------------------+---------+---------------------------------------|
+   | OCHSET=strexpr       | O/U/C   | strexpr specifies output character    |
+   |                      |         | set                                   |
+   |----------------------+---------+---------------------------------------|
+   | [NO]WRAP             | O/U     | Controls handling of records longer   |
+   |                      |         | than the device width.                |
+   |----------------------+---------+---------------------------------------|
+   | WIDTH=intexpr        | U       | Controls the maximum length of an     |
+   |                      |         | output message.                       |
+   |----------------------+---------+---------------------------------------|
+   | Z[NO]FF[=strexpr]    | O/U     | Controls whether and what characters  |
+   |                      |         | to send in response to a WRITE #.     |
    +------------------------------------------------------------------------+
 
    +------------------------------------------------------------------------+
@@ -15068,7 +15164,7 @@
 3 Socket_Device_Examples
    Socket Device Examples
 
-   The sockexamplemulti31.m routine shows the use of $KEY and $ZKEY in a
+   The sockexamplemulti32.m routine shows the use of $KEY and $ZKEY in a
    basic socket I/O setup. It's functionality is atypical in order to
    demonstrate a number of features. It launches two jobs: a server process
    which opens a listening socket and a client process which makes five
@@ -15077,11 +15173,11 @@
    send a response back to the server. Odd-numbered client sockets receive
    the full message and respond to the server with the message "Ok.". The
    server reads two characters (but the client sends three) and $ZKEY shows
-   sockets with unread characters.Please click Download sockexamplemulti31.m
-   to download the sockexamplemulti31.m program and follow instructions in
+   sockets with unread characters.Please click Download sockexamplemulti32.m
+   to download the sockexamplemulti32.m program and follow instructions in
    the comments near the top of the program file. You can also download
-   sockexamplemulti31.m from
-   http://tinco.pair.com/bhaskar/gtm/doc/books/pg/UNIX_manual/sockexamplemulti31.m.
+   sockexamplemulti32.m from
+   http://tinco.pair.com/bhaskar/gtm/doc/books/pg/UNIX_manual/sockexamplemulti32.m.
 
    You can start a YottaDB process in response to a connection request made
    using inetd/xinetd. The following example uses inetd/xinetd to implement a
@@ -16300,6 +16396,11 @@
    attempt to WRITE to it triggers an error. If it has not previously acted
    as the argument to an explicit CLOSE command, the CLOSE of the PIPE device
    implicitly closes the the STDERR device.
+
+   If the OPEN command does not specify STDERR, YottaDB redirects the stderr
+   output of the co-process created by the COMMAND to the standard output of
+   the co-process. Specify STDERR when there is a need to read the standard
+   error of the COMMAND seperately.
 
 5 STREAM
    STREAM
@@ -20572,10 +20673,20 @@
        control, the only implicit behavior is that as long as $ECODE'="" and
        $ZTRAP'="" an attempt to QUIT from the level of the current error
        causes that error to be reissued at the new stack level.
-     * otherwise, if $ETRAP'="" YottaDB performs a QUIT$QUIT "" QUIT and
+     * otherwise, if $ETRAP'="" YottaDB performs a QUIT:$QUIT "" QUIT and
        reissues the error at the new stack level.
      * otherwise, $ZTRAP must contain code and YottaDB retries the line of M on
        which the error occurred.
+
+   YottaDB checks the syntax of code assigned to $ETRAP, $ZSTEP, $ZTRAP, and
+   EXCEPTION at the time they are specified. Note that $ZTRAP and EXCEPTION
+   are subject to gtm_ztrap_form, and, if that specifies entryref or
+   adaptive, YottaDB does not check the syntax. Also, the environment variables
+   $gtm_etrap, $gtm_trigger_etrap, and $gtm_zstep provide ways of setting
+   some of the ISVs, so their values are verified at process initiation.
+   Further, a SET $ETRAP uses a temporary default value of "IF $ZJOBEXAM"
+   when shifting from $ZTRAP to $ETRAP in case the specified value has
+   compilation errors.
 
 3 Direct_Mode
    Direct Mode

@@ -47,7 +47,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 	{
 		reg = addr->maps->reg.addr; 	/* local lock map is first */
 		if (!reg->open)
-			gv_init_reg (reg);
+			gv_init_reg (reg, NULL);
 	} else
 	{
 		p++;
@@ -64,14 +64,14 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 			if (!reg->open)
 			{
 				targ->clue.end = 0;
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			}
 		} else
 		{
 			map = gv_srch_map(addr, gvent.var_name.addr, gvent.var_name.len, SKIP_BASEDB_OPEN_FALSE);
 			reg = map->reg.addr;
 			if (!reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			targ = (gv_namehead *)targ_alloc(reg->max_key_size, &gvent, reg);
 			GVNH_REG_INIT(addr, addr->tab_ptr, map, targ, reg, gvnh_reg, tabent);
 		}

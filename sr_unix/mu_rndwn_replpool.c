@@ -64,8 +64,8 @@
 
 GBLREF	boolean_t		argumentless_rundown;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	recvpool_addrs		recvpool;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			mutex_per_process_init_pid;
@@ -98,6 +98,7 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 	char			pool_type;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
+	gd_region		*reg;
 	boolean_t		anticipatory_freeze_available, reset_crash;
 	DCL_THREADGBL_ACCESS;
 
@@ -130,26 +131,27 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 	}
 	reset_crash = (!anticipatory_freeze_available || argumentless_rundown);
 	/* Assert that if we haven't yet attached to the journal pool yet, jnlpool_ctl better be NULL */
-	assert((JNLPOOL_SEGMENT != pool_type) || (NULL == jnlpool.jnlpool_ctl));
+	assert((JNLPOOL_SEGMENT != pool_type) || ((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl)));
 	if (JNLPOOL_SEGMENT == pool_type)
 	{	/* Initialize variables to simulate a "jnlpool_init". This is required by "repl_inst_flush_jnlpool" called below */
-		jnlpool_ctl = jnlpool.jnlpool_ctl = (jnlpool_ctl_ptr_t)start_addr;
-		assert(NULL != jnlpool.jnlpool_dummy_reg);
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+		SET_JNLPOOL_FROM_RECVPOOL_P(jnlpool);
+		jnlpool->jnlpool_ctl = (jnlpool_ctl_ptr_t)start_addr;
+		assert(NULL != jnlpool->jnlpool_dummy_reg);
+		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 		csa = &udi->s_addrs;
-		csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE);
+		csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
 		csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct));
 		/* secshr_db_clnup uses this relationship */
-		assert(jnlpool.jnlpool_ctl->filehdr_off);
-		assert(jnlpool.jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);
-		assert(jnlpool.jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);
-		/* Initialize "jnlpool.repl_inst_filehdr" and related fields as "repl_inst_flush_jnlpool" relies on that */
-		jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl
-									+ jnlpool.jnlpool_ctl->filehdr_off);
-		jnlpool.gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl
-									+ jnlpool.jnlpool_ctl->srclcl_array_off);
-		jnlpool.gtmsource_local_array = (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl
-										+ jnlpool.jnlpool_ctl->sourcelocal_array_off);
+		assert(jnlpool->jnlpool_ctl->filehdr_off);
+		assert(jnlpool->jnlpool_ctl->srclcl_array_off > jnlpool->jnlpool_ctl->filehdr_off);
+		assert(jnlpool->jnlpool_ctl->sourcelocal_array_off > jnlpool->jnlpool_ctl->srclcl_array_off);
+		/* Initialize "jnlpool->repl_inst_filehdr" and related fields as "repl_inst_flush_jnlpool" relies on that */
+		jnlpool->repl_inst_filehdr = (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl
+									+ jnlpool->jnlpool_ctl->filehdr_off);
+		jnlpool->gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl
+									+ jnlpool->jnlpool_ctl->srclcl_array_off);
+		jnlpool->gtmsource_local_array = (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl
+										+ jnlpool->jnlpool_ctl->sourcelocal_array_off);
 		if (0 == nattch)
 		{	/* No one attached. So, we can safely flush the journal pool so that the gtmsrc_lcl structures in the
 			 * jnlpool and disk are in sync with each other. More importantly we are about to remove the jnlpool
@@ -163,15 +165,16 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 			 */
 			assert((INVALID_SEMID != repl_inst_filehdr->jnlpool_semid)
 					&& (0 != repl_inst_filehdr->jnlpool_semid_ctime));
-			jnlpool.repl_inst_filehdr->jnlpool_semid = repl_inst_filehdr->jnlpool_semid;
-			jnlpool.repl_inst_filehdr->jnlpool_semid_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
+			jnlpool->repl_inst_filehdr->jnlpool_semid = repl_inst_filehdr->jnlpool_semid;
+			jnlpool->repl_inst_filehdr->jnlpool_semid_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
 			repl_inst_flush_jnlpool(FALSE, reset_crash);
-			assert(!jnlpool.repl_inst_filehdr->crash || !reset_crash);
-			/* Refresh local copy (repl_inst_filehdr) with the copy that was just flushed (jnlpool.repl_inst_filehdr) */
-			memcpy(repl_inst_filehdr, jnlpool.repl_inst_filehdr, SIZEOF(repl_inst_hdr));
+			assert(!jnlpool->repl_inst_filehdr->crash || !reset_crash);
+			/* Refresh local copy (repl_inst_filehdr) with the copy that was just
+				flushed (jnlpool->repl_inst_filehdr) */
+			memcpy(repl_inst_filehdr, jnlpool->repl_inst_filehdr, SIZEOF(repl_inst_hdr));
 			if (reset_crash)
 			{ 	/* Now that jnlpool has been flushed and there is going to be no journal pool, reset
-				 * "jnlpool.repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
+				 * "jnlpool->repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
 				 * affected by whether this is NULL or not.
 				 */
 				JNLPOOL_CLEAR_FIELDS(jnlpool);
@@ -196,22 +199,22 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 		{
 			repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
 			repl_inst_filehdr->jnlpool_shmid_ctime = 0;
-			assert((NULL == jnlpool.jnlpool_ctl) && (NULL == jnlpool_ctl));
+			assert((NULL == jnlpool) || ((NULL == jnlpool->jnlpool_ctl)));
 			*ipc_rmvd = TRUE;
 		} else
 		{
 			repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
 			repl_inst_filehdr->recvpool_shmid_ctime = 0;
-			if (NULL != jnlpool.repl_inst_filehdr)
+			if ((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr))
 			{
-				jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
-				jnlpool.repl_inst_filehdr->recvpool_shmid_ctime = 0;
+				jnlpool->repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;
+				jnlpool->repl_inst_filehdr->recvpool_shmid_ctime = 0;
 			}
 			*ipc_rmvd = TRUE;
 		}
 	} else
 	{
-		assert((JNLPOOL_SEGMENT != pool_type) || ((NULL != jnlpool.jnlpool_ctl) && (NULL != jnlpool_ctl)));
+		assert((JNLPOOL_SEGMENT != pool_type) || ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)));
 		if (JNLPOOL_SEGMENT == pool_type)
 		{
 			*ipc_rmvd = FALSE;
@@ -297,14 +300,14 @@ CONDITION_HANDLER(mu_rndwn_replpool_ch)
 	 * On the other hand, we don't respect IFOE in argumentless rundown, so go ahead and detach in that case, since otherwise
 	 * we could potentially leak the shared memory of multiple journal pools.
 	 */
-	if ((NULL != jnlpool.jnlpool_ctl) && (!INST_FREEZE_ON_ERROR_POLICY || argumentless_rundown))
+	if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && (!INST_FREEZE_ON_ERROR_POLICY || argumentless_rundown))
 	{
-		jnlpool_shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;
+		jnlpool_shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;
 		JNLPOOL_SHMDT(jnlpool, status, save_errno);
 		if (0 > status)
 		{
-			assert(NULL != jnlpool.jnlpool_dummy_reg);
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			assert(NULL != jnlpool->jnlpool_dummy_reg);
+			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 			assert(ERR_REPLINSTOPEN == SIGNAL); /* only reason we know why mu_rndwn_replpool can fail */
 			ISSUE_REPLPOOLINST(save_errno, jnlpool_shmid, udi->fn, "shmdt()");
 		}

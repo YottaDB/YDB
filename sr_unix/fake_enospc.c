@@ -34,8 +34,8 @@
 #endif
 #include "fake_enospc.h"
 #ifdef DEBUG
-GBLREF		jnlpool_addrs	jnlpool;
-GBLREF		volatile int4	gtmMallocDepth;
+GBLREF		jnlpool_addrs_ptr_t	jnlpool;
+GBLREF		volatile int4		gtmMallocDepth;
 
 STATICDEF	uint4		syslog_deferred = 0;
 
@@ -74,6 +74,7 @@ void fake_enospc(void)
 	gd_region	*r_local, *r_top;
 	int		i;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -134,7 +135,7 @@ void fake_enospc(void)
 		if (!IS_REG_BG_OR_MM(r_local))
 			continue;
 		csa = REG2CSA(r_local);
-		if ((NULL != csa) && (NULL != csa->nl) && INST_FREEZE_ON_NOSPC_ENABLED(csa))
+		if ((NULL != csa) && (NULL != csa->nl) && INST_FREEZE_ON_NOSPC_ENABLED(csa, local_jnlpool))
 		{
 			syslog_msg = NULL;
 			switch(enospc_enable_list[i])

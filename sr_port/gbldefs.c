@@ -222,13 +222,10 @@ GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF	mval		dollar_zgbldir,
 			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
-			dollar_zstep = DEFINE_MVAL_STRING(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
-			dollar_ztrap,
 			ztrap_pop2level = DEFINE_MVAL_STRING(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0),
 			zstep_action,
 			dollar_system,
 			dollar_estack_delta = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
-			dollar_etrap,
 			dollar_zerror = DEFINE_MVAL_STRING(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
 			dollar_zyerror,
 			dollar_ztexit = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
@@ -369,15 +366,13 @@ GBLDEF	int			gv_fillfactor = 100,
 GBLDEF	uint4			update_array_size,
 				cumul_update_array_size;	/* the current total size of the update array */
 GBLDEF	kill_set		*kill_set_tail;
-GBLDEF	boolean_t		pool_init;
+GBLDEF	int			pool_init;
 GBLDEF	boolean_t		is_src_server;
 GBLDEF	boolean_t		is_rcvr_server;
 GBLDEF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLDEF	boolean_t		dse_running;
-GBLDEF	jnlpool_addrs		jnlpool;
-GBLDEF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLDEF	sm_uc_ptr_t		jnldata_base;
-GBLDEF	int4			jnlpool_shmid = INVALID_SHMID;
+GBLDEF	jnlpool_addrs_ptr_t	jnlpool;
+GBLDEF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLDEF	recvpool_addrs		recvpool;
 GBLDEF	int			recvpool_shmid = INVALID_SHMID;
 GBLDEF	int			gtmsource_srv_count;
@@ -421,7 +416,6 @@ GBLDEF	sgmnt_addrs		*kip_csa;
 GBLDEF	boolean_t		need_kip_incr;
 GBLDEF	int			merge_args;
 GBLDEF	merge_glvn_ptr		mglvnp;
-GBLDEF	int			ztrap_form;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
 #ifdef DEBUG
@@ -978,8 +972,7 @@ GBLDEF	mval		*dollar_ztdata,
 			*dollar_ztupdate,
 			*dollar_ztvalue,
 			dollar_ztwormhole = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
-			dollar_ztslate = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
-			gtm_trigger_etrap;  		/* Holds $ETRAP value for inside trigger */
+			dollar_ztslate = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF	int		tprestart_state;		/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLDEF	boolean_t	skip_INVOKE_RESTART;		/* set to TRUE if caller of op_tcommit/t_retry does not want it to
 							 * use the INVOKE_RESTART macro (which uses an rts_error to trigger
@@ -1068,6 +1061,9 @@ GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at
 							 * anticipatory freeze supported configurations). The variable is set
 							 * explicitly by interested commands (eg., MUPIP REORG).
 							 */
+GBLDEF	char		repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
+GBLDEF	char		repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
+GBLDEF	gd_addr		*repl_inst_from_gld;		/* if above obtained from directory */
 GBLDEF	boolean_t	span_nodes_disallowed; 		/* Indicates whether spanning nodes are not allowed. For example,
 							 * they are not allowed for GT.CM OMI and GNP. */
 GBLDEF	boolean_t	argumentless_rundown;
