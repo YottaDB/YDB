@@ -17,7 +17,6 @@
 #   HLP file location (defaults to $gtm_pct)
 #   Error log file (used to redirect output to error file in comlist.csh)
 
-
 set hlpdir = $1
 if ("" == "${hlpdir}") then
 	if (0 == $?gtm_pct) then
@@ -100,12 +99,20 @@ GTM_in_gtmhelp
 			continue
 		endif
 	endif
+	set oldgld=$gtmgbldir
+	foreach x (${gtm_dist}/*.gld)
+		setenv gtmgbldir "$x"
+		echo "Setting read-only for $x regions"
+		$gtm_exe/mupip set -read_only -acc=MM -reg "*" >& /dev/null
+	end
 	chmod ugo-x ${gtm_dist}/${prefix}help.{gld,dat}
+	setenv gtmgbldir $oldgld
 end
 
 # Restore read-only status
 if ($?restorePerms) then
 	chmod ${restorePerms} ${gtm_dist}
+	$gtm_exe/mupip set -read_only -reg "*"
 endif
 
 exit ${script_stat}

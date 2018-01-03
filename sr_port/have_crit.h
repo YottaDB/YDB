@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,6 +77,7 @@ typedef enum
 	INTRPT_IN_CRYPT_RECONFIG,	/* Deferring interrupts during reconfiguration of the encryption state. */
 	INTRPT_IN_UNLINK_AND_CLEAR,	/* Deferring interrupts around unlink and clearing the filename being unlinked */
 	INTRPT_IN_GETC,			/* Deferring interrupts around GETC() call */
+	INTRPT_IN_AIO_ERROR,		/* Deferring interrupts around aio_error() call */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
@@ -165,7 +166,7 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
 
-/* Macro to cause deferrable interrupts to be deferred recording the cause.
+/* Macro to cause deferrable interrupts to be deferred, recording the cause.
  * If interrupt is already deferred, state is not changed.
  *
  * The normal usage of the below macros is

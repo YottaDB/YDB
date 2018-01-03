@@ -181,6 +181,6 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_fail, 1);
 		}
 	} else	/* acc_meth = dba_usr */
-		retval = gvusr_lock(p->total_length, &p->value[0], p->region);
+		retval = gvusr_lock(p->nref_length, &p->value[0], p->region);
 	return retval;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -71,18 +71,15 @@ GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_log_name	*dollar_principal;
-GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_job;
 GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zstep;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zeditor;
 GBLREF uint4		dollar_tlevel;
 GBLREF uint4		dollar_trestart;
-GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
@@ -351,7 +348,7 @@ void op_svget(int varnum, mval *v)
 			s2pool(&(v->str));
 			break;
 		case SV_ZSTEP:
-			*v = dollar_zstep;
+			*v = TREF(dollar_zstep);
 			break;
 		case SV_ZMODE:
 			*v = TREF(dollar_zmode);
@@ -392,7 +389,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZTRAP:
 			v->mvtype = MV_STR;
-			v->str = dollar_ztrap.str;
+			v->str = (TREF(dollar_ztrap)).str;
 			assert(!v->str.len || !ztrap_explicit_null);
 			s2pool(&(v->str));
 			break;
@@ -435,7 +432,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ETRAP:
 			v->mvtype = MV_STR;
-			v->str = dollar_etrap.str;
+			v->str = (TREF(dollar_etrap)).str;
 			assert(!v->str.len || !ztrap_explicit_null);
 			s2pool(&(v->str));
 			break;
@@ -620,6 +617,10 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZKEY:
 			get_dlr_zkey(v);
+			break;
+		case SV_ZSTRPLLIM:
+			count = TREF(gtm_strpllim);
+			MV_FORCE_MVAL(v, count);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,16 +16,10 @@
 #include "gtm_unistd.h"
 
 #include "rel_quant.h"
+#include "gtm_rel_quant.h"
 
 /* relinquish the processor to the next process in the scheduling queue */
 void rel_quant(void)
 {
-#	if defined(_AIX) || (defined(sparc))
-	/* For pSeries and SPARC, the "yield" system call seems a better match with what we want to do (yields to ALL
-	 * processes instead of just those on the local processor queue.
-	 */
-	yield();
-#	else
-	sched_yield();	/* we do not need to link with libpthreads, so the usage of pthread_yield() is avoided where possible */
-#	endif
+	RELQUANT;
 }

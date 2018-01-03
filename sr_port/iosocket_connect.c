@@ -32,6 +32,7 @@
 #include "gtm_ipv6.h"
 #include "gtm_unistd.h"
 #include "gtm_select.h"
+#include "min_max.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -290,18 +291,13 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						} /* else fall through */
 					case EINPROGRESS:
 					case EALREADY:
-#					if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
-					case EWOULDBLOCK:
-#					endif
 						need_socket = need_connect = FALSE;
 						if (0 != msec_timeout)
 							need_select = TRUE;
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
 					case ECONNREFUSED:
-#					ifndef VMS
-					case ENOENT:	/* LOCAL socket not there */
-#					endif
+					case ENOENT:    /* LOCAL socket not there */
 						if (!no_time_left && (0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
 						{
 							sys_get_curr_time(&cur_time);
@@ -317,7 +313,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						else if (!no_time_left)
 						{
 							if (ETIMEDOUT == save_errno || ECONNREFUSED == save_errno
-								UNIX_ONLY(|| ENOENT == save_errno))
+								|| ENOENT == save_errno)
 								need_connect = need_socket = TRUE;
 							save_errno = 0;
 							res = -1;	/* do the outer loop again */
@@ -376,7 +372,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						} else
 						{	/* return socket error */
 							if (ECONNREFUSED == sockerror || ETIMEDOUT == sockerror
-								UNIX_ONLY(|| ENOENT == sockerror))
+								|| ENOENT == sockerror)
 							{	/* try until timeout */
 								last_errno = sockerror;
 								save_errno = 0;
@@ -421,16 +417,13 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				sockptr->remote.ai_head = NULL;
 			}
 			errptr = (char *)STRERROR(save_errno);
-			errlen = STRLEN(errptr);
 			if (dev_open == iod->state)
 			{
 				iod->dollar.za = 9;
-				memcpy(iod->dollar.device, ONE_COMMA, SIZEOF(ONE_COMMA));
-				memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1],
-						errptr, errlen + 1); /* + 1 for null */
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr);
 			}
 			if (sockptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, STRLEN(errptr), errptr);
 			errno = save_errno;
 			return FALSE;
 		}

@@ -64,6 +64,17 @@ error_def(ERR_IOERROR);
 			cancel_timer(timer_id);
 
 #ifdef UNICODE_SUPPORTED
+
+#define UTF8CRLEN	1	/* Length of CR in UTF8 mode. */
+#define SET_UTF8_DOLLARKEY_DOLLARZB(UTF_CODE, DOLLAR_KEY, DOLLAR_ZB)		\
+{										\
+		unsigned char *endstr;						\
+		endstr = UTF8_WCTOMB(UTF_CODE, DOLLAR_KEY);			\
+		*endstr = '\0';							\
+		endstr = UTF8_WCTOMB(UTF_CODE, DOLLAR_ZB);			\
+		*endstr = '\0';							\
+}
+
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
@@ -103,9 +114,7 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
                 }
         }
 	/* set dollar.device in the output device */
-	len = SIZEOF(ONE_COMMA) - 1;
-	memcpy(iod->dollar.device, ONE_COMMA, len);
-	memcpy(&iod->dollar.device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG);
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 }
 #endif
@@ -117,7 +126,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	unsigned char	*nextmb, *char_ptr, *char_start, *buffer_start;
 	int		flags = 0;
 	int		len;
-	int		errlen, real_errno;
+	int		save_errno, errlen, real_errno;
 	int		fcntl_res, stp_need;
 	int4		bytes2read, bytes_read, char_bytes_read, add_bytes, reclen;
 	int4		buff_len, mblen, char_count, bytes_count, tot_bytes_read, chunk_bytes_read, utf_tot_bytes_read;
@@ -216,12 +225,21 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		flags = 0;
 		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
 		if (0 > flags)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		{
+			save_errno = errno;
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
+		}
 		if (flags & O_NONBLOCK)
 		{
 			FCNTL3(rm_ptr->fildes, F_SETFL, (flags & ~O_NONBLOCK), fcntl_res);
 			if (0 > fcntl_res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+					save_errno);
+			}
 		}
 	}
 	/* if the last operation was a write to a disk, we need to initialize it so file_pos is pointing
@@ -232,8 +250,10 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 		if ((off_t)-1 == cur_position)
 		{
+			save_errno = errno;
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, errno);
+				      RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, save_errno);
 		} else
 			rm_ptr->file_pos = cur_position;
 		*dollary_ptr = 0;
@@ -257,8 +277,12 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{
 				FSTAT_FILE(fildes, &statbuf, fstat_res);
 				if (-1 == fstat_res)
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
-						      CALLFROM, errno);
+						      CALLFROM, save_errno);
+				}
 				assert(UTF16BE_BOM_LEN < UTF8_BOM_LEN);
 				if ((CHSET_UTF8 == io_ptr->ichset) && (statbuf.st_size >= UTF8_BOM_LEN))
 					bom_size_toread = UTF8_BOM_LEN;
@@ -269,16 +293,24 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				if (0 < bom_size_toread)
 				{
 					if ((off_t)-1 == lseek(fildes, 0, SEEK_SET))
+					{
+						save_errno = errno;
+						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
 								      "Error setting file pointer to beginning of file"),
-							      CALLFROM, errno);
+							      CALLFROM, save_errno);
+					}
 					rm_ptr->bom_num_bytes = open_get_bom(io_ptr, bom_size_toread);
 					/* move back to previous file position */
 					if ((off_t)-1 == lseek(fildes, rm_ptr->file_pos, SEEK_SET))
+					{
+						save_errno = errno;
+						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
-								      "Error restoring file pointer"), CALLFROM, errno);
+								      "Error restoring file pointer"), CALLFROM, save_errno);
+					}
 				}
 				rm_ptr->bom_checked = TRUE;
 			}
@@ -333,6 +365,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	/* save the lastop for zeof test later */
 	saved_lastop = rm_ptr->lastop;
 	rm_ptr->lastop = RM_READ;
+	io_ptr->dollar.key[0] = '\0';
+	io_ptr->dollar.zb[0] = '\0';
 	timer_id = (TID)iorm_readfl;
 	max_width = io_ptr->width - *dollarx_ptr;
 	if (0 == width)
@@ -468,10 +502,20 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			out_of_time = TRUE;
 			FCNTL2(fildes, F_GETFL, flags);
 			if (0 > flags)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+					save_errno);
+			}
 			FCNTL3(fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
 			if (0 > fcntl_res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+					save_errno);
+			}
 			blocked_in = FALSE;
 			if (rm_ptr->is_pipe)
 				pipe_zero_timeout = TRUE;
@@ -915,6 +959,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					if (NATIVE_NL == inchar)
 					{
 						line_term_seen = TRUE;
+						io_ptr->dollar.key[0] = io_ptr->dollar.zb[0] = NATIVE_NL;
+						io_ptr->dollar.key[1] = io_ptr->dollar.zb[1] = '\0';
 						if (!rdone)
 							break;
 					}
@@ -1480,38 +1526,118 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								UTF8_BADCHAR(char_bytes_read, char_start,
 									     char_start + char_bytes_read, 0, NULL);
 							}
-							if (u32_line_term[U32_LT_LF] == *char_start)
-								if (rm_ptr->crlast)
+							if (ASCII_LF == *char_start)
+							{
+								if (rm_ptr->crlastbuff)
+									assert(rm_ptr->crlast);
+								if (rm_ptr->crlast && !rdone)
 								{	/* ignore LF following CR */
 									rm_ptr->crlast = FALSE;
 									rm_ptr->inbuf_pos = char_start;
 									bytes2read = 1;				/* reset */
 									bytes_read = char_bytes_read = 0;	/* start fresh */
 									tot_bytes_read--;
+									if (rm_ptr->crlastbuff)
+									{
+										/* $KEY contains CR at this point. append LF.
+										 * Also, CR was the last char of the previous buffer
+										 * We needed to inspect this char to be LF and did
+										 * not terminate the previous READ. Terminate it.
+										 */
+										rm_ptr->crlastbuff = FALSE;
+										assert(ASCII_CR == io_ptr->dollar.key[0]);
+										assert(ASCII_CR == io_ptr->dollar.zb[0]);
+										SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_LF]
+											, &io_ptr->dollar.key[UTF8CRLEN],
+											&io_ptr->dollar.zb[UTF8CRLEN]);
+										break;
+									}
 									continue;
 								} else
 								{
 									line_term_seen = TRUE;
 									rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
+									SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_LF],
+										 &io_ptr->dollar.key[0], &io_ptr->dollar.zb[0]);
 									if (!rdone)
 										break;
 								}
-							rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
-							if (u32_line_term[U32_LT_CR] == *char_start)
+							} else if (rm_ptr->crlastbuff)
 							{
-								rm_ptr->crlast = TRUE;
-								line_term_seen = TRUE;
-								if (!rdone)
-									break;
-							} else
-								rm_ptr->crlast = FALSE;
-							if (u32_line_term[U32_LT_FF] == *char_start)
-							{
-								line_term_seen = TRUE;
+								/* CR was the last char of the previous buffer.
+								 * We needed to inspect this char to be LF.
+								 * The previous READ was not terminated, terminate it.
+								 * Also reset the buffer pointers so this char goes into next read.
+								 */
+								rm_ptr->start_pos -= min_bytes_to_copy;
+								rm_ptr->inbuf_pos = char_start;
+								rm_ptr->crlastbuff = FALSE;
 								if (!rdone)
 									break;
 							}
-							*temp++ = *char_start;
+							rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
+							if (ASCII_CR == *char_start)
+							{
+								rm_ptr->crlast = TRUE;
+								line_term_seen = TRUE;
+								SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_CR],
+									 &io_ptr->dollar.key[0], &io_ptr->dollar.zb[0]);
+								/* Peep into the next char to see if it's LF and append it to $KEY.
+								 * If The buffer ends with 'CR', the next char in the buffer not yet
+								 * read can be LF. So don't terminate this read and force the next
+								 * read to check for LF in 1st char.
+								 * Same is the case if reading from BOM bytes.
+								 */
+								if (0 == rm_ptr->tot_bytes_in_buffer)
+								{	/* Reading from BOM */
+									if (rm_ptr->bom_buf_off == rm_ptr->bom_buf_cnt)
+										rm_ptr->crlastbuff = TRUE;
+									else
+									{
+										rm_ptr->crlastbuff = FALSE;
+										if (ASCII_LF ==
+											rm_ptr->bom_buf[rm_ptr->bom_buf_off])
+										{
+											SET_UTF8_DOLLARKEY_DOLLARZB(
+											u32_line_term[U32_LT_LF],
+											&io_ptr->dollar.key[UTF8CRLEN],
+											&io_ptr->dollar.zb[UTF8CRLEN]);
+										}
+									}
+								} else
+								{	/* Reading from the buffer */
+									if (rm_ptr->start_pos == rm_ptr->tot_bytes_in_buffer)
+										rm_ptr->crlastbuff = TRUE;
+									else
+									{
+										rm_ptr->crlastbuff = FALSE;
+										if (ASCII_LF ==
+											rm_ptr->tmp_buffer[rm_ptr->start_pos])
+										{
+											SET_UTF8_DOLLARKEY_DOLLARZB(
+											u32_line_term[U32_LT_LF],
+											&io_ptr->dollar.key[UTF8CRLEN],
+											&io_ptr->dollar.zb[UTF8CRLEN]);
+										}
+									}
+								}
+								if (!rdone && !rm_ptr->crlastbuff)
+									break;
+							} else
+							{
+								rm_ptr->crlast = FALSE;
+								rm_ptr->crlastbuff = FALSE;
+							}
+							if (ASCII_FF == *char_start)
+							{
+								line_term_seen = TRUE;
+								SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_FF],
+									 &io_ptr->dollar.key[0], &io_ptr->dollar.zb[0]);
+								if (!rdone)
+									break;
+							}
+							if (!rm_ptr->crlastbuff)
+								*temp++ = *char_start;
 							PIPE_DEBUG(PRINTF("8: move *char_start to *temp\n"); DEBUGPIPEFLUSH);
 						} else
 						{
@@ -1538,6 +1664,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							    u32_line_term[U32_LT_PS] == utf_code)
 							{
 								line_term_seen = TRUE;
+								SET_UTF8_DOLLARKEY_DOLLARZB(utf_code, &io_ptr->dollar.key[0],
+									&io_ptr->dollar.zb[0]);
 								if (!rdone)
 									break;
 							}
@@ -1546,7 +1674,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 									  char_bytes_read); DEBUGPIPEFLUSH);
 							temp += char_bytes_read;
 						}
-						bytes_count += char_bytes_read;
+						if (!rm_ptr->crlastbuff)
+							bytes_count += char_bytes_read;
 						PIPE_DEBUG(PRINTF("11: bytes_count: %d \n", bytes_count); DEBUGPIPEFLUSH);
 						if (bytes_count > MAX_STRLEN)
 						{	/* need to leave bytes for this character in buffer */
@@ -1595,32 +1724,108 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						assert(nextmb == rm_ptr->inbuf_pos);
 						if (u32_line_term[U32_LT_LF] == utf_code)
 						{
-							if (rm_ptr->crlast)
+							if (rm_ptr->crlastbuff)
+								assert(rm_ptr->crlast);
+							if (rm_ptr->crlast && !rdone)
 							{	/* ignore LF following CR */
 								rm_ptr->crlast = FALSE;
 								rm_ptr->inbuf_pos = char_start;
 								bytes2read = 2;				/* reset */
 								bytes_read = char_bytes_read = 0;	/* start fresh */
 								tot_bytes_read -= 2;
+								if (rm_ptr->crlastbuff)
+								{
+									/* $KEY contains CR at this point. append LF
+									 * Also, CR was the last char of the previous buffer.
+									 * We needed to inspect this char to be LF and did
+									 * not terminate the previous READ. Terminate it.
+									 */
+									rm_ptr->crlastbuff = FALSE;
+									assert(io_ptr->dollar.key[0] == ASCII_CR);
+									assert(io_ptr->dollar.zb[0] == ASCII_CR);
+									SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_LF],
+										&io_ptr->dollar.key[UTF8CRLEN],
+										&io_ptr->dollar.zb[UTF8CRLEN]);
+									break;
+								}
 								continue;
+							} else
+							{
+								line_term_seen = TRUE;
+								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;  /* mark as read */
+								SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_LF],
+									&io_ptr->dollar.key[0], &io_ptr->dollar.zb[0]);
+								if (!rdone)
+									break;
 							}
+						} else if (rm_ptr->crlastbuff)
+						{
+							/* CR was the last char of the previous buffer.
+							 * We needed to inspect this char for LF.
+							 * The previous READ was not terminated, terminate it.
+							 * Also reset the buffer pointers so this char goes into next read.
+							 */
+							rm_ptr->start_pos -= min_bytes_to_copy;
+							rm_ptr->inbuf_pos = char_start;
+							rm_ptr->crlastbuff = FALSE;
+							if (!rdone)
+								break;
 						}
 						rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
-						if (u32_line_term[U32_LT_CR] == utf_code)
-							rm_ptr->crlast = TRUE;
-						else
-							rm_ptr->crlast = FALSE;
 						for (ltind = 0; 0 < u32_line_term[ltind]; ltind++)
 							if (u32_line_term[ltind] == utf_code)
 							{
 								line_term_seen = TRUE;
+								SET_UTF8_DOLLARKEY_DOLLARZB(utf_code, &io_ptr->dollar.key[0],
+									&io_ptr->dollar.zb[0]);
 								break;
 							}
-						if (line_term_seen && !rdone)
+						if (u32_line_term[U32_LT_CR] == utf_code)
+						{
+							rm_ptr->crlast = TRUE;
+							/* Peep into the next char to see if it's LF and append it to $KEY.
+							 * If The buffer ends with 'CR', the next char in the buffer not yet read
+							 * can be LF. So don't terminate this read and force the next read
+							 * to check for LF in 1st char.
+							 * Same is the case if reading from BOM bytes.
+							 */
+							if (0 == rm_ptr->tot_bytes_in_buffer)
+								rm_ptr->crlastbuff = TRUE;	/* CR read as BOM. */
+							else
+							{	/* Reading from buffer */
+								if (rm_ptr->start_pos == rm_ptr->tot_bytes_in_buffer)
+									rm_ptr->crlastbuff = TRUE;	/* CR last char of buf */
+								else
+								{
+						 	 		/* This is UTF-16. Consider the BE/LE differences. */
+									rm_ptr->crlastbuff = FALSE;
+									if ((CHSET_UTF16BE == chset) ?
+										((0x0 == rm_ptr->tmp_buffer[rm_ptr->start_pos]) &&
+										 (ASCII_LF ==
+										   rm_ptr->tmp_buffer[rm_ptr->start_pos+1])) :
+										((0x0 == rm_ptr->tmp_buffer[rm_ptr->start_pos+1]) &&
+										 (ASCII_LF ==
+										   rm_ptr->tmp_buffer[rm_ptr->start_pos])))
+									{
+										SET_UTF8_DOLLARKEY_DOLLARZB(u32_line_term[U32_LT_LF]
+										, &io_ptr->dollar.key[UTF8CRLEN],
+										&io_ptr->dollar.zb[UTF8CRLEN]);
+									}
+								}
+							}
+						} else
+						{
+							rm_ptr->crlast = FALSE;
+							rm_ptr->crlastbuff = FALSE;
+						}
+						if (line_term_seen && !rdone && !rm_ptr->crlastbuff)
 							break;		/* out of do loop */
-						temp_start = temp;
-						temp = (char *)UTF8_WCTOMB(utf_code, temp_start);
-						bytes_count += (int4)(temp - temp_start);
+						if (!rm_ptr->crlastbuff)
+						{
+							temp_start = temp;
+							temp = (char *)UTF8_WCTOMB(utf_code, temp_start);
+							bytes_count += (int4)(temp - temp_start);
+						}
 						if (bytes_count > MAX_STRLEN)
 						{	/* need to leave bytes for this character in buffer */
 							bytes_count -= (int4)(temp - temp_start);
@@ -1630,7 +1835,10 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						}
 					} else
 						assertpro(FALSE);
-					char_count++;
+					if (!rm_ptr->crlastbuff)
+					{
+						char_count++;
+					}
 					char_start = rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
 					bytes_read = char_bytes_read = 0;
 					bytes2read = (CHSET_UTF8 == chset) ? 1 : 2;
@@ -1673,7 +1881,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				cancel_timer(timer_id);
 			io_ptr->dollar.za = 9;
 			/* save error in $device */
-			DOLLAR_DEVICE_SET(io_ptr, real_errno);
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 		}
 		ret = FALSE;
@@ -1686,8 +1894,12 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{
 				FCNTL3(fildes, F_SETFL, flags, fcntl_res);
 				if (0 > fcntl_res)
+				{
+					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"),
-						      CALLFROM, errno);
+						      CALLFROM, save_errno);
+				}
 			}
 			if ((rm_ptr->is_pipe && (0 == status)) || (rm_ptr->fifo && (0 == status || real_errno == EAGAIN)))
 				ret = FALSE;
@@ -1712,8 +1924,10 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			return FALSE;
 		}
 		/* on end of file set $za to 9 */
-		len = SIZEOF(ONE_COMMA_DEV_DET_EOF);
-		memcpy(io_ptr->dollar.device, ONE_COMMA_DEV_DET_EOF, len);
+		if (WBTEST_ENABLED(WBTEST_DOLLARDEVICE_BUFFER))
+			SET_DOLLARDEVICE_ERRSTR(io_ptr, ONE_COMMA_DEV_DET_EOF_DOLLARDEVICE);
+		else
+			SET_DOLLARDEVICE_ERRSTR(io_ptr, ONE_COMMA_DEV_DET_EOF);
 		io_ptr->dollar.za = 9;
 		if ((TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);

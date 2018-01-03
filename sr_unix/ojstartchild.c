@@ -57,6 +57,7 @@
 #include "zshow.h"
 #include "zwrite.h"
 #include "gtm_maxstr.h"
+#include "getzdir.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -464,7 +465,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(errno), pipe_status);
 				UNDERSCORE_EXIT(joberr);
-			}
+			} else	/* update dollar_zdir with the new current working directory */
+				getzdir();
 		}
 
 		/* attempt to open output files. This also redirects stdin/out/err, so any error messages by this process during the
@@ -473,7 +475,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		if ((status = ojchildioset(jparms)))
 		{
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
-			assert(FALSE);
 			UNDERSCORE_EXIT(status);
 		}
 		/* Record the fact that this process is interested in the relinkctl files inherited from the parent by

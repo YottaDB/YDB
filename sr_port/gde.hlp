@@ -3,7 +3,9 @@
 
    The GT.M Global Directory Editor (GDE) is a utility for creating,
    examining, and modifying a global directory. GDE is a program written in M
-   and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE.
+   and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE. If
+   you invoke it from the shell, GDE returns a status indicating success (0)
+   or an issue (non-zero).
 
    Because GDE is an M program, you can also invoke GDE from a GT.M process
    with DO ^GDE. If you invoke GDE with a DO and modify the map of global
@@ -553,10 +555,10 @@
 
    The format of the ADD command is one of the following:
 
+   A[DD] -G[BLNAME] global-name [-GBLNAME-qualifier ...]
    A[DD] -N[AME] namespace -R[EGION]=region-name
    A[DD] -R[EGION] region-name -D[YNAMIC]=segment-name [-REGION-qualifier...]
    A[DD] -S[EGMENT] segment-name [-SEGMENT-qualifier...] -F[ILE_NAME]=file-name
-   A[DD] -G[BLNAME] global-name [-GBLNAME-qualifier ...]
 
    The ADD command requires specification of an object-type and object-name.
    GDE supplies default values from the templates for qualifiers not
@@ -732,24 +734,27 @@
    Change
 
    The CHANGE command alters the name-to-region or region-to-segment mapping
-   and /or the environment for a region or segment.
+   and /or the environment for a region or segment. It may also alter the
+   association of a global directory with a replication instance file.
 
    The format of the CHANGE command is:
 
-   C[HANGE]-N[AME] namespace -R[EGION]=new-region
-   C[HANGE]-R[EGION] region-name [-REGION-qualifier...]
-   C[HANGE]-S[EGMENT] segment-name [-SEGMENT-qualifier...]
    C[HANGE] -G[BLNAME] -C[OLLATION]=collation_number
+   C[HANGE] -I[INSTANCE] -F[ILE_NAME=[repl_inst_filename|""]
+   C[HANGE] -N[AME] namespace -R[EGION]=new-region
+   C[HANGE] -R[EGION] region-name [-REGION-qualifier...]
+   C[HANGE] -S[EGMENT] segment-name [-SEGMENT-qualifier...]
 
    The CHANGE command requires specification of an object-type and
    object-name.
 
-   Once you exit GDE, mapping changes take effect for any subsequent image
-   activation (for example, the next RUN or the mumps -direct command).
-   Changes to database parameters only take effect for new database files
-   created with subsequent MUPIP CREATE commands that use the modified Global
-   Directory. Use the MUPIP SET command (or in some cases DSE) to change
-   characteristics of existing database files.
+   Once you exit GDE, mapping changes, including Instance mapping, take
+   effect for any subsequent image activation (for example, the next RUN or
+   the mumps -direct command). Changes to database parameters only take
+   effect for new database files created with subsequent MUPIP CREATE
+   commands that use the modified Global Directory. Use the MUPIP SET command
+   (or in some cases DSE) to change characteristics of existing database
+   files.
 
    Example:
 
@@ -775,10 +780,10 @@
 
    The format of the DELETE command is:
 
+   D[ELETE] -G[BLNAME] global-name
    D[ELETE] -N[AME] namespace
    D[ELETE] -R[EGION] region-name
    D[ELETE] -S[EGMENT] segment-name
-   D[ELETE] -G[BLNAME] global-name
 
    The DELETE command requires specification of an object-type and
    object-name.
@@ -938,10 +943,10 @@
 
    The format of the RENAME command is:
 
+   R[ENAME] -G[BLNAME] old-global-name new-global-name
    R[ENAME] -N[AME] old-name new-name
    R[ENAME] -R[EGION] old-region-name new-region-name
    R[ENAME] -S[EGMENT] old-segment-name new-segment-name
-   R[ENAME] -G[BLNAME] old-global-name new-global-name
 
    The RENAME command requires specification of an object-type and two
    object-names.
@@ -999,14 +1004,16 @@
 
    The format of the SHOW command is:
 
+   SH[OW]
+   SH[OW] -A[LL]
    SH[OW] -C[OMMAND] -F[ILE]=[gde-command-file]
+   SH[OW] -G[BLNAME]
+   SH[OW] -I[NSTANCE]
+   SH[OW] -M[AP] [-R[EGION]=region-name]
    SH[OW] -N[AME] [namespace]
    SH[OW] -R[EGION] [region-name]
    SH[OW] -S[EGMENT] [segment-name]
-   SH[OW] -M[AP] [-R[EGION]=region-name]
    SH[OW] -T[EMPLATE]
-   SH[OW] -G[BLNAME]
-   SH[OW] -A[LL]
 
    -COMMAND: Displays GDE commands that recreate the current Global Directory
    state.
@@ -1022,6 +1029,16 @@
    can input to GDE with the prior GT.M release to recreate the prior global
    directory file.
 
+   SHOW -COMMAND displays the GDE commands for creating names, regions, and
+   segments of the current global directory state in a target environment.
+   However, it does not always include the same template settings (SHOW
+   -TEMPLATE) of the current global directory. SHOW -COMMAND creates an
+   appropriate set of templates that minimize other adjustments to recreate
+   the current global directory. If the current GDE template settings (SHOW
+   -TEMPLATE) are important for your application, you need set them again
+   after applying the commands from GDE SHOW -COMMAND in the target
+   environment.
+
    **Note**
 
    When GDE encounters an error while executing the @command-file command, it
@@ -1031,9 +1048,21 @@
    same command-file, GDE resumes processing it at the line after the last
    error.
 
-   -NAME, -REGION, -SEGMENT, -GBLNAME, -MAP, -TEMPLATE, and -ALL are
+   -ALL: Displays the entire Global Directory. This qualifier corresponds to
+   displaying "all" sections of the SHOW report:
+
+   ***TEMPLATES***, ***NAMES***, ***REGIONS***, ***SEGMENTS***, ***MAP***, ***INSTANCE***.
+
+   By default, SHOW displays -ALL.
+
+   -GBLNAME, -INSTANCE, -MAP, -NAME, -REGION, -SEGMENT, and -TEMPLATE are
    qualifiers that cause GDE to display selected portions of the Global
    Directory as follows:
+
+   -INSTANCE: Displays the current Instance Mapping, if any. This qualifier
+   corresponds to the section of the SHOW report titled:
+
+   ***INSTANCE***
 
    -MAP: Displays the current mapping of all names, regions, segments, and
    files. This qualifier corresponds to the section of the SHOW report titled
@@ -1044,13 +1073,6 @@
    qualifier corresponds to the section of the SHOW report titled:
 
    ***TEMPLATES***
-
-   -ALL: Displays the entire Global Directory. This qualifier corresponds to
-   displaying "all" sections of the SHOW report:
-
-   ***TEMPLATES***, ***NAMES***, ***REGIONS***, ***SEGMENTS***,  ***MAP***.
-
-   By default, SHOW displays -ALL.
 
    If you want to print the Global Directory, create a log file by executing
    LOG -ON= before executing the SHOW command. The -LOG command captures all
@@ -1102,16 +1124,20 @@
    The format of the VERIFY command is:
 
    V[ERIFY]
+   V[ERIFY] -A[LL]
+   V[ERIFY] -G[BLNAME]
+   V[ERIFY] -M[AP]
    V[ERIFY] -N[AME] [namespace]
    V[ERIFY] -R[EGION] [region-name]
    V[ERIFY] -S[EGMENT] [segment-name]
-   V[ERIFY] -M[AP]
-   V[ERIFY] -G[BLNAME]
    V[ERIFY] -T[EMPLATE]
-   V[ERIFY] -A[LL]
 
    The object-type is optional. -MAP, -TEMPLATE, and -ALL are special
    qualifiers used as follows:
+
+   -ALL
+
+           Checks all map and template data.
 
    -MAP
 
@@ -1121,10 +1147,6 @@
    -TEMPLATE
 
            Checks that all templates currently are consistent and useable.
-
-   -ALL
-
-           Checks all map and template data.
 
    VERIFY with no qualifier, VERIFY -MAP, and VERIFY -ALL each check all
    current information.
@@ -1305,7 +1327,7 @@
 
    Example:
 
-   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2308,EXTENSION=2048)
+   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2312,EXTENSION=2048)
 
    Summary
 
@@ -1623,12 +1645,6 @@
    By default GDE uses NOASYNCIO. On segments with an access method of MM,
    GT.M ignores this setting.
 
-   -[NO]ENcryption
-
-   Specifies whether or not the database file for a segment is flagged for
-   encryption. Note that MUPIP CREATE acquires an encryption key for this
-   file and puts a cryptographic hash of the key in the database file header.
-
    -BL[OCK_SIZE]=size
 
    Specifies the size, in bytes, of each database block in the file system.
@@ -1698,10 +1714,10 @@
    should extend. The extend amount is interpreted as the number of usable
    GDS blocks to create with the extension. To calculate the number of host
    operating system blocks added with each extension, multiply the number of
-   GDS blocks added by (GDS BLOCK_SIZE/host BLOCK_SIZE); add one local bitmap
-   block for each 512 blocks added in each extension to the amount from step
-   1. If the extension is not a multiple of 512, remember to roundup when
-   figuring the number of bitmap blocks.
+   GDS blocks by (GDS BLOCK_SIZE/host BLOCK_SIZE); add one local bitmap block
+   for each 512 blocks added in each extension to the amount from step 1. If
+   the extension is not a multiple of 512, remember to roundup when figuring
+   the number of bitmap blocks.
 
    When a MUPIP EXTEND command does not include a -BLOCKS= qualifier, EXTEND
    uses the extension size in the database header.
@@ -1804,7 +1820,7 @@
 
    The minimum LOCK_SPACE is 10 pages.
 
-   The maximum LOCK_SPACE is 65,536 pages.
+   The maximum LOCK_SPACE is 262144 pages.
 
    By default, GDE uses a LOCK_SPACE of 40 pages.
 
@@ -1887,7 +1903,7 @@
    | -G[LOBAL_BUFFER_COUNT]=size | 1024*     | 64    | 2,147,483,647        |
    | (blocks)                    |           |       |                      |
    |-----------------------------+-----------+-------+----------------------|
-   | -L[OCK_SPACE]=size (pages)  | 40        | 10    | 65536                |
+   | -L[OCK_SPACE]=size (pages)  | 40        | 10    | 262144               |
    |-----------------------------+-----------+-------+----------------------|
    | -M[UTEX_SLOTS]=integer      | 1,024     | 1,024 | 32,768               |
    |-----------------------------+-----------+-------+----------------------|
@@ -1930,6 +1946,22 @@
           o else, if there is a default for that database file, use it
           o else (that is, neither exists), use standard M collation
 
+2 Instance_Qualifier
+   Instance Qualifier
+
+   The following -INSTANCE qualifier is used with the CHANGE command.
+
+   -F[ILE_NAME=[repl_inst_filename|""]
+
+     o -FILE_NAME=repl_inst_filename maps a replication instance file with
+       the global directory. -FILE_NAME="" removes the mapping of a global
+       directory with a replication instance file.
+     o When a global directory is use, the mapping set with CHANGE -INSTANCE
+       FILE_NAME=repl_inst_filename overrides any setting of the
+       gtm_repl_instance environment variable. However, other utilities
+       (MUPIP, LKE, and DSE) use the setting of the gtm_repl_instance
+       environment variable.
+
 1 Summary
    Summary
 
@@ -1939,116 +1971,124 @@
    +------------------------------------------------------------------------+
    |                          GDE Command Summary                           |
    |------------------------------------------------------------------------|
-   |  Command   | Specified Object |    Required Object Name/[Optional]     |
-   |            |       Type       |               Qualifier                |
+   |  Command   |  Specified  |  Required Object Name/[Optional] Qualifier  |
+   |            | Object Type |                                             |
    |------------------------------------------------------------------------|
    |        * -ALL is the default for the SHOW and VERIFY commands.         |
    |------------------------------------------------------------------------|
-   | @          | N/A              | file-name                              |
-   |------------+------------------+----------------------------------------|
-   |            |                  | namespace                              |
-   | A[DD]      | -N[AME]          |                                        |
-   |            |                  | -R[EGION]=region-name                  |
-   |------------+------------------+----------------------------------------|
-   |            |                  | region-name                            |
-   | -          | -R[EGION]        |                                        |
-   |            |                  | -D[YNAMIC]=segment-name                |
-   |            |                  | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | segment-name                           |
-   | -          | -S[EGMENT]       |                                        |
-   |            |                  | -F[ILE_NAME]=file-name                 |
-   |            |                  | [-SEGMENT-qualifier...]                |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | namespace                              |
-   | C[HANGE]   | -N[AME]          |                                        |
-   |            |                  | -R[EGION]=new-region                   |
-   |------------+------------------+----------------------------------------|
-   |            |                  | region-name                            |
-   | -          | -R[EGION]        |                                        |
-   |            |                  | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | segment-name                           |
-   | -          | -S[EGMENT]       |                                        |
-   |            |                  | [-SEGMENT-qualifier]                   |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | D[ELETE]   | -N[AME]          | namespace                              |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | region-name                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | segment-name                           |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | E[XIT]     | N/A              | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | HE[LP]     | N/A              | Keyword                                |
-   |------------+------------------+----------------------------------------|
-   | LOC[KS]    | N/A              | -R[EGION]=region-name                  |
-   |------------+------------------+----------------------------------------|
-   |            |                  | [-ON][=file-name]                      |
-   | LOG        | N/A              |                                        |
-   |            |                  | [-OF[F]]                               |
-   |------------+------------------+----------------------------------------|
-   | Q[UIT]     | N/A              | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | R[ENAME]   | -N[AME]          | old-name new-name                      |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | old-reg-name new-reg-name              |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | old-seg-name new-seg-name              |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | SE[TGD]    | N/A              | -F[ILE]=file-name [-Q[UIT]]            |
-   |------------+------------------+----------------------------------------|
-   | SH[OW]     | -N[AME]          | [namespace]                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | [region-name]                          |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [segment-name]                         |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -M[AP]           | [R[EGION]=region-name]                 |
-   |------------+------------------+----------------------------------------|
-   | -          | T[EMPLATE]       | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -A[LL]*          | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | T[EMPLATE] | -R[EGION]        | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [ -SEGMENT-qualifier...]               |
-   |------------+------------------+----------------------------------------|
-   | V[ERIFY]   | -N[AME]          | [namespace]                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | [region-name]                          |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [segment-name]                         |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -M[AP]           | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -T[EMPLATE]      | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -A[LL]*          | N/A                                    |
+   | @          | N/A         | file-name                                   |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | A[DD]      | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | namespace                                   |
+   | -          | -N[AME]     |                                             |
+   |            |             | -R[EGION]=region-name                       |
+   |------------+-------------+---------------------------------------------|
+   |            |             | region-name                                 |
+   | -          | -R[EGION]   |                                             |
+   |            |             | -D[YNAMIC]=segment-name                     |
+   |            |             | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | segment-name                                |
+   | -          | -S[EGMENT]  |                                             |
+   |            |             | -F[ILE_NAME]=file-name                      |
+   |            |             | [-SEGMENT-qualifier...]                     |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | C[HANGE]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | replication-instance                        |
+   | -          | -I[NSTANCE] |                                             |
+   |            |             | -F[ILE_NAME]=replication_instance_file      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | namespace                                   |
+   | -          | -N[AME]     |                                             |
+   |            |             | -R[EGION]=new-region                        |
+   |------------+-------------+---------------------------------------------|
+   |            |             | region-name                                 |
+   | -          | -R[EGION]   |                                             |
+   |            |             | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | segment-name                                |
+   | -          | -S[EGMENT]  |                                             |
+   |            |             | [-SEGMENT-qualifier]                        |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | D[ELETE]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | namespace                                   |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | region-name                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | segment-name                                |
+   |------------+-------------+---------------------------------------------|
+   | E[XIT]     | N/A         | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | HE[LP]     | N/A         | Keyword                                     |
+   |------------+-------------+---------------------------------------------|
+   | LOC[KS]    | N/A         | -R[EGION]=region-name                       |
+   |------------+-------------+---------------------------------------------|
+   |            |             | [-ON][=file-name]                           |
+   | LOG        | N/A         |                                             |
+   |            |             | [-OF[F]]                                    |
+   |------------+-------------+---------------------------------------------|
+   | Q[UIT]     | N/A         | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | R[ENAME]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | old-name new-name                           |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | old-reg-name new-reg-name                   |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | old-seg-name new-seg-name                   |
+   |------------+-------------+---------------------------------------------|
+   | SE[TGD]    | N/A         | -F[ILE]=file-name [-Q[UIT]]                 |
+   |------------+-------------+---------------------------------------------|
+   | SH[OW]     | -A[LL]*     | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | -          | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | replication-instance                        |
+   | -          | -I[NSTANCE] |                                             |
+   |            |             | -F[ILE_NAME]=replication_instance_file      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -M[AP]      | [R[EGION]=region-name]                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | [namespace]                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | [region-name]                               |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [segment-name]                              |
+   |------------+-------------+---------------------------------------------|
+   | -          | T[EMPLATE]  | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | T[EMPLATE] | -R[EGION]   | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [ -SEGMENT-qualifier...]                    |
+   |------------+-------------+---------------------------------------------|
+   | V[ERIFY]   | -A[LL]*     | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | -          | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | [namespace]                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | [region-name]                               |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [segment-name]                              |
+   |------------+-------------+---------------------------------------------|
+   | -          | -M[AP]      | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | -          | -T[EMPLATE] | N/A                                         |
    +------------------------------------------------------------------------+
 
 2 Qualifier_Summary
@@ -2148,7 +2188,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-001 of the
+   This help file is a concise representation of revision V6.3-003 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

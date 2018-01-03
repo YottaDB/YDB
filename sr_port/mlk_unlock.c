@@ -92,6 +92,6 @@ void mlk_unlock(mlk_pvtblk *p)
 			csa->nl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
 		REL_LOCK_CRIT(csa, p->region, was_crit);
 	} else	/* acc_meth == dba_usr */
-		gvusr_unlock(p->total_length, &p->value[0], p->region);
+		gvusr_unlock(p->nref_length, &p->value[0], p->region);
 	return;
 }

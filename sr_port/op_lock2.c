@@ -29,7 +29,7 @@
 #include "mlk_unlock.h"
 #include "mlk_unpend.h"
 #include "outofband.h"
-#include "lk_check_own.h"
+#include "mlk_check_own.h"
 #include "lock_str_to_buff.h"
 #include "gvcmx.h"
 #include "gvcmz.h"
@@ -60,6 +60,7 @@
 #include "lockdefs.h"
 #include "is_proc_alive.h"
 #include "mvalconv.h"
+#include "min_max.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -286,7 +287,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 		{
 			if (out_of_time || outofband)
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
-				if (outofband || !lk_check_own(pvt_ptr1))
+				if (outofband || !mlk_check_own(pvt_ptr1))
 				{	/* If CTL-C, check lock owner */
 					if (pvt_ptr1->nodptr)		/* Get off pending list to be sent a wake */
 						mlk_unpend(pvt_ptr1);
@@ -377,7 +378,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 				break;
 			}
 			if (pvt_ptr1->nodptr)
-				lk_check_own(pvt_ptr1);		/* clear an abandoned owner */
+				mlk_check_own(pvt_ptr1);		/* clear an abandoned owner */
 		}
 		if (blocked && out_of_time)
 			break;

@@ -352,7 +352,7 @@ int4 cli_t_f_n (char *entry)
 
 	assert (strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
 	if (cli_get_value(local_str, buf))
 	{
@@ -392,7 +392,7 @@ int4 cli_n_a_e (char *entry)
 
 	assert (strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
 	if (cli_get_value(local_str, buf))
 	{
@@ -414,3 +414,46 @@ int4 cli_n_a_e (char *entry)
 		return (-1);
 	}
 }
+
+boolean_t cli_get_defertime(char *entry, int4 *dst)
+{
+	char		buf[MAX_LINE];
+	char		local_str[MAX_LINE];
+	int		ch_index = 0;
+	int4		prev_value = 0, num = 0;
+	boolean_t	neg_num = FALSE;
+
+	assert(strlen(entry) > 0);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+
+	if (cli_present(local_str) == CLI_PRESENT
+		&& cli_get_value(local_str, buf))
+	{
+		prev_value = 0;
+		if (buf[ch_index] == '-')
+		{
+			neg_num = TRUE;
+			ch_index++;
+		}
+		for (; ((buf[ch_index] >= '0' && buf[ch_index] <= '9') && (buf[ch_index] != '\0')); ch_index++)
+		{
+			num = num * 10 + (buf[ch_index] - '0');
+			if (num < prev_value)
+				break;
+			prev_value = num;
+		}
+		if (neg_num && buf[ch_index] == '\0')
+		{
+			num = num * -1;
+		}
+		if((-1 > num || num > INT_MAX) || buf[ch_index] != '\0' || (neg_num && !num))
+		{
+			FPRINTF(stderr, "Error: cannot convert %s value to decimal number.\n", buf);
+			return FALSE;
+		}
+		*dst = num;
+		return TRUE;
+	}
+	return FALSE;
+}
+

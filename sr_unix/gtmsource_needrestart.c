@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +31,7 @@
 #include "repl_log.h"
 #include "repl_instance.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF 	gtmsource_options_t	gtmsource_options;
 
@@ -43,7 +44,7 @@ int gtmsource_needrestart(void)
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	if (NULL != gtmsource_local)
 	{
 		assert(!STRCMP(gtmsource_options.secondary_instname, gtmsource_local->secondary_instname));
@@ -53,13 +54,13 @@ int gtmsource_needrestart(void)
 	} else
 		repl_log(stderr, TRUE, TRUE, "Initiating NEEDRESTART operation for secondary instance [%s]\n",
 			gtmsource_options.secondary_instname);
-	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-	if ((NULL != gtmsource_local) && (gtmsource_local->connect_jnl_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno))
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+	if ((NULL != gtmsource_local) && (gtmsource_local->connect_jnl_seqno >= jnlpool->jnlpool_ctl->start_jnl_seqno))
 		util_out_print("Secondary Instance [!AZ] DOES NOT NEED to be restarted", TRUE, gtmsource_local->secondary_instname);
 	else
 		util_out_print("Secondary Instance [!AZ] NEEDS to be restarted first", TRUE, gtmsource_options.secondary_instname);
-	rel_lock(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	return (NORMAL_SHUTDOWN);
 }

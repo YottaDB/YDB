@@ -49,6 +49,7 @@
 #endif
 
 GBLREF	uint4			process_id;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
 GBLREF	uint4			dollar_tlevel;

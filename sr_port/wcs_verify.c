@@ -46,7 +46,6 @@ GBLREF sgmnt_addrs	*cs_addrs;
 error_def(ERR_DBADDRALIGN);
 error_def(ERR_DBADDRANGE);
 error_def(ERR_DBADDRANGE8);
-error_def(ERR_DBCLNUPINFO);
 error_def(ERR_DBCRERR);
 error_def(ERR_DBCRERR8);
 error_def(ERR_DBFHEADERR4);
@@ -80,11 +79,9 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	th_rec_ptr_t		th, th_prev;
 	cache_que_head_ptr_t	que_head;
 	cache_state_rec_ptr_t	cstt, cstt_prev;
-	char			secshr_string[2048];
-	char			secshr_string_delta[256];
 	sm_uc_ptr_t		jnl_buff_expected;
 	boolean_t		(*blkque_array)[] = NULL; /* TRUE indicates we saw the cr or bt of that array index */
-	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
+	int4			n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
 	int4			bml_status, in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
 	block_id		curbmp;
@@ -534,31 +531,6 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		bt_base_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + cnl->bt_base_off);
 		bt_top_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + offset);
 
-		/* print info. that secshr_db_clnup stored */
-		if (0 != cnl->secshr_ops_index)
-		{
-			assert(expect_damage);
-			if (SECSHR_OPS_ARRAY_SIZE < cnl->secshr_ops_index)
-			{
-				SPRINTF(secshr_string,
-					"secshr_max_index exceeded. max_index = %d [0x%08x] : ops_index = %d [0x%08x]",
-					SECSHR_OPS_ARRAY_SIZE, SECSHR_OPS_ARRAY_SIZE,
-					cnl->secshr_ops_index, cnl->secshr_ops_index);
-				SEND_MSG_CSA(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
-				cnl->secshr_ops_index = SECSHR_OPS_ARRAY_SIZE;
-			}
-			for (i = 0; (i + 1) < cnl->secshr_ops_index; i += (int4)cnl->secshr_ops_array[i])
-			{
-				SPRINTF(secshr_string, "Line %3ld ", cnl->secshr_ops_array[i + 1]);
-				for (lcnt = i + 2; lcnt < MIN(cnl->secshr_ops_index, i + cnl->secshr_ops_array[i]); lcnt++)
-				{
-					SPRINTF(secshr_string_delta, " : [0x%08lx]", cnl->secshr_ops_array[lcnt]);
-					strcat(secshr_string, secshr_string_delta);
-				}
-				SEND_MSG_CSA(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
-			}
-			cnl->secshr_ops_index = 0;
-		}
 		/* loop through the cache_recs */
 		memset(blkque_array, 0, n_bts * SIZEOF(boolean_t));	/* initially, we did not find any cr in the cr blkques */
 		asyncio = csd->asyncio;
@@ -701,7 +673,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					 */
 					do_cert_blk = ((0 == cr->twin) || (0 != cr->bt_index));
 				}
-				if (do_cert_blk && !cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, FALSE, NULL))
+				if (do_cert_blk && !cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, RTS_ERROR_ON_CERT_FAIL, NULL))
 				{
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),

@@ -13,7 +13,7 @@ gdeget:	;read in an existing GD or create a default
 LOAD
 	n abs,contents,rel,xregs,xsegs,reglist,map,$et,ptrsize
 	i debug s $et="b"
-	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! d GETOUT^GDEEXIT h"
+	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! d GETOUT^GDEEXIT zg 0"
 	; if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
 	; For OS390 aka z/OS, use BINARY mode
 	s abs=1,update=0,chset=$SELECT($ZV["OS390":"BINARY",$ZCHSET="UTF-8":"M",1:"")
@@ -33,6 +33,9 @@ LOAD
 	i gldfmt>6 s reghasv550fields=TRUE
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
+	s v631=0
+	i (label="GTCGBDUNX011")!(label="GTCGBDUNX111") s label=hdrlab,v631=1,update=1  ;autoconvert
+	i (v631=1) n SIZEOF d v631init
 	s v63a=0
 	i (label="GTCGBDUNX010")!(label="GTCGBDUNX110") s label=hdrlab,v63a=1,update=1  ;autoconvert
 	i (v63a=1) n SIZEOF d v63ainit
@@ -92,6 +95,7 @@ LOAD
 	s contents("regions")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	s contents("segments")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	i (gldfmt>8) s contents("gblnames")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
+	i (gldfmt>11) s contents("inst")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	s abs=abs+(3*ptrsize)							;skip link, tab_ptr and id pointers
 	s contents("end")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	i (gldfmt>8) s abs=abs+16	; reserved for runtime fillers
@@ -110,6 +114,9 @@ LOAD
 	i (gldfmt>8) d
 	. i x'=contents("gblnames") zm gdeerr("INPINTEG")
 	. s x=x+(contents("gblnamecnt")*(SIZEOF("gd_gblname")))
+	i (gldfmt>11),(contents("inst")>0) d
+	. i x'=contents("inst") zm gdeerr("INPINTEG")
+	. s x=x+(SIZEOF("gd_inst_info"))
 	i x'=contents("end") zm gdeerr("INPINTEG")
 	s rel=abs
 ; maps - verify that mapped regions and regions are 1-to-1
@@ -147,6 +154,11 @@ LOAD
 	i (gldfmt'>10) do
 	. ; remove any %Y* name mappings in old gld (unsubscripted OR subscripted) as documented
 	. n s s s="" f  s s=$o(nams(s)) q:s=""  i $ze(s,1,2)="%Y"  k nams(s)  i $incr(nams,-1)
+; instance
+	i (gldfmt>11) d
+	. k inst s inst=0
+	. i contents("inst")>0 d inst
+	e  s inst=0
 ; template access method
 	s tmpacc=$$gderead(4)
 	i accmeth'[("\"_tmpacc) zm gdeerr("INPINTEG")
@@ -404,7 +416,7 @@ segment:
 	i (gldfmt>8) s rel=rel+16	; reserved for runtime fillers
 	s abs=abs+SIZEOF("gd_segment")-v30
 	q
-gblname(i);
+gblname:(i)
 	n x,y
 	i $zl(rec)-(rel-1)<SIZEOF("gd_gblname") d nextrec
 	s gnams=gnams+1
@@ -418,6 +430,15 @@ gblname(i);
 	s gnams(s,"COLLATION")=x
 	s gnams(s,"COLLVER")=y
 	s abs=abs+SIZEOF("gd_gblname")
+	q
+inst:
+	n x,y
+	i $zl(rec)-(rel-1)<SIZEOF("gd_inst_info") d nextrec
+	i $zl(rec)-(rel-1)<SIZEOF("gd_inst_info") zm gdeerr("INPINTEG")
+	s y=$ze(rec,rel,rel+SIZEOF("gd_inst_info")),rel=rel+SIZEOF("gd_inst_info")
+	s x=$zf(y,ZERO)-2 i x=-2 zm gdeerr("INPINTEG")	; it better be null terminated
+	s y=$ze(y,1,x)
+	s inst("FILE_NAME")=y,inst=1
 	q
 gderead:(max)
 	n s
@@ -449,12 +470,12 @@ nextrec:
 ;----------------------------------------------------------------------------------------------------------------------------------
 
 CREATE
-	k contents,nams,regs,segs,tmpreg,tmpseg,gnams
+	k contents,nams,regs,segs,tmpreg,tmpseg,gnams,inst
 	s update=1
 	s header=$tr($j("",SIZEOF("gd_header")-16)," ",ZERO)
 	s nams=2,(nams("*"),nams("#"))=defreg
 	s regs=1,regs(defreg,"DYNAMIC_SEGMENT")=defseg,reg="regs(defreg)"
-	s gnams=0
+	s (gnams,inst)=0
 	d cretmps
 	s x=""
 	f  s x=$o(tmpreg(x)) q:'$zl(x)  s @reg@(x)=tmpreg(x)
@@ -736,6 +757,36 @@ v63ainit:
 	. s SIZEOF("gd_contents")=112
 	. s SIZEOF("gd_map")=24
 	. s SIZEOF("gd_region")=384
+	. s SIZEOF("gd_region_padding")=4
+	. s SIZEOF("gd_segment")=384
+	s SIZEOF("gd_gblname")=40
+	s SIZEOF("mident")=32
+	s SIZEOF("blk_hdr")=16
+	s SIZEOF("rec_hdr")=4
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=1048576
+	s SIZEOF("reg_jnl_deq")=4
+	d Init^GDEINITSZ
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	q
+v631init:
+	i (olabel="GTCGBDUNX011") d
+	. s SIZEOF("am_offset")=332
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=76
+	. s SIZEOF("gd_map")=16
+	. s SIZEOF("gd_region")=412
+	. s SIZEOF("gd_region_padding")=0
+	. s SIZEOF("gd_segment")=368
+	e  d
+	. s SIZEOF("am_offset")=340
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=112
+	. s SIZEOF("gd_map")=24
+	. s SIZEOF("gd_region")=424
 	. s SIZEOF("gd_region_padding")=4
 	. s SIZEOF("gd_segment")=384
 	s SIZEOF("gd_gblname")=40

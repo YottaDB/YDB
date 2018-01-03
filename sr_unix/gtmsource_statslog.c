@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +46,7 @@
 #include "util.h"
 #include "repl_log.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 error_def(ERR_REPLLOGOPN);
@@ -53,8 +54,8 @@ int gtmsource_statslog(void)
 {
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	repl_log(stderr, TRUE, TRUE, "Initiating STATSLOG operation on source server pid [%d] for secondary instance [%s]\n",
-		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
-	if (gtmsource_options.statslog == jnlpool.gtmsource_local->statslog)
+		jnlpool->gtmsource_local->gtmsource_pid, jnlpool->gtmsource_local->secondary_instname);
+	if (gtmsource_options.statslog == jnlpool->gtmsource_local->statslog)
 	{
 		util_out_print("STATSLOG is already !AD. Not initiating change in stats log", TRUE, gtmsource_options.statslog ?
 				strlen("ON") : strlen("OFF"), gtmsource_options.statslog ? "ON" : "OFF");
@@ -62,12 +63,12 @@ int gtmsource_statslog(void)
 	}
 	if (!gtmsource_options.statslog)
 	{
-		jnlpool.gtmsource_local->statslog = FALSE;
-		jnlpool.gtmsource_local->statslog_file[0] = '\0';
+		jnlpool->gtmsource_local->statslog = FALSE;
+		jnlpool->gtmsource_local->statslog_file[0] = '\0';
 		util_out_print("STATSLOG turned OFF", TRUE);
 		return (NORMAL_SHUTDOWN);
 	}
-	jnlpool.gtmsource_local->statslog = TRUE;
+	jnlpool->gtmsource_local->statslog = TRUE;
 	util_out_print("Stats log turned on", TRUE);
 	return (NORMAL_SHUTDOWN);
 }

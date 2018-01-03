@@ -844,7 +844,7 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read_state), SIZEOF(gtmsourcelocal_ptr->read_state));
 		string = (READ_POOL == gtmsourcelocal_ptr->read_state) ? "POOL" :
 				((READ_FILE == gtmsourcelocal_ptr->read_state) ? "FILE" : "UNKNOWN");
-		if (MEMCMP_LIT(string, "UNKNOWN"))
+		if (STRNCMP_LIT(string, "UNKNOWN"))
 			util_out_print( PREFIX_SOURCELOCAL "Currently Reading from     !R21AZ", TRUE, idx, string);
 		else
 		{

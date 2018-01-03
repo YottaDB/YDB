@@ -26,11 +26,15 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "interlock.h"
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
+
 
 GBLREF gd_region 	*gv_cur_region;
 GBLREF sgmnt_data	*cs_data;
 GBLREF tp_region 	*grlist;
 GBLREF uint4		process_id;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;	/* TP_CHANGE_REG */
 
 CONDITION_HANDLER(mu_freeze_ch)
 {

@@ -27,8 +27,8 @@
 
 #define	ENOSPC_LOGGING_PERIOD	100	/* every 100th ENOSPC error is logged to avoid flooding the operator log */
 
-GBLREF bool 	caller_id_flag;
-GBLREF uint4	process_id;
+GBLREF boolean_t	caller_id_flag;
+GBLREF uint4		process_id;
 
 error_def(ERR_CALLERID);
 error_def(ERR_JNLBUFINFO);

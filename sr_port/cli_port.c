@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -287,8 +288,9 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 	char		*first_num_str, *second_num_str, *two_num_str_top, *num_endptr;
 	char		two_num_qual_str[128];
 	unsigned short	two_num_qual_len;
-	uint4		num;
+	uint4		num, prev_value;
 	int		retval = 0;
+	char		*num_ch;
 
 	two_num_qual_len = SIZEOF(two_num_qual_str);
 	if (!cli_get_str(qual_name, two_num_qual_str, &two_num_qual_len))
@@ -296,18 +298,7 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 		util_out_print("Error parsing !AZ qualifier", TRUE, qual_name);
 		return 0;
 	}
-#ifdef VMS
-	/* DCL does not strip quotes included in the command line. However, the DEFAULT value (see mupip_cmd.cld) is stripped
-	 * of quotes. */
-	if ('"' == two_num_qual_str[0])
-	{
-		assert('"' == two_num_qual_str[two_num_qual_len - 1]); /* end quote should exist */
-		first_num_str = &two_num_qual_str[1]; /* Skip begin quote */
-		two_num_qual_str[two_num_qual_len - 1] = '\0'; /* Zap end quote */
-		two_num_qual_len -= 2; /* Quotes gone */
-	} else
-#endif
-		first_num_str = two_num_qual_str;
+	first_num_str = two_num_qual_str;
 	for (second_num_str = first_num_str, two_num_str_top = first_num_str + two_num_qual_len;
 		second_num_str < two_num_str_top && delimiter != *second_num_str;
 		second_num_str++)
@@ -316,10 +307,16 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 		*second_num_str++ = '\0';
 	if (*first_num_str != '\0') /* VMS issues EINVAL if strtoul is passed null string */
 	{
-		errno = 0;
-		num = (uint4)STRTOUL(first_num_str, &num_endptr, 10);
-		if ((0 == num && (0 != errno || (num_endptr == first_num_str && *first_num_str != '\0'))) ||
-		    (0 != errno && GTM64_ONLY(UINT_MAX == num) NON_GTM64_ONLY(ULONG_MAX == num)))
+		num = 0;
+		prev_value = 0;
+		for (num_ch = first_num_str; ((*num_ch >= '0' && *num_ch <= '9') && (*num_ch != '\0')); num_ch++)
+		{
+			num = num * 10 + (*num_ch - '0');
+			if (num < prev_value)
+				break;
+			prev_value = num;
+		}
+		if((0 > num || num > INT_MAX) || *num_ch != '\0')
 		{
 			util_out_print("Error parsing or invalid parameter for !AZ", TRUE, qual_name);
 			return 0;
@@ -329,10 +326,16 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 	} /* else, first number not specified */
 	if (second_num_str < two_num_str_top && *second_num_str != '\0')
 	{
-		errno = 0;
-		num = (uint4)STRTOUL(second_num_str, &num_endptr, 10);
-		if ((0 == num && (0 != errno || (num_endptr == second_num_str && *second_num_str != '\0'))) ||
-		    (0 != errno && GTM64_ONLY(UINT_MAX == num) NON_GTM64_ONLY(ULONG_MAX == num)))
+		num = 0;
+		prev_value = 0;
+		for (num_ch = second_num_str; ((*num_ch >= '0' && *num_ch <= '9') && (*num_ch != '\0')); num_ch++)
+		{
+			num = num * 10 + (*num_ch - '0');
+			if (num < prev_value)
+				break;
+			prev_value = num;
+		}
+		if((0 > num || num > INT_MAX) || *num_ch != '\0')
 		{
 			util_out_print("Error parsing or invalid parameter for LOG_INTERVAL", TRUE);
 			return 0;

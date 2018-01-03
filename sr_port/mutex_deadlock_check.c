@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions used in this transac
 GBLREF	uint4			crit_deadlock_check_cycle;
 GBLREF	boolean_t		is_replicator;
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
@@ -119,8 +119,9 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 	if (is_replicator || mu_reorg_process)
 	{
 		++crit_deadlock_check_cycle;
-		repl_csa = (NULL != jnlpool.jnlpool_dummy_reg) ? &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs : NULL;
-		assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open
+		repl_csa = ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open)
+			? &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs : NULL;
+		assert(!jnlpool || !jnlpool->jnlpool_dummy_reg || jnlpool->jnlpool_dummy_reg->open
 			 || (repl_csa->critical != criticalPtr));
 		if (!dollar_tlevel)
 		{

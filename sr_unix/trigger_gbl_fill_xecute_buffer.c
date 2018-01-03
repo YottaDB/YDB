@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,10 +32,8 @@
 #include "gtmimagename.h"
 #include "filestruct.h"			/* for FILE_INFO, needed by REG2CSA */
 #include "have_crit.h"
-#ifdef DEBUG
 #include "repl_msg.h"
 #include "gtmsource.h"			/* for jnlpool_addrs */
-#endif
 
 LITREF	mval			literal_ten;
 
@@ -54,8 +52,8 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 #ifdef DEBUG
 GBLREF	boolean_t		is_updproc;
-GBLREF	jnlpool_addrs		jnlpool;
 #endif
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 
@@ -136,8 +134,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				 * supplementary instance. Assert accordingly. Note similar asserts occur in t_end.c and
 				 * tp_tend.c.
 				 */
-				assert(!is_updproc || (jnlpool.repl_inst_filehdr->is_supplementary
-							&& !jnlpool.jnlpool_ctl->upd_disabled));
+				assert(!is_updproc || (jnlpool && jnlpool->repl_inst_filehdr->is_supplementary
+							&& !jnlpool->jnlpool_ctl->upd_disabled));
 				DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: multiline not found, retry\n"));
 				/* Assert that the cycle has changed but in order to properly do the assert, we need a memory
 				 * barrier since cs_data->db_trigger_cycle could be stale in our cache.

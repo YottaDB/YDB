@@ -57,6 +57,10 @@ GDEPUT()
 	s filesize=filesize+(csegcnt*SIZEOF("gd_segment"))
 	s rec=rec_$$num2bin(ptrsize,filesize)			; gblnameptr
 	s filesize=filesize+(gnamcnt*SIZEOF("gd_gblname"))
+	i inst>0 d
+	. s rec=rec_$$num2bin(ptrsize,filesize)			; instptr
+	. s filesize=filesize+SIZEOF("gd_inst_info")
+	e  s rec=rec_$tr($j("",ptrsize)," ",ZERO)		; no inst info
 	s rec=rec_$tr($j("",(3*ptrsize))," ",ZERO)		; reserved
 	s rec=rec_$$num2bin(ptrsize,filesize)			; end
 	s rec=rec_$$num2bin(4,hasSpanGbls)			; has_span_gbls
@@ -86,6 +90,8 @@ GDEPUT()
 	f  s s=$o(csegs(s)) q:'$l(s)  d csegment
 ; cgnams
 	f  s s=$o(gnams(s)) q:'$l(s)  d cgblname(s)
+; cinst
+	i inst>0 d cinst
 ; template access method
 	i accmeth'[("\"_tmpacc) d error1
 	s rec=rec_$tr($j($l(tmpacc),3)," ",0)
@@ -276,6 +282,13 @@ cgblname:(s)
 	s rec=rec_$$num2bin(4,coll)
 	s ver=$view("YCOLLATE",coll)
 	s rec=rec_$$num2bin(4,ver)
+	q
+cinst:
+	n s,len,n
+	d writerec
+	s s=inst("FILE_NAME")
+	s len=$zl(s)
+	s rec=rec_s_$tr($j("",SIZEOF("gd_inst_info")-len)," ",ZERO)
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------

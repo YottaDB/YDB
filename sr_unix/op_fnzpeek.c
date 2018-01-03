@@ -72,15 +72,15 @@ typedef enum
 	PO_JBFREG	/* 15 Journal buffer information - jnl_buffer_ptr_t */
 } zpeek_mnemonic;
 
-GBLREF boolean_t        created_core;
-GBLREF sigset_t		blockalrm;
-GBLREF gd_addr		*gd_header;
-GBLREF boolean_t	pool_init;
-GBLREF boolean_t	jnlpool_init_needed;
-GBLREF jnlpool_addrs	jnlpool;
-GBLREF recvpool_addrs	recvpool;
+GBLREF boolean_t        	created_core;
+GBLREF sigset_t			blockalrm;
+GBLREF gd_addr			*gd_header;
+GBLREF int			pool_init;
+GBLREF boolean_t		jnlpool_init_needed;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF recvpool_addrs		recvpool;
 #ifdef DEBUG
-GBLREF	int		process_exiting;
+GBLREF	int			process_exiting;
 #endif
 
 LITREF unsigned char lower_to_upper_table[];
@@ -409,7 +409,7 @@ CONDITION_HANDLER(op_fnzpeek_getpool_ch)
 STATICFNDEF boolean_t op_fnzpeek_attach_jnlpool(void)
 {
 	ESTABLISH_RET(op_fnzpeek_getpool_ch, FALSE);
-	jnlpool_init(GTMRELAXED, FALSE, NULL);		/* Attach to journal pool */
+	jnlpool_init(GTMRELAXED, FALSE, NULL, NULL);		/* Attach to journal pool */
 	REVERT;
 	return pool_init;
 }
@@ -549,7 +549,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			 */
 			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
 			{
-				gv_init_reg(r_ptr);
+				gv_init_reg(r_ptr, NULL);
 				if (!r_ptr->open)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 						      RTS_ERROR_LITERAL("mnemonic argument (region name could not be opened)"));
@@ -607,7 +607,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREPL:
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
-			if (!REPL_INST_AVAILABLE)
+			if (!REPL_INST_AVAILABLE(NULL))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (!pool_init)
 			{
@@ -618,19 +618,19 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			switch(mnemonic_opcode)
 			{
 				case PO_GLFREPL:	/* arryidx set by option processing */
-					zpeekadr = (jnlpool.gtmsrc_lcl_array + arryidx);
+					zpeekadr = (jnlpool->gtmsrc_lcl_array + arryidx);
 					break;
 				case PO_GSLREPL:	/* arryidx set by option processing */
-					zpeekadr = (jnlpool.gtmsource_local_array + arryidx);
+					zpeekadr = (jnlpool->gtmsource_local_array + arryidx);
 					break;
 				case PO_NLREPL:
-					zpeekadr = (&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs)->nl;
+					zpeekadr = (&FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)->nl;
 					break;
 				case PO_JPCREPL:
-					zpeekadr = jnlpool.jnlpool_ctl;
+					zpeekadr = jnlpool->jnlpool_ctl;
 					break;
 				case PO_RIHREPL:
-					zpeekadr = jnlpool.repl_inst_filehdr;
+					zpeekadr = jnlpool->repl_inst_filehdr;
 					break;
 				default:
 					assert(FALSE);
@@ -641,7 +641,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UPLREPL:
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
-			if (!REPL_INST_AVAILABLE)
+			if (!REPL_INST_AVAILABLE(NULL))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (NULL == recvpool.recvpool_ctl)
 			{

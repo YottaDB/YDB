@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information 	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -91,7 +91,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * is also NULL. In that case, we must be doing an indirect routine name only and the supplied name
 		 * was NULL.
 		 */
-		if (0 == lblname.str.len)
+		if ((0 == lblname.str.len) && !offset)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RTNNAME);
 		rtnhdr = frame_pointer->rvector;
 		ARLINK_ONLY(TADR(lnk_proxy)->rtnhdr_adr = rtnhdr);

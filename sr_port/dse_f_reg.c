@@ -84,7 +84,7 @@ void dse_f_reg(void)
 			BASEDBREG_TO_STATSDBREG(regptr, statsDBreg);
 			assert(NULL != statsDBreg);
 			if (!statsDBreg->open)
-				gv_init_reg(statsDBreg);
+				gv_init_reg(statsDBreg, NULL);
 			regptr = statsDBreg;
 		} else
 		{
@@ -123,6 +123,6 @@ void dse_f_reg(void)
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	patch_curr_blk = get_dir_root();
-	gv_init_reg(gv_cur_region);
+	gv_init_reg(gv_cur_region, NULL);
 	return;
 }

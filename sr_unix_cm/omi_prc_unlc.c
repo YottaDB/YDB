@@ -1,8 +1,9 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,12 +60,13 @@ omi_prc_unlc(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 	/*  Loop through all the locks, unlocking ones that belong to this client */
 	for (prior = &mlk_pvt_root; *prior; ) {
+		MLK_PVTBLK_VALIDATE(*prior);
 		if (!(*prior)->granted || !(*prior)->nodptr
 		    || (*prior)->nodptr->owner != omi_pid)
 			mlk_pvtblk_delete(prior);
 		else if ((*prior)->nodptr->auxowner == (UINTPTR_T)cptr
-			 && si.value == (*prior)->value[(*prior)->total_length]
-			 && memcmp(&(*prior)->value[(*prior)->total_length+1],
+			 && si.value == MLK_PVTBLK_TAIL(*prior)[0]
+			 && memcmp(MLK_PVTBLK_TAIL(*prior) + 1,
 				   jid, si.value) == 0) {
 			mlk_unlock(*prior);
 			mlk_pvtblk_delete(prior);

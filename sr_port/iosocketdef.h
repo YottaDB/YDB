@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,11 +22,9 @@
 #include <sys/types.h>
 #include "gtm_inet.h"
 #include "gtm_netdb.h"
-#ifndef VMS
 #include "gtm_un.h"
-#endif
+#include "min_max.h"
 #include "gtm_socket.h" /* for using sockaddr_storage */
-
 #ifndef GTM_MB_LEN_MAX
 #include "gtm_utf8.h"
 #endif
@@ -37,13 +35,11 @@
 #define TCP_WRITE		1
 #define TCP_READ		2
 
-#ifndef VMS
 typedef struct
 {
-        uid_t   mem;
-        gid_t   grp;
+	uid_t   mem;
+	gid_t   grp;
 } uic_struct_int;
-#endif
 
 /* Debugging notes: Some debuging calls as as below. Note that DBGSOCK2 is *always* disabled.
  * disabled. As parts of the code work, the DBGSOCK calls are changed to DBGSOCK2 to get
@@ -94,30 +90,26 @@ typedef struct
 /* For buffered output, wait this long for socket to be ready to output */
 #define DEFAULT_WRITE_WAIT		200
 
-#define	ONE_COMMA			"1,"
-
-#define SOCKERROR(iod, socketptr, gtmerror, syserror) 							\
-{ 													\
-	int	errlen; 										\
-	char	*errptr; 										\
-	iod->dollar.za = 9; 										\
-	memcpy(iod->dollar.device, ONE_COMMA, SIZEOF(ONE_COMMA)); 					\
-	errptr = (char *)STRERROR(syserror); 								\
-	errlen = STRLEN(errptr); 									\
-	memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ 	\
-	assert(ERR_SOCKWRITE == gtmerror);								\
-	UNIX_ONLY(if (iod == io_std_device.out)								\
-		{											\
-			if (!prin_out_dev_failure)							\
-				prin_out_dev_failure = TRUE;						\
-			else										\
-			{										\
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);			\
-				stop_image_no_core();							\
-			}										\
-		})											\
-	if (socketptr->ioerror) 									\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); 	\
+#define SOCKERROR(iod, socketptr, gtmerror, syserror) 								\
+{ 														\
+	int	errlen; 											\
+	char	*errptr; 											\
+	iod->dollar.za = 9; 											\
+	errptr = (char *)STRERROR(syserror); 									\
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);								\
+	assert(ERR_SOCKWRITE == gtmerror);									\
+	if (iod == io_std_device.out)										\
+	{													\
+		if (!prin_out_dev_failure)									\
+			prin_out_dev_failure = TRUE;								\
+		else												\
+		{												\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);					\
+			stop_image_no_core();									\
+		}												\
+	}													\
+	if (socketptr->ioerror) 										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, STRLEN(errptr), errptr);	\
 }
 
 #define SOCKET_ALLOC(SOCKPTR)										\
@@ -226,7 +218,6 @@ typedef struct
 	iosocket_delimiter_copy(SOCKPTR, NEWSOCKPTR);								\
 }
 
-#ifndef VMS
 enum socket_pass_type
 {
 	sockpass_new,
@@ -255,10 +246,6 @@ enum socket_pass_type
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
 	}                                                                      \
 }
-#else
-#define ENSURE_DATA_SOCKET(SOCKPTR)
-#define ENSURE_PASS_SOCKET(SOCKPTR)
-#endif
 
 enum socket_state
 {
@@ -335,12 +322,10 @@ typedef struct socket_struct_type
 	boolean_t			first_read;
 	boolean_t			first_write;
 	boolean_t			def_moreread_timeout;	/* true if deviceparameter morereadtime defined in open or use */
-#ifndef VMS
 	enum socket_pass_type		passtype;		/* prevent mix of data and socket passing on LOCAL sockets */
 	uint				filemode;		/* for LOCAL */
 	uint				filemode_mask;		/* to tell which modes specified */
 	uic_struct_int			uic;
-#endif
 	mstr				zff;
 	mstr				ozff;			/* UTF-16 if chset is UTF-16 else copy  of zff */
 	uint4				lastaction;		/* waitcycle  count */

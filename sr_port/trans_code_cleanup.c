@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@ GBLREF	unsigned short	proc_act_type;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	spdesc		stringpool;
 GBLREF	spdesc		rts_stringpool;
-GBLREF	mval		dollar_ztrap, dollar_etrap;
 GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
 GBLREF	boolean_t	ztrap_explicit_null;
@@ -51,7 +50,7 @@ void trans_code_cleanup(void)
 	 */
 	if (SFT_ZTRAP == proc_act_type)
 	{
-		if (0 < dollar_ztrap.str.len)
+		if (0 < (TREF(dollar_ztrap)).str.len)
 			errmsg = ERR_ERRWZTRAP;
 		else
 			errmsg = ERR_ERRWETRAP;
@@ -84,11 +83,11 @@ void trans_code_cleanup(void)
 				/* Turn off any device exception related flags now that we are going to handle errors using
 				 * $ETRAP or $ZTRAP AT THE PARENT LEVEL only (no more device exceptions).
 				 */
-				dollar_ztrap.str.len = 0;
+				(TREF(dollar_ztrap)).str.len = 0;
 				ztrap_explicit_null = FALSE;
 				fp->flags &= SFF_DEV_ACT_ERR_OFF;
 				fp->flags &= SFF_ZTRAP_ERR_OFF;
-				err_act = &dollar_etrap.str;
+				err_act = &((TREF(dollar_etrap)).str);
 				break;
 			} else if (ERR_ERRWIOEXC == errmsg)
 			{	/* Error while compiling device exception. Set SFF_ETRAP_ERR bit so control is transferred to

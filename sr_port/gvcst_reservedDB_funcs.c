@@ -42,11 +42,15 @@
 #include "parse_file.h"
 #include "getzposition.h"
 #include "util.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+
 
 LITREF mval		literal_statsDB_gblname;
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data	*cs_data;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4		process_id;
 GBLREF uint4		dollar_tlevel;
 GBLREF gd_region	*gv_cur_region;
@@ -56,6 +60,7 @@ GBLREF boolean_t	need_core;
 GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF gd_addr		*gd_header;
+GBLREF mstr		extnam_str;
 DEBUG_ONLY(GBLREF boolean_t    ok_to_UNWIND_in_exit_handling;)
 
 STATICDEF intrpt_state_t	gvcst_statsDB_open_ch_intrpt_ok_state;
@@ -65,6 +70,7 @@ STATICDEF gd_region		*save_statsDBreg;	/* For use in condition handler */
 #define RESTORE_SAVED_VALUES					\
 MBSTART {							\
 	TP_CHANGE_REG(save_cur_region);				\
+	jnlpool = save_jnlpool;					\
 	gv_target = save_gv_target;				\
 	reset_gv_target = save_reset_gv_target;			\
 	RESTORE_GV_ALTKEY(save_altkey);				\
@@ -98,19 +104,22 @@ error_def(ERR_STATSDBERR);
  */
 unsigned char gvcst_cre_autoDB(gd_region *reg)
 {
-	gd_region	*save_cur_region;
-	gd_region	cur_region;
-	gd_segment	cur_segment;
-	unsigned char	cstatus;
+	gd_region		*save_cur_region;
+	gd_region		cur_region;
+	gd_segment		cur_segment;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	unsigned char		cstatus;
 
 	assert(RDBF_AUTODB & reg->reservedDBFlags);
 	save_cur_region = gv_cur_region;
+	save_jnlpool = jnlpool;
 	memcpy((char *)&cur_region, reg, SIZEOF(gd_region));
 	memcpy((char *)&cur_segment, reg->dyn.addr, SIZEOF(gd_segment));
 	gv_cur_region = &cur_region;
 	gv_cur_region->dyn.addr = &cur_segment;
 	cstatus = mu_cre_file();
 	TP_CHANGE_REG(save_cur_region);
+	jnlpool = save_jnlpool;
 	return cstatus;
 }
 
@@ -143,9 +152,10 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	mval				statsDBrec_mval, statsDBget_mval;
 	gd_region			*statsDBreg, *statsDBreg_located, *save_cur_region;
 	gv_namehead			*save_gv_target, *save_reset_gv_target;
+	jnlpool_addrs_ptr_t		save_jnlpool;
 	srch_blk_status 		*bh;
 	char				statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives chunk large enuf to hold pad */
-	int				sizewkey, sizewkeyrnd, padsize, freespace, datasize;
+	int				datasize, extlen, freespace, padsize, sizewkey, sizewkeyrnd;
 	gv_key				save_altkey[DBKEYALLOC(MAX_KEY_SZ)], save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	sgmnt_addrs			*baseDBcsa, *statsDBcsa;
 	statsDB_deferred_init_que_elem	*sdiqeptr;
@@ -184,7 +194,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * (user-invisible) and the caller will modify gld map entries and/or switch baseDB to NOSTATS if any
 			 * errors occur thereby preventing future access to this statsDB database file.
 			 */
-			gvcst_init(statsDBreg_located);
+			gvcst_init(statsDBreg_located, NULL);
 			if (statsDBreg_located->open)		/* do the check just in case */
 			{
 				statsDBcsa = &FILE_INFO(statsDBreg_located)->s_addrs;
@@ -221,10 +231,11 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * and "OPEN_BASEREG_IF_STATSREG" rely on this open to happen here (and catch errors) so they
 			 * can take appropriate action (see comment in OPEN_BASEREG_IF_STATSREG for example reason).
 			 */
-			gvcst_init(statsDBreg_located);
+			gvcst_init(statsDBreg_located, NULL);
 			break;
 		}
 		save_cur_region = gv_cur_region;
+		save_jnlpool = jnlpool;
 		save_gv_target = gv_target;
 		save_reset_gv_target = reset_gv_target;
 		SAVE_GV_CURRKEY(save_currkey);
@@ -323,7 +334,9 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			}
 			gd_header->ygs_map_entry_changed = TRUE;
 		}
+		extlen = extnam_str.len;
 		op_gvname(3, (mval *)&literal_statsDB_gblname, &baseDBreg_nam_mval, &pid_mval);
+		extnam_str.len = extlen;
 		assert(NULL != gv_currkey);
 		assert(0 != gv_currkey->end);
 		statsDBreg = gv_cur_region;
@@ -463,24 +476,25 @@ CONDITION_HANDLER(gvcst_statsDB_init_ch)
  */
 void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 {
-	mval		pid_mval, baseDBreg_nam_mval;
-	mval		statsDBrec_mval, statsDBget_mval;
-	gd_region	*statsDBreg, *save_cur_region;
-	gv_namehead	*save_gv_target, *save_reset_gv_target;
-	char		statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives us a chunk large enuf to hold padding */
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	sgmnt_addrs	*baseDBcsa, *statsDBcsa;
-	gvstats_rec_t	*gvstats_rec_p;
-	gvnh_reg_t	*save_gd_targ_gvnh_reg;
-	gd_binding	*save_gd_targ_map;
-	gd_addr		*save_gd_targ_addr, *save_gd_header;
-	boolean_t	save_gv_last_subsc_null, save_gv_some_subsc_null;
+	mval			pid_mval, baseDBreg_nam_mval;
+	mval			statsDBrec_mval, statsDBget_mval;
+	gd_region		*statsDBreg, *save_cur_region;
+	gv_namehead		*save_gv_target, *save_reset_gv_target;
+	char			statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives us a chunk large enuf to hold padding */
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	sgmnt_addrs		*baseDBcsa, *statsDBcsa;
+	gvstats_rec_t		*gvstats_rec_p;
+	gvnh_reg_t		*save_gd_targ_gvnh_reg;
+	gd_binding		*save_gd_targ_map;
+	gd_addr			*save_gd_targ_addr, *save_gd_header;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 #	ifdef DEBUG
-	mval		stats_rec;
-	srch_blk_status *bh;
-	uint4		recsize;
-	rec_hdr		*recptr;
-	gd_region	*statsDBreg_located;
+	mval			stats_rec;
+	srch_blk_status		*bh;
+	uint4			recsize;
+	rec_hdr			*recptr;
+	gd_region		*statsDBreg_located;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -490,6 +504,7 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	save_gv_target = gv_target;
 	save_reset_gv_target = reset_gv_target;
 	SAVE_GV_CURRKEY(save_currkey);
+	save_jnlpool = jnlpool;
 	/* Below save is similar to that done in op_gvsavtarg/op_gvrectarg */
 	save_gd_targ_gvnh_reg = TREF(gd_targ_gvnh_reg);
 	save_gd_targ_map = TREF(gd_targ_map);
@@ -562,6 +577,7 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 	statsDBreg->statsDB_setup_completed = FALSE;
 	/* Restore previous region's setup */
 	TP_CHANGE_REG(save_cur_region);
+	jnlpool = save_jnlpool;
 	gv_target = save_gv_target;
 	reset_gv_target = save_reset_gv_target;
 	RESTORE_GV_CURRKEY(save_currkey);

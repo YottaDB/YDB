@@ -198,6 +198,8 @@ boolean_t line(uint4 *lnc)
 			dot_count = TREF(block_level);
 			show_source_line(TRUE);
 			dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
+			TREF(source_error_found) = TRUE;
+			success = FALSE;
 		}
 	}
 	if ((TREF(block_level) < dot_count) || (mline_tail == &mline_root))

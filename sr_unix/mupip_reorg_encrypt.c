@@ -52,6 +52,8 @@
 #include "mupip_reorg_encrypt.h"
 #include "t_abort.h"
 #include "interlock.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF bool		error_mupip;
 GBLREF bool		mu_ctrlc_occurred;
@@ -263,7 +265,7 @@ void mupip_reorg_encrypt(void)
 			continue;
 		}
 		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
-		gvcst_init(reg);
+		gvcst_init(reg, NULL);
 		mu_reorg_process = FALSE;
 		/* Note that db_init() does not release the access-control semaphore in case of MUPIP REORG -ENCRYPT (as determined
 		 * based on the mu_reorg_encrypt_in_prog variable), so no need to obtain it here.

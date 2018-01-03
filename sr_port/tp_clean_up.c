@@ -207,6 +207,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 					FREE_KILL_SET(ks);
 					si->kill_set_tail = NULL;
 					si->kill_set_head = NULL;
+					assert((NULL == si->kip_csa) || (!gv_cur_region->open || gv_cur_region->was_open));
 				}
 				if (NULL != si->jnl_head)
 				{

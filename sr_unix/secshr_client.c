@@ -350,9 +350,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
 					 process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
 					 ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
-					  process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
-					  ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) MAKE_MSG_ERROR(ERR_GTMSECSHRSRVFIL), 7,
+					 RTS_ERROR_TEXT("Client"), process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
+					 ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
 				break;	/* rts_error should not return */
 			}
 			switch(req_code)

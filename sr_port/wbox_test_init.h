@@ -11,8 +11,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WBOX_TEST_INIT_
-#define __WBOX_TEST_INIT_
+#ifndef WBOX_TEST_INIT
+#define WBOX_TEST_INIT
 
 /* The standalone routine gtmsecshr_wrapper needs these to be GBLDEFs so create a scheme to force that. If WBOX_GBLDEF is
  * defined, create these as GBLDEFs instead of GBLREFs.
@@ -180,7 +180,10 @@ typedef enum {
 	WBTEST_LVMON_PSEUDO_FAIL,		/* 133 : Create condition to cause lvmonitor to fail a comparison and report it */
 	WBTEST_REPLINSTSTNDALN,			/* 134 : Expected case of REPLINSTSTNDALN error */
 	WBTEST_FORCE_SHMPLRECOV,		/* 135 : Always invoke SHMPLRECOV abandoned block processing */
-	WBTEST_GETPWUID_CHECK_OVERWRITE		/* 136 : Check for getpwuid_struct variable overwrite condition */
+	WBTEST_GETPWUID_CHECK_OVERWRITE,	/* 136 : Check for getpwuid_struct variable overwrite condition */
+	WBTEST_NO_REPLINSTMULTI_FAIL,		/* 137 : Unless specified tests should not fail with REPLMULTINSTUPDATE */
+	WBTEST_DOLLARDEVICE_BUFFER,		/* 138 : Force larger error messages for $device to exceed DD_BUFLEN */
+	WBTEST_LOWERED_JNLEPOCH			/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

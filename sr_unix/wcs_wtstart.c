@@ -111,7 +111,7 @@ GBLREF	int			reformat_buffer_len;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data		*cs_data;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			update_trans;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
@@ -158,6 +158,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	gd_region		*sav_cur_region;
 	sgmnt_addrs		*sav_cs_addrs;
 	sgmnt_data		*sav_cs_data;
+	jnlpool_addrs_ptr_t	sav_jnlpool;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_ERROR_POLICY_CSA */
 	intrpt_state_t		prev_intrpt_state;
 	char			*in, *out;
 	int			in_len;
@@ -166,7 +168,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	boolean_t		use_new_key, skip_in_trans, skip_sync, sync_keys;
 	que_ent_ptr_t		next, prev;
 	void_ptr_t              retcsrptr;
-	boolean_t		keep_buff_lock;
+	boolean_t		keep_buff_lock, pushed_region;
 	cache_rec_ptr_t		older_twin;
 
 	DCL_THREADGBL_ACCESS;
@@ -174,10 +176,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	SETUP_THREADGBL_ACCESS;
 	if (cr_list_ptr)
 		cr_list_ptr->numcrs = 0;
-	if (INST_FREEZE_ON_ERROR_POLICY)
-		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data);
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
+	pushed_region = INST_FREEZE_ON_ERROR_POLICY_CSA(csa, local_jnlpool);
+	if (pushed_region)
+		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);
 	assert(is_mm || (dba_bg == csd->acc_meth));
@@ -188,8 +191,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	{
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart1, 0, 0, 0, 0, 0);
 		BG_TRACE_PRO_ANY(csa, wrt_busy);
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		return err_status;			/* Already here, get out */
 	}
 	/* Defer interrupts to protect against an inconsistent state caused by mismatch of such values as
@@ -204,8 +207,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart2, 0, 0, 0, 0, 0);
 		DECR_INTENT_WTSTART(cnl);
 		BG_TRACE_PRO_ANY(csa, wrt_blocked);
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART, prev_intrpt_state);
 		return err_status;
 	}
@@ -215,13 +218,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	 * Because it is highly unlikely for an interrupt-deferred process to get killed at exactly this spot, do not test that.
 	 */
 	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
-	if (FROZEN_CHILLED(csd) && !FREEZE_LATCH_HELD(csa))
+	if (FROZEN_CHILLED(csa) && !FREEZE_LATCH_HELD(csa))
 	{
 		CAREFUL_DECR_CNT(cnl->in_wtstart, cnl->wc_var_lock);
 		DECR_INTENT_WTSTART(cnl);
 		csa->in_wtstart = FALSE;
-		if (INST_FREEZE_ON_ERROR_POLICY)
-			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+		if (pushed_region)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART, prev_intrpt_state);
 		/* Return non-zero in order to break wcs_wtstart_fini() out of its loop. Ignored elsewhere. */
 		return EAGAIN;
@@ -336,7 +339,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		}
 		if (NULL == csr)
 			break;				/* the queue is empty */
-		assert(!FROZEN_CHILLED(csd) || FREEZE_LATCH_HELD(csa));
+		assert(!FROZEN_CHILLED(csa) || FREEZE_LATCH_HELD(csa));
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -446,13 +449,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 */
 			if (!wtfini_called_once && (was_crit || grab_crit_immediate(region, OK_FOR_WCS_RECOVER_FALSE)))
 			{
-				DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
-				older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
-				assert(!older_twin->bt_index);
-				wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
+				if (csr->twin)
+				{
+					DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
+					older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
+					assert(!older_twin->bt_index);
+					wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
+					wtfini_called_once = TRUE;
+				}
 				if (!was_crit)
 					rel_crit(region);
-				wtfini_called_once = TRUE;
 			}
 			/* Note that in the most common case, csr will be the NEWER twin. But it is possible csr is the OLDER
 			 * twin too. For example, if the OLDER twin's write got aborted because the process that initiated
@@ -800,7 +806,8 @@ writes_completed:
 		 */
 		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 	}
-	if (INST_FREEZE_ON_ERROR_POLICY)
-		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data);
+	if (pushed_region)
+
+		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data, sav_jnlpool);
 	return err_status;
 }

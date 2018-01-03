@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,13 +162,13 @@ typedef struct gtmsrc_lcl_struct
 #define	COPY_JCTL_STRMSEQNO_TO_INSTHDR_IF_NEEDED								\
 {														\
 	int				idx;									\
-	GBLREF	jnlpool_addrs		jnlpool;	/* used by the below macro */				\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;	/* used by the below macro */				\
 														\
 	/* Keep the file header copy of "strm_seqno" uptodate with jnlpool_ctl */				\
-	if (jnlpool.repl_inst_filehdr->is_supplementary)							\
+	if (jnlpool->repl_inst_filehdr->is_supplementary)							\
 	{													\
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)							\
-			jnlpool.repl_inst_filehdr->strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];	\
+			jnlpool->repl_inst_filehdr->strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];	\
 	}													\
 }
 
@@ -176,20 +176,21 @@ typedef struct gtmsrc_lcl_struct
  * corresponding to that stream in the instance file. If this is not the case, those history-less updates will have no way of
  * being replicated (propagated downstream) from this instance as there is no history record to identify the update originator.
  */
-#define	ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(STRM_IDX)					\
-{												\
-	GBLREF	jnlpool_addrs		jnlpool;	/* used by the below macro */		\
-												\
-	assert(INVALID_HISTINFO_NUM != jnlpool.repl_inst_filehdr->last_histinfo_num[STRM_IDX]);	\
+#define	ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(STRM_IDX, JNLPOOL)					\
+{													\
+	assert(INVALID_HISTINFO_NUM != JNLPOOL->repl_inst_filehdr->last_histinfo_num[STRM_IDX]);	\
 }
 
 #define	OK_TO_LOG_FALSE		FALSE
 #define	OK_TO_LOG_TRUE		TRUE
 
+#define INST_NOT_GLD			(struct gd_addr_struct *)1
+#define IS_INST_FROM_GLD(REPL_GLD)	(INST_NOT_GLD != REPL_GLD)	/* where repl_inst_get_name found instance file name */
+
 #define GET_INSTFILE_NAME(sendmsg, err_act)										\
 {															\
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn),		\
-							sendmsg)))							\
+	if (((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn,				\
+					SIZEOF(temp_inst_fn), sendmsg))) || (inst_from_gld && (SS_NOLOGNAM == status)))	\
 		&& (0 != trans_name.len))										\
 	{														\
 		temp_inst_fn[trans_name.len] = '\0';									\
@@ -202,13 +203,30 @@ typedef struct gtmsrc_lcl_struct
 	}														\
 }
 
+#define SETUP_INST_INFO(GDPTR, LOGNAM, INSTFROMGLD)			\
+{									\
+	if (IS_MUMPS_IMAGE && GDPTR && GDPTR->instinfo)			\
+	{	/* use global directory information */			\
+		LOGNAM.addr = GDPTR->instinfo->instfilename;		\
+		LOGNAM.len = STRLEN(GDPTR->instinfo->instfilename);	\
+		INSTFROMGLD = TRUE;					\
+	} else								\
+	{								\
+		LOGNAM.addr = GTM_REPL_INSTANCE;			\
+		LOGNAM.len = SIZEOF(GTM_REPL_INSTANCE) - 1;		\
+		INSTFROMGLD = FALSE;					\
+	}								\
+}
+
 typedef enum {
 	return_on_error,
 	issue_rts_error,
 	issue_gtm_putmsg
 } instname_act;
 
-boolean_t	repl_inst_get_name(char *, unsigned int *, unsigned int, instname_act error_action);
+/* return and gd_ptr are really gd_addr * but gdsfhead.h would be needed */
+struct gd_addr_struct	*repl_inst_get_name(char *, unsigned int *, unsigned int, instname_act error_action,
+						struct gd_addr_struct *gd_ptr);
 void		repl_inst_create(void);
 void		repl_inst_edit(void);
 void		repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);

@@ -315,7 +315,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname_plus(char *keyname, char 
 	/* Strip off EXT_NEW from autodb paths so that the key lookup works correctly */
 	keynamelen = strlen(keyname);
 	ynew_ext = keyname + keynamelen - STRLEN(EXT_NEW);
-	if (0 == strcmp(ynew_ext, EXT_NEW))
+	if ((ynew_ext >= keyname) && (0 == strcmp(ynew_ext, EXT_NEW)))
 	{	/* This is an autodb, fixup the path */
 		strncpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
 		lcl_keyname[keynamelen - STRLEN(EXT_NEW)] = '\0';

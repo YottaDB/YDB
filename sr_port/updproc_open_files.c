@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,6 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gtm_string.h"
 #include "gdsroot.h"
@@ -43,18 +41,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 
-#ifdef VMS
-#include <ssdef.h>
-#include <fab.h>
-#include <rms.h>
-#include <iodef.h>
-#include <secdef.h>
-#include <psldef.h>
-#include <lckdef.h>
-#include <syidef.h>
-#include <xab.h>
-#include <prtdef.h>
-#endif
 #include "util.h"
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
@@ -76,12 +62,10 @@ GBLREF	FILE			*updproc_log_fp;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
-#ifndef UNIX
 GBLREF	boolean_t		secondary_side_std_null_coll;
-#endif
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 #ifdef DEBUG
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 #endif
 
 error_def(ERR_NOREPLCTDREG);
@@ -105,7 +89,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		reg = curr->gd;
 		fn = (char *)reg->dyn.addr->fname;
 		csa = &FILE_INFO(reg)->s_addrs;	/* Work of dbfilopn - assigning file_cntl already done db_files_from_gld */
-		gvcst_init(reg);
+		gvcst_init(reg, NULL);
 		csd = csa->hdr;
 		/* Check whether all regions have same null collation order */
 		if (this_side_std_null_coll != csd->std_null_coll)
@@ -132,13 +116,6 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 			continue;
 		} else
 			assertpro(!REPL_ENABLED(csd) || JNL_ENABLED(csd));
-#		ifdef VMS
-		if (recvpool.upd_proc_local->updateresync)
-		{
-			TP_CHANGE_REG(reg);
-			wcs_flu(WCSFLU_FLUSH_HDR);
-		}
-#		endif
 		prev = curr;
 		curr = curr->next;
 		prev->next = *gld_db_files;
@@ -152,47 +129,34 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		 * region, there is no reason for the update process to continue.
 		 */
 		assert(FALSE);
-		/* Unix and VMS have different field names */
-		UNIX_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.instfilename;)
-		VMS_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.gtmgbldir;)
+		gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.instfilename;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NOREPLCTDREG, 3,
-			   LEN_AND_LIT(UNIX_ONLY("instance file") VMS_ONLY("global directory")), gld_fn);
+			   LEN_AND_LIT("instance file"), gld_fn);
 	}
 	/* Now that all the databases are opened, compute the MAX region sequence number across all regions */
-	assert((NULL != jnlpool.jnlpool_ctl) && pool_init); /* jnlpool_init should have already been done */
-	VMS_ONLY(jgbl.max_resync_seqno = 0;)
+	assert(pool_init && jnlpool && (NULL != jnlpool->jnlpool_ctl)); /* jnlpool_init should have already been done */
 	lcl_seqno = 0;
 	/* Before looking at the region sequence numbers (to compute the MAX of them), we need to ensure that NO concurrent
 	 * online rollback happens. So, grab the journal pool lock as rollback needs it. The reason we do it in two separate
 	 * loops instead of one is because we don't want to do gvcst_init while holding the journal pool lock as the former
 	 * acquires ftok and access control semaphores and holding the journal pool lock is a potential recipe for deadlocks
 	 */
-	UNIX_ONLY(grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY));
+	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 	for (curr = *gld_db_files; NULL != curr; curr = curr->next)
 	{
 		reg = curr->gd;
 		csa = &FILE_INFO(reg)->s_addrs;	/* Work of dbfilopn - assigning file_cntl already done db_files_from_gld */
 		csd = csa->hdr;
-#		ifdef UNIX
+		if (NULL == csa->jnlpool)
+			csa->jnlpool = jnlpool;
 		if (lcl_seqno < csd->reg_seqno)
 			lcl_seqno = csd->reg_seqno;
-#		else
-		if (recvpool.upd_proc_local->updateresync)
-			csd->resync_seqno = csd->reg_seqno;
-		if (lcl_seqno < csd->resync_seqno)
-			lcl_seqno = csd->resync_seqno;
-		/* jgbl.max_resync_seqno should be set only after the test for updateresync because resync_seqno gets
-		 * modified to reg_seqno in case receiver is started with -updateresync option */
-		if (jgbl.max_resync_seqno < csd->resync_seqno)
-			jgbl.max_resync_seqno = csd->resync_seqno;
-#		endif
 	}
 	repl_log(updproc_log_fp, TRUE, TRUE, "             -------->  start_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 			INT8_PRINT(lcl_seqno), INT8_PRINTX(lcl_seqno));
-	UNIX_ONLY(rel_lock(jnlpool.jnlpool_dummy_reg));
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	assert(0 != lcl_seqno);
 	*start_jnl_seqno = lcl_seqno;
-	UNIX_ONLY(recvpool.recvpool_ctl->this_side.is_std_null_coll = this_side_std_null_coll;)
-	VMS_ONLY(secondary_side_std_null_coll = this_side_std_null_coll;)
+	recvpool.recvpool_ctl->this_side.is_std_null_coll = this_side_std_null_coll;
 	return TRUE;
 }

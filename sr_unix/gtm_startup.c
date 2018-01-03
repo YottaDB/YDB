@@ -67,7 +67,7 @@
 #include "jobchild_init.h"
 #include "error_trap.h"			/* for ecode_init() prototype */
 #include "zyerror_init.h"
-#include "ztrap_form_init.h"
+#include "trap_env_init.h"
 #include "zdate_form_init.h"
 #include "dollar_system_init.h"
 #include "sig_init.h"
@@ -269,7 +269,8 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_zstatus.str.addr = NULL;
 	ecode_init();
 	zyerror_init();
-	ztrap_form_init();
+	if (IS_MUMPS_IMAGE)
+		trap_env_init();
 	zdate_form_init(svec);
 	dollar_system_init(svec);
 	init_callin_functable();

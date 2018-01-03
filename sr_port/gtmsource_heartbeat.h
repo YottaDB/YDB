@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +18,7 @@
 #ifndef REPL_DISABLE_HEARTBEAT
 #define GTMSOURCE_IS_HEARTBEAT_DUE(NOW)												\
 	(0 != last_sent_time													\
-	 && difftime(*(NOW), last_sent_time) >= (double)jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
+	 && difftime(*(NOW), last_sent_time) >= (double)jnlpool->gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
 #else
 #define GTMSOURCE_IS_HEARTBEAT_DUE(NOW) FALSE
 #endif

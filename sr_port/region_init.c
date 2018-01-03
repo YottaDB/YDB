@@ -103,6 +103,6 @@ void region_open(void)
 #ifdef UNIX
 	gv_cur_region->node = -1;
 #endif
-	gv_init_reg(gv_cur_region);
+	gv_init_reg(gv_cur_region, NULL);
 	REVERT;
 }

@@ -280,6 +280,9 @@ LITDEF	gtmImageName	gtmImageNames[n_image_types] =
 #undef IMAGE_TABLE_ENTRY
 };
 
+#define DEFAULT_ETRAP		"IF $ZJOBEXAM()"
+LITDEF mval default_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_ETRAP) - 1),  DEFAULT_ETRAP , 0 , 0 );
+
 LITDEF mname_entry 	null_mname_entry =
 {
 	{UNIX_ONLY_COMMA(0) 0, NULL},

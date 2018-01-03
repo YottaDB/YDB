@@ -50,8 +50,7 @@
 #include "gtm_repl.h"
 #endif
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
@@ -67,6 +66,7 @@ GBLREF	qw_num			repl_source_msg_sent;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	uchar_ptr_t		repl_filter_buff;
+GBLREF	int			pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
@@ -78,19 +78,19 @@ int gtmsource_end1(boolean_t auto_shutdown)
 
 	SETUP_THREADGBL_ACCESS;
 	gtmsource_ctl_close();
-	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
-	rel_lock(jnlpool.jnlpool_dummy_reg);
-	mutex_cleanup(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
+	mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 	exit_status = NORMAL_SHUTDOWN;
 	if (!auto_shutdown)
-		jnlpool.gtmsource_local->shutdown = NORMAL_SHUTDOWN;
-	read_jnl_seqno = jnlpool.gtmsource_local->read_jnl_seqno;
-	jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		jnlpool->gtmsource_local->shutdown = NORMAL_SHUTDOWN;
+	read_jnl_seqno = jnlpool->gtmsource_local->read_jnl_seqno;
+	jnlpool_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
-	jnlpool.gtmsource_local->gtmsource_pid = 0;
-	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
+		jnlpool_strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];
+	jnlpool->gtmsource_local->gtmsource_pid = 0;
+	jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached
 	 * so that we can check for instance freeze in database rundown, or if auto_shutdown is set.
 	 * In those cases, the detach will happen automatically when the process terminates.

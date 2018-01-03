@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,17 @@
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrblk_create.h"
+
+#ifdef MLK_SHRHASH_DEBUG
+#define SHRHASH_DEBUG_ONLY(x) x
+#else
+#define SHRHASH_DEBUG_ONLY(x)
+#endif
+
+void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
+#ifdef MLK_SHRHASH_DEBUG
+void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
+#endif
 
 mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   unsigned char *val,		/* the subscript */
@@ -56,5 +68,125 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	subptr->backpointer = n;
 	subptr->length = len;
 	memcpy(subptr->data, val, len);
+	mlk_shrhash_add(p, ret, p->subscript_cnt - nshrs);
 	return ret;
 }
+
+void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
+{
+	int			bi, fi, si, mi;
+	uint4			hash, num_buckets, usedmap;
+	mlk_shrhash_ptr_t	shrhash, bucket, free_bucket, search_bucket, move_bucket;
+	mlk_shrblk_ptr_t	move_shrblk;
+
+	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
+	shrhash = (mlk_shrhash_ptr_t)R2A(p->ctlptr->blkhash);
+	num_buckets = p->ctlptr->num_blkhash;
+	hash = MLK_PVTBLK_SUBHASH(p, subnum);
+	bi = hash % num_buckets;
+	bucket = &shrhash[bi];
+	assert(MAXUINT4 > bucket->usedmap);
+	if (0 == bucket->shrblk)
+	{	/* Target bucket is free, so just use it. */
+		assert(0 == (bucket->usedmap & 1U));
+		A2R(bucket->shrblk, shr);
+		assert(0 < bucket->shrblk);
+		bucket->hash = hash;
+		bucket->usedmap |= 1U;
+		SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
+		return;
+	}
+	/* Search for free bucket */
+	for (fi = (bi + 1) % num_buckets ; 0 != shrhash[fi].shrblk ; fi = (fi + 1) % num_buckets)
+		assert(fi != bi);	/* Table full */
+	/* While free bucket is out of the neighborhood, find a closer one that can be moved into it. */
+	while (MLK_SHRHASH_NEIGHBORS <= ((num_buckets + fi - bi) % num_buckets))
+	{	/* Find a bucket with a neighbor which can be moved to the free bucket */
+		for ((si = ((num_buckets + fi - MLK_SHRHASH_NEIGHBORS + 1) % num_buckets)), (mi = fi) ;
+				si != fi ;
+				si = (si + 1) % num_buckets)
+		{
+			search_bucket = &shrhash[si];
+			usedmap = search_bucket->usedmap;
+			if (0 == usedmap)
+				continue;
+			/* Pull the earliest used bucket out of the map, but don't pass the free bucket. */
+			for (mi = si ; (0 == (usedmap & 1U)) && (mi != fi) ; usedmap >>= 1)
+			{
+				assert(0 != usedmap);
+				mi = (mi + 1) % num_buckets;
+			}
+			if (mi != fi)
+				break;
+		}
+		assert(si != fi);	/* Otherwise no movable buckets */
+		/* Move the bucket from the mapped bucket to the free bucket */
+		move_bucket = &shrhash[mi];
+		free_bucket = &shrhash[fi];
+		assert(0 != move_bucket->shrblk);
+		assert(0 == free_bucket->shrblk);
+		/* Check that moving neighbor was marked used and free neighbor was not */
+		assert(0 != (search_bucket->usedmap & (1U << ((num_buckets + mi - si) % num_buckets))));
+		assert(0 == (search_bucket->usedmap & (1U << ((num_buckets + fi - si) % num_buckets))));
+		/* We are moving a relative pointer, so convert to absolute and back */
+		move_shrblk = (mlk_shrblk_ptr_t)R2A(move_bucket->shrblk);
+		A2R(free_bucket->shrblk, move_shrblk);
+		assert(0 < free_bucket->shrblk);
+		assert(MLK_SHRHASH_NEIGHBORS > ((num_buckets + fi - (move_bucket->hash % num_buckets)) % num_buckets));
+		free_bucket->hash = move_bucket->hash;
+		move_bucket->shrblk = 0;
+		move_bucket->hash = 0;
+		/* Clear bit for moved neighbor, set bit for target neighbor */
+		search_bucket->usedmap &= ~(1U << ((num_buckets + mi - si) % num_buckets));
+		search_bucket->usedmap |= (1U << ((num_buckets + fi - si) % num_buckets));
+		/* The moved neighbor is now free */
+		fi = mi;
+	}
+	/* We found one close enough, so store the new data there */
+	assert(0 == (bucket->usedmap & (1U << ((num_buckets + fi - bi) % num_buckets))));	/* Neighbor was not used before */
+	free_bucket = &shrhash[fi];
+	assert(0 == free_bucket->shrblk);
+	A2R(free_bucket->shrblk, shr);
+	assert(0 < free_bucket->shrblk);
+	assert(MLK_SHRHASH_NEIGHBORS > ((num_buckets + fi - (hash % num_buckets)) % num_buckets));
+	free_bucket->hash = hash;
+	/* Note the new neighbor of the original bucket */
+	bucket->usedmap |= (1U << ((num_buckets + fi - bi) % num_buckets));
+	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
+}
+
+#ifdef MLK_SHRHASH_DEBUG
+
+void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl)
+{
+	mlk_shrhash_ptr_t	shrhash, bucket, neighbor_bucket, original_bucket;
+	uint4			num_buckets, usedmap;
+	int			bi, ni, obi;
+
+	shrhash = (mlk_shrhash_ptr_t)R2A(ctl->blkhash);
+	num_buckets = ctl->num_blkhash;
+	for (bi=0; bi < num_buckets; bi++)
+	{
+		bucket = &shrhash[bi];
+		for ((usedmap = bucket->usedmap), (ni = bi); usedmap; (usedmap >>= 1), (ni = (ni + 1) % num_buckets))
+		{
+			if (usedmap & 1U)
+			{
+				neighbor_bucket = &shrhash[ni];
+				assert(0 != neighbor_bucket->shrblk);
+				assert(neighbor_bucket->hash % num_buckets == bi);
+			}
+		}
+		if (0 == bucket->shrblk)
+			assert(0 == (usedmap & 1U));
+		else
+		{
+			obi = bucket->hash % num_buckets;
+			assert(MLK_SHRHASH_NEIGHBORS > ((num_buckets + bi - obi) % num_buckets));
+			original_bucket = &shrhash[obi];
+			assert(0 != (original_bucket->usedmap & (1U << ((num_buckets + bi - obi) % num_buckets))));
+		}
+	}
+}
+
+#endif

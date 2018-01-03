@@ -27,11 +27,10 @@
 #include "gtmsource.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile boolean_t	in_wcs_recover;
 GBLREF	int			process_exiting;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 
 error_def(ERR_JNLCLOSED);
 error_def(ERR_REPLJNLCLOSED);
@@ -40,17 +39,22 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 {	/* Notify operator and terminate journaling */
 	unsigned int	status;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_MSG_ENABLED */
 	seq_num		reg_seqno, jnlseqno;
 	boolean_t	was_lockid = FALSE, instfreeze_environ;
 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	save_jnlpool = jnlpool;
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
 	case dba_mm:
 	case dba_bg:
 		csa = &FILE_INFO(jpc->region)->s_addrs;
+		if (csa->jnlpool && (jnlpool != csa->jnlpool))
+			jnlpool = csa->jnlpool;
 		break;
 	default:
 		assertpro(FALSE && jpc->region->dyn.addr->acc_meth);
@@ -62,12 +66,14 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	 * 2) The process has the given message set in $gtm_custom_errors (indicative of instance freeze on error setup)
 	 *    in which case the goal is to never shut-off journaling
 	 */
-	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-	instfreeze_environ = INST_FREEZE_ON_MSG_ENABLED(csa, jnl_stat);
+	assert((NULL == jnlpool) || (NULL != jnlpool->jnlpool_ctl));
+	instfreeze_environ = INST_FREEZE_ON_MSG_ENABLED(csa, jnl_stat, local_jnlpool);
 	if ((JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost)) || instfreeze_environ)
 	{
 		if (!process_exiting || instfreeze_environ || !csa->jnl->error_reported)
 		{
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
 			csa->jnl->error_reported = TRUE;
 			in_wcs_recover = FALSE;	/* in case we're called in wcs_recover() */
 			if (SS_NORMAL != jpc->status)
@@ -77,6 +83,8 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
 						DB_LEN_STR(gv_cur_region));
 		}
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
 		return jnl_stat;
 	}
 	if (0 != jnl_stat)
@@ -88,11 +96,13 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	{
 		csa->hdr->repl_state = repl_was_open;
 		reg_seqno = csa->hdr->reg_seqno;
-		jnlseqno = (NULL != jnlpool.jnlpool_ctl) ? jnlpool.jnlpool_ctl->jnl_seqno : MAX_SEQNO;
+		jnlseqno = (jnlpool && jnlpool->jnlpool_ctl) ? jnlpool->jnlpool_ctl->jnl_seqno : MAX_SEQNO;
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(jpc->region), &reg_seqno, &reg_seqno,
 				&jnlseqno, &jnlseqno);
 	} else
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLCLOSED, 3, DB_LEN_STR(jpc->region), &csa->ti->curr_tn);
 	jnl_file_close(jpc->region, FALSE, TRUE);
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	return EXIT_NRM;
 }

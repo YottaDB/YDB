@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,7 @@
 #include "sgtm_putmsg.h"
 #include "util.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	gd_addr			*gd_header;
@@ -68,17 +69,17 @@ int gtmsource_checkhealth(void)
 	char			*modestr;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	if (NULL != jnlpool.gtmsource_local)	/* Check health of a specific source server */
-		gtmsourcelocal_ptr = jnlpool.gtmsource_local;
+	if (NULL != jnlpool->gtmsource_local)	/* Check health of a specific source server */
+		gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 	else
-		gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 	num_servers = 0;
 	status = SRV_ALIVE;
 	for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 	{
 		if ('\0' == gtmsourcelocal_ptr->secondary_instname[0])
 		{
-			assert(NULL == jnlpool.gtmsource_local);
+			assert(NULL == jnlpool->gtmsource_local);
 			continue;
 		}
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
@@ -86,7 +87,7 @@ int gtmsource_checkhealth(void)
 		 * of whether a source server for that instance is alive or not. For CHECKHEALTH on ALL secondary instances
 		 * print health information only for those instances that have an active or passive source server alive.
 		 */
-		if ((NULL == jnlpool.gtmsource_local) && (0 == gtmsource_pid))
+		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
 			continue;
 		repl_log(stdout, TRUE, TRUE, "Initiating CHECKHEALTH operation on source server pid [%d] for secondary instance"
 			" name [%s]\n", gtmsource_pid, gtmsourcelocal_ptr->secondary_instname);
@@ -116,10 +117,10 @@ int gtmsource_checkhealth(void)
 					LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
 			status |= SRV_DEAD;
 		}
-		if (NULL != jnlpool.gtmsource_local)
+		if (NULL != jnlpool->gtmsource_local)
 			break;
 	}
-	if (NULL == jnlpool.gtmsource_local)
+	if (NULL == jnlpool->gtmsource_local)
 	{	/* Compare number of servers that were found alive with the current value of the COUNT semaphore.
 		 * If they are not equal, report the discrepancy.
 		 */
@@ -159,7 +160,7 @@ int gtmsource_checkhealth(void)
 			{
 				assert(!JNL_ENABLED(csd) || REPL_ENABLED(csd));	/* || is for turning replication on concurrently */
 				reg_seqno = csd->reg_seqno;
-				jnlseqno = (NULL != jnlpool.jnlpool_ctl) ? jnlpool.jnlpool_ctl->jnl_seqno : MAX_SEQNO;
+				jnlseqno = (NULL != jnlpool->jnlpool_ctl) ? jnlpool->jnlpool_ctl->jnl_seqno : MAX_SEQNO;
 				sgtm_putmsg(errtxt, VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
 					&reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno);
 				repl_log(stderr, FALSE, TRUE, errtxt);
@@ -167,10 +168,10 @@ int gtmsource_checkhealth(void)
 			}
 		}
 	}
-	if (jnlpool.jnlpool_ctl->freeze)
+	if (jnlpool->jnlpool_ctl->freeze)
 	{
 		repl_log(stderr, FALSE, FALSE, "Warning: Instance Freeze is ON\n");
-		repl_log(stderr, FALSE, TRUE, "   Freeze Comment: %s\n", jnlpool.jnlpool_ctl->freeze_comment);
+		repl_log(stderr, FALSE, TRUE, "   Freeze Comment: %s\n", jnlpool->jnlpool_ctl->freeze_comment);
 		status |= SRV_ERR;
 	}
 	return (status + NORMAL_SHUTDOWN);

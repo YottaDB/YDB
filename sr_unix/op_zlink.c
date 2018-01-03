@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ typedef enum
 #  define CHECK_OBJECT_HISTORY(OBJPATH, OBJDIR, RECENT_ZHIST_PARM)
 #endif
 
-GBLREF spdesc			stringpool;
+GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF mval			dollar_zsource;
 GBLREF int			object_file_des;
@@ -442,6 +442,7 @@ void op_zlink (mval *v, mval *quals)
 			}
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
 			assert(FD_INVALID == object_file_des);	/* zlcompile() should have driven obj_code() which closes object */
+			assertpro(FALSE == TREF(compile_time) && (stringpool.base == rts_stringpool.base));	/* sb back in rts */
 			if ((SRC == type) && !(qlf & CQ_OBJECT))
 				return;
 			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
@@ -462,6 +463,7 @@ void op_zlink (mval *v, mval *quals)
 				cmd_qlf.object_file.str.len = objnamelen;
 			}
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
+			assertpro(FALSE == TREF(compile_time) && (stringpool.base == rts_stringpool.base));	/* sb back in rts */
 			if (!(cmd_qlf.qlf & CQ_OBJECT) && (SRC != type))
 			{
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;

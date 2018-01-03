@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ DEBUG_ONLY(GBLREF mur_opt_struct	mur_options;)
  */
 void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 {
-	size_t		seq_arr_size, index, seqno_span, byte, offset;
+	size_t		seq_arr_size, seq_arr_alloc_size, index, seqno_span, byte, offset;
 	jnl_tm_t	min_time;
 	seq_num		min_brkn_seqno, min_resolve_seqno, max_resolve_seqno, lcl_losttn_seqno, stop_rlbk_seqno;
 	unsigned char	*seq_arr, bit;
@@ -103,11 +103,12 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 			&& (max_resolve_seqno >= min_resolve_seqno))
 	{	/* Update losttn_seqno to the first seqno gap from min_resolve_seqno to max_resolve_seqno */
 		seqno_span = (max_resolve_seqno - min_resolve_seqno + 1);
-		seq_arr_size = DIVIDE_ROUND_UP(seqno_span, 8); /* Need only an 8th of the actual memory since we use bit-array */
-		seq_arr = (uchar_ptr_t) malloc(seq_arr_size);
+		seq_arr_size = DIVIDE_ROUND_UP(seqno_span, 8);	/* Need only an 8th of the actual memory since we use bit-array */
+		seq_arr_alloc_size = ROUND_UP(seq_arr_size, SIZEOF(NATIVE_PTR_TYPE));	/* Pad to native word size */
+		seq_arr = (uchar_ptr_t) malloc(seq_arr_alloc_size);
 		ptr = (NATIVE_PTR_TYPE *)(seq_arr);
-		ptr_top = ptr + seq_arr_size;
-		memset(seq_arr, 0, seq_arr_size);
+		ptr_top = (NATIVE_PTR_TYPE *)(seq_arr + seq_arr_alloc_size);
+		memset(seq_arr, 0, seq_arr_alloc_size);
 		/* The below for-loop sets the BIT corresponding to a sequence number (as an offset from the min_resolve_seqno) */
 		for (curent = murgbl.token_table.base, topent = murgbl.token_table.top; curent < topent; curent++)
 		{

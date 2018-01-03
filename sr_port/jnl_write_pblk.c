@@ -71,7 +71,7 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
 	}
 	jpc = csa->jnl;
-	assert(0 != jpc->pini_addr);
+	assert((0 != jpc->pini_addr) || ((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa))));
 	pblk_record.prefix.jrec_type = JRT_PBLK;
 	pblk_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	pblk_record.prefix.tn = JB_CURR_TN_APPROPRIATE(TRUE, jpc, csa);

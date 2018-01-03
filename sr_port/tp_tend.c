@@ -97,8 +97,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	int4			n_pvtmods, n_blkmods;
 GBLREF	unsigned int		t_tries;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_updproc;
 GBLREF	boolean_t		is_replicator;
 GBLREF	seq_num			seq_num_zero;
@@ -189,7 +188,7 @@ boolean_t	tp_crit_all_regions()
 						 * crit on any region. So take care of that explicitly here just like csd->freeze.
 						 */
 			assert(!(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
-			if (FROZEN_HARD(tmpcsd) && tmpsi->update_trans)
+			if (FROZEN_HARD(tmpcsa) && tmpsi->update_trans)
 			{
 				tr = tr->fPtr;		/* Increment so we release the crit lock we actually got */
 				x_lock = FALSE;
@@ -220,7 +219,7 @@ boolean_t	tp_crit_all_regions()
 		}
 		if (NULL != frozen_csa)
 		{	/* Wait for region to be unfrozen before re-grabbing crit on ALL regions */
-			WAIT_FOR_REGION_TO_UNFREEZE(frozen_csa, tmpcsd);
+			WAIT_FOR_REGION_TO_UNFREEZE(frozen_csa);
 		}
 		if (NULL != encr_csa)
 		{
@@ -262,6 +261,7 @@ boolean_t	tp_tend()
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size, in_tend;
 	uint4			lcl_update_trans;
+	jnlpool_addrs_ptr_t	save_jnlpool, update_jnlpool, local_jnlpool;
 	jnlpool_ctl_ptr_t	jpl;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
@@ -285,6 +285,8 @@ boolean_t	tp_tend()
 	assert(dollar_tlevel);
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
+	save_jnlpool = jnlpool;
+	update_jnlpool = NULL;
 	/* if the transaction does no updates and the transaction history has not changed, we do not need any more validation */
 	do_validation = FALSE;	/* initially set to FALSE, but set to TRUE below */
 	assert(NULL == first_tp_si_by_ftok);
@@ -336,7 +338,7 @@ boolean_t	tp_tend()
 		assert((UPDTRNS_JNL_LOGICAL_MASK & lcl_update_trans) || (NULL == si->jnl_head));
 		assert(!(UPDTRNS_JNL_LOGICAL_MASK & lcl_update_trans) || (NULL != si->jnl_head));
 		assert(!tr->reg->read_only || !lcl_update_trans);
-		region_is_frozen = (lcl_update_trans && FROZEN_HARD(csd));
+		region_is_frozen = (lcl_update_trans && FROZEN_HARD(csa));
 		if ((CDB_STAGNATE > t_tries)
 				? (csa->now_crit && !csa->hold_onto_crit)
 				: (!csa->now_crit || region_is_frozen))
@@ -404,7 +406,19 @@ boolean_t	tp_tend()
 				assert(JNL_ENABLED(csa) || REPL_WAS_ENABLED(csa));
 				replication = TRUE;
 				if (is_replicator)
-					repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+				{
+					if (csa->jnlpool && (jnlpool != csa->jnlpool))
+						local_jnlpool = csa->jnlpool;
+					else
+						local_jnlpool = jnlpool;
+					if (!update_jnlpool)
+					{
+						update_jnlpool = local_jnlpool;
+						assert(update_jnlpool && update_jnlpool->jnlpool_dummy_reg);
+						repl_csa = &FILE_INFO(update_jnlpool->jnlpool_dummy_reg)->s_addrs;
+					} else
+						assert(update_jnlpool == local_jnlpool);
+				}
 				jnl_participants++;
 			} else if (JNL_ENABLED(csa))
 			{
@@ -417,7 +431,7 @@ boolean_t	tp_tend()
 		{	/* Wait for it to be unfrozen before proceeding to commit. This reduces the
 			 * chances that we find it frozen after we grab crit further down below.
 			 */
-			WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);
+			WAIT_FOR_REGION_TO_UNFREEZE(csa);
 		}
 	}	/* for (tr... ) */
 	*prev_tp_si_by_ftok = NULL;
@@ -434,8 +448,12 @@ boolean_t	tp_tend()
 		if (replication)
 		{
 			if (yes_jnl_no_repl)
+			{
+				if (save_jnlpool != jnlpool)
+					jnlpool = save_jnlpool;
 				rts_error_csa(CSA_ARG(REG2CSA(save_gv_cur_region)) VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
 						DB_LEN_STR(save_gv_cur_region));
+			}
 			/* If caller does NOT want this update to be replicated, turn "replication" local variable off.
 			 * The only such caller known at this time is "trigger_upgrade" - 2014/05/02.
 			 */
@@ -456,8 +474,12 @@ boolean_t	tp_tend()
 				rel_crit(tr->reg);
 			}
 		} /* else we are online rollback and we already hold crit on all regions */
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
 		return TRUE;
 	}
+	if (jnlpool && (NULL == update_jnlpool))
+		update_jnlpool = jnlpool;
 	/* Because secshr_db_clnup uses first_tp_si_by_ftok to determine if a TP transaction is underway and expects
 	 * a well-formed linked list if it is non-zero, the following assignment to the head of the region list must occur
 	 * after the loop above
@@ -541,7 +563,7 @@ boolean_t	tp_tend()
 			 * that they become frozen just before we grab crit. In this case (should be rare though) release
 			 * crit on ALL regions that we have grabbed uptil this point and wait for the freeze to be removed.
 			 */
-			if (FROZEN_HARD(csd) && lcl_update_trans)
+			if (FROZEN_HARD(csa) && lcl_update_trans)
 			{
 				x_lock = FALSE;
 				break;
@@ -581,8 +603,9 @@ boolean_t	tp_tend()
 				 * concurrent trigger changes. Assert accordingly.
 				 */
 				assert(CDB_STAGNATE > t_tries);
-				assert(!is_updproc || (jnlpool.repl_inst_filehdr->is_supplementary
-								&& !jnlpool.jnlpool_ctl->upd_disabled));
+				assert(!is_updproc || (update_jnlpool && (!csa->jnlpool || (update_jnlpool == csa->jnlpool))));
+				assert(!is_updproc || (update_jnlpool && (update_jnlpool->repl_inst_filehdr->is_supplementary
+								&& !update_jnlpool->jnlpool_ctl->upd_disabled)));
 				assert(csd->db_trigger_cycle > csa->db_trigger_cycle);
 				/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle for all participating
 				 * regions when they are each first referenced in the next retry (in tp_set_sgm)\
@@ -719,6 +742,8 @@ boolean_t	tp_tend()
 					{
 						ctn = csd->trans_hist.curr_tn;
 						assert(csd->trans_hist.early_tn == ctn);
+						if (save_jnlpool != jnlpool)
+							jnlpool = save_jnlpool;
 						if (SS_NORMAL != jpc->status)
 							rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
 								DB_LEN_STR(gv_cur_region), jpc->status);
@@ -753,7 +778,7 @@ boolean_t	tp_tend()
 					if (MAXUINT4 == jbp->next_epoch_time)
 						jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
 					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
-						&& !FROZEN_CHILLED(csd))
+						&& !FROZEN_CHILLED(csa))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						/* Note that at this point, jgbl.gbl_jrec_time has been computed taking into
 						 * account the current system time & the last journal record timestamp of ALL
@@ -1180,7 +1205,7 @@ boolean_t	tp_tend()
 		 */
 		assert(jgbl.onlnrlbk || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 		/* Wait for it to be unfrozen before re-grabbing crit on ALL regions */
-		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);
+		WAIT_FOR_REGION_TO_UNFREEZE(csa);
 		assert(CDB_STAGNATE > t_tries);
 	}	/* for (;;) */
 	/* At this point, we are done with validation and so we need to assert that donot_commit is set to FALSE */
@@ -1189,13 +1214,19 @@ boolean_t	tp_tend()
 	assert(tmp_jnl_participants == jnl_participants);
 	assert(cdb_sc_normal == status);
 	DEBUG_ONLY(if (!jgbl.forw_phase_recovery) jnl_fence_ctl.token = 0;)
-	jnl_fence_ctl.replication = replication;	/* used by "secshr_db_clnup" to finish CMT09 if needed */
+	jnl_fence_ctl.replication = replication;	/* used by "secshr_finish_CMT08_to_CMT14" to finish CMT09 if needed */
 	if (replication)
 	{
-		jpl = jnlpool_ctl;
+		assert(update_jnlpool);
+		jpl = update_jnlpool->jnlpool_ctl;
+		assert(jpl);
+		assert(update_jnlpool->pool_init);
 		if (!repl_csa->hold_onto_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);	/* Step CMT02 */
-		if (jnlpool.jnlpool_ctl->freeze)
+		{
+			jnlpool = update_jnlpool;	/* required by grab lock */
+			grab_lock(update_jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);	/* Step CMT02 */
+		}
+		if (update_jnlpool->jnlpool_ctl->freeze)
 		{
 			status = cdb_sc_instancefreeze;	/* break the possible deadlock by signalling a restart */
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
@@ -1208,7 +1239,7 @@ boolean_t	tp_tend()
 			supplementary = TRUE;
 			assert(0 <= strm_index);
 			strm_seqno = jpl->strm_seqno[strm_index];
-			ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
+			ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index, update_jnlpool);
 			jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
 		} else
 		{	/* Note: "supplementary == FALSE" if strm_seqno is 0 is relied upon by "mutex_salvage" */
@@ -1224,7 +1255,8 @@ boolean_t	tp_tend()
 		 * with a potentially lower value than the final adjusted time written in the jnl record.
 		 */
 		ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl);
-		UPDATE_JPL_RSRV_WRITE_ADDR(jpl, jnlpool, jgbl.cumul_jnl_rec_len); /* updates jpl->rsrv_write_addr. Step CMT03 */
+		/* updates jpl->rsrv_write_addr. Step CMT03 */
+		UPDATE_JPL_RSRV_WRITE_ADDR(jpl, update_jnlpool, jgbl.cumul_jnl_rec_len);
 		/* Source server does not read in crit. It relies on the transaction data, lastwrite_len,
 		 * rsrv_write_addr being updated in that order. To ensure this order, we have to force out
 		 * rsrv_write_addr to its coherency point now. If not, the source server may read data that
@@ -1565,7 +1597,7 @@ boolean_t	tp_tend()
 								 */
 								jrs = si->jbuf_rsrv_ptr;
 								if (NEED_TO_FINISH_JNL_PHASE2(jrs))
-									FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);	/* Step CMT06a */
+									FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);	/* Step CMT10a */
 								status = bg_update_phase2(cse, ctn, ctn, si);	/* Step CMT10a */
 								if (cdb_sc_normal == status)
 									cse->mode = gds_t_committed;
@@ -1610,7 +1642,7 @@ boolean_t	tp_tend()
 			assert(!(UPDTRNS_TCOMMIT_STARTED_MASK & lcl_update_trans));
 			si->update_trans = lcl_update_trans | UPDTRNS_TCOMMIT_STARTED_MASK; /* Step CMT11 */
 			/* should never increment curr_tn on a frozen database */
-			assert(!(FROZEN_HARD(csd) || (replication && IS_REPL_INST_FROZEN)));
+			assert(!(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool))));
 			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
 			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
 			 * modification.
@@ -1647,7 +1679,7 @@ boolean_t	tp_tend()
 			/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
 			 * otherwise do it here every HEADER_UPDATE_COUNT transactions.
 			 */
-			if (!JNL_ENABLED(csa) && !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)) && !FROZEN_CHILLED(csd))
+			if (!JNL_ENABLED(csa) && !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)) && !FROZEN_CHILLED(csa))
 				fileheader_sync(gv_cur_region);
 			if (NULL != si->kill_set_head)
 				INCR_KIP(csd, csa, si->kip_csa);
@@ -1668,15 +1700,19 @@ boolean_t	tp_tend()
 	 */
 	if (replication)
 	{
+		assert(update_jnlpool);
+		assert(update_jnlpool->jnlpool_ctl == jpl);
+		assert(NULL != repl_csa);
+		assert(update_jnlpool && update_jnlpool->pool_init);
 		assert(repl_csa->now_crit);
 		if (!repl_csa->hold_onto_crit)
-			rel_lock(jnlpool.jnlpool_dummy_reg);	/* Step CMT15 */
+			rel_lock(update_jnlpool->jnlpool_dummy_reg);	/* Step CMT15 */
 	}
 	/* Check that we DON'T own crit on ANY region. The only exception is online mupip journal rollback/recovery
 	 * or MUPIP TRIGGER -UPGRADE which holds crit for the entire process lifetime. */
 	assert(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	/* the following section is the actual commitment of the journal records */
-	TP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(jnl_fence_ctl, replication, jnlpool);	/* Step CMT16 & CMT17 */
+	TP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(jnl_fence_ctl, replication, update_jnlpool);	/* Step CMT16 & CMT17 */
 	/* The following section is the actual commitment of the changes in the database (phase2 for BG) */
 	for (si = first_tp_si_by_ftok;  (NULL != si); si = si->next_tp_si_by_ftok)
 	{
@@ -1781,7 +1817,8 @@ failed:
 		if (replication && repl_csa->now_crit && release_crit)
 		{	/* The only restart that is possible once we acquired the journal pool lock is due to instance freeze */
 			assert(cdb_sc_instancefreeze == status);
-			rel_lock(jnlpool.jnlpool_dummy_reg);
+			assert(update_jnlpool && update_jnlpool->pool_init);
+			rel_lock(update_jnlpool->jnlpool_dummy_reg);
 		}
 		/* Check that we DON'T own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
 		 * which holds crit for the entire process lifetime.
@@ -1843,6 +1880,8 @@ skip_failed:
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
 	if (cdb_sc_normal == status)
 	{
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
 		first_tp_si_by_ftok = NULL; /* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
 		return TRUE;
 	}
@@ -1852,6 +1891,8 @@ failed_skip_revert:
 	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, status);
 	TP_RETRY_ACCOUNTING(csa, cnl);
 	first_tp_si_by_ftok = NULL;	/* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	return FALSE;
 }
 

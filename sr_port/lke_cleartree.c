@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "mlkdef.h"
 #include "gdsroot.h"
@@ -27,6 +28,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "mlk_shrblk_delete_if_empty.h"
 #include "mlk_wake_pending.h"
 #include "lke.h"
@@ -36,6 +38,10 @@
 #define KDIM	64		/* max number of subscripts */
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
+
+error_def(ERR_CTRLC);
+
+mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head);
 
 bool	lke_cleartree(
 		      gd_region		*region,
@@ -56,10 +62,8 @@ bool	lke_cleartree(
 	int		depth = 0;
 	bool		locks = FALSE, locked, deleted;
 
-	error_def(ERR_CTRLC);
-
 	node = start[0]
-	     = tree;
+	     = mlk_shrblk_sort(tree);
 	subscript_offset[0] = 0;
 
 	for (;;)
@@ -109,10 +113,10 @@ bool	lke_cleartree(
 			/* This node has children, so move down */
 			++depth;
 			node = start[depth]
-			     = (mlk_shrblk_ptr_t)R2A(node->children);
+			     = mlk_shrblk_sort((mlk_shrblk_ptr_t)R2A(node->children));
 			subscript_offset[depth] = name.len;
 		}
 		if (util_interrupt)
-			rts_error(VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(REG2CSA(region)) VARLSTCNT(1) ERR_CTRLC);
 	}
 }

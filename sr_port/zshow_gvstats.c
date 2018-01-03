@@ -71,7 +71,7 @@ STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *re
 	zshow_output(output,&valmstr);
 }
 
-void zshow_gvstats(zshow_out *output)
+void zshow_gvstats(zshow_out *output, boolean_t total_only)
 {
 	mstr			gldname;
 	mstr			regname;
@@ -100,20 +100,23 @@ void zshow_gvstats(zshow_out *output)
  	}
 	cumul_gvstats.db_curr_tn = 0;	/* nullify CTN field as it has no meaning in the "aggregated" sense */
 	zshow_gvstats_output(output, &stargldname, &starregname, &cumul_gvstats);
-	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+	if (!total_only)
 	{
-		get_first_gdr_name(addr_ptr, &gldname);
-		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
-			if (!reg->open || IS_STATSDB_REG(reg))
-				continue;
-			acc_meth = reg->dyn.addr->acc_meth;
-			if (!IS_ACC_METH_BG_OR_MM(acc_meth))
-				continue;
-			csa = &FILE_INFO(reg)->s_addrs;
-			regname.len = reg->rname_len;
-			regname.addr = (char *)&reg->rname[0];
-			zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p);
+			get_first_gdr_name(addr_ptr, &gldname);
+			for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
+			{
+				if (!reg->open || IS_STATSDB_REG(reg))
+					continue;
+				acc_meth = reg->dyn.addr->acc_meth;
+				if (!IS_ACC_METH_BG_OR_MM(acc_meth))
+					continue;
+				csa = &FILE_INFO(reg)->s_addrs;
+				regname.len = reg->rname_len;
+				regname.addr = (char *)&reg->rname[0];
+				zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p);
+			}
 		}
- 	}
+	}
 }

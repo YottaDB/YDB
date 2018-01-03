@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,12 @@
 
 GBLDEF	char	codelist[] = PATM_CODELIST;
 
+GBLREF	boolean_t	gtm_utf8_mode;
+GBLREF	boolean_t	run_time;
 GBLREF	uint4		pat_allmaskbits;
 GBLREF	uint4		*pattern_typemask;
-GBLREF	boolean_t	gtm_utf8_mode;
+
+error_def(ERR_PATNOTFOUND);
 
 /* This procedure executes at "run-time".  After a pattern in a MUMPS program has been compiled (by patstr and its
  *  	helper-procedures), this procedure is called to evaluate "fixed-length" patterns.
@@ -36,22 +40,19 @@ int do_patfixed(mval *str, mval *pat)
 	int4			count, tempint;
 	int4			*min, *reptr, *rtop;
 	int4			repeat;
-	int			bit;
 	int			letter;
 	int			repcnt;
 	int			bytelen, charlen, pbytelen, strbytelen;
 	unsigned char		*strptr, *strtop, *strnext, *pstr, *ptop, *pnext;
 	uint4			code, tempuint, patstream_len;
 	uint4			*patptr;
-	uint4			mbit;
-	char			buf[CHAR_CLASSES];
 	boolean_t		flags, pvalid, strvalid;
 	UNICODE_ONLY(
 	wint_t			utf8_codepoint;
 	)
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_PATNOTFOUND);
-
+	SETUP_THREADGBL_ACCESS;
 	/* set up information */
 	MV_FORCE_STR(str);
 	patptr =  (uint4 *)pat->str.addr;
@@ -96,17 +97,7 @@ int do_patfixed(mval *str, mval *pat)
 		patptr++;
 		if (!(code & PATM_STRLIT))
 		{	/* meta character pat atom */
-			if (!(code & pat_allmaskbits))
-			{	/* current table has no characters with this pattern code */
-				bytelen = 0;
-				for (bit = 0; bit < PAT_MAX_BITS; bit++)
-				{
-					mbit = (1 << bit);
-					if ((mbit & code & PATM_LONGFLAGS) && !(mbit & pat_allmaskbits))
-						buf[bytelen++] = codelist[patmaskseq(mbit)];
-				}
-				rts_error(VARLSTCNT(4) ERR_PATNOTFOUND, 2, bytelen, buf);
-			}
+			ENSURE_PAT_IN_TABLE(code);
 			if (!gtm_utf8_mode)
 			{
 				for (repcnt = 0; repcnt < repeat; repcnt++)

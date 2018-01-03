@@ -88,7 +88,7 @@ void	op_dmode(void)
 	}
 	io_curr_device = io_std_device;
 	if ((TRUE == io_curr_device.in->dollar.zeof) || kill)
-		op_halt();
+		op_zhalt(ERR_NOPRINCIO, FALSE);	/* op_zhalt doesn't restrict this because it's a halt with a return code */
 	/* The following code avoids an infinite loop on UNIX systems when there is an error in writing to the principal device
 	 * resulting in a call to the condition handler and an eventual return to this location
 	 */
