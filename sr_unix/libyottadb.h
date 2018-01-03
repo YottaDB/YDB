@@ -23,8 +23,8 @@
 /* Enumerated parameter values */
 typedef enum
 {
-	LYDB_DEL_TREE = 1,
-	LYDB_DEL_NODE,
+	YDB_DEL_TREE = 1,
+	YDB_DEL_NODE,
 } ydb_delete_method;
 
 /* Maximum values */

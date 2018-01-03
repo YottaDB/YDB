@@ -38,8 +38,8 @@
  *   subs_used	    - Count of subscripts (if any else 0) in input node
  *   subsarray	    - an array of "subs_used" subscripts in input node (not looked at if "subs_used" is 0)
  *   delete_method  - Is one of the below choices
- *			LYDB_DEL_TREE (kills the subtree underneath i.e. KILL command in M)
- *			LYDB_DEL_NODE (kills only the node and not the subtree underneath i.e. ZKILL/ZWITHDRAW command in M)
+ *			YDB_DEL_TREE (kills the subtree underneath i.e. KILL command in M)
+ *			YDB_DEL_NODE (kills only the node and not the subtree underneath i.e. ZKILL/ZWITHDRAW command in M)
  *
  * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
@@ -114,10 +114,10 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
 				 * node plus descendants (tree).
 				 */
-				case LYDB_DEL_TREE:
+				case YDB_DEL_TREE:
 					op_kill(src_lv);
 					break;
-				case LYDB_DEL_NODE:
+				case YDB_DEL_NODE:
 					op_lvzwithdraw(src_lv);
 					break;
 				default:
@@ -145,10 +145,10 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
 				 * node plus descendants (tree).
 				 */
-				case LYDB_DEL_TREE:
+				case YDB_DEL_TREE:
 					op_gvkill();
 					break;
-				case LYDB_DEL_NODE:
+				case YDB_DEL_NODE:
 					op_gvzwithdraw();
 					break;
 				default:
