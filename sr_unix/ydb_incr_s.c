@@ -57,8 +57,10 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_INCR);				/* Note: macro could return from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
+	LIBYOTTADB_INIT(LYDB_RTN_INCR);			/* Note: macro could return from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -148,7 +150,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 			assertpro(FALSE);
 	}
 	SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", "ydb_incr_s()"); /* Copy value to return buffer */
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
+	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
 	REVERT;
 	return YDB_OK;
 }

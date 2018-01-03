@@ -42,10 +42,7 @@
  *
  * Note unlike "ydb_set_s", none of the input subscript need rebuffering in this routine
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines. But the input varname does need rebuffering as it is possible the local
- * varname does not yet exist in the current symbol table (curr_symval) in which case we do want
- * that to store a name string pointing to the stringpool rather than user-pointed C program storage
- * which could change after the current ydb_*_s() call.
+ * YottaDB runtime routines.
  */
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value)
 {
@@ -63,11 +60,15 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_GET);	/* Note: macro could "return" from this function in case of errors */
-	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have never become non-zero and even if it did,
+								 * it should have been cleared by "ydb_simpleapi_ch".
+								 */
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -99,7 +100,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1, "ydb_get_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_get_s()");
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
@@ -138,7 +139,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		default:
 			assertpro(FALSE);
 	}
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* These mstrs are no longer protected */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	REVERT;
 	return YDB_OK;
 }
