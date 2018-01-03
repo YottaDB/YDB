@@ -31,38 +31,23 @@
 #include "gdsfhead.h"
 #include "mvalconv.h"
 
-LITREF	mval	literal_zero;
-
-/* Routine to return existance of given nodes and existence of descendants
- *
- * Parameters:
- *   varname	- Gives name of local or global variable
- *   subs_used	- Count of subscripts (if any else 0)
- *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
- *   ret_value	- $data of input local/global variable stored/returned here
- *
- * Note unlike "ydb_set_s", none of the input varname or subscripts need rebuffering in this routine
- * as they are not ever being used to create a new node or are otherwise kept for any reason by the
- * YottaDB runtime routines.
- */
-int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value)
+/* */
+int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		data_svn_index;
+	int		delete_svn_index;
 	lv_val		*lvvalp, *src_lv;
 	mname_entry	var_mname;
-	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	ydb_var_types	data_type;
+	mval		gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_var_types	delete_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DATA);			/* Note: macro could return from this function in case of errors */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-							 * corresponding ydb_*_s() call.
-							 */
+	LIBYOTTADB_INIT(LYDB_RTN_DELETE);			/* Note: macro could return from this function in case of errors */
+	TREF(sapi_mstrs_for_gc_indx) = 0;			/* Clear any previously used entries */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -70,28 +55,28 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
-	/* Do some validation */
-	VALIDATE_VARNAME(varname, data_type, data_svn_index, FALSE);
+	/* If the varname pointer is null, this implies a local var kill-all. Check for that before attempting to
+	 * validate a name that may not be specified.
+	 */
+	if (NULL == varname)
+	{	/* Special case - no varname supplied so drive kill-all of local variables */
+		op_killall();
+		REVERT;
+		return YDB_OK;
+	}
+	/* We should have a variable name - check it out and determine type */
+	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if (NULL == ret_value)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			      LEN_AND_LIT("NULL ret_value"), LEN_AND_LIT("ydb_data_s()"));
-	/* Separate actions depending on type of DATA being done */
-	switch(data_type)
+	/* Separate actions depending on type of delete (KILL) being done */
+	switch(delete_type)
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Find status of the given local variable. Locate base var lv_val in curr_symval */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE);
-			if (NULL == lvvalp)
-			{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
-				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro). Return 0 for $data result.
-				 */
-				data_value = literal_zero;
-				break;
-			}
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_TRUE);
+			assert(lvvalp);
 			if (0 == subs_used)
 				/* If no subscripts, this is the node we are interested in */
 				src_lv = lvvalp;
@@ -102,10 +87,22 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_data_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_delete_s()");
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
-			op_fndata(src_lv, &data_value);
+			switch(delete_method)
+			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
+				 * node plus descendants (tree).
+				 */
+				case LYDB_DEL_TREE:
+					op_kill(src_lv);
+					break;
+				case LYDB_DEL_NODE:
+					op_lvzwithdraw(src_lv);
+					break;
+				default:
+					assertpro(FALSE);
+			}
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Find dstatus of the given global variable value. We do this by:
@@ -120,11 +117,23 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_data_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_delete_s()");
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
-			op_gvdata(&data_value);				/* Fetch status into data_value */
+			switch(delete_method)
+			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
+				 * node plus descendants (tree).
+				 */
+				case LYDB_DEL_TREE:
+					op_gvkill();
+					break;
+				case LYDB_DEL_NODE:
+					op_gvzwithdraw();
+					break;
+				default:
+					assertpro(FALSE);
+			}
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -133,8 +142,8 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		default:
 			assertpro(FALSE);
 	}
-	*ret_value = mval2i(&data_value);
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));
 	REVERT;
 	return YDB_OK;
 }
+

@@ -40,6 +40,7 @@ LITREF	svn_data_type	svn_data[];
 typedef enum
 {
 	LYDB_RTN_DATA = 1,		/* "ydb_data_s" is running */
+	LYDB_RTN_DELETE,		/* "ydb_delete_s" is running */
 	LYDB_RTN_GET,			/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
