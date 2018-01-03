@@ -62,6 +62,15 @@ typedef enum
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
 }
 
+/* Macro to create/fill-in a ydb_buffer_t structure from a string (i.e. "char *" pointer in C).
+ * User of this macro needs to include <string.h> (needed for "strlen" prototype).
+ */
+#define YDB_STR_TO_BUFFER(BUFFERP, STRING)					\
+{										\
+	(BUFFERP)->buf_addr = STRING;						\
+	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);		\
+}
+
 /* Basic/standard types */
 typedef int		ydb_status_t;
 typedef	int		ydb_int_t;
