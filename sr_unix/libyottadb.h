@@ -20,6 +20,13 @@
 #include <sys/types.h>	/* For intptr_t */
 #include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
 
+/* Enumerated parameter values */
+typedef enum
+{
+	LYDB_DEL_TREE = 1,
+	LYDB_DEL_NODE,
+} ydb_delete_method;
+
 /* Maximum values */
 #define YDB_MAX_SUBS	31	/* Maximum subscripts currently supported */
 #define YDB_MAX_IDENT	31	/* Maximum size of global/local name (not including '^') */
@@ -137,12 +144,15 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
 /* Simple API routine declarations */
 int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
+int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method);
 int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
-int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used, ydb_buffer_t *ret_subsarray);
-int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used, ydb_buffer_t *ret_subsarray);
+int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+		    ydb_buffer_t *ret_subsarray);
+int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+			ydb_buffer_t *ret_subsarray);
 int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value);
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
