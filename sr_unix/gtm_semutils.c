@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,7 +79,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 	assert(!((NULL == timedout) ^ (NULL == stacktrace_time)));
 	*sem_halted = FALSE;
 	/* Access control semaphore should not be increased when the process is readonly */
-	SET_GTM_SOP_ARRAY(sop, sopcnt, (incr_cnt && (IS_FTOK_SEM || !reg->read_only)), (SEM_UNDO | IPC_NOWAIT));
+	SET_YDB_SOP_ARRAY(sop, sopcnt, (incr_cnt && (IS_FTOK_SEM || !reg->read_only)), (SEM_UNDO | IPC_NOWAIT));
 	/* If DSE or LKE or MUPIP FREEZE -ONLINE, it is okay to bypass but only if input "*bypass" is TRUE.
 	 * If "*bypass" is FALSE, that overrides anything else.
 	 */
@@ -133,7 +136,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 						 LEN_AND_STR((IS_LKE_IMAGE ? "LKE" : "DSE")), process_id,
 						 LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid);
 					/* If this is a readonly access, we don't increment access semaphore's counter. See
-					 * SET_GTM_SOP_ARRAY definition in gtm_semutils.h and how it is called from db_init().
+					 * SET_YDB_SOP_ARRAY definition in gtm_semutils.h and how it is called from db_init().
 					 */
 					if (!(*sem_halted) && incr_cnt && (IS_FTOK_SEM || !reg->read_only))
 					{

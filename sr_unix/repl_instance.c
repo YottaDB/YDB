@@ -489,7 +489,7 @@ void	repl_inst_ftok_sem_lock(void)
 	if (!udi->grabbed_ftok_sem)
 	{
 		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-		if (!ftok_sem_lock(reg, IMMEDAITE_FALSE))
+		if (!ftok_sem_lock(reg, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));

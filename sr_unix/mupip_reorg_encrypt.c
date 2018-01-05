@@ -863,7 +863,7 @@ void get_ftok_semaphore(gd_region *reg, sgmnt_addrs *csa)
 	unix_db_info *udi;
 
 	udi = FILE_INFO(reg);
-	if (!ftok_sem_lock(reg, IMMEDAITE_FALSE))
+	if (!ftok_sem_lock(reg, IMMEDIATE_FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRITSEMFAIL, 2, LEN_AND_STR(udi->fn));
 	assert(ftok_sem_reg == reg);
 }

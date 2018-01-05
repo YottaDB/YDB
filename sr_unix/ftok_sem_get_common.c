@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -122,7 +125,7 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 	if (-1 == (udi->key = FTOK(udi->fn, project_id)))
 		RETURN_SEMWAIT_FAILURE(retstat, errno, op_ftok, 0, ERR_FTOKERR, 0);
 	/* First try is always IPC_NOWAIT */
-	SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+	SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 	/* The following loop deals with the possibility that the semaphores can be deleted by someone else AFTER a successful
 	 * semget but BEFORE semop locks it, in which case we should retry.
 	 */
@@ -142,7 +145,7 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 			if (SEM_REMOVED(save_errno))
 			{	/* start afresh for next iteration of for loop with new semid and initial operations */
 				*ftok_counter_halted = FALSE;
-				SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+				SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 				continue;
 			}
 			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
@@ -195,7 +198,7 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 		if (SEM_REMOVED(save_errno))
 		{	/* start afresh for next iteration of for loop with new semid and ftok_sopcnt */
 			*ftok_counter_halted = FALSE;
-			SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+			SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 			continue;
 		}
 		assert(EINTR != save_errno);
