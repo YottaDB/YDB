@@ -3,10 +3,11 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -890,7 +891,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 		shm_base = linkctl->rtnobj_shm_base[dbg_shm_index];
 		assert(NULL != shm_base);
 		shm_size = ((size_t)1 << (dbg_shm_index + MIN_RTNOBJ_SHM_INDEX));
-#		ifdef __armv7l__
+#		if defined(__armv6l__) || defined(__armv7l__)
 		if ((shm_base <= (uchar_ptr_t)rtnobj)
 		    && ((shm_base + shm_size) > (uchar_ptr_t)rtnobj))
 #		else

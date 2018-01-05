@@ -1,9 +1,10 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,13 +37,21 @@ RETRY_COUNT	=	1024
  */
 ENTRY aswp
 	mov	r12, #RETRY_COUNT
+.ifdef __armv7l__
 	dmb
+.else	/* __armv6l__ */
+	mcr	p15, 0, r0, c7, c10, 5	/* equivalent to armv7l's "dmb" on armv6l */
+.endif
 retry:
 	ldrex	r2, [r0]
 	strex	r3, r1, [r0]
 	cmp	r3, #1
 	beq	store_failed
+.ifdef __armv7l__
 	dmb
+.else	/* __armv6l__ */
+	mcr	p15, 0, r0, c7, c10, 5	/* equivalent to armv7l's "dmb" on armv6l */
+.endif
 	mov	r0, r2
 	bx	lr
 store_failed:

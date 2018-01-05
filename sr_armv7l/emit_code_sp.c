@@ -1,9 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +70,9 @@ void	emit_base_offset_addr(int base, int offset)
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
 			assert(base >= 0  &&  base <= 15);		/* register is in correct range */
+#ifdef __armv7l__
 			/* Always use movw - add sequence because shrink trips can convert a movw add sequence to
-			 * add r1, r1, #xxx if the adjusted offset now falls within the weird ARM shifted 12 bit range. 
+			 * add r1, r1, #xxx if the adjusted offset now falls within the weird ARM shifted 12 bit range.
 			 * But now the next shrink trips pass can change it back to movw - add. Now the old code size
 			 * will be smaller than the new, leading to an assert in shrink_trips().
 			 */
@@ -86,6 +88,13 @@ void	emit_base_offset_addr(int base, int offset)
 								| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
 								| (((abs_offst >> 16) & ARM_MASK_IMM12) << ARM_SHIFT_IMM8);
 			}
+#else	/* __armv6l__ */
+			code_buf[code_idx++] = ARM_INS_LDR
+							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RT)
+							| (ARM_REG_PC << ARM_SHIFT_RN);
+			code_buf[code_idx++] = ARM_INS_B;
+			code_buf[code_idx++] = abs(offset);
+#endif
 			code_buf[code_idx] = (((0 <= offset) ? ARM_U_BIT_ON : ARM_B_BIT_ON)
 							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RM)
 							| (base << ARM_SHIFT_RN));
@@ -117,6 +126,7 @@ void	emit_base_offset_load(int base, int offset)
 							| (base << ARM_SHIFT_RN));
 			} else
 			{
+#ifdef __armv7l__
 				code_buf[code_idx++] = ARM_INS_MOVW
 								| (((abs_offst >> 12) & ARM_MASK_IMM4) << ARM_SHIFT_IMM4)
 								| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
@@ -128,6 +138,13 @@ void	emit_base_offset_load(int base, int offset)
 									| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
 									| (((abs_offst >> 16) & ARM_MASK_IMM12) << ARM_SHIFT_IMM8);
 				}
+#else	/* __armv6l__ */
+				code_buf[code_idx++] = ARM_INS_LDR
+							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RT)
+							| (ARM_REG_PC << ARM_SHIFT_RN);
+				code_buf[code_idx++] = ARM_INS_B;
+				code_buf[code_idx++] = abs_offst;
+#endif
 				code_buf[code_idx++] = (((0 <= offset) ? ARM_INS_ADD_REG : ARM_INS_SUB_REG)
 								| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RM)
 								| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
@@ -356,9 +373,15 @@ void fmt_rd_raw_imm16()
 	obpt += i2hex_nofill(imm16, obpt, 6);
 }
 
+void fmt_const()
+{
+	obpt = i2asc(obpt, ains);
+	tab_to_column(55);
+	fmt_ains();
+}
+
 void fmt_brdisp()
 {
-	obpt++;
 	*obpt++ = '0';
 	*obpt++ = 'x';
 	obpt += i2hex_nofill(((GET_BRDISP(ains) + 1 ) * 4 + curr_addr - SIZEOF(rhdtyp)), obpt, 6);
@@ -415,8 +438,9 @@ void tab_to_column(int col)
 
 void 	format_machine_inst(void)
 {
-	int	instindx, shift;
+	int	instindx, shift, load_const;
 
+	load_const = 0;
 	for (instindx = 0; instindx < code_idx; instindx++)
 	{
 		list_chkpage();
@@ -429,6 +453,13 @@ void 	format_machine_inst(void)
 		i2hex(code_buf[instindx], (uchar_ptr_t)obpt, 8);
 		obpt += 10;
 		ains = code_buf[instindx];
+		if (2 == load_const)
+		{
+			load_const = 0;
+			fmt_const();
+			emit_eoi();
+			continue;
+		}
 		switch(GET_OPCODE(ains))
 		{
 			case 0x04:	/* SUB register */
@@ -489,7 +520,7 @@ void 	format_machine_inst(void)
 					memcpy(obpt, LSR_INST, SIZEOF(LSR_INST) - 1);
 					obpt += OPSPC;
 					fmt_rd_rm_shift_imm5();
-					
+
 				} else
 				{
 					/* It's a MOV register */
@@ -554,6 +585,11 @@ void 	format_machine_inst(void)
 				break;
 			case 0x51:	/* LDR -4095 <= imm12 <= 0 */
 			case 0x59:	/* LDR  4095 >= imm12 >= 0 */
+				if ((0xe51f0000 == (ains & 0xffff0000)) && (0xea000000 == code_buf[instindx + 1]))
+				{
+					/* it's a "ldr reg,[pc], b pc, constant" construct */
+					load_const = 1;
+				}
 				memcpy(obpt, LDR_INST, SIZEOF(LDR_INST) - 1);
 				obpt += OPSPC;
 				fmt_rt_rn_raw_imm12();
@@ -632,6 +668,7 @@ void 	format_machine_inst(void)
 								memcpy(obpt, BLE_COND, SIZEOF(BLE_COND) - 1);
 								break;
 							case ARM_COND_ALWAYS:
+								load_const += (1 == load_const) ? 1 : 0;
 								memcpy(obpt, B_INST, SIZEOF(B_INST) - 1);
 								break;
 							default:

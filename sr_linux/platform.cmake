@@ -3,10 +3,11 @@
 # Copyright (c) 2013-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -17,14 +18,16 @@
 
 set(srdir "sr_linux")
 if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
-#  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l")
-  if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm.*")
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
+    set(arch "armv6l")
+    set(bits 32)
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -marm -march=armv6")
+    set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-mcpu=arm1176jzf-s")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
     set(arch "armv7l")
     set(bits 32)
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -marm -march=armv7-a")
     set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv7-a")
-#    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -marm -march=armv7-a -mfpu=neon -mabi=aapcs-linux -mfloat-abi=hard")
-#    set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv7-a -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard")
   else()
     set(arch "x86")
     set(bits 32)
@@ -51,7 +54,7 @@ set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp")
 # Platform directories
 list(APPEND gt_src_list sr_linux)
 if(${bits} EQUAL 32)
-  if("${arch}" MATCHES "armv7.*")
+  if("${arch}" MATCHES "armv[67]l")
     list(APPEND gt_src_list sr_armv7l)
   else()
     list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
@@ -130,7 +133,7 @@ set(libgtmshr_link "${libgtmshr_link} -Wl,--version-script,\"${YDB_BINARY_DIR}/g
 set(libgtmshr_dep  "${YDB_BINARY_DIR}/gtmexe_symbols.export")
 
 if(${bits} EQUAL 32)
-  if("${arch}" MATCHES "armv7.*")
+  if("${arch}" MATCHES "armv[67]l")
     set(libsyslibs "-lelf -lncurses -lm -ldl -lc -lpthread -lrt")
   else()
     set(libsyslibs "-lncurses -lm -ldl -lc -lpthread -lrt")

@@ -3,10 +3,11 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -183,8 +184,13 @@ typedef char  mach_inst;	/* machine instruction */
 #  endif
 #endif
 
-#if defined(__ARM_ARCH_7A__)
-#  define __armv7l__
+#if __arm__
+#  if __ARM_ARCH_6__
+#    define __armv6l__
+#  elif __ARM_ARCH_7A__
+#    define __armv7l__
+#  endif
+
 #  define CACHELINE_SIZE		64
 #  define USHBIN_SUPPORTED
 #  define AUTORELINK_SUPPORTED

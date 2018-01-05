@@ -3,10 +3,11 @@
 # Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -110,7 +111,7 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	IFLAGS += -I /usr/include/openssl-1.0
 	ifeq ($(BIT64),0)
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
-	else ifneq (,$(findstring armv7l,$(MACHTYPE)))
+	else ifneq (,$(findstring arm,$(MACHTYPE)))
 		IFLAGS += -I /usr/include/openssl -I /usr/lib/arm-linux-gnueabihf
 		LIBFLAGS += -L /usr/lib/arm-linux-gnueabihf
 	else

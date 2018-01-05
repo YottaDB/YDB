@@ -2,10 +2,11 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,7 +138,7 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
 #    elif defined(__s390__)
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.psw.addr;
-#    elif defined(__armv7l__)
+#    elif defined(__armv6l__) || defined(__armv7l__)
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.arm_pc;
 #    else
 #      error "Unsupported Linux Platform"

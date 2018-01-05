@@ -3,7 +3,10 @@
  * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2018 Stephen L Johnson.			*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,9 +192,16 @@
 /* On IA64, cross processor notifications of write barriers are automatic so no read barrier is necessary */
 #  define SHM_READ_MEMORY_BARRIER
 
+#elif defined(__armv6l__)
+
+  /* ############################### ARMV6L architecture ################################## */
+#  define SHM_WRITE_MEMORY_BARRIER	__asm__ volatile ("mcr p15, 0, r0, c7, c10, 5" : : : "memory")
+#  define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
+#  define MM_WRITE_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
+
 #elif defined(__armv7l__)
 
-  /* ############################### ARM architecture ################################## */
+  /* ############################### ARMV7L architecture ################################## */
 
 #  define SHM_WRITE_MEMORY_BARRIER	__asm__ volatile ("dmb" ::: "memory")
 #  define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER

@@ -2,10 +2,11 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +49,9 @@ int	gtm_reg(int vax_reg);
 #elif defined(__MVS__) || defined(Linux390)
 #  define CODE_TYPE uint2
 #  define NUM_BUFFERRED_INSTRUCTIONS 100
+#elif defined(__armv6l__)
+#  define CODE_TYPE uint4
+#  define NUM_BUFFERRED_INSTRUCTIONS 100
 #elif defined(__armv7l__)
 #  define CODE_TYPE uint4
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
@@ -59,11 +63,12 @@ int	gtm_reg(int vax_reg);
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
-#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64)) \
+#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64))	\
 	|| defined(__MVS__)
 #  define TRUTH_IN_REG
-#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390) \
-	|| (defined(__CYGWIN__) && defined(__x86_64__)) || (defined(__linux__) && defined(__armv7l__))
+#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)				\
+	|| (defined(__CYGWIN__) && defined(__x86_64__))									\
+	|| (defined(__linux__) && defined(__armv6l__)) || (defined(__linux__) && defined(__armv7l__))
 #  undef TRUTH_IN_REG
 #else
 #  error UNSUPPORTED PLATFORM
