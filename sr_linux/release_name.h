@@ -3,10 +3,11 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,8 @@
 
 #if defined(__x86_64__)
 # define YDB_PLATFORM		"Linux x86_64"
+#elif defined(__armv6l__)
+# define YDB_PLATFORM		"Linux armv6l"
 #elif defined(__armv7l__)
 # define YDB_PLATFORM		"Linux armv7l"
 #else

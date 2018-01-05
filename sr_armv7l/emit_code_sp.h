@@ -2,10 +2,11 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,7 @@ void    format_machine_inst(void);
 int	decode_immed12(int offset);
 void	fmt_ains(void);
 void	fmt_brdisp(void);
+void	fmt_const(void);
 void	fmt_registers(void);
 void	fmt_rd(void);
 void	fmt_rd_rm_shift_imm5(void);
@@ -73,8 +75,13 @@ void	tab_to_column(int col);
 #define CLRL_REG			ARM_REG_R0
 #define CMPL_TEMP_REG			ARM_REG_R2
 #define GET_ARG_REG(indx)		(ARM_REG_R0 + (indx))
+#ifdef __armv7l__
 #define MOVC3_SRC_REG			ARM_REG_R2
 #define MOVC3_TRG_REG			ARM_REG_R3
+#else	/* __armv6l__ */
+#define MOVC3_SRC_REG			ARM_REG_R12
+#define MOVC3_TRG_REG			ARM_REG_R4
+#endif
 #define MOVL_RETVAL_REG			ARM_REG_R0
 #define MOVL_REG_R1			ARM_REG_R1
 
@@ -96,48 +103,7 @@ void	tab_to_column(int col);
 
 
 /* Macros to create specific generated code sequences */
-
-#define GEN_LOAD_ADDR(areg, breg, disp)												\
-{																\
-	if (0 <= encode_immed12(abs(disp)))											\
-	{															\
-		if (0 < disp)													\
-		{														\
-			code_buf[code_idx++] = (ARM_INS_ADD_IMM									\
-							| breg << ARM_SHIFT_RN							\
-							| areg << ARM_SHIFT_RD							\
-							| encode_immed12(disp) << ARM_SHIFT_IMM12);				\
-		} else if (0 > disp)												\
-		{														\
-			code_buf[code_idx++] = (ARM_INS_SUB_IMM									\
-							| breg << ARM_SHIFT_RN							\
-							| areg << ARM_SHIFT_RD							\
-							| encode_immed12(-1 * disp) << ARM_SHIFT_IMM12);			\
-		} else if (areg != breg)											\
-		{														\
-			code_buf[code_idx++] = (ARM_INS_MOV_REG									\
-							| breg << ARM_SHIFT_RM							\
-							| areg << ARM_SHIFT_RD);						\
-		}														\
-	} else															\
-	{															\
-		code_buf[code_idx++] = (ARM_INS_MOVW										\
-						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RD						\
-						| (disp & ARM_MASK_IMM4_HI) << ARM_SHIFT_IMM4_HI				\
-						| (disp & ARM_MASK_IMM12 << ARM_SHIFT_IMM12)); 					\
-		if ((MAX_16BIT < disp) || (-MAX_16BIT > disp)) 									\
-		{														\
-			code_buf[code_idx++] = (ARM_INS_MOVT									\
-							| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RD)				\
-							| (((disp >> 16) & ARM_MASK_IMM4_HI) << ARM_SHIFT_IMM4_HI)		\
-							| (((disp >> 16) & ARM_MASK_IMM12) << ARM_SHIFT_IMM12));		\
-		}														\
-		code_buf[code_idx++] = (ARM_INS_ADD_REG										\
-						| (breg << ARM_SHIFT_RM)							\
-						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RN)					\
-						| (areg << ARM_SHIFT_RD));							\
-}
-
+#ifdef __armv7l__
 #define GEN_LOAD_WORD(areg, breg, disp)												\
 {																\
 	if ((-4096 < disp) && (4096 > disp))											\
@@ -179,7 +145,45 @@ void	tab_to_column(int col);
 						| (areg << ARM_SHIFT_RT));							\
 	}															\
 }
+#else	/* __armv6l__ */
+#define GEN_LOAD_WORD(areg, breg, disp)												\
+{																\
+	if ((-4096 < disp) && (4096 > disp))											\
+	{															\
+		if (0 <= disp)													\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							| ARM_U_BIT_ON								\
+							| ((disp & ARM_MASK_IMM12) << ARM_SHIFT_IMM12)				\
+							| (breg << ARM_SHIFT_RN)						\
+							| (areg << ARM_SHIFT_RT));						\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							& ARM_U_BIT_OFF								\
+							| (((-1 * disp) & ARM_MASK_IMM12) << ARM_SHIFT_IMM12)			\
+							| (breg << ARM_SHIFT_RN)						\
+							| (areg << ARM_SHIFT_RT));						\
+		}														\
+	} else															\
+	{															\
+		code_buf[code_idx++] = (ARM_INS_LDR										\
+						| (ARM_REG_PC << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));					\
+		code_buf[code_idx++] = (ARM_INS_B);										\
+		code_buf[code_idx++] = disp;											\
+		code_buf[code_idx++] = (ARM_INS_ADD_REG										\
+						| (breg << ARM_SHIFT_RD)							\
+						| (breg << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));					\
+		code_buf[code_idx++] = (ARM_INS_LDR										\
+						| (breg << ARM_SHIFT_RN)							\
+						| (areg << ARM_SHIFT_RT));							\
+	}															\
+}
+#endif
 
+#ifdef __armv7l__
 #define GEN_STORE_WORD(areg, breg, disp)											\
 {																\
 	if ((-4096 < disp) && (4096 > disp))											\
@@ -221,7 +225,45 @@ void	tab_to_column(int col);
 						| (breg << ARM_SHIFT_RN));							\
 	}															\
 }
+#else	/* __armv6l__ */
+#define GEN_STORE_WORD(areg, breg, disp)											\
+{																\
+	if ((-4096 < disp) && (4096 > disp))											\
+	{															\
+		if (0 <= disp)													\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_STR									\
+							| ARM_U_BIT_ON								\
+							| ((disp & ARM_MASK_IMM12) << ARM_SHIFT_IMM12)				\
+							| (breg << ARM_SHIFT_RN)						\
+							| (areg << ARM_SHIFT_RT));						\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_STR									\
+							& ARM_U_BIT_OFF								\
+							| (((-1 * disp) & ARM_MASK_IMM12) << ARM_SHIFT_IMM12)			\
+							| (breg << ARM_SHIFT_RN)						\
+							| (areg << ARM_SHIFT_RT));						\
+		}														\
+	} else															\
+	{															\
+		code_buf[code_idx++] = (ARM_INS_LDR										\
+						| (ARM_REG_PC << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));					\
+		code_buf[code_idx++] = (ARM_INS_B);										\
+		code_buf[code_idx++] = disp;											\
+		code_buf[code_idx++] = (ARM_INS_ADD_REG										\
+						| (breg << ARM_SHIFT_RD)							\
+						| (breg << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));					\
+		code_buf[code_idx++] = (ARM_INS_STR										\
+						| (areg << ARM_SHIFT_RT)							\
+						| (breg << ARM_SHIFT_RN));							\
+	}															\
+}
+#endif
 
+#ifdef __armv7l__
 #define GEN_LOAD_IMMED(reg, imval)												\
 {																\
 	if (0 <= imval)														\
@@ -265,6 +307,42 @@ void	tab_to_column(int col);
 		}														\
 	}															\
 }
+#else	/* __armv6l__ */
+#define GEN_LOAD_IMMED(reg, imval)												\
+{																\
+	if (0 <= imval)														\
+	{															\
+		if (0 <= encode_immed12(imval))											\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_MOV_IMM									\
+							| (encode_immed12(imval) << ARM_SHIFT_IMM12)				\
+							| (reg << ARM_SHIFT_RD));						\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							| (ARM_REG_PC << ARM_SHIFT_RN)						\
+							| (reg << ARM_SHIFT_RT));						\
+			code_buf[code_idx++] = (ARM_INS_B);									\
+			code_buf[code_idx++] = imval;										\
+		}														\
+	} else															\
+	{															\
+		if (256 >= (-1 * (imval)))											\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_MVN									\
+							| (reg << ARM_SHIFT_RD) 						\
+							| ((((-1 * (imval)) - 1) & ARM_MASK_IMM12) << ARM_SHIFT_IMM12));	\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							| (ARM_REG_PC << ARM_SHIFT_RN)						\
+							| (reg << ARM_SHIFT_RT));						\
+			code_buf[code_idx++] = (ARM_INS_B);									\
+			code_buf[code_idx++] = imval;										\
+		}														\
+	}															\
+}
+#endif
 
 #define GEN_CLEAR_WORD_EMIT(reg)												\
 {       															\
@@ -282,6 +360,7 @@ void	tab_to_column(int col);
 					| (src2 << ARM_SHIFT_RM)								\
 					| (trgt << ARM_SHIFT_RD))
 
+#ifdef __armv7l__
 #define GEN_ADD_IMMED(reg, imval)												\
 {																\
 	if (0 <= encode_immed12(abs(imval)))											\
@@ -318,10 +397,43 @@ void	tab_to_column(int col);
 						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));					\
 	}															\
 }
+#else	/* __armv6l__ */
+#define GEN_ADD_IMMED(reg, imval)												\
+{																\
+	if (0 <= encode_immed12(abs(imval)))											\
+	{															\
+		if (0 < imval)													\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_ADD_IMM									\
+							| reg << ARM_SHIFT_RN							\
+							| reg << ARM_SHIFT_RD							\
+							| encode_immed12(imval) << ARM_SHIFT_IMM12);				\
+		} else if (0 > imval)												\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_SUB_IMM									\
+							| reg << ARM_SHIFT_RN							\
+							| reg << ARM_SHIFT_RD							\
+							| encode_immed12(-1 * imval) << ARM_SHIFT_IMM12);			\
+		}														\
+	} else															\
+	{															\
+		code_buf[code_idx++] = (ARM_INS_LDR										\
+						| (ARM_REG_PC << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));					\
+		code_buf[code_idx++] = (ARM_INS_B);										\
+		code_buf[code_idx++] = imval;											\
+		code_buf[code_idx++] = (ARM_INS_ADD_REG										\
+						| (reg << ARM_SHIFT_RD)								\
+						| (reg << ARM_SHIFT_RN)								\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));					\
+	}															\
+}
+#endif
 
 #define GEN_JUMP_REG(reg)													\
 	code_buf[code_idx++] = (ARM_INS_BX | (reg << ARM_SHIFT_RM))
 
+#ifdef __armv7l__
 #define GEN_STORE_ARG(reg, offset)												\
 {																\
 	if (((CGP_APPROX_ADDR == cg_phase || CGP_ADDR_OPT == cg_phase) && (MACHINE_REG_ARGS == vax_pushes_seen))		\
@@ -364,6 +476,44 @@ void	tab_to_column(int col);
 					| (ARM_REG_SP << ARM_SHIFT_RN)								\
 					| (reg << ARM_SHIFT_RT));								\
 }
+#else	/* __armv6l__ */
+#define GEN_STORE_ARG(reg, offset)												\
+{																\
+	if (((CGP_APPROX_ADDR == cg_phase || CGP_ADDR_OPT == cg_phase) && (MACHINE_REG_ARGS == vax_pushes_seen))		\
+	    || ((CGP_ASSEMBLY == cg_phase || CGP_MACHINE == cg_phase) && (0 == vax_pushes_seen)))				\
+	{															\
+		code_buf[code_idx++] = (ARM_INS_MOV_REG										\
+						| ARM_REG_SP << ARM_SHIFT_RM							\
+						| ARM_REG_FP << ARM_SHIFT_RD);							\
+		code_buf[code_idx++] = (ARM_INS_LDR										\
+						| (ARM_REG_PC << ARM_SHIFT_RN)							\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));					\
+		code_buf[code_idx++] = (ARM_INS_B);										\
+		code_buf[code_idx++] = offset;											\
+		/* Divide offset by 8, add 1, and multiply it by 8 -- multiply is done within the subtract */			\
+		/* The ((offset / 8) + 1) * 8 is to ensure 8 byte stack alignment */						\
+		code_buf[code_idx++] = (ARM_INS_LSR										\
+						| GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM						\
+						| GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RD						\
+						| 3 << ARM_SHIFT_IMM5);								\
+		code_buf[code_idx++] = (ARM_INS_ADD_IMM										\
+						| GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RN						\
+						| GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RD						\
+						| 1 << ARM_SHIFT_IMM12);							\
+		code_buf[code_idx++] = (ARM_INS_SUB_REG										\
+						| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM)					\
+						| (ARM_REG_SP << ARM_SHIFT_RN)							\
+						| (ARM_REG_SP << ARM_SHIFT_RD)							\
+						| (ARM_SHIFT_TYPE_LSL << ARM_SHIFT_TYPE)					\
+						| (3 << ARM_SHIFT_IMM5));							\
+	}															\
+	code_buf[code_idx++] = (ARM_INS_STR											\
+					| ARM_U_BIT_ON										\
+					| (offset << ARM_SHIFT_IMM12)								\
+					| (ARM_REG_SP << ARM_SHIFT_RN)								\
+					| (reg << ARM_SHIFT_RT));								\
+}
+#endif
 
 #define GEN_MVAL_COPY(src_reg, trg_reg, size)											\
 {																\
@@ -405,9 +555,19 @@ void	tab_to_column(int col);
  *	; if offset < 4096
  *		ldr	r12, [r7, #offset]
  *		blx	r12			; call location in xfer_table
- *	; if offset >= 4096
+ *
+ *	; if offset >= 4096 -- armv7l
  *		movw	r12, offset & 0xffff
  *		movt	r12, offset >> 16
+ *		add	r12, r7
+ *		ldr	r12, [r12]
+ *		blx	r12			; call location in xfer_table
+ *
+ *	; if offset >= 4096 -- armv6l
+ *		ldr	r12, =xxxx	(ldr	r12, [pc])
+ *		b	yyy		(b	pc)
+ *	xxxx	equ	offset
+ *	yyy:
  *		add	r12, r7
  *		ldr	r12, [r12]
  *		blx	r12			; call location in xfer_table
@@ -430,6 +590,7 @@ void	tab_to_column(int col);
 	}															\
 }
 
+#ifdef __armv7l__
 #define GEN_CMP_REG_IMM(reg, imm)												\
 { 																\
 	if (imm < 0)														\
@@ -482,6 +643,48 @@ void	tab_to_column(int col);
 		}														\
 	}															\
 }
+#else	/* __armv6l__ */
+#define GEN_CMP_REG_IMM(reg, imm)												\
+{ 																\
+	if (imm < 0)														\
+	{															\
+		if (0 <= encode_immed12(-1 * imm))										\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_CMN_IMM									\
+							| ((reg & ARM_MASK_REG) << ARM_SHIFT_RN)				\
+							| (encode_immed12(-1 * imm) << ARM_SHIFT_IMM12));			\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							| (ARM_REG_PC << ARM_SHIFT_RN)						\
+							| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));				\
+			code_buf[code_idx++] = (ARM_INS_B);									\
+			code_buf[code_idx++] = imm;										\
+			code_buf[code_idx++] = (ARM_INS_CMN_REG									\
+							| (reg << ARM_SHIFT_RN)							\
+							| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));				\
+		}														\
+	} else															\
+	{															\
+		if (0 <= encode_immed12(imm))											\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_CMP_IMM									\
+							| ((reg & ARM_MASK_REG) << ARM_SHIFT_RN)				\
+							| (encode_immed12(imm) << ARM_SHIFT_IMM12));				\
+		} else														\
+		{														\
+			code_buf[code_idx++] = (ARM_INS_LDR									\
+							| (ARM_REG_PC << ARM_SHIFT_RN)						\
+							| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RT));				\
+			code_buf[code_idx++] = (ARM_INS_B);									\
+			code_buf[code_idx++] = imm;										\
+			code_buf[code_idx++] = (ARM_INS_CMP_REG									\
+							| (reg << ARM_SHIFT_RN)							\
+							| (GTM_REG_CODEGEN_TEMP << ARM_SHIFT_RM));				\
+		}														\
+	}															\
+}
+#endif
 
 /* Macros to return an instruction value. This is typcically used to modify an instruction
    that is already in the instruction buffer such as the last instruction that was created
@@ -501,7 +704,7 @@ void	tab_to_column(int col);
  * these macros start with the routine name they are used in.
 */
 
-/* Branch has origin of +2 instructions. However, if the branch was nullified 
+/* Branch has origin of +2 instructions. However, if the branch was nullified
  * in an earlier shrink_trips, the origin is the current instruction itself
 */
 #define EMIT_JMP_ADJUST_BRANCH_OFFSET												\

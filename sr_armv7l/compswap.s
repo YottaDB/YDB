@@ -1,9 +1,10 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -42,9 +43,13 @@ ENTRY compswap_lock
 	strexeq	r3, r2, [r0]		/* only do swap if latch value matches comparison value */
 	cmpeq	r3, #1
 	beq	notset			/* store-exclusive failed */
+.ifdef __armv7l__
 	dmb				/* ensures that all subsequent accesses are observed (by a concurrent process)
 					 * AFTER the gaining of the lock is observed.
 					 */
+.else	/* __armv6l__ */
+	mcr	p15, 0, r0, c7, c10, 5	/* equivalent to armv7l's "dmb" on armv6l */
+.endif
 	movs	r0, #1			/* return success */
 	bx	lr
 nomatch:
@@ -59,9 +64,13 @@ notset:
  */
 ENTRY compswap_unlock
 	mov	r1, #0
+.ifdef __armv7l__
 	dmb				/* ensures that all previous accesses are observed (by a concurrent process)
 					 * BEFORE the clearing of the lock is observed.
 					 */
+.else	/* __armv6l__ */
+	mcr	p15, 0, r0, c7, c10, 5	/* equivalent to armv7l's "dmb" on armv6l */
+.endif
 	str	r1, [r0]
 	bx	lr
 

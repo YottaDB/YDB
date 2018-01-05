@@ -1,9 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +41,11 @@
 
 /* Numeric literals are pushed on the stack or loaded into argument registers with a combination of the following instructions: */
 #define	PUSH_NUM_LIT1	(ARM_INS_MOV_IMM & (ARM_MASK_OP << ARM_SHIFT_OP))
+#ifdef __armv7l__
 #define PUSH_NUM_LIT2	(ARM_INS_MOVW & (ARM_MASK_OP << ARM_SHIFT_OP))
+#else	/* __armv6l__ */
+#define PUSH_NUM_LIT2	((ARM_INS_LDR & (ARM_MASK_OP << ARM_SHIFT_OP)) | (ARM_REG_PC << ARM_SHIFT_RN))
+#endif
 #define PUSH_NUM_LIT3	(ARM_INS_MOV_REG & (ARM_MASK_OP << ARM_SHIFT_OP))
 #define PUSH_NUM_LIT4	(ARM_INS_ADD_IMM & (ARM_MASK_OP << ARM_SHIFT_OP))
 #define PUSH_NUM_LIT5	((ARM_INS_STR | ARM_U_BIT_ON) & (ARM_MASK_OP << ARM_SHIFT_OP))
@@ -76,7 +81,7 @@ zb_code  *find_line_call(void *addr)
 	 */
 	xfer_addr = call_addr;
 	if (   (PUSH_NUM_LIT1 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
-	    || (PUSH_NUM_LIT2 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
+	    || (PUSH_NUM_LIT2 == (*call_addr & ((ARM_MASK_OP << ARM_SHIFT_OP) | (ARM_MASK_REG << ARM_SHIFT_RN))))
 	    || (PUSH_NUM_LIT3 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 	    || (PUSH_NUM_LIT4 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 	    || (PUSH_NUM_LIT5 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
@@ -84,13 +89,19 @@ zb_code  *find_line_call(void *addr)
 	    || (PUSH_NUM_LIT7 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP))))
 	{
 		while (    (PUSH_NUM_LIT1 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
-			|| (PUSH_NUM_LIT2 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
+			|| (PUSH_NUM_LIT2 == (*call_addr & ((ARM_MASK_OP << ARM_SHIFT_OP) | (ARM_MASK_REG << ARM_SHIFT_RN))))
 			|| (PUSH_NUM_LIT3 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 			|| (PUSH_NUM_LIT4 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 			|| (PUSH_NUM_LIT5 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 			|| (PUSH_NUM_LIT6 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP)))
 			|| (PUSH_NUM_LIT7 == (*call_addr &  (ARM_MASK_OP << ARM_SHIFT_OP))))
 		{
+#ifdef __armv6l__
+			if (PUSH_NUM_LIT2 == (*call_addr & ((ARM_MASK_OP << ARM_SHIFT_OP) | (ARM_MASK_REG << ARM_SHIFT_RN))))
+			{
+				call_addr += 2;			/* Skip over the branch and constant on the next 2 lines */
+			}
+#endif
 			call_addr++;
 		}
 		/* If it's not a transfer table call, give up.  */

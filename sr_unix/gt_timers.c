@@ -3,7 +3,10 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2018 Stephen L Johnson.			*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -718,7 +721,7 @@ STATICFNDEF void timer_handler(int why)
 		cmp = abs_time_comp(&at, (ABS_TIME *)&tpop->expir_time);
 		if (cmp < 0)
 			break;
-#		if defined(DEBUG) && !defined(_AIX) && !defined(__armv7l__)
+#		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
 			&& !(gtm_white_box_test_case_enabled
 				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)))
