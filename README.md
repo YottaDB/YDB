@@ -55,7 +55,7 @@ versions of packages from the distribution repositories.
 
    ```sh
    $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
-   $ make -j `grep -c processor /proc/cpuinfo`
+   $ make -j `grep -c ^processor /proc/cpuinfo`
    $ make install
    $ cd yottadb_r110
    ```
