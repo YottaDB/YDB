@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -486,7 +489,7 @@ void	repl_inst_ftok_sem_lock(void)
 	if (!udi->grabbed_ftok_sem)
 	{
 		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-		if (!ftok_sem_lock(reg, FALSE))
+		if (!ftok_sem_lock(reg, IMMEDAITE_FALSE))
 		{
 			assert(FALSE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));

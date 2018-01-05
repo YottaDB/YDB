@@ -51,6 +51,7 @@ typedef enum
 	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
 	LYDB_RTN_STR2ZWR,		/* "ydb_str2zwr_s" is running */
 	LYDB_RTN_ZWR2STR,		/* "ydb_zwr2str_s" is running */
+	LYDB_RTN_CHILDINIT,		/* "ydb_child_init" is running */
 } libyottadb_routines;
 
 typedef enum

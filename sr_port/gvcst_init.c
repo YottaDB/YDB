@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -483,7 +483,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 										 * in "gvcst_init_autoDB_ch".
 										 */
 			ESTABLISH(gvcst_init_autoDB_ch);
-			if (!ftok_sem_lock(baseDBreg, FALSE))
+			if (!ftok_sem_lock(baseDBreg, IMMEDIATE_FALSE))
 			{
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));

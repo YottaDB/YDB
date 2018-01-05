@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -922,7 +925,7 @@ boolean_t mur_close_files(void)
 		 */
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg));
-		got_ftok = ftok_sem_lock(jnlpool->jnlpool_dummy_reg, TRUE); /* immediate=TRUE */
+		got_ftok = ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_TRUE); /* immediate=TRUE */
 		/* Note: The decision to remove the Journal Pool Access Control Semaphores should be based on two things:
 		 * 1. If we have the ftok on the instance file
 		 * 			AND
@@ -946,7 +949,7 @@ boolean_t mur_close_files(void)
 		 * to error out because the semaphore should still exist in the system
 		 */
 		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || anticipatory_freeze_available);
-		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
+		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE)
 				|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 			wrn_count++;
 	}
