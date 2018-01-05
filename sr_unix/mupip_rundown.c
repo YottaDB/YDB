@@ -223,7 +223,7 @@ void mupip_rundown(void)
 				mupip_exit(ERR_MUNOTALLSEC);
 			}
 			/* Grab the ftok again */
-			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDAITE_FALSE))
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE))
 			{	/* CRITSEMFAIL is issued in case of an error */
 				assert(FALSE);
 				mupip_exit(ERR_MUNOTALLSEC);

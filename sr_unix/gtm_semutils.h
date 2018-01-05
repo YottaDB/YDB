@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -172,7 +175,7 @@ MBSTART {														\
 #define	FTOK_SOPCNT_INCR_COUNTER	3
 
 /* Set up typical GT.M semaphore (access control semaphore and/or ftok semaphore) */
-#define SET_GTM_SOP_ARRAY(SOP, SOPCNT, INCR_CNT, SEMFLG)									\
+#define SET_YDB_SOP_ARRAY(SOP, SOPCNT, INCR_CNT, SEMFLG)									\
 {																\
 	/* Typically, multiple statements are not specified in a single line. However, each of the 2 lines below represent	\
 	 * "one" semaphore operation and hence an acceptible exception to the coding guidelines.				\
@@ -187,6 +190,16 @@ MBSTART {														\
 	} else															\
 		SOPCNT = FTOK_SOPCNT_NO_INCR_COUNTER;										\
 	SOP[0].sem_flg = SOP[1].sem_flg = SOP[2].sem_flg = SEMFLG;								\
+}
+
+#define SET_SOP_ARRAY_FOR_INCR_CNT(SOP, SOPCNT, SEMFLG)										\
+{																\
+	/* Typically, multiple statements are not specified in a single line. However, each of the 2 lines below represent	\
+	 * "one" semaphore operation and hence an acceptible exception to the coding guidelines.				\
+	 */															\
+	SOP[0].sem_num = DB_COUNTER_SEM; SOP[0].sem_op = DB_COUNTER_SEM_INCR;	/* Increment counter semaphore */		\
+	SOPCNT = 1;														\
+	SOP[0].sem_flg = SEMFLG;												\
 }
 
 #define SET_SOP_ARRAY_FOR_DECR_CNT(SOP, SOPCNT, SEMFLG)										\

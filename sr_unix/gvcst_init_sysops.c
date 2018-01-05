@@ -1037,7 +1037,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			 */
 			incr_cnt = (!read_only || tsd_read_only);
 			/* We already have ftok semaphore of this region, so all we need is the access control semaphore */
-			SET_GTM_SOP_ARRAY(sop, sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+			SET_YDB_SOP_ARRAY(sop, sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 			SEMOP(udi->semid, sop, sopcnt, status, NO_WAIT);
 			if (-1 != status)
 				break;

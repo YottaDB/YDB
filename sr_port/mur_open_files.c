@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,7 +106,7 @@
 	int			save_errno, sopcnt, status;								\
 	struct sembuf		sop[3];											\
 															\
-	SET_GTM_SOP_ARRAY(sop, sopcnt, FALSE, SEM_UNDO);								\
+	SET_YDB_SOP_ARRAY(sop, sopcnt, FALSE, SEM_UNDO);								\
 	assert(2 == sopcnt);												\
 	lcl_reg = REGLIST->reg;												\
 	lcl_rctl = REGLIST->rctl;											\
