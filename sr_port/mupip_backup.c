@@ -823,7 +823,7 @@ void mupip_backup(void)
 		{
 			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 			assert(INVALID_SEMID != udi->ftok_semid);
-			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE))
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 				error_mupip = TRUE;

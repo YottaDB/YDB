@@ -167,4 +167,7 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
 
+/* Comprehensive API routine declarations */
+int ydb_child_init(void *param);
+
 #endif /* LIBYOTTADB_TYPES_H */

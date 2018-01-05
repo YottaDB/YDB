@@ -220,7 +220,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	 * remove the ftok semaphore as well. This means, not able to lock or release the ftok semaphore is not treated
 	 * as an error condition.
 	 */
-	if (ftok_sem_lock(reg, TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
+	if (ftok_sem_lock(reg, IMMEDIATE_TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
 	{
 		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY);
 		ftok_sem_release(reg, udi->counter_ftok_incremented, TRUE);
