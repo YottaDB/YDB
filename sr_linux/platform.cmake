@@ -132,6 +132,7 @@ set(libyottadb_link "${libyottadb_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_child_init")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_data_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_s")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_excl_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_get_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_incr_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_node_next_s")
