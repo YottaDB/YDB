@@ -31,3 +31,6 @@ PARAMINVALID	<!AD parameter specified in !AD call>/error/fao=4
 INSUFFSUBS	<Return subscript array for !AD call too small - needs at least !UL entries for this call>/error/fao=3
 MINNRSUBSCRIPTS	<Number of subscripts cannot be a negative number>/error/fao=0
 SUBSARRAYNULL	<Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call>/error/fao=3
+MISSINGVARNAMES	<At least one variable name must be specified>/error/fao=0
+TOOMANYVARNAMES	<Number of varnames specified exceeds maximum (!UL)>/error/fao=1
+

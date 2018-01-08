@@ -30,6 +30,8 @@ typedef enum
 /* Maximum values */
 #define YDB_MAX_SUBS	31	/* Maximum subscripts currently supported */
 #define YDB_MAX_IDENT	31	/* Maximum size of global/local name (not including '^') */
+#define YDB_MAX_NAMES	31	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
+/* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl() */
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
@@ -154,6 +156,7 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 /* Simple API routine declarations */
 int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
 int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method);
+int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
 int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);

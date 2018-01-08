@@ -27,6 +27,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3 },
 	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0 },
 	{ "SUBSARRAYNULL", "Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call", 3 },
+	{ "MISSINGVARNAMES", "At least one variable name must be specified", 0 },
+	{ "TOOMANYVARNAMES", "Number of varnames specified exceeds maximum (!UL)", 1 },
 };
 
 
@@ -34,4 +36,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	10};
+	12};

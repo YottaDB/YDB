@@ -41,6 +41,7 @@ typedef enum
 {
 	LYDB_RTN_DATA = 1,		/* "ydb_data_s" is running */
 	LYDB_RTN_DELETE,		/* "ydb_delete_s" is running */
+	LYDB_RTN_DELETE_EXCL,		/* "ydb_delete_excl_s" is running */
 	LYDB_RTN_GET,			/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
@@ -320,8 +321,8 @@ MBSTART	{													\
 	}													\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
-		parmp < parmp_top;										\
-			parmp++, mvalp++, subs++)								\
+	     parmp < parmp_top;											\
+	     parmp++, mvalp++, subs++)										\
 	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
 		 * A subscript has been specified - copy it to the associated mval and put its address		\
 		 * in the param list. But before that, do validity checks on input ydb_buffer_t.		\
@@ -330,7 +331,7 @@ MBSTART	{													\
 		{												\
 			SPRINTF(buff, "Invalid subsarray (index %d)", subs - ((ydb_buffer_t *)SUBSARRAY));	\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
-							LEN_AND_STR(buff), LEN_AND_LIT(PARAM2));		\
+				      LEN_AND_STR(buff), LEN_AND_LIT(PARAM2));					\
 		}												\
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);								\
 		if (REBUFFER)											\
