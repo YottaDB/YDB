@@ -713,7 +713,7 @@ void	tab_to_column(int col);
 /* Can jump be done within range of immediate operand */
 /* Multiples of 4 in the range -33554432 (0xfe000000) to 33554428 (0x1fffffc) (from ARM v7 Architecture Reference Manual) */
 #define EMIT_JMP_SHORT_CODE_CHECK												\
-	((branch_offset >= -33554432) && (branch_offset <= 33554428))
+	(((branch_offset * INST_SIZE) >= -33554432) && ((branch_offset * INST_SIZE) <= 33554428))
 
 /* Emit the short jump */
 #define EMIT_JMP_SHORT_CODE_GEN													\
