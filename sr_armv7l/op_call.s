@@ -34,7 +34,11 @@ ENTRY op_callb
 	push	{r4, lr}			/* r4 is to maintain 8 byte stack alignment */
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
-	add	r0, lr, #4			/* Bump return pc past the branch instruction following bl that got us here */
+	ldr	r4, [lr]			/* verify the instruction immediately after return */
+	lsr	r4, r4, #24
+	cmp	r4, #0xea			/* Is the instruction a (short) branch */
+	addeq	r0, lr, #4			/* Bump return pc past the short branch instruction */
+	addne	r0, lr, #24			/* Bump return pc past the long branch instruction */
 	str	r0, [r12, #msf_mpc_off]		/* and store it in Mumps stack frame */
 	bl	copy_stack_frame
 	pop	{r4, pc}
