@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -968,14 +971,26 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				{
 					if (multi->fence != rec_fence)
 					{
-						assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
-						if (!(mur_report_error(jctl, MUR_DUPTOKEN)))
-						{
-							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
-							rctl->jctl_error = jctl;
-							return ERR_DUPTOKEN;
+						if (NULLFENCE != multi->fence)
+						{	/* See similar later check (TCOM record case) for why the NULLFENCE
+							 * check is needed here.
+							 */
+							assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
+							if (!(mur_report_error(jctl, MUR_DUPTOKEN)))
+							{
+								PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
+								rctl->jctl_error = jctl;
+								return ERR_DUPTOKEN;
+							}
+						} else if (0 == multi->partner)
+						{	/* This is the first time a TPFENCE-type record is seen for a token
+							 * that was stored in the hash table first as a NULLFENCE type tn.
+							 * Use this to bump broken tn count in hashtable.
+							 */
+							murgbl.broken_cnt++;
 						}
 						SET_THIS_TN_AS_BROKEN(multi, reg_total); /* This is broken */
+						assert(multi->partner);
 						if (rec_time < multi->time)
 							multi->time = rec_time;
 					} else
@@ -1020,16 +1035,34 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_time, rec_fence)))
 				{
 					if ((last_tcom_token == token) || (multi->fence != rec_fence) || (0 == multi->partner))
-					{
-						assert(0 != multi->partner);
-						assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
-						if (!mur_report_error(jctl, MUR_DUPTOKEN))
+					{	/* The token corresponding to the TCOM record is already in the hashtable.
+						 * We expect then that this is a TP transaction with at least two regions
+						 * involved. Hence assert that multi->partner is > 0 (when the token was first
+						 * added, we would have set partner to nregions - 1). The only exception is if
+						 * a NULL record was written on behalf of one region's journal records (possible
+						 * in "jnl_phase2_salvage") but not on all regions. In that case we would have
+						 * a NULL record in some regions and TCOM records in some regions. Allow this
+						 * exception and treat this as a broken transaction in that case.
+						 */
+						if (NULLFENCE != multi->fence)
 						{
-							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release thread lock */
-							jctl->reg_ctl->jctl_error = jctl;
-							return ERR_DUPTOKEN;
+							assert(0 != multi->partner);
+							assert(!mur_options.rollback); /* jnl_seqno cannot be duplicate */
+							if (!mur_report_error(jctl, MUR_DUPTOKEN))
+							{
+								PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);/* release thread lock */
+								jctl->reg_ctl->jctl_error = jctl;
+								return ERR_DUPTOKEN;
+							}
+						} else if (0 == multi->partner)
+						{	/* This is the first time a TPFENCE-type record is seen for a token
+							 * that was stored in the hash table first as a NULLFENCE type tn.
+							 * Use this to bump broken tn count in hashtable.
+							 */
+							murgbl.broken_cnt++;
 						}
 						SET_THIS_TN_AS_BROKEN(multi, reg_total); /* This is broken */
+						assert(multi->partner);
 						if (rec_time < multi->time)
 							multi->time = rec_time;
 					} else
@@ -1093,14 +1126,11 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			{
 				rec_fence = (JRT_NULL == rectype) ? NULLFENCE : NOFENCE;
 				assert(token == ((struct_jrec_upd *)jnlrec)->token_seq.token);
-				/* For rollback, pid/image_type/time are not necessary to establish uniqueness of token
-				 * as token (which is a seqno) is already guaranteed to be unique for an instance.
-				 */
 				/* Get thread-lock before searching/adding in token hash table */
 				PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
 				if (NULL == (multi = MUR_TOKEN_LOOKUP(token, 0, rec_fence)))
 				{	/* We reuse same token table. Most of the fields in multi_struct are unused */
-					MUR_TOKEN_ADD(multi, token, 0, 1, rec_fence, last_tcom_token);
+					MUR_TOKEN_ADD(multi, token, rec_time, 1, rec_fence, last_tcom_token);
 				} else if (NULLFENCE != rec_fence)
 				{
 					if (!(mur_report_error(jctl, MUR_DUPTOKEN)))

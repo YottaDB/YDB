@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,7 +51,7 @@ void jnlext_merge_sort_prepare(jnl_ctl_list *jctl, jnl_record *rec, enum broken_
 	{
 		assert(rec == rctl->mur_desc->jnlrec);
 		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-		is_logical_rec = (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || IS_COM(rectype));
+		is_logical_rec = (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || IS_COM(rectype) || (JRT_NULL == rectype));
 		need_new_elem = (is_logical_rec || (NULL == jext_rec) || rctl->last_jext_logical_rec[recstat]
 				|| (jext_rec->time != rec->prefix.time));
 		assert(need_new_elem || (NULL != rctl->jnlext_multi_list[recstat]));

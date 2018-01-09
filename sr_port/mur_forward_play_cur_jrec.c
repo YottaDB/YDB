@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -175,8 +178,11 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	recstat = process_losttn ? LOST_TN : GOOD_TN;
 	status = SS_NORMAL;
 	if (FENCE_NONE != mur_options.fences)
-	{
-		if (IS_FENCED(rectype))
+	{	/* Note that a JRT_NULL record could also be part of a TP transaction
+		 * (see mur_back_process.c comment describing "jnl_phase2_salvage".
+		 * So check for that too when checking for fenced record types.
+		 */
+		if (IS_FENCED(rectype) || (JRT_NULL == rectype))
 		{
 			assert(rec_token_seq);
 #			ifdef DEBUG
