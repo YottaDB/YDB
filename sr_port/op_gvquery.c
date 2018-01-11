@@ -35,6 +35,18 @@ GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
 GBLREF mstr             extnam_str;
 
+/* This function is the entry point for $query(gvn) or $query(gvn,1) that indicates a "formward" query.
+ * "gv_currkey" already points to the input "gvn".
+ * "v" stores the result of the reverse $query at function end.
+ *
+ * Note - this module runs in two modes:
+ *   1. Normal calls from generated code on behalf of a $QUERY() usage.
+ *   2. Calls to ydb_node_next_s() from the SimpleAPI.
+ * The IS_SIMPLEAPI_MODE macro can determine which mode we are in. The mode regulates how this routine returns its
+ * output to the caller. The simpleAPI "returns" its information into a static array allocated at need with the addr
+ * cached in TREF(sapi_query_node_subs) with the count of valid entries in TREF(sapi_query_node_subs_cnt) while a
+ * YDB runtime call returns a string in the dst mval.
+ */
 void op_gvquery(mval *v)
 {
 	int4			size;
@@ -128,7 +140,7 @@ void op_gvquery(mval *v)
 	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
 	assert((is_simpleapi_mode && (NULL == v)) || (!is_simpleapi_mode && (NULL != v)));
 	if (!is_simpleapi_mode)
-		v->mvtype = 0;	/* so STP_GCOL (if invoked below) can free up space
+		v->mvtype = 0;	/* So STP_GCOL (if invoked below) can free up space
 				 * currently occupied by this to-be-overwritten mval.
 				 */
 	if (found)
@@ -137,7 +149,7 @@ void op_gvquery(mval *v)
 		{	/* We have a known access method - save the subscript path appropriately for the mode we are in */
 			if (!is_simpleapi_mode)
 			{	/* MM/BG mode - do a normal ASCII format of the reference for return */
-				if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)) == 0)
+				if (0 == (end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)))
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
 				size = (int)(end - &buff[0] - 1);	/* Exclude ^ */
 				glob_begin = &buff[1];			/* Skip ^ */

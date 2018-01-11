@@ -13,6 +13,11 @@
  *								*
  ****************************************************************/
 
+/* Note: Some constructs in this header file were taken from gtmxc_types.h which has an
+ * FIS copyright hence the copyright is copied over here even though this header file was
+ * not created by FIS.
+ */
+
 /*	libyottadb.h - YottaDB type and routine definitions for call_ins, call-outs, plugins, etc.  */
 #ifndef LIBYOTTADB_TYPES_H
 #define LIBYOTTADB_TYPES_H
@@ -72,6 +77,26 @@ typedef enum
 	(BUFFERP)->buf_addr = STRING;						\
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);		\
 }
+
+/* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
+#define YDB_ASSERT(X)														\
+{																\
+	if (!(X))														\
+	{															\
+		fprintf(stderr, "YDB_ASSERT: ** Assert failed (%s) at line %d in routine %s - generating core\n",		\
+			#X, __LINE__, __FILE__);										\
+		fflush(stderr);													\
+		ydb_fork_n_core();												\
+		exit(1);													\
+	}															\
+}
+
+/* If only want assertions in DEBUG mode (-DDEBUG option specified), use this macro instead */
+#ifdef DEBUG
+#  define YDB_ASSERT_DBG(X)	YDB_ASSERT(X)
+#else
+#  define YDB_ASSERT_DBG(X)
+#endif
 
 /* Basic/standard types */
 typedef int		ydb_status_t;
@@ -150,6 +175,7 @@ void		gtm_xcfileid_free(ydb_fileid_ptr_t fileid);
 int		gtm_is_main_thread(void);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
+void		ydb_fork_n_core(void);
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
@@ -169,6 +195,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
+void ydb_fork_n_core(void);
 
 /* Comprehensive API routine declarations */
 int ydb_child_init(void *param);
