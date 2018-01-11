@@ -57,6 +57,14 @@ error_def(ERR_STACKOFLOW);
  *               through an array of mvals located at TREF(sapi_query_node_subs). The reason for using a global
  *		 instead of overloading this parameter is garbage collection needs to also be able to get ahold
  *		 of these values since most of them live in the stringpool.
+ *
+ * Note - this module runs in two modes:
+ *   1. Normal calls from generated code on behalf of a $QUERY() usage.
+ *   2. Calls to ydb_node_next_s() from the SimpleAPI.
+ * The IS_SIMPLEAPI_MODE macro can determine which mode we are in. The mode regulates how this routine returns its
+ * output to the caller. The simpleAPI "returns" its information into a static array allocated at need with the addr
+ * cached in TREF(sapi_query_node_subs) with the count of valid entries in TREF(sapi_query_node_subs_cnt) while a
+ * YDB runtime call returns a string in the dst mval.
  */
 void op_fnquery(int sbscnt, mval *dst, ...)
 {
@@ -462,10 +470,10 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					if (last_sub_null)
 					{
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
-							(char *)stringpool.free;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
-							v2->str.len;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
+							= (char *)stringpool.free;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len
+							= v2->str.len;
 					}
 					stringpool.free += v2->str.len;
 					*stringpool.free++ = '\"';
@@ -474,10 +482,10 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					if (last_sub_null)
 					{
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
-							(char *)stringpool.free;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
-							format_out.len;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
+							= (char *)stringpool.free;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len
+							= format_out.len;
 					}
 					stringpool.free += format_out.len;
 				}
@@ -492,8 +500,10 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		}
 		dstlen = INTCAST((char *)stringpool.free - v1->str.addr);
 		if (MAX_STRLEN < dstlen)
-		{	/* Result of $query would be greater than maximum string length allowed. Error out but cleanup before that. */
-			stringpool.free = (unsigned char *)v1->str.addr; /* Remove the incomplete $query result from stringpool */
+		{	/* Result of $query would be greater than maximum string length allowed. Error out but cleanup before
+			 * driving the error.
+			 */
+			stringpool.free = (unsigned char *)v1->str.addr; /* Remove incomplete $query result from stringpool */
 			if (last_sub_null)
 			{	/* If TREF(last_fnquery_return_subcnt) was being maintained above, reset it too */
 				TREF(last_fnquery_return_subcnt) = 0;
@@ -506,9 +516,9 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		dst->str.len = dstlen;
 		dst->str.addr = v1->str.addr;
 	}
-	POP_MV_STENT();		/* v2 */
+	POP_MV_STENT();		/* v2 - this one was always allocated */
 	if (push_v1)
 	{
-		POP_MV_STENT();	/* v1 */
+		POP_MV_STENT();	/* v1 - this one only allocated in the M runtime path (not simpleAPI path) */
 	}
 }

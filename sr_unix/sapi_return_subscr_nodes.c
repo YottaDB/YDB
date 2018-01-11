@@ -40,6 +40,12 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 		*ret_subs_used = YDB_NODE_END;
 		return;
 	}
+	if (-1 == TREF(sapi_query_node_subs_cnt))
+	{	/* No subscripts were returned but we are legitimately returning the basevar name in a rever $query()
+		 * so no YDB_NODE_END return code.
+		 */
+		*ret_subs_used = 0;			/* Just return 0 subscripts */
+	}
 	if (NULL == ret_subsarray)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 							LEN_AND_LIT("NULL ret_subsarray"), LEN_AND_STR(ydb_caller_fn));

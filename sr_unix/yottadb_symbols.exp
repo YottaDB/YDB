@@ -18,7 +18,11 @@ ydb_subscript_next_s
 ydb_subscript_previous_s
 ydb_tp_s
 ydb_zstatus
+ydb_node_next_s
+ydb_node_previous_s
+ydb_str2zwr_s
 ydb_zwr2str_s
+ydb_fork_n_core
 gtm_jinit
 gtm_exit
 gtm_cij
