@@ -31,6 +31,7 @@
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "repl_inst_ftok_counter_halted.h"
+#include "add_inter.h"
 
 typedef enum
 {
