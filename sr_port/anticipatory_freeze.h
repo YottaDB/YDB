@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -365,7 +368,7 @@ MBSTART {														\
 /* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITEASYNCRESTART) is thread-safe */
 #define	DB_LSEEKWRITEASYNCRESTART(CSA, UDI, DB_FN, FD, BUFF, CR, STATUS)						\
 MBSTART {														\
-	DBG_CHECK_DIO_ALIGNMENT(UDI, CR->aiocb.aio_offset, BUFF, CR->aiocb.aio_nbytes);					\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, CR->aiocb.sys_iocb.aio_offset, BUFF, CR->aiocb.sys_iocb.aio_nbytes);		\
 	DO_LSEEKWRITEASYNC(CSA, DB_FN, FD, 0, BUFF, 0, CR, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB_ASYNC_RESTART);	\
 } MBEND
 

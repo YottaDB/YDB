@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,20 +70,8 @@ struct aiocb {
  * to the end for our own use. See <linux/aio_abi.h>::struct iocb.
  */
 struct aiocb {
-	/* kernel-internel structure, mirrors struct iocb */
-	__u64	aio_data;
-	__u32	PADDED(aio_key, aio_reserved1);
-	__u16	aio_lio_opcode;
-	__s16	aio_reqprio;
-	__u32	aio_fildes;
-	__u64	aio_buf;
-	__u64	aio_nbytes;
-	__s64	aio_offset;
-	__u64	aio_reserved2;
-	__u32	aio_flags;
-	__u32	aio_resfd;
-
-	/* personal implementation-specific definitions */
+	struct iocb sys_iocb;	/* kernel internal structure */
+	/* YottaDB-specific extensions */
 	volatile int res;	/* If status is not EINPROGRESS, then denotes the
 				 * return value of the IO that just finished. The
 				 * return value is analagous to that of the return
