@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,6 +64,12 @@ error_def(ERR_UNIMPLOP);
 
 #define FULL_FILESYSTEM_WRITE 1
 #define FULL_DATABASE_WRITE 2
+
+#ifdef USE_LIBAIO
+#	define	SYS_IOCB(CR)	CR->aiocb.sys_iocb
+#else
+#	define	SYS_IOCB(CR)	CR->aiocb
+#endif
 
 /* Cache record */
 typedef struct cache_rec_struct

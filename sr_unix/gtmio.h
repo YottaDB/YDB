@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -370,12 +373,12 @@ MBSTART {											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
 } MBEND
 
-#define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)			\
-MBSTART {											\
-	memset(&CR->aiocb, 0, SIZEOF(struct aiocb));						\
-	CR->aiocb.aio_nbytes = (size_t) FBUFF_LEN;						\
-	CR->aiocb.aio_offset = (off_t) FPTR;							\
-	LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC);					\
+#define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)	\
+MBSTART {									\
+	memset(&CR->aiocb, 0, SIZEOF(struct aiocb));				\
+	SYS_IOCB(CR).aio_nbytes = (size_t) FBUFF_LEN;				\
+	SYS_IOCB(CR).aio_offset = (off_t) FPTR;					\
+	LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC);			\
 } MBEND
 
 #define LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC)					\
@@ -383,10 +386,10 @@ MBSTART {											\
 	GBLREF 	boolean_t	async_restart_got_eagain;					\
 	ssize_t			gtmioStatus;							\
 												\
-	CR->aiocb.aio_buf = IF_LIBAIO((unsigned long)) FBUFF;					\
-	CR->aiocb.aio_fildes = FDESC;								\
-	assert(0 < CR->aiocb.aio_nbytes);							\
-	assert(0 < CR->aiocb.aio_offset);							\
+	SYS_IOCB(CR).aio_buf = IF_LIBAIO((unsigned long)) FBUFF;				\
+	SYS_IOCB(CR).aio_fildes = FDESC;							\
+	assert(0 < SYS_IOCB(CR).aio_nbytes);							\
+	assert(0 < SYS_IOCB(CR).aio_offset);							\
 	AIO_SHIM_WRITE(CSA->region, &(CR->aiocb), gtmioStatus);					\
 	if (0 == gtmioStatus)									\
 		RC = 0;										\

@@ -3,6 +3,9 @@
  * Copyright (c) 2016 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,7 +66,7 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 			 * Do synchronous IO given OS does not have enough memory temporarily.
 			 */
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd,
-				csr->aiocb.aio_offset, save_bp, csr->aiocb.aio_nbytes, save_errno);
+				SYS_IOCB(csr).aio_offset, save_bp, SYS_IOCB(csr).aio_nbytes, save_errno);
 			assert(0 <= save_errno);
 			if (0 == save_errno)
 			{	/* SYNCIO succeeded. Return special status */
