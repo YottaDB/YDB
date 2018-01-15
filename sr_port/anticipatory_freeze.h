@@ -368,7 +368,7 @@ MBSTART {														\
 /* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITEASYNCRESTART) is thread-safe */
 #define	DB_LSEEKWRITEASYNCRESTART(CSA, UDI, DB_FN, FD, BUFF, CR, STATUS)						\
 MBSTART {														\
-	DBG_CHECK_DIO_ALIGNMENT(UDI, CR->aiocb.sys_iocb.aio_offset, BUFF, CR->aiocb.sys_iocb.aio_nbytes);		\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, SYS_IOCB(CR).aio_offset, BUFF, SYS_IOCB(CR).aio_nbytes);				\
 	DO_LSEEKWRITEASYNC(CSA, DB_FN, FD, 0, BUFF, 0, CR, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB_ASYNC_RESTART);	\
 } MBEND
 

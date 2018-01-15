@@ -66,7 +66,7 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 			 * Do synchronous IO given OS does not have enough memory temporarily.
 			 */
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd,
-				csr->aiocb.sys_iocb.aio_offset, save_bp, csr->aiocb.sys_iocb.aio_nbytes, save_errno);
+				SYS_IOCB(csr).aio_offset, save_bp, SYS_IOCB(csr).aio_nbytes, save_errno);
 			assert(0 <= save_errno);
 			if (0 == save_errno)
 			{	/* SYNCIO succeeded. Return special status */
