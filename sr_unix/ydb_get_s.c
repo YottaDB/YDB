@@ -25,7 +25,6 @@
 #include "namelook.h"
 #include "stringpool.h"
 #include "libyottadb_int.h"
-#include "libydberrors.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"

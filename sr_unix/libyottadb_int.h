@@ -26,6 +26,7 @@
 #include "send_msg.h"
 #include "stack_frame.h"
 #include "lv_val.h"
+#include "libydberrors.h"	/* Define YDB_ERR_* errors */
 
 #define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
 
@@ -44,6 +45,9 @@ typedef enum
 	LYDB_RTN_DELETE_EXCL,		/* "ydb_delete_excl_s" is running */
 	LYDB_RTN_GET,			/* "ydb_get_s" is running */
 	LYDB_RTN_SET,			/* "ydb_set_s" is running */
+	LYDB_RTN_LOCK,			/* "ydb_lock_s" is running */
+	LYDB_RTN_LOCK_INCR,		/* "ydb_lock_incr_s" is running */
+	LYDB_RTN_LOCK_DECR,		/* "ydb_lock_decr_s" is running */
 	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
 	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
 	LYDB_RTN_NODE_NEXT,		/* "ydb_node_next_s" is running */

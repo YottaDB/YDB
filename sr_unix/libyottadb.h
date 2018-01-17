@@ -44,10 +44,11 @@ typedef enum
  * (e.g. EINTR etc. all of which are mostly <= 1024). Can use INT_MAX but not sure if that will change
  * in the future to a higher value in <limits.h> so set YDB_INT_MAX to the hardcoded fixed value of ((2**31)-1).
  */
-#define YDB_INT_MAX	((int)2147483647)
-#define	YDB_TP_RESTART	(YDB_INT_MAX - 1)
-#define	YDB_TP_ROLLBACK	(YDB_INT_MAX - 2)
-#define YDB_NODE_END	(YDB_INT_MAX - 3)
+#define YDB_INT_MAX		((int)2147483647)
+#define	YDB_TP_RESTART		(YDB_INT_MAX - 1)
+#define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)
+#define YDB_NODE_END		(YDB_INT_MAX - 3)
+#define YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)
 
 /* Miscellaneous defines */
 #ifndef TRUE
@@ -203,6 +204,7 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
 int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method);
 int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
+int ydb_lock_s(unsigned long long timeout, int namecount, ...);
 int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
@@ -216,7 +218,6 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
 void ydb_fork_n_core(void);
-
 /* Comprehensive API routine declarations */
 int ydb_child_init(void *param);
 
