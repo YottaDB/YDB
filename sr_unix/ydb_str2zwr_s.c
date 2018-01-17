@@ -15,7 +15,6 @@
 #include "gtm_string.h"
 
 #include "libyottadb_int.h"
-#include "libydberrors.h"
 #include "stringpool.h"		/* for "s2pool" prototype */
 #include "op.h"			/* for "op_fnzwrite" prototype */
 

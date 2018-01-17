@@ -24,7 +24,6 @@
 #include "namelook.h"
 #include "stringpool.h"
 #include "libyottadb_int.h"
-#include "libydberrors.h"
 
 /* Routine to set local, global and ISV values
  *

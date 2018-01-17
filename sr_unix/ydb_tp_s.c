@@ -16,7 +16,6 @@
 
 #include "callg.h"
 #include "op.h"
-#include "libydberrors.h"
 #include "libyottadb_int.h"
 #include "tp_frame.h"
 #include "op_tcommit.h"

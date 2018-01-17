@@ -29,6 +29,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SUBSARRAYNULL", "Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call", 3 },
 	{ "MISSINGVARNAMES", "At least one variable name must be specified", 0 },
 	{ "TOOMANYVARNAMES", "Number of varnames specified exceeds maximum (!UL)", 1 },
+	{ "INVNAMECOUNT", "Invalid value for namecount parameter in a !AD call", 2 },
 };
 
 
@@ -36,4 +37,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	12};
+	13};

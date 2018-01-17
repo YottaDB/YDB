@@ -19,7 +19,6 @@
 #include "op.h"
 #include "error.h"
 #include "stringpool.h"
-#include "libydberrors.h"
 
 /* Routine to get local, global and ISV values
  *
