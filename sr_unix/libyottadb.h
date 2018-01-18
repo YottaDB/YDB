@@ -205,6 +205,8 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method);
 int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
 int ydb_lock_s(unsigned long long timeout, int namecount, ...);
+int ydb_lock_incr_s(unsigned long long timeout, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
 int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);

@@ -12,6 +12,8 @@ ydb_incr_s
 ydb_init
 ydb_jinit
 ydb_lock_s
+ydb_lock_decr_s
+ydb_lock_incr_s
 ydb_node_next_s
 ydb_set_s
 ydb_str2zwr_s

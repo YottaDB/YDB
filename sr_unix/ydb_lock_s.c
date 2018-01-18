@@ -24,8 +24,6 @@
 #include "callg.h"
 #include "mvalconv.h"
 
-LITREF mval	literal_null;
-
 int ydb_lock_s(unsigned long long timeout, int namecount, ...)
 {
 	va_list		var;
@@ -56,8 +54,10 @@ int ydb_lock_s(unsigned long long timeout, int namecount, ...)
 	/* First step in this routine is to release all the locks */
 	op_unlock();
 	if (0 == namecount)
-		/* If no names were specified, we're done after the unlock */
+	{	/* If no names were specified, we're done after the unlock */
+		REVERT;
 		return YDB_OK;
+	}
 	/* Now we have one or more lock names to go through. First initialize the lock set for this new set of locks */
 	op_lkinit();
 	/* Now go through each nameset that has been passed to us sending each one to op_lkname() which creates a private
@@ -86,14 +86,16 @@ int ydb_lock_s(unsigned long long timeout, int namecount, ...)
 		 */
 		COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_s()");
 		callg((callgfnptr)op_lkname, &plist);
-	}	/* At this point, all of the private lock blocks have been created. Remaining task before calling op_lock2() is to
-		 * convert the timeout value from microseconds to milliseconds (temporary until microseconds are supported).
-		 */
+	}
+	/* At this point, all of the private lock blocks have been created. Remaining task before calling op_lock2() is to
+	 * convert the timeout value from microseconds to milliseconds (temporary until microseconds are supported).
+	 */
 	timeoutms = (int)(timeout / 1000);
 	if (0 > timeoutms)
 		timeoutms = MAXPOSINT4;		/* Likely large number truncated to this value */
 	i2mval(&timeout_mval, timeoutms);
 	/* The generated code typically calls op_lock() but that routine just calls op_lock2() */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
+	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }
