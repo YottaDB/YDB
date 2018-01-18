@@ -78,6 +78,26 @@ typedef enum
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);		\
 }
 
+/* Below macro returns TRUE if two input ydb_buffer_t structures have identical content and FALSE otherwise. */
+#define YDB_BUFFER_IS_IDENTICAL(BUFFERP1, BUFFERP2)										\
+	((BUFFERP1->len_used == BUFFERP2->len_used) && !memcmp(BUFFERP1->buf_addr, BUFFERP2->buf_addr, BUFFERP2->len_used))
+
+/* Below macro copies SRC ydb_buffer_t to DST ydb_buffer_t.
+ * If DST does not have space allocated to hold SRC->len_used, then no copy is done
+ *	and COPY_DONE will be set to FALSE.
+ * Else the copy is done and COPY_DONE will be set to TRUE.
+ */
+#define	YDB_COPY_BUFFER_TO_BUFFER(SRC, DST, COPY_DONE)				\
+{										\
+	if ((SRC)->len_used <= (DST)->len_alloc)				\
+	{									\
+		memcpy((DST)->buf_addr, (SRC)->buf_addr, (SRC)->len_used);	\
+		(DST)->len_used = (SRC)->len_used;				\
+		COPY_DONE = TRUE;						\
+	} else									\
+		COPY_DONE = FALSE;						\
+}
+
 /* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
 #define YDB_ASSERT(X)														\
 {																\
