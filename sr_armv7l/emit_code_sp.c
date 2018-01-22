@@ -70,31 +70,41 @@ void	emit_base_offset_addr(int base, int offset)
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
 			assert(base >= 0  &&  base <= 15);		/* register is in correct range */
-#ifdef __armv7l__
-			/* Always use movw - add sequence because shrink trips can convert a movw add sequence to
-			 * add r1, r1, #xxx if the adjusted offset now falls within the weird ARM shifted 12 bit range.
-			 * But now the next shrink trips pass can change it back to movw - add. Now the old code size
-			 * will be smaller than the new, leading to an assert in shrink_trips().
-			 */
 			abs_offst = abs(offset);
-			code_buf[code_idx++] = ARM_INS_MOVW
-							| (((abs_offst >> 12) & ARM_MASK_IMM4) << ARM_SHIFT_IMM4)
-							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
-							| ((abs_offst & ARM_MASK_IMM12) << ARM_SHIFT_IMM12);
-			if (65535 < abs_offst)
+			if (256 > abs_offst)
 			{
-				code_buf[code_idx++] = ARM_INS_MOVT
-								| (((abs_offst >> 28) & ARM_MASK_IMM4) << ARM_SHIFT_IMM4)
-								| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
-								| (((abs_offst >> 16) & ARM_MASK_IMM12) << ARM_SHIFT_IMM8);
+				code_buf[code_idx++] = ARM_INS_MOV_IMM
+					| (abs_offst << ARM_SHIFT_IMM12)
+					| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD);
+			} else
+#			ifdef __armv7l__
+			{
+				/* Always use movw - add sequence because shrink trips can convert a movw add sequence to
+				 * add r1, r1, #xxx if the adjusted offset now falls within the weird ARM shifted 12 bit range.
+				 * But now the next shrink trips pass can change it back to movw - add. Now the old code size
+				 * will be smaller than the new, leading to an assert in shrink_trips().
+				 */
+				code_buf[code_idx++] = ARM_INS_MOVW
+						| (((abs_offst >> 12) & ARM_MASK_IMM4) << ARM_SHIFT_IMM4)
+						| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
+						| ((abs_offst & ARM_MASK_IMM12) << ARM_SHIFT_IMM12);
+				if (65535 < abs_offst)
+				{
+					code_buf[code_idx++] = ARM_INS_MOVT
+						| (((abs_offst >> 28) & ARM_MASK_IMM4) << ARM_SHIFT_IMM4)
+						| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RD)
+						| (((abs_offst >> 16) & ARM_MASK_IMM12) << ARM_SHIFT_IMM8);
+				}
 			}
-#else	/* __armv6l__ */
-			code_buf[code_idx++] = ARM_INS_LDR
-							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RT)
-							| (ARM_REG_PC << ARM_SHIFT_RN);
-			code_buf[code_idx++] = ARM_INS_B;
-			code_buf[code_idx++] = abs(offset);
-#endif
+#			else    /* __armv6l__ */
+			{
+				code_buf[code_idx++] = ARM_INS_LDR
+					| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RT)
+					| (ARM_REG_PC << ARM_SHIFT_RN);
+				code_buf[code_idx++] = ARM_INS_B;
+				code_buf[code_idx++] = abs(offset);
+			}
+#			endif
 			code_buf[code_idx] = (((0 <= offset) ? ARM_U_BIT_ON : ARM_B_BIT_ON)
 							| (GTM_REG_CODEGEN_TEMP_1 << ARM_SHIFT_RM)
 							| (base << ARM_SHIFT_RN));
