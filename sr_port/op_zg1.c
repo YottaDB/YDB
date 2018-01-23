@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,11 +71,12 @@ void op_zg1(int4 level)
 			/* Couldn't get to the level we were trying to unwind to */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
-	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
-	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
-	 */
-	if (0 == level)
-	{
+	if ((0 == level) && (0 == TREF(gtmci_nested_level)))
+	{	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
+		 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
+		 * Note that if we are inside a call-in, we want to return to the caller C frame (not shell) so do not
+		 * come into this codepath which does an unconditional EXIT.
+		 */
 		exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
 		if (IS_MUPIP_IMAGE)
 		{

@@ -62,11 +62,14 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 	if (0 < TREF(gtmci_nested_level))
 	{	/* Need to return to caller - not halt (halting out of this call-in level) */
 		mumps_status = SUCCESS;
-		tmpmv = &tmpmval;
-		i2mval(tmpmv, retcode);
-		MV_FORCE_STR(tmpmv);
-		TREF(gtmci_retval) = tmpmv;
-		DBG_MARK_STRINGPOOL_UNUSABLE;	/* No GCs expected between now and when this is fetched in goframes() */
+		if (is_zhalt)
+		{	/* Set retcode in TREF(gtmci_retval) (needed later by "goframes" as part of "op_zg1" call below) */
+			tmpmv = &tmpmval;
+			i2mval(tmpmv, retcode);
+			MV_FORCE_STR(tmpmv);
+			TREF(gtmci_retval) = tmpmv;
+			DBG_MARK_STRINGPOOL_UNUSABLE;	/* No GCs expected between now and when this is fetched in goframes() */
+		}
 		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
 		assertpro(FALSE);		/* Should not return */
 		return;				/* Previous call does not return so this is for the compiler */
