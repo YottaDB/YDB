@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -602,17 +602,19 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		while (timeroot)
 		{
 			eltime = sub_abs_time((ABS_TIME *)&timeroot->expir_time, curr_time);
-			/* If nothing has expired yet, break. */
-			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))) || (0 < timer_stack_count))
+			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))))
+			{	/* Timer isn't due yet, so set signal to fire at proper time. */
+				deferred_timers_check_needed = FALSE;
+				SYS_SETTIMER(timeroot, &eltime);
 				break;
+			}
+			else if (0 < timer_stack_count)
+			{	/* Timer has expired, but we can't fire it now, so defer. */
+				deferred_timers_check_needed = TRUE;
+				break;
+			}
 			/* Otherwise, drive the handler. */
 			timer_handler(DUMMY_SIG_NUM);
-		}
-		/* Do we still have a timer to set? */
-		if (timeroot)
-		{
-			deferred_timers_check_needed = FALSE;
-			SYS_SETTIMER(timeroot, &eltime);
 		}
 	} else if (0 < safe_timer_cnt)
 	{	/* There are some safe timers on the queue. */

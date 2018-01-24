@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 #include "opcode.h"
 #include "alloc_reg.h"
 #include "cdbg_dump.h"
+#include "fullbool.h"
 
 GBLDEF int4			sa_temps[VALUED_REF_TYPES];
 GBLDEF int4			sa_temps_offset[VALUED_REF_TYPES];
@@ -59,7 +60,9 @@ void alloc_reg(void)
 	int		r, c, temphigh[VALUED_REF_TYPES];
 	unsigned int	oct;
 	int4		size;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	memset(&tempcont[0][0], 0, SIZEOF(tempcont));
 	memset(&temphigh[0], -1, SIZEOF(temphigh));
 	temphigh[TVAR_REF] = mvmax - 1;
@@ -97,16 +100,18 @@ void alloc_reg(void)
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
 				}
-#				ifndef DEBUG
-				break;
-#				endif
 			case OC_LINEFETCH:
-#				ifdef DEBUG
+				/* this code is a sad hack - it used to assert that there was no temp leak, but in non-short-circuit
+				 * mode there can be a leak, we weren't finding it and the customers were justifiably impatient
+				 * so the following code now makes the leak go away
+				 */
 				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
-					assert(0 == tempcont[TVAL_REF][c]);	/* check against leaking TVAL temps */
+				{
+					assert((GTM_BOOL != TREF(gtm_fullbool)) || (0 == tempcont[TVAL_REF][c]));
+					tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
+				}
 				if (OC_LINESTART == opc)
 					break;
-#				endif
 			case OC_FETCH:
 				assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
 				if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
@@ -148,6 +153,8 @@ void alloc_reg(void)
 			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
 			remove_backptr(x, &x->operand[0], tempcont);
 			x->opcode = OC_NOOP;
+			x->operand[0].oprclass = NO_REF;
+			assert(NO_REF == x->operand[1].oprclass);
 			continue;
 		}
 		if (NO_REF == (dest_type = x->destination.oprclass))	/* Note assignment */
@@ -230,13 +237,8 @@ void remove_backptr(triple *curtrip, oprtype *opnd, char (*tempcont)[MAX_TEMP_CO
 	int		r;
 
 	assert(TRIP_REF == opnd->oprclass);
+	assert(OC_PASSTHRU != opnd->oprval.tref->opcode);
 	ref = opnd->oprval.tref;
-	while (OC_PASSTHRU == opnd->oprval.tref->opcode)
-	{
-		ref = ref->operand[0].oprval.tref;
-		opnd = &ref->operand[0];
-		assert(TRIP_REF == opnd->oprclass);
-	}
 	r = ref->destination.oprclass;
 	if (NO_REF != r)
 	{

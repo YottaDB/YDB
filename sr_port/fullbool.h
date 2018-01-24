@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,5 +25,14 @@ enum gtm_se_type
 	STD_SE,			/* reorder argument processing for left-to-right side effects */
 	SE_WARN			/* like STD but give compiler warnings when it makes a difference */
 };
+
+#define TRACK_JMP_TARGET(T, REF0)												\
+MBSTART {	/* T is triple to tag; REF0 is the new target triple with which it's tagged */					\
+	tripbp = &T->jmplist;						/* borrow jmplist to track jmp targets */		\
+	assert(NULL == tripbp->bpt);												\
+	assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));							\
+	tripbp->bpt = REF0;						/* point to the new location */				\
+	dqins(TREF(bool_targ_ptr), que, tripbp);			/* queue jmplist for clean-up */			\
+} MBEND
 
 #endif /* FULLBOOL_H_INCLUDED */

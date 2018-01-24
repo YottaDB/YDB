@@ -55,6 +55,8 @@ foreach hlp (${hlpdir}/*.hlp)
 		continue
 	endif
 
+	echo "Generating ${prefix}help.gld and ${prefix}help.dat"
+
 	# Either help info does not exist or needs to be regenerated
 
 	# Define the global directory with the same prefix as the HLP file and
@@ -92,27 +94,21 @@ GTM_in_gtmhelp
 		continue
 	endif
 	if ("gtm" == "$prefix") then
-		$gtm_exe/mumps -run GTMDEFINEDTYPESTODB
+		${gtm_dist}/mumps -run GTMDEFINEDTYPESTODB
 		if ($status) then
 			@ script_stat++
 			echo "generatehelp-E-hlp, Error during GTMDEFINEDTYPESTODB ${hlp}" $errout
 			continue
 		endif
 	endif
-	set oldgld=$gtmgbldir
-	foreach x (${gtm_dist}/*.gld)
-		setenv gtmgbldir "$x"
-		echo "Setting read-only for $x regions"
-		$gtm_exe/mupip set -read_only -acc=MM -reg "*" >& /dev/null
-	end
+	echo "Setting read-only for ${gtm_dist}/${prefix}help.{gld,dat} regions"
+	${gtm_dist}/mupip set -read_only -acc=MM -reg "*" >& /dev/null
 	chmod ugo-x ${gtm_dist}/${prefix}help.{gld,dat}
-	setenv gtmgbldir $oldgld
 end
 
 # Restore read-only status
 if ($?restorePerms) then
 	chmod ${restorePerms} ${gtm_dist}
-	$gtm_exe/mupip set -read_only -reg "*"
 endif
 
 exit ${script_stat}

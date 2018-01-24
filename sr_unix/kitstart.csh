@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2017 Fidelity National Information		#
+# Copyright (c) 2011-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -380,6 +380,7 @@ if (-f $gtm_tools/gtmpcat.m) then
 		$package $dist_file gtmpcat.m $fldbld install_gtmpcat.sh gtmpcat.sh || exit 10
 		chown ${prev_user}:${prev_group} gtmpcat.m $fldbld
 		chmod ${prev_perm} gtmpcat.m $fldbld
+		rm -f gtmpcat.sh install_gtmpcat.sh
 		echo ""
 		echo "Gzipping $dist_file"
 		gzip $dist_file || exit 11
