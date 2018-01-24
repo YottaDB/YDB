@@ -19,7 +19,7 @@
 #ifndef GTM_RELEASE_NAME
 
 #define GTM_VERSION	"V6.3"
-#define	GTM_ZVERSION	"V6.3-003"
+#define	GTM_ZVERSION	"V6.3-003A"
 #define	YDB_ZYRELEASE	"r1.10"
 
 #if defined(__x86_64__)

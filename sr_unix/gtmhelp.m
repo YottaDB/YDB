@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2002-2017 Fidelity National Information		;
+; Copyright (c) 2002-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -40,7 +40,7 @@ again	set:$data(COUNT) subtopic=""				; <CTRL-C> comes back to here and clears a
 	quit
 	;
 parse(subtopic)							; organize space-delimited input memes into a topic hierarchy
-	new (subtopic,NEW,COUNT,TOPIC)
+	new (pio,subtopic,NEW,COUNT,TOPIC)
 	set NEW=0
 	for i=1:1:$length(subtopic," ") set x=$piece(subtopic," ",i) if x'="" do
 	. set COUNT=COUNT+1,NEW=NEW+1
@@ -49,7 +49,7 @@ parse(subtopic)							; organize space-delimited input memes into a topic hierar
 	quit
 	;
 display								; do the real work
-	new (COUNT,IO,MATCH,NEW,NOTFOUND,PROMPT,TOPIC)
+	new (pio,COUNT,IO,MATCH,NEW,NOTFOUND,PROMPT,TOPIC)
 	if $get(TOPIC(COUNT))="?" set COUNT=COUNT-1		; refresh choices on the same topic (leve)
 	write #
 	if $$MATCH do						; look up the topic
@@ -88,7 +88,7 @@ display								; do the real work
 	quit
 	;
 print(ref,i);							; text output function
-	new (ref,i,MATCH,COUNT)
+	new (pio,ref,i,MATCH,COUNT)
 	write !,@ref
 	set y=""
 	for  set y=$order(@ref@(y)) quit:(y="s")!(y="")  do
@@ -110,7 +110,7 @@ print(ref,i);							; text output function
 	quit
 	;
 recursiv(ref,level)						;
-	new (COUNT,TOPIC,ref,MATCH,level,PROMPT,FLAG)
+	new (pio,COUNT,TOPIC,ref,MATCH,level,PROMPT,FLAG)
 	set level=level+1
 	if ($extract(TOPIC(level))="-")&($get(FLAG)'=1) do
 	. set FLAG=1
@@ -141,7 +141,7 @@ recursiv(ref,level)						;
 	. quit
 	quit
 qualifiers(ref)							; qualifier lister
-	new (ref)
+	new (pio,ref)
 	if $data(@ref)>1 do
 	. set ref=$name(@ref@("s")),x="-"
 	. for  set x=$order(@ref@(x)) quit:x=""!($extract(x)'="-")   do:($extract(^(x))="-")
@@ -163,7 +163,7 @@ error								; Error handler called by $etrap
 	quit
 MATCH()								; return array MATCH containing all global references that match
 	; the TOPIC array.
-	new (TOPIC,COUNT,MATCH,PROMPT)
+	new (pio,TOPIC,COUNT,MATCH,PROMPT)
 	set QUALIFIERS=0
 	if COUNT=0 set MATCH=1 set MATCH(1)="^HELP"
 	if COUNT'=0 do
@@ -189,7 +189,7 @@ COLUMNS(subref,x)
 	if $x+12>$$WIDTH write !
 	quit ""
 PROMPT()
-	new (COUNT,TOPIC,PROMPT)
+	new (pio,COUNT,TOPIC,PROMPT)
 	write !!
 	set ref="^HELP"
 	for i=1:1:COUNT do
