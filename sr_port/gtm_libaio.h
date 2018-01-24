@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,11 +65,21 @@ struct aiocb {
 
 /* This struct mimics the structure of struct iocb, but adds a few fields
  * to the end for our own use. See <linux/aio_abi.h>::struct iocb.
+ * Note: that Linux v4.14 typedef'ed aio_rw_flags like so.
+ *	typedef int __bitwise __kernel_rwf_t;
  */
 struct aiocb {
 	/* kernel-internel structure, mirrors struct iocb */
 	__u64	aio_data;
-	__u32	PADDED(aio_key, aio_reserved1);
+#if defined(__BYTE_ORDER) ? __BYTE_ORDER == __LITTLE_ENDIAN : defined(__LITTLE_ENDIAN)
+	__u32	aio_key;	/* the kernel sets aio_key to the req # */
+	int __bitwise aio_rw_flags;	/* RWF_* flags */
+#elif defined(__BYTE_ORDER) ? __BYTE_ORDER == __BIG_ENDIAN : defined(__BIG_ENDIAN)
+	int __bitwise aio_rw_flags;	/* RWF_* flags */
+	__u32	aio_key;	/* the kernel sets aio_key to the req # */
+#else
+#error edit for your odd byteorder.
+#endif
 	__u16	aio_lio_opcode;
 	__s16	aio_reqprio;
 	__u32	aio_fildes;
@@ -92,10 +102,12 @@ struct aiocb {
 #define IF_LIBAIO(x) x
 #define IF_LIBAIO_ELSE(x,y) x
 
-/* linux/aio_abi.h provides PADDED to define the above struct, but this collides with
- * our personal #define which means something completely different.
+#ifdef PADDED
+/* linux/aio_abi.h provides PADDED until Linux v4.14 to define the above struct, but
+ * this collides with our personal #define which means something completely different.
  */
 #undef PADDED
+#endif
 #endif	/* USE_LIBAIO */
 
 #endif	/* GTM_LIBAIO_H_INCLUDED  */
