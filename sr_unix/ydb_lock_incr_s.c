@@ -25,20 +25,20 @@
 /* Routine to incrementally obtain a lock (not unlocking everything first).
  *
  * Parameters:
- *   - timeout   - Causes the lock attempt to timeout after the given time (in microseconds) has elapsed.
- *   - varname   - Contains the basevar name (local or global). Must be a valid variable name.
- *   - subs_used - The number of subscripts specified in the subsarray parm
- *   - subsarray - An array of 'subs_used' ydb_buffer_t structures containing the definitions of the subscripts.
- *
+ *   - nsec_timeout - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
+ *   - varname      - Contains the basevar name (local or global). Must be a valid variable name.
+ *   - subs_used    - The number of subscripts specified in the subsarray parm
+ *   - subsarray    - An array of 'subs_used' ydb_buffer_t structures containing the definitions of the subscripts.
  */
-int ydb_lock_incr_s(unsigned long long timeout, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
+int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
-	va_list		var;
-	int		parmidx, timeoutms, lock_rc;
-	gparam_list	plist;
-	boolean_t	is_gbl, error_encountered;
-	mval		timeout_mval, varname_mval;
-	mval		plist_mvals[YDB_MAX_SUBS + 1];
+	va_list			var;
+	int			parmidx, timeoutms, lock_rc;
+	gparam_list		plist;
+	boolean_t		is_gbl, error_encountered;
+	mval			timeout_mval, varname_mval;
+	mval			plist_mvals[YDB_MAX_SUBS + 1];
+	unsigned long long	msec_timeout;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -74,12 +74,13 @@ int ydb_lock_incr_s(unsigned long long timeout, ydb_buffer_t *varname, int subs_
 	 */
 	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_incr_s()");
 	callg((callgfnptr)op_lkname, &plist);
-	/* At this point, the private lock block has been created. Remaining task before calling op_incrlock() is to
-	 * convert the timeout value from microseconds to milliseconds (temporary until microseconds are supported).
+	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
+	 * convert the timeout value from microseconds to milliseconds.
 	 */
-	timeoutms = (int)(timeout / 1000);
-	if (0 > timeoutms)
-		timeoutms = MAXPOSINT4;		/* Likely large number truncated to this value */
+	msec_timeout = (nsec_timeout / NANOSECS_IN_MSEC);
+	if (MAXPOSINT4 < msec_timeout)
+		msec_timeout = MAXPOSINT4;		/* MAXPOSINT4 is maximum possible timeout in milliseconds */
+	timeoutms = (int)msec_timeout;
 	i2mval(&timeout_mval, timeoutms);
 	lock_rc = op_incrlock(&timeout_mval);
 	REVERT;

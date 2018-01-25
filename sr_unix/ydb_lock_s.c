@@ -24,16 +24,22 @@
 #include "callg.h"
 #include "mvalconv.h"
 
-int ydb_lock_s(unsigned long long timeout, int namecount, ...)
+/* Routine to obtain a lock (unlocking everything first).
+ *
+ * Parameters:
+ *   - nsec_timeout - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
+ */
+int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 {
-	va_list		var;
-	int		parmidx, timeoutms, lock_rc;
-	gparam_list	plist;
-	boolean_t	is_gbl, error_encountered;
-	mval		timeout_mval, varname_mval;
-	mval		plist_mvals[YDB_MAX_SUBS + 1];
-	ydb_buffer_t	*varname, *subsarray;
-	int		subs_used;
+	va_list			var;
+	int			parmidx, timeoutms, lock_rc;
+	gparam_list		plist;
+	boolean_t		is_gbl, error_encountered;
+	mval			timeout_mval, varname_mval;
+	mval			plist_mvals[YDB_MAX_SUBS + 1];
+	ydb_buffer_t		*varname, *subsarray;
+	int			subs_used;
+	unsigned long long	msec_timeout;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -87,14 +93,15 @@ int ydb_lock_s(unsigned long long timeout, int namecount, ...)
 		COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_s()");
 		callg((callgfnptr)op_lkname, &plist);
 	}
-	/* At this point, all of the private lock blocks have been created. Remaining task before calling op_lock2() is to
-	 * convert the timeout value from microseconds to milliseconds (temporary until microseconds are supported).
+	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
+	 * convert the timeout value from microseconds to milliseconds.
 	 */
-	timeoutms = (int)(timeout / 1000);
-	if (0 > timeoutms)
-		timeoutms = MAXPOSINT4;		/* Likely large number truncated to this value */
+	msec_timeout = (nsec_timeout / NANOSECS_IN_MSEC);
+	if (MAXPOSINT4 < msec_timeout)
+		msec_timeout = MAXPOSINT4;		/* MAXPOSINT4 is maximum possible timeout in milliseconds */
+	timeoutms = (int)msec_timeout;
 	i2mval(&timeout_mval, timeoutms);
-	/* The generated code typically calls op_lock() but that routine just calls op_lock2() */
+	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
