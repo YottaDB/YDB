@@ -40,11 +40,12 @@ typedef enum
 	RECVPOOL_REG = 3,
 } ydb_reg_type_t;
 
-void	ydb_child_init_incrcnt(gd_region *reg, ydb_reg_type_t reg_type);
+void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
 
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		skip_exit_handler;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_process_vector	*prc_vec;
@@ -61,6 +62,7 @@ int	ydb_child_init(void *param)
 	boolean_t		error_encountered;
 	gd_addr			*addr_ptr;
 	gd_region		*reg_top, *reg;
+	jnlpool_addrs_ptr_t	tmp_jnlpool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -94,23 +96,28 @@ int	ydb_child_init(void *param)
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
 		{
 			if (reg->open && !reg->was_open && IS_REG_BG_OR_MM(reg))
-				ydb_child_init_incrcnt(reg, DB_REG);
+				ydb_child_init_sem_incrcnt(reg, DB_REG, NULL);	/* Bump sem count for database */
 		}
 	}
-	reg = jnlpool.jnlpool_dummy_reg;
-	if ((NULL != reg) && reg->open)
-		ydb_child_init_incrcnt(reg, JNLPOOL_REG);	/* Bump sem/shm count for receive pool */
+	/* Bump semaphore count (for child process) in all journal pools that the parent process was attached to */
+	for (tmp_jnlpool = jnlpool_head; NULL != tmp_jnlpool; tmp_jnlpool = tmp_jnlpool->next)
+	{
+		reg = tmp_jnlpool->jnlpool_dummy_reg;
+		if ((NULL != reg) && reg->open)
+			ydb_child_init_sem_incrcnt(reg, JNLPOOL_REG, tmp_jnlpool);
+	}
+	/* Bump semaphore count (for child process) in receive pool if the parent process was attached to it */
 	reg = recvpool.recvpool_dummy_reg;
 	if ((NULL != reg) && reg->open)
-		ydb_child_init_incrcnt(reg, RECVPOOL_REG);	/* Bump sem/shm count for receive pool */
-	/* NARSTODO: Need to go through all attached jnlpool_ctls (starting V63003 this is a list, not just one jnlpool) */
+		ydb_child_init_sem_incrcnt(reg, RECVPOOL_REG, NULL);
 	skip_exit_handler = FALSE; /* Now that the child process database state is set up correctly, it is safe to "gds_rundown" */
 	assert(NULL == ftok_sem_reg);
 	REVERT;
 	return YDB_OK;
 }
 
-void	ydb_child_init_incrcnt(gd_region *reg, ydb_reg_type_t reg_type)
+/* Note: cur_jnlpool is non-NULL if reg_type is JNLPOOL_REG and NULL otherwise */
+void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t cur_jnlpool)
 {
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
@@ -298,7 +305,7 @@ void	ydb_child_init_incrcnt(gd_region *reg, ydb_reg_type_t reg_type)
 		{
 			udi->counter_ftok_incremented = FALSE;	/* Reset field in child */
 			if (JNLPOOL_REG == reg_type)
-				shm_counter_halted = jnlpool.jnlpool_ctl->ftok_counter_halted;
+				shm_counter_halted = cur_jnlpool->jnlpool_ctl->ftok_counter_halted;
 			else
 				shm_counter_halted = FALSE; /* for receive pool, we can never overflow according to recvpool_init */
 			if (!shm_counter_halted)
@@ -323,7 +330,7 @@ void	ydb_child_init_incrcnt(gd_region *reg, ydb_reg_type_t reg_type)
 							ERR_SYSCALL, 5, RTS_ERROR_TEXT("semop ftok"), CALLFROM, save_errno);
 					}
 					assert(JNLPOOL_REG == reg_type);
-					if (!jnlpool.jnlpool_ctl->ftok_counter_halted)
+					if (!cur_jnlpool->jnlpool_ctl->ftok_counter_halted)
 						repl_inst_ftok_counter_halted(udi);
 					break;
 				}
