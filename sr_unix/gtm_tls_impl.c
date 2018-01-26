@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -499,8 +502,8 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			return NULL; /* Relevant error detail populated in the above macro. */
 	}
 	OpenSSL_add_all_algorithms();
-	/* Setup function pointers to symbols exported by libgtmshr.so. */
-	if (0 != gc_load_gtmshr_symbols())
+	/* Setup function pointers to symbols exported by libyottadb.so. */
+	if (0 != gc_load_yottadb_symbols())
 		return NULL;
 	/* Setup a SSL context that allows SSLv3 and TLSv1.x but no SSLv2 (which is deprecated due to a great number of security
 	 * vulnerabilities).

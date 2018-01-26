@@ -18403,7 +18403,7 @@
    invocation.
 
    libyottadb.h also includes definitions for the following entry points
-   exported from libgtmshr:
+   exported from libyottadb:
 
    void gtm_hiber_start(ydb_uint_t mssleep);
    void gtm_hiber_start_wait_any(ydb_uint_t mssleep)
@@ -18934,7 +18934,7 @@
    To facilitate Call-Ins to M routines, the YottaDB distribution directory
    ($gtm_dist) contains the following files:
 
-    1. libgtmshr.so - A shared library that implements the YottaDB run-time
+    1. libyottadb.so - A shared library that implements the YottaDB run-time
        system, including the Call-In API. If Call-Ins are used from a
        standalone C/C++ program, this library needs to be explicitly linked
        into the program.
@@ -18945,7 +18945,7 @@
        platforms.
 
     2. mumps - The YottaDB startup program that dynamically links with
-       libgtmshr.so.
+       libyottadb.so.
     3. gtmxc_types.h - A C-header file containing the declarations of Call-In
        API.
 
@@ -19014,7 +19014,7 @@
    that require more than 18 digits as strings.
 
    libyottadb.h also includes definitions for the following entry points
-   exported from libgtmshr:
+   exported from libyottadb:
 
    void gtm_hiber_start(ydb_uint_t mssleep);
    void gtm_hiber_start_wait_any(ydb_uint_t mssleep)
@@ -19280,10 +19280,10 @@
    be used instead of the native types (int, float, char, etc).
 
    To use call-ins from a standalone C program, it is necessary that the YottaDB
-   runtime library (libgtmshr.so) is explicitly linked into the program. If
+   runtime library (libyottadb.so) is explicitly linked into the program. If
    call-ins are used from an External Call function (which in turn was called
    from YottaDB through the existing external call mechanism), the External Call
-   library does not need to be linked explicitly with libgtmshr.so since YottaDB
+   library does not need to be linked explicitly with libyottadb.so since YottaDB
    would have already loaded it.
 
 3 Nested_Call-Ins

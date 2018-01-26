@@ -143,8 +143,8 @@
 !  usages should be reflected with the new value.
 !	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
 !	ERR_DISTPATHMAX		150377682 (reported in gtm.c if $gtm_dist buffer is insufficient)
-!	ERR_DLLNOOPEN		150379250 (reported in gtm.c if libgtmshr cannot be opened)
-!	ERR_DLLNORTN		150379258 (reported in gtm.c if gtm_main is not found in libgtmshr)
+!	ERR_DLLNOOPEN		150379250 (reported in gtm.c if libyottadb cannot be opened)
+!	ERR_DLLNORTN		150379258 (reported in gtm.c if gtm_main is not found in libyottadb)
 !	ERR_OPCOMMISSED		150381275 (sent via $SNDOPR in util_output.c if prior errors)
 !
 !  The following items must be followed by a tab (because they are parsed by tools/library/doc_tools/routines/diffm.m)

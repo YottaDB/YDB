@@ -532,7 +532,7 @@ else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be insta
     fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
-if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext. Keep original .o object files (y or n)?"
+if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $gtm_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
 echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 

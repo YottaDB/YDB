@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -974,7 +974,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
  *
  * 1. Target process has an execution directory the same as ours ($gtm_dist). Note it is possible a target process is doing
  *    a call-in so this test is not always TRUE but is the faster of the two tests.
- * 2. Target process has libgtmshr.{suffix} (aka GTMSHR_IMAGE_NAME from mdefsa.h) loaded which we can tell by examining the
+ * 2. Target process has libyottadb.{suffix} (aka YOTTADB_IMAGE_NAME from mdefsa.h) loaded which we can tell by examining the
  *    open files of the target process.
  *
  * Note - this routine is currently NOT USED as it is incomplete and not yet implemented for all platforms. We leave it in here
@@ -1040,7 +1040,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 			return 0;
 		}
 	}
-	/* Check #1 failed - attempt check #2 - read /proc/<pid>/maps to see if libgtmshr is there */
+	/* Check #1 failed - attempt check #2 - read /proc/<pid>/maps to see if libyottadb is there */
 	memcpy(ppptr_save, PROCPATH_MAPSSUFFIX, SIZEOF(PROCPATH_MAPSSUFFIX));	/* Copy includes terminating null of literal */
 	Fopen(procstrm, procpath, "r");
 	if (NULL == procstrm)

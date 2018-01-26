@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -792,7 +795,7 @@ int gtmsource_process(void)
 			 * is taken from the jnlpool_ctl->jnl_seqno right when we detected the online rollback. We could have set
 			 * this right when we set gtmsource_save_read_jnl_seqno but we don't do that because we want to print the
 			 * old value in the log file but we can't use repl_log/gtmsource_log_fp in gtmsource_onln_rlbk_clnup() as
-			 * it is bundled up as part of libgtmshr.so whereas repl_log is bundled in libmupip.a.
+			 * it is bundled up as part of libyottadb.so whereas repl_log is bundled in libmupip.a.
 			 */
 			gtmsource_local->read_jnl_seqno = gtmsource_save_read_jnl_seqno;
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Source Server Read Seqno is now set to : "INT8_FMT"\n",

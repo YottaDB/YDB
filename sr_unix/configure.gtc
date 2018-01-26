@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -73,7 +73,7 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
+binaries="mupip mumps libyottadb$ext lke dse  geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase lowerc_cp"
@@ -112,7 +112,7 @@ fi
 $echo "                     YottaDB Configuration Script"
 $echo "Copyright 2009, 2014 Fidelity Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
-$echo "Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries."
+$echo "Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries."
 $echo "All rights reserved."
 $echo ""
 
@@ -448,6 +448,12 @@ if [ "$doutf8" -ne 0 ]; then
 	fi
 fi
 
+# Install libgtmshr.so as a soft link to libyottadb.so for backward compatibility purposes just in case
+ln -s ./libyottadb$ext $gtmdist/libgtmshr$ext || echo ln -s ./libyottadb$ext $gtmdist/libgtmshr$ext
+if [ "$doutf8" -ne 0 ]; then
+	ln -s ./libyottadb$ext $gtmdist/utf8/libgtmshr$ext || echo ln -s ./libyottadb$ext $gtmdist/utf8/libgtmshr$ext
+fi
+
 # Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable
 for file in COPYING README.md README.txt
 do
@@ -524,11 +530,11 @@ do
 	chown $owner $gtmdist/$i
 done
 
-# For linux systems, attempt to execute the chcon command to allow use of the libgtmshr shared library. This
+# For linux systems, attempt to execute the chcon command to allow use of the libyottadb shared library. This
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
-	(chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext; exit 0)
+	(chcon -t texrel_shlib_t $gtmdist/libyottadb$ext; exit 0)
 fi
 
 # Create $gtmdist/plugin/gtmcrypt directory if this platform supports encryption
@@ -657,8 +663,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	fi
 fi
 
-# Change mode to executable for mumps and libgtmshr to do the compiles
-chmod 755 $gtmdist/mumps $gtmdist/libgtmshr$ext
+# Change mode to executable for mumps and libyottadb to do the compiles
+chmod 755 $gtmdist/mumps $gtmdist/libyottadb$ext
 
 gtmroutines=$gtmdist
 gtmgbldir=$gtmdist/mumps.gld
@@ -674,7 +680,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 gtm_chset="M"
 export gtm_chset
-(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libgtmutil$ext *.o )
+(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -698,8 +704,14 @@ if [ "$doutf8" -ne 0 ]; then
 			export LD_LIBRARY_PATH
 		fi
 		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
-		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libyottadbutil$ext *.o ; fi )
 	)
+fi
+
+# Install libgtmutil.so as a soft link to libyottadbutil.so for backward compatibility purposes just in case
+ln -s ./libyottadbutil$ext $gtmdist/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $gtmdist/libgtmutil$ext
+if [ "$doutf8" -ne 0 ]; then
+	ln -s ./libyottadbutil$ext $gtmdist/utf8/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $gtmdist/utf8/libgtmutil$ext
 fi
 
 # Change mode to executable for the normal binaries
@@ -729,8 +741,8 @@ if [ "$doutf8" -ne 0 ]; then
 	chgrp $bingroup $gtmdist/utf8/*.txt
 fi
 
-if [ -f $gtm_dist/libgtmutil$ext ] ; then
-    gtmroutines="$gtm_dist/libgtmutil$ext $gtmdist"
+if [ -f $gtm_dist/libyottadbutil$ext ] ; then
+    gtmroutines="$gtm_dist/libyottadbutil$ext $gtmdist"
 else
     gtmroutines="$gtmdist"
 fi
@@ -757,17 +769,17 @@ fi
 cd $savedir
 
 # Optionally remove .o files if they are in a shared library
-if [ -f $gtm_dist/libgtmutil$ext ] ; then
-	chown ${owner}:${bingroup} $gtm_dist/libgtmutil$ext
+if [ -f $gtm_dist/libyottadbutil$ext ] ; then
+	chown ${owner}:${bingroup} $gtm_dist/libyottadbutil$ext
 	$echo ""
-	$echo "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext"
+	$echo "Object files of M routines placed in shared library $gtm_dist/libyottadbutil$ext"
 	$echo "Keep original .o object files (y or n)? \c"
 	read resp
 	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $gtm_dist/*.o $gtm_dist/utf8/*.o ; fi
 	$echo ""
-	if [ -f $gtm_dist/utf8/libgtmutil$ext ] ; then
-		chown ${owner}:${bingroup} $gtm_dist/utf8/libgtmutil$ext
+	if [ -f $gtm_dist/utf8/libyottadbutil$ext ] ; then
+		chown ${owner}:${bingroup} $gtm_dist/utf8/libyottadbutil$ext
 	fi
 fi
 

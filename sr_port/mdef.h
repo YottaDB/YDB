@@ -1390,7 +1390,7 @@ void suspend(int sig);
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);
 
-int dlopen_libgtmshr(int argc, char **argv, char **envp, char *main_func);
+int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func);
 int gtm_main(int argc, char **argv, char **envp);
 int mupip_main(int argc, char **argv, char **envp);
 int dse_main(int argc, char **argv, char **envp);
@@ -1913,10 +1913,10 @@ enum
 #endif
 
 #ifdef DEBUG
-  /* Define macros that are helpful in verifying that functions in libgtmshr.so are only invoked
+  /* Define macros that are helpful in verifying that functions in libyottadb.so are only invoked
    * by the executables/utilities we expect and not by anything else. For example, libgnpclient.list
    * used to have a list of modules that this library includes and was linked only by mumps and lke.
-   * Now libgnpclient.list is nixed (as part of changes that made all utilities use libgtmshr.so
+   * Now libgnpclient.list is nixed (as part of changes that made all utilities use libyottadb.so
    * and reduce their sizes) but we now have an ASSERT_IS_LIBGNPCLIENT check at function entry in all
    * functions that were part of modules in that listing file. Same with the other asserts defined below.
    */

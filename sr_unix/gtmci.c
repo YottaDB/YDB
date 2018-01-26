@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -1106,7 +1109,7 @@ int ydb_exit()
 		}
 	}
 	gtm_exit_handler(); /* rundown all open database resource */
-	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+	/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
 	 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
 	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
@@ -1130,12 +1133,12 @@ void ydb_zstatus(char *msg, int len)
 }
 
 #ifdef _AIX
-/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
  * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
  * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
  * our exit handler has already been called. Linux and Solaris don't need this, looking at the
  * other platforms we support to see if resolutions can be found. This routine will be called
- * by the OS when libgtmshr is unloaded. Specified with the -binitfini loader option on AIX
+ * by the OS when libyottadb is unloaded. Specified with the -binitfini loader option on AIX
  * to be run when the shared library is unloaded. 06/2007 SE
  */
 void gtmci_cleanup(void)

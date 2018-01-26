@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,7 +21,7 @@
 /* This header is split between sr_unix and sr_vvms because there are several test system and standalone modules
  * that do not #define UNIX or VMS for us to know which defines to proceed with. So now this split makes
  * that determination unnecessary. Note we still use the definition of UNIX or not in THIS header to indicate the
- * compilation of a GTM source file or a standalone file not needing (or able to get to) libgtmshr wrappers.
+ * compilation of a YottaDB source file or a standalone file not needing (or able to get to) libyottadb wrappers.
  */
 
 #include <stdio.h>

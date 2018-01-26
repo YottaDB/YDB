@@ -4,7 +4,7 @@
 # Copyright (c) 2011-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -421,9 +421,9 @@ if ($testinstall) then
 		# restricted build.
 		# V54002 now asks for an installation group (newline entered for default) so response needs one more
 		# blank line for default group
-		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
+		# V54003 now asks whether or not to retain .o files if libyottadbutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i586) this question is not asked
+		# If libyottadbutil.so is not created(on i586) this question is not asked
 			if ("$osname" == "linux" && "$arch" == "i586") then
 				sh ./configure << CONFIGURE_EOF
 
@@ -458,9 +458,9 @@ CONFIGURE_EOF
 
 		# V54002 now asks for an installation group before the restricted group question so response is
 		# reversed from V54000
-		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
+		# V54003 now asks whether or not to retain .o files if libyottadbutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i586) this question is not asked
+		# If libyottadbutil.so is not created(on i586) this question is not asked
 			if ("$osname" == "linux" && "$arch" == "i586") then
 	 			sh ./configure << CONFIGURE_EOF
 

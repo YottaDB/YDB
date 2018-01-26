@@ -197,27 +197,27 @@ endmacro()
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-set_source_list(dbcertify        dbcertify dlopen_libgtmshr)
-set_source_list(dse              dse dlopen_libgtmshr)
-set_source_list(ftok             ftok dlopen_libgtmshr)
+set_source_list(dbcertify        dbcertify dlopen_libyottadb)
+set_source_list(dse              dse dlopen_libyottadb)
+set_source_list(ftok             ftok dlopen_libyottadb)
 set_source_list(geteuid          geteuid)
-set_source_list(gtcm_gnp_server  gtcm_gnp_server dlopen_libgtmshr)
+set_source_list(gtcm_gnp_server  gtcm_gnp_server dlopen_libyottadb)
 set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
-set_source_list(gtcm_play        gtcm_play dlopen_libgtmshr)
-set_source_list(gtcm_server      gtcm_server dlopen_libgtmshr)
-set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libgtmshr)
+set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
+set_source_list(gtcm_server      gtcm_server dlopen_libyottadb)
+set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libyottadb)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
-set_source_list(libgtmshr        gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
-set_source_list(libgtmshr        gtcm_play_main omi_srvc_xct omi_extstr)
-set_source_list(libgtmshr        gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
-set_source_list(libgtmshr        dbcertify_main dbcertify_cmd ftok_main)
-set_source_list(lke              lke dlopen_libgtmshr)
+set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
+set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
+set_source_list(libyottadb       gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
+set_source_list(libyottadb       dbcertify_main dbcertify_cmd ftok_main)
+set_source_list(lke              lke dlopen_libyottadb)
 set_source_list(maskpass         maskpass gtmcrypt_util)
-set_source_list(mumps            gtm dlopen_libgtmshr)
-set_source_list(mupip            mupip dlopen_libgtmshr)
+set_source_list(mumps            gtm dlopen_libyottadb)
+set_source_list(mupip            mupip dlopen_libyottadb)
 set_source_list(semstat2         semstat2)
 
 #-----------------------------------------------------------------------------
@@ -358,9 +358,9 @@ add_custom_command(
 add_custom_target(gen_gtm_threadgbl_deftypes
   DEPENDS ${YDB_BINARY_DIR}/${gtmthreadgblasmhdr} ${YDB_BINARY_DIR}/${gtmthreadgblasmfile})
 
-foreach(exp exe shr)
-  set(out gtm${exp}_symbols.export)
-  set(in ${YDB_SOURCE_DIR}/sr_unix/gtm${exp}_symbols.exp)
+foreach(exp ydbexe yottadb)
+  set(out ${exp}_symbols.export)
+  set(in ${YDB_SOURCE_DIR}/sr_unix/${exp}_symbols.exp)
   add_custom_command(
     OUTPUT ${out}
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
@@ -368,7 +368,7 @@ foreach(exp exe shr)
     )
 endforeach()
 
-add_custom_target(gen_export DEPENDS gtmexe_symbols.export gtmshr_symbols.export)
+add_custom_target(gen_export DEPENDS ydbexe_symbols.export yottadb_symbols.export)
 
 foreach(lib
   mumps
@@ -389,9 +389,9 @@ endif()
 function(add_executable target)
   _add_executable(${target} ${ARGN})
   set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
-  # Since all utilities now dlopen() libgtmshr.so at startup, add a dependency to not build the utilities
-  # until libgtmshr.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
-  add_dependencies(${target} libgtmshr gen_gtm_threadgbl_deftypes)
+  # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
+  # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
+  add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
   # And add system libraries as a target library for all utilities (e.g. dlopen() etc.).
   target_link_libraries(${target}	${libsyslibs})
 endfunction()
@@ -413,7 +413,7 @@ set_target_properties(gtmsecshr_real PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
 target_link_libraries(gtmsecshr_real	libmumps)	# needed for static linking since this is a setuid executable
-							# and does not do a dlopen of libgtmshr.so
+							# and does not do a dlopen of libyottadb.so
 
 add_executable(mupip			${mupip_SOURCES})
 list(APPEND with_export mupip)
@@ -439,15 +439,15 @@ add_executable(semstat2		 	${semstat2_SOURCES})
 
 add_executable(ftok 			${ftok_SOURCES})
 
-add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
-set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
-target_link_libraries(libgtmshr libmumps)
-set_target_properties(libgtmshr PROPERTIES
-  LINK_FLAGS "${libgtmshr_link} -Wl,-Map=libgtmshr.map"
-  LINK_DEPENDS "${libgtmshr_dep}"
+add_library(libyottadb MODULE ${libyottadb_SOURCES})
+set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
+target_link_libraries(libyottadb libmumps)
+set_target_properties(libyottadb PROPERTIES
+  LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
+  LINK_DEPENDS "${libyottadb_dep}"
   )
-add_dependencies(libgtmshr gen_export)
-add_dependencies(mumps libgtmshr)
+add_dependencies(libyottadb gen_export)
+add_dependencies(mumps libyottadb)
 
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)
@@ -579,7 +579,7 @@ install(TARGETS
   ftok
   gtmsecshr
   mupip
-  libgtmshr
+  libyottadb
   DESTINATION ${YDB_INSTALL_DIR}
   )
 install(TARGETS gtmsecshr_real DESTINATION ${YDB_INSTALL_DIR}/gtmsecshrdir)

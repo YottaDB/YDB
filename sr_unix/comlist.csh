@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -651,7 +651,7 @@ if ( ! -x $gtm_dist/mumps ) then
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
-set gtmshr_size = `ls -l $gtm_exe/libgtmshr$gt_ld_shl_suffix |awk '{print $5}'`
+set yottadb_size = `ls -l $gtm_exe/libyottadb$gt_ld_shl_suffix |awk '{print $5}'`
 
 cd $p3
 

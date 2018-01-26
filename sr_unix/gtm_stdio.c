@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -64,7 +67,7 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	sigset_t	savemask;
 
 	/* Note: cannot use SIGPROCMASK below because this function is used by "gtmsecshr" and using SIGPROCMASK
-	 * pulls in a lot of stuff from libgtmshr.so (due to asserts) and we want minimal stuff in "gtmsecshr".
+	 * pulls in a lot of stuff from libyottadb.so (due to asserts) and we want minimal stuff in "gtmsecshr".
 	 */
 	if (blocksig_initialized)
 		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);	/* BYPASSOK(sigprocmask) */

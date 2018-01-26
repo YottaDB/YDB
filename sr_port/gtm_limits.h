@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +44,7 @@
 /* Now define our version which includes space for a terminating NULL byte */
 #define	GTM_PATH_MAX	PATH_MAX + 1
 /* The maximum path to the GT.M distribution is complicated by the paths underneath $gtm_dist.
- * At the top level, there is libgtmshr.{so,sl,dll} which is roughly 12 characters plus 1 for the
+ * At the top level, there is libyottadb.so which is roughly 12 characters plus 1 for the
  * slash. The path length of gtmsecshrdir/gtmsecshr doesn't  come into play because
  * $gtm_dist/gtmsecshr will change directory to $gtm_dist/gtmsecshrdir (13 characters including the
  * leading slash) and then exec gtmsecshr, avoiding the maximum path issue. Going to "UTF-8" mode adds

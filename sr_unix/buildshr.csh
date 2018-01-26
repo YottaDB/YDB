@@ -4,6 +4,9 @@
 # Copyright (c) 2001-2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -76,10 +79,10 @@ if ( $buildshr_status != 0 ) then
 endif
 
 set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o -lmumps -lgnpclient -lcmisockettcp"
-set nolibgtmshr = "no"	# by default build libgtmshr
+set nolibyottadb = "no"	# by default build libyottadb
 
 if ($gt_image == "bta") then
-	set nolibgtmshr = "yes"	# if bta build, build a static mumps executable
+	set nolibyottadb = "yes"	# if bta build, build a static mumps executable
 endif
 
 if ("OS/390" == $HOSTOS) then
@@ -87,46 +90,46 @@ if ("OS/390" == $HOSTOS) then
 else
 	set exp = "export"
 endif
-$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.$exp
+$shell $gtm_tools/genexport.csh $gtm_tools/yottadb_symbols.exp yottadb_symbols.$exp
 
 # The below is used to generate an export file that is specific to executables. Typically used to export
 # some symbols from utility progs like mupip, dse, lke etc
 
-$shell $gtm_tools/genexport.csh $gtm_tools/gtmexe_symbols.exp gtmexe_symbols.$exp
+$shell $gtm_tools/genexport.csh $gtm_tools/ydbexe_symbols.exp ydbexe_symbols.$exp
 
-if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
-	# Building libgtmshr.so shared library
+if ($nolibyottadb == "no") then	# do not build libyottadb.so for bta builds
+	# Building libyottadb.so shared library
 	set aix_loadmap_option = ''
 	set aix_binitfini_option = ''
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = \
-		"-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
-		# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
-		rm -f $3/libgtmshr$gt_ld_shl_suffix
-		# Define gtmci_cleanup as a termination routine for libgtmshr on AIX.
+		"-bcalls:$gtm_map/libyottadb.loadmap -bmap:$gtm_map/libyottadb.loadmap -bxref:$gtm_map/libyottadb.loadmap"
+		# Delete old yottadb since AIX linker fails to overwrite an already loaded shared library.
+		rm -f $3/libyottadb$gt_ld_shl_suffix
+		# Define gtmci_cleanup as a termination routine for libyottadb on AIX.
 		set aix_binitfini_option = "-binitfini::gtmci_cleanup"
 	endif
 
 	set echo
 	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
-		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
-		${gt_ld_linklib_options} $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/libgtmshr.map
+		${gt_ld_option_output}$3/libyottadb$gt_ld_shl_suffix \
+		${gt_ld_linklib_options} $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/libyottadb.map
 	@ exit_status = $status
 	unset echo
 	if ( $exit_status != 0 ) then
 		@ buildshr_status++
-		echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
+		echo "buildshr-E-linkyottadb, Failed to link yottadb (see ${dollar_sign}gtm_map/libyottadb.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	else if ( ($HOSTOS == "Linux") && (-e /usr/bin/chcon) ) then
 		# Successful build -- for Linux builds use chcon to enable usage of executable (later SELinux platforms)
 		# Note that this command only works on filesystems that support context info so because it may fail,
 		# (and if it does, it is irrelevent) we merrily ignore the output. It either works or it doesn't.
-		chcon -t texrel_shlib_t $3/libgtmshr$gt_ld_shl_suffix >& /dev/null
+		chcon -t texrel_shlib_t $3/libyottadb$gt_ld_shl_suffix >& /dev/null
 	endif
 	if ($HOSTOS == "OS/390") then
-		cp $gtm_obj/gtmshr_symbols.$exp $3/
+		cp $gtm_obj/yottadb_symbols.$exp $3/
 	endif
-	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libgtmshr.so
+	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libyottadb.so
 endif
 
 # Building mumps executable

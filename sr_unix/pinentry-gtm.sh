@@ -3,6 +3,9 @@
 #                                                               #
 # Copyright (c) 2010-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -42,10 +45,10 @@ if [ -n "$gtm_passwd" -a -x "$gtm_dist/mumps" ] ; then
 		if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
 			utfodir="/utf8"
 		fi
-		# $gtmroutines is not set in the environment, attempt to pick it up from libgtmutil.so,
+		# $gtmroutines is not set in the environment, attempt to pick it up from libyottadbutil.so,
 		# $gtm_dist, $gtm_dist/plugin/o
-		if [ -e "$gtm_dist/libgtmutil.so" ] ; then
-			gtmroutines="$gtm_dist/libgtmutil.so"
+		if [ -e "$gtm_dist/libyottadbutil.so" ] ; then
+			gtmroutines="$gtm_dist/libyottadbutil.so"
 			export gtmroutines
 		elif [ -e "$gtm_dist/PINENTRY.o" ] ; then
 			pinentry=PINENTRY
