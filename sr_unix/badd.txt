@@ -1,6 +1,9 @@
 #################################################################
 #								#
-#	Copyright 2011, 2013 Fidelity Information Services, Inc	#
+# Copyright 2011, 2013 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -18,7 +21,7 @@ gtmcshrc.gtc%-r-xr-x--- gtmbase
 gtmhelp.dat%-r-xr-x--- gtmcshrc
 gtmsecshr%-r-xr-x--- gtmprofile
 gtmsecshr%-r-xr-x--- gtmprofile_preV54000
-lke%-r-xr-x--- libgtmutil.so
+lke%-r-xr-x--- libyottadbutil.so
 
 pro/plugin:
 zzz_insert%dr-xr-x--- o
@@ -32,7 +35,7 @@ TTTGEN.m -> ../TTTGEN.m%lrwxrwxrwx README.txt -> ../README.txt
 dse -> ../dse%lrwxrwxrwx custom_errors_sample.txt -> ../custom_errors_sample.txt
 gtmstart.gtc -> ../gtmstart.gtc%-r-sr-x--- gtmsecshr
 gtmstart.gtc -> ../gtmstart.gtc%dr-x------ gtmsecshrdir
-lke -> ../lke%-r-xr-x--- libgtmutil.so
+lke -> ../lke%-r-xr-x--- libyottadbutil.so
 
 pro/utf8/gtmsecshrdir:
 zzz_insert%-r-s------ gtmsecshr

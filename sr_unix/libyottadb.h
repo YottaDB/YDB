@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ ydb_status_t	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *ar
 		unsigned int *has_ret_value);
 void 		ydb_zstatus(char* msg, int len);
 
-/* Other entry points accessable in libgtmshr. */
+/* Other entry points accessable in libyottadb.so */
 ydb_status_t	gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
 void		gtm_hiber_start(ydb_uint_t mssleep);
 void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);

@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,11 +36,7 @@ GBLDEF		int		gid_list_len = 0;
 GBLREF		char		gtm_dist[GTM_PATH_MAX];
 GBLREF		boolean_t	gtm_dist_ok_to_use;
 
-#if defined(__MVS__)
-#	define LIBGTMSHR "%s/libgtmshr.dll"
-#else
-#	define LIBGTMSHR "%s/libgtmshr.so"
-#endif
+#define LIBYOTTADB "%s/libyottadb.so"
 
 /* Get the process's group list and stash the information to avoid repeated calls */
 void gtm_init_gid_list(void)
@@ -74,9 +73,9 @@ boolean_t	gtm_gid_in_gid_list(gid_t gid)
 			return TRUE;
 	return FALSE;
 }
-/* Return the group id of the distribution based on libgtmshr.xx[x]. If there is some
- * problem accessing that file then return INVALID_GID which signals no change to group.  Otherwise,
- * the pointer to the stat buffer will contain the result of the call to STAT_FILE.
+/* Return the group id of the distribution based on libyottadb.so.
+ * If there is some problem accessing that file then return INVALID_GID which signals no change to group.
+ * Otherwise, the pointer to the stat buffer will contain the result of the call to STAT_FILE.
  */
 gid_t	gtm_get_group_id(struct stat *stat_buff)
 {
@@ -92,8 +91,8 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 	}
 	if (gtm_dist_ok_to_use)
 	{
-		/* build a path to libgtmshr.so or .sl on hpux or .dll on zos */
-		SNPRINTF(temp, SIZEOF(temp), LIBGTMSHR, gtm_dist);
+		/* build a path to libyottadb.so */
+		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADB, gtm_dist);
 		STAT_FILE(temp, stat_buff, ret_stat);
 		if (0 == ret_stat)
 		{

@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -94,7 +97,7 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 }
 #endif
 
-int gc_load_gtmshr_symbols()
+int gc_load_yottadb_symbols()
 {
 /* CYGWIN TODO: This is to fix a linker error. Undo when it is fixed. */
 #	if !defined(USE_SYSLIB_FUNCS) && !defined(__CYGWIN__)

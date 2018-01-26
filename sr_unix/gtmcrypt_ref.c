@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,10 +40,6 @@
 #include "gtmcrypt_dbk_ref.h"
 #include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
-
-#ifdef __MVS__
-#define GTMSHR_IMAGENAME	"libgtmshr.dll"
-#endif
 
 #define CHECK_IV_LENGTH(IV)									\
 {												\
@@ -81,7 +80,7 @@ gtm_status_t gtmcrypt_init(gtm_int_t flags)
 
 	if (gtmcrypt_inited)
 		return 0;
-	if (0 != gc_load_gtmshr_symbols())
+	if (0 != gc_load_yottadb_symbols())
 		return -1;
 #	ifdef USE_GCRYPT
 	gcry_set_log_handler(gtm_gcry_log_handler, NULL);

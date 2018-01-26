@@ -253,10 +253,10 @@ if ( $?gtm_version_change == "1" ) then
 
 	# -M		generate link map onto standard output
 	setenv	gt_ld_options_common	"-Wl,-M"
-	setenv 	gt_ld_options_gtmshr	"-Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong"
-	setenv 	gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export"
+	setenv 	gt_ld_options_yottadb	"-Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong"
+	setenv 	gt_ld_options_yottadb	"$gt_ld_options_yottadb -Wl,-u,gtm_filename_to_id -Wl,--version-script,yottadb_symbols.export"
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
-	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
+	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,ydbexe_symbols.export"
 
   	# optimize for all 64bit platforms
  	#
@@ -288,7 +288,7 @@ if ( $?gtm_version_change == "1" ) then
 	# over-ride option.
         if ( "x86_64" == $mach_type && "32" == $gt_build_type ) then
 		setenv  gt_cc_options_common 	"$gt_cc_options_common -m32"
-		setenv  gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -m32"
+		setenv  gt_ld_options_yottadb	"$gt_ld_options_yottadb -m32"
                 setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
                 setenv  gt_ld_shl_options	"$gt_ld_shl_options -m32"
                 setenv  gt_ld_options_common	"$gt_ld_options_common -m32"

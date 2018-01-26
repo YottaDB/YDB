@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -369,7 +372,7 @@ void gtm_icu_init(void)
 	}
 #	ifdef __hpux
 	/* HP-UX dlsym() doesn't allow lookup for symbols that are present in the nested dependent shared libraries
-	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libgtmshr)
+	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libyottadb)
 	 * where all symbols would have been brought in by previous dlopen() with the RTLD_GLOBAL flag.
 	 */
 	handle = dlopen(NULL, ICU_LIBFLAGS);

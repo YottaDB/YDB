@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2014 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,5 +17,5 @@
 
 int main(int argc, char **argv, char **envp)
 {
-	return	dlopen_libgtmshr(argc, argv, envp, "gtm_main");
+	return	dlopen_libyottadb(argc, argv, envp, "gtm_main");
 }

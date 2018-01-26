@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	SETUP_THREADGBL_ACCESS;
 	if (image_type)
 	{	/* An image is already loaded. This is possible if a C function that did call-ins
-		 * (and hence has access to the symbols that libgtmshr.so exposes) invokes "dlopen_libgtmshr"
+		 * (and hence has access to the symbols that libyottadb.so exposes) invokes "dlopen_libyottadb"
 		 * more than once for different image types. Do not allow multiple images to be loaded.
 		 */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MIXIMAGE, 4, GTMIMAGENAMETXT(img_type), GTMIMAGENAMETXT(image_type));

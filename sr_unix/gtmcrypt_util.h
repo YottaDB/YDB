@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -235,7 +238,7 @@ GBLREF gtm_free_fnptr_t		gtm_free_fnptr;
 
 GBLREF	char			gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN];
 
-int				gc_load_gtmshr_symbols(void);
+int				gc_load_yottadb_symbols(void);
 void 				gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_ptr);
 int				gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty);
 int				gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out);

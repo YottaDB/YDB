@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -122,7 +122,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"
 	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
-	setenv	gt_ld_options_gtmshr	""
+	setenv	gt_ld_options_yottadb	""
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
 	setenv gt_ld_ci_u_option	"-Wl,-u,ydb_ci -Wl,-u,gtm_is_main_thread"
 
@@ -254,7 +254,7 @@ endif
 
 # Allow platform specific gt_ld_ci related symbol changes
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"
+setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_yottadb"
 # customization for non-GG environment
 if !($?gt_as_option_I) then
 	setenv	gt_as_option_I	"-I$gtm_inc"
