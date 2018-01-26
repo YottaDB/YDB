@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -424,7 +427,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		if (!(IS_GTM_IMAGE))
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
 					rename_fn_len, rename_fn);
-		STATUS_MSG(info, info->jnl_len, info->jnl, rename_fn, rename_fn_len);
+		STATUS_MSG(info, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 		return EXIT_ERR;
 	}
 	/* Following does rename of a.mjl_new to a.mjl.
