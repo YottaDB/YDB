@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -56,10 +56,8 @@ l1:
 ENTRY opp_zstepretarg
 	push	{r0, r1}
 	CHKSTKALIGN				/* Verify stack alignment */
+	bl	op_zstepretarg_helper
 	ldr	r12, [r5]
-	ldrh	r0, [r12, +#msf_typ_off]
-	tst	r0, #1
-	beq	l2
 	ldr	r1, =zstep_level
 	ldr	r1, [r1]
 	cmp	r1, r12
@@ -279,13 +277,11 @@ l11:
 ENTRY opp_zst_over_retarg
 	push	{r0, r1}
 	CHKSTKALIGN				/* Verify stack alignment */
+	bl	op_zst_over_retarg_helper
 	ldr	r12, [r5]
-	ldrh	r1, [r12, #msf_typ_off]
-	tst	r1, #1
-	beq	l12
+	ldr	r0, [r12, #msf_old_frame_off]
 	ldr	r1, =zstep_level
 	ldr	r1, [r1]
-	ldr	r0, [r12, #msf_old_frame_off]
 	cmp	r1, r0
 	bgt	l12
 	bl	op_zstepret

@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -53,10 +53,8 @@ ENTRY	opp_zstepretarg
 	CHKSTKALIGN					# Verify stack alignment
 	movq	REG64_RET0, save0(REG_SP)		# Save input regs
 	movq	REG64_RET1, save1(REG_SP)
+	call	op_zstepretarg_helper
 	movq	frame_pointer(REG_IP), REG64_ACCUM
-	movw	msf_typ_off(REG64_ACCUM), REG16_ARG2
-	testw	$1, REG16_ARG2
-	je	l2
 	movq	zstep_level(REG_IP), REG64_ARG2
 	cmpq	REG64_ACCUM, REG64_ARG2
 	jg	l2
@@ -230,12 +228,10 @@ ENTRY	opp_zst_over_retarg
 	CHKSTKALIGN					# Verify stack alignment
 	movq	REG64_RET0, save0(REG_SP)		# Save input regs
 	movq	REG64_RET1, save1(REG_SP)
+	call	op_zst_over_retarg_helper
 	movq	frame_pointer(REG_IP), REG64_ACCUM
-	movw	msf_typ_off(REG64_ACCUM), REG16_ARG2
-	testw	$1, REG16_ARG2
-	je	l12
-	movq	zstep_level(REG_IP), REG64_ARG2
 	movq	msf_old_frame_off(REG64_ACCUM), REG64_ACCUM
+	movq	zstep_level(REG_IP), REG64_ARG2
 	cmpq	REG64_ACCUM, REG64_ARG2
 	jg	l12
 	call	op_zstepret

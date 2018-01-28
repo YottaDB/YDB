@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,12 +58,10 @@ void op_zstep(uint4 code, mval *action)
 			break;
 		case ZSTEP_OVER:
 		case ZSTEP_OUTOF:
-
-			fp = frame_pointer;
 			for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-			{	if (fp->type & SFT_COUNT)
-				{	break;
-				}
+			{
+				if (fp->type & SFT_COUNT)
+					break;
 			}
 			zstep_level = (unsigned char *) fp;
 			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
