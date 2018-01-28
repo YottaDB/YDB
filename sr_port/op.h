@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -308,4 +308,6 @@ int	opp_zstepret();
 int	opp_zstepretarg();
 void	op_zut(mval *s);
 void	op_zwritesvn(int svn);
+void	op_zst_over_retarg_helper(void);
+void	op_zstepretarg_helper(void);
 #endif
