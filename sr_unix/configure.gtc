@@ -57,14 +57,14 @@ fi
 # Native shared library extension.
 ext=".so"
 
-isarm_gtm=`file mumps | grep -w "ARM" | wc -l`
-is64bit_gtm=`file mumps | grep -c "64-bit"`
+isarm_ydb=`file mumps | grep -w "ARM" | wc -l`
+is64bit_ydb=`file mumps | grep -c "64-bit"`
 
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
 elif [ "linux" = $arch ] ; then
 	ldflags="-shared"
-	if [ "$isarm_gtm" -eq 1 ] ; then
+	if [ "$isarm_ydb" -eq 1 ] ; then
 		ldcmd="cc" # On Linux/ARM only cc (not ld) creates a valid ELF header when compiling M routines
 	else
 		ldcmd="ld" # Linux - all platforms
@@ -284,9 +284,9 @@ if [ -d "utf8" ]; then
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
-	if [ $is64bit_gtm -eq 1 ] ; then
+	if [ $is64bit_ydb -eq 1 ] ; then
 		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu"
-	elif [ "$isarm_gtm" -eq 1 ] ; then
+	elif [ "$isarm_ydb" -eq 1 ] ; then
 		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/arm-linux-gnueabihf /lib32 /lib"
 	else
 		library_path="                 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
@@ -372,9 +372,9 @@ if [ -d "utf8" ]; then
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
 				fi
 				# Make sure both YottaDB and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
-				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
+				if [ "$is64bit_ydb" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
 					found_icu=1
-				elif [ "$is64bit_gtm" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
+				elif [ "$is64bit_ydb" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
 					found_icu=1
 				else
 					found_icu=0
@@ -704,7 +704,7 @@ if [ "$doutf8" -ne 0 ]; then
 			export LD_LIBRARY_PATH
 		fi
 		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
-		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libyottadbutil$ext *.o ; fi )
+		$ldcmd $ldflags -o libyottadbutil$ext *.o)
 	)
 fi
 
