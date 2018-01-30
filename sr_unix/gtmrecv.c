@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -68,8 +71,8 @@ GBLREF	void			(*call_on_signal)();
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_log_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
@@ -82,7 +85,7 @@ GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 LITREF	gtmImageName		gtmImageNames[];
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_INITORRESUME);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NORESYNCSUPPLONLY);
@@ -122,8 +125,8 @@ int gtmrecv(void)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
 	{

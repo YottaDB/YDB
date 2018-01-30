@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,11 +99,11 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	int offset = 0;
 	static int fileID = 0;
 	char tbuf[16];
-	char fileName[GTM_PATH_MAX];
+	char fileName[YDB_PATH_MAX];
 	time_t ctim;
 	struct tm *ltime;
 	FILE *fp;
-	char *gtm_dist;
+	char *ydb_dist;
 	int status;
 
 	ASSERT_IS_LIBGTCM;
@@ -112,30 +112,30 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
-	if (gtm_dist=getenv("gtm_dist"))
+	if (ydb_dist=getenv("ydb_dist"))
 	{
-	    	char subdir[GTM_PATH_MAX];
+	    	char subdir[YDB_PATH_MAX];
 		struct stat buf;
 
-		/* check for the subdirectory $gtm_dist/log/<omi_service>
+		/* check for the subdirectory $ydb_dist/log/<omi_service>
 		 * If the subdirectory exists, place the log file there.
-		 * Otherwise...place the file in $gtm_dist/log.
+		 * Otherwise...place the file in $ydb_dist/log.
 		 */
-		SNPRINTF(subdir, GTM_PATH_MAX, "%s/log/%s", gtm_dist, omi_service);
+		SNPRINTF(subdir, YDB_PATH_MAX, "%s/log/%s", ydb_dist, omi_service);
 		if (stat(subdir,&buf) == 0
 		    && S_ISDIR(buf.st_mode))
 		{
-		    SNPRINTF(fileName, GTM_PATH_MAX,"%s/%s_%s.%d", subdir, omi_service,
+		    SNPRINTF(fileName, YDB_PATH_MAX,"%s/%s_%s.%d", subdir, omi_service,
 			tbuf, fileID++);
 		}
 		else
 		{
-		    SNPRINTF(fileName, GTM_PATH_MAX,"%s/log/%s_%s.%d", gtm_dist, omi_service,
+		    SNPRINTF(fileName, YDB_PATH_MAX,"%s/log/%s_%s.%d", ydb_dist, omi_service,
 			    tbuf, fileID++);
 		}
 	}
 	else
-		SNPRINTF(fileName, GTM_PATH_MAX,"/usr/tmp/%s_%s.%d", omi_service,
+		SNPRINTF(fileName, YDB_PATH_MAX,"/usr/tmp/%s_%s.%d", omi_service,
 			tbuf, fileID++);
 
 #ifdef __MVS__

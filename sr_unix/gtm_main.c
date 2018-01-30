@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@
 #include "op.h"
 #include "tp_timeout.h"
 #include "ctrlc_handler.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "gtm_startup.h"
 #include "jobchild_init.h"
 #include "cli_parse.h"
@@ -56,8 +56,8 @@
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
 GBLREF	char				cli_err_str[];
-GBLREF	boolean_t			gtm_dist_ok_to_use;
-GBLREF	char				gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t			ydb_dist_ok_to_use;
+GBLREF	char				ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
 GBLREF	boolean_t			skip_dbtriggers;
 #if defined (GTM_TRIGGER) && (DEBUG)
@@ -84,7 +84,7 @@ error_def(ERR_TLSINIT);
 int gtm_main(int argc, char **argv, char **envp)
 {
 	char			*ptr, *eq, **p;
-	char			gtmlibxc[GTM_PATH_MAX];
+	char			gtmlibxc[YDB_PATH_MAX];
 	int             	eof, parse_ret;
 	int			gtmcrypt_errno;
 	int			status;
@@ -96,12 +96,12 @@ int gtm_main(int argc, char **argv, char **envp)
 
 	GTM_THREADGBL_INIT;
 	gtmenvp = envp;
-	gtm_dist_ok_to_use = TRUE;
 	common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	ydb_chk_dist(argv[0]);
 	cli_lex_setup(argc, argv);
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]
@@ -143,10 +143,9 @@ int gtm_main(int argc, char **argv, char **envp)
 	}
 	else if (cli_present("RUN"))
 		invocation_mode = MUMPS_RUN;
-	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
-	SNPRINTF(gtmlibxc, GTM_PATH_MAX, GTMXC_gblstat, gtm_dist);
+	SNPRINTF(gtmlibxc, YDB_PATH_MAX, GTMXC_gblstat, ydb_dist);
 	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
 	if (MUMPS_COMPILE != invocation_mode)

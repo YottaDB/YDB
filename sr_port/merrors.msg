@@ -141,10 +141,9 @@
 !  List of messages which are not reported by YottaDB standard error routines(rts_error etc.) but
 !  by PRINTFs. NOTE: if the value of any these messages changes in future, all its non-standard
 !  usages should be reflected with the new value.
-!	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
-!	ERR_DISTPATHMAX		150377682 (reported in gtm.c if $gtm_dist buffer is insufficient)
-!	ERR_DLLNOOPEN		150379250 (reported in gtm.c if libyottadb cannot be opened)
-!	ERR_DLLNORTN		150379258 (reported in gtm.c if gtm_main is not found in libyottadb)
+!	ERR_DISTPATHMAX		150377682 (reported in dlopen_libyottadb.c if $ydb_dist buffer is insufficient)
+!	ERR_DLLNOOPEN		150379250 (reported in dlopen_libyottadb.c if libyottadb cannot be opened)
+!	ERR_DLLNORTN		150379258 (reported in dlopen_libyottadb.c if a symbol name is not found in libyottadb)
 !	ERR_OPCOMMISSED		150381275 (sent via $SNDOPR in util_output.c if prior errors)
 !
 !  The following items must be followed by a tab (because they are parsed by tools/library/doc_tools/routines/diffm.m)
@@ -266,7 +265,7 @@ TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
 CORRUPTNODE	<Corrupt input in Record # !UL, Key #!UL; resuming with next global node>/error/fao=2!/ansi=0
 INDRMAXLEN	<Maximum length !UL of an indirection argument was exceeded>/error/fao=1!/ansi=0
-INSFFBCNT	<Insufficient byte count quota left for requested operation>/error/fao=0!/ansi=0
+UNUSEDMSG268	<INSFFBCNT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INTEGERRS	<Database integrity errors>/error/fao=0!/ansi=0
 INVCMD		<Invalid command keyword encountered>/warning/fao=0!/ansi=0
 INVFCN		<Invalid function name>/error/fao=0!/ansi=0
@@ -275,7 +274,7 @@ INVSVN		<Invalid special variable name>/error/fao=0!/ansi=8
 IOEOF		<Attempt to read past an end-of-file>/error/fao=0!/ansi=0
 IONOTOPEN	<Attempt to USE an I/O device which has not been opened>/error/fao=0!/ansi=0
 MUPIPINFO	<!AD>/info/fao=2!/ansi=0
-IVTIME		<Invalid time specification: !AD>/error/fao=2!/ansi=0
+UNUSEDMSG277	<IVTIME nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 JOBFAIL		<JOB command failure>/error/fao=0!/ansi=0
 JOBLABOFF	<Label and offset not found in created process>/error/fao=0!/ansi=13
 JOBPARNOVAL	<This job parameter cannot take a value>/error/fao=0!/ansi=0
@@ -388,14 +387,14 @@ ZLINKFILE	<Error while zlinking "!AD">/error/fao=2!/ansi=0
 ZPARSETYPE	<Illegal TYPE argument to $ZPARSE(): !AD>/error/fao=2!/ansi=0
 ZPARSFLDBAD	<Illegal $ZPARSE() field parameter: !AD>/error/fao=2!/ansi=0
 ZPIDBADARG	<The tvexpr must be FALSE if last $ZPID() not found>/error/fao=0!/ansi=0
-ZPRIVARGBAD	<!AD is not a legal privilege for $ZPRIV()>/error/fao=2!/ansi=0
-ZPRIVSYNTAXERR	<Privilege string cannot end with a comma>/error/fao=0!/ansi=0
+UNUSEDMSG390	<ZPRIVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG391	<ZPRIVSYNTAXERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZPRTLABNOTFND	<Label not found in routine>/error/fao=0!/ansi=13
 VIEWAMBIG	<View parameter !AD is ambiguous>/error/fao=2!/ansi=0
 VIEWNOTFOUND	<View parameter !AD not valid>/error/fao=2!/ansi=0
-ZSETPRVARGBAD	<!AD is not a legal privilege for $ZSETPRIV()>/error/fao=2!/ansi=0
+UNUSEDMSG395	<ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVSPECREC	<Invalid global modifier record>/error/fao=0!/ansi=0
-ZSETPRVSYNTAX	<$ZSETPRIV() privileges string cannot end with a comma>/error/fao=0!/ansi=0
+UNUSEDMSG397	<ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZSRCHSTRMCT	<Search stream identifier out of range>/error/fao=0!/ansi=0
 VERSION		<Version mismatch - This program must be recompiled>/error/fao=0!/ansi=0
 MUNOTALLSEC	<WARNING: not all global sections accessed were successfully rundown>/warning/fao=0!/ansi=0
@@ -418,8 +417,8 @@ ZCALLTABLE	<External call Table format error>/error/fao=0!/ansi=0
 ZCARGMSMTCH	<External call: Actual argument count, !UL, is greater than formal argument count, !UL>/error/fao=2!/ansi=58
 ZCCONMSMTCH	<External call: Too many input arguments>/error/fao=0!/ansi=58
 ZCOPT0		<External call: Qualifier OPTIONAL_0 can be used only with mechanisms REFERENCE or DESCRIPTOR>/error/fao=0!/ansi=0
-ZCSTATUS	<External call: Unsuccessful return status>/error/fao=0!/ansi=0
-ZCUSRRTN	<External call: Run-time error in user routine>/error/fao=0!/ansi=0
+UNUSEDMSG420	<ZCSTATUS nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG421	<ZCUSRRTN nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZCPOSOVR	<External call: Invalid overlapping of arguments in table position !UL>/error/fao=1!/ansi=0
 ZCINPUTREQ	<External call: Required input argument missing>/error/fao=0!/ansi=0
 JNLTNOUTOFSEQ	<End transaction [0x!16@XQ] of journal !AD different from Begin transaction [0x!16@XQ] of next generation journal !AD>/error/fao=6!/ansi=0
@@ -558,7 +557,7 @@ BACKUPCTRL	<Control Y or control C encountered during backup, aborting backup>/i
 NOCCPPID	<Cannot find CCP process id>/error/fao=0!/ansi=0
 CCPJNLOPNERR	<Error opening journal file.  Database not opened.>/error/fao=0!/ansi=0
 LCKSGONE	<Locks selected for deletion removed>/success/fao=0!/ansi=0
-ZLKIDBADARG	<The tvexpr must be FALSE if last ZLKID not found>/error/fao=0!/ansi=0
+UNUSEDMSG560	<ZLKIDBADARG nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 DBFILOPERR	<Error doing database I/O to region !AD>/error/fao=2!/ansi=0
 CCERDERR	<Error reading from database file !AD>/error/fao=2!/ansi=0
 CCEDBCL		<Database file !AD is clustered>/info/fao=2!/ansi=0
@@ -635,7 +634,7 @@ MTIOERR		<I/O Error with magnetic tape device !AD>/error/fao=2!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
-JOBARGMISSING	<Missing job argument !UL - can't skip non-trailing arguments to a JOB command in OpenVMS editions>/error/fao=1!/ansi=0
+UNUSEDMSG637	<JOBARGMISSING nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 RUNPARAMERR	<Error accessing parameter for run command>/error/fao=0!/ansi=0
 FNNAMENEG	<Depth argument to $NAME cannot be negative>/error/fao=0!/ansi=0
 ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi=0
@@ -673,7 +672,7 @@ CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/an
 CETOOLONG	<Compiler escape substitution exceeds maximum line size>/error/fao=0!/ansi=0
 CENOINDIR	<Indirection type information not available for compiler escape feature>/error/fao=0!/ansi=0
 COLLATIONUNDEF	<Collation type !UL is not defined>/error/fao=1!/ansi=0
-UNUSEDMSG673	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
+UNUSEDMSG675	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
@@ -700,7 +699,7 @@ DBBMINV		<!AD Bit map contains an invalid pattern> /info /fao=2!/ansi=0
 DBBMMSTR	<!AD Bit map does not match master map> /info /fao=2!/ansi=0
 DBROOTBURN	<!AD Root block has data level> /info /fao=2!/ansi=0
 REPLSTATEERR	<Replication state cannot be changed to the specified value for database file !AD>/error/fao=2!/ansi=0
-VMSMEMORY	<Central memory exhausted during request for !UL bytes from 0x!XJ - check page file quota and page file size>/fatal/fao=2!/ansi=0
+UNUSEDMSG702	<VMSMEMORY nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 DBDIRTSUBSC	<!AD Directory tree block contains non name-level entries> /info /fao=2!/ansi=0
 TIMEROVFL	<Timer overflow; interval probably too large> /error /fao=0!/ansi=0
 GTMASSERT	<!AD - Assert failed !AD line !UL>/fatal/fao=5!/ansi=0
@@ -726,7 +725,7 @@ JNLWRERR	<Error writing journal file !AD.  Unable to update header.>/error/fao=2
 FILEIDMATCH	<Saved File ID does not match the current ID - the file appears to have been moved>/error/fao=0!/ansi=0
 EXTSRCLIN	<!_!AD!/!_!AD>/info/fao=4!/ansi=0
 EXTSRCLOC	<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
-BIGNOACL	<Existing file found when BIGRECORD specified with UDF format but no GT.M ACE, perhaps lost during COPY>/error/fao=0!/ansi=0
+UNUSEDMSG728	<BIGNOACL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ERRCALL		<Error called from !AD line !UL>/error/fao=3!/ansi=0
 ZCCTENV		<Environmental variable for external package !AD not set>/error/fao=2!/ansi=0
 ZCCTOPN		<Unable to open external call table: !AD>/error/fao=2!/ansi=0
@@ -779,7 +778,7 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
-UNUSEDMSG779	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG781	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -847,11 +846,11 @@ BADGBLSECVER	<Global Section !AD does not match the current database version>/er
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
-DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
+DISTPATHMAX	<Executable path length is greater than maximum (!UL)>/error/fao=1!/ansi=0
 FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
-IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
-GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
+UNUSEDMSG851	<IMAGENAME nixed in r1.20>/error/fao=0!/ansi=0
+GTMSECSHRPERM	<The gtmsecshr module in $ydb_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
+YDBDISTUNDEF	<Environment variable $ydb_dist is not defined>/error/fao=0!/ansi=0
 SYSCALL		<Error received from system call !AD -- called from module !AD at line !UL>/error/fao=5!/ansi=0
 MAXGTMPATH	<The executing module path is greater than the maximum !UL>/error/fao=1!/ansi=0
 TROLLBK2DEEP	<Intended rollback(!SL) deeper than the current $tlevel(!UL)>/error/fao=2!/ansi=0
@@ -1000,8 +999,8 @@ JNLSETDATA2LONG	<SET journal record has data of length !UL.  Target system canno
 JNLNEWREC	<Target system cannot recognize journal record of type !UL, last recognized type is !UL>/error/fao=2!/ansi=0
 REPLFTOKSEM	<Error with replication semaphores for instance file !AD>/error/fao=2!/ansi=0
 SOCKNOTPASSED	<Socket message contained no passed socket descriptors>/error/fao=0!/ansi=0
-EXTRIOERR	<Error writing extract file !AD>/error/fao=2!/ansi=0
-EXTRCLOSEERR	<Error closing extract file !AD>/error/fao=2!/ansi=0
+UNUSEDMSG1002	<EXTRIOERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1003	<EXTRCLOSEERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 CONNSOCKREQ	<Socket not connected>/error/fao=0!/ansi=0
 REPLEXITERR	<Replication process encountered an error while exiting>/error/fao=0!/ansi=0
 MUDESTROYSUC	<Global section (!AD) corresponding to file !AD successfully destroyed>/info/fao=4!/ansi=0
@@ -1010,7 +1009,7 @@ MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destr
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!XL.>/warning/fao=5!/ansi=0
-TRUNCATEFAIL	<Truncating !AD from 0x!XL VMS blocks to 0x!XL blocks failed>/error/fao=4!/ansi=0
+UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
@@ -1242,7 +1241,7 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
-VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
+UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
 LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
@@ -1294,7 +1293,7 @@ RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
-GTMERREXIT	<YottaDB image has exited with errors>/error/fao=0!/ansi=0
+UNUSEDMSG1296	<GTMERREXIT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
 COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
@@ -1384,7 +1383,7 @@ WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
 REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
-ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
+UNUSEDMSG1386	<ZGOTOINVLVL2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
 JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
@@ -1488,7 +1487,7 @@ DBIOERR		<Error while doing write operation on region !AD (!AD)>/error/fao=4!/an
 INITORRESUME	<UPDATERESYNC on a Supplementary Instance must additionally specify INITIALIZE or RESUME>/error/fao=0!/ansi=0
 GTMSECSHRNOARG0	<gtmsecshr cannot identify its origin - argv[0] is null>/fatal/fao=0!/ansi=0
 GTMSECSHRISNOT	<gtmsecshr is not running as gtmsecshr but !AD - must be gtmsecshr>/fatal/fao=2!/ansi=0
-GTMSECSHRBADDIR	<gtmsecshr is not running from $gtm_dist/gtmsecshrdir or $gtm_dist cannot be determined>/fatal/fao=0!/ansi=0
+GTMSECSHRBADDIR	<gtmsecshr is not running from $ydb_dist/gtmsecshrdir or $ydb_dist cannot be determined>/fatal/fao=0!/ansi=0
 JNLBUFFREGUPD	<Journal file buffer size for region !AD has been adjusted from !UL to !UL.>/warning/fao=4!/ansi=0
 JNLBUFFDBUPD	<Journal file buffer size for database file !AD has been adjusted from !UL to !UL.>/warning/fao=4!/ansi=0
 LOCKINCR2HIGH	<Attempt to increment a LOCK more than !UL times>/error/fao=1!/ansi=0
@@ -1526,13 +1525,13 @@ NULLENTRYREF	<JOB command did not specify entryref>/error/fao=0!/ansi=0
 ZPEEKNORPLINFO	<$ZPEEK() unable to access requested replication structure>/error/fao=0!/ansi=0
 MMREGNOACCESS	<Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs>/error/fao=4!/ansi=0
 MALLOCMAXUNIX	<Exceeded maximum allocation defined by $gtm_max_storalloc>/error/fao=0!/ansi=0
-MALLOCMAXVMS	<Exceeded maximum allocation defined by GTM_MAX_STORALLOC>/error/fao=0!/ansi=0
+UNUSEDMSG1528	<MALLOCMAXVMS nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
 GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
 GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
 SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
-UNUSEDMSG1532	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG1534	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
 REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool>/error/fao=2!/ansi=0
 DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0
@@ -1542,7 +1541,7 @@ ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from gl
 GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
-UNUSEDMSG1542	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG1544	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
 ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load YottaDB TLS/SSL library for secure communication>/error/fao=0!/ansi=0
@@ -1569,7 +1568,7 @@ DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL
 BLKINVALID	<!XL is not a valid block as database file !AD has !XL total blocks>/error/fao=4!/ansi=0
 CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
 AIMGBLKFAIL	<After image build for block !XL in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
-GTMDISTUNVERIF	<Environment variable $gtm_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
+YDBDISTUNVERIF	<Environment variable $ydb_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
 CRYPTNOAPPEND	<APPEND disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOSEEK	<SEEK disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOTRUNC	<Not positioned at file start or EOF. TRUNCATE disallowed on the encrypted file !AD>/error/fao=2!/ansi=0

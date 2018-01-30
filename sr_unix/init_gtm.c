@@ -35,7 +35,7 @@
 #include "tp_timeout.h"
 #include "ctrlc_handler.h"
 #include "mprof.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "gtm_compile.h"
 #include "gtm_startup.h"
 #include "jobchild_init.h"

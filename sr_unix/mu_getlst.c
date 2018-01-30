@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,7 +70,7 @@ error_def(ERR_NOREGION);
 void mu_getlst(char *name, int4 size)
 {
 	boolean_t	matched, is_statsDB, is_autoDB;
-	char		*c1, *c2, *c3, *c4, fbuff[GTM_PATH_MAX], rbuff[GTM_PATH_MAX], fnbuff[GTM_PATH_MAX + 1];
+	char		*c1, *c2, *c3, *c4, fbuff[YDB_PATH_MAX], rbuff[YDB_PATH_MAX], fnbuff[YDB_PATH_MAX + 1];
 	gd_region	*reg;
 	tp_region	*list;
 	unsigned short	flen, i, rlen;

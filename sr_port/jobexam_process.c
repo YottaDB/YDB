@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,7 +70,6 @@ error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
-error_def(ERR_VMSMEMORY);
 
 void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 {
@@ -77,7 +79,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	boolean_t		saved_mv_stent;
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			rc, saved_util_outbuff_len;
-	char			save_dump_file_name_buff[GTM_PATH_MAX];
+	char			save_dump_file_name_buff[YDB_PATH_MAX];
 #	ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
@@ -214,7 +216,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	 */
 	if (process_exiting)
 	{
-		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
+		assert(YDB_PATH_MAX >= dump_file_spec->str.len);
 		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}

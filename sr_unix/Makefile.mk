@@ -24,17 +24,17 @@ algo = AES256CFB
 # If the machine has a libgcrypt version <= 1.4.1, then FIPS mode cannot be turned on.
 gcrypt_nofips = 0
 
-# Verify that $gtm_dist is defined
-ifndef gtm_dist
-$(error $$gtm_dist not defined!)
+# Verify that $ydb_dist is defined
+ifndef ydb_dist
+$(error $$ydb_dist not defined!)
 endif
 
-DISTDIR = $(gtm_dist)
+DISTDIR = $(ydb_dist)
 PLUGINDIR = $(DISTDIR)/plugin
 GTMCRYPTDIR = $(PLUGINDIR)/gtmcrypt
 CURDIR = `pwd`
 
-# Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
+# Find out whether we are already in $ydb_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
 # Users may install YottaDB without Unicode support
@@ -151,7 +151,7 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 endif
 
 # Common header and library paths
-IFLAGS += -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
+IFLAGS += -I /usr/local/include -I /usr/include -I $(ydb_dist) -I $(CURDIR)
 ifeq ($(BIT64),0)
 	LIBFLAGS += -L /usr/local/lib64
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
@@ -217,14 +217,14 @@ install: all
 	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
-	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 ifeq ($(HAVE_UNICODE),0)
 	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
-	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

@@ -27,7 +27,7 @@
 #include <locale.h>		/* needed for setlocale() */
 #include <langinfo.h>		/* needed for nl_langinfo() */
 #ifdef _AIX
-#include <gtm_limits.h>		/* needed for GTM_PATH_MAX */
+#include <gtm_limits.h>		/* needed for YDB_PATH_MAX */
 #include <sys/ldr.h>		/* needed for loadquery */
 #include <libgen.h>		/* needed for basename */
 #include <gtm_stat.h>
@@ -45,8 +45,8 @@
 
 #ifdef _AIX
 # define DELIM			":"
-# define MAX_SEARCH_PATH_LEN	GTM_PATH_MAX * 4 /* Give enough room for loadquery to give the search paths in the first time */
-# define ICU_LIBNAME_LEN	GTM_PATH_MAX
+# define MAX_SEARCH_PATH_LEN	YDB_PATH_MAX * 4 /* Give enough room for loadquery to give the search paths in the first time */
+# define ICU_LIBNAME_LEN	YDB_PATH_MAX
 # define ICU_NOT_FOUND_ERR	"Cannot find ICU library in the standard system library path (/usr/lib, /usr/lib64 etc.) or LIBPATH"
 #endif
 
@@ -221,7 +221,7 @@ void gtm_icu_init(void)
 	mstr		icu_ver, trans;
 #	ifdef _AIX
 	int		buflen, prev_dyn_size;
-	char            buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], real_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
+	char            buf[ICU_LIBNAME_LEN], temp_path[YDB_PATH_MAX], real_path[YDB_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
@@ -314,7 +314,7 @@ void gtm_icu_init(void)
 		each_libpath = STRTOK_R(search_path_ptr, DELIM, &strtokptr);
 		while (NULL != each_libpath)
 		{
-			SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
+			SNPRINTF(temp_path, YDB_PATH_MAX, "%s/%s", each_libpath, libname);
 			if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
 			{
 				each_libpath = STRTOK_R(NULL, DELIM, &strtokptr);

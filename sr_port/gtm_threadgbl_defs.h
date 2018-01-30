@@ -352,7 +352,7 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * commonly used Unicode characters only occupy up
 										 * to 3 bytes, the buffer would at least
 										 * accommodate 10 Unicode characters in a prompt */
-THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
+THREADGBLAR1DEF(tmp_object_file_name,		char,	YDB_PATH_MAX)		/* Hold temporary object name across routines */
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
 #ifdef UNICODE_SUPPORTED
 THREADGBLDEF(utfcgra,				utfcgr_area)			/* Lookaside cache for UTF8 parsing */

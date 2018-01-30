@@ -29,9 +29,10 @@ MBSTART {							\
 
 #define DOTM			".m"
 #define DOTOBJ			".o"
+#define YDB_DIST		"ydb_dist"
 #define GTM_DIST		"gtm_dist"
-#define GTM_IMAGE_NAME		"mumps"
-#define GTM_IMAGE_NAMELEN	(SIZEOF(GTM_IMAGE_NAME) - 1)
+#define YDB_IMAGE_NAME		"mumps"
+#define YDB_IMAGE_NAMELEN	(SIZEOF(YDB_IMAGE_NAME) - 1)
 #define	GTMSECSHR_NAME		"gtmsecshr"
 #define GTMSECSHR_NAMELEN	(SIZEOF(GTMSECSHR_NAME) - 1)
 

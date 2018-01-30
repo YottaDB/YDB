@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -307,9 +307,9 @@ STATICFNDEF int gtm_trigger_invoke(void)
 
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
-	char		rtnname[GTM_PATH_MAX + 1], rtnname_template[GTM_PATH_MAX + 1];
-	char		objname[GTM_PATH_MAX + 1];
-	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
+	char		rtnname[YDB_PATH_MAX + 1], rtnname_template[YDB_PATH_MAX + 1];
+	char		objname[YDB_PATH_MAX + 1];
+	char		zcomp_parms[(YDB_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
 	int		rtnfd, rc, lenrtnname, lenobjname, len, retry, save_errno;
@@ -368,9 +368,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
-	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
+	rc = SNPRINTF(rtnname_template, YDB_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
-	assert(GTM_PATH_MAX >= rc);
+	assert(YDB_PATH_MAX >= rc);
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */

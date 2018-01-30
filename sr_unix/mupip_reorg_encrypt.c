@@ -3,6 +3,9 @@
  * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -142,7 +145,7 @@ MBSTART {														\
  */
 void mupip_reorg_encrypt(void)
 {
-	char			key[GTM_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
+	char			key[YDB_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
 	char			*db_name, *bml_lcl_buff;
 	int			db_name_len, gtmcrypt_errno, status, reg_status, status1;
 	int			reg_count, i, total_blks, cycle, lcnt, bml_status;

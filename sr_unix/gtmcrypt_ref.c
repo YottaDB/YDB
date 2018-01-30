@@ -148,14 +148,14 @@ gtm_status_t gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm
 				gtm_string_t db_path, gtm_string_t iv)
 {
 	gtm_keystore_t		*entry;
-	char			filename[GTM_PATH_MAX], real_db_path[GTM_PATH_MAX];
+	char			filename[YDB_PATH_MAX], real_db_path[YDB_PATH_MAX];
 	char			*db_path_ptr;
 	gtm_cipher_ctx_t	**ctx;
 
 	GC_VERIFY_INITED;
 	/* Discard any previously recorded error messages. */
 	gtmcrypt_err_string[0] = '\0';
-	assert((GTM_PATH_MAX > db_path.length) && (0 <= db_path.length));
+	assert((YDB_PATH_MAX > db_path.length) && (0 <= db_path.length));
 	CHECK_IV_LENGTH(iv);
 	if (key_hash.length != GTMCRYPT_HASH_LEN)
 	{
@@ -213,7 +213,7 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 									 gtm_string_t iv, gtm_int_t operation)
 {
 	gtm_keystore_t		*entry;
-	char			keyname[GTM_PATH_MAX];
+	char			keyname[YDB_PATH_MAX];
 	gtm_cipher_ctx_t	**ctx;
 
 	GC_VERIFY_INITED;
@@ -222,7 +222,7 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 	CHECK_IV_LENGTH(iv);
 	/* NULL-terminating to ensure correct lookups. */
 	memcpy(keyname, key_name.address, key_name.length);
-	memset(keyname + key_name.length, 0, GTM_PATH_MAX - key_name.length);
+	memset(keyname + key_name.length, 0, YDB_PATH_MAX - key_name.length);
 	if (0 != gtmcrypt_getkey_by_keyname(keyname, NULL, &entry, FALSE))
 		return -1;
 	assert(NULL != entry);
@@ -247,14 +247,14 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 gtm_status_t gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t db_path, gtm_string_t key_path, gtm_string_t *hash_dest)
 {
 	gtm_keystore_t	*entry;
-	char		filename[GTM_PATH_MAX], real_db_path[GTM_PATH_MAX], real_key_path[GTM_PATH_MAX];
+	char		filename[YDB_PATH_MAX], real_db_path[YDB_PATH_MAX], real_key_path[YDB_PATH_MAX];
 	char		*key_path_ptr;
 
 	GC_VERIFY_INITED;
 	/* Discard any previously recorded error messages. */
 	gtmcrypt_err_string[0] = '\0';
-	assert((GTM_PATH_MAX > db_path.length) && (0 < db_path.length));
-	assert((GTM_PATH_MAX > key_path.length) && (0 <= key_path.length));
+	assert((YDB_PATH_MAX > db_path.length) && (0 < db_path.length));
+	assert((YDB_PATH_MAX > key_path.length) && (0 <= key_path.length));
 	memcpy(filename, db_path.address, db_path.length);
 	filename[db_path.length] = '\0';
 	/* Database path needs to be fully resolved before we can reliably use it, hence realpath-ing. */

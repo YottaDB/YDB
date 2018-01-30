@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license   If you do not know the terms of	*
@@ -25,7 +28,7 @@
 #define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2
 
 /* Length of the key name (which for databases is an absolute path to the file). */
-#define GTMCRYPT_MAX_KEYNAME_LEN	GTM_PATH_MAX
+#define GTMCRYPT_MAX_KEYNAME_LEN	YDB_PATH_MAX
 
 /* Definitions must match those in gtm_tls_interface.h */
 /* Flag to be used whenever password can be obtained interactively. */

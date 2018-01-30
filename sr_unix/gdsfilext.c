@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -217,7 +220,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
 	{
-		SYSTEM("$gtm_dist/mumps -run $gtm_wbox_mrtn");
+		SYSTEM("$ydb_dist/mumps -run $gtm_wbox_mrtn");
 		assert(1 == cs_addrs->nl->wbox_test_seq_num);	/* should have been set by mubfilcpy */
 		cs_addrs->nl->wbox_test_seq_num = 2;	/* signal mupip backup to stop sleeping in mubfilcpy */
 	}

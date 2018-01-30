@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -74,7 +77,7 @@ error_def(ERR_DBMAXREC2BIG);
 error_def(ERR_DBCKILLIP);
 error_def(ERR_DBCNOTSAMEDB);
 error_def(ERR_LOGTOOLONG);
-error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_YDBDISTUNDEF);
 
 /* Open the temporary file that hold the command(s) we are going to execute */
 void dbc_open_command_file(phase_static_area *psa)
@@ -83,25 +86,25 @@ void dbc_open_command_file(phase_static_area *psa)
 	int		rc, save_errno;
 	int4		status;
 	char		*dist_ptr;
-	mstr		gtm_dist_m, gtm_dist_path;
-	char		gtm_dist_path_buff[MAX_FN_LEN + 1];
+	mstr		ydb_dist_m, ydb_dist_path;
+	char		ydb_dist_path_buff[MAX_FN_LEN + 1];
 
 	assert(NULL != psa && NULL == psa->tcfp);
 	if (!psa->tmp_file_names_gend)
 		dbc_gen_temp_file_names(psa);
-	gtm_dist_m.addr = UNIX_ONLY("$")GTM_DIST;
-	gtm_dist_m.len = SIZEOF(UNIX_ONLY("$")GTM_DIST) - 1;
-	status = TRANS_LOG_NAME(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff, SIZEOF(gtm_dist_path_buff),
+	ydb_dist_m.addr = UNIX_ONLY("$")YDB_DIST;
+	ydb_dist_m.len = SIZEOF(UNIX_ONLY("$")YDB_DIST) - 1;
+	status = TRANS_LOG_NAME(&ydb_dist_m, &ydb_dist_path, ydb_dist_path_buff, SIZEOF(ydb_dist_path_buff),
 					dont_sendmsg_on_log2long);
 #ifdef UNIX
 	if (SS_LOG2LONG == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-				gtm_dist_m.len, gtm_dist_m.addr, SIZEOF(gtm_dist_path_buff) - 1);
+				ydb_dist_m.len, ydb_dist_m.addr, SIZEOF(ydb_dist_path_buff) - 1);
 	else
 #endif
 	if (SS_NORMAL != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-	assert(0 < gtm_dist_path.len);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+	assert(0 < ydb_dist_path.len);
 	VMS_ONLY(dbc_remove_command_file(psa));	/* If we don't do this, the command files versions pile up fast */
 	Fopen(psa->tcfp, (char_ptr_t)psa->tmpcmdfile, "w");
 	if (NULL == psa->tcfp)
@@ -113,8 +116,8 @@ void dbc_open_command_file(phase_static_area *psa)
 	}
 	UNIX_ONLY(dbc_write_command_file(psa, SHELL_START));
 	MEMCPY_LIT(psa->util_cmd_buff, SETDISTLOGENV);
-	memcpy(psa->util_cmd_buff + SIZEOF(SETDISTLOGENV) - 1, gtm_dist_path.addr, gtm_dist_path.len);
-	psa->util_cmd_buff[SIZEOF(SETDISTLOGENV) - 1 + gtm_dist_path.len] = 0;	/* Null temrinator */
+	memcpy(psa->util_cmd_buff + SIZEOF(SETDISTLOGENV) - 1, ydb_dist_path.addr, ydb_dist_path.len);
+	psa->util_cmd_buff[SIZEOF(SETDISTLOGENV) - 1 + ydb_dist_path.len] = 0;	/* Null temrinator */
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
 }
 
@@ -186,7 +189,7 @@ void dbc_run_command_file(phase_static_area *psa, char_ptr_t cmdname, char_ptr_t
 		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_DBCCMDFAIL, 7, rc, cmd_len, cmdbuf1, RTS_ERROR_TEXT(cmdname),
 			  RTS_ERROR_TEXT(cmdargs), ERR_TEXT, 2,
-			  RTS_ERROR_LITERAL("Note that the "UNIX_ONLY("environment variable $")VMS_ONLY("logical ")GTM_DIST
+			  RTS_ERROR_LITERAL("Note that the "UNIX_ONLY("environment variable $")VMS_ONLY("logical ")YDB_DIST
 					    " must point to the current GT.M V4 installation"));
 	}
 }

@@ -1,7 +1,7 @@
 2 About_YottaDB
    About YottaDB
 
-   YottaDB runs on a wide variety of computer platforms. Consult FIS for the
+   YottaDB runs on a wide variety of computer platforms. Consult YottaDB for the
    current list of Supported platforms.
 
    In addition to preserving the traditional features of M, YottaDB also offers
@@ -60,7 +60,7 @@
    stored as standard UNIX files. They are created and edited with standard
    UNIX text editors. YottaDB accepts source lines of up to 8192 bytes. When
    YottaDB encounters a line with a length greater than 8192 bytes in a source
-   file, it emits a %GTM-W-LSEXPECTED warning. This warning identifies cases
+   file, it emits a %YDB-W-LSEXPECTED warning. This warning identifies cases
    where a line greater than 8192 bytes is split into multiple lines, which
    causes statements beyond the character prior to the limit to execute
    irrespective of any starting IF, ELSE or FOR commands. The 8192 byte limit
@@ -122,16 +122,17 @@
 
    Copyright 1987 - 2003, 2013 - 2017
 
-   Fidelity Information Services, Inc. All rights reserved.
+   Fidelity National Information Services, Inc. and/or its subsidiaries. All
+   rights reserved.
+
+   Copyright 2017-2018 YottaDB LLC and/or its subsidiaries. All Rights Reserved.
 
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
-   GT.M(TM) is a trademark of Fidelity Information Services, Inc.
-
-   Copyright 2017 YottaDB LLC. All rights reserved.
+   GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
 
    YottaDB(TM) is a trademark of YottaDB LLC.
 
@@ -139,10 +140,16 @@
 
    This document contains a description of YottaDB and the operating
    instructions pertaining to the various functions that comprise the system.
-   This document does not contain any commitment of FIS. FIS believes the
-   information in this publication is accurate as of its publication date;
-   such information is subject to change without notice. FIS is not
-   responsible for any errors or defects.
+   This document does not contain any commitment of YottaDB. YottaDB believes
+   the information in this publication is accurate as of its publication
+   date; such information is subject to change without notice.  YottaDB is
+   not responsible for any errors or defects.
+
+   **Note**
+
+   This help file is a concise representation of the revision r1.20 of the
+   Administration and Operations Guide. To obtain a copy of the current
+   revision, go to https://docs.yottadb.com/ProgrammersGuide/index.html.
 
 1 Language_Extensions
    Language Extensions
@@ -393,12 +400,12 @@
 
    Example:
 
-   GTM>kill A,B
+   YDB>kill A,B
 
-   GTM>set A=1,*B=A ; B & A are aliases
-   GTM>write B
+   YDB>set A=1,*B=A ; B & A are aliases
+   YDB>write B
    1
-   GTM>
+   YDB>
 
    The following table summarizes Alias Variables extensions.
 
@@ -489,38 +496,38 @@
 
    Example
 
-   GTM>Set A=1,*B=A ; Create an array and an association
+   YDB>Set A=1,*B=A ; Create an array and an association
 
-   GTM>ZWRite ; Show that the array and association exist
+   YDB>ZWRite ; Show that the array and association exist
    A=1 ;*
    *B=A
-   GTM>Kill *A ; Remove the association for A - it now has no association and no array
-   GTM>ZWRite ; B is a traditional local variable
+   YDB>Kill *A ; Remove the association for A - it now has no association and no array
+   YDB>ZWRite ; B is a traditional local variable
    B=1
    Example:
-   GTM>Set A=2 ; add a value for A
+   YDB>Set A=2 ; add a value for A
 
-   GTM>ZWRite ; A and B have different values and both are traditional local variables
+   YDB>ZWRite ; A and B have different values and both are traditional local variables
    A=2
    B=1
-   GTM>
+   YDB>
 
    KILL on the other hand, removes data in the array (and possibly the array
    itself) without affecting any alias association.
 
-   GTM>Set A=2,*B=A ; Create an array and an association
+   YDB>Set A=2,*B=A ; Create an array and an association
 
-   GTM>ZWRite ; Both array and association exist
+   YDB>ZWRite ; Both array and association exist
    A=2 ;*
    *B=A
-   GTM>Kill A ; Kill the array
-   GTM>ZWRite ; There's no data to show - only the association
+   YDB>Kill A ; Kill the array
+   YDB>ZWRite ; There's no data to show - only the association
    *B=A
-   GTM>Set B=3 ; Create a new value
-   GTM>ZWRite ; The association was unaffected by the Kill
+   YDB>Set B=3 ; Create a new value
+   YDB>ZWRite ; The association was unaffected by the Kill
    A=3 ;*
    *B=A
-   GTM>
+   YDB>
 
    Example:
 
@@ -568,17 +575,17 @@
    A=1
    C=4
    Example:
-   GTM>Set A=1,*B=A ; Create an array and association
-   GTM>ZWRite ; Verify that it's there
+   YDB>Set A=1,*B=A ; Create an array and association
+   YDB>ZWRite ; Verify that it's there
    A=1 ;*
    *B=A
-   GTM>Kill (A) ; Kill everything except A
-   GTM>ZWRite ; Demonstrate that A also has no array
-   GTM>Set A=2 ; Create an array
-   GTM>ZWRite ; The association survived the Kill
+   YDB>Kill (A) ; Kill everything except A
+   YDB>ZWRite ; Demonstrate that A also has no array
+   YDB>Set A=2 ; Create an array
+   YDB>ZWRite ; The association survived the Kill
    A=2 ;*
    *B=A
-   GTM>
+   YDB>
 
 3 Examples
    Examples
@@ -784,12 +791,12 @@
    which suffices for English, and many single-language applications.
 
    All YottaDB components related to M mode reside in the top level directory in
-   which a YottaDB release is installed and the environment variable gtm_dist
+   which a YottaDB release is installed and the environment variable ydb_dist
    should points to that directory for M mode processes. All Unicode-related
    components reside in the utf8 subdirectory and the environment variable
-   gtm_dist should point to that subdirectory for UTF-8 mode processes. So,
+   ydb_dist should point to that subdirectory for UTF-8 mode processes. So,
    in addition to the values of the environment variables gtm_chset and
-   LC_ALL/LC_CTYPE, gtm_dist for a UTF-8 process should also point to the
+   LC_ALL/LC_CTYPE, ydb_dist for a UTF-8 process should also point to the
    utf8 subdirectory.
 
    M mode and UTF-8 mode are set for the process, not for the database. As a
@@ -928,7 +935,7 @@
    |------------------------+-----------------------------------------------|
    |                        | $ZPROM[PT] contains a string value specifying |
    |                        | the current Direct Mode prompt. By default,   |
-   |                        | GTM> is the Direct Mode prompt. M routines    |
+   |                        | YDB> is the Direct Mode prompt. M routines    |
    |                        | can modify $ZPROMPT by means of a SET         |
    |                        | command. $ZPROMPT cannot exceed 31 bytes. If  |
    |                        | an attempt is made to assign $ZPROMPT to a    |
@@ -1022,7 +1029,7 @@
    |                        |                                               |
    |                        | 09-OCT-2006 04:27:53 ZWR                      |
    |                        |                                               |
-   |                        | GT.M MUPIP EXTRACT UTF-8                      |
+   |                        | YottaDB MUPIP EXTRACT UTF-8                      |
    |                        |                                               |
    | MUPIP                  | ^A="************"                             |
    |                        |                                               |
@@ -1200,7 +1207,7 @@
    evolve.
 
    An operating system's distribution generally includes an ICU library
-   tailored to the OS and hardware, therefore FIS does not provide any ICU
+   tailored to the OS and hardware, therefore YottaDB does not provide any ICU
    library. In order to support Unicode functionality, YottaDB requires an
    appropriate version of ICU to be installed on the system - check the
    release notes for your YottaDB release for supported ICU versions.
@@ -1348,7 +1355,7 @@
    When a command refers to an M routine that is not part of the current
    image, YottaDB automatically attempts to ZLINK and, if necessary, compile
    that routine. In Direct Mode, the most common method to invoke the
-   compiler through an auto-ZLINK is to enter DO ^routinename at the GTM>
+   compiler through an auto-ZLINK is to enter DO ^routinename at the YDB>
    prompt. When the current image does not contain the routine, YottaDB does the
    following:
 
@@ -1364,11 +1371,11 @@
 
    Example:
 
-   GTM>do ^payroll
-   GTM>do ^taxes
+   YDB>do ^payroll
+   YDB>do ^taxes
 
    This uses the M DO command to invoke the YottaDB compiler implicitly from the
-   GTM> prompt if the routine requires new object code. When the compiler
+   YDB> prompt if the routine requires new object code. When the compiler
    runs, it produces two object module files, payroll.o and taxes.o.
 
    If you receive error messages from the compilation, you may fix them
@@ -1390,8 +1397,8 @@
 
    Example:
 
-   GTM>zlink "payroll"
-   GTM>zlink "taxes.m"
+   YDB>zlink "payroll"
+   YDB>zlink "taxes.m"
 
    The first ZLINK compiles payroll.m if it cannot locate payroll, or if it
    finds that payroll.m has a more recent date/time stamp than payroll.o. The
@@ -1482,7 +1489,7 @@
    generated when a routine is linked and stay in the private memory of each
    process. As the use of -DYNAMIC_LITERALS increases object code size, and
    as the dynamic loading and unloading only saves memory when the object
-   code is in shared libraries, FIS recommends restricting the use of
+   code is in shared libraries, YottaDB recommends restricting the use of
    -DYNAMIC_LITERALS to only when compiling object code to be loaded into
    shared libraries or executed from an auto relink enabled directory.
 
@@ -1568,7 +1575,7 @@
    memory usage may or may not compensate for the incremental cost of
    dynamically loading and unloading the data structures, and as the
    performance of routines vs. inline code can be affected by the
-   availability of routines in cache, FIS suggests benchmarking to determine
+   availability of routines in cache, YottaDB suggests benchmarking to determine
    the combination of qualifiers best suited to each workload. Note that
    applications can freely mix routines compiled with different combinations
    of qualifiers.
@@ -1674,7 +1681,7 @@
 
    Example:
 
-   GTM>ZLINK "taxes"
+   YDB>ZLINK "taxes"
 
    If ZLINK finds taxes.m or taxes.o, the command adds the routine taxes to
    the current image. When ZLINK cannot locate taxes.o, or when it finds
@@ -1709,7 +1716,7 @@
 
    Example:
 
-   GTM>zlink "_MGR"
+   YDB>zlink "_MGR"
 
    This ZLINK links the M routine %MGR into the current image.
 
@@ -1787,12 +1794,12 @@
 3 Entering_Direct_Mode
    Entering Direct Mode
 
-   To enter Direct Mode, type $gtm_dist/mumps -direct at the shell prompt.
+   To enter Direct Mode, type $ydb_dist/mumps -direct at the shell prompt.
 
-   $ $gtm_dist/mumps -direct
-   GTM>
+   $ $ydb_dist/mumps -direct
+   YDB>
 
-   This shows using $gtm_dist/mumps -direct at the prompt to enter Direct
+   This shows using $ydb_dist/mumps -direct at the prompt to enter Direct
    Mode.
 
    To create a gtm alias in your shell startup file (in the example below the
@@ -1804,7 +1811,7 @@
 
     2. Add a function to the file to define your gtm alias:
 
-       gtm(){ $gtm_dist/mumps -direct}
+       gtm(){ $ydb_dist/mumps -direct}
 
     3. Save the file.
 
@@ -1814,7 +1821,7 @@
    Example:
 
    $ gtm
-   GTM>
+   YDB>
 
    This shows that the gtm alias typed at the shell prompt also takes you to
    the Direct Mode.
@@ -1829,7 +1836,7 @@
    Command Recall
 
    Direct Mode includes a line command recall function to display previously
-   entered command lines. Use <CTRL-B> or the Up Arrow key at the GTM> prompt
+   entered command lines. Use <CTRL-B> or the Up Arrow key at the YDB> prompt
    to scroll back through command lines. Use the Down Arrow key to scroll
    forward through the command lines. YottaDB displays one command line at a
    time.You may delete and reenter characters starting at the end of a
@@ -1860,17 +1867,17 @@
 
    Example:
 
-   GTM>write $zgbldir
+   YDB>write $zgbldir
    /usr/lib/fis-gtm/V5.4-002B_x86/mumps.gld
-   GTM>set $zgbldir="test.gld"
-   GTM>set a=10
-   GTM>set b=a
-   GTM>recall
+   YDB>set $zgbldir="test.gld"
+   YDB>set a=10
+   YDB>set b=a
+   YDB>recall
    1 set b=a
    2 set a=10
    3 set $zgbldir="test.gld"
    4 write $zgbldir
-   GTM>
+   YDB>
 
    This REC[ALL] command displays the previously entered commands.
 
@@ -1879,8 +1886,8 @@
 
    Example:
 
-   GTM>recall 2
-   GTM>set a=10
+   YDB>recall 2
+   YDB>set a=10
 
    This RECALLs the line number two (2).
 
@@ -1889,8 +1896,8 @@
 
    Example:
 
-   GTM>recall write
-   GTM>write $zgbldir
+   YDB>recall write
+   YDB>write $zgbldir
 
    This RECALLs "WRITE", the command most recently beginning with this text.
    Note that the RECALL command text is case sensitive. The RECALL command
@@ -2264,15 +2271,15 @@
    $ export gtmgbldir
    $ GTM
 
-   GTM>WRITE $ZGBLDIR
+   YDB>WRITE $ZGBLDIR
    TEST.GLD
-   GTM>WRITE ^A
+   YDB>WRITE ^A
    THIS IS ^A IN DATABASE RED
-   GTM>WRITE ^|"M1.GLD"|A
+   YDB>WRITE ^|"M1.GLD"|A
    THIS IS ^A IN DATABASE WHITE
-   GTM>WRITE $ZGBLDIR
+   YDB>WRITE $ZGBLDIR
    TEST.GLD
-   GTM>HALT
+   YDB>HALT
 
    $ echo gtmgbldir
    TEST.GLD
@@ -2282,11 +2289,11 @@
 
    Example:
 
-   GTM>WRITE $ZGBLDIR
+   YDB>WRITE $ZGBLDIR
    M1.GLD
-   GTM>WRITE ^A
+   YDB>WRITE ^A
    THIS IS ^A IN DATABASE WHITE
-   GTM>WRITE ^|"M1.GLD"|A
+   YDB>WRITE ^|"M1.GLD"|A
    THIS IS ^A IN DATABASE WHITE
 
    The statement WRITE ^|"M1.GLD"|A is equivalent to WRITE ^A.
@@ -2296,7 +2303,7 @@
 
    Example:
 
-   GTM>WRITE ^|"M1.GLD"|A,!,^|"M2.GLD"|A,!,^|"M3.GLD"
+   YDB>WRITE ^|"M1.GLD"|A,!,^|"M2.GLD"|A,!,^|"M3.GLD"
    |A,!
    THIS IS ^A IN DATABASE WHITE
    THIS IS ^A IN DATABASE BLUE
@@ -2338,9 +2345,9 @@
 
    Example:
 
-   GTM>write """"
+   YDB>write """"
    "
-   GTM>
+   YDB>
 
    The WRITE displays a single quotation mark because the first quotation
    mark delimits the beginning of the string literal, the next two quotation
@@ -2352,9 +2359,9 @@
 
    Example:
 
-   GTM>WRITE "A"_$CHAR(9)_"B"
+   YDB>WRITE "A"_$CHAR(9)_"B"
    A B
-   GTM>
+   YDB>
 
    The WRITE displays an "A," followed by a tab (<HT>), followed by a "B"
    using $CHAR(), to introduce the non-graphic character.
@@ -2367,9 +2374,9 @@
 
    Example:
 
-   GTM>WRITE 1
+   YDB>WRITE 1
    1
-   GTM> WRITE 1.1
+   YDB> WRITE 1.1
    1.1
 
    These display numeric literals that are integer and decimal.
@@ -2381,11 +2388,11 @@
 
    Example:
 
-   GTM>WRITE 8E6
+   YDB>WRITE 8E6
    8000000
-   GTM> WRITE 8E-6
+   YDB> WRITE 8E-6
    .000008
-   GTM>
+   YDB>
 
    **Caution**
 
@@ -2475,32 +2482,32 @@
 
    Example:
 
-   GTM>WRITE 1+1
+   YDB>WRITE 1+1
    2
-   GTM>WRITE 2-1
+   YDB>WRITE 2-1
    1
-   GTM>WRITE 2*2
+   YDB>WRITE 2*2
    4
-   GTM>WRITE 3**2
+   YDB>WRITE 3**2
    9
-   GTM>WRITE 4/2
+   YDB>WRITE 4/2
    2
-   GTM>WRITE 7
+   YDB>WRITE 7
    2
-   GTM>WRITE 7#3
+   YDB>WRITE 7#3
    1
-   GTM>
+   YDB>
 
    This simple example demonstrates how each arithmetic binary operation uses
    numeric literals.
 
    Example:
 
-   GTM>WRITE +"12ABC"
+   YDB>WRITE +"12ABC"
    12
-   GTM>WRITE --"-3-4"
+   YDB>WRITE --"-3-4"
    -3
-   GTM>
+   YDB>
 
    The first WRITE shows the unary plus sign (+) operation forcing the
    numeric evaluation of a string literal. The second WRITE demonstrates the
@@ -2531,44 +2538,44 @@
 
    Example:
 
-   GTM>WRITE '0
+   YDB>WRITE '0
    1
-   GTM>WRITE '1
+   YDB>WRITE '1
    0
-   GTM>WRITE '5689
+   YDB>WRITE '5689
    0
-   GTM>WRITE '-1
+   YDB>WRITE '-1
    0
-   GTM>WRITE '"ABC"
+   YDB>WRITE '"ABC"
    1
-   GTM>
+   YDB>
 
    The above example demonstrates the unary NOT operation. Note that any
    non-zero numeric value is true and has a false negation.
 
    Example:
 
-   GTM>WRITE 0&0
+   YDB>WRITE 0&0
    0
-   GTM>WRITE 1&0
+   YDB>WRITE 1&0
    0
-   GTM>WRITE 0&1
+   YDB>WRITE 0&1
    0
-   GTM>WRITE 1&1
+   YDB>WRITE 1&1
    1
-   GTM>WRITE 2&1
+   YDB>WRITE 2&1
    1
-   GTM>WRITE 0!0
+   YDB>WRITE 0!0
    0
-   GTM>WRITE 1!0
+   YDB>WRITE 1!0
    1
-   GTM>WRITE 0!1
+   YDB>WRITE 0!1
    1
-   GTM>WRITE 1!1
+   YDB>WRITE 1!1
    1
-   GTM>WRITE 2!1
+   YDB>WRITE 2!1
    1
-   GTM>
+   YDB>
 
    The above example demonstrates all cases covered by the binary logical
    operators.
@@ -2584,11 +2591,11 @@
 
    Example:
 
-   GTM>WRITE "B"_"A"
+   YDB>WRITE "B"_"A"
    BA
-   GTM>WRITE "A"_1
+   YDB>WRITE "A"_1
    A1
-   GTM>
+   YDB>
 
    The above example demonstrates M concatenation.
 
@@ -2622,21 +2629,21 @@
 
    Example:
 
-   GTM>WRITE 1>2
+   YDB>WRITE 1>2
    0
-   GTM>WRITE 1<2
+   YDB>WRITE 1<2
    1
-   GTM>
+   YDB>
 
    The above example demonstrates the basic arithmetic relational operations.
 
    Example:
 
-   GTM>WRITE 1'<2
+   YDB>WRITE 1'<2
    0
-   GTM>WRITE 2'<1
+   YDB>WRITE 2'<1
    1
-   GTM>
+   YDB>
 
    The above example demonstrates combinations of arithmetic, relational
    operators with the logical NOT operator.
@@ -2678,21 +2685,21 @@
 
    Example:
 
-   GTM>WRITE "A"="B"
+   YDB>WRITE "A"="B"
    0
-   GTM>WRITE "C"="C"
+   YDB>WRITE "C"="C"
    1
-   GTM>WRITE "A"["B"
+   YDB>WRITE "A"["B"
    0
-   GTM>WRITE "ABC"["C"
+   YDB>WRITE "ABC"["C"
    1
-   GTM>WRITE "A"]"B"
+   YDB>WRITE "A"]"B"
    0
-   GTM>WRITE "B"]"A"
+   YDB>WRITE "B"]"A"
    1
-   GTM>WRITE "A"]]"B"
+   YDB>WRITE "A"]]"B"
    0
-   GTM>WRITE "B"]]"A"
+   YDB>WRITE "B"]]"A"
    1
 
    These examples demonstrate the string relational operators using string
@@ -2700,13 +2707,13 @@
 
    Example:
 
-   GTM>WRITE 2]10
+   YDB>WRITE 2]10
    1
-   GTM>WRITE 2]]10
+   YDB>WRITE 2]]10
    0
-   GTM>WRITE 0]"$"
+   YDB>WRITE 0]"$"
    1
-   GTM>WRITE 0]]"$"
+   YDB>WRITE 0]]"$"
    0
 
    These examples illustrate that when using the primary ASCII character set,
@@ -2715,19 +2722,19 @@
 
    Example:
 
-   GTM>WRITE 1=1
+   YDB>WRITE 1=1
    1
-   GTM>WRITE 1=2
+   YDB>WRITE 1=2
    0
-   GTM>WRITE 1="1"
+   YDB>WRITE 1="1"
    1
-   GTM>WRITE 1=01
+   YDB>WRITE 1=01
    1
-   GTM>WRITE 1="01"
+   YDB>WRITE 1="01"
    0
-   GTM>WRITE 1=+"01"
+   YDB>WRITE 1=+"01"
    1
-   GTM>
+   YDB>
 
    These examples illustrate the dual nature of the equal sign operator. If
    both expressions are string or numeric, the results are straight forward.
@@ -2736,11 +2743,11 @@
 
    Example:
 
-   GTM>WRITE "a"'="A"
+   YDB>WRITE "a"'="A"
    1
-   GTM>WRITE "FRED"'["RED"
+   YDB>WRITE "FRED"'["RED"
    0
-   GTM>WRITE "ABC"']""
+   YDB>WRITE "ABC"']""
    0
 
    These examples demonstrate combinations of the string relational operators
@@ -2807,9 +2814,9 @@
 
    Example:
 
-   GTM>WRITE "ABC"?3U
+   YDB>WRITE "ABC"?3U
    1
-   GTM>WRITE "123-45-6789"?3N1"-"2N1"-"4N
+   YDB>WRITE "123-45-6789"?3N1"-"2N1"-"4N
    1
 
    The first WRITE has a simple one-element pattern while the second has
@@ -3016,7 +3023,7 @@
    they are available only during compilation and inaccessible to other
    routines and to indirection or XECUTE. Because references to local labels
    preceding their position in a routine produce a LABELUNKNOWN error at
-   run-time, FIS recommends omitting the routinename from labelrefs to a
+   run-time, YottaDB recommends omitting the routinename from labelrefs to a
    local label. Using local labels reduces object size and linking overhead
    for both all types for dynamic linking except indirection and XECUTE. Use
    of local labels may either improve or impair performance; typically any
@@ -3082,8 +3089,8 @@
 
    Example:
 
-   GTM>set x="^INDER"
-   GTM>do @x
+   YDB>set x="^INDER"
+   YDB>do @x
 
    This example is equivalent to do ^INDER.
 
@@ -3095,11 +3102,11 @@
 
    Example:
 
-   GTM>set x="HOOP",b="x"
-   GTM>set a="HULA "_@b
-   GTM>write a
+   YDB>set x="HOOP",b="x"
+   YDB>set a="HULA "_@b
+   YDB>write a
    HULA HOOP
-   GTM>
+   YDB>
 
    This example uses indirection within a concatenation operation.
 
@@ -3110,8 +3117,8 @@
 
    Example:
 
-   GTM>set lab="START",routine="PROG"
-   GTM>do @lab^@routine
+   YDB>set lab="START",routine="PROG"
+   YDB>do @lab^@routine
 
    This example is equivalent to do START^PROG.
 
@@ -3122,8 +3129,8 @@
 
    Example:
 
-   GTM>FOR p="1U.20A1"",""1U.20A",5N IF x?@p QUIT
-   GTM>ELSE WRITE !,"Incorrect format" QUIT
+   YDB>FOR p="1U.20A1"",""1U.20A",5N IF x?@p QUIT
+   YDB>ELSE WRITE !,"Incorrect format" QUIT
 
    This example uses pattern code indirection to test x for either a name or
    a number.
@@ -3139,8 +3146,8 @@
 
    Example:
 
-   GTM>SET from="B",to="^A(15)",x=""
-   GTM>FOR SET x=$O(@from@(x)) Q:x="" S @to@(x)=@from@(x)
+   YDB>SET from="B",to="^A(15)",x=""
+   YDB>FOR SET x=$O(@from@(x)) Q:x="" S @to@(x)=@from@(x)
 
    This example uses name indirection to copy the level contents of a local
    array to a part of a global array. The example assumes that all existing
@@ -3219,7 +3226,7 @@
 
    Example:
 
-   GTM>DO MULT(3,X,.RESULT)
+   YDB>DO MULT(3,X,.RESULT)
 
      o 3 - a numeric literal
      o X - a local variable
@@ -3485,9 +3492,9 @@
    IF X<0 SET X=-X,S=1
    FOR X=1:1:X S T=T*V
    QUIT $S(S:1/T,1:T)
-   GTM> WRITE $$^POWER(3,4)
+   YDB> WRITE $$^POWER(3,4)
    81
-   GTM>
+   YDB>
 
    **Note**
 
@@ -3518,11 +3525,11 @@
 
    Example:
 
-   GTM>ZPRINT ^DAYOWEEK
+   YDB>ZPRINT ^DAYOWEEK
    DAYOWEEK();extrinsic special variable to
    ;provide the day of the week
    QUIT $ZD($H,"DAY")
-   GTM>WRITE $$DAYOWEEK^DAYOWEEK
+   YDB>WRITE $$DAYOWEEK^DAYOWEEK
    MON
 
 2 Transaction_Processing
@@ -3602,7 +3609,7 @@
     SET ^ID(NEXT)=RECORD,^XID(ZIP,NEXT)=""
     TCOMMIT
 
-   %GTM-I-TPRESTART, Database /gbls/dtx/dtx.dat; code: L; blk: 0x00BA13DD in glbl: ^DTX; pvtmods: 0, blkmods: 1, blklvl: 1, type: 4, readset: 3, writeset: 1, local_tn: 0x00000000000002D0, zpos: LABEL+108^ROUTINENAME
+   %YDB-I-TPRESTART, Database /gbls/dtx/dtx.dat; code: L; blk: 0x00BA13DD in glbl: ^DTX; pvtmods: 0, blkmods: 1, blklvl: 1, type: 4, readset: 3, writeset: 1, local_tn: 0x00000000000002D0, zpos: LABEL+108^ROUTINENAME
 
      * pvtmods - Is always less than or equal to blkmods. This means it can
        be 1 only if "blkmods" is also 1. If it is 1, it means that process P1
@@ -3695,7 +3702,7 @@
 
    Example:
 
-   GTM>ZPRINT ^br
+   YDB>ZPRINT ^br
    br;
          kill
          for i=1:1:3 do break;
@@ -3705,25 +3712,25 @@
          break:$data(x) "write ""OK"",!":x,"write ""Wrong again"",!":'x
          set x=$increment(x,$data(x))
          quit
-   GTM>DO ^br
+   YDB>DO ^br
    Iteration 1    x=<UNDEF>
    Iteration 2    x=0
-   %GTM-I-BREAK, Break instruction encountered
+   %YDB-I-BREAK, Break instruction encountered
                At M source location break+2^br
-   GTM>ZCONTINUE
+   YDB>ZCONTINUE
    Wrong again
-   %GTM-I-BREAK, Break instruction encountered
+   %YDB-I-BREAK, Break instruction encountered
                At M source location break+2^br
-   GTM>ZCONTINUE
+   YDB>ZCONTINUE
    Iteration 3    x=1
    OK
-   %GTM-I-BREAK, Break instruction encountered
+   %YDB-I-BREAK, Break instruction encountered
                At M source location break+2^br
-   GTM>ZCONTINUE
-   %GTM-I-BREAK, Break instruction encountered
+   YDB>ZCONTINUE
+   %YDB-I-BREAK, Break instruction encountered
                At M source location break+2^br
-   GTM>ZCONTINUE
-   GTM>
+   YDB>ZCONTINUE
+   YDB>
 
    This uses a BREAK with both command and argument postconditionals. The
    actions display debugging messages.
@@ -3752,7 +3759,7 @@
 
    Example:
 
-   GTM>DO ^%RD
+   YDB>DO ^%RD
 
    This example invokes the routine directory utility program (%RD) from
    Direct Mode. The caret symbol (^) specifies that the DO command invokes
@@ -3760,7 +3767,7 @@
 
    Example:
 
-   GTM>DO A(3)
+   YDB>DO A(3)
 
    This example invokes the subroutine at label A and passes the value 3 as a
    parameter. The DO argument does not have a caret symbol (^), therefore, it
@@ -3782,15 +3789,15 @@
 
    Example:
 
-   GTM>zprint ^SQR
+   YDB>zprint ^SQR
    SQR(z);
      set revert=0
      if $view("undef") set revert=1 view "noundef"
      if z="" write "Missing parameter.",!     view:revert "undef" quit
      else  write z*z,! view:revert "undef" quit
-   GTM>do ^SQR(10)
+   YDB>do ^SQR(10)
    100
-   GTM>do ^SQR
+   YDB>do ^SQR
    Missing parameter.
 
    This examples demonstrates label invocations using DO with and without
@@ -3856,15 +3863,15 @@
 
    Example:
 
-   GTM>Kill i For i=1:1:5 Write !,i
+   YDB>Kill i For i=1:1:5 Write !,i
    1
    2
    3
    4
    5
-   GTM>Write i
+   YDB>Write i
    5
-   GTM>
+   YDB>
 
    This FOR loop has a control variable, i, which has the value one (1) on
    the first iteration, then the value two (2), and so on, until in the last
@@ -3874,11 +3881,11 @@
 
    Example:
 
-   GTM>FOR x="hello",2,"goodbye" WRITE !,x
+   YDB>FOR x="hello",2,"goodbye" WRITE !,x
    hello
    2
    goodbye
-   GTM>
+   YDB>
 
    This FOR loop uses the control variable x and a series of arguments that
    have no increments or limits. Notice that the control variable may have a
@@ -3886,10 +3893,10 @@
 
    Example:
 
-   GTM>For x="hello":1:-1 Write !,x
-   GTM>ZWRite x
+   YDB>For x="hello":1:-1 Write !,x
+   YDB>ZWRite x
    x=0
-   GTM>
+   YDB>
 
    Because the argument has an increment, the FOR initializes the control
    variable x to the numeric evaluation of "hello" (0). Then, YottaDB never
@@ -3899,18 +3906,18 @@
 
    Example:
 
-   GTM>For y=-1:-3:-6,y:4:y+10,"end" Write !,y
+   YDB>For y=-1:-3:-6,y:4:y+10,"end" Write !,y
    -1
    -4
    -4
    0
    4
    end
-   GTM>
+   YDB>
 
    Example:
 
-   GTM>Set x="" For  Set x=$Order(ar(x)) Quit:x=""  Write !,x
+   YDB>Set x="" For  Set x=$Order(ar(x)) Quit:x=""  Write !,x
 
 2 Goto
    Goto
@@ -3927,7 +3934,7 @@
 
    Example:
 
-   GTM>GOTO TIME+4
+   YDB>GOTO TIME+4
 
    This GOTO command transfers control from Direct Mode to the line that is
    four (4) lines after the line labeled TIME (in the currently active
@@ -3956,7 +3963,7 @@
    Example:
 
    $ gtm
-   GTM>HALT
+   YDB>HALT
    $
 
    Because we invoke this YottaDB image interactively, the HALT in Direct Mode
@@ -4043,9 +4050,9 @@
 
    Example:
 
-   GTM>Set X=1,Y=1,Z=2 Kill UNDEF
-   GTM>If X=1,Y=1,Z=3,UNDEF=0 Write "HI"
-   GTM>
+   YDB>Set X=1,Y=1,Z=2 Kill UNDEF
+   YDB>If X=1,Y=1,Z=3,UNDEF=0 Write "HI"
+   YDB>
 
    The IF command causes YottaDB to cease executing the line after it determines
    Z is not equal to three (3). Therefore, YottaDB never evaluates the reference
@@ -4053,10 +4060,10 @@
 
    Example:
 
-   GTM>Set X=1 Kill UNDEF
-   GTM>If X=1!(UNDEF=3) Write "HI"
+   YDB>Set X=1 Kill UNDEF
+   YDB>If X=1!(UNDEF=3) Write "HI"
    HI
-   GTM>
+   YDB>
 
 2 Job
    Job
@@ -4214,7 +4221,7 @@
 
    Example:
 
-   GTM>JOB ^TEST("V54001","")
+   YDB>JOB ^TEST("V54001","")
 
    This creates a job that starts doing the routine ^TEST (with 2 parameters)
    in the current working directory.
@@ -4246,9 +4253,9 @@
 
    Example:
 
-   GTM>Kill  Set a=0,a(1)=1,a(1,1)="under" KILL a(1) ZWR
+   YDB>Kill  Set a=0,a(1)=1,a(1,1)="under" KILL a(1) ZWR
    a=0
-   GTM>
+   YDB>
 
    This uses an argumentless KILL to get a "fresh start" by deleting all
    existing local variables. After SETting a, a(1), and a(1,1), the KILL
@@ -4256,7 +4263,7 @@
 
    Example:
 
-   GTM>Kill (a,b),^AB(a,b)
+   YDB>Kill (a,b),^AB(a,b)
 
    The first argument (an exclusive KILL) specifies to KILL all local
    variables except a and b. The second argument deletes ^AB(a,b) and any
@@ -4314,7 +4321,7 @@
    data. However, an application that adheres to clearly defined conventions
    of LOCKing before any access can indirectly achieve such an effect.
 
-   FIS recommends implementing database Consistency using transaction
+   YottaDB recommends implementing database Consistency using transaction
    processing rather than LOCKs. If you wish to avoid YottaDB's use of
    optimistic concurrency for TP, place the LOCK just before the original
    TSTART and release it after the final TCOMMIT.
@@ -4328,7 +4335,7 @@
    ZDEALLOCATE actions produces a BADLOCKNEST error except where there is
    only one such argument, it is the first argument in the list and the
    LOCK'ng as a consequence of the extrinsic function(s) is simple. Note that
-   this pattern may still produce some unintended outcomes, so FIS recommends
+   this pattern may still produce some unintended outcomes, so YottaDB recommends
    against its use.
 
 2 Merge
@@ -4347,29 +4354,29 @@
 
    Example:
 
-   GTM>Set ^gbl1="one"
+   YDB>Set ^gbl1="one"
 
-   GTM>Set ^gbl1(1,1)="oneone"
-   GTM>Set ^gbl1(1,1,3)="oneonethree"
-   GTM>Set ^gbl1(1,2,4)="onetwofour"
-   GTM>Set ^gbl2(2)="gbl2_2"
-   GTM>Set ^gbl2(2,1,3)="gbl2_2_1_3"
-   GTM>Set ^gbl2(2,1,4,5)="gbl2_2_1_4_5"
-   GTM>Merge ^gbl1(1)=^gbl2(2)
-   GTM>WRITE $Reference
+   YDB>Set ^gbl1(1,1)="oneone"
+   YDB>Set ^gbl1(1,1,3)="oneonethree"
+   YDB>Set ^gbl1(1,2,4)="onetwofour"
+   YDB>Set ^gbl2(2)="gbl2_2"
+   YDB>Set ^gbl2(2,1,3)="gbl2_2_1_3"
+   YDB>Set ^gbl2(2,1,4,5)="gbl2_2_1_4_5"
+   YDB>Merge ^gbl1(1)=^gbl2(2)
+   YDB>WRITE $Reference
    ^gbl1(1)
-   GTM>ZWRite ^gbl1
+   YDB>ZWRite ^gbl1
    ^gbl1="one"
    ^gbl1(1)="gbl2_2"
    ^gbl1(1,1)="oneone"
    ^gbl1(1,1,3)="gbl2_2_1_3"
    ^gbl1(1,1,4,5)="gbl2_2_1_4_5"
    ^gbl1(1,2,4)="onetwofour"
-   GTM>ZWRITE ^gbl2
+   YDB>ZWRITE ^gbl2
    ^gbl2(2)="gbl2_2"
    ^gbl2(2,1,3)="gbl2_2_1_3"
    ^gbl2(2,1,4,5)="gbl2_2_1_4_5"
-   GTM>
+   YDB>
 
    This example illustrates how MERGE copies a sub-tree of one global into
    another. The nodes in the sub-tree of ^gbl(2), for which $DATA() value is
@@ -4387,17 +4394,17 @@
 
    Example:
 
-   GTM>Kill
+   YDB>Kill
 
-   GTM>Set ^gbl(1,2)="1,2"
-   GTM>Merge lcl(3,4)=^gbl(1)
-   GTM>Set ^("naked")=2
-   GTM>ZWRite ^gbl
+   YDB>Set ^gbl(1,2)="1,2"
+   YDB>Merge lcl(3,4)=^gbl(1)
+   YDB>Set ^("naked")=2
+   YDB>ZWRite ^gbl
    ^gbl(1,2)="1,2"
    ^gbl("naked")=2
-   GTM>ZWRite lcl
+   YDB>ZWRite lcl
    lcl(3,4,2)="1,2"
-   GTM>
+   YDB>
 
    This example illustrates how MERGE creates a sub-tree of a variable when
    the variable does not exist. Also, notice how the naked indicator is set
@@ -4659,12 +4666,12 @@
 
    Example:
 
-   GTM>Kill  Set a="x",(b,c)=1,@a="hello" ZWRite
+   YDB>Kill  Set a="x",(b,c)=1,@a="hello" ZWRite
    a=x
    b=1
    c=1
    x="hello"
-   GTM>
+   YDB>
 
    The KILL command deletes any previously defined local variables. The SET
    command has three arguments. The first shows a simple direct assignment.
@@ -4674,7 +4681,7 @@
 
    Example:
 
-   GTM>Set ^(3,4)=^X(1,2)
+   YDB>Set ^(3,4)=^X(1,2)
 
    As YottaDB evaluates the right-hand side of the equal sign before the
    left-hand side within a SET argument, the right-hand expression determines
@@ -4683,24 +4690,24 @@
 
    Example:
 
-   GTM>Kill x Set $Piece(x,"^",2)="piece 3" ZWRite x
+   YDB>Kill x Set $Piece(x,"^",2)="piece 3" ZWRite x
    x="^^piece 3"
-   GTM>
+   YDB>
 
    This SET demonstrates a "set piece" and shows how SET generates missing
    delimiters when required.
 
    Example:
 
-   GTM>Set x="I love hotdogs"
+   YDB>Set x="I love hotdogs"
 
-   GTM>Set $Extract(x,3,6)="want"
-   GTM>Write x
+   YDB>Set $Extract(x,3,6)="want"
+   YDB>Write x
    I want hotdogs
-   GTM>Set $Extract(x,7)=" many "
-   GTM>Write x
+   YDB>Set $Extract(x,7)=" many "
+   YDB>Write x
    I want many hotdogs
-   GTM>
+   YDB>
 
    The SET $EXTRACT command replaces and extracts the specified characters
    with the value of the expression on the right hand side of the equal-sign
@@ -4708,15 +4715,15 @@
 
    Example:
 
-   GTM>kill A,B
+   YDB>kill A,B
 
-   GTM>set A=1,A(1)=1,A(2)=2
-   GTM>set *B=A ; A & B are aliases.
-   GTM>zwrite B
+   YDB>set A=1,A(1)=1,A(2)=2
+   YDB>set *B=A ; A & B are aliases.
+   YDB>zwrite B
    B=1 ;*
    B(1)=1
    B(2)=2
-   GTM>
+   YDB>
 
    This SET * command creates an alias associated between A and B. It
    associates the entire tree of nodes of A including its root and all
@@ -4724,16 +4731,16 @@
 
    Example:
 
-   GTM>kill A,B,C
+   YDB>kill A,B,C
 
-   GTM>set A=1,*C(2)=A ; C(2) is a container
-   GTM>zwrite
+   YDB>set A=1,*C(2)=A ; C(2) is a container
+   YDB>zwrite
    A=1 ;*
    *C(2)=A
-   GTM>set *B=C(2) ; B is now an alias
-   GTM>write B,":",$length(C(2)),":" ; An alias variable provides access but a container doesn't
+   YDB>set *B=C(2) ; B is now an alias
+   YDB>write B,":",$length(C(2)),":" ; An alias variable provides access but a container doesn't
    1:0:
-   GTM>
+   YDB>
 
    This SET * command creates an alias by dereferencing an alias container.
 
@@ -4902,7 +4909,7 @@
 
    Example:
 
-   GTM>VIEW "BREAKMSG":5
+   YDB>VIEW "BREAKMSG":5
 
    In this example the BREAKMSG value is 5, representing the sum of 1 and 4.
    This enables BREAKS within the body of a program (value 1) and for a
@@ -4924,7 +4931,7 @@
    encounter malformed byte sequences. With this setting, YottaDB detects and
    clearly reports potential application program logic errors as soon as they
    appear. As an illegal UTF-8 character in the argument of a
-   character-oriented function likely indicates a logic issue, FIS recommends
+   character-oriented function likely indicates a logic issue, YottaDB recommends
    using VIEW "BADCHAR" in production environments.
 
    **Note**
@@ -5044,7 +5051,7 @@
 
    Database block certification causes YottaDB to check the internal integrity
    of every block as it writes the block. Block certification degrades
-   performance and exists primarily as a tool for use by FIS. The default is
+   performance and exists primarily as a tool for use by YottaDB. The default is
    GDSCERT:0.
 
 4 GVSRESET
@@ -5176,7 +5183,7 @@
    **Note**
 
    There are no visible effects from LV_GCOL, LV_REHASH, and STP_GCOL except
-   for the passage of time depending on the state of your process. FIS uses
+   for the passage of time depending on the state of your process. YottaDB uses
    these VIEW "LV_GCOL","LV_REHASH","STP_GCOL" facilities in testing. They
    are documented to ensure completeness in product documentation. You may
    (or may not) find them useful during application development for debugging
@@ -5191,7 +5198,7 @@
    **Note**
 
    There are no visible effects from LV_REHASH, LV_GCOL, and STP_GCOL except
-   for the passage of time depending on the state of your process. FIS uses
+   for the passage of time depending on the state of your process. YottaDB uses
    these VIEW "LV_GCOL","LV_REHASH","STP_GCOL" facilities in testing. They
    are documented to ensure completeness in product documentation. You may
    (or may not) find them useful during application development for debugging
@@ -5222,7 +5229,7 @@
    **Important**
 
    Remember that for global variables, empty string subscript checking is
-   controlled by a database region characteristic. FIS recommends using
+   controlled by a database region characteristic. YottaDB recommends using
    LVNULLSUBS, NOLVNULLSUBS, or NEVERLVNULLSUBS for local variables and
    NULLSUBS options ALWAYS or NEVER for global variables.
 
@@ -5290,7 +5297,7 @@
    routine was found there. It merely means it was looked for there and shows
    a cycle number (which ZRUPDATE bumps) whose change indicates a new
    published version of the given object file. As it is a diagnostic tool for
-   the new feature, FIS may remove or modify this VIEW option in subsequent
+   the new feature, YottaDB may remove or modify this VIEW option in subsequent
    releases.
 
    **Note**
@@ -5337,7 +5344,7 @@
    **Note**
 
    There are no visible effects from STP_GCOL, LV_GCOL and LV_REHASH except
-   for the passage of time depending on the state of your process. FIS uses
+   for the passage of time depending on the state of your process. YottaDB uses
    these VIEW "LV_GCOL","LV_REHASH","STP_GCOL" facilities in testing. They
    are documented to ensure completeness in product documentation. You may
    (or may not) find them useful during application development for debugging
@@ -5397,7 +5404,7 @@
 
    Example:
 
-   GTM>zprint ^profiling
+   YDB>zprint ^profiling
    ; In this example, query^profiling, order^profiling, and merge^profling perform the same operation -- store even-numbered subscripts of a global to a subscripted loc
    al variable. M-profiling results show which yields the fastest execution between the three.
    profiling
@@ -5441,7 +5448,7 @@
    On a Ubuntu system running GTM V6.1-000_x86_64, this example produces an
    output like the following:
 
-   GTM>do ^profiling
+   YDB>do ^profiling
    ^trc("*CHILDREN")="0:0:0"
    ^trc("*RUN")="144009:76004:220013"
    ^trc("profiling","merge")="1:8001:12000:20001:16231"
@@ -5514,7 +5521,7 @@
    Consider the following program that presents the output of this
    M-profiling result in a tabular report.
 
-   GTM>zprint ^tracereport
+   YDB>zprint ^tracereport
    tracereport(gbl,label,rtn)
      set gap=15
      set $piece(x,".",gap*6)="" write x,!
@@ -5533,7 +5540,7 @@
      .      write "Line #",i,": ",?9
      .      zprint @zp
 
-   GTM>do ^tracereport("^trc","order","profiling")
+   YDB>do ^tracereport("^trc","order","profiling")
    .........................................................................................
    Line #         Count          User Time      System Time    Total Time     Elapsed Time
    .........................................................................................
@@ -5558,7 +5565,7 @@
    This shows that order^profiling has an elapsed time of 25720 and the
    maximum elapsed time was on line #5, which was executed 1500 times.
 
-   GTM>do ^tracereport("^trc","merge","profiling")
+   YDB>do ^tracereport("^trc","merge","profiling")
    .........................................................................................
    Line #         Count          User Time      System Time    Total Time     Elapsed Time
    .........................................................................................
@@ -5577,7 +5584,7 @@
    Line #4:   for i=1:1:$order(merval(""),-1)  do
    Line #5:   . kill:i#2 merval(i)
    Line #6:   quit
-   GTM>
+   YDB>
 
    This shows that merge^profiling has an elapsed time of 16231 and the
    maximum elapsed time was on line #3, which was executed once.
@@ -5588,7 +5595,7 @@
 
    Here is an example:
 
-   GTM>do ^tracereport("^trc","qom","profiling")
+   YDB>do ^tracereport("^trc","qom","profiling")
    .........................................................................................
    Line #         Count          User Time      System Time    Total Time     Elapsed Time
    .........................................................................................
@@ -5619,12 +5626,12 @@
    merge^profiling, remove VIEW "TRACE" commands from profiling.m and then
    execute the following commands:
 
-   GTM>ZBREAK merge^profiling:"view ""TRACE"":1:""^mtrc"" write ""Trace"""
-   GTM>do ^profiling
+   YDB>ZBREAK merge^profiling:"view ""TRACE"":1:""^mtrc"" write ""Trace"""
+   YDB>do ^profiling
    Trace
-   GTM>view "TRACE":0:"^mtrc"
+   YDB>view "TRACE":0:"^mtrc"
 
-   GTM>zwrite ^mtrc
+   YDB>zwrite ^mtrc
    ^mtrc("*CHILDREN")="0:0:0"
    ^mtrc("*RUN")="132008:52003:184011"
    ^mtrc("GTM$DMOD","^")="1:0:0:0:4"
@@ -5814,34 +5821,34 @@
 
    Example:
 
-   GTM>Kill A
+   YDB>Kill A
 
-   GTM>View "NOUNDEF"
-   GTM>Write A,?10,$L(A)
+   YDB>View "NOUNDEF"
+   YDB>Write A,?10,$L(A)
             0
-   GTM>
+   YDB>
 
    This demonstrates how a VIEW that specifies NOUNDEF prevents UNDEFined
    errors.
 
    Example 2:
 
-   GTM>ZLink "NOSENSE"
-   %GTM-E-LABELMISSING Label referenced but
+   YDB>ZLink "NOSENSE"
+   %YDB-E-LABELMISSING Label referenced but
    not defined:lab
-   %GTM-I-SRCNAM in source module /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/
+   %YDB-I-SRCNAM in source module /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/
    NOSENSE.m
-   GTM>ZPrint ^NOSENSE
+   YDB>ZPrint ^NOSENSE
    NOSENSE;
            Do lab
            Quit
    LAB  Write !,"THIS IS NOSENSE"
            Quit
-   GTM>View "LABELS":"UPPER"
-   GTM>ZLink "NOSENSE.m"
-   GTM>Do ^NOSENSE
+   YDB>View "LABELS":"UPPER"
+   YDB>ZLink "NOSENSE.m"
+   YDB>Do ^NOSENSE
    THIS IS NOSENSE
-   GTM>
+   YDB>
 
    This demonstrates use of VIEW "LABELS" to make label handling case
    insensitive. Notice that the routine was ZLINKed with an extension of .m
@@ -5873,9 +5880,9 @@
 
    Example:
 
-   GTM>Xecute "Write ""HELLO"""
+   YDB>Xecute "Write ""HELLO"""
    HELLO
-   GTM>
+   YDB>
 
    This demonstrates a simple use of Xecute.
 
@@ -6006,17 +6013,17 @@
 
    Example:
 
-   GTM>ZPRint ^ZBTEST
+   YDB>ZPRint ^ZBTEST
    ZBTEST;
         Do SUB
         Quit
    SUB  Write !,"This is ZBTEST"
         Quit
-   GTM>ZBREAK SUB^ZBTEST
-   GTM>Do ^ZBTEST
-   %GTM-I-BREAKZBA, Break instruction encountered during ZBREAK action
+   YDB>ZBREAK SUB^ZBTEST
+   YDB>Do ^ZBTEST
+   %YDB-I-BREAKZBA, Break instruction encountered during ZBREAK action
    At M source location SUB^ZBTEST
-   GTM>ZSHOW "B"
+   YDB>ZSHOW "B"
    SUB^ZBTEST
 
    This inserts a ZBREAK with a default action at SUB^ZBTEST. After YottaDB
@@ -6025,14 +6032,14 @@
 
    Example:
 
-   GTM>ZBREAK -*
+   YDB>ZBREAK -*
 
-   GTM>ZGOTO
-   GTM>ZBREAK SUB^ZBTEST:"W !,""Trace"""
-   GTM>Do ^ZBTEST
+   YDB>ZGOTO
+   YDB>ZBREAK SUB^ZBTEST:"W !,""Trace"""
+   YDB>Do ^ZBTEST
    Trace
    This is ZBTEST
-   GTM>
+   YDB>
 
    This removes all existing ZBREAKs with a ZBREAK -*. Note that it is not
    necessary to remove ZBREAKs before modifying them. It also clears the
@@ -6149,23 +6156,23 @@
 
    Example:
 
-   GTM>ZEDIT "BAL"
+   YDB>ZEDIT "BAL"
 
    This invokes the editor for a file with a name of BAL and an extension of
    .m. Notice that BAL is a string literal.
 
    Example:
 
-   GTM>Set prog="BAL"
+   YDB>Set prog="BAL"
 
-   GTM>ZEDit prog
+   YDB>ZEDit prog
 
    This is similar to the first example except that it uses a variable
    argument rather than a string literal.
 
    Example:
 
-   GTM>zedit ".login"
+   YDB>zedit ".login"
 
    This invokes the editor for a file with the name .login. Notice that in
    this case the file is not a YottaDB file, since .login starts with a period,
@@ -6188,10 +6195,10 @@
 
    Example:
 
-   GTM>ZGOTO
-   GTM>ZSHow
+   YDB>ZGOTO
+   YDB>ZSHow
    +1^GTM$DMOD (Direct mode)
-   GTM>
+   YDB>
 
    This uses ZGOTO to clear all levels of the YottaDB invocation stack. ZSHOW
    with no arguments displays the stack.
@@ -6219,13 +6226,13 @@
 
    Example:
 
-   GTM>zhalt 230
+   YDB>zhalt 230
    $ echo $?
    230
 
    Example:
 
-   GTM>zhalt 257
+   YDB>zhalt 257
    $ echo $?
    1
 
@@ -6244,20 +6251,20 @@
 
    Example:
 
-   GTM>zhelp "func $data"
+   YDB>zhelp "func $data"
 
    This lists the help for function $DATA, which is a subtopic of functions
    topic.
 
    Example:
 
-   GTM>zhelp
+   YDB>zhelp
 
    This uses ZHELP to list all the keywords in the help library.
 
    Example:
 
-   GTM>zhelp "ZSHOW"
+   YDB>zhelp "ZSHOW"
 
    This lists the help for command ZSHOW.
 
@@ -6310,7 +6317,7 @@
 
    Example:
 
-   GTM>ZLINK "test"
+   YDB>ZLINK "test"
 
    If ZLINK finds test.m or test.o, it adds the routine test to the current
    image. If ZLINK does not find test.o, or finds that test.o is older than
@@ -6321,7 +6328,7 @@
 
    Example:
 
-   GTM>zlink "test.m":"-noobject -list"
+   YDB>zlink "test.m":"-noobject -list"
 
    This compiles the routine "test" and produces a listing but no object
    file. Because the example produces no object file, it must locate an
@@ -6332,13 +6339,13 @@
 
    Example:
 
-   GTM>zlink "sockexamplemulti2"
-   %GTM-E-LOADRUNNING, Cannot ZLINK an active routine sockexamplemulti2
-   GTM>zshow "S"
+   YDB>zlink "sockexamplemulti2"
+   %YDB-E-LOADRUNNING, Cannot ZLINK an active routine sockexamplemulti2
+   YDB>zshow "S"
    sockexamplemulti2+12^sockexamplemulti2    (Direct mode)
-   GTM>view "LINK":"RECURSIVE"
-   GTM>zlink "sockexamplemulti2"
-   GTM>
+   YDB>view "LINK":"RECURSIVE"
+   YDB>zlink "sockexamplemulti2"
+   YDB>
 
    This example demonstrates how VIEW "LINK":"RECURSIVE" command ZLINKs a
    routine when its prior version is already there in the active M virtual
@@ -6434,7 +6441,7 @@
        uses short-lived processes, such as YottaDB routines invoked by web
        servers using a CGI interface.
 
-   FIS recommends that a directory in the $zroutines of a process be either
+   YottaDB recommends that a directory in the $zroutines of a process be either
    auto-relink-enabled or auto-relink-disabled for the life of the process.
    Changing the auto-relink mode of the directory within a process is likely
    to result in counter-intuitive results..
@@ -6510,7 +6517,7 @@
 
    Example:
 
-   GTM>ZMessage 2
+   YDB>ZMessage 2
    %SYSTEM-E-ENO2, No such file or directory
 
    This ZMESSAGE does not specify substitution text and the message does not
@@ -6518,16 +6525,16 @@
 
    Example:
 
-   GTM>ZMESSAGE 150372994
-   %GTM-E-GVUNDEF, Global Variable undefined:
+   YDB>ZMESSAGE 150372994
+   %YDB-E-GVUNDEF, Global Variable undefined:
 
    The message specified by this ZMESSAGE command includes a substitution
    directive but the command does not supply any text.
 
    Example:
 
-   GTM>ZMESSAGE 150373850:"x"
-   %GTM-E-UNDEF, Undefined local variable: x
+   YDB>ZMESSAGE 150373850:"x"
+   %YDB-E-UNDEF, Undefined local variable: x
 
    This ZMESSAGE command supplies the substitution text for the message.
 
@@ -6560,17 +6567,17 @@
 
    Example:
 
-   GTM>ZPRINT X^RTN
+   YDB>ZPRINT X^RTN
 
    This example displays the line beginning with the label X in the routine
    RTN.
 
    Example:
 
-   GTM>ZPRINT X^RTN:X+5
+   YDB>ZPRINT X^RTN:X+5
 
-   GTM>ZPRINT X+-5^RTN:X
-   GTM>ZPRINT X^RTN:X+-5^RTN
+   YDB>ZPRINT X+-5^RTN:X
+   YDB>ZPRINT X^RTN:X+-5^RTN
 
    The first line displays the line beginning with the label X and the next 5
    lines in routine RTN. The second line displays the 5 lines preceding label
@@ -6580,10 +6587,10 @@
 
    Example:
 
-   GTM>zprint ^A#1#
+   YDB>zprint ^A#1#
     do ^test1
     do stop^test2
-   GTM>
+   YDB>
 
    This command displays the trigger code for trigger name A#1#.
 
@@ -6624,7 +6631,7 @@
        permissions match those for the directory as described in the section
        Shared Resources Authorization Permissions in Appendix E (YottaDB
        Security Philosophy) of the UNIX Administration and Operations Guide.
-       FIS recommends that all processes that share a directory whose
+       YottaDB recommends that all processes that share a directory whose
        contents are subject to ZRUPDATE use the same value for
        $gtm_linktmpdir so that all processes see update notifications - with
        different values of $gtm_linktmpdir, a ZRUPDATE by a process with one
@@ -6799,7 +6806,7 @@
 
    Example:
 
-   GTM>ZSHOW "db"
+   YDB>ZSHOW "db"
 
    This command displays all devices with deviceparameters reflecting their
    current characteristics followed by any current ZBREAK locations with
@@ -6807,13 +6814,13 @@
 
    Example:
 
-   GTM>ZSHOW "dbd"
+   YDB>ZSHOW "dbd"
 
    This command displays the same output as the previous example.
 
    Example:
 
-   GTM>ZSHOW "ax"
+   YDB>ZSHOW "ax"
 
    This command generates a run-time error.
 
@@ -6834,7 +6841,7 @@
 
    Example:
 
-   GTM>ZSHOW "G"
+   YDB>ZSHOW "G"
 
    For process that has access to two database files produces results like
    the following:
@@ -6854,7 +6861,7 @@
 
    Example:
 
-   GTM>ZSHOW "G"
+   YDB>ZSHOW "G"
 
    Assuming that a YottaDB process uses the global directory "/tmp/x1.gld" and
    opens two regions REG1 and REG2 corresponding to two database files, the
@@ -6874,7 +6881,7 @@
 
    Example:
 
-   GTM>ZSHOW "G":zgbl
+   YDB>ZSHOW "G":zgbl
 
    This example redirects the output of ZSHOW "G" into a local variable zgbl:
 
@@ -6893,9 +6900,9 @@
 
    Example:
 
-   GTM>LOCK ^FAIL:10
-   GTM>lock (^SUCCESS1,^SUCCESS2)
-   GTM>zshow "L"
+   YDB>LOCK ^FAIL:10
+   YDB>lock (^SUCCESS1,^SUCCESS2)
+   YDB>zshow "L"
    MLG:1,MLT:1
    LOCK ^SUCCESS1 LEVEL=1
    LOCK ^SUCCESS2 LEVEL=1
@@ -6915,8 +6922,8 @@
 
    Example:
 
-   GTM>ZSHOW "L":var
-   GTM>ZWRITE var
+   YDB>ZSHOW "L":var
+   YDB>ZWRITE var
    var("L",0)="MLG:1,MLT:1"
    var("L",1)="LOCK ^SUCCESS1 LEVEL=1"
    var("L",2)="LOCK ^SUCCESS2 LEVEL=1"
@@ -6950,36 +6957,36 @@
 
    Example:
 
-   GTM>Kill  Set b(1,"two")="test" ZSHow "v":a ZWRite
+   YDB>Kill  Set b(1,"two")="test" ZSHow "v":a ZWRite
    a("V",1)="b(1,""two"")=""test"""
    b(1,"two")="test"
-   GTM>
+   YDB>
 
    This ZSHow stores all local variables in the local variable a. Note that
    ZSHOW does not replicate a("V") and a("V",1).
 
    Example:
 
-   GTM>KILL  SET a(1,"D",3,5)="stuff",a(1,"X",2)="",a(1)=1
-   GTM>ZSHow "d":a(1)
-   GTM>ZWRite
+   YDB>KILL  SET a(1,"D",3,5)="stuff",a(1,"X",2)="",a(1)=1
+   YDB>ZSHow "d":a(1)
+   YDB>ZWRite
    a(1)=1
    a(1,"D",1)="/dev/pts/1 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
                     EDIT "
    a(1,"X",2)=""
-   GTM>
+   YDB>
 
    This ZSHOW stores the current open device information under a(1). Notice
    how the ZSHOW overlays the prior value of a(1,"D",3,5).
 
    Example:
 
-   GTM>KILL ^ZSHOW
+   YDB>KILL ^ZSHOW
 
-   GTM>ZB -*,lab^rout ZSH "B":^ZSHOW
-   GTM>ZWRite ^ZSHOW
+   YDB>ZB -*,lab^rout ZSH "B":^ZSHOW
+   YDB>ZWRite ^ZSHOW
    ^ZSHOW("B",1)="LAB^ROUT"
-   GTM>
+   YDB>
 
    This ZSHOW stores the current ZBREAK information under the global variable
    ^ZSHOW.
@@ -7065,7 +7072,7 @@
 
    Example:
 
-   GTM>ZSTEP INTO:"W ! ZP @$ZPOS W !"
+   YDB>ZSTEP INTO:"W ! ZP @$ZPOS W !"
 
    This ZSTEP resumes execution of the current routine. At the beginning of
    the next line executed, the ZSTEP action ZPRINTs the source code for that
@@ -7075,8 +7082,8 @@
 
    Example:
 
-   GTM>Set curx=$get(x),zact="ZSTEP:$get(curx)=$get(x) INTO:zact Break:$get(curx)'=$get(x)"
-   GTM>ZSTEP INTO:zact
+   YDB>Set curx=$get(x),zact="ZSTEP:$get(curx)=$get(x) INTO:zact Break:$get(curx)'=$get(x)"
+   YDB>ZSTEP INTO:zact
 
    This sequence uses ZSTEP to invoke Direct Mode at the beginning of the
    first line after the line that alters the value of x.
@@ -7095,13 +7102,13 @@
 
    Example:
 
-   GTM>zsystem "ls *.m"
+   YDB>zsystem "ls *.m"
 
    This uses ZSYSTEM to fork a process that then performs the ls command with
    *.m as an argument to ls. Once the command completes, the forked process
    terminates.
 
-   GTM>zsystem "echo 'hello world'"
+   YDB>zsystem "echo 'hello world'"
    hello world
 
    This examples show a possible use of quoting with ZSYSTEM to run the echo
@@ -7109,7 +7116,7 @@
 
    Example:
 
-   GTM>zsystem
+   YDB>zsystem
    $
 
    This ZSYSTEM has no argument so the forked process prompts for input.
@@ -7122,8 +7129,8 @@
    the end and beginning). Fencing transactions allows the MUPIP JOURNAL
    facility to prevent incomplete application transactions consisting of
    multiple global updates from affecting the database during a database
-   recovery. FIS strongly recommends the use of the M transaction processing
-   commands such as TSTART and TCOMMIT rather than ZTSTART and ZTCOMMIT. FIS
+   recovery. YottaDB strongly recommends the use of the M transaction processing
+   commands such as TSTART and TCOMMIT rather than ZTSTART and ZTCOMMIT. YottaDB
    no longer tests the deprecated ZTSTART / ZTCOMMIT functionally.
 
    The format of the ZTCOMMIT command is:
@@ -7135,7 +7142,7 @@
 
    Example:
 
-   GTM>ZTCOMMIT 0
+   YDB>ZTCOMMIT 0
 
    This ZTCOMMIT issued from Direct Mode would close any open ZTSTARTs.
 
@@ -7151,13 +7158,13 @@
 
    Example:
 
-   GTM>write $ztrigger("S")
+   YDB>write $ztrigger("S")
    ;trigger name: C#1#  cycle: 1
    +^C -commands=ZTR -xecute="write ""ZTR trigger invoked"""
    1
-   GTM>ztrigger ^C
+   YDB>ztrigger ^C
    ZTR trigger invoked
-   GTM>
+   YDB>
 
 2 ZTStart
    ZTStart
@@ -7167,9 +7174,9 @@
    beginning and end). Fenced transactions prevent the MUPIP JOURNAL facility
    from recovering incomplete transactions. All ZTSTARTs must be matched with
    ZTCOMMITs before the journal processing facility recognizes the
-   transaction as complete. FIS strongly recommends the use of the M
+   transaction as complete. YottaDB strongly recommends the use of the M
    transaction processing commands such as TSTART and TCOMMIT rather than
-   ZTSTART and ZTCOMMIT. FIS no longer tests the deprecated ZTSTART /
+   ZTSTART and ZTCOMMIT. YottaDB no longer tests the deprecated ZTSTART /
    ZTCOMMIT functionally.
 
    The format of the ZTSTART command is:
@@ -7248,25 +7255,25 @@
    array, the nodes of that array are output with A, which occurs lexically
    before C, even though the values were assigned to C:
 
-   GTM>Set C=1,C("Malvern")="Wales",*A=C,*B(-3.14)=C
+   YDB>Set C=1,C("Malvern")="Wales",*A=C,*B(-3.14)=C
 
-   GTM>ZSHow "V" ; ZWRite would produce the same output
+   YDB>ZSHow "V" ; ZWRite would produce the same output
    A=1 ;*
    A("Malvern")="Wales"
    *B(-3.14)=A
    *C=A
-   GTM>ZWRite C ; Only one is name associated with the array on this ZWRite command
+   YDB>ZWRite C ; Only one is name associated with the array on this ZWRite command
    C=1 ;*
    C("Malvern")="Wales"
-   GTM>
+   YDB>
 
    Continuing the example, if the variables selected for the ZWRITE command
    do not include any of the the associated alias variables, the output shows
    only the reference, not the data:
 
-   GTM>ZWRITE B ; B only has a container
+   YDB>ZWRITE B ; B only has a container
    *B(-3.14)=A
-   GTM>
+   YDB>
 
    When ZWRITE / ZSHOW "V" encounters an alias container for an array with no
    current alias variable, it uses a name $ZWRTACn as the made-up name of an
@@ -7275,15 +7282,15 @@
    a ZWRITE / ZSHOW "V" to be used to recreate alias containers without
    associated alias variables. Continuing the above example:
 
-   GTM>Kill *A,*C ; Delete alias variables and associations, leaving only the container
+   YDB>Kill *A,*C ; Delete alias variables and associations, leaving only the container
 
-   GTM>ZWRite
+   YDB>ZWRite
    $ZWRTAC=""
    *B(-3.14)=$ZWRTAC1
    $ZWRTAC1=3 ;*
    $ZWRTAC1("Malvern")="Wales"
    $ZWRTAC=""
-   GTM>
+   YDB>
 
    ZWRITE produces $ZWRTACn names to serve as data cell anchors which SET @
    accepts as valid set left targets. $ZWRTACn names are created and
@@ -7307,10 +7314,10 @@
 
    **Caution**
 
-   FIS strongly recommends that you should not create or manipulate your own
+   YottaDB strongly recommends that you should not create or manipulate your own
    $ZWRTACn "variables". They are not part of the supported functionality for
    implementing alias variables and containers, but are rather a part of the
-   underlying implementation that is visible to you, the YottaDB user. FIS can
+   underlying implementation that is visible to you, the YottaDB user. YottaDB can
    arbitrarily, for its own convenience change the use of $ZWRTAC in YottaDB at
    any time. They are only documented here since you may see them in the
    output of ZWRITE and ZSHOW "V".
@@ -7320,7 +7327,7 @@
 
    Example:
 
-   GTM>ZWRITE ^?1"%"2U(0:":",)
+   YDB>ZWRITE ^?1"%"2U(0:":",)
 
    This command displays the descendants of all subscripts between 0 and ":"
    of all global names starting with a "%" and having two upper case letters
@@ -7328,7 +7335,7 @@
 
    Example:
 
-   GTM>ZWRITE A(,:,3)
+   YDB>ZWRITE A(,:,3)
 
    This command displays all of the third level nodes with a subscript of 3
    for local variable A.
@@ -7343,9 +7350,9 @@
 
    Example:
 
-   GTM>Set A=1,*B=A ; Create an array and an alias association
+   YDB>Set A=1,*B=A ; Create an array and an alias association
 
-   GTM>ZWRite ; Show that the array and association exist
+   YDB>ZWRite ; Show that the array and association exist
    A=1 ;*
    *B=A
 
@@ -7395,23 +7402,23 @@
 
    Example:
 
-   GTM>For i=0:1:3 Write !,$Ascii("Hi",i)
+   YDB>For i=0:1:3 Write !,$Ascii("Hi",i)
    -1
    72
    73
    -1
-   GTM>
+   YDB>
 
    This loop displays the result of $ASCII() specifying a character position
    before, first and second positions, and after the string.
 
    Example:
 
-   GTM>Write $ZCHSET
+   YDB>Write $ZCHSET
    UTF-8
-   GTM>Write $Ascii("*")
+   YDB>Write $Ascii("*")
    20027
-   GTM>Write $$FUNC^%DH("20027")
+   YDB>Write $$FUNC^%DH("20027")
    00004E3B
 
    In this example, 20027 is the integer equivalent of the hexadecimal value
@@ -7435,9 +7442,9 @@
 
    Example:
 
-   GTM>write $char(77,85,77,80,83,7)
+   YDB>write $char(77,85,77,80,83,7)
    MUMPS
-   GTM>
+   YDB>
 
    This example uses $CHAR() to WRITE the word MUMPS and signal the terminal
    "bell."
@@ -7452,11 +7459,11 @@
 
    Example:
 
-   GTM>write $zchset
+   YDB>write $zchset
    UTF-8
-   GTM>write $char(20027)
+   YDB>write $char(20027)
    *
-   GTM>write $char(65)
+   YDB>write $char(65)
    A
 
    In the above example, the integer value 20027 is the Unicode character "*"
@@ -7500,15 +7507,15 @@
 
    Example:
 
-   GTM>Kill  Write $Data(a)
+   YDB>Kill  Write $Data(a)
    0
-   GTM>Set a(1)=1 Write $Data(a(1))
+   YDB>Set a(1)=1 Write $Data(a(1))
    1
-   GTM>Write $Data(a)
+   YDB>Write $Data(a)
    10
-   GTM>Set a=0 Write $Data(a)
+   YDB>Set a=0 Write $Data(a)
    11
-   GTM>
+   YDB>
 
    This uses $DATA to display all possible $DATA() results.
 
@@ -7558,12 +7565,12 @@
 
    Example:
 
-   GTM>for i=0:1:3 write !,$extract("HI",i),"<"
+   YDB>for i=0:1:3 write !,$extract("HI",i),"<"
    <
    H<
    I<
    <
-   GTM>
+   YDB>
 
    This loop displays the result of $EXTRACT(), specifying no ending
    character position and a beginning character position "before" first and
@@ -7571,12 +7578,12 @@
 
    Example:
 
-   GTM>For i=0:1:3 write !,$extract("HI",1,i),"<"
+   YDB>For i=0:1:3 write !,$extract("HI",1,i),"<"
    <
    H<
    HI<
    HI<
-   GTM>
+   YDB>
 
    This loop displays the result of $EXTRACT() specifying a beginning
    character position of 1 and an ending character position "before, " first
@@ -7584,18 +7591,18 @@
 
    Example:
 
-   GTM>zprint ^trim
+   YDB>zprint ^trim
    trim(x)
        new i,j
        for i=1:1:$length(x) quit:" "'=$extract(x,i)
        for j=$length(x):-1:1 quit:" "'=$extract(x,j)
        quit $extract(x,i,j)
-   GTM>set str=" MUMPS "
-   GTM>write $length(str)
+   YDB>set str=" MUMPS "
+   YDB>write $length(str)
    7
-   GTM>write $length($$^trim(str))
+   YDB>write $length($$^trim(str))
    5
-   GTM>
+   YDB>
 
    This extrinsic function uses $EXTRACT() to remove extra leading and
    trailing spaces from its argument.
@@ -7618,9 +7625,9 @@
 
    Example:
 
-   GTM>write $find("HIFI","I")
+   YDB>write $find("HIFI","I")
    3
-   GTM>
+   YDB>
 
    This example uses $FIND() to WRITE the position of the first occurrence of
    the character "I." The return of 3 gives the position after the "found"
@@ -7628,19 +7635,19 @@
 
    Example:
 
-   GTM>write $find("HIFI","I",3)
+   YDB>write $find("HIFI","I",3)
    5
-   GTM>
+   YDB>
 
    This example uses $FIND() to WRITE the position of the next occurrence of
    the character "I" starting in character position three.
 
    Example:
 
-   GTM>set t=1 for  set t=$find("BANANA","AN",t) quit:'t  write !,t
+   YDB>set t=1 for  set t=$find("BANANA","AN",t) quit:'t  write !,t
    4
    6
-   GTM>
+   YDB>
 
    This example uses a loop with $FIND() to locate all occurrences of "AN" in
    "BANANA". $FIND() returns 4 and 6 giving the positions after the two
@@ -7648,14 +7655,14 @@
 
    Example:
 
-   GTM>set str="MUMPS databases are hierarchical"
-   GTM>Write $find(str," ")
+   YDB>set str="MUMPS databases are hierarchical"
+   YDB>Write $find(str," ")
    7
-   GTM>Write $find(str,"Z")
+   YDB>Write $find(str,"Z")
    0
-   GTM>Write $find(str,"d",1)
+   YDB>Write $find(str,"d",1)
    8
-   GTM>Write $find(str,"d",10)
+   YDB>Write $find(str,"d",10)
    0
 
    The above example searches a string for a sub string, and returns an
@@ -7680,7 +7687,7 @@
 
    Example:
 
-   GTM>do ^fnum
+   YDB>do ^fnum
    fnum;
      zprint ^fnum
      set X=-100000,Y=2000
@@ -7774,22 +7781,22 @@
 
    Example:
 
-   GTM>set i=1
-   GTM>write $increment(i)
+   YDB>set i=1
+   YDB>write $increment(i)
    2
-   GTM>write $increment(i)
+   YDB>write $increment(i)
    3
-   GTM>write $increment(i)
+   YDB>write $increment(i)
    4
-   GTM>write $increment(i)
+   YDB>write $increment(i)
    5
-   GTM>write i
+   YDB>write i
    5
-   GTM>write $increment(i,-2)
+   YDB>write $increment(i,-2)
    3
-   GTM>write I
+   YDB>write I
    3
-   GTM>
+   YDB>
 
    This example increments the value of i by 1 and at the end decrements it
    by 2. Note that the default value for incrementing a variable is 1.
@@ -7820,10 +7827,10 @@
 
    Example:
 
-   GTM>write ":",$justify("HELLO",10),":",!,":",$justify("GOODBYE",5),":"
+   YDB>write ":",$justify("HELLO",10),":",!,":",$justify("GOODBYE",5),":"
    :     HELLO:
    :GOODBYE:
-   GTM>
+   YDB>
 
    This uses $JUSTIFY() to display "HELLO" in a field of 10 spaces and
    "GOODBYE" in a field of 5 spaces. Because the length of "GOODBYE" exceeds
@@ -7831,30 +7838,30 @@
 
    Example:
 
-   GTM>write "1234567890",!,$justify(10.545,10,2)
+   YDB>write "1234567890",!,$justify(10.545,10,2)
    1234567890
         10.55
-   GTM>
+   YDB>
 
    This uses $JUSTIFY() to WRITE a rounded value right justified in a field
    of 10 spaces. Notice that the result has been rounded up.
 
    Example:
 
-   GTM>write "1234567890",!,$justify(10.544,10,2)
+   YDB>write "1234567890",!,$justify(10.544,10,2)
    1234567890
         10.54
-   GTM>
+   YDB>
 
    Again, this uses $JUSTIFY() to WRITE a rounded value right justified in a
    field of 10 spaces. Notice that the result has been rounded down.
 
    Example:
 
-   GTM>write "1234567890",!,$justify(10.5,10,2)
+   YDB>write "1234567890",!,$justify(10.5,10,2)
    1234567890
         10.50
-   GTM>
+   YDB>
 
    Once again, this uses $JUSTIFY() to WRITE a rounded value right justified
    in a field of 10 spaces. Notice that the result has been zero-filled to 2
@@ -7862,9 +7869,9 @@
 
    Example:
 
-   GTM>write $justify(.34,0,2)
+   YDB>write $justify(.34,0,2)
    0.34
-   GTM>
+   YDB>
 
    This example uses $JUSTIFY to ensure that the fraction has a leading zero.
    Note the use of a second argument of zero in the case that rounding is the
@@ -7885,28 +7892,28 @@
 
    Example:
 
-   GTM>Write $length("KINGSTON")
+   YDB>Write $length("KINGSTON")
    8
-   GTM>
+   YDB>
 
    This uses $LENGTH() to WRITE the length in characters of the string
    "KINGSTON".
 
    Example:
 
-   GTM>set x="Smith/John/M/124 Main Street/Ourtown/KA/USA"
-   GTM>write $length(x,"/")
+   YDB>set x="Smith/John/M/124 Main Street/Ourtown/KA/USA"
+   YDB>write $length(x,"/")
    7
-   GTM>
+   YDB>
 
    This uses $LENGTH() to WRITE the number of pieces in a string, as
    delimited by /.
 
    Example:
 
-   GTM>write $length("/2/3/","/")
+   YDB>write $length("/2/3/","/")
    4
-   GTM>
+   YDB>
 
    This also uses $LENGTH() to WRITE the number of pieces in a string, as
    delimited by /. Notice that YottaDB. adds one count to the count of
@@ -7928,19 +7935,19 @@
 
    Example:
 
-   GTM>set X="A""B",^Y(1,X,"B",4)=""
-   GTM>write $name(^(3),3)
+   YDB>set X="A""B",^Y(1,X,"B",4)=""
+   YDB>write $name(^(3),3)
    ^Y(1,"A""B","B")
-   GTM>
+   YDB>
 
    This example sets up a naked reference and then uses $NAME() to display
    the first three levels of that four-level reference.
 
    Example:
 
-   GTM>write $name(^(3),0)
+   YDB>write $name(^(3),0)
    ^Y
-   GTM>
+   YDB>
 
    This example shows the name level for the same naked reference.
 
@@ -7991,10 +7998,10 @@
 
    Example:
 
-   GTM>zwrite
+   YDB>zwrite
    lcl(1)=3
    lcl("x")=4
-   GTM>write $order(lcl(""))
+   YDB>write $order(lcl(""))
    1
 
    This example returns the first node, that is 1, because the specified last
@@ -8002,7 +8009,7 @@
 
    Example:
 
-   GTM>write $order(lcl(1))
+   YDB>write $order(lcl(1))
    x
 
    This example returns the first node after lcl(1) that is x because lcl has
@@ -8010,18 +8017,18 @@
 
    Example:
 
-   GTM>write $order(lcl(""),-1)
+   YDB>write $order(lcl(""),-1)
    x
 
    This example returns the last node that is, x, because the last subscript
    of the first argument is null and second argument is -1.
 
-   GTM>set lcl("")=2
-   GTM>zwrite
+   YDB>set lcl("")=2
+   YDB>zwrite
    lcl("")=2
    lcl(1)=3
    lcl("x")=4
-   GTM>write $order(lcl(""))
+   YDB>write $order(lcl(""))
    1
 
    This example returns the second node at the specified level because the
@@ -8032,30 +8039,30 @@
 
    Example:
 
-   GTM>write $order(lcl(""),-1)
+   YDB>write $order(lcl(""),-1)
    x
-   GTM>write $order(lcl("x"),-1)
+   YDB>write $order(lcl("x"),-1)
    1
 
    Example:
 
-   GTM>kill  set (a(1),a(2000),a("CAT"),a("cat"),a("ALF"),a(12))=1
-   GTM>set x="" for  set x=$order(a(x)) quit:x=""  write !,x
+   YDB>kill  set (a(1),a(2000),a("CAT"),a("cat"),a("ALF"),a(12))=1
+   YDB>set x="" for  set x=$order(a(x)) quit:x=""  write !,x
    1
    12
    2000
    ALF
    CAT
    cat
-   GTM>kill a("CAT") set a(5,10)="woolworths",a("cat")="last"
-   GTM>set x="" for  set x=$order(a(x),-1) quit:x=""  write !,x
+   YDB>kill a("CAT") set a(5,10)="woolworths",a("cat")="last"
+   YDB>set x="" for  set x=$order(a(x),-1) quit:x=""  write !,x
    cat
    ALF
    2000
    12
    5
    1
-   GTM>
+   YDB>
 
    This example uses a $ORDER() loop to display all the subscripts at the
    first level of local variable a, make some changes in a, and then display
@@ -8067,9 +8074,9 @@
 
    Example:
 
-   GTM>kill set (%(1),tiva(2),A(3),tiv(4),Q(5),%a(6))=""
-   GTM>set x="%"
-   GTM>write:$data(@x) !,x for  set x=$order(@x) quit:x=""  write !,x
+   YDB>kill set (%(1),tiva(2),A(3),tiv(4),Q(5),%a(6))=""
+   YDB>set x="%"
+   YDB>write:$data(@x) !,x for  set x=$order(@x) quit:x=""  write !,x
    %
    %a
    A
@@ -8077,8 +8084,8 @@
    tiv
    tiva
    x
-   GTM>set $piece(x,"z",32)=""
-   GTM>write:$data(@x) !,x for  set x=$order(@x,-1) quit:x=""  write !,x
+   YDB>set $piece(x,"z",32)=""
+   YDB>write:$data(@x) !,x for  set x=$order(@x,-1) quit:x=""  write !,x
    x
    tiva
    tiv
@@ -8086,7 +8093,7 @@
    A
    %a
    %
-   GTM>
+   YDB>
 
    This example uses $ORDER() to display the current local variable names in
    both forward and reverse order. Notice that the first ([^]%) and last
@@ -8119,12 +8126,12 @@
 
    Example:
 
-   GTM>for i=0:1:3 write !,$piece("1 2"," ",i),"<"
+   YDB>for i=0:1:3 write !,$piece("1 2"," ",i),"<"
    <
    1<
    2<
    <
-   GTM>
+   YDB>
 
    This loop displays the result of $PIECE(), specifying a space as a
    delimiter, a piece position "before," first and second, and "after" the
@@ -8132,13 +8139,13 @@
 
    Example:
 
-   GTM>for i=-1:1:3 write !,$piece("1 2"," ",i,i+1),"<"
+   YDB>for i=-1:1:3 write !,$piece("1 2"," ",i,i+1),"<"
    <
    1<
    1 2<
    2<
    <
-   GTM>
+   YDB>
 
    This example is similar to the previous example except that it displays
    two pieces on each iteration. Notice the delimiter (a space) in the middle
@@ -8153,7 +8160,7 @@
 
    Example:
 
-   GTM>set $piece(x,".",25)="" write x
+   YDB>set $piece(x,".",25)="" write x
    ........................
 
    This SETs the 25th piece of the variable x to null, with a delimiter of a
@@ -8161,7 +8168,7 @@
 
    Example:
 
-   GTM>set ^x=1,$piece(^a,";",3,2)=^b
+   YDB>set ^x=1,$piece(^a,";",3,2)=^b
 
    This example leaves the naked indicator to pointing to the global ^b.
 
@@ -8177,10 +8184,10 @@
 
    Example:
 
-   GTM>write $data(^|"XXX"|ABC(1,2,3,4))
+   YDB>write $data(^|"XXX"|ABC(1,2,3,4))
    0
-   GTM>set X=$name(^(5,6))
-   GTM>write $qlength(X)
+   YDB>set X=$name(^(5,6))
+   YDB>write $qlength(X)
    5
 
    The number of subscripts in x is 5. Notice that the name and the
@@ -8207,17 +8214,17 @@
 
    write X
    X="^|""XXX""|ABC(1,2,3,5,6)"
-   GTM>write $qsubscript(X,-2)
+   YDB>write $qsubscript(X,-2)
    error
-   GTM>WRITE $qsubscript(X,-1)
+   YDB>WRITE $qsubscript(X,-1)
    XXX
-   GTM>WRITE $qsubscript(X,0)
+   YDB>WRITE $qsubscript(X,0)
    ^ABC
-   GTM>WRITE $qsubscript(X,1)
+   YDB>WRITE $qsubscript(X,1)
    1
-   GTM>WRITE $qsubscript(X,4)
+   YDB>WRITE $qsubscript(X,4)
    5
-   GTM>WRITE $qsubscript(X,7)
+   YDB>WRITE $qsubscript(X,7)
    ""
 
 2 $Query()
@@ -8268,7 +8275,7 @@
 
    Example:
 
-   GTM>zwrite lcl
+   YDB>zwrite lcl
    lcl("")=1
    lcl(1)=1
    lcl(1,2)=2
@@ -8278,8 +8285,8 @@
    lcl(1,2,0)=6
    lcl(1,2,"abc",5)=7
    lcl("x")=1
-   GTM>set y="lcl"
-   GTM>for  set y=$query(@y) quit:y=""  write !,y,"=",@y
+   YDB>set y="lcl"
+   YDB>for  set y=$query(@y) quit:y=""  write !,y,"=",@y
 
    This example produces the results:
 
@@ -8320,9 +8327,9 @@
 
    Example:
 
-   GTM>for i=1:1:10 write $random(1)
+   YDB>for i=1:1:10 write $random(1)
    0000000000
-   GTM>
+   YDB>
 
    This shows that when $RANDOM() has an argument of one (1), the result is
    too confined to be random.
@@ -8350,9 +8357,9 @@
 
    Example:
 
-   GTM>write $reverse(123)
+   YDB>write $reverse(123)
    321
-   GTM>write $reverse("AbCDe")
+   YDB>write $reverse("AbCDe")
    "eDCbA"
 
 2 $Select()
@@ -8377,12 +8384,12 @@
 
    Example:
 
-   GTM>for i=3:-1:0 write !,$select(i=1:"here",i=2:"come",i=3:"Watson")
+   YDB>for i=3:-1:0 write !,$select(i=1:"here",i=2:"come",i=3:"Watson")
    Watson
    come
    here
-   %GTM-E-SELECTFALSE, No argument to $SELECT was true
-   GTM>
+   %YDB-E-SELECTFALSE, No argument to $SELECT was true
+   YDB>
 
    This loop uses $SELECT() to WRITE a series of strings. Because there is no
    true argument on the fourth iteration, when i=0, $SELECT() produces an
@@ -8454,28 +8461,28 @@
 
    Example for error processing:
 
-   GTM>zprint ^debugerr
+   YDB>zprint ^debugerr
    debugerr;
     set dsm1=$stack(-1)
     write !,"$stack(-1):",dsm1
     for l=dsm1:-1:0 do
     . write !,l
     . for i="ecode","place","mcode" write ?5,i,?15,$stack(l,i),!
-   GTM>
+   YDB>
 
    The above example can be used to display a trace of the code path that led
    to an error.
 
    Example:
 
-   GTM>zprint ^dstacktst
+   YDB>zprint ^dstacktst
    dstacktst(x)       ; check $stack() returns with and without clearing $ecode
     set $etrap="do ^debugerr"
    label
     if x>0 set $ecode=",U1," ; if condition
     else  set $ecode=",U2," ;  else condition
     quit
-   GTM>do ^dstacktst(0)
+   YDB>do ^dstacktst(0)
    $stack(-1):2
    2    ecode
         place     debugerr+3^debugerr
@@ -8486,8 +8493,8 @@
    0    ecode
         place     +1^GTM$DMOD
         mcode
-   %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-   GTM>do ^dstacktst(1)
+   %YDB-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
+   YDB>do ^dstacktst(1)
    $stack(-1):1
    1    ecode     ,U2,
         place     label+2^dstacktst
@@ -8495,9 +8502,9 @@
    0    ecode
         place     +1^GTM$DMOD
         mcode
-   %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-   GTM>set $ecode=""
-   GTM>do ^dstacktst(1)
+   %YDB-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
+   YDB>set $ecode=""
+   YDB>do ^dstacktst(1)
    $stack(-1):2
    2    ecode
         place     debugerr+3^debugerr
@@ -8508,8 +8515,8 @@
    0    ecode
         place     +1^GTM$DMOD
         mcode
-   %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-   GTM>
+   %YDB-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
+   YDB>
 
    This example shows how SETing $ECODE=.. makes $STACK() reports current
    information. Notice how ^do dstacktst(0) and ^dostacktst(1) without
@@ -8551,14 +8558,14 @@
 
    Example:
 
-   GTM>write $text(+0)
+   YDB>write $text(+0)
    GTM$DMOD
-   GTM>write $text(+1)
-   GTM>
+   YDB>write $text(+1)
+   YDB>
 
    This uses $TEXT() to WRITE the name of the current routine, then it tries
    to access the source and returns an empty string. This occurs because the
-   default Direct Mode image is compiled by FIS and delivered without source.
+   default Direct Mode image is compiled by YottaDB and delivered without source.
    The exact failure message may vary.
 
 2 $TRanslate()
@@ -8592,9 +8599,9 @@
 
    Example:
 
-   GTM>write $translate("ABC","CB","1")
+   YDB>write $translate("ABC","CB","1")
    A1
-   GTM>
+   YDB>
 
    **Note**
 
@@ -8604,9 +8611,9 @@
 
    Example:
 
-   GTM>write $translate("A","AA","BC")
+   YDB>write $translate("A","AA","BC")
    B
-   GTM>
+   YDB>
 
    This $TRANSLATE() example finds the first occurrence of "A" in the second
    expression, which holds the first character position, and substitutes the
@@ -8614,9 +8621,9 @@
 
    Example:
 
-   GTM>write $translate("BACKUP","AEIOU")
+   YDB>write $translate("BACKUP","AEIOU")
    BCKP
-   GTM>
+   YDB>
 
    Because the $TRANSLATE() has only two parameters in this example, it finds
    the characters in the first expression that also exist in the second
@@ -8908,7 +8915,7 @@
 
    **Important**
 
-   FIS uses the LC_CREF, LV_GCOL, LV_REF keywords in testing and is
+   YottaDB uses the LC_CREF, LV_GCOL, LV_REF keywords in testing and is
    documenting them to ensure completeness in product documentation. They may
    (or may not) be useful during application development for debugging or
    performance testing implementation alternatives.
@@ -8918,12 +8925,12 @@
 
    Example:
 
-   GTM>Set a=1,*b(1)=a
-   GTM>write $view("LV_CREF","a")," ",$view("LV_CREF","b")
+   YDB>Set a=1,*b(1)=a
+   YDB>write $view("LV_CREF","a")," ",$view("LV_CREF","b")
    1 0
-   GTM>write $view("LV_REF","a")," ",$view("LV_REF","b")
+   YDB>write $view("LV_REF","a")," ",$view("LV_REF","b")
    2 1
-   GTM>
+   YDB>
 
    This example creates an alias variable and an alias container variable and
    checks the number of both container references and total references to the
@@ -8931,11 +8938,11 @@
 
    Example:
 
-   GTM>Set *a(1)=b,*b(1)=a
-   GTM>kill *a,*b
-   GTM>write $view("LV_GCOL")
+   YDB>Set *a(1)=b,*b(1)=a
+   YDB>kill *a,*b
+   YDB>write $view("LV_GCOL")
    2
-   GTM>
+   YDB>
 
    This example creates two cross associated alias containers, destroys their
    ancestor nodes with KILL * and uses $VIEW("LV_GCOL") to force a clean-up
@@ -8944,13 +8951,13 @@
 
    Example:
 
-   GTM>write $view("GVSTAT","DEFAULT")
+   YDB>write $view("GVSTAT","DEFAULT")
    SET:203,KIL:12,GET:203,DTA:2,ORD:23,ZPR:21,QRY:0,LKS:0,LKF:0,CTN:44,DRD:103,DWT:59,
    NTW:24,NTR:55,NBW:27,NBR:138,NR0:0,NR1:0,NR2:0,NR3:0,TTW:17,TTR:5,TRB:0,TBW:32,
    TBR:80,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:7,DFL:9,
    DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,
    CAT:35,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:13
-   GTM>
+   YDB>
 
    Example:
 
@@ -8975,13 +8982,13 @@
 
    Here are some $VIEW("REGION",gvn) outputs:
 
-   GTM>write $view("REGION","^a(1)")
+   YDB>write $view("REGION","^a(1)")
    A1
-   GTM>write $view("REGION","^a(10)")
+   YDB>write $view("REGION","^a(10)")
    DEFAULT,A2,A3
-   GTM>w $view("REGION","^a(60)")
+   YDB>w $view("REGION","^a(60)")
    A5
-   GTM>w $view("REGION","^a")
+   YDB>w $view("REGION","^a")
    DEFAULT,A1,A2,A3,A5,A4
 
 2 $ZAHandle()
@@ -8998,16 +9005,16 @@
 
    Example:
 
-   GTM>set A=1,*B(1)=A
-   GTM>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
+   YDB>set A=1,*B(1)=A
+   YDB>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
    $zahandle(A)="17B8810" $zahandle(B(1))="17B8810"
-   GTM>set A("Subscript")="Value" ; Change array - but $ZAHandle() doesn't change
-   GTM>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
+   YDB>set A("Subscript")="Value" ; Change array - but $ZAHandle() doesn't change
+   YDB>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
    $zahandle(A)="17B8810" $zahandle(B(1))="17B8810"
-   GTM>merge D=A ; A copy of the data has a different $zahandle()
-   GTM>Write "$ZAHandle(A)=""",$ZAHandle(A),""" $ZAHandle(D)=""",$ZAHandle(D),""""
+   YDB>merge D=A ; A copy of the data has a different $zahandle()
+   YDB>Write "$ZAHandle(A)=""",$ZAHandle(A),""" $ZAHandle(D)=""",$ZAHandle(D),""""
    $zahandle(A)="17B8810" $zahandle(D)="17B8C10"
-   GTM>
+   YDB>
 
    Since YottaDB does not provide a way for a function to return an array or
    alias variable as its result, the uniqueness of $ZAHandle() can be
@@ -9071,14 +9078,14 @@
 
    Example:
 
-   GTM>for i=0:1:4 write !,$zascii("*",i)
+   YDB>for i=0:1:4 write !,$zascii("*",i)
 
    -1
    228
    184
    187
    -1
-   GTM>
+   YDB>
 
    This UTF-8 mode example displays the result of $ZASCII() specifying a byte
    position before, first, second and third positions, and after the sequence
@@ -9105,9 +9112,9 @@
 
    Example:
 
-   GTM>write $ztransform("John Smythe",1)]$zatransform("Jane Smith",2)
+   YDB>write $ztransform("John Smythe",1)]$zatransform("Jane Smith",2)
    0
-   GTM>
+   YDB>
 
    This example uses $ZATRANSFORM() and two (here unspecified) collation
    definitions to compare the ordering of two (literal) expressions as YottaDB
@@ -9160,12 +9167,12 @@
 4 Example_of_$ZBITAND()
    Example of $ZBITAND()
 
-   GTM>
+   YDB>
    ; The binary representation of A is 01000001
-   GTM>Set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
+   YDB>Set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-   GTM>set BITSTRINGAB=$zbitand(BITSTRINGA,BITSTRINGB)
-   GTM>for i=1:1:8 write $zbitget(BITSTRINGAB,I)
+   YDB>set BITSTRINGAB=$zbitand(BITSTRINGA,BITSTRINGB)
+   YDB>for i=1:1:8 write $zbitget(BITSTRINGAB,I)
    01000000
 
    This examples uses $ZBITAND to perform a bitwise AND operation on A and B.
@@ -9188,19 +9195,19 @@
 
    Example:
 
-   GTM>set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
+   YDB>set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
+   YDB>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-   GTM>Set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
+   YDB>Set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
    ; A OR B=01000011
-   GTM>write $zbitcount(BITSTRINGA)
+   YDB>write $zbitcount(BITSTRINGA)
    2
-   GTM>write $zbitcount(BITSTRINGB)
+   YDB>write $zbitcount(BITSTRINGB)
    2
-   GTM>write $zbitcount(BITSTRINGC)
+   YDB>write $zbitcount(BITSTRINGC)
    3
-   GTM>
+   YDB>
 
    This example displays the number of ON bits in BITSTRINGA, BITSTRINGB, and
    BITSTRINGC.
@@ -9224,11 +9231,11 @@
 
    Example:
 
-   GTM>Set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
+   YDB>Set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>write $zbitfind(BITSTRINGA,1,3)
+   YDB>write $zbitfind(BITSTRINGA,1,3)
    9
-   GTM>
+   YDB>
 
    This example searches for bit value 1 starting from the 3rd bit of
    BITSTRINGA.
@@ -9248,11 +9255,11 @@
    Example:
 
 
-   GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
+   YDB>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>for i=1:1:8 write $zbitget(BITSTRINGA,I)
+   YDB>for i=1:1:8 write $zbitget(BITSTRINGA,I)
    01000001
-   GTM>
+   YDB>
 
    This examples uses $ZBITGET() to display the binary representation of A.
 
@@ -9268,11 +9275,11 @@
 4 Examples
    Examples
 
-   GTM>set BITSTR=$zbitstr(6,1)
+   YDB>set BITSTR=$zbitstr(6,1)
 
-   GTM>write $zbitlen(BITSTR)
+   YDB>write $zbitlen(BITSTR)
    6
-   GTM>
+   YDB>
 
    This example displays the length of a bit string of 6 bits.
 
@@ -9288,11 +9295,11 @@
 4 Examples
    Examples
 
-   GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
+   YDB>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>for i=1:1:8 write $zbitget($zbitnot(BITSTRINGA),I)
+   YDB>for i=1:1:8 write $zbitget($zbitnot(BITSTRINGA),I)
    10111110
-   GTM>
+   YDB>
 
    This example displays inverted bits for all the bits in BITSTRINGA.
 
@@ -9312,15 +9319,15 @@
 4 Examples
    Examples
 
-   GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
+   YDB>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
+   YDB>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-   GTM>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
+   YDB>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
    ; A OR B=01000011
-   GTM>write BITSTRINGC
+   YDB>write BITSTRINGC
    C
-   GTM>
+   YDB>
 
    This example displays the result of BITSTRINGA bitwise ORed with
    BITSTRINGB.
@@ -9338,7 +9345,7 @@
 4 Examples
    Examples
 
-   GTM>set X="A",Y=$extract($zbitset($char(0)_X,3,1),2) zwrite
+   YDB>set X="A",Y=$extract($zbitset($char(0)_X,3,1),2) zwrite
    X="A"
    Y="a"
 
@@ -9358,7 +9365,7 @@
 4 Examples
    Examples
 
-   GTM>set BITSTR=$zbitstr(6,1)
+   YDB>set BITSTR=$zbitstr(6,1)
 
    This example sets the value of expression BITSTR to 6 bit with all bits
    set to 1.
@@ -9379,12 +9386,12 @@
 4 Examples
    Examples
 
-   GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1) ; The binary representation of A is 01000001
-   GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1); The binary representation of B is 01000010
-   GTM>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB) ; A XOR B=00000011
-   GTM>for I=1:1:8 write $zbitget(BITSTRINGC,I)
+   YDB>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1) ; The binary representation of A is 01000001
+   YDB>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1); The binary representation of B is 01000010
+   YDB>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB) ; A XOR B=00000011
+   YDB>for I=1:1:8 write $zbitget(BITSTRINGC,I)
    00000011
-   GTM>
+   YDB>
 
    This example displays the result of the bitwise XOR of A and B.
 
@@ -9441,9 +9448,9 @@
 
    Example:
 
-   GTM>write $zchar(228,184,187,7)
+   YDB>write $zchar(228,184,187,7)
    *
-   GTM>
+   YDB>
 
    This example WRITEs the byte sequence represented by * and signals the
    terminal bell.
@@ -9473,11 +9480,11 @@
 
    Example:
 
-   GTM>write $zwrite($zcollate("A(""foo"")",0))
+   YDB>write $zwrite($zcollate("A(""foo"")",0))
    "A"_$C(0,255)_"foo"_$C(0,0)
-   GTM>write $zcollate($zcollate("A(""foo"")",0),0,1)
+   YDB>write $zcollate($zcollate("A(""foo"")",0),0,1)
    ^A("foo")
-   GTM>
+   YDB>
 
    The first WRITE in this example shows the readable form or the value
    produced by the $ZCOLLATE() revealing the details of how YottaDB internally
@@ -9514,26 +9521,26 @@
 
    Example:
 
-   GTM>write $zconvert("Happy New Year","U")
+   YDB>write $zconvert("Happy New Year","U")
    HAPPY NEW YEAR
 
    Example:
 
-   GTM>write $ZCHSET
+   YDB>write $ZCHSET
    M
-   GTM>Write $zconvert("HAPPY NEW YEAR","T")
-   %GTM-E-BADCASECODE, T is not a valid case conversion code
+   YDB>Write $zconvert("HAPPY NEW YEAR","T")
+   %YDB-E-BADCASECODE, T is not a valid case conversion code
 
    Example:
 
-   GTM>Set T8="************"
-   GTM>Write $Length(T8)
+   YDB>Set T8="************"
+   YDB>Write $Length(T8)
    12
-   GTM>Set T16=$zconvert(T8,"UTF-8","UTF-16LE")
-   GTM>Write $length(T16)
-   %GTM-E-BADCHAR, $ZCHAR(129,137,232,150) is not a valid character in the UTF-8 encoding form
-   GTM>Set T16=$ZCOnvert(T16,"UTF-16LE","UTF-8")
-   GTM>Write $length(T16)
+   YDB>Set T16=$zconvert(T8,"UTF-8","UTF-16LE")
+   YDB>Write $length(T16)
+   %YDB-E-BADCHAR, $ZCHAR(129,137,232,150) is not a valid character in the UTF-8 encoding form
+   YDB>Set T16=$ZCOnvert(T16,"UTF-16LE","UTF-8")
+   YDB>Write $length(T16)
    9
 
    In the above example, $LENGTH() function triggers an error because it
@@ -9560,23 +9567,23 @@
 
    Example:
 
-   GTM>set a=1,*b(1)=a,*c=d
-   GTM>write $data(a)," ",$zdata(a)
+   YDB>set a=1,*b(1)=a,*c=d
+   YDB>write $data(a)," ",$zdata(a)
    1 101
-   GTM>write $data(b)," ",$zdata(b)
+   YDB>write $data(b)," ",$zdata(b)
    10 10
-   GTM>write $data(c)," ",$zdata(c)
+   YDB>write $data(c)," ",$zdata(c)
    0 100
-   GTM>write $data(d)," ",$zdata(d)
+   YDB>write $data(d)," ",$zdata(d)
    0 100
-   GTM>write $data(b(1))," ",$zdata(b(1))
+   YDB>write $data(b(1))," ",$zdata(b(1))
    1 101
-   GTM>set b(1,2)=2
-   GTM>write $data(b(1))," ",$zdata(b(1))
+   YDB>set b(1,2)=2
+   YDB>write $data(b(1))," ",$zdata(b(1))
    11 111
-   GTM>write $data(b(1,2))," ",$zdata(b(1,2))
+   YDB>write $data(b(1,2))," ",$zdata(b(1,2))
    1 1
-   GTM>
+   YDB>
 
 2 $ZDate()
    $ZDate()
@@ -9684,10 +9691,10 @@
 
    Example:
 
-   GTM>write $horolog,!,$zdate($H)
+   YDB>write $horolog,!,$zdate($H)
    62109,60946
    01/18/11
-   GTM>
+   YDB>
 
    This displays $HOROLOG and then uses $ZDATE() to display today's date. The
    output shown would appear if today were the eighteenth day of January,
@@ -9695,48 +9702,48 @@
 
    Example:
 
-   GTM>write $zdate($H,"DD-MON-YEAR")
+   YDB>write $zdate($H,"DD-MON-YEAR")
    18-JAN-2011
-   GTM>
+   YDB>
 
    This uses the second argument to specify a text format different from the
    default.
 
    Example:
 
-   GTM>set m="Januar,Februar,Marz,April,Mai,Juni,Juli,August,"
-   GTM>set m=m_"September,October,November,Dezember"
-   GTM>write $zdate($horolog,"DD-MON-YEAR",m)
+   YDB>set m="Januar,Februar,Marz,April,Mai,Juni,Juli,August,"
+   YDB>set m=m_"September,October,November,Dezember"
+   YDB>write $zdate($horolog,"DD-MON-YEAR",m)
    18-Januar-2011
-   GTM>
+   YDB>
 
    This is similar to the prior example, however it uses the third argument
    to specify the months in German.
 
    Example:
 
-   GTM>set d="Dimanche,Lundi,Mardi,Mercredi,Jeudi,Vendredi,Samedi"
-   GTM>write $zdate($H,"DAY, DD/MM/YY","",d)
+   YDB>set d="Dimanche,Lundi,Mardi,Mercredi,Jeudi,Vendredi,Samedi"
+   YDB>write $zdate($H,"DAY, DD/MM/YY","",d)
    Mardi, 18/01/2011
-   GTM>
+   YDB>
 
    This example displays the eighteenth of January, however it uses the
    fourth argument to specify the days of the week in French.
 
    Example:
 
-   GTM>write !,$zdate($H,"12:60:SS AM")
+   YDB>write !,$zdate($H,"12:60:SS AM")
    10:35:51 PM
-   GTM>
+   YDB>
 
    This example shows hours, minutes, and seconds in a 12 hour clock with an
    AM/PM indicator.
 
    Example:
 
-   GTM>write !,$zdate(",36524","24-60")
+   YDB>write !,$zdate(",36524","24-60")
    10-08
-   GTM>
+   YDB>
 
    This example shows hours and minutes on a 24 hour clock. Notice that the
    first argument must provide the time in the second comma delimiter piece
@@ -9744,14 +9751,14 @@
 
    Example:
 
-   GTM>write $zdateform
+   YDB>write $zdateform
    0
-   GTM>write $zdate($H)
+   YDB>write $zdate($H)
    01/18/11
-   GTM>set $zdateform=1
-   GTM>write $zdate($horolog)
+   YDB>set $zdateform=1
+   YDB>write $zdate($horolog)
    01/18/2011
-   GTM>write $zdate($horolog,"MM/DD/YY")
+   YDB>write $zdate($horolog,"MM/DD/YY")
    01/18/11
 
    This example converts the output format for years from the default ("YY")
@@ -9760,9 +9767,9 @@
 
    Example:
 
-   GTM>write $zdate(123456789,"DAY MON DD, YYYYYY")
+   YDB>write $zdate(123456789,"DAY MON DD, YYYYYY")
    FRI MAR 17, 339854
-   GTM>
+   YDB>
 
    This example displays year as a six-digit number.
 
@@ -9780,11 +9787,11 @@
 
    Example:
 
-   GTM>Set A="************"
+   YDB>Set A="************"
 
-   GTM>For i=0:1:$zlength(A)
-   GTM>write !,$zascii($zextract(A,i)),"|"
-   GTM>
+   YDB>For i=0:1:$zlength(A)
+   YDB>write !,$zascii($zextract(A,i)),"|"
+   YDB>
 
    This example displays the numeric byte sequence of the sequence of octets
    ("************").
@@ -9804,9 +9811,9 @@
 
    Example:
 
-   GTM>write $zfind("***",$zchar(187))
+   YDB>write $zfind("***",$zchar(187))
    4
-   GTM>
+   YDB>
 
    This example uses $ZFIND() to WRITE the position of the first occurrence
    of the numeric byte code 150. The return of 3 gives the position after the
@@ -9814,18 +9821,18 @@
 
    Example:
 
-   GTM>write $zfind("***",$zchar(229),5)
+   YDB>write $zfind("***",$zchar(229),5)
    8
-   GTM>
+   YDB>
 
    This example uses $ZFIND() to WRITE the position of the next occurrence of
    the byte code 229 starting in byte position five.
 
    Example:
 
-   GTM>set t=1 for  set t=$zfind("***",$zchar(230,150,176),t) quit:'t  write !,t
+   YDB>set t=1 for  set t=$zfind("***",$zchar(230,150,176),t) quit:'t  write !,t
    4
-   GTM>
+   YDB>
 
    This example uses a loop with $ZFIND() to locate all the occurrences of
    the byte sequence $ZCHAR(230,150,176) in the sequence of octets ("***").
@@ -9842,18 +9849,18 @@
 
    Example:
 
-   GTM>write $zgetjpi(1975,"isprocalive")
+   YDB>write $zgetjpi(1975,"isprocalive")
    1
-   GTM>
+   YDB>
 
    This uses $ZGETJPI() to determine whether process 1975 is alive.
 
    Example:
 
-   GTM>set t=$zgetjpi("","cputim")
-   GTM>do ^bench write $zgetjpi("","cputim")-t
+   YDB>set t=$zgetjpi("","cputim")
+   YDB>do ^bench write $zgetjpi("","cputim")-t
    1738
-   GTM>
+   YDB>
 
    This uses $ZGETJPI() to measure the actual CPU time, measured in
    hundredths of a second, consumed by performing the BENCH routine.
@@ -9893,13 +9900,13 @@
 
    Example:
 
-   GTM>set x=$zjobexam()
-   GTM>write x
+   YDB>set x=$zjobexam()
+   YDB>write x
    /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/GTM_JOBEXAM.ZSHOW_DMP_28760_1
-   GTM>set x=$zjobexam("test.file")
-   GTM>write x
+   YDB>set x=$zjobexam("test.file")
+   YDB>write x
    /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/test.file
-   GTM>
+   YDB>
 
    Shows default file name and type of the files created containing the zshow
    dump information and the difference when the name and type are specified.
@@ -9918,11 +9925,11 @@
 
    Example:
 
-   GTM>write "123456789012345",! write $zjustify("***",15),!,$zjustify("***",5)
+   YDB>write "123456789012345",! write $zjustify("***",15),!,$zjustify("***",5)
    123456789012345
         ***
    ***
-   GTM>
+   YDB>
 
    This example uses $ZJUSTIFY() to display the sequence of octets
    represented by "***" in fields of 15 space octets and 5 space octets.
@@ -9944,29 +9951,29 @@
 
    Example:
 
-   GTM>write $zlength("************")
+   YDB>write $zlength("************")
    36
-   GTM>
+   YDB>
 
    This uses $ZLENGTH() to WRITE the length in bytes of the sequence of
    octets "************".
 
    Example:
 
-   GTM>set x="*"_$zchar(63)_"*"_$zchar(63)_"*"
-   GTM>write $zlength(x,$zchar(63))
+   YDB>set x="*"_$zchar(63)_"*"_$zchar(63)_"*"
+   YDB>write $zlength(x,$zchar(63))
    3
-   GTM>
+   YDB>
 
    This uses $ZLENGTH() to WRITE the number of pieces in a sequence of
    octets, as delimited by the byte code $ZCHAR(63).
 
    Example:
 
-   GTM>set x=$zchar(63)_"*"_$zchar(63)_"*"_$zchar(63)_"*"_$zchar(63)"
-   GTM>write $zlength(x,$zchar(63))
+   YDB>set x=$zchar(63)_"*"_$zchar(63)_"*"_$zchar(63)_"*"_$zchar(63)"
+   YDB>write $zlength(x,$zchar(63))
    5
-   GTM>
+   YDB>
 
    This also uses $ZLENGTH() to WRITE the number of pieces in a sequence of
    octets, as delimited by byte code $ZCHAR(63). Notice that YottaDB counts both
@@ -9994,9 +10001,9 @@
 
    Example:
 
-   GTM>write $zmessage(150373210)
-   %GTM-E-DIVZERO, Attempt to divide by zero
-   GTM>
+   YDB>write $zmessage(150373210)
+   %YDB-E-DIVZERO, Attempt to divide by zero
+   YDB>
 
    This uses $ZMESSAGE() to display the message string corresponding to code
    150373210.
@@ -10060,9 +10067,9 @@
 
    Example:
 
-   GTM>write $zparse("test","","/usr/work/","dust.lis")
+   YDB>write $zparse("test","","/usr/work/","dust.lis")
    /usr/work/test.lis
-   GTM>
+   YDB>
 
    This uses $ZPARSE() to demonstrate defaulting using the third and fourth
    arguments. The result gets the directory field from the third expression,
@@ -10071,9 +10078,9 @@
 
    Example:
 
-   GTM>r!,"file :",f w ?20,$zparse(f,"directory")
+   YDB>r!,"file :",f w ?20,$zparse(f,"directory")
    file: test.list /usr/work/
-   GTM>
+   YDB>
 
    This uses $ZPARSE() to display the directory for the file name entered as
    input at the prompt file: , in this case, the current working directory.
@@ -10082,10 +10089,10 @@
 
    $ cd /usr/work/me
    $ $gtm
-   GTM>write $zparse("test","","x.list","y.c")/usr/work/me/test.lis
-   GTM>write $zparse("test","","/usr/work/","/dev/y.c")/usr/work/test.c
-   GTM>write $zparse("test","","/usr/work","/dev/y.c")/usr/test.c
-   GTM>
+   YDB>write $zparse("test","","x.list","y.c")/usr/work/me/test.lis
+   YDB>write $zparse("test","","/usr/work/","/dev/y.c")/usr/work/test.c
+   YDB>write $zparse("test","","/usr/work","/dev/y.c")/usr/test.c
+   YDB>
 
    This example illustratest the use of the third and fourth arguments to
    $ZPARSE(). In the first statement, the first argument has no directory or
@@ -10111,12 +10118,12 @@
 
    $ cd /usr/work/me
    $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm
-   GTM>For i="DIRECTORY","NAME","TYPE","" Write $ZPARSE("test.m",i),!
+   YDB>For i="DIRECTORY","NAME","TYPE","" Write $ZPARSE("test.m",i),!
    /usr/work/me/
    test
    .m
    /usr/work/me/test.m
-   GTM>
+   YDB>
 
    This example illustrates the output produced for each of the possible
    values for the second argument.
@@ -10136,12 +10143,12 @@
 
    Example:
 
-   GTM>for i=0:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i),"|"
+   YDB>for i=0:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i),"|"
    |
    *|
    *|
    |
-   GTM>
+   YDB>
 
    This loop displays the result of $ZPIECE(), specifying $ZCHAR(64) as a
    delimiter, a piece position "before," first and second, and "after" the
@@ -10149,13 +10156,13 @@
 
    Example:
 
-   GTM>for i=-1:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i,i+1),"|"
+   YDB>for i=-1:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i,i+1),"|"
    |
    *|
    *@*|
    *|
    |
-   GTM>
+   YDB>
 
    This example is similar to the previous example except that it displays
    two pieces on each iteration. Notice the delimiter () in the middle of the
@@ -10170,7 +10177,7 @@
 
    Example:
 
-   GTM>Set $piece(x,$zchar(64),25)="" write x
+   YDB>Set $piece(x,$zchar(64),25)="" write x
    @@@@@@@@@@@@@@@@@@@@@@@@
 
    This SETs the 25th piece of the variable x to null, with delimiter
@@ -10182,7 +10189,7 @@
 
    Provides a way to examine memory in the current process address space. Use
    of this function requires information about YottaDB internals, which may
-   change from release to release. Contact FIS support for information on
+   change from release to release. Contact YottaDB support for information on
    techniques for using $ZPEEK() in largely release independent ways.
 
    The $ZPEEK() function returns the contents of the memory requested as a
@@ -10449,8 +10456,8 @@
 
    Sends its string parameter to the system log and always returns TRUE (1).
    The text appears in the syslog with the same format as any other YottaDB
-   syslog message (that is, in the user.info log with GTM-MUMPS[pid]" or
-   "GTM-MUPIP[pid]" prefix along with instance information where
+   syslog message (that is, in the user.info log with YDB-MUMPS[pid]" or
+   "YDB-MUPIP[pid]" prefix along with instance information where
    appropriate). The format of the $ZSYSLOG function is:
 
    $ZSYSLOG(expr)
@@ -10528,17 +10535,17 @@
 
    Example:
 
-   GTM>write $zsearch("data.dat")
+   YDB>write $zsearch("data.dat")
    /usr/staff/ccc/data.dat
-   GTM>
+   YDB>
 
    This uses $ZSEARCH() to display the full file path name of "data.dat" in
    the process current default directory.
 
    Example:
 
-   GTM>set x=$zsearch("*.c")
-   GTM>for  set x=$zsearch("*.m") quit:x=""  write !,$zparse(x,"NAME")
+   YDB>set x=$zsearch("*.c")
+   YDB>for  set x=$zsearch("*.m") quit:x=""  write !,$zparse(x,"NAME")
 
    This FOR loop uses $ZSEARCH() and $ZPARSE() to display M source file names
    in the process current working directory. To ensure that the search starts
@@ -10556,7 +10563,7 @@
 
    Although $ZSIGPROC() may work today as a way to invoke the asynchronous
    interrupt mechanism of YottaDB processes to XECUTE $ZINTERRUPT because the
-   underlying mechanism uses the POSIX USR1 signal, FIS reserves the right to
+   underlying mechanism uses the POSIX USR1 signal, YottaDB reserves the right to
    change the underlying mechanism to suit its convenience and sending a
    POSIX USR1 may cease to work as a way to invoke the asynchronous interrupt
    mechanism. Use MUPIP INTRPT as the supported and stable API to invoke the
@@ -10567,13 +10574,13 @@
 
    Example:
 
-   GTM>job ^Somejob
-   GTM>set ret=$&gtmposix.signalval("SIGUSR1",.sigusr1) zwrite
+   YDB>job ^Somejob
+   YDB>set ret=$&gtmposix.signalval("SIGUSR1",.sigusr1) zwrite
    ret=0
    sigusr1=10
-   GTM>write $zsigproc($zjob,sigusr1)
+   YDB>write $zsigproc($zjob,sigusr1)
    0
-   GTM>
+   YDB>
 
    This example sends the SIGUSR1 signal to the pid specified by $zjob.
 
@@ -10589,13 +10596,13 @@
 
    Example:
 
-   GTM>write $ZCHSET
+   YDB>write $ZCHSET
    M
-   GTM>set char1="a" ; one byte character
-   GTM>set char2="c,"; two-byte character
-   GTM>set char3="*"; three-byte character
-   GTM>set y=char1_char2_char3
-   GTM>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
+   YDB>set char1="a" ; one byte character
+   YDB>set char2="c,"; two-byte character
+   YDB>set char3="*"; three-byte character
+   YDB>set y=char1_char2_char3
+   YDB>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
    0
 
    With character set M specified, the expression
@@ -10604,13 +10611,13 @@
 
    Example:
 
-   GTM>write $zchset
+   YDB>write $zchset
    UTF-8
-   GTM>set char1="a" ; one byte character
-   GTM>set char2="c,"; two-byte character
-   GTM>set char3="*"; three-byte character
-   GTM>set y=char1_char2_char3
-   GTM>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
+   YDB>set char1="a" ; one byte character
+   YDB>set char2="c,"; two-byte character
+   YDB>set char3="*"; three-byte character
+   YDB>set y=char1_char2_char3
+   YDB>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
    1
 
    For a process started in UTF-8 mode, the expression
@@ -10655,13 +10662,13 @@
 
    Example:
 
-   GTM>set hiraganaA=$char(12354) ; $zchar(227,129,130)
-   GTM>set temp1=$zchar(130)
-   GTM>set temp2=$zchar(140)
-   GTM>set tr=$ztranslate(hiraganaA,temp1,temp2)
-   GTM>w $ascii(tr)
+   YDB>set hiraganaA=$char(12354) ; $zchar(227,129,130)
+   YDB>set temp1=$zchar(130)
+   YDB>set temp2=$zchar(140)
+   YDB>set tr=$ztranslate(hiraganaA,temp1,temp2)
+   YDB>w $ascii(tr)
    12364
-   GTM>
+   YDB>
 
    In the above example, $ZTRANSLATE() replaces byte $ZCHAR(130) in first
    expression and matching the first (and only) byte in the second expression
@@ -10681,7 +10688,7 @@
    regions matching the specified signature. If the argument specifies an
    incomplete trigger signature, for example, only the name, the
    specification may match multiple triggers and apply the delete or select
-   to all of them. FIS recommends you run a select and analyze the scope of
+   to all of them. YottaDB recommends you run a select and analyze the scope of
    the signature before any signature limited delete.
 
 3 Examples_of_$ZTRIGGER()
@@ -10689,20 +10696,20 @@
 
    Example:
 
-   GTM>set X=$ztrigger("S")
-   GTM>
+   YDB>set X=$ztrigger("S")
+   YDB>
 
    This example displays the current trigger definitions stored in the
    database.
 
-   GTM>set X=$ztrigger("i","+^Acct(sub=:) -command=set -xecute=""set ^X($ztvalue)=sub""")
-   GTM>
+   YDB>set X=$ztrigger("i","+^Acct(sub=:) -command=set -xecute=""set ^X($ztvalue)=sub""")
+   YDB>
 
    This example adds a trigger definition for the first level node of ^Acct.
 
    Example:
 
-   GTM>set trigstr="+^a -commands=S -xecute=<<"_$c(10)_" do ^twork1"_$c(10)_" do ^twork2"_$c(10) write $ztrigger("item",trigstr)
+   YDB>set trigstr="+^a -commands=S -xecute=<<"_$c(10)_" do ^twork1"_$c(10)_" do ^twork2"_$c(10) write $ztrigger("item",trigstr)
 
    This example demonstrates the usage of the
    $ztrigger("ITEM",<multi-line-trigger-definition>> where <<denotes the
@@ -10713,9 +10720,9 @@
 
    Example:
 
-   GTM>write $ztrigger("file","agbl.trg")
+   YDB>write $ztrigger("file","agbl.trg")
    1
-   GTM>
+   YDB>
 
    This example is equivalent to the previous $ztrigger("ITEM") example. In
    this example, agbl.trg contains the following multi-line trigger
@@ -10769,11 +10776,11 @@
 
    Example:
 
-   GTM>write $ztrnlnm("gtm_dist","","","","","VALUE")
+   YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
    /usr/lib/fis-gtm/V6.0-000_x86_64/utf8
-   GTM>
+   YDB>
 
-   This uses $ZTRNLNM() to display the translation value for gtm_dist.
+   This uses $ZTRNLNM() to display the translation value for ydb_dist.
 
 2 $ZWidth()
    $ZWidth()
@@ -10798,11 +10805,11 @@
 
    Example:
 
-   GTM>set NG=$char($$FUNC^%HD("200B"))
-   GTM>set S=$char(26032)_NG_$CHAR(26033)
-   GTM>W $ZWidth(STR)
+   YDB>set NG=$char($$FUNC^%HD("200B"))
+   YDB>set S=$char(26032)_NG_$CHAR(26033)
+   YDB>W $ZWidth(STR)
    4
-   GTM>
+   YDB>
 
    In the above example, the local variable NG contains a non-graphic
    character which does not display between two double-width characters in
@@ -10810,12 +10817,12 @@
 
    Example:
 
-   GTM>write $zwidth("The rain in Spain stays mainly in the plain.")
+   YDB>write $zwidth("The rain in Spain stays mainly in the plain.")
    44
-   GTM>set A="************"
-   GTM>write $length(A)
+   YDB>set A="************"
+   YDB>write $length(A)
    12
-   GTM>write $zwidth(A)
+   YDB>write $zwidth(A)
    24
 
    In the above example, the $ZWIDTH() function returns 24 because each
@@ -10851,16 +10858,16 @@
 
    Example:
 
-   GTM>set temp="X"_$char(10)_"X" ; $CHAR(10) is the linefeed character
-   GTM>write temp
+   YDB>set temp="X"_$char(10)_"X" ; $CHAR(10) is the linefeed character
+   YDB>write temp
    X
    X
-   GTM>write $zwrite(temp)
+   YDB>write $zwrite(temp)
    "X"_$C(10)_"X"
-   GTM>write $zwrite($zwrite(temp),1)
+   YDB>write $zwrite($zwrite(temp),1)
    X
    X
-   GTM>
+   YDB>
 
 1 ISV
    ISV
@@ -11007,7 +11014,7 @@
 
    Example:
 
-   GTM>Write $HOROLOG
+   YDB>Write $HOROLOG
 
    Produces the result 58883,55555 at 3:25:55 pm on 20 March, 2002.
 
@@ -11479,9 +11486,9 @@
 
    $ export gtm_chset=UTF-8
    $ /usr/lib/fis-gtm/V6.0-001_x86/gtm
-   GTM>write $zchset
+   YDB>write $zchset
    UTF-8
-   GTM>
+   YDB>
 
 2 $ZCMdline
    $ZCMdline
@@ -11566,13 +11573,13 @@
 
    $ export gtmcompile="-LIST -LENGTH=56 -SPACE=2"
    $ gtm
-   GTM>WRITE $ZCOMPILE
+   YDB>WRITE $ZCOMPILE
    -LIST -LENGTH=56 -SPACE=2
-   GTM>SET $ZCOMPILE="-LIST -NOIGNORE"
-   GTM>WRITE $ZCOMPILE
+   YDB>SET $ZCOMPILE="-LIST -NOIGNORE"
+   YDB>WRITE $ZCOMPILE
    -LIST -NOIGNORE
-   GTM>ZLINK "A.m"
-   GTM>HALT
+   YDB>ZLINK "A.m"
+   YDB>HALT
    $ echo $gtmcompile
    -LIST -LENGTH=56 -SPACE=2
 
@@ -11619,12 +11626,12 @@
 
    Example:
 
-   GTM>WRITE $ZDATEFROM
+   YDB>WRITE $ZDATEFROM
    0
-   GTM>WRITE $ZDATE($H)
+   YDB>WRITE $ZDATE($H)
    11/15/02
-   GTM>SET $ZDATEFORM=1
-   GTM>WRITE $ZDATE($H)
+   YDB>SET $ZDATEFORM=1
+   YDB>WRITE $ZDATE($H)
    11/15/2002
 
 2 $ZDirectory
@@ -11639,10 +11646,10 @@
 
    Example:
 
-   GTM>WRITE $ZDIR
+   YDB>WRITE $ZDIR
    /usr/tmp
-   GTM>SET $ZDIR=".."
-   GTM>WRITE $ZDIR
+   YDB>SET $ZDIR=".."
+   YDB>WRITE $ZDIR
    /usr
 
    This example displays the current working directory and changes $ZDIR to
@@ -11745,12 +11752,12 @@
    $ gtmgbldir=test.gld
    $ export gtmgbldir
    $ gtm
-   GTM>WRITE $zgbldir
+   YDB>WRITE $zgbldir
    /usr/dev/test.gld
-   GTM>SET $zgbldir="mumps.gld"
-   GTM>WRITE $zgbldir
+   YDB>SET $zgbldir="mumps.gld"
+   YDB>WRITE $zgbldir
    mumps.gld
-   GTM>HALT
+   YDB>HALT
    $ echo $gtmgbldir
    test.gld
 
@@ -11762,15 +11769,15 @@
    $ ls test.gld
    test.gld not found
    $ gtm
-   GTM>WRITE $zgbldir
+   YDB>WRITE $zgbldir
    /usr/dev/mumps.gld
-   GTM>set $zgbldir="test.gld"
-   %GTM-E-ZGBLDIRACC, Cannot access global directory
+   YDB>set $zgbldir="test.gld"
+   %YDB-E-ZGBLDIRACC, Cannot access global directory
    "/usr/dev/test.gld". Retaining /usr/dev/mumps.gld"
    %SYSTEM-E-ENO2, No such file or directory
-   GTM>WRITE $zgbldir
+   YDB>WRITE $zgbldir
    /usr/dev/mumps.gld
-   GTM>halt
+   YDB>halt
    $
 
    The SET command attempts to change the value of $ZGBLDIR to test.gld.
@@ -11811,7 +11818,7 @@
 
    Example:
 
-   GTM>zprint ^zhoro
+   YDB>zprint ^zhoro
    zhoro(zone)
     set:'$data(zone) zone="Europe/London"
     new zutzh
@@ -11819,7 +11826,7 @@
     do displaytzdetails(zutzh,zone)
     quit
    getzutzh(zone)
-     set shcommand="TZ="_zone_" $gtm_dist/mumps -run %XCMD 'write $zut,"" "",$zhorolog,"" "",$zdate($horolog,""MON DD,YYYY 12:60:SS AM""),!'"
+     set shcommand="TZ="_zone_" $ydb_dist/mumps -run %XCMD 'write $zut,"" "",$zhorolog,"" "",$zdate($horolog,""MON DD,YYYY 12:60:SS AM""),!'"
      set descname="tzpipe"
      open descname:(shell="/bin/sh":command=shcommand:readonly)::"pipe"
      use descname read dateline use $principal close descname
@@ -11838,11 +11845,11 @@
     else  if zhsp<1 set zhfp=zhfp-1,zhsp=zhsp+86400
     write "Time in UTC ",$zdate(zhfp_","_zhsp,"MON DD,YYYY 12:60:SS AM")
     quit
-   GTM>do ^zhoro
+   YDB>do ^zhoro
    Time in Europe/London APR 10,2015 05:20:29 PM $ZUT=1428682829213711
    1 Hour Ahead of UTC
    Time in UTC APR 10,2015 04:20:29 PM
-   GTM>
+   YDB>
 
 2 $ZINTerrupt
    $ZINTerrupt
@@ -11952,17 +11959,17 @@
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
    is not invoked (the error handler is invoked if an error occurs while
-   executing the $ZINTERRUPT code), YottaDB sends the GTM-ERRWZINTR message and
+   executing the $ZINTERRUPT code), YottaDB sends the YDB-ERRWZINTR message and
    the compiler error message to the operator log facility. If the YottaDB
    process is at a direct mode prompt or is executing a direct mode command
-   (for example, a FOR loop), YottaDB sends also sends the GTM-ERRWZINTR error
+   (for example, a FOR loop), YottaDB sends also sends the YDB-ERRWZINTR error
    message to the user console along with the compilation error. In both
    cases, the interrupted process resumes execution without performing any
    action specified by the defective $ZINTERRUPT vector.
 
    If YottaDB encounters an error during creation of the interrupt handler's
    stack frame (before transferring control to the application code specified
-   by the vector), that error is prefixed with a GTM-ERRWZINTR error. The
+   by the vector), that error is prefixed with a YDB-ERRWZINTR error. The
    error handler then executes normal error processing associated with the
    interrupted routine.
 
@@ -12006,9 +12013,9 @@
 
    $ gtm_principal="foo"
    $ export gtm_principal
-   GTM>WRITE $IO
+   YDB>WRITE $IO
    foo
-   GTM>WRITE $ZIO
+   YDB>WRITE $ZIO
    /dev/pts/8
 
    Notice that $ZIO contains the actual terminal device name while $IO
@@ -12093,7 +12100,7 @@
 
    Example:
 
-   GTM>zprint ^zleve
+   YDB>zprint ^zleve
    zleve;
     do B
     write X,!
@@ -12107,9 +12114,9 @@
    D
     set X=$ZLEVEL
     quit
-   GTM>do ^zleve
+   YDB>do ^zleve
    4
-   GTM>
+   YDB>
 
    This program, executed from Direct Mode, produces a value of 4 for
    $ZLEVEL. If you run this program from the shell, the value of $ZLEVEL is
@@ -12181,10 +12188,10 @@
    ^X=2,will set ^Y to 5 in 5 seconds...^Y=5...committed.
    ^X=3,will set ^Y to 7 in 7 seconds...
    In $ETRAP handler. Error was:
-   150377322,longtran+7^tptime,%GTM-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
+   150377322,longtran+7^tptime,%YDB-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
    ^X=3,will set ^Y to 9 in 9 seconds...
    In $ETRAP handler. Error was:
-   150377322,longtran+7^tptime,%GTM-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
+   150377322,longtran+7^tptime,%YDB-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
    Done TP Timeout test.
 
 2 $ZMOde
@@ -12201,7 +12208,7 @@
 
    Example:
 
-   GTM>WRITE $ZMODE
+   YDB>WRITE $ZMODE
    INTERACTIVE
 
    This displays the process mode.
@@ -12288,13 +12295,13 @@
 
    Example:
 
-   GTM>write $zpatnumeric
+   YDB>write $zpatnumeric
    UTF-8
-   GTM>Write $Char($$FUNC^%HD("D67"))?.N ; This is the Malayalam decimal digit 1
+   YDB>Write $Char($$FUNC^%HD("D67"))?.N ; This is the Malayalam decimal digit 1
    1
-   GTM>Write 1+$Char($$FUNC^%HD("D67"))
+   YDB>Write 1+$Char($$FUNC^%HD("D67"))
    1
-   GTM>Write 1+$Char($$FUNC^%HD("31")) ; This is the ASCII digit 1
+   YDB>Write 1+$Char($$FUNC^%HD("31")) ; This is the ASCII digit 1
    2
 
 2 $ZPIN
@@ -12383,7 +12390,7 @@
 
    Example:
 
-   GTM>WRITE !,$ZPOS,! ZPRINT @$ZPOS
+   YDB>WRITE !,$ZPOS,! ZPRINT @$ZPOS
 
    This example displays the current location followed by the source code for
    that line.
@@ -12392,7 +12399,7 @@
    $ZPROMpt
 
    $ZPROM[PT] contains a string value specifying the current Direct Mode
-   prompt. By default, GTM>is the Direct Mode prompt. M routines can modify
+   prompt. By default, YDB>is the Direct Mode prompt. M routines can modify
    $ZPROMPT by means of a SET command. $ZPROMPT cannot exceed 16 characters.
    If an attempt is made to assign $ZPROMPT to a longer string, only the
    first 16 characters will be taken.
@@ -12405,10 +12412,10 @@
 
    Example:
 
-   GTM>set $zprompt="Test01">"
-   Test01>set $zprompt="GTM>"
+   YDB>set $zprompt="Test01">"
+   Test01>set $zprompt="YDB>"
 
-   This example changes the YottaDB prompt to Test01> and then back to GTM>.
+   This example changes the YottaDB prompt to Test01> and then back to YDB>.
 
 2 $ZREalstor
    $ZREalstor
@@ -12497,7 +12504,7 @@
 
    Example:
 
-   GTM>s $zroutines=".(../src) $gtm_dist"
+   YDB>s $zroutines=".(../src) $ydb_dist"
 
    This example directs GTM to look for object modules first in your current
    directory, then in the distribution directory that contains the percent
@@ -12509,12 +12516,12 @@
    $ gtmroutines="/usr/jones /usr/smith"
    $ export gtmroutines
    $ gtm
-   GTM>write $zroutines
+   YDB>write $zroutines
    "/usr/jones /usr/smith"
-   GTM>set $zro="/usr/jones/utl /usr/smith/utl"
-   GTM>write $zroutines
+   YDB>set $zro="/usr/jones/utl /usr/smith/utl"
+   YDB>write $zroutines
    "/usr/jones/utl /usr/smith/utl"
-   GTM>halt
+   YDB>halt
    $ echo $gtmroutines
    /usr/jones /usr/smith
 
@@ -12526,13 +12533,13 @@
 
    Example:
 
-   GTM>SET $ZRO=". /usr/smith"
+   YDB>SET $ZRO=". /usr/smith"
 
    This example sets $zroutines to a list containing two directories.
 
    Example:
 
-   GTM>set $zro="/usr/smith(/usr/smith/tax /usr/smith/fica)"
+   YDB>set $zro="/usr/smith(/usr/smith/tax /usr/smith/fica)"
 
    This example specifies that YottaDB should search the directory /usr/smith
    for object files, and the directories /usr/smith/tax and /usr/smith/fica
@@ -12541,7 +12548,7 @@
 
    Example:
 
-   GTM>set $zro="/usr/smith(/usr/smith /usr/smith/tax /usr/smith/fica)"
+   YDB>set $zro="/usr/smith(/usr/smith /usr/smith/tax /usr/smith/fica)"
 
    This example specifies that YottaDB should search the directory /usr/smith
    for object files and the directories /usr/smith/tax and /usr/smith/fica
@@ -12551,7 +12558,7 @@
 
    Example:
 
-   GTM>set $zro="/usr/smith /usr/smith/tax() /usr/smith/fica"
+   YDB>set $zro="/usr/smith /usr/smith/tax() /usr/smith/fica"
 
    This specifies that YottaDB should search /usr/smith and /usr/smith/fica for
    object and source files. However, because the empty parentheses indicate
@@ -12647,7 +12654,7 @@
 
    Example:
 
-   GTM>s $zro=". /usr/smi/utl() /usr/jon/utl
+   YDB>s $zro=". /usr/smi/utl() /usr/jon/utl
    (/usr/jon/utl/so /usr/smi/utl)"
 
    The following table illustrates the matrix view of this $ZROUTINES.
@@ -12756,13 +12763,13 @@
    ./shrsrc/foo.m, the following commands specify that YottaDB should search the
    library ./libshare.so for symbol foo when do ^foo is encountered.
 
-   GTM>SET $ZROUTINES="./libshare.so ./obj(./shrsrc)"
-   GTM>DO ^foo;auto-ZLINK foo - shared
-   GTM>ZEDIT "foo";edit ./shrsrc/foo.m
-   GTM>W $ZSOURCE,!;prints foo
-   GTM>ZPRINT +0^foo;issues a source-object mismatch status TXTSRCMAT error message
-   GTM>ZLINK "foo";re-compile ./shrsrc/foo.m to generate ./obj/foo.o.
-   GTM>W $TEXT(+0^foo);prints foo
+   YDB>SET $ZROUTINES="./libshare.so ./obj(./shrsrc)"
+   YDB>DO ^foo;auto-ZLINK foo - shared
+   YDB>ZEDIT "foo";edit ./shrsrc/foo.m
+   YDB>W $ZSOURCE,!;prints foo
+   YDB>ZPRINT +0^foo;issues a source-object mismatch status TXTSRCMAT error message
+   YDB>ZLINK "foo";re-compile ./shrsrc/foo.m to generate ./obj/foo.o.
+   YDB>W $TEXT(+0^foo);prints foo
 
    Note that ZPRINT reports an error, as foo.m does not match the routine
    already linked into image. Also note that, to recompile and re-link the
@@ -12804,37 +12811,37 @@
 
    Example:
 
-   GTM>ZEDIT "subr.m"
+   YDB>ZEDIT "subr.m"
    .
    .
-   GTM>WRITE $ZSOURCE
+   YDB>WRITE $ZSOURCE
    subr
 
    Example:
 
-   GTM>ZEDIT "test"
+   YDB>ZEDIT "test"
    .
    .
    .
-   GTM>WRITE $ZSOURCE
+   YDB>WRITE $ZSOURCE
    "test"
 
    Example:
 
-   GTM>ZEDIT "/usr/smith/report.txt"
+   YDB>ZEDIT "/usr/smith/report.txt"
    .
    .
    .
-   GTM>WRITE $ZSOURCE
+   YDB>WRITE $ZSOURCE
    /usr/smith/report.txt
 
    Example:
 
-   GTM>ZLINK "BASE.O"
+   YDB>ZLINK "BASE.O"
    .
    .
    .
-   GTM>WRITE $ZSOURCE
+   YDB>WRITE $ZSOURCE
    BASE
 
 2 $ZStatus
@@ -12848,20 +12855,20 @@
    substrings. The string consists of the following:
 
    Format: %<FAC>-<SEV>-<ID>, <TEXT>
-   Example: %GTM-E-DIVZERO, Attempt to divide by zero
+   Example: %YDB-E-DIVZERO, Attempt to divide by zero
 
    YottaDB sets $ZSTATUS when it encounters errors during program execution, but
    not when it encounters errors in a Direct Mode command.
 
    $ZSTATUS is a read-write Intrinsic Special Variable, (i.e., it can occur
    on the left side of the equal sign (=) in the argument to the SET
-   command). While it will accept any string, FIS recommends setting it to
+   command). While it will accept any string, YottaDB recommends setting it to
    null. M routines cannot modify $ZSTATUS with the NEW command.
 
    Example:
 
-   GTM>WRITE $ZSTATUS
-   150373110,+1^MYFILE,%GTM-E-DIVZERO,
+   YDB>WRITE $ZSTATUS
+   150373110,+1^MYFILE,%YDB-E-DIVZERO,
    Attempt to divide by zero
 
    This example displays the status generated by a divide by zero (0).
@@ -12881,15 +12888,15 @@
 
    Example:
 
-   GTM>WRITE $ZSTEP
+   YDB>WRITE $ZSTEP
    B
-   GTM>
+   YDB>
 
    This example displays the current value of $ZSTEP, which is the default.
 
    Example:
 
-   GTM>SET $ZSTEP="ZP @$ZPOS B"
+   YDB>SET $ZSTEP="ZP @$ZPOS B"
 
    This example sets $ZSTEP to code that displays the contents of the next
    line to execute, and then enters Direct Mode.
@@ -12936,7 +12943,7 @@
 
    $ export sigusrval=10
    $ /usr/lib/fis-gtm/V6.1-000_x86_64/gtm
-   GTM>zprint ^ztran
+   YDB>zprint ^ztran
    foo;
      set $ztexit=1
      set $zinterrupt="d ^throwint"
@@ -12964,18 +12971,18 @@
      write "End Transaction",!
      ;do ^srv
      quit
-   GTM>zprint ^throwint
+   YDB>zprint ^throwint
    throwint
      set $zinterrupt="write !,""interrupt occurred at : "",$stack($stack-1,""PLACE""),! set $ztexit=1"
      if '$zsigproc($job,$ztrnlnm("sigusrval")) write "interrupt sent to process"
      write "***************************************",!!
      quit
-   GTM>do foo^ztran
+   YDB>do foo^ztran
    interrupt sent to process
    interrupt occurred at : throwint+3^throwint
    ***************************************
    interrupt occurred at : foo+13^ztran
-   GTM>
+   YDB>
 
    In the above call to foo^ztran, the interrupt handler is a user-defined
    routine, throwint. The process is sent a signal (SIGUSR1), and $ZINTERRUPT
@@ -12984,17 +12991,17 @@
 
    Example:
 
-   GTM>w $zinterrupt
+   YDB>w $zinterrupt
    "IF $ZJOBEXAM()"
-   GTM>zsystem "ls GTM*"
+   YDB>zsystem "ls GTM*"
    ls: No match.
-   GTM>do bar^ztran
+   YDB>do bar^ztran
    Begin Transaction
    interrupt sent...
    End Transaction
-   GTM>zsystem "ls GTM*"
+   YDB>zsystem "ls GTM*"
    GTM_JOBEXAM.ZSHOW_DMP_3951_1  GTM_JOBEXAM.ZSHOW_DMP_3951_2
-   GTM>
+   YDB>
 
    This uses the default value of $ZINTERRUPT to service interrupts issued to
    the process. The $ZJOBEXAM function executes a ZSHOW "*", and stores the
@@ -13050,7 +13057,7 @@
 
    Example:
 
-   GTM>S $ZTRAP="ZP @$ZPOS B"
+   YDB>S $ZTRAP="ZP @$ZPOS B"
 
    This example modifies $ZTRAP to display source code for the line where
    YottaDB encounters an error before entering Direct Mode.
@@ -13137,7 +13144,7 @@
 
    Example:
 
-   GTM>w $zversion
+   YDB>w $zversion
    YottaDB V6.0-003 Linux x86_64
 
    This example displays the current version identifier for YottaDB.
@@ -13240,9 +13247,9 @@
    This trigger gets invoked with a SET and displays the prior value (if it
    exists) of ^Acct(1,"ID").
 
-   GTM>w ^Acct(1,"ID")
+   YDB>w ^Acct(1,"ID")
    1975
-   GTM>s ^Acct(1,"ID")=2011
+   YDB>s ^Acct(1,"ID")=2011
    The prior value of ^Acct(1,ID) was: 1975
 
 3 $ZTRIggerop
@@ -13300,9 +13307,9 @@
    separated list of the changed piece numbers if on of the pieces of
    interest: 1,3,4,5,or 6 are modified by the update.
 
-   GTM>write ^trigvn
+   YDB>write ^trigvn
    Window|Table|Chair|Curtain|Cushion|Air Conditioner
-   GTM>set ^trigvn="Window|Dining Table|Chair|Vignette|Pillow|Air Conditioner"
+   YDB>set ^trigvn="Window|Dining Table|Chair|Vignette|Pillow|Air Conditioner"
    4,5
 
    Note that even though piece numbers 2,4 and 5 are changed, $ZTUPDATE
@@ -13318,7 +13325,7 @@
    performance impact because it causes an additional update operation on the
    node once all trigger code completes. If a node has multiple associated
    triggers each trigger receives the current value of $ZTVALUE, however,
-   because the triggers run in arbitrary order, FIS strongly recommends no
+   because the triggers run in arbitrary order, YottaDB strongly recommends no
    more than one trigger change any given element of application data, for
    example, a particular piece. For KILL and its variants, $ZTVALUE returns
    the empty string. While YottaDB accepts updates to $ZTVALUE within the
@@ -13487,7 +13494,7 @@
    This feature of the USE command provides routine control over the timing
    of output, which is occasionally required. However, it also means that
    redundant USE commands may induce an unnecessary performance penalty.
-   Therefore, FIS recommends restricting USE commands to redirecting I/O,
+   Therefore, YottaDB recommends restricting USE commands to redirecting I/O,
    modifying deviceparameters, and initiating specifically required flushes.
 
    The terminal input buffer size is fixed at 1024 on UNIX and a variable
@@ -14125,7 +14132,7 @@
 
    Example:
 
-   GTM>do ^runrep
+   YDB>do ^runrep
    runrep;
     zprint ^runrep
     set dev="/dev/null"
@@ -14381,8 +14388,8 @@
 
    Example:
 
-   GTM>kill ^a
-   GTM>zprint ^indepserver
+   YDB>kill ^a
+   YDB>zprint ^indepserver
    indepserver;
      read x
      write "received = ",x,!
@@ -14390,27 +14397,27 @@
      for  do  quit:^quit
      . if $data(^a) write "^a = ",^a,!
      . Hang 5
-   GTM>set a="test"
-   GTM>open a:(command="mumps -run ^indepserver>indout":independent)::"pipe"
-   GTM>use a
-   GTM>write "instructions",!
-   GTM>close a
-   GTM>zsystem "cat indout"
+   YDB>set a="test"
+   YDB>open a:(command="mumps -run ^indepserver>indout":independent)::"pipe"
+   YDB>use a
+   YDB>write "instructions",!
+   YDB>close a
+   YDB>zsystem "cat indout"
    received = instructions
-   GTM>set ^a=1
-   GTM>zsystem "cat indout"
-   received = instructions
-   ^a = 1
-   ^a = 1
-   ^a = 1
-   GTM>s ^quit=1
-   GTM>zsystem "cat indout"
+   YDB>set ^a=1
+   YDB>zsystem "cat indout"
    received = instructions
    ^a = 1
    ^a = 1
    ^a = 1
+   YDB>s ^quit=1
+   YDB>zsystem "cat indout"
+   received = instructions
    ^a = 1
-   GTM>
+   ^a = 1
+   ^a = 1
+   ^a = 1
+   YDB>
 
    This is a simple example using a mumps process as a server.
 
@@ -14464,7 +14471,7 @@
      set piperr="piperr"
      set writesize=1024
      set cmd=$piece($zcmdline," ") set:'$length(cmd) cmd="induceEPIPE"
-     open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample":stderr=piperr)::"pipe"
+     open pipe:(shell="/bin/bash":command="$ydb_dist/mumps -run "_cmd_"^pipexample":stderr=piperr)::"pipe"
      zshow "D":devicelist write "The active device is ",devicelist("D",2),!
      use pipe
      for i=1:1:1024 write $tr($justify(i,writesize)," ","X"),!
@@ -14476,7 +14483,7 @@
      set pipe="pipe"
      set writesize=1024
      set cmd=$piece($zcmdline," ",2) set:'$length(cmd) cmd="induceEAGAIN"
-     open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample")::"pipe"
+     open pipe:(shell="/bin/bash":command="$ydb_dist/mumps -run "_cmd_"^pipexample")::"pipe"
      zshow "D":devicelist write "The active device is ",devicelist("D",2),!
      write !,!
      use pipe
@@ -14530,7 +14537,7 @@
      set cmd=$piece($zcmdline," ") set:'$length(cmd) cmd="induceEPIPE"
      for try=0:1  do  quit:$get(readcomplete,0)
      . new $etrap set $etrap="goto retryEPIPE"
-     . open pipe:(shell="/bin/bash":command="$gtm_dist/mumps -run "_cmd_"^pipexample "_try:stderr=piperr)::"pipe"
+     . open pipe:(shell="/bin/bash":command="$ydb_dist/mumps -run "_cmd_"^pipexample "_try:stderr=piperr)::"pipe"
      . zshow "D":devicelist write "Try ",try,$char(9),devicelist("D",2),!
      . use pipe
      . for i=1:1:1024 do
@@ -14563,11 +14570,11 @@
    Example:
 
    sh> mumps -run pipexample induceEAGAIN
-   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample" STDERR="piperr"
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEAGAIN^pipexample" STDERR="piperr"
    $ZSTATUS="11,pipexample+9^pipexample,%SYSTEM-E-ENO11, Resource temporarily unavailable"
 
    sh> mumps -run retry^pipexample induceEAGAIN
-   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEAGAIN^pipexample 0" STDERR="piperr"
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEAGAIN^pipexample 0" STDERR="piperr"
    ...Failed to perform non-blocked writes... Retrying write # 54
    ...Failed to perform non-blocked writes... Retrying write # 63
    ...Failed to perform non-blocked writes... Retrying write # 69
@@ -14585,21 +14592,21 @@
    mechanism to back off the WRITEs when the buffer fills up.
 
    sh> mumps -run pipexample induceEPIPE
-   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample" STDERR="piperr"
+   The active device is pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEPIPE^pipexample" STDERR="piperr"
        stdout:My PID is 12808
-       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
+       stderr:%YDB-F-FORCEDHALT, Image HALTed by MUPIP STOP
    $ZSTATUS="32,pipexample+9^pipexample,%SYSTEM-E-ENO32, Broken pipe"
 
    sh> mumps -run retry^pipexample induceEPIPE
-   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 0" STDERR="piperr"
+   Try 0   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEPIPE^pipexample 0" STDERR="piperr"
    ...Caught on try 0, write 49... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
        stdout:My PID is 16252
-       stderr:%GTM-F-FORCEDHALT, Image HALTed by MUPIP STOP
-   Try 1   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 1" STDERR="piperr"
+       stderr:%YDB-F-FORCEDHALT, Image HALTed by MUPIP STOP
+   Try 1   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEPIPE^pipexample 1" STDERR="piperr"
    ...Caught on try 1, write 697... 32,retry+13^pipexample,%SYSTEM-E-ENO32, Broken pipe
        stdout:My PID is 16403
-       stdout:$ZSTATUS="150373210,induceEPIPE+5^pipexample,%GTM-E-DIVZERO, Attempt to divide by zero"
-   Try 2   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$gtm_dist/mumps -run induceEPIPE^pipexample 2" STDERR="piperr"
+       stdout:$ZSTATUS="150373210,induceEPIPE+5^pipexample,%YDB-E-DIVZERO, Attempt to divide by zero"
+   Try 2   pipe OPEN PIPE SHELL="/bin/bash" COMMAND="$ydb_dist/mumps -run induceEPIPE^pipexample 2" STDERR="piperr"
        Writes completed
 
 
@@ -14609,7 +14616,7 @@
    is possible to read the errors without creating a STDERR pipe device,
    however the error messages are commingled with the output of the programs
    inside the pipe which could make diagnosis of the underlying problem
-   harder. Notice that YottaDB writes fatal errors, GTM-F types, to STDERR, but
+   harder. Notice that YottaDB writes fatal errors, YDB-F types, to STDERR, but
    all others go to STDOUT.
 
    Additionally, this example demonstrates handling errors that terminate the
@@ -15215,16 +15222,16 @@
    YottaDB. Please check the man page for inetd.conf on your system as the
    details may be slightly different.
 
-   The minimum variables are: $gtm_dist, which specifies the directory
+   The minimum variables are: $ydb_dist, which specifies the directory
    containing the YottaDB distribution, and $gtmroutines, which specifies the
    paths used to locate the YottaDB routines. As an example:
 
    #!/bin/bash
    cd /path/to/workarea
-   export gtm_dist=/usr/local/gtm
-   export gtmroutines="/var/myApp/o(/var/myApp/r) $gtm_dist"
+   export ydb_dist=/usr/local/gtm
+   export gtmroutines="/var/myApp/o(/var/myApp/r) $ydb_dist"
    export gtmgbldir=/var/myApp/g/mumps.dat
-   $gtm_dist/mumps -r start^server
+   $ydb_dist/mumps -r start^server
 
    When start^server begins, the $PRINCIPAL device is the current device
    connected a socket and $KEY contains "ESTABLISHED|socket_handle|
@@ -15478,7 +15485,7 @@
 
    Example:
 
-   GTM>do ^FREAD
+   YDB>do ^FREAD
    FREAD;
     zprint ^FREAD
     read "File > ",sd
@@ -15596,7 +15603,7 @@
 
    Example:
 
-   GTM>do ^fixedex
+   YDB>do ^fixedex
    fixedex;
      zprint ^fixedex
      set file="fix.txt"
@@ -15631,10 +15638,10 @@
 
    Example:
 
-   GTM>zprint ^gtmcp
+   YDB>zprint ^gtmcp
    gtmcp ; Copy a binary file using YottaDB
      new dest,line,max,src
-     if 2>$length($zcmdline," ") write "$gtm_dist/mumps -r source target",!
+     if 2>$length($zcmdline," ") write "$ydb_dist/mumps -r source target",!
      set dest=$piece($zcmdline," ",2)
      set src=$piece($zcmdline," ",1)
      set max=1024*1024 ; the maximum YottaDB string size
@@ -15797,7 +15804,7 @@
    YottaDB runtime system uses the plugin to pass the IV to the cryptographic
    libraries used, which use the length of the IV, to determine whether an IV
    less than the required size it is zero padded, and whether an IV that is
-   longer than the required length generates an error. FIS suggests using
+   longer than the required length generates an error. YottaDB suggests using
    $ZCHAR() in preference to $CHAR() when building IV byte sequences, and to
    make sure that IV sequences are not unintentionally subjected to numeric
    conversion.
@@ -15841,15 +15848,15 @@
 
    export LD_LIBRARY_PATH=/usr/local/lib
    export GNUPGHOME=$PWD/mygnupg
-   $gtm_dist/plugin/gtmcrypt/gen_keypair.sh mykeypair@gtm Keymaster
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Sunday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Monday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Tuesday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Wednesday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Thursday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Friday.key
-   $gtm_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Saturday.key
-   echo -n "Enter password for gtm_passwd";export gtm_passwd="`$gtm_dist/plugin/gtmcrypt/maskpass|cut -f 3 -d " "`"
+   $ydb_dist/plugin/gtmcrypt/gen_keypair.sh mykeypair@gtm Keymaster
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Sunday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Monday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Tuesday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Wednesday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Thursday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Friday.key
+   $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Saturday.key
+   echo -n "Enter password for gtm_passwd";export gtm_passwd="`$ydb_dist/plugin/gtmcrypt/maskpass|cut -f 3 -d " "`"
    export gtmcrypt_config=mygtmcryptfile
    cat mygtmcryptfile
     files: {
@@ -15861,8 +15868,8 @@
     CustomerReportKey6: "Friday.key";
     CustomerReportKey7: "Saturday.key";
    };
-   $gtm_dist/mumps -dir
-   GTM>zprint ^encrfile
+   $ydb_dist/mumps -dir
+   YDB>zprint ^encrfile
    encrfile
     set now=$horolog
     set timestamp=$zdate(now,"YYYYMMDDAM1260SS")
@@ -15873,19 +15880,19 @@
     write "Customer Report - Page 1",!
     close file
     write "IV : ",timestamp,!,"Key : CustomerReportKey"_dayofweek
-   GTM>do ^encrfile
+   YDB>do ^encrfile
    IV : 20140911AM042419
    Key : CustomerReportKey5
-   GTM>zprint ^readencrfile
+   YDB>zprint ^readencrfile
    readencrfile(key,iv)
     set file="Customers"_iv_".log"
     open file:(key=key_" "_iv)
     use file
     for read data use $principal write data,! use file quit:$zeof
     close file
-   GTM>do ^readencrfile("CustomerReportKey5","20140911AM042419")
+   YDB>do ^readencrfile("CustomerReportKey5","20140911AM042419")
    Customer Report - Page 1
-   GTM>
+   YDB>
 
    In this example, the key name is CustomerReportKey followed by the number
    representing the day of the week, and IV is a timestamp, which is also a
@@ -15969,18 +15976,18 @@
 
    Example:
 
-   GTM>file1="foo.txt"
-   GTM>open file1:newversion:recordsize=5000
-   GTM>
+   YDB>file1="foo.txt"
+   YDB>open file1:newversion:recordsize=5000
+   YDB>
 
    This example creates a new version of sequential file foo.txtwith
    RECORDSIZE of 5000 bytes.
 
    Example:
 
-   GTM>set delim=$c(13)
-   GTM>set tcpdev="server$"_$j,timeout=30
-   GTM>open tcpdev:(LISTEN="local.socket"_":LOCAL":delim=$c(13):attach="server":newversion):timeout:"SOCKET"
+   YDB>set delim=$c(13)
+   YDB>set tcpdev="server$"_$j,timeout=30
+   YDB>open tcpdev:(LISTEN="local.socket"_":LOCAL":delim=$c(13):attach="server":newversion):timeout:"SOCKET"
 
    This example deletes the old local.socket file (if it exists) and creates
    a new LISTENING local.socket file.
@@ -16009,13 +16016,13 @@
 
    Example:
 
-   GTM>SET file1="mydata.out"
-   GTM>SET expr="UTF-16LE"
-   GTM>OPEN file1:(ochset=expr)
-   GTM>SET DS=$CHAR($$FUNC^%HD("0905"))_$CHAR($$FUNC^%HD("091A"))
-   GTM>SET DS=DS_$CHAR($$FUNC^%HD("094D"))_$CHAR($$FUNC^%HD("091B"))_$CHAR($$FUNC^%HD("0940"))
-   GTM>USE file1 WRITE DS,!
-   GTM>CLOSE file1
+   YDB>SET file1="mydata.out"
+   YDB>SET expr="UTF-16LE"
+   YDB>OPEN file1:(ochset=expr)
+   YDB>SET DS=$CHAR($$FUNC^%HD("0905"))_$CHAR($$FUNC^%HD("091A"))
+   YDB>SET DS=DS_$CHAR($$FUNC^%HD("094D"))_$CHAR($$FUNC^%HD("091B"))_$CHAR($$FUNC^%HD("0940"))
+   YDB>USE file1 WRITE DS,!
+   YDB>CLOSE file1
 
    This example opens a new file called mydata.out and writes Devanagari
    characters in the UTF-16LE encoding.
@@ -16099,7 +16106,7 @@
 
    Example:
 
-   GTM>do ^padexample
+   YDB>do ^padexample
    padexample
     zprint ^padexample
     set a="************"
@@ -16212,7 +16219,7 @@
 
    Example:
 
-   GTM>zprint ^seekdemo
+   YDB>zprint ^seekdemo
    seekdemo
      new x,p
      set p="seekfixed"
@@ -16293,7 +16300,7 @@
 
 
 
-   GTM>do ^seekdemo
+   YDB>do ^seekdemo
    x= 0 - [-05-|-10-|-15-|-20-|-25-|-30-|-35-|-40-|-45-|-50-|-55-| $zkey= 1,0
    x= 1 - [-05-|-10-|-15-|-20-|-25-|-30-|-35-|-40-|-45-|-50-|-55-| $zkey= 2,0
    x= 2 - [-05-|-10-|-15-|-20-|-25-|-30-|-35-|-40-|-45-|-50-|-55-| $zkey= 3,0
@@ -16324,7 +16331,7 @@
    ** CLOSE NODESTROY and reOPEN with append:SEEK="-60" and read last 60 bytes
    x= 8 - [-05-|-10-|-15-|-20-|-25-|-30-|-35-|-40-|-45-|-50-|-55-| $zkey= 540
 
-   GTM>
+   YDB>
 
    This program demonstrates the use of the SEEK deviceparameter on OPEN and
    USE and reOPEN after CLOSE NODESTROY. This test is shown as an M program
@@ -16483,12 +16490,12 @@
 
    Example:
 
-   GTM> set perm="rwx"
-   GTM>OPEN "test52.txt":(NEWVERSION:SYSTEM="r":GROUP=perm:WORLD=perm)
-   GTM>ZSYSTEM "ls -la test52.txt"
+   YDB> set perm="rwx"
+   YDB>OPEN "test52.txt":(NEWVERSION:SYSTEM="r":GROUP=perm:WORLD=perm)
+   YDB>ZSYSTEM "ls -la test52.txt"
 
    -r--rwxrwx 1 user group 0 Aug 20 18:36 test52.txt
-   GTM>
+   YDB>
 
    This example opens file test52.txt and sets read access for the owner,
    while others have complete access.
@@ -16841,7 +16848,7 @@
 
    CONNECT is not compatible with LISTEN.
 
-   Although CONNECT can be used with USE command, FIS recommends not to use
+   Although CONNECT can be used with USE command, YottaDB recommends not to use
    it that way, because unlike the OPEN command, there is no way to specify a
    timeout to the USE command. CONNECT in the USE command take a default
    timeout value of 0.
@@ -16943,14 +16950,14 @@
 
    Example:
 
-   GTM>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
-   GTM>zshow "D"
+   YDB>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
+   YDB>zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
             ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
-   GTM>set tcp="seerv" o tcp:(listen="6322:TCP":attach="serv2")::"SOCKET"
-   GTM>zshow "D"
+   YDB>set tcp="seerv" o tcp:(listen="6322:TCP":attach="serv2")::"SOCKET"
+   YDB>zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=2 CURRENT=1
        SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
@@ -16963,8 +16970,8 @@
 
    The following command moves the "serv" socket to the "socketpool" device.
 
-   GTM>use tcp:detach="serv"
-   GTM>use 0 zshow "D"
+   YDB>use tcp:detach="serv"
+   YDB>use 0 zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv2 DESC=4 LISTENING PASSIVE NOTRAP PORT=6322
@@ -16976,11 +16983,11 @@
    Notice how socket "serv" is now associated with the pseudo socket device
    "socketpool". Its only purpose is to hold detached sockets.
 
-   GTM>set tcp2="s2" o tcp2:::"SOCKET"
+   YDB>set tcp2="s2" o tcp2:::"SOCKET"
 
    This creates a new socket device.
 
-   GTM>zshow "D"
+   YDB>zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
     s2 OPEN SOCKET TOTAL=0 CURRENT=0
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
@@ -16993,8 +17000,8 @@
    The following command moves the serv socket from the socketpool to the
    tcp2 device.
 
-   GTM>use tcp2:attach="serv"
-   GTM>use 0 zshow "D"
+   YDB>use tcp2:attach="serv"
+   YDB>use 0 zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    s2 OPEN SOCKET TOTAL=1 CURRENT=0
       SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
@@ -17350,9 +17357,9 @@
 
    Example:
 
-   GTM>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
-   GTM>use tcp:listen="6322:TCP"
-   GTM>use 0 zshow "D"
+   YDB>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
+   YDB>use tcp:listen="6322:TCP"
+   YDB>use 0 zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=2 CURRENT=1
    SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
@@ -17510,7 +17517,7 @@
 
    Example:
 
-   GTM> USE $P:TERM=$C(26,13,11,7)
+   YDB> USE $P:TERM=$C(26,13,11,7)
 
    This example enables the ASCII characters <SUB>, <CR>, <VT> and <BEL> as
    READ terminators.
@@ -18090,12 +18097,12 @@
 
    The YottaDB distribution includes the source files for these utilities. The
    default installation compiles them to produce object modules in the
-   $gtm_dist distribution library.
+   $ydb_dist distribution library.
 
    You may wish to examine the utilities and include some of them in your
    programs if the programs access the function frequently or you may want to
    modify the utilities to better fit your particular needs. If you modify a
-   utility, store your copy in a directory that precedes gtm_dist in the
+   utility, store your copy in a directory that precedes ydb_dist in the
    search list $ZROUTINES to prevent a new release of YottaDB from overwriting
    your copy.
 
@@ -18115,9 +18122,9 @@
 
    Example:
 
-   GTM>SET %ds="11/22/2010"
-   GTM>DO INT^%DATE
-   GTM>ZWRITE
+   YDB>SET %ds="11/22/2010"
+   YDB>DO INT^%DATE
+   YDB>ZWRITE
    %DN=62047
    %ds="11/22/2010"
 
@@ -18304,7 +18311,7 @@
 
    Example:
 
-   $ cc -c -I$gtm_dist increment.c decrement.c
+   $ cc -c -I$ydb_dist increment.c decrement.c
    $ ld -o libcrement.so increment.o decrement.o -G -bexpall -bnoentry -bh:4 -lc
 
    **Note**
@@ -18316,7 +18323,7 @@
 
    Example:
 
-   % gcc -c -fPIC -I$gtm_dist increment.c decrement.c
+   % gcc -c -fPIC -I$ydb_dist increment.c decrement.c
    % gcc -o libcrement.so -shared increment.o decrement.o
 
 2 External_Calls
@@ -18347,7 +18354,7 @@
    respectively.
 
    The following table describes the legal types defined in the C header file
-   $gtm_dist/libyottadb.h:
+   $ydb_dist/libyottadb.h:
 
    Type : Usage
 
@@ -18393,7 +18400,7 @@
    In the mathpak package example, the following invocation translate inval
    to the default value, that is, 0.
 
-   GTM>do &mathpak.increment(,.outval)
+   YDB>do &mathpak.increment(,.outval)
 
    If an external call's function argument is defined in the external call
    table and that function is invoked without specifying the argument, ensure
@@ -18451,23 +18458,23 @@
    Encryption Extensions
 
    To support Database Encryption, YottaDB provides a reference implementation
-   which resides in $gtm_dist/plugin/gtmcrypt.
+   which resides in $ydb_dist/plugin/gtmcrypt.
 
    The reference implementation includes:
 
-     * A $gtm_dist/plugin/gtmcrypt sub-directory with all source files and
+     * A $ydb_dist/plugin/gtmcrypt sub-directory with all source files and
        scripts. The scripts include those needed to build/install
        libgtmcrypt.so and "helper" scripts, for example, add_db_key.sh (see
        below).
      * The plugin interface that YottaDB expects is defined in
        gtmcrypt_interface.h. Never modify this file - it defines the
        interface that the plugin must provide.
-     * $gtm_dist/plugin/libgtmcrypt.so is the shared library containing the
+     * $ydb_dist/plugin/libgtmcrypt.so is the shared library containing the
        executables which is dynamically linked by YottaDB and which in turn
-       calls the encryption packages. If the $gtm_dist/utf8 directory exists,
+       calls the encryption packages. If the $ydb_dist/utf8 directory exists,
        then it should contain a symbolic link to ../plugin.
      * Source code is provided in the file
-       $gtm_dist/plugin/gtmcrypt/source.tar which includes build.sh and
+       $ydb_dist/plugin/gtmcrypt/source.tar which includes build.sh and
        install.sh scripts to respectively compile and install libgtmcrypt.so
        from the source code.
 
@@ -18731,7 +18738,7 @@
 
    **Note**
 
-   FIS strongly discourages the use of signals, especially SIGALARM, in user
+   YottaDB strongly discourages the use of signals, especially SIGALARM, in user
    written C functions. YottaDB assumes that it has complete control over any
    signals that occur and depends on that behavior for recovery if anything
    should go wrong. The use of exposed timer APIs should be considered for
@@ -18750,7 +18757,7 @@
        SIGALRM such as sleep(). Use of signals by external call code may
        cause YottaDB to fail.
     2. Use of the YottaDB provided malloc and free, creates an integrated heap
-       management system, which has a number of debugging tools. FIS
+       management system, which has a number of debugging tools. YottaDB
        recommends the usage of gtm_malloc/gtm_free in the external functions
        that provides better debugging capability in case memory management
        problems occur with external calls.
@@ -18800,8 +18807,8 @@
           }
    % gtm
    ...
-   GTM>d &mathpak.exp(inval,.outval)
-   GTM>
+   YDB>d &mathpak.exp(inval,.outval)
+   YDB>
 
    Example : For preallocation:
 
@@ -18906,8 +18913,8 @@
    /usr/lib/callback.sl
    init: void init_callbacks(I:ydb_pointertofunc_t, I:ydb_pointertofunc_t)
    % gtm
-   GTM> do &.init(4,5)
-   GTM>
+   YDB> do &.init(4,5)
+   YDB>
    % cat /usr/joe/callback.c
    #include <stdio.h>
    #include <stdlib.h>
@@ -18932,7 +18939,7 @@
    Relevant files
 
    To facilitate Call-Ins to M routines, the YottaDB distribution directory
-   ($gtm_dist) contains the following files:
+   ($ydb_dist) contains the following files:
 
     1. libyottadb.so - A shared library that implements the YottaDB run-time
        system, including the Call-In API. If Call-Ins are used from a
@@ -19264,7 +19271,7 @@
    else it returns the $ZSTATUS error code.
 
    ydb_exit() cannot be called from an external call function. YottaDB reports
-   the error GTM-E-INVGTMEXIT if an external call function invokes
+   the error YDB-E-INVGTMEXIT if an external call function invokes
    ydb_exit(). Since the YottaDB run-time system must be operational even after
    the external call function returns, ydb_exit() is meant to be called only
    once during a process lifetime, and only from the base C/C++ program when
@@ -19276,7 +19283,7 @@
    All external C functions that use call-ins should include the header file
    libyottadb.h that defines various types and provides signatures of
    call-in functions. To avoid potential size mismatches with the parameter
-   types, FIS strongly recommends that ydb_*_t types defined in libyottadb.h
+   types, YottaDB strongly recommends that ydb_*_t types defined in libyottadb.h
    be used instead of the native types (int, float, char, etc).
 
    To use call-ins from a standalone C program, it is necessary that the YottaDB
@@ -19297,7 +19304,7 @@
 
    YottaDB currently allows up to 10 levels of nesting, if TP is not used, and
    less than 10 if YottaDB supports call-ins from a transaction. YottaDB reports
-   the error GTM-E-CIMAXLEVELS when the nesting reaches its limit.
+   the error YDB-E-CIMAXLEVELS when the nesting reaches its limit.
 
    Following are the YottaDB commands, Intrinsic Special Variables, and
    functions whose behavior changes in the context of every new nested
@@ -19330,7 +19337,7 @@
 
     1. External calls must not be fenced with TSTART/TCOMMIT if the external
        routine calls back into mumps using call-in mechanism. YottaDB reports
-       the error GTM-E-CITPNESTED if nested call-ins are invoked within a TP
+       the error YDB-E-CITPNESTED if nested call-ins are invoked within a TP
        fence since YottaDB currently does not handle TP support across multiple
        call-in invocations.
     2. The external application should never call exit() unless it has called
@@ -19339,7 +19346,7 @@
     3. The external application should never use any signals when YottaDB is
        active since YottaDB reserves them for its internal use. YottaDB provides
        the ability to handle SIGUSR1 within M. An interface is provided by
-       YottaDB for timers. Although not required, FIS recommends the use of
+       YottaDB for timers. Although not required, YottaDB recommends the use of
        gtm_malloc() and gtm_free() for memory management by C code that
        executes in a YottaDB process space for enhanced performance and improved
        debugging.
@@ -19484,15 +19491,15 @@
    before searching for the gtm_ac_xform and gtm_ac_xback routines. If the
    shared library contains gtm_ac_xform_1, YottaDB ignores gtm_ac_xform even if
    it is present. If YottaDB finds gtm_ac_xform_1 but does not find
-   gtm_ac_xback_1, it reports a GTM-E-COLLATIONUNDEF error with an additional
-   mismatch warning GTM-E-COLLFNMISSING.
+   gtm_ac_xback_1, it reports a YDB-E-COLLATIONUNDEF error with an additional
+   mismatch warning YDB-E-COLLFNMISSING.
 
    If the application does not use strings longer than 32,767 bytes, the
    alternative collation library need not contain the gtm_ac_xform_1 and
    gtm_ac_xback_1 routines. On the other hand, if the application passes
    strings greater than 32,767 bytes (but less than the maximum support
    string length) and does not provide gtm_xc_xform_1 and gtm_xc_xback_1,
-   YottaDB issues the run-time error GTM-E-COLLARGLONG.
+   YottaDB issues the run-time error YDB-E-COLLARGLONG.
 
    Note that database key sizes are much more restricted by YottaDB than local
    key sizes, and may be restricted further by user configuration.
@@ -19604,13 +19611,13 @@
    With set^%LCLCOL(,ncol), the null collation order can be changed while
    keeping the alternate collation order unchanged. If subscripted local
    variables exist, null collation order cannot be changed. In this case,
-   YottaDB issues GTM-E-COLLDATAEXISTS.
+   YottaDB issues YDB-E-COLLDATAEXISTS.
 
    get^%LCLCOL returns the current local type.
 
    Example:
 
-   GTM>Write $$get^%LCLCOL
+   YDB>Write $$get^%LCLCOL
    0
 
    This example uses $$get^%LCLCOL as an extrinsic that returns 0, indicating
@@ -19971,10 +19978,10 @@
 
    Example:
 
-   GTM>kill ^G
-   GTM>write $select($$set^%GBLDEF("^G",0,3):"ok",1:"failed")
+   YDB>kill ^G
+   YDB>write $select($$set^%GBLDEF("^G",0,3):"ok",1:"failed")
    ok
-   GTM>
+   YDB>
 
    This deletes the global variable ^G, then uses the $$set%GBLDEF as an
    extrinsic to set ^G to the collation sequence number 3 with numeric
@@ -20020,7 +20027,7 @@
 
    Example:
 
-   GTM>Write $$get^%GBLDEF("^G")
+   YDB>Write $$get^%GBLDEF("^G")
    1,3,1
 
    This example returns the collation sequence information currently assigned
@@ -20200,11 +20207,11 @@
     4. Save and compile polish.c. On x86 GNU/Linux (64-bit Ubuntu 10.10),
        execute a command like the following:
 
-       gcc -c polish.c -I$gtm_dist
+       gcc -c polish.c -I$ydb_dist
 
    **Note**
 
-       The -I$gtm_dist option includes gtmxc_types.h.
+       The -I$ydb_dist option includes gtmxc_types.h.
 
     5. Create a new shared library or add the above routines to an existing
        one. The following command adds these alternative sequence routines to
@@ -20214,9 +20221,9 @@
        gcc -o altcoll.so -shared polish.o
 
     6. Set $gtm_collate_1 to point to the location of altcoll.so.
-    7. At the GTM> prompt execute the following command:
+    7. At the YDB> prompt execute the following command:
 
-       GTM>Write $SELECT($$set^%GBLDEF("^G",0,1):"OK",1:"FAILED")
+       YDB>Write $SELECT($$set^%GBLDEF("^G",0,1):"OK",1:"FAILED")
              OK
 
        This deletes the global variable ^G, then sets ^G to the collation
@@ -20224,15 +20231,15 @@
 
     8. Assign the following value to ^G.
 
-       GTM>Set ^G("du Pont")=1
-       GTM>Set ^G("Friendly")=1
-       GTM>Set ^G("le Blanc")=1
-       GTM>Set ^G("Madrid")=1
+       YDB>Set ^G("du Pont")=1
+       YDB>Set ^G("Friendly")=1
+       YDB>Set ^G("le Blanc")=1
+       YDB>Set ^G("Madrid")=1
 
     9. See how the subscript of ^G order according to the alternative
        collation sequence:
 
-       GTM>ZWRite ^G
+       YDB>ZWRite ^G
        ^G("du Pont")=1
        ^G("Friendly")=1
        ^G("le Blanc")=1
@@ -20263,11 +20270,11 @@
     2. Save and compile col_reverse_32.c. On x86 GNU/Linux (64-bit Ubuntu
        10.10), execute a command like the following:
 
-       gcc -c col_reverse_32.c -I$gtm_dist
+       gcc -c col_reverse_32.c -I$ydb_dist
 
    **Note**
 
-       The -I$gtm_dist option includes gtmxc_types.h.
+       The -I$ydb_dist option includes gtmxc_types.h.
 
     3. Create a new shared library or add the routines to an existing one.
        The following command adds these alternative sequence routines to a
@@ -20282,19 +20289,19 @@
        2.
     5. At the GTM prompt, execute the following command:
 
-       GTM>Write $SELECT($$set^%GBLDEF("^E",0,2):"OK",1:"FAILED")
+       YDB>Write $SELECT($$set^%GBLDEF("^E",0,2):"OK",1:"FAILED")
        OK
 
     6. Assign the following value to ^E.
 
-       GTM>Set ^E("du Pont")=1
-       GTM>Set ^E("Friendly")=1
-       GTM>Set ^E("le Blanc")=1
-       GTM>Set ^E("Madrid")=1
+       YDB>Set ^E("du Pont")=1
+       YDB>Set ^E("Friendly")=1
+       YDB>Set ^E("le Blanc")=1
+       YDB>Set ^E("Madrid")=1
 
     7. Notice how the subscript of ^E sort in reverse order:
 
-       GTM>zwrite ^E
+       YDB>zwrite ^E
        ^G("le Blanc")=1
        ^G("du Pont")=1
        ^G("Madrid")=1
@@ -20489,7 +20496,7 @@
 
    Example:
 
-   GTM>Write $$set^%PATCODE("NEWLANGUAGE")
+   YDB>Write $$set^%PATCODE("NEWLANGUAGE")
    1
 
    If there is no table with that name, the function returns a false (0) and
@@ -20501,7 +20508,7 @@
 
    Example:
 
-   GTM>Write $$get^%PATCODE
+   YDB>Write $$get^%PATCODE
    NEWLANGUAGE
 
 1 Err_Processing
@@ -20617,13 +20624,13 @@
    run-time error message:
 
    $ mumps -run printsum
-   %GTM-E-UNDEF, Undefined local variable: C
+   %YDB-E-UNDEF, Undefined local variable: C
    At MUMPS source location GO+1^printsum
-   GTM>
+   YDB>
 
    YottaDB informs you of the error (Undefined local variable) and where in the
    routine the error occurred (GO+1). Note that the run-time system displays
-   the GTM> prompt, indicating that the process has entered Direct Mode. YottaDB
+   the YDB> prompt, indicating that the process has entered Direct Mode. YottaDB
    places run time error information in the intrinsic special variables
    $ECODE and $ZSTATUS.
 
@@ -20692,15 +20699,15 @@
    Direct Mode
 
    When YottaDB detects an error in Direct Mode, it reports the error with a
-   message and leaves the process at the GTM> prompt.
+   message and leaves the process at the YDB> prompt.
 
    Example:
 
-   GTM>ZW
+   YDB>ZW
    ZW
    ^_____
-   %GTM-E-INVCMD, Invalid command keyword encountered
-   GTM>
+   %YDB-E-INVCMD, Invalid command keyword encountered
+   YDB>
 
    In Direct Mode, YottaDB provides access to the RECALL command. RECALL allows
    you to retrieve a Direct Mode command line with a minimum of typing. The
@@ -21145,7 +21152,7 @@
 
    Example:
 
-   GTM>ZPRINT ^EP12
+   YDB>ZPRINT ^EP12
    EP12    WRITE !,"THIS IS ",$TEXT(+0)
            SET $ECODE="";this only affects $ETRAP
            SET $ETRAP="GOTO ET"
@@ -21163,7 +21170,7 @@
            USE $P:(EXCEPTION="":CTRAP="")
            WRITE !,"$ZSTATUS=",$ZSTATUS
            ZGOTO 1
-   GTM>DO ^EP12
+   YDB>DO ^EP12
    THIS IS EP12
    TYPE <CTRL-C> TO STOP
    TYPE A NUMBER: 1 HAS RECIPROCAL OF: 1
@@ -21174,8 +21181,8 @@
    CAN'T TAKE RECIPROCAL OF 0
    TYPE A NUMBER:
    YOU TYPED <CTRL-C> YOU MUST BE DONE!
-   $ZSTATUS=150372498,LOOP+1^EP12,%GTM-E-CTRAP,Character trap $C(3) encountered
-   GTM>
+   $ZSTATUS=150372498,LOOP+1^EP12,%YDB-E-CTRAP,Character trap $C(3) encountered
+   YDB>
 
    This routine prompts the user to enter a number at the terminal. If the
    user enters a zero, YottaDB encounters an error and executes $ETRAP (or
@@ -21291,7 +21298,7 @@
    **Note**
 
             While YottaDB does not restrict trigger code from performing I/O
-            operations, FIS recommends against using OPEN, USE, READ, WRITE
+            operations, YottaDB recommends against using OPEN, USE, READ, WRITE
             and CLOSE within trigger application code. Such operations may be
             useful for development and diagnostic purposes. However, triggers
             implicitly run as TP transactions and I/O violates the ACID

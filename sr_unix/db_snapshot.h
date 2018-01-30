@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -41,7 +44,7 @@ typedef struct snapshot_info_struct
 	uint4		db_blk_size; 			/* Database block size */
 	uint4		free_blks;			/* Free blocks at the time of snapshot */
 	uint4		total_blks;			/* Total blocks at the time of snapshot */
-	char		shadow_file[GTM_PATH_MAX];	/* Temporary file that will contain the before images */
+	char		shadow_file[YDB_PATH_MAX];	/* Temporary file that will contain the before images */
 	int4		shadow_vbn;			/* Starting VBN of the shadow file */
 	long		ss_shmid;			/* Shared memory identifier created by snapshot initiating process */
 	int		ss_shmsize;			/* Size of the shared memory newly created by snapshot initiating process */
@@ -81,7 +84,7 @@ typedef	struct snapshot_context_struct
 	sm_uc_ptr_t		start_shmaddr;
 	void			*bitmap_addr;
 	int4			shadow_vbn;
-	char			shadow_file[GTM_PATH_MAX];
+	char			shadow_file[YDB_PATH_MAX];
 	ss_proc_status		cur_state;
 	/* the property of process triggering snapshot. At present only last bit is used to indicate property of integ process:
          * 0x0000: Normal Integ, 0x0001:Fast Integ
@@ -112,7 +115,7 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 	lcl_ss_ctx->ss_shm_ptr = NULL;					\
 	lcl_ss_ctx->start_shmaddr = lcl_ss_ctx->bitmap_addr = NULL;	\
 	lcl_ss_ctx->shadow_vbn = 0;					\
-	memset(lcl_ss_ctx->shadow_file, 0, GTM_PATH_MAX);		\
+	memset(lcl_ss_ctx->shadow_file, 0, YDB_PATH_MAX);		\
 	lcl_ss_ctx->cur_state = SNAPSHOT_NOT_INITED;			\
 }
 
@@ -123,7 +126,7 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 	ss_ptr->ss_info.db_blk_size = 0;			\
 	ss_ptr->ss_info.free_blks = 0;				\
 	ss_ptr->ss_info.total_blks = 0;				\
-	memset(ss_ptr->ss_info.shadow_file, 0, GTM_PATH_MAX);	\
+	memset(ss_ptr->ss_info.shadow_file, 0, YDB_PATH_MAX);	\
 	ss_ptr->ss_info.ss_shmid = INVALID_SHMID;		\
 	ss_ptr->ss_info.ss_shmsize = 0;				\
 }

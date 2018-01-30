@@ -63,7 +63,7 @@ dump_info()
     if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
     if [ -n "$gtm_copyexec" ] ; then echo gtm_copyexec " : " $gtm_copyexec ; fi
     if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
-    if [ -n "$gtm_dist" ] ; then echo gtm_dist " : " $gtm_dist ; fi
+    if [ -n "$ydb_dist" ] ; then echo ydb_dist " : " $ydb_dist ; fi
     if [ -n "$ydb_distrib" ] ; then echo ydb_distrib " : " $ydb_distrib ; fi
     if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
     if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
@@ -332,11 +332,11 @@ if [ -z "$ydb_version" ] ; then
     tmp=`dirname $0`
     if [ -e "$tmp/mumps" -a -e "$tmp/_XCMD.m" ] ; then
         ydb_distrib=$tmp
-        gtm_dist=$tmp ; export gtm_dist
-        chmod +x $gtm_dist/mumps
+        ydb_dist=$tmp ; export ydb_dist
+        chmod +x $ydb_dist/mumps
         tmp=`mktmpdir`
-        gtmroutines="$tmp($gtm_dist)" ; export gtmroutines
-        ydb_version=`$gtm_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)'`
+        gtmroutines="$tmp($ydb_dist)" ; export gtmroutines
+        ydb_version=`$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)'`
         rm -rf $tmp
     fi
 fi
@@ -522,8 +522,8 @@ echo $gtm_group >>$gtm_configure_in		# Response to : "What group should own the 
 echo $gtm_group_restriction >>$gtm_configure_in	# Response to : "Should execution of YottaDB be restricted to this group?"
 echo $ydb_installdir >>$gtm_configure_in	# Response to : "In what directory should YottaDB be installed?"
 echo y >>$gtm_configure_in			# Response to one of two possible questions
-						#	"Directory $gtmdist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
-						#	"Directory $gtmdist does not exist. Do you wish to create it as part of this installation? (y or n)"
+						#	"Directory $ydb_dist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
+						#	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
 if [ -z "$gtm_icu_version" ] ; then echo n  >>$gtm_configure_in	# Response to : "Should UTF-8 support be installed?"
 else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be installed?"
     if [ "default" = $gtm_icu_version ] ; then echo n  >>$gtm_configure_in	# Response to : "Should an ICU version other than the default be used?"
@@ -532,7 +532,7 @@ else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be insta
     fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
-if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $gtm_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
+if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
 echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 

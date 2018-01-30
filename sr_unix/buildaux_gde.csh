@@ -4,6 +4,9 @@
 # Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -52,7 +55,7 @@ else
 	ls -1 *.m | awk '{printf "mv %s %s.tmp;mv %s.tmp %s\n", $1, $1, $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
 endif
 
-# Compile all of the *.m files once so the $gtm_dist directory can remain protected.
+# Compile all of the *.m files once so the $ydb_dist directory can remain protected.
 # Switch to M mode so we are guaranteed the .o files in this directory will be M-mode
 # 	(just in case current environment variables are in UTF8 mode)
 # Not doing so could cause later INVCHSET error if parent environment switches back to M mode.

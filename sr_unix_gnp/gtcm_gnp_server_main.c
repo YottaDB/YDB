@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@
 #include "getzdir.h"
 #include "suspsigs_handler.h"
 #include "common_startup_init.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "gtm_threadgbl_init.h"
 #include "fork_init.h"
 #include "gt_timers_add_safe_hndlrs.h"
@@ -367,7 +367,7 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	assert(2 == offsetof(gv_key, end)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-	gtm_chk_dist(argv[0]);
+	ydb_chk_dist(argv[0]);
 	/* read comments in gtm.c for cli magic below */
 	cli_lex_setup(argc, argv);
 	if (1 < argc)

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +78,7 @@ enum
 							 * primary (source server) and secondary (receiver server or rollback)
 							 */
 /* Below macro defines the maximum size of the replication logfile path information that will be sent across to the other side.
- * While the actual path max is defined by GTM_PATH_MAX, the value of GTM_PATH_MAX differ across different platforms and so we
+ * While the actual path max is defined by YDB_PATH_MAX, the value of YDB_PATH_MAX differ across different platforms and so we
  * cannot always be sure if this side can store the remote side's logfile path. Since REPL_LOGFILE_INFO message is sent across
  * only during handshake, malloc too is an overkill. So, have a fixed size buffer (see repl_logfile_info_msg_t beow) bounded by
  * the below size.

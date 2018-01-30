@@ -3,6 +3,9 @@
 # Copyright (c) 2012-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -10,7 +13,7 @@
 #								#
 #################################################################
 foreach(v
-    gtm_dist
+    ydb_dist
     gtmroutines
     gtm_chset
     gtm_icu_version

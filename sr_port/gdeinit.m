@@ -478,7 +478,7 @@ UNIX:
 	i (gtm64=TRUE) s hdrlab="GTCGBDUNX112" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
-	s helpfile="$gtm_dist/gdehelp.gld"
+	s helpfile="$ydb_dist/gdehelp.gld"
 	s defdb="mumps.dat"
 	s defgld="mumps.gld",defgldext="*.gld"
 	s defreg="DEFAULT"

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -258,7 +258,7 @@ void mupip_backup(void)
 	sgmnt_addrs		*csa;
 	repl_inst_hdr		repl_instance, *save_inst_hdr;
 	unsigned char		*cmdptr;
-	unsigned char 		command[(GTM_PATH_MAX) * 2 + 5]; /*2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
+	unsigned char 		command[(YDB_PATH_MAX) * 2 + 5]; /*2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
 	struct shmid_ds		shm_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;

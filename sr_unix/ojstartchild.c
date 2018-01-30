@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -83,8 +86,8 @@ GBLREF	int			sys_nerr;
 #endif
 
 GBLREF char		**environ;
-GBLREF char		gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t	gtm_dist_ok_to_use;
+GBLREF char		ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t	ydb_dist_ok_to_use;
 LITREF gtmImageName	gtmImageNames[];
 
 #define MAX_MUMPS_EXE_PATH_LEN	8192
@@ -154,7 +157,7 @@ LITREF gtmImageName	gtmImageNames[];
 }
 #endif
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_JOBFAIL);
 error_def(ERR_JOBLVN2LONG);
 error_def(ERR_JOBPARTOOLONG);
@@ -376,8 +379,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
 	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
 	 */
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	FFLUSH(NULL);
 	FORK_RETRY(child_pid);
@@ -815,7 +818,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		}
 		*env_ind = NULL;	/* null terminator required by execve() */
 
-		c1 = gtm_dist;
+		c1 = ydb_dist;
 		string_len = STRLEN(c1);
 		if ((string_len + SIZEOF(MUMPS_EXE_STR)) < SIZEOF(tbuff))
 		{

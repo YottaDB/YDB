@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@
 #include "mupip_exit.h"
 #include "patcode.h"
 #include "lke.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "generic_signal_handler.h"
 #include "mu_op_open.h"
 #include "cli_parse.h"
@@ -102,7 +102,7 @@ int mupip_main(int argc, char **argv, char **envp)
 	op_open_ptr = mu_op_open;
 	INIT_FNPTR_GLOBAL_VARIABLES;
 	mu_get_term_characterstics();
-	gtm_chk_dist(argv[0]);
+	ydb_chk_dist(argv[0]);
 	cli_lex_setup(argc,argv);
 	if (argc < 2)			/* Interactive mode */
 		display_prompt();

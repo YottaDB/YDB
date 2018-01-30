@@ -4,6 +4,9 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -47,7 +50,7 @@ switch ($2)
 		set plugin_build_type="DEBUG"
 		breaksw
 endsw
-# First copy all the necessary source and script files to $gtm_dist/plugin/gtmcrypt
+# First copy all the necessary source and script files to $ydb_dist/plugin/gtmcrypt
 set helpers = "encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
 set helpers = "$helpers,pinentry-gtm,show_install_config"
 
@@ -57,22 +60,22 @@ set srcfiles = "$srcfiles gtmcrypt_util.c"
 set incfiles = "gtmcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
 set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h gtm_tls_interface.h"
 
-set gtm_dist_plugin = $gtm_dist/plugin
-rm -rf $gtm_dist_plugin
-mkdir -p $gtm_dist_plugin/gtmcrypt
+set ydb_dist_plugin = $ydb_dist/plugin
+rm -rf $ydb_dist_plugin
+mkdir -p $ydb_dist_plugin/gtmcrypt
 set srcfile_list = ($srcfiles)
-eval cp -pf '${srcfile_list:gs||'$gtm_src'/|} $gtm_dist_plugin/gtmcrypt'
+eval cp -pf '${srcfile_list:gs||'$gtm_src'/|} $ydb_dist_plugin/gtmcrypt'
 
 set incfile_list = ($incfiles)
-eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $gtm_dist_plugin/gtmcrypt'
+eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $ydb_dist_plugin/gtmcrypt'
 
-cp -pf $gtm_tools/{$helpers}.sh $gtm_dist_plugin/gtmcrypt
-cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin/gtmcrypt
-rm -f $gtm_dist/{PINENTRY,pinentry}.[om]
-cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile
-chmod +x $gtm_dist_plugin/gtmcrypt/*.sh
+cp -pf $gtm_tools/{$helpers}.sh $ydb_dist_plugin/gtmcrypt
+cp -pf $gtm_pct/pinentry.m $ydb_dist_plugin/gtmcrypt
+rm -f $ydb_dist/{PINENTRY,pinentry}.[om]
+cp -pf $gtm_tools/Makefile.mk $ydb_dist_plugin/gtmcrypt/Makefile
+chmod +x $ydb_dist_plugin/gtmcrypt/*.sh
 #
-pushd $gtm_dist_plugin/gtmcrypt
+pushd $ydb_dist_plugin/gtmcrypt
 if ("HP-UX" == "$HOSTOS") then
 	set make = "gmake"
 else
@@ -101,7 +104,7 @@ endif
 
 source $gtm_tools/set_library_path.csh
 source $gtm_tools/check_unicode_support.csh
-if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
+if (! -e $ydb_dist/utf8) mkdir $ydb_dist/utf8
 # Build and install all encryption libraries and executables.
 env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib
 if ($status) then
@@ -118,7 +121,7 @@ if ($status) then
 				>> $gtm_log/error.${gtm_exe:t}.log
 endif
 # Remove pinentry routine for GTM-8668
-rm -f $gtm_dist_plugin/gtmcrypt/pinentry.m
+rm -f $ydb_dist_plugin/gtmcrypt/pinentry.m
 
 
 popd >&! /dev/null

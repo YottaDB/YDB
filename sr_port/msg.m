@@ -3,7 +3,7 @@
 ; Copyright (c) 2001, 2015 Fidelity National Information	;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -53,11 +53,17 @@
  use ydbfn
  do chdr
  ;
- ; If this is merrors.msg, we have a file to create:
- ;   - libydberrors.h  - header file with YDB_ERR_ #defines for each error with negated error values.
+ ; If this is merrors.msg or ydberrors.msg, we have an associated file to create:
+ ;   - merrors.msg creates libydberrors.h  - header file with YDB_ERR_ #defines for each error with negated error values.
+ ;   - ydberrors.msg creates libydberrors2.h - same as libydberrors.h for new YDB errors (so don't mess with merrors.msg)
  ;
  if ("merrors"=fn) do
  . set libydberrorsfn="libydberrors.h"
+ . open libydberrorsfn:newversion
+ . use libydberrorsfn
+ . do chdr
+ if ("ydberrors"=fn) do
+ . set libydberrorsfn="libydberrors2.h"
  . open libydberrorsfn:newversion
  . use libydberrorsfn
  . do chdr
@@ -178,16 +184,18 @@
  ;
  use ydbfn
  for i=1:1:cnt write "#define ",prefix,outmsg(i)," ",outmsg(i,"code"),!
+ write:("merrors"=fn) !,"#include ""ydberrors.h""",!	; Daisy chain this to the file created for ydberrors.msg
  close ydbfn
  ;
  ; Write out additional header files if needed
  ;
- do:("merrors"=fn)
+ do:(("merrors"=fn)!("ydberrors"=fn))
  . ;
  . ; Write the negative values of errors used by libyottadb and its users
  . ;
  . use libydberrorsfn
  . for i=1:1:cnt write "#define YDB_ERR_",outmsg(i)," -",outmsg(i,"code"),!
+ . write:("merrors"=fn) !,"#include ""libydberrors2.h""",!	; Daisy chain this to the file created for ydberrors.msg
  . close libydberrorsfn
  Quit
 

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,13 +33,13 @@ void maskpass_signal_handler(int sig);
 
 int main()
 {
-	char			passwd[GTM_PASSPHRASE_MAX], hex_out[GTM_PASSPHRASE_MAX * 2], mumps_exe[GTM_PATH_MAX], *env_ptr;
+	char			passwd[GTM_PASSPHRASE_MAX], hex_out[GTM_PASSPHRASE_MAX * 2], mumps_exe[YDB_PATH_MAX], *env_ptr;
 	struct stat		stat_info;
 	gtm_string_t		passwd_str;
 	struct sigaction	reset_term_handler, ignore_handler;
 	int			sig;
 
-	/* Since the obfuscated password depends on $USER and the inode of $gtm_dist/mumps, make sure all the pre-requisites are
+	/* Since the obfuscated password depends on $USER and the inode of $ydb_dist/mumps, make sure all the pre-requisites are
 	 * available to this process.
 	 */
 	if (NULL == (env_ptr = (char *)getenv(USER_ENV)))
@@ -44,12 +47,12 @@ int main()
 		printf(ENV_UNDEF_ERROR "\n", USER_ENV);
 		exit(EXIT_FAILURE);
 	}
-	if (NULL == (env_ptr = (char *)getenv(GTM_DIST_ENV)))
+	if (NULL == (env_ptr = (char *)getenv(YDB_DIST_ENV)))
 	{
-		printf(ENV_UNDEF_ERROR "\n", GTM_DIST_ENV);
+		printf(ENV_UNDEF_ERROR "\n", YDB_DIST_ENV);
 		exit(EXIT_FAILURE);
 	}
-	SNPRINTF(mumps_exe, GTM_PATH_MAX, "%s/%s", env_ptr, "mumps");
+	SNPRINTF(mumps_exe, YDB_PATH_MAX, "%s/%s", env_ptr, "mumps");
 	if (0 != stat(mumps_exe, &stat_info))
 	{
 		printf("Cannot stat %s\n", mumps_exe);

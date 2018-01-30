@@ -227,7 +227,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
  */
 int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 {
-	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[GTM_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
+	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[YDB_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
 	char 		*ptr, *mmap_addrs;
 	int		passwd_len, len, i, save_errno, fd, have_hash, status;
 	struct stat	stat_info;
@@ -262,12 +262,12 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 			return -1;
 		}
 		strncpy(hash_in, ptr, passwd_len);
-		if (!(ptr = getenv(GTM_DIST_ENV)))
+		if (!(ptr = getenv(YDB_DIST_ENV)))
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, GTM_DIST_ENV);
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, YDB_DIST_ENV);
 			return -1;
 		}
-		SNPRINTF(mumps_exe, GTM_PATH_MAX, "%s/%s", ptr, "mumps");
+		SNPRINTF(mumps_exe, YDB_PATH_MAX, "%s/%s", ptr, "mumps");
 		if (0 == stat(mumps_exe, &stat_info))
 		{
 			SNPRINTF(tmp, GTM_PASSPHRASE_MAX, "%ld", (long) stat_info.st_ino);

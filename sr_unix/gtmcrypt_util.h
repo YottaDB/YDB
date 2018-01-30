@@ -21,10 +21,10 @@
 #endif
 
 #include "gtm_sizeof.h"			/* For SIZEOF. */
-#include "gtm_limits.h"			/* For GTM_PATH_MAX. */
+#include "gtm_limits.h"			/* For YDB_PATH_MAX. */
 #include "gtm_common_defs.h"		/* To import common macros implemented by GT.M */
 
-#define GTM_DIST_ENV			"gtm_dist"
+#define YDB_DIST_ENV			"ydb_dist"
 #define USER_ENV			"USER"
 #define ENV_UNDEF_ERROR			"Environment variable %s not set"
 #define ENV_EMPTY_ERROR			"Environment variable %s set to empty string"

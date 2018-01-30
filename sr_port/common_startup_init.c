@@ -14,9 +14,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_limits.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+
+#include <dlfcn.h>
 
 #include "gt_timer.h"
 #include "gtm_env_init.h"
@@ -27,7 +30,8 @@
 #include "min_max.h"
 #include "common_startup_init.h"
 #include "cli.h"
-#include "gtmimagename.h"
+#include "gdsroot.h"
+#include "is_file_identical.h"
 
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	boolean_t		is_replicator;
@@ -37,16 +41,20 @@ GBLREF	boolean_t		dse_running;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY		*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
 
 error_def(ERR_MIXIMAGE);
 
 void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 {
-	boolean_t		is_gtcm;
-	char			*dist;
-	int			len;
+	boolean_t	is_gtcm;
+	boolean_t	status;
+	char		*dist;
+	int		len;
+	int		nbytes;
+	Dl_info		shlib_info;
+	char		comparison[YDB_PATH_MAX];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,6 +66,40 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MIXIMAGE, 4, GTMIMAGENAMETXT(img_type), GTMIMAGENAMETXT(image_type));
 		assert(FALSE);
 	}
+	/* At this point, $ydb_dist should be set by "dlopen_libyottadb" (mumps/mupip/dse etc.) or "ydb_init" (call_ins).
+	 * Read the env var "ydb_dist" and set the "ydb_dist" buffer based on that.
+	 */
+	if (NULL == (dist = GETENV(YDB_DIST)))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+	len = STRLEN(dist);
+	len = (YDB_PATH_MAX < len) ? YDB_PATH_MAX : len;
+	memcpy(ydb_dist, dist, len);
+	len = MIN(len, PATH_MAX);
+	ydb_dist[len] = '\0';
+	if (GTMSECSHR_IMAGE != img_type)
+	{
+		/* Check that the currently running libyottadb.so points to $ydb_dist. If not, it is a possible
+		 * rogue C program that directly invoked one of "gtm_main","mupip_main","dse_main" etc. for
+		 * more than one libyottadb.so (potentially different builds/releases of YottaDB) in the same
+		 * process, a situation we do not want to get into. Issue an error in that case.
+		 */
+		if (0 == dladdr(&common_startup_init, &shlib_info))
+		{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
+		}
+		nbytes = SNPRINTF(comparison, YDB_PATH_MAX, LIBYOTTADBDOTSO, ydb_dist);
+		if ((0 > nbytes) || (nbytes >= YDB_PATH_MAX))
+		{	/* Error return from SNPRINTF */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+		}
+		status = is_file_identical((char *)shlib_info.dli_fname, comparison);
+		if (!status)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_LIBYOTTAMISMTCH, 4,
+				LEN_AND_STR(comparison), LEN_AND_STR(shlib_info.dli_fname));
+	}
+	/* else : In gtmsecshr, there is no dlopen of "libyottadb.so" hence above check is skipped.
+	 *        Also, it has its own "ydb_dist" checks.
+	 */
 	cmd_ary = image_cmd_ary;	/* Define cmd_ary to point to IMAGE-specific cmd table */
 	/* First set the global variable image_type. */
 	image_type = img_type;
@@ -65,15 +107,6 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	getjobnum();
 	/* Get the OS page size. */
 	get_page_size();
-	/* Read gtm_dist. */
-	if (NULL != (dist = GETENV(GTM_DIST)))
-	{
-		len = STRLEN(dist);
-		len = (GTM_PATH_MAX < len) ? GTM_PATH_MAX : len;
-		memcpy(gtm_dist, dist, len);
-		len = MIN(len, PATH_MAX);
-		gtm_dist[len] = '\0';
-	}
 	/* Setup global variables corresponding to signal blocks. */
 	set_blocksig();
 	/* Do common environment initialization. */

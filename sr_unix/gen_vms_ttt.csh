@@ -1,6 +1,9 @@
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc       #
+# Copyright 2010 Fidelity Information Services, Inc		#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -27,8 +30,8 @@ if (-e $work_dir/vvms/new) then
 			$work_tools/workfetch.csh $cmpnt
 		endif
 	end
-	set save_gtm_dist = "$gtm_dist"
-	setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
+	set save_ydb_dist = "$ydb_dist"
+	setenv ydb_dist "$gtm_root/$gtm_curpro/pro"
 	set save_gtmroutines = "$gtmroutines"
 	setenv gtmroutines ". $gtm_obj($gtm_pct)"
 	if (-e ttt.c) then
@@ -41,8 +44,8 @@ if (-e $work_dir/vvms/new) then
 	rm -f chk2lev.o chkop.o gendash.o genout.o loadop.o loadvx.o tttgen.o tttscan.o
 	setenv gtmroutines "$save_gtmroutines"
 	unset save_gtmroutines
-	setenv gtm_dist "$save_gtm_dist"
-	unset save_gtm_dist
+	setenv ydb_dist "$save_ydb_dist"
+	unset save_ydb_dist
 	cd ../../
 	echo "workclean may be needed to clear out implicitly fetched modules"
 else

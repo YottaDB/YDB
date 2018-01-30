@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,7 +51,7 @@
 #include "wbox_test_init.h"
 
 
-#define UPDHELPER_CMD_MAXLEN		GTM_PATH_MAX
+#define UPDHELPER_CMD_MAXLEN		YDB_PATH_MAX
 #define UPDHELPER_CMD			"%s/mupip"
 #define UPDHELPER_CMD_FILE		"mupip"
 #define UPDHELPER_CMD_ARG1		"replicate"
@@ -61,13 +64,13 @@
 						/* U for update process, R for receiver, S for source, H for helper */
 
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	uint4			process_id;
 LITREF	gtmImageName		gtmImageNames[];
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
@@ -84,20 +87,20 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_HELPER_PROCESS))
+	if (WBTEST_ENABLED(WBTEST_MAXYDBDIST_HELPER_PROCESS))
 	{
-		memset(gtm_dist, 'a', GTM_PATH_MAX-2);
-		gtm_dist[GTM_PATH_MAX-1] = '\0';
+		memset(ydb_dist, 'a', YDB_PATH_MAX-2);
+		ydb_dist[YDB_PATH_MAX-1] = '\0';
 	}
-	helper_cmd_len = SNPRINTF(helper_cmd, UPDHELPER_CMD_MAXLEN, UPDHELPER_CMD, gtm_dist);
+	helper_cmd_len = SNPRINTF(helper_cmd, UPDHELPER_CMD_MAXLEN, UPDHELPER_CMD, ydb_dist);
 	if ((-1 == helper_cmd_len) || (UPDHELPER_CMD_MAXLEN <= helper_cmd_len))
 	{
 		helper->helper_shutdown = save_shutdown;
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_HLPPROC, 0, ERR_TEXT, 2,
-			   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
+			   LEN_AND_LIT("Could not find path of Helper Process. Check value of $ydb_dist"));
 		repl_errno = EREPL_UPDSTART_BADPATH;
 		return UPDPROC_START_ERR ;
 	}
@@ -176,7 +179,7 @@ int gtmrecv_helpers_init(int n_readers, int n_writers)
 				writer_count++;
 		} else /* UPDPROC_START_ERR == status */
 		{
-			if ((EREPL_UPDSTART_BADPATH == repl_errno) /* receiver server lost gtm_dist environment, bad situation */
+			if ((EREPL_UPDSTART_BADPATH == repl_errno) /* receiver server lost ydb_dist environment, bad situation */
 					|| (EREPL_UPDSTART_EXEC == repl_errno)) /* in forked child, could not exec, should exit */
 				gtmrecv_exit(ABNORMAL_SHUTDOWN);
 			error_count++;

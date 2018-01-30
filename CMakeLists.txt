@@ -80,7 +80,7 @@ endif()
 set(YDB_DIST "" CACHE PATH "Existing YottaDB Distribution")
 if(YDB_DIST)
   # Bootstrap using already-installed mumps.
-  message(STATUS "Using existing gtm_dist=${YDB_DIST} to generate sources.")
+  message(STATUS "Using existing ydb_dist=${YDB_DIST} to generate sources.")
   set(gen_bootstrap 1)
   set(gen_bootstrap_dist "${YDB_DIST}")
   set(gen_bootstrap_mumps "${YDB_DIST}/mumps")
@@ -260,7 +260,7 @@ add_custom_command(
     ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
   WORKING_DIRECTORY ${YDB_BINARY_DIR}/gennotused
   COMMAND ${CMAKE_COMMAND}
-    -D gtm_dist=${gen_bootstrap_dist}
+    -D ydb_dist=${gen_bootstrap_dist}
     -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
     -D gtmroutines=.
     -D mumps=${gen_bootstrap_mumps}
@@ -287,7 +287,7 @@ foreach(msg
             ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
     WORKING_DIRECTORY ${YDB_BINARY_DIR}/gennotused
     COMMAND ${CMAKE_COMMAND}
-      -D gtm_dist=${gen_bootstrap_dist}
+      -D ydb_dist=${gen_bootstrap_dist}
       -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
       -D gtmroutines=.
       -D mumps=${gen_bootstrap_mumps}
@@ -771,7 +771,7 @@ foreach(gtm_chset "" "UTF-8")
       OUTPUT ${out}
       DEPENDS ${in} ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps
       COMMAND ${CMAKE_COMMAND}
-        -D gtm_dist=${YDB_BINARY_DIR}
+        -D ydb_dist=${YDB_BINARY_DIR}
         -D gtmroutines=.
         -D gtm_chset=${gtm_chset}
         -D gtm_icu_version=${gtm_icu_version}
@@ -795,7 +795,7 @@ set(dse_hlp dse.hlp)
 set(lke_hlp lke.hlp)
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
-    "Change -segment DEFAULT -block=2048 -file=\$gtm_dist/${help}help.dat
+    "Change -segment DEFAULT -block=2048 -file=\$ydb_dist/${help}help.dat
 Change -region DEFAULT -record=1020 -key=255 -qdbrundown -nostats
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
@@ -807,7 +807,7 @@ Halt")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in2)
   set(env
-    -D gtm_dist=${YDB_BINARY_DIR}
+    -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
     -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
     )
@@ -840,7 +840,7 @@ add_custom_command(
   DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/gtmhelp.dat_noro
   COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
-    -D gtm_dist=${YDB_BINARY_DIR}
+    -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
     -D gtmgbldir=${YDB_BINARY_DIR}/gtmhelp
     -D mumps=$<TARGET_FILE:mumps>
@@ -858,7 +858,7 @@ exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in3)
   set(env
-    -D gtm_dist=${YDB_BINARY_DIR}
+    -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
     -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
     )
@@ -883,7 +883,7 @@ exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in4)
   set(env
-    -D gtm_dist=${YDB_BINARY_DIR}
+    -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
     -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
     )

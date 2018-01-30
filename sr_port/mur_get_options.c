@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -260,7 +263,7 @@ void	mur_get_options(void)
 	if (cli_present("REDIRECT") == CLI_PRESENT)
 	{
 		file_name_specified = (char *)malloc(MAX_FN_LEN + 1);
-		file_name_expanded = (char *)malloc(GTM_PATH_MAX);
+		file_name_expanded = (char *)malloc(YDB_PATH_MAX);
 		length = MAX_LINE;
 		if (!CLI_GET_STR_ALL("REDIRECT", qual_buffer, &length))
 			mupip_exit(ERR_MUPCLIERR);
@@ -306,7 +309,7 @@ void	mur_get_options(void)
 			memcpy(file_name_specified, entry, file_name_specified_len);
 			*(file_name_specified + file_name_specified_len)= '\0';
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,
-				&file_name_expanded_len, GTM_PATH_MAX, &ustatus))
+				&file_name_expanded_len, YDB_PATH_MAX, &ustatus))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
 									LEN_AND_LIT("Unable to find full pathname"));

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,10 +46,10 @@ gtm_tls_func_n			/* total number of TLS functions that needs to be dlsym()ed */
 #define GTM_TLS_LIBNAME		"libgtmtls.so"
 
 GBLREF	char		dl_err[MAX_ERRSTR_LEN];
-GBLREF	char		gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t	gtm_dist_ok_to_use;
+GBLREF	char		ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t	ydb_dist_ok_to_use;
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 
 /* Cannot include gtm_tls.h in this module due to conflicting GBLDEF/GBLREFs. So, redefine the function prototype here to silent
  * the compiler.
@@ -71,35 +74,35 @@ int	gtm_tls_loadlibrary()
 						  };
 #	undef TLS_DEF
 	void_ptr_t		*handle;
-	char			*err_str, libpath[GTM_PATH_MAX], util_libpath[GTM_PATH_MAX];
+	char			*err_str, libpath[YDB_PATH_MAX], util_libpath[YDB_PATH_MAX];
 	int			findx;
 #	ifdef _AIX
-	char			new_libpath_env[GTM_PATH_MAX], *save_libpath_ptr, plugin_dir_path[GTM_PATH_MAX];
-	char			save_libpath[GTM_PATH_MAX];
+	char			new_libpath_env[YDB_PATH_MAX], *save_libpath_ptr, plugin_dir_path[YDB_PATH_MAX];
+	char			save_libpath[YDB_PATH_MAX];
 #	endif
 
-	if(!gtm_dist_ok_to_use)
+	if(!ydb_dist_ok_to_use)
 	{
-		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-GTMDISTUNVERIF, Environment variable $gtm_dist (%s) "
-				"could not be verified against the executables path", gtm_dist);
+		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-YDBDISTUNVERIF, Environment variable $ydb_dist (%s) "
+				"could not be verified against the executables path", ydb_dist);
 		return -1;
 	}
 #	ifdef _AIX
-	SNPRINTF(plugin_dir_path, GTM_PATH_MAX, "%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME);
-	SNPRINTF(libpath, GTM_PATH_MAX, "%s/%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME, GTM_TLS_LIBNAME);
-	/* Prefix LIBPATH with "$gtm_dist/plugin" so that dlopen can find the helper library (libgtmcryptutil.so). */
+	SNPRINTF(plugin_dir_path, YDB_PATH_MAX, "%s/%s", ydb_dist, GTMCRYPT_PLUGIN_DIR_NAME);
+	SNPRINTF(libpath, YDB_PATH_MAX, "%s/%s/%s", ydb_dist, GTMCRYPT_PLUGIN_DIR_NAME, GTM_TLS_LIBNAME);
+	/* Prefix LIBPATH with "$ydb_dist/plugin" so that dlopen can find the helper library (libgtmcryptutil.so). */
 	if (NULL == (save_libpath_ptr = getenv(LIBPATH_ENV)))
-		SNPRINTF(new_libpath_env, GTM_PATH_MAX, "%s", plugin_dir_path);
+		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s", plugin_dir_path);
 	else
 	{
 		/* Since the setenv below can potentially thrash the save_libpath_ptr, take a copy of it for later restore. */
 		strncpy(save_libpath, save_libpath_ptr, SIZEOF(save_libpath));
 		save_libpath[SIZEOF(save_libpath) - 1] = '\0';
-		SNPRINTF(new_libpath_env, GTM_PATH_MAX, "%s:%s", plugin_dir_path, save_libpath);
+		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s:%s", plugin_dir_path, save_libpath);
 	}
 	setenv(LIBPATH_ENV, new_libpath_env, TRUE);
 #	else
-	SNPRINTF(libpath, GTM_PATH_MAX, "%s/%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME, GTM_TLS_LIBNAME);
+	SNPRINTF(libpath, YDB_PATH_MAX, "%s/%s/%s", ydb_dist, GTMCRYPT_PLUGIN_DIR_NAME, GTM_TLS_LIBNAME);
 #	endif
 	if (NULL == (handle = dlopen(libpath, RTLD_GLOBAL | RTLD_NOW)))
 	{
@@ -112,7 +115,7 @@ int	gtm_tls_loadlibrary()
 		unsetenv(LIBPATH_ENV);
 	else
 		setenv(LIBPATH_ENV, save_libpath, TRUE);
-	/* Now verify that "libgtmcryptutil.so" was really loaded from "$gtm_dist/plugin". */
+	/* Now verify that "libgtmcryptutil.so" was really loaded from "$ydb_dist/plugin". */
 	if (!verify_lib_loadpath(GTMCRYPT_UTIL_LIBNAME, plugin_dir_path))
 		return -1;
 #	endif

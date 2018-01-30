@@ -3,6 +3,9 @@
 # Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -309,12 +312,12 @@ endif
 echo "setenv gtm_misc	$gtm_vrt/misc"	>> $4
 echo "setenv gtm_tags	$gtm_vrt/misc/tags"	>> $4
 echo "setenv gtm_exe	$gtm_exe"	>> $4
-echo "setenv gtm_dist	$gtm_exe"	>> $4
+echo "setenv ydb_dist	$gtm_exe"	>> $4
 echo "setenv gtm_lint	$gtm_exe/lint"	>> $4
 echo "setenv gtm_map	$gtm_exe/map"	>> $4
 echo "setenv gtm_obj	$gtm_exe/obj"	>> $4
 
-# Strip off the trailing $gtm_dist/plugin/o($gtm_dist/plugin/r). This is necessary for prior version testing
+# Strip off the trailing $ydb_dist/plugin/o($ydb_dist/plugin/r). This is necessary for prior version testing
 if ($?gtmroutines) then
 	set rtns = ($gtmroutines:x)
 	if (0 < $#rtns) then

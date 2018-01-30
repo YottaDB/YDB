@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	!
+! Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -23,3 +23,4 @@
 !
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0
 MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/error/fao=4
+LIBYOTTAMISMTCH	<$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)>/error/fao=4!/ansi=0

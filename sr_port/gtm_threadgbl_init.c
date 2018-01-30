@@ -181,7 +181,6 @@ GBLREF int4 			*aligned_source_buffer;
  */
 
 error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
 error_def(ERR_GTMASSERT);
 
 void gtm_threadgbl_init(void)
@@ -205,7 +204,7 @@ void gtm_threadgbl_init(void)
 	if (NULL == gtm_threadgbl)
 	{	/* Storage was not allocated for some reason - no error handling yet still */
 		perror("GTM-F-MEMORY Unable to allocate startup thread structure");
-		EXIT(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
+		EXIT(ERR_MEMORY);
 	}
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;

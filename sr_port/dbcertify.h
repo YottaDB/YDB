@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,24 +24,24 @@
 #  define OPTDELIM	"/"
 #  define DEFAULT_OUTFILE_SUFFIX "_DBCERTSCAN"
 #  define TMPCMDFILSFX	".com"
-#  define SETDISTLOGENV	"$ DEFINE/NOLOG "GTM_DIST" "
-#  define DSE_START	"$ RUN "GTM_DIST":DSE.EXE"
+#  define SETDISTLOGENV	"$ DEFINE/NOLOG "YDB_DIST" "
+#  define DSE_START	"$ RUN "YDB_DIST":DSE.EXE"
 #  define DSE_FIND_REG_ALL "FIND /REG"
-#  define MUPIP_START	"$ RUN "GTM_DIST":MUPIP.EXE"
+#  define MUPIP_START	"$ RUN "YDB_DIST":MUPIP.EXE"
 #  define RUN_CMD	"@"
 #  define RESULT_ASGN	"$ DEFINE SYS$OUTPUT "
 #  define DUMPRSLTFILE	"TYPE "
 #  define RMS_OPEN_BIN        ,"rfm=fix","mrs=512","ctx=bin"
 #else
 #  define SHELL_START	"#!/bin/sh"
-#  define SETDISTLOGENV	GTM_DIST"="
-#  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF > "
+#  define SETDISTLOGENV	YDB_DIST"="
+#  define DSE_START_PIPE_RSLT1	"$"YDB_DIST"/dse << EOF > "
 #  define DSE_START_PIPE_RSLT2	" 2>&1"
 #  define OPTDELIM	"-"
 #  define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
 #  define TMPCMDFILSFX	".sh"
 #  define DSE_FIND_REG_ALL	"find -reg"
-#  define MUPIP_START	"$"GTM_DIST"/mupip << EOF"
+#  define MUPIP_START	"$"YDB_DIST"/mupip << EOF"
 #  define RUN_CMD	"./"
 #  define DUMPRSLTFILE	"cat "
 #  define RMS_OPEN_BIN

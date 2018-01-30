@@ -54,8 +54,13 @@
 
 # customization for non-GG environment
 setenv gtm_version_change 1
-setenv gtm_exe $gtm_dist
-setenv gtm_inc "$gtm_dist:h/inc"
+if (! $?ydb_dist) then
+	setenv ydb_dist $gtm_dist
+endif
+
+setenv gtm_exe $ydb_dist
+setenv gtm_inc "$ydb_dist:h/inc"
+
 # customization ends
 if ( $?gtm_version_change == "1" ) then
 
@@ -239,7 +244,7 @@ endif
 # Platform-specific overrides, if any:
 # customization for non-GG environment
 if (! $?gtm_tools) then
-	set gtm_tools = $gtm_dist:h/tools
+	set gtm_tools = $ydb_dist:h/tools
 	set gtm_tools_set
 endif
 # customization ends

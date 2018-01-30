@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright 2013 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,37 +33,37 @@ uint4	repl_logfileinfo_get(char *logfile, repl_logfile_info_msg_t *msgp, boolean
 {
 	uint4		status, fullpath_len, msglen;
 	int		save_errno;
-	char		fullpath[GTM_PATH_MAX], *cwdptr;
+	char		fullpath[YDB_PATH_MAX], *cwdptr;
 
 	assert(NULL != msgp);
 	msgp->type = cross_endian ? GTM_BYTESWAP_32(REPL_LOGFILE_INFO) : REPL_LOGFILE_INFO;
-	assert(GTM_PATH_MAX >= REPL_LOGFILE_PATH_MAX);
-	assert(GTM_PATH_MAX >= PATH_MAX);
+	assert(YDB_PATH_MAX >= REPL_LOGFILE_PATH_MAX);
+	assert(YDB_PATH_MAX >= PATH_MAX);
 	if (NULL == logfile)
 	{
-		GETCWD(fullpath, GTM_PATH_MAX, cwdptr);
+		GETCWD(fullpath, YDB_PATH_MAX, cwdptr);
 		assert(NULL != cwdptr);
 		if (NULL == cwdptr)
 		{
 			save_errno = errno;
 			assert(FALSE);
 			repl_log(logfp, TRUE, TRUE, "Could not obtain current working directory: %s\n", STRERROR(save_errno));
-			SNPRINTF(fullpath, GTM_PATH_MAX, "Could not obtain current working directory");
+			SNPRINTF(fullpath, YDB_PATH_MAX, "Could not obtain current working directory");
 		}
 		fullpath_len = STRLEN(fullpath);
-	} else if (!get_full_path(STR_AND_LEN(logfile), fullpath, &fullpath_len, GTM_PATH_MAX + 1, &status))
+	} else if (!get_full_path(STR_AND_LEN(logfile), fullpath, &fullpath_len, YDB_PATH_MAX + 1, &status))
 	{	/* Either GETCWD failed or buffer not large enough to hold the expanded logfile path. In either case, we don't want
 		 * to error out as this is just a supplementary message. Copy whatever possible.
 		 */
 		assert(ERR_FILENAMETOOLONG != status);
-		SNPRINTF(fullpath, GTM_PATH_MAX, logfile);
+		SNPRINTF(fullpath, YDB_PATH_MAX, logfile);
 		fullpath_len = STRLEN(fullpath);
 		/* Print a warning message for diagnostic purposes */
 		if (ERR_FILENAMETOOLONG != status)
 			repl_log(logfp, TRUE, TRUE, "Could not obtain current working directory: %s\n", STRERROR(status));
 		else
 			repl_log(logfp, TRUE, TRUE, "Could not obtain full path of log file: Path name exceeds %d characters\n",
-					GTM_PATH_MAX);
+					YDB_PATH_MAX);
 	}
 	assert('\0' == fullpath[fullpath_len]);
 	fullpath_len = MIN(fullpath_len, REPL_LOGFILE_PATH_MAX);

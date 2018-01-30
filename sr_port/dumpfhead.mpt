@@ -3,7 +3,7 @@
 ; Copyright (c) 2016-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -100,7 +100,7 @@ getfields(fldarray,dbname)
 	;
 	; Now parse out the fields
 	;
-	set $zgbldir="$gtm_dist/gtmhelp.gld"
+	set $zgbldir="$ydb_dist/gtmhelp.gld"
 	set skey="sgmnt_data"
 	for fldnum=1:1:^gtmtypes(skey,0) do
 	. set fldtype=^gtmtypes(skey,fldnum,"type")

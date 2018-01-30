@@ -3,6 +3,9 @@
 ; Copyright (c) 2012-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -28,7 +31,7 @@ dump(reglist,output,what,detail)	; dump information
 	; detail - optional default is basic information, "all" is full fileheader dump
 	; install an error handler if non exists
 	if 0=$length($ETRAP) new $ETRAP set $ETRAP="do errtrap^%DSEWRAP"
-	new cmd,dse,debug,error,gtmdist,i,io,isVMS,line,mod,nopipe,region,ver
+	new cmd,dse,debug,error,ydbdist,i,io,isVMS,line,mod,nopipe,region,ver
 	; save previous $IO to restore once the routine has completed
 	set io=$io
 	if $data(%DSEWRAP("debug")) do
@@ -41,7 +44,7 @@ dump(reglist,output,what,detail)	; dump information
 	set ver=$tr($piece($zversion," ",2),"V-.",""),ver=$select(ver<1000:ver*10,1:$extract(ver,1,5))
 	set isVMS=$zversion["VMS"
 	set nopipe=((ver<53003)&($get(%DSEWRAP("forcenopipe"),0)))!isVMS,mod=$select(isVMS:"/",1:"-")
-	set gtmdist=$select(isVMS:"gtm$dist",1:"gtm_dist")
+	set ydbdist=$select(isVMS:"gtm$dist",1:"ydb_dist")
 	;
 	; Applicable regions list
 	set reglist=$$reglist($$FUNC^%UCASE($get(reglist,"*")),isVMS)
@@ -57,7 +60,7 @@ dump(reglist,output,what,detail)	; dump information
 	; Use alternate GT.M version - only supported with pipes
 	if nopipe&$data(%DSEWRAP("alternate"))  set $ecode=",U252," quit:$quit 252 quit
 	; DSE command to use
-	set dse=$get(%DSEWRAP("alternate"),$ztrnlnm(gtmdist)_"/dse")
+	set dse=$get(%DSEWRAP("alternate"),$ztrnlnm(ydbdist)_"/dse")
 	if $data(debug) merge debug(debug,"outputreg")=reglist
 	if reglist="" set $ecode=",U251," quit:$quit 251 quit
 	; Drive DSE
@@ -235,7 +238,7 @@ dsecomftr
 	quit
 dseshhdr
 	;#!/bin/sh
-	;$gtm_dist/dse > dsedump.txt 2>&1 << EOF
+	;$ydb_dist/dse > dsedump.txt 2>&1 << EOF
 	quit
 dseshftr
 	;EOF

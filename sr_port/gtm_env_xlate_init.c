@@ -2,6 +2,9 @@
  *                                                              *
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -31,7 +34,7 @@ void gtm_env_xlate_init(void)
 {
 	int4		status;
 	mstr		val, tn;
-	char		buf[GTM_PATH_MAX];
+	char		buf[YDB_PATH_MAX];
 
 	val.addr = GTM_ENV_XLATE;
 	val.len =  STR_LIT_LEN(GTM_ENV_XLATE);

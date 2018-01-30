@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,8 +51,8 @@
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF  volatile boolean_t      timer_in_handler;
 
 error_def(ERR_DEVOPENFAIL);
@@ -75,7 +78,7 @@ int parse_pipe(char *cmd_string, char *ret_token);
  *
  * Command Parsing Limitations:
  *
- * All commands will be searched for in $PATH and in $gtm_dist and if not found will trap.  Most pipe strings can be
+ * All commands will be searched for in $PATH and in $ydb_dist and if not found will trap.  Most pipe strings can be
  * entered with some minor exceptions.  First, no parentheses around commands are allowed. An example of this which would
  * fail is:
  *
@@ -94,8 +97,8 @@ int parse_pipe(char *cmd_string, char *ret_token);
  *	o p:(comm="tr -d '()'":writeonly)::"pipe"     (which if passed (test) would output: test )
  *
  * Second, commands must be valid commands - not aliases.  Third, no shell built-in commands are allowed (unless a version
- * is found in the $PATH and $gtm_dist); with the exception of nohup and cd.  In the case of nohup, the next token will be
- * the command to be looked for in $PATH and $gtm_dist.  "cd" will be allowed, but no parsing for a command will occur
+ * is found in the $PATH and $ydb_dist); with the exception of nohup and cd.  In the case of nohup, the next token will be
+ * the command to be looked for in $PATH and $ydb_dist.  "cd" will be allowed, but no parsing for a command will occur
  * until the next "|" token - if there is one.  In addition, environment variables may be used to define a path, or actual
  * paths may be given.
  *
@@ -104,14 +107,14 @@ int parse_pipe(char *cmd_string, char *ret_token);
  * 1.   o a:(comm="tr e j | echoback":stderr=e:exception="g BADOPEN")::"pipe"
  * 2.   o a:(comm="/bin/cat |& nl")::"pipe"
  * 3.   o a:(comm="mupip integ mumps.dat")::"pipe"
- * 4.   o a:(comm="$gtm_dist/mupip integ mumps.dat")::"pipe"
+ * 4.   o a:(comm="$ydb_dist/mupip integ mumps.dat")::"pipe"
  * 5.   o a:(comm="nohup cat")::"pipe"
  * 6.   o p:(comm="cd ..; pwd | tr -d e":writeonly)::"pipe"
  *
  * In the first example the commands parsed are "tr" and "echoback".  "echoback" is in the current directory which is
  * included in the $PATH.  In the second example an explicit path is given for "cat", but "nl" is found via $PATH.
- * In the third example mupip will be found if it is in the $PATH or in $gtm_dist.  In the fourth example the
- * $gtm_dist environment variable is explicitly used to find mupip.  In the fifth example the "cat" after "nohup"
+ * In the third example mupip will be found if it is in the $PATH or in $ydb_dist.  In the fourth example the
+ * $ydb_dist environment variable is explicitly used to find mupip.  In the fifth example the "cat" after "nohup"
  * is used as the command looked up in $PATH.  In the sixth example the default directory is moved up a level and
  * pwd is executed with the output piped to the tr command.  The pwd command is not checked for existence, but the
  * "tr" command after the "|" is checked.
@@ -123,7 +126,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	char *env_var;
 	int env_inc;
 	struct stat sb;
-	char *path, path_buff[GTM_PATH_MAX];
+	char *path, path_buff[YDB_PATH_MAX];
 	char *temp = NULL;
 	char *buf = NULL;
 	char *dir_in_path = NULL;
@@ -141,14 +144,14 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	if (NULL != path)
 	{
 		path_len = STRLEN(path);
-		if (GTM_PATH_MAX <= path_len)
-			path_len = GTM_PATH_MAX - 1;
+		if (YDB_PATH_MAX <= path_len)
+			path_len = YDB_PATH_MAX - 1;
 		memcpy(path_buff, path, path_len + 1);	/* + 1 for null */
 		path = path_buff;
-		dir_in_path = (char *)malloc(GTM_PATH_MAX);
+		dir_in_path = (char *)malloc(YDB_PATH_MAX);
 	}
 	cmd_string_size = STRLEN(cmd_string) + 1;
-	pathsize = GTM_PATH_MAX + cmd_string_size;
+	pathsize = YDB_PATH_MAX + cmd_string_size;
 	buf = (char *)malloc(pathsize);
 	copy_cmd_string = (char *)malloc(cmd_string_size);
 	command2 = (char *)malloc(cmd_string_size);
@@ -185,7 +188,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		if (NULL != strchr(token2, '/'))
 		{
 			/* if the first character is a $ sign then assume it is an environment variable used
-			 * like $gtm_dist/mupip.  Get the environment variable and substitute it.
+			 * like $ydb_dist/mupip.  Get the environment variable and substitute it.
 			 */
 			notfound = TRUE;
 			temp[0] = '\0';
@@ -211,10 +214,10 @@ int parse_pipe(char *cmd_string, char *ret_token)
 					notfound = FALSE;
 			}
 		} else
-		{	/* look in $gtm_dist in case not explicitly listed or not in the $PATH variable */
-			if (gtm_dist_ok_to_use)
+		{	/* look in $ydb_dist in case not explicitly listed or not in the $PATH variable */
+			if (ydb_dist_ok_to_use)
 			{	/* build a translated path to command */
-				SPRINTF(temp, "%s/%s", gtm_dist, token2);
+				SPRINTF(temp, "%s/%s", ydb_dist, token2);
 				STAT_FILE(temp, &sb, ret_stat);
 				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 					notfound = FALSE;
@@ -243,7 +246,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		}
 		if (TRUE == notfound)
 		{
-			assert(GTM_PATH_MAX > (STRLEN(token2) + 1));
+			assert(YDB_PATH_MAX > (STRLEN(token2) + 1));
 			memcpy(ret_token, token2, STRLEN(token2) + 1);
 			FREE_ALL;
 			if (NULL != path)

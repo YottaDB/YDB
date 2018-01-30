@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +23,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-#include "gtm_limits.h"		/* for GTM_PATH_MAX */
+#include "gtm_limits.h"		/* for YDB_PATH_MAX */
 
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "real_len.h"
@@ -51,8 +54,8 @@ gtmcrypt_func_n			/* total number of gtmcrypt functions that needs to be dlsym()
 #undef GTMCRYPT_DEF
 
 GBLREF	char		dl_err[MAX_ERRSTR_LEN];
-GBLREF	char		gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t	gtm_dist_ok_to_use;
+GBLREF	char		ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t	ydb_dist_ok_to_use;
 
 error_def(ERR_CRYPTDLNOOPEN);
 
@@ -65,17 +68,17 @@ boolean_t verify_lib_loadpath(const char *libname, char *loadpath);
 #ifdef _AIX
 /* On AIX, there is no known way to specify that dependent libraries (in this case "libgtmcryptutil.so") should also be searched in
  * the same directory from which the parent library is loaded ($ORIGIN on Linux, HP-UX and Solaris). To work-around that, we
- * explicitly prefix LIBPATH with "$gtm_dist/plugin" before invoking dlopen. But, to ensure that "libgtmcryptutil.so" was indeed
- * loaded from "$gtm_dist/plugin", we use loadquery to get the list of loaded modules along with the path from which they are loaded
+ * explicitly prefix LIBPATH with "$ydb_dist/plugin" before invoking dlopen. But, to ensure that "libgtmcryptutil.so" was indeed
+ * loaded from "$ydb_dist/plugin", we use loadquery to get the list of loaded modules along with the path from which they are loaded
  * from and verify against it.
  */
 boolean_t verify_lib_loadpath(const char *libname, char *loadpath)
 {
 	struct ld_xinfo		*ldxinfo;
-	char			*bufptr, *ptr, cmpptr[GTM_PATH_MAX], buf[GTM_PATH_MAX];
+	char			*bufptr, *ptr, cmpptr[YDB_PATH_MAX], buf[YDB_PATH_MAX];
 	int			ret, cmplen, buflen, save_errno;
 
-	buflen = GTM_PATH_MAX;
+	buflen = YDB_PATH_MAX;
 	bufptr = &buf[0];
 	while (-1 == loadquery(L_GETXINFO, bufptr, buflen))
 	{
@@ -93,7 +96,7 @@ boolean_t verify_lib_loadpath(const char *libname, char *loadpath)
 	}
 	ldxinfo = (struct ld_xinfo *)bufptr;
 	ret = FALSE;
-	SNPRINTF(cmpptr, GTM_PATH_MAX, "%s/%s", loadpath, libname);
+	SNPRINTF(cmpptr, YDB_PATH_MAX, "%s/%s", loadpath, libname);
 	while (ldxinfo->ldinfo_next)
 	{
 		/* Point to the offset at which the path of the loaded module is present. */
@@ -134,19 +137,19 @@ uint4 gtmcrypt_entry()
 	gtmcrypt_func_t		fptr;
 	int			findx, plugin_dir_len, save_errno;
 #	ifdef _AIX
-	char			new_libpath_env[GTM_PATH_MAX], *save_libpath_ptr, save_libpath[GTM_PATH_MAX];
+	char			new_libpath_env[YDB_PATH_MAX], *save_libpath_ptr, save_libpath[YDB_PATH_MAX];
 #	endif
-	char			libpath[GTM_PATH_MAX], buf[MAX_GTMCRYPT_PLUGIN_STR_LEN], plugin_dir_path[GTM_PATH_MAX];
-	char			resolved_libpath[GTM_PATH_MAX], resolved_plugin_dir_path[GTM_PATH_MAX];
+	char			libpath[YDB_PATH_MAX], buf[MAX_GTMCRYPT_PLUGIN_STR_LEN], plugin_dir_path[YDB_PATH_MAX];
+	char			resolved_libpath[YDB_PATH_MAX], resolved_plugin_dir_path[YDB_PATH_MAX];
 	mstr			trans, env_var = {0, LEN_AND_LIT(GTM_CRYPT_PLUGIN)};
 
-	if(!gtm_dist_ok_to_use)
+	if(!ydb_dist_ok_to_use)
 	{
-		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-GTMDISTUNVERIF, Environment variable $gtm_dist (%s) "
-				"could not be verified against the executables path", gtm_dist);
+		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-YDBDISTUNVERIF, Environment variable $ydb_dist (%s) "
+				"could not be verified against the executables path", ydb_dist);
 		return ERR_CRYPTDLNOOPEN;
 	}
-	SNPRINTF(plugin_dir_path, GTM_PATH_MAX, "%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME);
+	SNPRINTF(plugin_dir_path, YDB_PATH_MAX, "%s/%s", ydb_dist, GTMCRYPT_PLUGIN_DIR_NAME);
 	if (NULL == realpath(plugin_dir_path, resolved_plugin_dir_path))
 	{
 		save_errno = errno;
@@ -161,7 +164,7 @@ uint4 gtmcrypt_entry()
 		libname_ptr = GTMCRYPT_LIBNAME;
 	} else
 		libname_ptr = &buf[0];		/* value of $gtm_crypt_plugin */
-	SNPRINTF(libpath, GTM_PATH_MAX, "%s/%s", plugin_dir_path, libname_ptr);
+	SNPRINTF(libpath, YDB_PATH_MAX, "%s/%s", plugin_dir_path, libname_ptr);
 	if (NULL == realpath(libpath, resolved_libpath))
 	{
 		save_errno = errno;
@@ -170,20 +173,20 @@ uint4 gtmcrypt_entry()
 	}
 	/* Symbolic link found. dlopen resolved_libpath */
 	if (0 != memcmp(resolved_libpath, resolved_plugin_dir_path, plugin_dir_len))
-	{	/* resolved_path doesn't contain $gtm_dist/plugin as the prefix */
+	{	/* resolved_path doesn't contain $ydb_dist/plugin as the prefix */
 		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "Resolved path for %s must be relative to the resolved path for %s",
 			libpath, plugin_dir_path);
 		return ERR_CRYPTDLNOOPEN;
 	}
 #	ifdef _AIX
 	if (NULL == (save_libpath_ptr = getenv(LIBPATH_ENV)))
-		SNPRINTF(new_libpath_env, GTM_PATH_MAX, "%s", plugin_dir_path);
+		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s", plugin_dir_path);
 	else
 	{
 		/* Since the setenv below can potentially thrash the save_libpath_ptr, take a copy of it for later restore. */
 		strncpy(save_libpath, save_libpath_ptr, SIZEOF(save_libpath));
 		save_libpath[SIZEOF(save_libpath) - 1] = '\0';
-		SNPRINTF(new_libpath_env, GTM_PATH_MAX, "%s:%s", plugin_dir_path, save_libpath_ptr);
+		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s:%s", plugin_dir_path, save_libpath_ptr);
 	}
 	setenv(LIBPATH_ENV, new_libpath_env, TRUE);
 #	endif
