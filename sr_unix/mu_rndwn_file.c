@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -820,7 +820,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					db_ipcs.shmid = tsd->shmid;
 					db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 					if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len,
-											GTM_PATH_MAX, &status_msg))
+											YDB_PATH_MAX, &status_msg))
 					{
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) status_msg);
 						RNDWN_ERR("!AD -> get_full_path failed.", reg);

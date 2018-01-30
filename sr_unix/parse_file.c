@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +106,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	if ((0 == trans.len) || ('/' != *ptr))
 	{	/* No file given, no full path given, or a nodename was specified */
 		setzdir(NULL, &def_trans); /* Default current directory if none given */
-		assert((0 == dollar_zdir.str.len) /* dollar_zdir not initialized yet, possible thru main() -> gtm_chk_dist() */
+		assert((0 == dollar_zdir.str.len) /* dollar_zdir not initialized yet, possible thru main() -> ydb_chk_dist() */
 			|| ((def_trans.str.len == dollar_zdir.str.len) /* Check if cwd and cached value are the same */
 				&& (0 == memcmp(def_trans.str.addr, dollar_zdir.str.addr, def_trans.str.len))));
 		if (pblk->fop & F_PARNODE)

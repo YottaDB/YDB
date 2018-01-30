@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,7 +16,7 @@
 #ifndef PARSE_FILE_H_INCLUDED
 #define PARSE_FILE_H_INCLUDED
 
-#define MAX_FBUFF	255		/* Max file size (why different from MAX_PATH[_LEN]/GTM_PATH_MAX ? */
+#define MAX_FBUFF	255		/* Max file size (why different from MAX_PATH[_LEN]/YDB_PATH_MAX ? */
 #define DEF_DBEXT	"*.dat"
 #define DEF_NODBEXT	"*"
 

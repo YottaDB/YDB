@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@
 #include "gt_timer.h"
 #include "lke.h"
 #include "lke_fileio.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "generic_signal_handler.h"
 #include "cli_parse.h"
 #include "getzdir.h"
@@ -105,7 +105,7 @@ int lke_main(int argc, char *argv[], char **envp)
 	rts_stringpool = stringpool;
 	getjobname();
 	getzdir();
-	gtm_chk_dist(argv[0]);
+	ydb_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();

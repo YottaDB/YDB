@@ -29,14 +29,13 @@
 #include "gtm_permissions.h"
 #include "send_msg.h"
 #include "eintr_wrappers.h"
+#include "gtmimagename.h"
 
 GBLDEF		gid_t		*gid_list = NULL;
 GBLDEF		int		gid_list_len = 0;
 
-GBLREF		char		gtm_dist[GTM_PATH_MAX];
-GBLREF		boolean_t	gtm_dist_ok_to_use;
-
-#define LIBYOTTADB "%s/libyottadb.so"
+GBLREF		char		ydb_dist[YDB_PATH_MAX];
+GBLREF		boolean_t	ydb_dist_ok_to_use;
 
 /* Get the process's group list and stash the information to avoid repeated calls */
 void gtm_init_gid_list(void)
@@ -80,7 +79,7 @@ boolean_t	gtm_gid_in_gid_list(gid_t gid)
 gid_t	gtm_get_group_id(struct stat *stat_buff)
 {
 	int			ret_stat;
-	char			temp[GTM_PATH_MAX];
+	char			temp[YDB_PATH_MAX];
 	static boolean_t	first_time = TRUE;
 	static struct stat	st_buff;
 
@@ -89,10 +88,10 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 		*stat_buff = st_buff;
 		return st_buff.st_gid;
 	}
-	if (gtm_dist_ok_to_use)
+	if (ydb_dist_ok_to_use)
 	{
 		/* build a path to libyottadb.so */
-		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADB, gtm_dist);
+		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADBDOTSO, ydb_dist);
 		STAT_FILE(temp, stat_buff, ret_stat);
 		if (0 == ret_stat)
 		{
@@ -101,7 +100,7 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 			return(stat_buff->st_gid);
 		}
 	}
-	/* return INVALID_GID if STAT_FILE returned a -1 or gtm_dist has not been validated */
+	/* return INVALID_GID if STAT_FILE returned a -1 or ydb_dist has not been validated */
 	return (INVALID_GID);
 }
 
@@ -161,7 +160,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 {
 	uid_t		this_uid, file_uid;
 	gid_t		this_gid, file_gid;
-	gid_t		gtm_dist_gid = INVALID_GID;
+	gid_t		ydb_dist_gid = INVALID_GID;
 	struct stat	dist_stat_buff;
 	int		this_uid_is_file_owner;
 	int		this_uid_is_root;
@@ -245,9 +244,9 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			new_other_perms = file_other_perms;
 		}
 		/* Find restricted group, if any */
-		gtm_dist_gid = gtm_get_group_id(&dist_stat_buff);
+		ydb_dist_gid = gtm_get_group_id(&dist_stat_buff);
 		dir_mode = dist_stat_buff.st_mode;
-		gtm_group_restricted = ((INVALID_GID != gtm_dist_gid) && !(dir_mode & 01)); /* not other executable */
+		gtm_group_restricted = ((INVALID_GID != ydb_dist_gid) && !(dir_mode & 01)); /* not other executable */
 		if ((this_uid_is_file_owner && this_uid_in_file_group) || this_uid_is_root)
 		{
 			if (this_uid_is_root)		/* otherwise, use default uid */
@@ -264,8 +263,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			if (gtm_group_restricted)
 			{
 				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
-						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
-				*group_id = gtm_dist_gid;	/* use restricted group */
+						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
+				*group_id = ydb_dist_gid;	/* use restricted group */
 				*perm = new_owner_perms | new_group_perms;
 			} else
 			{
@@ -295,8 +294,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			} else if (gtm_group_restricted)
 			{
 				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
-						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
-				*group_id = gtm_dist_gid;	/* use restricted group */
+						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
+				*group_id = ydb_dist_gid;	/* use restricted group */
 				new_group_perms = (new_group_perms | (new_other_perms << 3));
 				/* "owner" gets group permissions if in group, otherwise "other" permissions */
 				new_owner_perms = this_uid_in_file_group ? (new_group_perms << 3) : (new_other_perms << 6);
@@ -332,7 +331,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 		pdd->this_gid = this_gid;
 		pdd->file_uid = file_uid;	/* get owning file uid */
 		pdd->file_gid = file_gid;	/* get owning file gid */
-		pdd->lib_gid  = gtm_dist_gid;
+		pdd->lib_gid  = ydb_dist_gid;
 		SNPRINTF(pdd->file_perm, SIZEOF(pdd->file_perm), "%04o", st_mode & 07777);
 		SNPRINTF(pdd->lib_perm, SIZEOF(pdd->lib_perm), "%04o", dir_mode  & 07777);
 		if (gid_list_len > 0)

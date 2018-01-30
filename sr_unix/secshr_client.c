@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,8 +71,8 @@ GBLREF int			server_start_tries;
 GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF ipcs_mesg		db_ipcs;
-GBLREF char			gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t		gtm_dist_ok_to_use;
+GBLREF char			ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t		ydb_dist_ok_to_use;
 
 LITREF char			ydb_release_name[];
 LITREF int4			ydb_release_name_len;
@@ -80,7 +80,7 @@ LITREF gtmImageName		gtmImageNames[];
 
 static int			secshr_sem;
 static boolean_t		gtmsecshr_file_check_done;
-static char			gtmsecshr_path[GTM_PATH_MAX];
+static char			gtmsecshr_path[YDB_PATH_MAX];
 static volatile boolean_t	client_timer_popped;
 static unsigned long		cur_seqno;
 
@@ -97,7 +97,7 @@ const static char readonly *secshr_fail_mesg_code[] = {
 const static char readonly *secshrstart_error_code[] = {
 	"",
 	"gtmsecshr unable to set-uid to root",
-	"The environmental variable gtm_dist is pointing to an invalid path",
+	"The environmental variable ydb_dist is pointing to an invalid path",
 	"Unable to start gtmsecshr executable",
 	"gtmsecshr unable to create a  child process",
 	"Error with gtmsecshr semaphore",
@@ -106,7 +106,7 @@ const static char readonly *secshrstart_error_code[] = {
 	"gtmsecshr startup failed - gtmsecshr unable to chdir to tmp directory",
 	"gtmsecshr startup failed - gtmsecshr unable to determine invocation path",
 	"gtmsecshr startup failed - gtmsecshr not named gtmsecshr",
-	"gtmsecshr startup failed - $gtm_dist not same as startup path"
+	"gtmsecshr startup failed - $ydb_dist not same as startup path"
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */
@@ -148,7 +148,7 @@ const static char readonly *secshrstart_error_code[] = {
 	start_timer(timer_id, CLIENT_ACK_TIMER, client_timer_handler, 0, NULL);			\
 }
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_GTMSECSHR);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_GTMSECSHRSOCKET);
@@ -194,8 +194,8 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 
 	SETUP_THREADGBL_ACCESS;
 	DBGGSSHR((LOGFLAGS, "secshr_client: New send request\n"));
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	/* Create communication key (hash of release name) if it has not already been done */
 	if (0 == TREF(gtmsecshr_comkey))
@@ -203,13 +203,13 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	timer_id = (TID)send_mesg2gtmsecshr;
 	if (!gtmsecshr_file_check_done)
 	{
-		len = STRLEN(gtm_dist);
-		memcpy(gtmsecshr_path, gtm_dist, len);
+		len = STRLEN(ydb_dist);
+		memcpy(gtmsecshr_path, ydb_dist, len);
 		gtmsecshr_path[len] =  '/';
 		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
 		gtmsecshr_pathname.addr = gtmsecshr_path;
 		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_pathname.len);
+		assertpro(YDB_PATH_MAX > gtmsecshr_pathname.len);
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
@@ -229,13 +229,13 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		send_len = (int4)(GTM_MESG_HDR_SIZE);
   		if (REMOVE_FILE == code)
 		{
-			assert(GTM_PATH_MAX > path_len);	/* Name is not user supplied so simple check */
+			assert(YDB_PATH_MAX > path_len);	/* Name is not user supplied so simple check */
 			memcpy(mesg.mesg.path, path, path_len);
 			send_len += path_len;
 		} else if (FLUSH_DB_IPCS_INFO == code)
 		{
-			assert(GTM_PATH_MAX > db_ipcs.fn_len);
-			/* Most of the time file length is much smaller than GTM_PATH_MAX, hence the fn_len + 1 below */
+			assert(YDB_PATH_MAX > db_ipcs.fn_len);
+			/* Most of the time file length is much smaller than YDB_PATH_MAX, hence the fn_len + 1 below */
 			memcpy(&mesg.mesg.db_ipcs, &db_ipcs, (offsetof(ipcs_mesg, fn[0]) + db_ipcs.fn_len + 1));
 			send_len += offsetof(ipcs_mesg, fn[0]);
 			send_len += mesg.mesg.db_ipcs.fn_len + 1;

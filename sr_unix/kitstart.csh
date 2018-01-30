@@ -26,7 +26,7 @@
 # Make sure don't start in utf-8 mode
 if ($?gtm_chset) then
 	if (M != $gtm_chset) then
-		set longline='$LC_CTYPE, $gtm_dist, and $gtmroutines for M mode'
+		set longline='$LC_CTYPE, $ydb_dist, and $gtmroutines for M mode'
 		echo '$gtm_chset'" = $gtm_chset, so change to M mode and also check "$longline
 		exit
 	endif
@@ -35,7 +35,7 @@ endif
 # This script needs root privileges to
 # - test install GT.M
 # - set file ownership to 40535
-set euser = `$gtm_dist/geteuid`
+set euser = `$ydb_dist/geteuid`
 if ("$euser" != "root") then
 	echo "You must have root privileges to run kitstart"
 	exit -1
@@ -72,11 +72,11 @@ end
 # if not found in distribution servers then try from uname in case -allow entered
 if (! $?os_arch) then
 	# make a directory in /tmp to use to run unamearch.m
-	setenv randstr `$gtm_dist/mumps -r %XCMD 'do ^%RANDSTR'`
+	setenv randstr `$ydb_dist/mumps -r %XCMD 'do ^%RANDSTR'`
 	set tempdir = /tmp/kit_unamearch_${randstr}
 	mkdir $tempdir
 	cp $cms_tools/unamearch.m $tempdir
-	set os_arch=`(cd $tempdir; $gtm_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
+	set os_arch=`(cd $tempdir; $ydb_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
 	if ("" == "$os_arch") then
 		echo "Problem getting platform and arch from uname -a"
 		rm -rf $tempdir
@@ -186,7 +186,7 @@ endif
 
 version $version p  # Set the current version so that relative paths work
 cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
-set zver = `$gtm_dist/mumps -run %XCMD 'write $zversion'`
+set zver = `$ydb_dist/mumps -run %XCMD 'write $zversion'`
 set releasever = $zver[2]
 
 # create a README.txt which has the current year in it
@@ -584,14 +584,14 @@ CONFIGURE_EOF
 
 		# Install gtmpcat
 		pushd $gtm_tools
-		yes | env gtm_dist=${install}/defgroup/${image} sh ./install_gtmpcat.sh
-		yes | env gtm_dist=${install}/${image} sh ./install_gtmpcat.sh
+		yes | env ydb_dist=${install}/defgroup/${image} sh ./install_gtmpcat.sh
+		yes | env ydb_dist=${install}/${image} sh ./install_gtmpcat.sh
 		popd
 
 		# Test gtmpcat
 		pushd /tmp
-		(source ${install}/defgroup/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
-		(source ${install}/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
+		(source ${install}/defgroup/${image}/gtmcshrc ; $ydb_dist/mumps -r %XCMD 'zsystem "$ydb_dist/gtmpcat "_$job')
+		(source ${install}/${image}/gtmcshrc ; $ydb_dist/mumps -r %XCMD 'zsystem "$ydb_dist/gtmpcat "_$job')
 		popd
 
 	end

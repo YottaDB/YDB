@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,12 +47,6 @@ error_def(ERR_GTMCHECK);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
-#ifdef VMS
-error_def(ERR_MUNOFINISH);
-error_def(ERR_DSENOFINISH);
-error_def(ERR_LKENOFINISH);
-#endif
 
 CONDITION_HANDLER(util_base_ch)
 {

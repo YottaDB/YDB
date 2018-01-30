@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,7 +40,7 @@ void mupip_rctldump(void)
 #	ifdef AUTORELINK_SUPPORTED
 	unsigned short		max_len;
 	mstr			dir;
-	char			objdir[GTM_PATH_MAX];
+	char			objdir[YDB_PATH_MAX];
 	open_relinkctl_sgm	*linkctl;
 	DCL_THREADGBL_ACCESS;
 

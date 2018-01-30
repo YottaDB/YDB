@@ -99,7 +99,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* INDEXTRACHARS */
 	   0,	/* CORRUPTNODE */
 	   0,	/* INDRMAXLEN */
-	   0,	/* INSFFBCNT */
+	   0,	/* UNUSEDMSG268 */
 	   0,	/* INTEGERRS */
 	   0,	/* INVCMD */
 	   0,	/* INVFCN */
@@ -108,7 +108,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* IOEOF */
 	   0,	/* IONOTOPEN */
 	   0,	/* MUPIPINFO */
-	   0,	/* IVTIME */
+	   0,	/* UNUSEDMSG277 */
 	   0,	/* JOBFAIL */
 	  13,	/* JOBLABOFF */
 	   0,	/* JOBPARNOVAL */
@@ -221,14 +221,14 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZPARSETYPE */
 	   0,	/* ZPARSFLDBAD */
 	   0,	/* ZPIDBADARG */
-	   0,	/* ZPRIVARGBAD */
-	   0,	/* ZPRIVSYNTAXERR */
+	   0,	/* UNUSEDMSG390 */
+	   0,	/* UNUSEDMSG391 */
 	  13,	/* ZPRTLABNOTFND */
 	   0,	/* VIEWAMBIG */
 	   0,	/* VIEWNOTFOUND */
-	   0,	/* ZSETPRVARGBAD */
+	   0,	/* UNUSEDMSG395 */
 	   0,	/* INVSPECREC */
-	   0,	/* ZSETPRVSYNTAX */
+	   0,	/* UNUSEDMSG397 */
 	   0,	/* ZSRCHSTRMCT */
 	   0,	/* VERSION */
 	   0,	/* MUNOTALLSEC */
@@ -251,8 +251,8 @@ const static readonly int error_ansi[] = {
 	  58,	/* ZCARGMSMTCH */
 	  58,	/* ZCCONMSMTCH */
 	   0,	/* ZCOPT0 */
-	   0,	/* ZCSTATUS */
-	   0,	/* ZCUSRRTN */
+	   0,	/* UNUSEDMSG420 */
+	   0,	/* UNUSEDMSG421 */
 	   0,	/* ZCPOSOVR */
 	   0,	/* ZCINPUTREQ */
 	   0,	/* JNLTNOUTOFSEQ */
@@ -391,7 +391,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOCCPPID */
 	   0,	/* CCPJNLOPNERR */
 	   0,	/* LCKSGONE */
-	   0,	/* ZLKIDBADARG */
+	   0,	/* UNUSEDMSG560 */
 	   0,	/* DBFILOPERR */
 	   0,	/* CCERDERR */
 	   0,	/* CCEDBCL */
@@ -468,7 +468,7 @@ const static readonly int error_ansi[] = {
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
-	   0,	/* JOBARGMISSING */
+	   0,	/* UNUSEDMSG637 */
 	   0,	/* RUNPARAMERR */
 	   0,	/* FNNAMENEG */
 	   0,	/* ORDER2 */
@@ -506,7 +506,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CETOOLONG */
 	   0,	/* CENOINDIR */
 	   0,	/* COLLATIONUNDEF */
-	   0,	/* UNUSEDMSG673 */
+	   0,	/* UNUSEDMSG675 */
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */
@@ -533,7 +533,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBMMSTR */
 	   0,	/* DBROOTBURN */
 	   0,	/* REPLSTATEERR */
-	   0,	/* VMSMEMORY */
+	   0,	/* UNUSEDMSG702 */
 	   0,	/* DBDIRTSUBSC */
 	   0,	/* TIMEROVFL */
 	   0,	/* GTMASSERT */
@@ -559,7 +559,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILEIDMATCH */
 	   0,	/* EXTSRCLIN */
 	   0,	/* EXTSRCLOC */
-	   0,	/* BIGNOACL */
+	   0,	/* UNUSEDMSG728 */
 	   0,	/* ERRCALL */
 	   0,	/* ZCCTENV */
 	   0,	/* ZCCTOPN */
@@ -612,7 +612,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
-	   0,	/* UNUSEDMSG779 */
+	   0,	/* UNUSEDMSG781 */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
@@ -682,9 +682,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUQUALINCOMP */
 	   0,	/* DISTPATHMAX */
 	   0,	/* FILEOPENFAIL */
-	   0,	/* IMAGENAME */
+	   0,	/* UNUSEDMSG851 */
 	   0,	/* GTMSECSHRPERM */
-	   0,	/* GTMDISTUNDEF */
+	   0,	/* YDBDISTUNDEF */
 	   0,	/* SYSCALL */
 	   0,	/* MAXGTMPATH */
 	   0,	/* TROLLBK2DEEP */
@@ -833,8 +833,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLNEWREC */
 	   0,	/* REPLFTOKSEM */
 	   0,	/* SOCKNOTPASSED */
-	   0,	/* EXTRIOERR */
-	   0,	/* EXTRCLOSEERR */
+	   0,	/* UNUSEDMSG1002 */
+	   0,	/* UNUSEDMSG1003 */
 	   0,	/* CONNSOCKREQ */
 	   0,	/* REPLEXITERR */
 	   0,	/* MUDESTROYSUC */
@@ -843,7 +843,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
-	   0,	/* TRUNCATEFAIL */
+	   0,	/* UNUSEDMSG1012 */
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */
@@ -1075,7 +1075,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
-	   0,	/* VMSMEMORY2 */
+	   0,	/* UNUSEDMSG1244 */
 	   0,	/* LOADBGSZ2 */
 	   0,	/* LOADEDSZ2 */
 	   0,	/* REPLINSTMISMTCH */
@@ -1127,7 +1127,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* RLBKLOSTTNONLY */
 	   0,	/* KILLBYSIGSINFO3 */
 	   0,	/* GTMSECSHRTMPPATH */
-	   0,	/* GTMERREXIT */
+	   0,	/* UNUSEDMSG1296 */
 	   0,	/* INVMEMRESRV */
 	   0,	/* OPCOMMISSED */
 	   0,	/* COMMITWAITSTUCK */
@@ -1217,7 +1217,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZGOCALLOUTIN */
 	   0,	/* REPLNOXENDIAN */
 	   0,	/* REPLXENDIANFAIL */
-	   0,	/* ZGOTOINVLVL2 */
+	   0,	/* UNUSEDMSG1386 */
 	   0,	/* GTMSECSHRCHDIRF */
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
@@ -1357,13 +1357,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZPEEKNORPLINFO */
 	   0,	/* MMREGNOACCESS */
 	   0,	/* MALLOCMAXUNIX */
-	   0,	/* MALLOCMAXVMS */
+	   0,	/* UNUSEDMSG1528 */
 	   0,	/* HOSTCONFLICT */
 	   0,	/* GETADDRINFO */
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* UNUSEDMSG1532 */
+	   0,	/* UNUSEDMSG1534 */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */
@@ -1373,7 +1373,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-	   0,	/* UNUSEDMSG1542 */
+	   0,	/* UNUSEDMSG1544 */
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
@@ -1400,7 +1400,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BLKINVALID */
 	   0,	/* CANTBITMAP */
 	   0,	/* AIMGBLKFAIL */
-	   0,	/* GTMDISTUNVERIF */
+	   0,	/* YDBDISTUNVERIF */
 	   0,	/* CRYPTNOAPPEND */
 	   0,	/* CRYPTNOSEEK */
 	   0,	/* CRYPTNOTRUNC */

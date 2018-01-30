@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -108,7 +111,7 @@
 							 * receiver server; used to reduce calls to time related systemc calls */
 
 #define ONLN_RLBK_CMD_MAXLEN			1024
-#define MUPIP_DIST_STR				"$gtm_dist/mupip "
+#define MUPIP_DIST_STR				"$ydb_dist/mupip "
 #define	ONLN_RLBK_CMD				"journal "
 #define ONLN_RLBK_VERBOSE			"-verbose "
 #define	ONLN_RLBK_QUALIFIERS			"-online -rollback -backward \"*\" -fetchresync=" /* port# will be filled later */

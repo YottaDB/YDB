@@ -62,18 +62,18 @@ locale
 echo ""
 
 echo "--------------------------------------------"
-echo "Value at start : gtm_dist=$gtm_dist"
+echo "Value at start : ydb_dist=$ydb_dist"
 echo "Value at start : gtmroutines=""$gtmroutines"""
 echo "--------------------------------------------"
 echo ""
 
-echo "Setting gtm_dist and gtmroutines to non-UTF8 unconditionally"
-setenv gtm_dist $gtm_exe
+echo "Setting ydb_dist and gtmroutines to non-UTF8 unconditionally"
+setenv ydb_dist $gtm_exe
 setenv gtmroutines ". $gtm_exe"
 echo ""
 
 echo "--------------------------------------------"
-echo "Value after reset : gtm_dist=$gtm_dist"
+echo "Value after reset : ydb_dist=$ydb_dist"
 echo "Value after reset : gtmroutines=""$gtmroutines"""
 echo "--------------------------------------------"
 echo ""
@@ -359,7 +359,7 @@ set gi = ($gtm_inc)
 set gs = ($gtm_src)
 
 # Irrespective of the gtm_chset value from the user environment, all
-# M objects generated in $gtm_dist (GDE*.o, _*.o, ttt.o) must be
+# M objects generated in $ydb_dist (GDE*.o, _*.o, ttt.o) must be
 # compiled with gtm_chset="M".
 unsetenv gtm_chset
 
@@ -371,9 +371,9 @@ unsetenv gtm_chset
 if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
     set comlist_ZPARSE_error_count = 0
     pushd $gtm_src
-    # gtm_startup_chk requires gtm_dist setup
-    set real_gtm_dist = "$gtm_dist"
-    setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
+    # ydb_chk_dist requires ydb_dist setup
+    set real_ydb_dist = "$ydb_dist"
+    setenv ydb_dist "$gtm_root/$gtm_curpro/pro"
     set old_gtmroutines = "$gtmroutines"
     setenv gtmroutines "$gtm_obj($gtm_pct)"
     foreach i ( *.msg )
@@ -399,8 +399,8 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 
     setenv gtmroutines "$old_gtmroutines"
     unset old_gtmroutines
-    setenv gtm_dist "$real_gtm_dist"
-    unset real_gtm_dist
+    setenv ydb_dist "$real_ydb_dist"
+    unset real_ydb_dist
     popd
 else
     echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" >> $errorlog
@@ -643,8 +643,8 @@ case "gtm_pro":
 	breaksw
 endsw
 
-if ( ! -x $gtm_dist/mumps ) then
-	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $errorlog
+if ( ! -x $ydb_dist/mumps ) then
+	echo "comlist-E-nomumps, ${dollar_sign}ydb_dist/mumps is not executable" >> $errorlog
 	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $errorlog
 	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $errorlog
 	goto comlist.END
@@ -708,12 +708,12 @@ if (-e GTMDefinedTypesInit.m) then
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
 	source $gtm_tools/set_library_path.csh
 	source $gtm_tools/check_unicode_support.csh
-	if (-e $gtm_dist/utf8 && ("TRUE" == "$is_unicode_support")) then
-		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
-		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+	if (-e $ydb_dist/utf8 && ("TRUE" == "$is_unicode_support")) then
+		if (! -e $ydb_dist/utf8/GTMDefinedTypesInit.m) then
+		    ln -s $ydb_dist/GTMDefinedTypesInit.m $ydb_dist/utf8/GTMDefinedTypesInit.m
 		endif
-		if (! -e $gtm_dist/utf8/GDEINITSZ.m) then
-		    ln -s $gtm_dist/GDEINITSZ.m $gtm_dist/utf8/GDEINITSZ.m
+		if (! -e $ydb_dist/utf8/GDEINITSZ.m) then
+		    ln -s $ydb_dist/GDEINITSZ.m $ydb_dist/utf8/GDEINITSZ.m
 		endif
 		pushd utf8
 		# Switch to UTF8 mode
@@ -767,7 +767,7 @@ endif
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
 
-# Create a mirror image (using soft links) of $gtm_dist under $gtm_dist/utf8 if it exists.
+# Create a mirror image (using soft links) of $ydb_dist under $ydb_dist/utf8 if it exists.
 if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
 	pushd $gtm_exe
 	foreach file (*)
@@ -797,15 +797,15 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 	popd
 endif
 # To check the length of path of files even insdie gtmsecshr directory, relax permissions first
-$gtm_com/IGS $gtm_dist/gtmsecshr UNHIDE
+$gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
-find $gtm_dist -type f >&! $gtm_log/$distfiles_log
-$gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
-awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
+find $ydb_dist -type f >&! $gtm_log/$distfiles_log
+$gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
+awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
 if ($status) then
 	@ comlist_status++
-	echo "comlist-E-pathlength, the longest path beyond \$gtm_dist exceeds 50 bytes" >> $errorlog
-	awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} \
+	echo "comlist-E-pathlength, the longest path beyond \$ydb_dist exceeds 50 bytes" >> $errorlog
+	awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} \
 		{if ((length($0)-dlen)>50) {print $0,"- length :",length($0)-dlen ; stat=1}} \
 		END {exit stat}' $gtm_log/$distfiles_log >>&! $errorlog
 endif

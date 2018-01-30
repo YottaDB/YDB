@@ -3,10 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +25,8 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "gtm_limits.h"
+
+#include <dlfcn.h>
 
 #include "cli.h"
 #include "stringpool.h"
@@ -98,8 +97,8 @@ GBLREF	boolean_t		gtm_jvm_process;
 GBLREF	pthread_t		gtm_main_thread_id;
 GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	int			dollar_truth;
 GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
@@ -116,7 +115,7 @@ error_def(ERR_CIRCALLNAME);
 error_def(ERR_CITPNESTED);
 error_def(ERR_DISTPATHMAX);
 error_def(ERR_FMLLSTMISSING);
-error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_YDBDISTUNDEF);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_INVGTMEXIT);
 error_def(ERR_JOBLABOFF);
@@ -963,11 +962,12 @@ int ydb_jinit()
 int ydb_init()
 {
 	unsigned char   	*transfer_addr;
-	char			*dist;
-	int			dist_len;
-	char			gtmsecshr_path[GTM_PATH_MAX];
-	int			gtmsecshr_path_len;
+	char			*dist, *tmp_ptr;
+	int			dist_len, tmp_len;
+	char			path[YDB_PATH_MAX];
+	int			path_len;
 	struct stat		stat_buf;
+	Dl_info			shlib_info;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -985,38 +985,70 @@ int ydb_init()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
+	if (NULL == (dist = GETENV(YDB_DIST)))
+	{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
+		 * that contains the currently invoked "ydb_init" function.
+		 */
+		if (0 == dladdr(&ydb_init, &shlib_info))
+		{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
+		}
+		/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former and we need to
+		 * to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
+		 */
+		tmp_ptr = path;
+		tmp_len = STRLEN(shlib_info.dli_fname);
+		assert(tmp_len);
+		if (tmp_len >= SIZEOF(path))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+		memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
+		tmp_ptr += tmp_len - 1;
+		/* Remove trailing "/libyottadb.so" from filename before setting $ydb_dist.
+		 * Note: The later call to "common_startup_init" will ensure the filename is libyottadb.so.
+		 */
+		for (; tmp_ptr >= path; tmp_ptr--)
+		{
+			if ('/' == *tmp_ptr)
+				break;
+		}
+		*tmp_ptr = '\0';
+		/* First check the executable name is libyottadb.so. If not issue error. */
+		setenv(YDB_DIST, path, TRUE);
+		setenv("gtm_dist", path, TRUE);
+	}
+	/* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-		/* Ensure that $gtm_dist exists */
-		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
+		/* Ensure that $ydb_dist exists */
+		if (NULL == (dist = (char *)GETENV(YDB_DIST)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+		/* Ensure that $ydb_dist is non-zero and does not exceed YDB_DIST_PATH_MAX */
 		dist_len = STRLEN(dist);
 		if (!dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		else if (GTM_DIST_PATH_MAX <= dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
-		/* Verify that $gtm_dist/gtmsecshr is available with setuid root */
-		memcpy(gtmsecshr_path, gtm_dist, dist_len);
-		gtmsecshr_path[dist_len] =  '/';
-		memcpy(gtmsecshr_path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		gtmsecshr_path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_path_len);
-		gtmsecshr_path[gtmsecshr_path_len] = '\0';
-		if (-1 == Stat(gtmsecshr_path, &stat_buf))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+		else if (YDB_DIST_PATH_MAX <= dist_len)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+		/* Verify that $ydb_dist/gtmsecshr is available with setuid root */
+		memcpy(path, ydb_dist, dist_len);
+		path[dist_len] =  '/';
+		memcpy(path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+		assertpro(YDB_PATH_MAX > path_len);
+		path[path_len] = '\0';
+		if (-1 == Stat(path, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
-		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
+					LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
+		/* Ensure that the call-in can execute $ydb_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 		else
-		{	/* $gtm_dist validated */
-			gtm_dist_ok_to_use = TRUE;
-			memcpy(gtm_dist, dist, dist_len);
+		{	/* $ydb_dist validated */
+			ydb_dist_ok_to_use = TRUE;
+			memcpy(ydb_dist, dist, dist_len);
 		}
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,

@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -177,7 +180,7 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 
 int gc_pk_gpghome_has_permissions()
 {
-	char		pathname[GTM_PATH_MAX], *ptr;
+	char		pathname[YDB_PATH_MAX], *ptr;
 	int		gnupghome_set, perms, pathlen;
 
 	/* See if GNUPGHOME is set in the environment */
@@ -189,7 +192,7 @@ int gc_pk_gpghome_has_permissions()
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, HOME);
 			return -1;
 		}
-		SNPRINTF(pathname, GTM_PATH_MAX, "%s/%s", ptr, DOT_GNUPG);
+		SNPRINTF(pathname, YDB_PATH_MAX, "%s/%s", ptr, DOT_GNUPG);
 	} else
 	{
 		pathlen = strlen(ptr);
@@ -198,7 +201,7 @@ int gc_pk_gpghome_has_permissions()
 			UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, GNUPGHOME);
 			return -1;
 		}
-		if (GTM_PATH_MAX <= pathlen)
+		if (YDB_PATH_MAX <= pathlen)
 		{
 			UPDATE_ERROR_STRING("$GNUPGHOME is too long -" STR_ARG, ELLIPSIZE(pathname));
 			return -1;

@@ -4,6 +4,9 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -398,7 +401,7 @@ if ($listonly) then
 endif
 
 # Irrespective of the gtm_chset value from the user environment, all
-# M objects generated in $gtm_dist (GDE*.o, _*.o, ttt.o) must be
+# M objects generated in $ydb_dist (GDE*.o, _*.o, ttt.o) must be
 # compiled with gtm_chset="M".
 unsetenv gtm_chset
 

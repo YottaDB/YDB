@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -133,7 +136,7 @@ void	gtm_env_init_sp(void)
 	int4		status, index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined, novalidate;
-	char		buf[MAX_SRCLINE + 1], *token, cwd[GTM_PATH_MAX];
+	char		buf[MAX_SRCLINE + 1], *token, cwd[YDB_PATH_MAX];
 	char		*cwdptr, *c, *end, *strtokptr;
 	struct stat	outbuf;
 	int		gtm_autorelink_shm_min;
@@ -166,17 +169,17 @@ void	gtm_env_init_sp(void)
 		} /* else gtm_core_file/gtm_core_putenv remain null and we likely cannot generate proper core files */
 	}
 #	endif
-	assert(GTM_PATH_MAX <= MAX_SRCLINE);
+	assert(YDB_PATH_MAX <= MAX_SRCLINE);
 	/* Validate $gtm_tmp if specified, else that default is available */
 	val.addr = GTM_TMP_ENV;
 	val.len = SIZEOF(GTM_TMP_ENV) - 1;
-	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) || (0 == trans.len))
+	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long))) || (0 == trans.len))
 	{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
 		trans.addr = buf;
 		trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
 	}
-	assert(GTM_PATH_MAX > trans.len);
+	assert(YDB_PATH_MAX > trans.len);
 	REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
 	trans.addr[trans.len] = '\0';
 	STAT_FILE(trans.addr, &outbuf, stat_res);
@@ -205,9 +208,9 @@ void	gtm_env_init_sp(void)
 	gtm_principal_editing_defaults = 0;
 	val.addr = GTM_PRINCIPAL_EDITING;
 	val.len = SIZEOF(GTM_PRINCIPAL_EDITING) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 	{
-		assert(trans.len < GTM_PATH_MAX);
+		assert(trans.len < YDB_PATH_MAX);
 		trans.addr[trans.len] = '\0';
 		token = STRTOK_R(trans.addr, ":", &strtokptr);
 		while (NULL != token)
@@ -245,7 +248,7 @@ void	gtm_env_init_sp(void)
 	}
 	val.addr = GTM_CHSET_ENV;
 	val.len = STR_LIT_LEN(GTM_CHSET_ENV);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long))
 	    && STR_LIT_LEN(UTF8_NAME) == trans.len)
 	{
 		if (!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
@@ -254,7 +257,7 @@ void	gtm_env_init_sp(void)
 #			ifdef __MVS__
 			val.addr = GTM_CHSET_LOCALE_ENV;
 			val.len = STR_LIT_LEN(GTM_CHSET_LOCALE_ENV);
-			if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) &&
+			if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long))) &&
 			    (0 < trans.len))
 			{	/* full path to 64 bit ASCII UTF-8 locale object */
 				gtm_utf8_locale_object = malloc(trans.len + 1);
@@ -263,7 +266,7 @@ void	gtm_env_init_sp(void)
 			}
 			val.addr = GTM_TAG_UTF8_AS_ASCII;
 			val.len = STR_LIT_LEN(GTM_TAG_UTF8_AS_ASCII);
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 			{	/* We to tag UTF8 files as ASCII so we can read them, this var disables that */
 				if (status = logical_truth_value(&val, FALSE, &is_defined) && is_defined)
 					gtm_tag_utf8_as_ascii = FALSE;
@@ -272,7 +275,7 @@ void	gtm_env_init_sp(void)
 			/* Initialize $ZPATNUMERIC only if $ZCHSET is "UTF-8" */
 			val.addr = GTM_PATNUMERIC_ENV;
 			val.len = STR_LIT_LEN(GTM_PATNUMERIC_ENV);
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long))
 			    && STR_LIT_LEN(UTF8_NAME) == trans.len
 			    && !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
@@ -318,9 +321,9 @@ void	gtm_env_init_sp(void)
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	val.addr = GTM_CUSTOM_ERRORS;
 	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long))) && (0 < trans.len))
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long))) && (0 < trans.len))
 	{
-		assert(GTM_PATH_MAX > trans.len);
+		assert(YDB_PATH_MAX > trans.len);
 		(TREF(gtm_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		(TREF(gtm_custom_errors)).len = trans.len;
 		/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
@@ -334,7 +337,7 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_LINK;
 	val.len = SIZEOF(GTM_LINK) - 1;
 	TREF(relink_allowed) = LINK_NORECURSIVE; /* default */
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 	{
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
 	}
@@ -343,11 +346,11 @@ void	gtm_env_init_sp(void)
 	{	/* Set default or supplied value for $gtm_linktmpdir */
 		val.addr = GTM_LINKTMPDIR;
 		val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 		{	/* Else use default $gtm_tmp value or its default */
 			val.addr = GTM_TMP_ENV;
 			val.len = SIZEOF(GTM_TMP_ENV) - 1;
-			if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+			if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 					|| (0 < trans.len))
 			{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
@@ -356,7 +359,7 @@ void	gtm_env_init_sp(void)
 			novalidate = TRUE;		/* Don't validate gtm_linktmpdir if is defaulting to $gtm_tmp */
 		} else
 			novalidate = FALSE;
-		assert(GTM_PATH_MAX > trans.len);
+		assert(YDB_PATH_MAX > trans.len);
 		REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
 		(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		(TREF(gtm_linktmpdir)).len = trans.len;
@@ -486,9 +489,9 @@ void	gtm_env_init_sp(void)
 	{
 		val.addr = GTM_LOCALE;
 		val.len = SIZEOF(GTM_LOCALE) - 1;
-		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, YDB_PATH_MAX, do_sendmsg_on_log2long)))
 		{
-			if ((0 < trans.len) && (GTM_PATH_MAX > trans.len))
+			if ((0 < trans.len) && (YDB_PATH_MAX > trans.len))
 			{	/* Something was specified - need to clear LC_ALL and set LC_CTYPE but need room in buf[]
 				 * for string-ending null.
 				 */
@@ -522,7 +525,7 @@ void	gtm_env_init_sp(void)
 	 */
 	val.addr = GTM_STATSDIR;
 	val.len = SIZEOF(GTM_STATSDIR) - 1;
-	/* Using MAX_FN_LEN below instead of GTM_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
+	/* Using MAX_FN_LEN below instead of YDB_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
 	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
 			|| (0 == trans.len))
 	{	/* Either no translation for $gtm_statsdir or the current and/or expanded value of $gtm_statsdir exceeds the

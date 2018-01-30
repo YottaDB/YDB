@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -63,7 +63,6 @@ error_def(ERR_NOPLACE);
 error_def(ERR_NOZBRK);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TRIGNAMENF);
-error_def(ERR_VMSMEMORY);
 error_def(ERR_ZBREAKFAIL);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
@@ -189,7 +188,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 						addr = (zb_code *)(routine->ptext_adr + addr_off);
 					else
 					{
-						assert(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY) == status);
+						assert(ERR_MEMORY == status);
 						/* Convert to label+offset^routine to be presented to the user */
 						rname.len = rtn->str.len;
 						rname.addr = rtn->str.addr;

@@ -1,7 +1,7 @@
 1 Introduction
    Introduction
 
-   The M Lock Utility (LKE) is a tool for examining and changing the GT.M
+   The M Lock Utility (LKE) is a tool for examining and changing the YottaDB
    LOCK environment. For a description of M LOCKs, refer to the LOCKs section
    in the General Language Features of M chapter and the description of the
    LOCK command in the Commands chapter of the Programmers Guide.
@@ -32,18 +32,18 @@
 
    **Note**
 
-   When a process leaves M, GT.M normally releases any LOCKs or ZALLOCATEs
-   held by that process. If a GT.M process terminates abnormally, or if the
-   system "crashes" while a GT.M process is active, GT.M cannot perform
+   When a process leaves M, YottaDB normally releases any LOCKs or ZALLOCATEs
+   held by that process. If a YottaDB process terminates abnormally, or if the
+   system "crashes" while a YottaDB process is active, YottaDB cannot perform
    normal clean-up. However, as soon as any other process waits several
-   seconds for a LOCK owned by a process that no longer exists, GT.M
+   seconds for a LOCK owned by a process that no longer exists, YottaDB
    automatically clears the "orphaned" LOCK.
 
 2 Invoke
    Invoke
 
-   GT.M installation procedure places the LKE utility package in a directory
-   specified by the environment variable gtm_dist.
+   YottaDB installation procedure places the LKE utility package in a directory
+   specified by the environment variable ydb_dist.
 
    LKE requires that the environment variable gtmgbldir be defined.
 
@@ -51,7 +51,7 @@
    not work, consult your system manager to investigate setup and file access
    issues.
 
-   $gtm_dist/lke LKE>
+   $ydb_dist/lke LKE>
 
    **Important**
 
@@ -63,7 +63,7 @@
    When additional information is entered on the command line after the LKE
    command, LKE processes the additional information as its command.
 
-   $gtm_dist/lke show -all
+   $ydb_dist/lke show -all
 
    This command displays all current LOCKs and then returns to the shell
    prompt.
@@ -73,8 +73,8 @@
    (matching single or double). Apply this convention only for those LKE
    commands that you run from the shell.
 
-   $gtm_dist/lke show -lock="^Account(\"Name\")"
-   $gtm_dist/lke show -lock='^Account("Name")'
+   $ydb_dist/lke show -lock="^Account(\"Name\")"
+   $ydb_dist/lke show -lock='^Account("Name")'
 
    Both these commands display the status of LOCK ^Account("Name") in the
    default region.
@@ -88,7 +88,7 @@
 
    LKE accepts command and qualifier abbreviations. The section describing
    each command provides the minimal abbreviation that can be used for that
-   command, and the command qualifiers, if any. FIS recommends the use of a
+   command, and the command qualifiers, if any. YottaDB recommends the use of a
    minimum of four characters for key words in scripts to ensure new keywords
    do not conflict with older scripts.
 
@@ -99,10 +99,10 @@
 
    **Caution**
 
-   FIS recommends restricting the use of the LKE CLEAR facility to debugging
+   YottaDB recommends restricting the use of the LKE CLEAR facility to debugging
    environments; removing LOCKs in a production environment typically
    violates application design assumptions and can cause aberrant process
-   behavior. GT.M automatically removes abandoned LOCKs so it is typically
+   behavior. YottaDB automatically removes abandoned LOCKs so it is typically
    safer to MUPIP STOP a process that is inappropriately hanging on to a
    LOCK.
 
@@ -132,7 +132,7 @@
      o -ALL removes all current LOCKs.
      o If used, CLEAR and -REGION qualifier, -ALL removes all LOCKs in that
        region.
-     o Issue a CLEAR - ALL only when there are no active GT.M processes using
+     o Issue a CLEAR - ALL only when there are no active YottaDB processes using
        LOCKs, or when you can predict the effect on the application.
      o By default, CLEAR -ALL operates interactively (-INTERACTIVE).
 
@@ -144,7 +144,7 @@
    **Caution**
 
    This can damage current LOCKs and the LOCK mechanism. It is intended for
-   use only under the direction of FIS.
+   use only under the direction of YottaDB.
 
    By default LKE operates in CRIT mode and ensures a consistent view of
    LOCKs by using the database critical section(s).
@@ -243,7 +243,7 @@
 
    LKE responds with an informational message:
 
-   %GTM-S-LCKGONE, Lock removed : ^a
+   %YDB-S-LCKGONE, Lock removed : ^a
 
    Type Yes or N or No or N until all LOCKs are displayed and acted upon.
 
@@ -312,7 +312,7 @@
      o The SHOW command reports active LOCKs. Information includes the LOCK
        resource name and the process identification (PID) of the LOCK owner.
      o LKE SHOW displays lock space usage with a message in the form of:
-       "%GTM-I-LOCKSPACEUSE, Estimated free lock space: xxx% of pppp pages."
+       "%YDB-I-LOCKSPACEUSE, Estimated free lock space: xxx% of pppp pages."
        If the lock space is full, it also displays a LOCKSPACEFULL error.
      o A LOCK command which finds no room in LOCK_SPACE to queue a waiting
        LOCK, does a slow poll waiting for LOCK_SPACE to become available. If
@@ -322,18 +322,18 @@
        poll till the space becomes available.
      o LOCK commands which find no available lock space send a LOCKSPACEFULL
        message to the operator log. To prevent flooding the operator log,
-       GT.M suppresses further such messages until the lock space usage drops
+       YottaDB suppresses further such messages until the lock space usage drops
        below 75% full.
      o The results of a SHOW may be immediately "outdated" by M LOCK
        activity.
-     o If the LOCK is owned by a GT.CM server on behalf of a client GT.M
+     o If the LOCK is owned by a GT.CM server on behalf of a client YottaDB
        process, then LKE SHOW displays the client NODENAME (limited to the
        first 15 characters) and clientPID. The client PID (CLNTPID) is a
        decimal value in UNIX.
 
    **Note**
 
-       GT.CM is an RPC-like way of remotely accessing a GT.M database.
+       GT.CM is an RPC-like way of remotely accessing a YottaDB database.
 
    -ALL
 
@@ -409,7 +409,7 @@
      o SHOW -ALL -WAIT displays both -ALL and -WAIT information.
      o When a process abandons a "wait" request, that request may continue to
        appear in LKE SHOW -WAIT displays. This appearance is harmless, and is
-       automatically eliminated if the GT.M lock management requires the
+       automatically eliminated if the YottaDB lock management requires the
        space which it occupies.
 
    Use the following procedure to display all LOCKs active in the database(s)
@@ -436,7 +436,7 @@
    DEFAULT
    ^A Owned by PID= 5052 which is an existing process
    ^B Owned by PID= 5052 which is an existing process
-   %GTM-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
+   %YDB-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
 
    Example:
 
@@ -474,7 +474,7 @@
 
    DEFAULT
    ^A Owned by PID= 5052 which is an existing process
-   %GTM-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
+   %YDB-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
 
 2 Exit
    Exit
@@ -560,25 +560,29 @@
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
 
+   Copyright 2017-2018 YottaDB LLC and/or its subsidiaries. All Rights Reserved.
+
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
    GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+
+   YottaDB(TM) is a trademark of YottaDB LLC.
+
    Other trademarks are the property of their respective owners.
 
-   This document contains a description of GT.M and the operating
+   This document contains a description of YottaDB and the operating
    instructions pertaining to the various functions that comprise the system.
-   This document does not contain any commitment of FIS. FIS believes the
-   information in this publication is accurate as of its publication date;
-   such information is subject to change without notice. FIS is not
-   responsible for any errors or defects.
+   This document does not contain any commitment of YottaDB. YottaDB believes
+   the information in this publication is accurate as of its publication
+   date; such information is subject to change without notice.  YottaDB is
+   not responsible for any errors or defects.
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-003 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
+   This help file is a concise representation of the revision r1.20 of the
+   Administration and Operations Guide. To obtain a copy of the current
+   revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
 

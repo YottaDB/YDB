@@ -3,6 +3,9 @@
  * Copyright (c) 2002-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,13 +25,13 @@
 #include "gtm_string.h"
 #include "arlinkdbg.h"
 
-error_def(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY);)
+error_def(ERR_MEMORY);
 
 CONDITION_HANDLER(cre_priv_ch)
 {
 
 	START_CH(TRUE);
-	if (SIGNAL == UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY))
+	if (SIGNAL == ERR_MEMORY)
 	{
 		UNWIND(NULL, NULL); /* ignore "lack-of-memory" error, rather not set breakpoint than error out in such a case */
 	}
@@ -44,7 +47,7 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 	assert(NULL != rtn->shared_ptext_adr); 			/* Don't need private copy if not shared */
 	assert(rtn->shared_ptext_adr == rtn->ptext_adr); 	/* If already private, we shouldn't be calling this routine */
 	code_size = (int)(rtn->ptext_end_adr - rtn->ptext_adr) ;
-	ESTABLISH_RET(cre_priv_ch, UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
+	ESTABLISH_RET(cre_priv_ch, ERR_MEMORY);
 	new_ptext = GTM_TEXT_ALLOC(code_size);
 	REVERT;
 	DBGARLNK((stderr, "cre_private_code_copy: Creating private code copy for rtnhdr 0x"lvaddr" at 0x"lvaddr"\n",

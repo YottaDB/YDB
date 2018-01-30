@@ -129,7 +129,7 @@ MBSTART {								\
 MBSTART {										\
 	mstr		*gldname;							\
 	mstr 		gld_str_tmp;							\
-	char		err_buffer[GTM_PATH_MAX + SIZEOF(ERROR_LIT) + 3];		\
+	char		err_buffer[YDB_PATH_MAX + SIZEOF(ERROR_LIT) + 3];		\
 	/* save errno in case SNPRINTF modifies errno and SAVE_ERRNO passed		\
 	 * in is "errno" in caller.							\
 	 */										\

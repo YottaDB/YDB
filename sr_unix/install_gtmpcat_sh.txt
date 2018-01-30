@@ -4,6 +4,9 @@
 # Copyright (c) 2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -32,38 +35,38 @@ if [ ! -f "${package_dir}/gtmpcat.m" ]; then
 	exit 1
 fi
 
-# Check valid $gtm_dist
+# Check valid $ydb_dist
 
-if [ ! -d "$gtm_dist" ]; then
-	echo "gtm_dist ($gtm_dist) is not a valid directory"
+if [ ! -d "$ydb_dist" ]; then
+	echo "ydb_dist ($ydb_dist) is not a valid directory"
 	exit 1
 fi
-if [ ! -x "$gtm_dist/mumps" ]; then
-	echo "gtm_dist ($gtm_dist) is not a GT.M installation"
+if [ ! -x "$ydb_dist/mumps" ]; then
+	echo "ydb_dist ($ydb_dist) is not a GT.M installation"
 	exit 1
 fi
 
-gtmroutines=". $gtm_dist"
+gtmroutines=". $ydb_dist"
 export gtmroutines
 
 # Note owner and group of mumps executable for later use as the owner and group of the installed files
 
-eval $(/bin/ls -l $gtm_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
+eval $(/bin/ls -l $ydb_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
 
 # Check matching version
 
 req_zver="#ZVERSION#"
-cur_zver="$($gtm_dist/mumps -r %XCMD 'write $zversion')"
+cur_zver="$($ydb_dist/mumps -r %XCMD 'write $zversion')"
 
 if [ "$req_zver" != "$cur_zver" -a "$req_zver" != "ANY" ]; then
-	echo "Version to install ($req_zver) does not match \$gtm_dist/mumps version ($cur_zver)"
+	echo "Version to install ($req_zver) does not match \$ydb_dist/mumps version ($cur_zver)"
 	exit 1
 fi
 
 # Confirm installation
 
 echo ""
-echo "Installing gtmpcat files to $gtm_dist/tools/gtmpcat"
+echo "Installing gtmpcat files to $ydb_dist/tools/gtmpcat"
 echo ""
 printf "Proceed? > "
 read resp
@@ -74,15 +77,15 @@ fi
 
 # Do the copy
 
-if [ ! -d "$gtm_dist/tools" ]; then
-	mkdir $gtm_dist/tools
-	chown ${owner}:${group} $gtm_dist/tools
+if [ ! -d "$ydb_dist/tools" ]; then
+	mkdir $ydb_dist/tools
+	chown ${owner}:${group} $ydb_dist/tools
 fi
-mkdir -p $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.sh $gtm_dist/gtmpcat
-(cd $gtm_dist/tools/gtmpcat && gtmroutines="." $gtm_dist/mumps *.m)
-chown -R ${owner}:${group} $gtm_dist/gtmpcat $gtm_dist/tools/gtmpcat
-ls -ald $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*
+mkdir -p $ydb_dist/tools/gtmpcat
+cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $ydb_dist/tools/gtmpcat
+cp ${package_dir}/gtmpcat.sh $ydb_dist/gtmpcat
+(cd $ydb_dist/tools/gtmpcat && gtmroutines="." $ydb_dist/mumps *.m)
+chown -R ${owner}:${group} $ydb_dist/gtmpcat $ydb_dist/tools/gtmpcat
+ls -ald $ydb_dist/gtmpcat $ydb_dist/tools $ydb_dist/tools/gtmpcat $ydb_dist/tools/gtmpcat/*
 echo ""
 echo "Done. Please check the permissions on the listed files and directories and change them as appropriate."

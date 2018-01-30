@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@
 #include "gtm_threadgbl_init.h"
 #include "gtmimagename.h"
 #include "common_startup_init.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "send_msg.h"
 #include "wbox_test_init.h"
 #include "cli.h"
@@ -82,7 +82,7 @@ int gtcm_server_main(int argc, char_ptr_t argv[], char **envp)
 #	endif
 	/*  Initialize everything but the network */
 	err_init(gtcm_exit_ch);
-	gtm_chk_dist(argv[0]);
+	ydb_chk_dist(argv[0]);
 	omi_errno = OMI_ER_NO_ERROR;
 	ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */
 	gtcm_init(argc, argv);

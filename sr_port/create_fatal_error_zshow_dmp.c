@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,7 +33,7 @@ GBLREF	int		process_exiting;
 /* Create GTM_FATAL_ERROR* ZSHOW dump file for given fatal condition */
 void create_fatal_error_zshow_dmp(int4 signal)
 {
-	unsigned char	dump_fn[GTM_PATH_MAX], *dump_fn_ptr;
+	unsigned char	dump_fn[YDB_PATH_MAX], *dump_fn_ptr;
 	mval		dump_fn_mval, dummy_mval;
 	int4		save_SIGNAL;	/* On UNIX this is exi_condition */
 	DCL_THREADGBL_ACCESS;
@@ -57,7 +60,7 @@ void create_fatal_error_zshow_dmp(int4 signal)
 		dump_fn_mval.mvtype = MV_STR;
 		dump_fn_mval.str.addr = (char *)dump_fn;
 		dump_fn_mval.str.len = INTCAST(dump_fn_ptr - dump_fn);
-		assert(GTM_PATH_MAX >= dump_fn_mval.str.len);
+		assert(YDB_PATH_MAX >= dump_fn_mval.str.len);
 		/* Create dump file */
 		save_SIGNAL = SIGNAL; 		/* Signal might be modified by jobexam_process() */
 		jobexam_process(&dump_fn_mval, &dummy_mval);

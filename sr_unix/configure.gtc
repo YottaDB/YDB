@@ -94,7 +94,7 @@ hlpfiles="*help.dat *help.gld *.h"
 # Other files (left here for future use)
 ofiles="$hlpfiles"
 
-# Files that need to have $gtm_dist, $echo, etc. set in them.
+# Files that need to have $ydb_dist, $echo, etc. set in them.
 pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc gtm.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
 
 if [ $deliver_gtcm = "yes" ]; then
@@ -232,41 +232,41 @@ fi
 rm tmp_owngrp
 
 $echo "In what directory should YottaDB be installed? \c"
-read gtmdist
-if [ ! -t 0 ] ; then echo "$gtmdist"; fi
+read ydbdist
+if [ ! -t 0 ] ; then echo "$ydbdist"; fi
 
-# if gtmdist is relative then need to make it absolute
+# if ydbdist is relative then need to make it absolute
 
-if [ `$echo $gtmdist | grep -c '^/'` -eq 0 ] ; then
-    gtmdist=`pwd`/$gtmdist
+if [ `$echo $ydbdist | grep -c '^/'` -eq 0 ] ; then
+    ydbdist=`pwd`/$ydbdist
 fi
 
 # ensure that canonical paths do not exceed PATH_MAX
-getconf PATH_MAX $gtmdist | \
+getconf PATH_MAX $ydbdist | \
 	awk '{max=$0-max;if(max<0)max+=1024;if(length(dist)>max){print dist" exceeds the maximum path length: "max;exit 1}}' \
-		dist=$gtmdist max=50 || exit
+		dist=$ydbdist max=50 || exit
 $echo ""
 
-if [ -d $gtmdist ]; then
-	$echo "Directory $gtmdist exists. If you proceed with this installation then"
+if [ -d $ydbdist ]; then
+	$echo "Directory $ydbdist exists. If you proceed with this installation then"
 	$echo "some files will be over-written. Is it ok to proceed? (y or n) \c"
 else
-	$echo "Directory $gtmdist does not exist. Do you wish to create it as part of"
+	$echo "Directory $ydbdist does not exist. Do you wish to create it as part of"
 	$echo "this installation? (y or n) \c"
 fi
 read resp
 if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
-	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-	chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	mkdir -p        $ydbdist/plugin/r $ydbdist/plugin/o
+	chmod 0755      $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
+	chown $owner    $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
+	chgrp $bingroup $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
 else
 	exit
 fi
 
-if [ ! -w $gtmdist ]; then
-	$echo "Directory $gtmdist is not writeable, so exiting"
+if [ ! -w $ydbdist ]; then
+	$echo "Directory $ydbdist is not writeable, so exiting"
 	exit
 fi
 
@@ -276,7 +276,7 @@ $echo ""
 $echo "Installing YottaDB...."
 $echo ""
 
-# Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
+# Create $ydbdist/utf8 if this platform can support "UTF-8" mode.
 
 # keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
 if [ -d "utf8" ]; then
@@ -418,7 +418,7 @@ else
 fi
 
 # Solaris 10 bourne shell does not support ${var#word} syntax
-install_dest=$gtmdist
+install_dest=$ydbdist
 if [ X"$gtm_destdir" != X"" ] ; then
 	install_dest=`echo $install_dest | sed "s;${gtm_destdir};;"`
 fi
@@ -443,24 +443,24 @@ do
 done
 rm sedin$$
 if [ "$doutf8" -ne 0 ]; then
-	if [ ! -d $gtmdist/utf8 ]; then
-		mkdir -p $gtmdist/utf8 $gtmdist/plugin/o/utf8
+	if [ ! -d $ydbdist/utf8 ]; then
+		mkdir -p $ydbdist/utf8 $ydbdist/plugin/o/utf8
 	fi
 fi
 
 # Install libgtmshr.so as a soft link to libyottadb.so for backward compatibility purposes just in case
-ln -s ./libyottadb$ext $gtmdist/libgtmshr$ext || echo ln -s ./libyottadb$ext $gtmdist/libgtmshr$ext
+ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext
 if [ "$doutf8" -ne 0 ]; then
-	ln -s ./libyottadb$ext $gtmdist/utf8/libgtmshr$ext || echo ln -s ./libyottadb$ext $gtmdist/utf8/libgtmshr$ext
+	ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext
 fi
 
 # Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable
 for file in COPYING README.md README.txt
 do
 	if [ -f $file ]; then
-		cp -p $file $gtmdist
+		cp -p $file $ydbdist
 		if [ "$doutf8" -ne 0 ]; then
-			ln -s ../$file $gtmdist/utf8/$file
+			ln -s ../$file $ydbdist/utf8/$file
 		fi
 	fi
 done
@@ -468,76 +468,76 @@ done
 # Install custom_errors_sample.txt if it is applicable
 file=custom_errors_sample.txt
 if [ -f $file ]; then
-	cp -p $file $gtmdist
+	cp -p $file $ydbdist
 	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
+		ln -s ../$file $ydbdist/utf8/$file
 	fi
 fi
 # Install the .cshrc and .profile files
 for i in gdedefaults gtmgblstat.xc
 do
 	if [ -e $i ]; then
-		cp -p $i $gtmdist
-		chmod 0444 $gtmdist/$i
-		chown $owner $gtmdist/$i
+		cp -p $i $ydbdist
+		chmod 0444 $ydbdist/$i
+		chown $owner $ydbdist/$i
 	fi
 done
 
 for i in gtmprofile gtmprofile_preV54000 gtm gtmcshrc
 do
 	if [ -e $i ]; then
-		cp -p $i $gtmdist
-		chmod 0755 $gtmdist/$i
-		chown $owner $gtmdist/$i
+		cp -p $i $ydbdist
+		chmod 0755 $ydbdist/$i
+		chown $owner $ydbdist/$i
 	fi
 done
 
 # Install the normal scripts
 for i in $nscripts
 do
-	cp -p $i $gtmdist
-	chmod 0755 $gtmdist/$i
-	chown $owner $gtmdist/$i
+	cp -p $i $ydbdist
+	chmod 0755 $ydbdist/$i
+	chown $owner $ydbdist/$i
 done
 
 # Install the root scripts
 for i in $rscripts
 do
-	cp -p $i $gtmdist
-	chmod 0744 $gtmdist/$i
-	chown $rootuser $gtmdist/$i
+	cp -p $i $ydbdist
+	chmod 0744 $ydbdist/$i
+	chown $rootuser $ydbdist/$i
 done
 
 # Install the normal binaries
 for i in $binaries
 do
 	if [ $arch = "linux" ]; then
-		install -g $bingroup -o $owner -m 644 $i $gtmdist
+		install -g $bingroup -o $owner -m 644 $i $ydbdist
 	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $gtmdist -M 644 -O $owner -G $bingroup $i
+		/usr/bin/install -f $ydbdist -M 644 -O $owner -G $bingroup $i
 	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $gtmdist -m 644 -u $owner -g $bingroup $i $gtmdist
+		/usr/sbin/install -f $ydbdist -m 644 -u $owner -g $bingroup $i $ydbdist
 	else
-		install -f $gtmdist -m 644 -u $owner -g $bingroup $i $gtmdist
+		install -f $ydbdist -m 644 -u $owner -g $bingroup $i $ydbdist
 	fi
-#		strip $gtmdist/$i >/dev/null 2>&1
+#		strip $ydbdist/$i >/dev/null 2>&1
 done
 
 # Install other individual files
 for i in  $ofiles
 do
-	cp -p $i $gtmdist
-	chown $owner $gtmdist/$i
+	cp -p $i $ydbdist
+	chown $owner $ydbdist/$i
 done
 
 # For linux systems, attempt to execute the chcon command to allow use of the libyottadb shared library. This
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
-	(chcon -t texrel_shlib_t $gtmdist/libyottadb$ext; exit 0)
+	(chcon -t texrel_shlib_t $ydbdist/libyottadb$ext; exit 0)
 fi
 
-# Create $gtmdist/plugin/gtmcrypt directory if this platform supports encryption
+# Create $ydbdist/plugin/gtmcrypt directory if this platform supports encryption
 
 # Define variables to denote plugin and gtmcrypt directory names
 plugin="plugin"
@@ -560,13 +560,13 @@ dogtmcrypt=0
 if [ -d "$plugin_gtmcrypt" ]; then
 	dogtmcrypt=1
 	# Create plugin directory and gtmcrypt directory
-	mkdir -p $gtmdist/plugin/gtmcrypt
-	chmod 0755 $gtmdist/plugin
-	chown $owner $gtmdist/plugin
-	chgrp $bingroup $gtmdist/plugin
-	chmod 0755 $gtmdist/plugin/gtmcrypt
-	chown $owner $gtmdist/plugin/gtmcrypt/
-	chgrp $bingroup $gtmdist/plugin/gtmcrypt
+	mkdir -p $ydbdist/plugin/gtmcrypt
+	chmod 0755 $ydbdist/plugin
+	chown $owner $ydbdist/plugin
+	chgrp $bingroup $ydbdist/plugin
+	chmod 0755 $ydbdist/plugin/gtmcrypt
+	chown $owner $ydbdist/plugin/gtmcrypt/
+	chgrp $bingroup $ydbdist/plugin/gtmcrypt
 
 	# Tar the source files
 	cat > $plugin_gtmcrypt/README << EOF
@@ -591,28 +591,28 @@ if [ -d "$plugin_gtmcrypt" ]; then
 #
 #  You should be able to cut and paste the following commands
 #
-gtm_dist="$gtmdist"
-export gtm_dist
+ydb_dist="$ydbdist"
+export ydb_dist
 make && make install && make clean
-find \$gtm_dist/plugin -type f -exec chown ${owner}:${bingroup} {} +
+find \$ydb_dist/plugin -type f -exec chown ${owner}:${bingroup} {} +
 EOF
 	if [ "$group" != "" ] ; then
-		echo "chmod -R o-rwx \$gtm_dist/plugin" >> $plugin_gtmcrypt/README
+		echo "chmod -R o-rwx \$ydb_dist/plugin" >> $plugin_gtmcrypt/README
 	fi
 	(cd $plugin_gtmcrypt			&& \
 	 chmod 0644 $gtmcryptsrcfiles		&& \
 	 chmod 0755 $gtmcryptscripts 		&& \
 	 chown ${owner}:${bingroup} *		&& \
-	 tar -cvf $gtmdist/$plugin_gtmcrypt/source.tar $gtmcryptsrcfiles $gtmcryptscripts >/dev/null 2>&1)
-	chmod 0644 $gtmdist/$plugin_gtmcrypt/source.tar
-	chown ${owner}:${bingroup} $gtmdist/$plugin_gtmcrypt/source.tar
+	 tar -cvf $ydbdist/$plugin_gtmcrypt/source.tar $gtmcryptsrcfiles $gtmcryptscripts >/dev/null 2>&1)
+	chmod 0644 $ydbdist/$plugin_gtmcrypt/source.tar
+	chown ${owner}:${bingroup} $ydbdist/$plugin_gtmcrypt/source.tar
 	rm $plugin_gtmcrypt/README
 fi
 
 # Install GDE, GTMHELP, and all the percent routines
-cp -p *.o *.m $gtmdist
+cp -p *.o *.m $ydbdist
 
-# Install a mirror image (using soft links) of $gtmdist under $gtmdist/utf8 if this platform can support "UTF-8" mode.
+# Install a mirror image (using soft links) of $ydbdist under $ydbdist/utf8 if this platform can support "UTF-8" mode.
 if [ "$doutf8" -ne 0 ]; then
 	cd utf8
 	for file in *
@@ -628,19 +628,19 @@ if [ "$doutf8" -ne 0 ]; then
 		# Install .o files
 		base="`basename $file .o`"
 		if [ "$base" != "$file" ]; then
-			cp -p "$file" $gtmdist/utf8
+			cp -p "$file" $ydbdist/utf8
 		else
 			# Soft link everything else
-			if [ -f $gtmdist/utf8/"$file" ]; then
-				rm -f $gtmdist/utf8/"$file"
+			if [ -f $ydbdist/utf8/"$file" ]; then
+				rm -f $ydbdist/utf8/"$file"
 			fi
-			if [ -f $gtmdist/"$file" ]; then
-				ln -s ../"$file" $gtmdist/utf8/"$file"
+			if [ -f $ydbdist/"$file" ]; then
+				ln -s ../"$file" $ydbdist/utf8/"$file"
 			fi
 		fi
 	done
 	if [ "$dogtmcrypt" -ne 0 ]; then
-		ln -s ../plugin $gtmdist/utf8/plugin
+		ln -s ../plugin $ydbdist/utf8/plugin
 	fi
 	cd ..
 fi
@@ -657,19 +657,19 @@ if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
-	(cd $gtmdist; ./lowerc_cp *.m)
+	(cd $ydbdist; ./lowerc_cp *.m)
 	if [ "$doutf8" -ne 0 ]; then
-		(cd $gtmdist/utf8; ./lowerc_cp *.m)
+		(cd $ydbdist/utf8; ./lowerc_cp *.m)
 	fi
 fi
 
 # Change mode to executable for mumps and libyottadb to do the compiles
-chmod 755 $gtmdist/mumps $gtmdist/libyottadb$ext
+chmod 755 $ydbdist/mumps $ydbdist/libyottadb$ext
 
-gtmroutines=$gtmdist
-gtmgbldir=$gtmdist/mumps.gld
-gtm_dist=$gtmdist
-export gtm_dist
+gtmroutines=$ydbdist
+gtmgbldir=$ydbdist/mumps.gld
+ydb_dist=$ydbdist
+export ydb_dist
 export gtmroutines
 export gtmgbldir
 
@@ -680,7 +680,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 gtm_chset="M"
 export gtm_chset
-(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
+(cd $ydbdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -703,48 +703,48 @@ if [ "$doutf8" -ne 0 ]; then
 			LD_LIBRARY_PATH=$save_icu_libpath
 			export LD_LIBRARY_PATH
 		fi
-		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
+		(ydb_dist=$ydbdist/utf8; export ydb_dist; cd $ydb_dist; ./mumps -noignore *.m; $echo $?>>$ydbdist/compstat; \
 		$ldcmd $ldflags -o libyottadbutil$ext *.o)
 	)
 fi
 
 # Install libgtmutil.so as a soft link to libyottadbutil.so for backward compatibility purposes just in case
-ln -s ./libyottadbutil$ext $gtmdist/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $gtmdist/libgtmutil$ext
+ln -s ./libyottadbutil$ext $ydbdist/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $ydbdist/libgtmutil$ext
 if [ "$doutf8" -ne 0 ]; then
-	ln -s ./libyottadbutil$ext $gtmdist/utf8/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $gtmdist/utf8/libgtmutil$ext
+	ln -s ./libyottadbutil$ext $ydbdist/utf8/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $ydbdist/utf8/libgtmutil$ext
 fi
 
 # Change mode to executable for the normal binaries
 for i in $binaries
 do
-	chmod 755 $gtmdist/$i
+	chmod 755 $ydbdist/$i
 done
 
-chmod 0644 $gtmdist/*.m
-chmod 0644 $gtmdist/*.o
-chown $owner $gtmdist/*.m
-chown $owner $gtmdist/*.o
-chown $owner $gtmdist/*.txt
-chgrp $bingroup $gtmdist/*.m
-chgrp $bingroup $gtmdist/*.o
-chgrp $bingroup $gtmdist/*.txt
+chmod 0644 $ydbdist/*.m
+chmod 0644 $ydbdist/*.o
+chown $owner $ydbdist/*.m
+chown $owner $ydbdist/*.o
+chown $owner $ydbdist/*.txt
+chgrp $bingroup $ydbdist/*.m
+chgrp $bingroup $ydbdist/*.o
+chgrp $bingroup $ydbdist/*.txt
 
 if [ "$doutf8" -ne 0 ]; then
-	chmod 0644 $gtmdist/utf8/*.m
-	chmod 0644 $gtmdist/utf8/*.o
-	chown $owner $gtmdist/utf8
-	chown $owner $gtmdist/utf8/*.m
-	chown $owner $gtmdist/utf8/*.o
-	chown $owner $gtmdist/utf8/*.txt
-	chgrp $bingroup $gtmdist/utf8/*.m
-	chgrp $bingroup $gtmdist/utf8/*.o
-	chgrp $bingroup $gtmdist/utf8/*.txt
+	chmod 0644 $ydbdist/utf8/*.m
+	chmod 0644 $ydbdist/utf8/*.o
+	chown $owner $ydbdist/utf8
+	chown $owner $ydbdist/utf8/*.m
+	chown $owner $ydbdist/utf8/*.o
+	chown $owner $ydbdist/utf8/*.txt
+	chgrp $bingroup $ydbdist/utf8/*.m
+	chgrp $bingroup $ydbdist/utf8/*.o
+	chgrp $bingroup $ydbdist/utf8/*.txt
 fi
 
-if [ -f $gtm_dist/libyottadbutil$ext ] ; then
-    gtmroutines="$gtm_dist/libyottadbutil$ext $gtmdist"
+if [ -f $ydb_dist/libyottadbutil$ext ] ; then
+    gtmroutines="$ydb_dist/libyottadbutil$ext $ydbdist"
 else
-    gtmroutines="$gtmdist"
+    gtmroutines="$ydbdist"
 fi
 export gtmroutines
 
@@ -752,13 +752,13 @@ other_object_files=""
 csh_script_files=""
 
 # make database files read only
-chmod 0444 $gtmdist/*.dat
-chmod 0444 $gtmdist/*.gld
+chmod 0444 $ydbdist/*.dat
+chmod 0444 $ydbdist/*.gld
 
 # $other_object_files, $csh_script_files should be removed unconditionally
 savedir=`pwd`
-# temporarily change to $gtmdist
-cd $gtmdist
+# temporarily change to $ydbdist
+cd $ydbdist
 \rm -rf $other_object_files $csh_script_files lowerc_cp
 
 if [ -d utf8 ]; then
@@ -769,109 +769,109 @@ fi
 cd $savedir
 
 # Optionally remove .o files if they are in a shared library
-if [ -f $gtm_dist/libyottadbutil$ext ] ; then
-	chown ${owner}:${bingroup} $gtm_dist/libyottadbutil$ext
+if [ -f $ydb_dist/libyottadbutil$ext ] ; then
+	chown ${owner}:${bingroup} $ydb_dist/libyottadbutil$ext
 	$echo ""
-	$echo "Object files of M routines placed in shared library $gtm_dist/libyottadbutil$ext"
+	$echo "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext"
 	$echo "Keep original .o object files (y or n)? \c"
 	read resp
 	if [ ! -t 0 ] ; then echo "$resp"; fi
-	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $gtm_dist/*.o $gtm_dist/utf8/*.o ; fi
+	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $ydb_dist/*.o $ydb_dist/utf8/*.o ; fi
 	$echo ""
-	if [ -f $gtm_dist/utf8/libyottadbutil$ext ] ; then
-		chown ${owner}:${bingroup} $gtm_dist/utf8/libyottadbutil$ext
+	if [ -f $ydb_dist/utf8/libyottadbutil$ext ] ; then
+		chown ${owner}:${bingroup} $ydb_dist/utf8/libyottadbutil$ext
 	fi
 fi
 
 # change group ownership of all files if group restricted
 # otherwise change to the default as some files were created with root group
 if [ "$group" != "" ] ; then
-	chgrp -R $group $gtmdist
-	chmod -R o-rwx $gtmdist
+	chgrp -R $group $ydbdist
+	chmod -R o-rwx $ydbdist
 else
-	chgrp -R $bingroup $gtmdist
+	chgrp -R $bingroup $ydbdist
 fi
 
-# Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
-tgtmsecshrdir=$gtmdist/gtmsecshrdir
+# Install real gtmsecshr with special permissions in $ydbdist/gtmsecshrdir
+tgtmsecshrdir=$ydbdist/gtmsecshrdir
 mkdir $tgtmsecshrdir
 chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
 if [ $arch = "linux" ]; then
-	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
+	install -m 4555 -o root -g $bingroup gtmsecshr $ydbdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then
-	/usr/bin/install -f $gtmdist -M 4555 -O root -G $bingroup gtmsecshr
+	/usr/bin/install -f $ydbdist -M 4555 -O root -G $bingroup gtmsecshr
 	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $bingroup gtmsecshrdir/gtmsecshr
 elif [ -x /usr/sbin/install ]; then
-	/usr/sbin/install -f $gtmdist -m 4555 -u root -g $bingroup gtmsecshr $gtmdist
+	/usr/sbin/install -f $ydbdist -m 4555 -u root -g $bingroup gtmsecshr $ydbdist
 	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 else
-	install -f $gtmdist -m 4555 -u root -g $bingroup gtmsecshr $gtmdist
+	install -f $ydbdist -m 4555 -u root -g $bingroup gtmsecshr $ydbdist
 	install -f $tgtmsecshrdir -m 4500 -u root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 fi
 
-strip $gtmdist/gtmsecshr > /dev/null 2>&1
+strip $ydbdist/gtmsecshr > /dev/null 2>&1
 strip $tgtmsecshrdir/gtmsecshr > /dev/null 2>&1
 
-if [ -d $gtmdist/utf8 ]; then
+if [ -d $ydbdist/utf8 ]; then
 
 	# Delete the gtmsecshr symlink
-	if [ -f $gtmdist/utf8/gtmsecshr -o -h $gtmdist/utf8/gtmsecshr ]; then
-		rm -f $gtmdist/utf8/gtmsecshr
+	if [ -f $ydbdist/utf8/gtmsecshr -o -h $ydbdist/utf8/gtmsecshr ]; then
+		rm -f $ydbdist/utf8/gtmsecshr
 	fi
-	ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
+	ln $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr || \
+		echo ln $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr
 
 	# Delete the gtmsecshrdir symlink
-	if [ -f $gtmdist/utf8/gtmsecshrdir -o -h $gtmdist/utf8/gtmsecshrdir ]; then
-		rm -f $gtmdist/utf8/gtmsecshrdir
+	if [ -f $ydbdist/utf8/gtmsecshrdir -o -h $ydbdist/utf8/gtmsecshrdir ]; then
+		rm -f $ydbdist/utf8/gtmsecshrdir
 	fi
-	mkdir -p $gtmdist/utf8/gtmsecshrdir
-	chmod 0500 $gtmdist/utf8/gtmsecshrdir
-	ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
+	mkdir -p $ydbdist/utf8/gtmsecshrdir
+	chmod 0500 $ydbdist/utf8/gtmsecshrdir
+	ln $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr || \
+		echo ln $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr
 
 fi
 
 # change group ownership of wrapper if group restricted
 # also remove user privileges for wrapper if group changed
 if [ "$group" != "" ] ; then
-	chgrp $group $gtmdist/gtmsecshr
+	chgrp $group $ydbdist/gtmsecshr
 	$echo ""
 	$echo "Removing world permissions from gtmsecshr wrapper since group restricted to \"$group\""
-	chmod 4550 $gtmdist/gtmsecshr
+	chmod 4550 $ydbdist/gtmsecshr
 fi
 
 # leave nothing writeable
-chmod a-w $gtmdist
-chmod a-w $gtmdist/*
+chmod a-w $ydbdist
+chmod a-w $ydbdist/*
 
-if [ -d $gtmdist/utf8 ]; then
-	chmod a-w $gtmdist/utf8/*
+if [ -d $ydbdist/utf8 ]; then
+	chmod a-w $ydbdist/utf8/*
 fi
 
-if [ -d $gtmdist/plugin ]; then
-	chmod a-w $gtmdist/plugin/*
+if [ -d $ydbdist/plugin ]; then
+	chmod a-w $ydbdist/plugin/*
 fi
 
-if [ -d $gtmdist/plugin/gtmcrypt ]; then
-	chmod a-w $gtmdist/plugin/gtmcrypt/*
+if [ -d $ydbdist/plugin/gtmcrypt ]; then
+	chmod a-w $ydbdist/plugin/gtmcrypt/*
 fi
 
 # if we had a mumps error then remove executable bit recursively and exit
 # this could include compile and/or library load errors
-if [ 0 != `grep -c '[1-9]' $gtm_dist/compstat` ]; then
+if [ 0 != `grep -c '[1-9]' $ydb_dist/compstat` ]; then
 	$echo ""
 	$echo "YottaDB installation FAILED -- please review error messages"
 	$echo ""
-	chmod -R a-x $gtmdist
+	chmod -R a-x $ydbdist
 	exit 1
 fi
 
-rm -f $gtmdist/compstat
+rm -f $ydbdist/compstat
 
 $echo ""
 $echo "Installation completed. Would you like all the temporary files"

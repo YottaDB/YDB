@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +23,6 @@ GBLREF	int		process_exiting;
 #endif
 
 error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
 error_def(ERR_MEMORYRECURSIVE);
 
 CONDITION_HANDLER(stp_gcol_ch)
@@ -28,7 +30,7 @@ CONDITION_HANDLER(stp_gcol_ch)
 	/* If we cannot alloc memory while doing a forced expansion, disable all cases of forced expansion henceforth */
 	START_CH(TRUE);
 
-	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && retry_if_expansion_fails)
+	if ((ERR_MEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && retry_if_expansion_fails)
 	{
 		UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing error later */
 		expansion_failed = TRUE;

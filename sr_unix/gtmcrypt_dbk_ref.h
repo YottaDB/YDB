@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -87,7 +90,7 @@ typedef struct gtm_keystore_struct
 {
 	unsigned char					key[SYMMETRIC_KEY_MAX];		/* Raw symmetric key contents. */
 	unsigned char					key_hash[GTMCRYPT_HASH_LEN];	/* SHA-512 hash of symmetric key. */
-	char						key_path[GTM_PATH_MAX];		/* Path to the key file. */
+	char						key_path[YDB_PATH_MAX];		/* Path to the key file. */
 	struct gtm_cipher_ctx_struct			*cipher_head;			/* Linked list of cipher handles for
 											 * either encryption or decryption. A list
 											 * is needed because multiple devices or
@@ -113,7 +116,7 @@ typedef struct gtm_cipher_ctx_struct
 typedef struct gtm_keystore_keyname_link_struct
 {
 	gtm_keystore_t					*link;				/* Link to respective key object. */
-	char						key_name[GTM_PATH_MAX];		/* Logical entity that the symmetric key
+	char						key_name[YDB_PATH_MAX];		/* Logical entity that the symmetric key
 											 * maps to. For databases it is the name of
 											 * the database file. For devices it is a
 											 * user-chosen string. */
@@ -140,11 +143,11 @@ typedef struct gtm_keystore_hash_link_struct
 /* Structure to temporarily store key information if the real path of the respective database file name could not be obtained. */
 typedef struct gtm_keystore_unres_key_link_struct
 {
-	char						key_name[GTM_PATH_MAX];		/* Logical entity that the symmetric key
+	char						key_name[YDB_PATH_MAX];		/* Logical entity that the symmetric key
 											 * maps to. For databases it is the name of
 											 * the database file. For devices it is a
 											 * user-chosen string. */
-	char						key_path[GTM_PATH_MAX];		/* Path to the key file. */
+	char						key_path[YDB_PATH_MAX];		/* Path to the key file. */
 	int						index;				/* Index in the configuration file */
 	int						status;				/* Indication of whether it is for a device,
 											 * unresolved, or resolved database. */

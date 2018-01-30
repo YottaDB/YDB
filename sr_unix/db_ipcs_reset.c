@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -173,7 +176,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			db_ipcs.gt_sem_ctime = 0;
 			db_ipcs.gt_shm_ctime = 0;
 			if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
-					   GTM_PATH_MAX, &ustatus))
+					   YDB_PATH_MAX, &ustatus))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
 				return FALSE;

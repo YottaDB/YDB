@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +20,8 @@
 
 static mval com 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , 1 , (char *) "," , 0 , 0 );
 static mval rpar 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , 1 , (char *) ")" , 0 , 0 );
-static mval dlib 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF("$gtm_dist/gtmhelp.gld") - 1 ,
-					 (char *) "$gtm_dist/gtmhelp.gld" , 0 , 0 );
+static mval dlib 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF("$ydb_dist/gtmhelp.gld") - 1 ,
+					 (char *) "$ydb_dist/gtmhelp.gld" , 0 , 0 );
 
 GBLREF spdesc stringpool;
 

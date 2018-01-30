@@ -1,5 +1,8 @@
 /****************************************************************
  *								*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
@@ -10,11 +13,6 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-
-#include "cli.h"
-
-int main(int argc, char **argv, char **envp)
-{
-	return dlopen_libyottadb(argc, argv, envp, "ftok_main");
-}
+#define YDB_ERR_QUERY2 -151027722
+#define YDB_ERR_MIXIMAGE -151027730
+#define YDB_ERR_LIBYOTTAMISMTCH -151027738

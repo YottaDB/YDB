@@ -4,6 +4,9 @@
 # Copyright (c) 2011-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -48,16 +51,16 @@ sim
 	halt
 SIM
 
-setenv save_gtm_dist $gtm_dist
-# unset gtm_dist for gtm to generate mumps.gld and journal file
-unsetenv gtm_dist
+setenv save_ydb_dist $ydb_dist
+# unset ydb_dist for gtm to generate mumps.gld and journal file
+unsetenv ydb_dist
 # set to test directory
-setenv gtmdir $save_gtm_dist/test_gtm
+setenv gtmdir $save_ydb_dist/test_gtm
 # NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
 ../gtm -r sim >& gtm.out
 # get $ZCHSET
-echo ""							>>&! $save_gtm_dist/gtm_test_install.out
-grep ZCHSET gtm.out					>>&! $save_gtm_dist/gtm_test_install.out
+echo ""							>>&! $save_ydb_dist/gtm_test_install.out
+grep ZCHSET gtm.out					>>&! $save_ydb_dist/gtm_test_install.out
 
 #get version number
 
@@ -66,22 +69,22 @@ setenv gtmver `ls -d V*`
 # get journal output
 cd $gtmver/g
 
-setenv gtm_dist $save_gtm_dist
+setenv ydb_dist $save_ydb_dist
 
-$gtm_dist/mupip journal -extract -forward gtm.mjl 				>& mupip.out
-env gtmgbldir=$gtm_dist/test_gtm/mumps.gld $gtm_dist/mupip integ -reg "*"	>& integ.out
+$ydb_dist/mupip journal -extract -forward gtm.mjl 				>& mupip.out
+env gtmgbldir=$ydb_dist/test_gtm/mumps.gld $ydb_dist/mupip integ -reg "*"	>& integ.out
 set mupip_status = $status
 # output the change lines
-echo ""							>>&! $gtm_dist/gtm_test_install.out
-echo "Global changes in the gtm.mjl file:"		>>&! $gtm_dist/gtm_test_install.out
-grep = gtm.mjf | awk -F\\ '{print ($NF)}'		>>&! $gtm_dist/gtm_test_install.out
+echo ""							>>&! $ydb_dist/gtm_test_install.out
+echo "Global changes in the gtm.mjl file:"		>>&! $ydb_dist/gtm_test_install.out
+grep = gtm.mjf | awk -F\\ '{print ($NF)}'		>>&! $ydb_dist/gtm_test_install.out
 if (0 != $mupip_status) then
-	echo "Error: mupip integ returned $status status instead of 0" >>&! $gtm_dist/gtm_test_install.out
+	echo "Error: mupip integ returned $status status instead of 0" >>&! $ydb_dist/gtm_test_install.out
 else
-	echo "mupip integ returned a 0 status - as expected" >>&! $gtm_dist/gtm_test_install.out
+	echo "mupip integ returned a 0 status - as expected" >>&! $ydb_dist/gtm_test_install.out
 endif
 
-cd $gtm_dist
+cd $ydb_dist
 
 # keep the utf8 libicu search code below in synch with configure.gtc!
 
@@ -179,13 +182,13 @@ if ( $msg2 ) then
     ls -al * | grep -v \> | grep w-			>>&! gtm_test_install.out
 endif
 
-setenv gtm_dist .
+setenv ydb_dist .
 
 gtm << EOF						>>&! gtm_test_install.out
 write \$zchset
 EOF
 
-setenv gtm_dist utf8
+setenv ydb_dist utf8
 
 setenv LD_LIBRARY_PATH $libpath
 setenv LIBPATH $libpath
@@ -204,15 +207,15 @@ gtm << EOF						>>&! gtm_test_install.out
 write \$zchset
 EOF
 
-setenv gtm_dist $save_gtm_dist/utf8
-setenv gtmroutines ". $save_gtm_dist/utf8"
+setenv ydb_dist $save_ydb_dist/utf8
+setenv gtmroutines ". $save_ydb_dist/utf8"
 
 mkdir test_gtm_utf8
 cd test_gtm_utf8
 cp ../test_gtm/sim.m .
 
 # set to test directory
-setenv gtmdir $save_gtm_dist/test_gtm_utf8
+setenv gtmdir $save_ydb_dist/test_gtm_utf8
 # make gtm set the utf locale
 unsetenv LC_CTYPE
 if ($?gtm_icu_version) then
@@ -224,54 +227,54 @@ endif
 ../gtm -r sim >& gtm.out
 
 # get $ZCHSET
-echo ""						>>&! $save_gtm_dist/gtm_test_install.out
-grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
+echo ""						>>&! $save_ydb_dist/gtm_test_install.out
+grep ZCHSET gtm.out				>>&! $save_ydb_dist/gtm_test_install.out
 if ($?save_icu) then
 	# restore saved gtm_icu_version
 	setenv gtm_icu_version $save_icu
 endif
 # test gtmsecshr with an alternate user
-set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
-su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH
+set XCMD='do ^GTMHELP("",$ztrnlnm("ydb_dist")_"/gtmhelp.gld")'
+su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 ydb_dist=$ydb_dist gtmroutines='$gtmroutines' $ydb_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH
 # if we see the 'Topic? ' prompt, all is well
 grep -q '^Topic. $' gtmtest.out
-if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
+if ( $status ) cat gtmtest.out			>>&! $save_ydb_dist/gtm_test_install.out
 # get journal output
 cd V*/g
 
-$save_gtm_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
-env gtmgbldir=$save_gtm_dist/test_gtm/mumps.gld $save_gtm_dist/mupip integ -reg "*"	>& integ.out
+$save_ydb_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
+env gtmgbldir=$save_ydb_dist/test_gtm/mumps.gld $save_ydb_dist/mupip integ -reg "*"	>& integ.out
 set mupip_status = $status
 # output the change lines
-echo ""						>>&! $save_gtm_dist/gtm_test_install.out
-echo "Global changes in the gtm.mjl file:"	>>&! $save_gtm_dist/gtm_test_install.out
-awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_gtm_dist/gtm_test_install.out
+echo ""						>>&! $save_ydb_dist/gtm_test_install.out
+echo "Global changes in the gtm.mjl file:"	>>&! $save_ydb_dist/gtm_test_install.out
+awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_ydb_dist/gtm_test_install.out
 if (0 != $mupip_status) then
-	echo "Error: mupip integ returned $status status instead of 0" >>&! $save_gtm_dist/gtm_test_install.out
+	echo "Error: mupip integ returned $status status instead of 0" >>&! $save_ydb_dist/gtm_test_install.out
 else
-	echo "mupip integ returned a 0 status - as expected" >>&! $save_gtm_dist/gtm_test_install.out
+	echo "mupip integ returned a 0 status - as expected" >>&! $save_ydb_dist/gtm_test_install.out
 endif
-$gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
-$gtm_com/IGS $gtm_dist/gtmsecshr "STOP"
+$ydb_dist/gtmsecshr				>>&! $save_ydb_dist/gtm_test_install.out
+$gtm_com/IGS $ydb_dist/gtmsecshr "STOP"
 
-echo "Build test the encryption plugin"									>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
-mkdir -p $save_gtm_dist/plugin/buildcrypt
-cd $save_gtm_dist/plugin/buildcrypt
-tar xf $save_gtm_dist/plugin/gtmcrypt/source.tar
-env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL GTMXC_gpgagent=$save_gtm_dist/plugin/gpgagent.tab sh -v README >& $save_gtm_dist/encr_plugin_build_test.out #BYPASSOKLENGTH
+echo "Build test the encryption plugin"									>>&! $save_ydb_dist/gtm_test_install.out #BYPASSOKLENGTH
+mkdir -p $save_ydb_dist/plugin/buildcrypt
+cd $save_ydb_dist/plugin/buildcrypt
+tar xf $save_ydb_dist/plugin/gtmcrypt/source.tar
+env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL GTMXC_gpgagent=$save_ydb_dist/plugin/gpgagent.tab sh -v README >& $save_ydb_dist/encr_plugin_build_test.out #BYPASSOKLENGTH
 if ($status) echo "Encryption plugin build failure"
-grep "GTM.[WIFE]" $save_gtm_dist/encr_plugin_build_test.out
-setenv gtmroutines ". $gtm_dist/plugin/o($gtm_dist/plugin/r) $gtm_dist"
-setenv gtm_passwd "`echo gtmrocks | env gtm_dist=$gtm_dist $gtm_dist/plugin/gtmcrypt/maskpass | cut -f3 -d ' '`"
-setenv GTMXC_gpgagent $gtm_dist/plugin/gpgagent.tab
-setenv gtm_pinentry_log $gtm_dist/encr_plugin_build_test.out
-echo "Default gtmroutines"										>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
-echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $gtm_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
-echo "Null gtmroutines"											>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+grep "GTM.[WIFE]" $save_ydb_dist/encr_plugin_build_test.out
+setenv gtmroutines ". $ydb_dist/plugin/o($ydb_dist/plugin/r) $ydb_dist"
+setenv gtm_passwd "`echo gtmrocks | env ydb_dist=$ydb_dist $ydb_dist/plugin/gtmcrypt/maskpass | cut -f3 -d ' '`"
+setenv GTMXC_gpgagent $ydb_dist/plugin/gpgagent.tab
+setenv gtm_pinentry_log $ydb_dist/encr_plugin_build_test.out
+echo "Default gtmroutines"										>>&! $save_ydb_dist/gtm_test_install.out #BYPASSOKLENGTH
+echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $ydb_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_ydb_dist/gtm_test_install.out #BYPASSOKLENGTH
+echo "Null gtmroutines"											>>&! $save_ydb_dist/gtm_test_install.out #BYPASSOKLENGTH
 unsetenv gtmroutines
-echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $gtm_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
+echo GETPIN | env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL $ydb_dist/plugin/gtmcrypt/pinentry-gtm.sh	>>&! $save_ydb_dist/gtm_test_install.out #BYPASSOKLENGTH
 
-cd $save_gtm_dist
+cd $save_ydb_dist
 
 # strip off the copyright lines
 tail -n +11 $gtm_tools/gtm_test_install.txt > gtm_test_install.txt

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -188,8 +191,8 @@ void mupip_integ(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	span_node_integ		span_node_data;
-	char			ss_filename[GTM_PATH_MAX];
-	unsigned short		ss_file_len = GTM_PATH_MAX;
+	char			ss_filename[YDB_PATH_MAX];
+	unsigned short		ss_file_len = YDB_PATH_MAX;
 	unix_db_info		*udi;
 	gd_region		*baseDBreg, *reg;
 	sgmnt_addrs		*baseDBcsa;

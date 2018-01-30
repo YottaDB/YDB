@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,7 +57,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 	unsigned short	buf_len;
 	unsigned int	full_buf_len, prev_buf_len, jnl_fn_len;
 	uint4		ustatus;
-	char		buf[JNL_NAME_SIZE], full_buf[GTM_PATH_MAX], prev_buf[JNL_NAME_SIZE];
+	char		buf[JNL_NAME_SIZE], full_buf[YDB_PATH_MAX], prev_buf[JNL_NAME_SIZE];
 	char		jnl_fn[JNL_NAME_SIZE];
 	mstr		jnlfile, jnldef;
 

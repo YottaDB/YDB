@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +28,7 @@
 
 #ifdef EXTRACT_HASHT_GLOBAL
 #include "gv_trigger_common.h"	/* for IS_GVKEY_HASHT_GBLNAME macro */
-/* $gtm_dist/mupip extract -select="^#t" is implemented as an internal debugging feature and only supports
+/* $ydb_dist/mupip extract -select="^#t" is implemented as an internal debugging feature and only supports
  * dumping ^#t. Using it with other globals won't work unless the ^#t is the last selected global because the
  * macro IS_GVKEY_HASHT_GBLNAME checks (KEY_DELIMITER == ADDR[HASHT_GBLNAME_LEN]) which is true only when ^#t is
  * the last parameter */

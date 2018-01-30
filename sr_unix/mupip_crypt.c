@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,7 +29,7 @@ error_def(ERR_MUPCLIERR);
 void mupip_crypt(void)
 {
 	unsigned short		fname_len, type_len;
-	char			fname[GTM_PATH_MAX], type[32];	/* Type should not be too long */
+	char			fname[YDB_PATH_MAX], type[32];	/* Type should not be too long */
 	int4			len, off;
 
 	fname_len = SIZEOF(fname);

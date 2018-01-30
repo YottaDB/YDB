@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,10 +101,10 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	open_relinkctl_sgm 	*linkctl, new_link, *new_link_ptr;
 	int			i, len, save_errno;
 	mstr			objdir;
-	char			pathin[GTM_PATH_MAX], resolvedpath[GTM_PATH_MAX];	/* Includes null terminator char */
+	char			pathin[YDB_PATH_MAX], resolvedpath[YDB_PATH_MAX];	/* Includes null terminator char */
 	char			*pathptr;
 	boolean_t		obj_dir_found;
-	char			relinkctl_path[GTM_PATH_MAX], *ptr;
+	char			relinkctl_path[YDB_PATH_MAX], *ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -115,7 +115,7 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	 *    2. Remove trailing slash(es) from the object directory name.
 	 */
 	obj_dir_found = TRUE;				/* Assume we will find the path */
-	assert(GTM_PATH_MAX > obj_container_name->len);	/* Should have been checked by our caller */
+	assert(YDB_PATH_MAX > obj_container_name->len);	/* Should have been checked by our caller */
 	memcpy(pathin, obj_container_name->addr, obj_container_name->len);
 	pathin[obj_container_name->len] = '\0';		/* Needs null termination for realpath call */
 	pathptr = realpath(pathin, resolvedpath);
@@ -573,10 +573,10 @@ void relinkctl_incr_nattached(void)
  *
  * Parameters:
  *
- *   key            - Generated as $gtm_linktmpdir/gtm-relinkctl-<hash>. Buffer should be GTM_PATH_MAX bytes (output).
+ *   key            - Generated as $gtm_linktmpdir/gtm-relinkctl-<hash>. Buffer should be YDB_PATH_MAX bytes (output).
  *   zro_entry_name - Address of mstr containing the fully expanded zroutines entry directory name.
  */
-int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name)
+int relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name)
 {
 	gtm_uint16	hash;
 	unsigned char	hexstr[33];
@@ -588,8 +588,8 @@ int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name)
 	gtmmrhash_128(zro_entry_name->addr, zro_entry_name->len, 0, &hash);
 	gtmmrhash_128_hex(&hash, hexstr);
 	hexstr[32] = '\0';
-	/* If the cumulative path to the relinkctl file exceeds GTM_PATH_MAX, it will be inaccessible, so no point continuing. */
-	if (GTM_PATH_MAX < (TREF(gtm_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))
+	/* If the cumulative path to the relinkctl file exceeds YDB_PATH_MAX, it will be inaccessible, so no point continuing. */
+	if (YDB_PATH_MAX < (TREF(gtm_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(zro_entry_name),
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
 	key_ptr = key;
@@ -600,7 +600,7 @@ int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name)
 	STRNCPY_STR(key_ptr, hexstr, 33); /* NULL-terminate the string. */
 	key_ptr += 32;
 	keylen = (key_ptr - key);
-	assert((0 < keylen) && (GTM_PATH_MAX > keylen));
+	assert((0 < keylen) && (YDB_PATH_MAX > keylen));
 	return keylen;
 }
 

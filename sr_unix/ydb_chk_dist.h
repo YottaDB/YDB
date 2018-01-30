@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +15,10 @@
 #ifndef __GTM_STARTUP_CHK_H__
 #define __GTM_STARTUP_CHK_H__
 
-#if defined(__linux__) || defined(__CYGWIN__)
+#if defined(__linux__)
 #define PROCSELF	"/proc/self/exe"
-#elif defined(__sparc)
-#define PROCSELF	"/proc/%d/path/a.out"
-#elif defined(_AIX)
-#define PROCSELF	"/proc/%d/object/a.out"
 #endif
 
-int gtm_chk_dist(char *image);
-int gtm_image_path(char *realpath);
+int ydb_chk_dist(char *image);
+
 #endif

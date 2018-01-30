@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +124,7 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	boolean_t		was_crit;
 	struct shmid_ds		ss_shmstat;
 	struct stat		stat_buf;
-	char			shadow_file[GTM_PATH_MAX];
+	char			shadow_file[YDB_PATH_MAX];
 	ss_proc_status		cur_state;
 
 	assert(NULL != cs_addrs && (NULL != gv_cur_region));

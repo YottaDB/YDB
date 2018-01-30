@@ -20,7 +20,7 @@
 /* Warning: A consideration is that reordering these values reorders the output in v53003/D9I10002703 as well */
 /* -------------------------- Common to UNIX and VMS --------------------------  */
 
-#define	GTM_DIST_LOG			"$gtm_dist"
+#define	YDB_DIST_LOG			"$ydb_dist"
 
 /* Database */
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"

@@ -4,6 +4,9 @@
 # Copyright (c) 2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -58,16 +61,16 @@ if ($linkonly == 0) then
 		endif
 	else if ($ext == "msg") then
 		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
-		# gtm_startup_chk requires gtm_dist setup
+		# ydb_chk_dist requires ydb_dist setup
 		rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
-		set real_gtm_dist = "$gtm_dist"
+		set real_ydb_dist = "$ydb_dist"
 		if ($?gtmroutines) set save_gtmroutines = "$gtmroutines"
-		setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
+		setenv ydb_dist "$gtm_root/$gtm_curpro/pro"
 		setenv gtmroutines "$gtm_obj($gtm_pct)"
 		$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
 		if (0 != $status) @ runall_status = $status
-		setenv gtm_dist "$real_gtm_dist"
-		unset real_gtm_dist
+		setenv ydb_dist "$real_ydb_dist"
+		unset real_ydb_dist
 		if ($?save_gtmroutines) setenv gtmroutines "$save_gtmroutines"
 		\mv -f ${file}_ctl.c $gtm_src/${file}_ctl.c
 		if ( -f ${file}_ansi.h ) then
