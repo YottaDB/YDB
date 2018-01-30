@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,7 +146,12 @@
 
 #include "gtm_threadgbl_init.h"
 
-#define	DEFAULT_PROMPT	"YDB>"
+#define	DEFAULT_PROMPT		"YDB>"
+#define	DEFAULT_MSGPREFIX	"YDB"
+
+#ifdef DEBUG
+# define SIZEOF_ydbmsgprefixbuf	ggl_ydbmsgprefixbuf
+#endif
 
 GBLDEF void	*gtm_threadgbl;		/* Anchor for thread global for this thread */
 
@@ -210,10 +215,10 @@ void gtm_threadgbl_init(void)
 	TREF(for_stack_ptr) = TADR(for_stack);
 	(TREF(gtmprompt)).addr = TADR(prombuf);
 	(TREF(gtmprompt)).len = SIZEOF(DEFAULT_PROMPT) - 1;
+	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;	/* UNIX: set in gtm_env_init_sp(), VMS: set in gtm$startup() - init'd here
 							 * in case alternative invocation methods bypass gtm_startup()
 							 */
-	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	(TREF(window_ident)).addr = TADR(window_string);
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
@@ -221,4 +226,9 @@ void gtm_threadgbl_init(void)
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
+	assert(SIZEOF_ydbmsgprefixbuf >= SIZEOF(DEFAULT_MSGPREFIX));
+	(TREF(ydbmsgprefix)).addr = TADR(ydbmsgprefixbuf);
+	(TREF(ydbmsgprefix)).len = STR_LIT_LEN(DEFAULT_MSGPREFIX);	/* STR_LIT_LEN does not include terminating null byte */
+	MEMCPY_LIT(TADR(ydbmsgprefixbuf), DEFAULT_MSGPREFIX);
+	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
 }

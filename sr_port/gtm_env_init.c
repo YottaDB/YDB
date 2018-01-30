@@ -64,7 +64,8 @@
 #else
 #  define DEFAULT_FBW_FLAG 0
 #endif
-#define SIZEOF_prombuf ggl_prombuf
+#define SIZEOF_prombuf		ggl_prombuf
+#define SIZEOF_ydbmsgprefixbuf	ggl_ydbmsgprefixbuf
 
 /* gtm_dirtree_collhdr_always is only used in dbg code and hence doesn't need checking in the D9I10002703 subtest
  * Hence this env var is not defined in gtm_logicals.h as that is what the D9I10002703 subtest looks at for a list of env vars.
@@ -120,6 +121,23 @@ void	gtm_env_init(void)
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			gtmDebugLevel |= tdbglvl;
+		}
+		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
+		 * Note: Default value is already stored in "gtm_threadgbl_init".
+		 * Do this initialization before most other variables so any error messages later issued in this module
+		 * have the correct msgprefix.
+		 */
+		val.addr = YDB_MSGPREFIX;
+		val.len = SIZEOF(YDB_MSGPREFIX) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			assert(SIZEOF(buf) > trans.len);
+			if (SIZEOF_ydbmsgprefixbuf > trans.len)
+			{
+				(TREF(ydbmsgprefix)).len = trans.len;
+				memcpy((TREF(ydbmsgprefix)).addr, trans.addr, trans.len);
+				(TREF(ydbmsgprefix)).addr[trans.len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
+			}
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;
