@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,4 +159,5 @@
 
 /* YottaDB specified variables */
 #define	YDB_REPL_FILTER_TIMEOUT		"$ydb_repl_filter_timeout"
+#define	YDB_MSGPREFIX			"$ydb_msgprefix"
 
