@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@ void	op_idiv(mval *u, mval *v, mval *q)
 
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
+	assert((v->mvtype & MV_INT) || (0 != v->m[0]) || (0 != v->m[1]));
 	if ((v->mvtype & MV_INT)  &&  v->m[1] == 0)
 		rts_error(VARLSTCNT(1) ERR_DIVZERO);
 	if (u->mvtype & MV_INT & v->mvtype)

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +27,6 @@ void	op_mul (mval *u, mval *v, mval *p)
 	bool		promo;
 	int4		c, exp;
 	mval		w, z;
-	error_def	(ERR_NUMOFLOW);
 
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
@@ -35,21 +37,18 @@ void	op_mul (mval *u, mval *v, mval *p)
 		{
 			p->mvtype = MV_NM | MV_INT;
 			return;
-		}
-		else
+		} else
 		{
 			w = *u;      z = *v;
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
-	}
-	else if (u->mvtype & MV_INT)
+	} else if (u->mvtype & MV_INT)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
-	}
-	else if (v->mvtype & MV_INT)
+	} else if (v->mvtype & MV_INT)
 	{
 		w = *v;
 		promote(&w);
@@ -63,6 +62,8 @@ void	op_mul (mval *u, mval *v, mval *p)
 		*p = literal_zero;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  p->m[0] == 0  &&  (p->m[1]%ten_pwr[EXP_INT_OVERF-1-exp]==0))
 		demote(p, exp, u->sgn ^ v->sgn);
+	else if ((0 == p->m[0]) && (0 == p->m[1]))
+		*p = literal_zero;
 	else
 	{
 		p->mvtype = MV_NM;
