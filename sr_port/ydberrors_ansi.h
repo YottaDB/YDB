@@ -16,4 +16,6 @@
 
 const static readonly int error_ansi[] = {
 	   0,	/* LIBYOTTAMISMTCH */
+	   0,	/* READONLYNOSTATS */
+	   0,	/* READONLYLKFAIL */
 	};

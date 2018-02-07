@@ -24,3 +24,5 @@
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0
 MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/error/fao=4
 LIBYOTTAMISMTCH	<$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)>/error/fao=4!/ansi=0
+READONLYNOSTATS	<Read-only and Statistics sharing cannot both be enabled on database>/error/fao=0!/ansi=0
+READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao=4!/ansi=0

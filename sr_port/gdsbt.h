@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -731,8 +731,9 @@ MBSTART {														\
 	statsDBcsd->basedb_fname_len = fname_len;									\
 } MBEND
 
-#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL)										\
+#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL, CSD)									\
 MBSTART {														\
+	assert(!CNL->statsdb_created || !CSD->read_only);								\
 	if (CNL->statsdb_created && CNL->statsdb_rundown_clean)								\
 	{														\
 		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
