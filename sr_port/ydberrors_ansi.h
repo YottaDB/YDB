@@ -26,4 +26,6 @@ const static readonly int error_ansi[] = {
 	   0,	/* MISSINGVARNAMES */
 	   0,	/* TOOMANYVARNAMES */
 	   0,	/* INVNAMECOUNT */
+	   0,	/* MSGBUF2SMALL */
+	   0,	/* UNKNOWN */
 	};

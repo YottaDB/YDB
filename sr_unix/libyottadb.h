@@ -38,6 +38,9 @@ typedef enum
 #define YDB_MAX_NAMES	31	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 /* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl() */
 
+/* Minimum values */
+#define YDB_MIN_ERROR_BUF_LEN	30	/* Min length of buffer for ydb_message() -- needed for error processing */
+
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
 /* Keep the below YDB_* macros a very high positive error # to avoid intersection with system errors #s
@@ -223,21 +226,24 @@ ydb_status_t 	ydb_jinit(void);
 #endif
 ydb_status_t 	ydb_exit(void);
 ydb_status_t	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
-		unsigned int *has_ret_value);
+			unsigned int *has_ret_value);
 void 		ydb_zstatus(char* msg, int len);
 
-/* Other entry points accessable in libyottadb.so */
-ydb_status_t	gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
-void		gtm_hiber_start(ydb_uint_t mssleep);
-void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);
-void		gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
-void		gtm_cancel_timer(ydb_tid_t tid);
-ydb_status_t	gtm_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
-void		gtm_xcfileid_free(ydb_fileid_ptr_t fileid);
-int		gtm_is_main_thread(void);
-void 		*gtm_malloc(size_t);
-void 		gtm_free(void *);
+/* Utility entry points accessable in libyottadb.so */
+ydb_status_t	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
+void		ydb_hiber_start(unsigned long long mssleep);
+void		ydb_hiber_start_wait_any(unsigned long long mssleep);
+void		ydb_start_timer(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len,
+				void *hdata);
+void		ydb_cancel_timer(ydb_tid_t tid);
+ydb_status_t	ydb_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
+void		ydb_file_id_free(ydb_fileid_ptr_t fileid);
+int		ydb_is_main_thread(void);
+void 		*ydb_malloc(size_t);
+void 		ydb_free(void *);
 void		ydb_fork_n_core(void);
+int		ydb_child_init(void *param);
+int		ydb_message(ydb_int_t status, ydb_buffer_t *msg_buff);
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
@@ -261,7 +267,5 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
 void ydb_fork_n_core(void);
-/* Comprehensive API routine declarations */
-int ydb_child_init(void *param);
 
 #endif /* LIBYOTTADB_TYPES_H */

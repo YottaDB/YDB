@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +60,18 @@ typedef ydb_char_t		gtm_jstring_t;
 typedef ydb_char_t		gtm_jbyte_array_t;
 typedef ydb_char_t		gtm_jbig_decimal_t;
 
+/* GT.M flavor utility routines */
+ydb_status_t	gtm_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
+ydb_status_t	gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
+int		gtm_is_main_thread(void);
+void		gtm_xcfileid_free(ydb_fileid_ptr_t fileid);
+void		gtm_cancel_timer(ydb_tid_t tid);
+void 		*gtm_malloc(size_t);
+void 		gtm_free(void *);
+void		gtm_hiber_start(ydb_uint_t mssleep);
+void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);
+void		gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
+
 /* The java plug-in has some very direct references to some of these routines that
  * cannot be changed by the pre-processor so for now, we have some stub routines
  * that take care of the translation. These routines are exported along with their
@@ -67,10 +82,13 @@ ydb_status_t 	gtm_jinit(void);
 #endif
 ydb_status_t 	gtm_exit(void);
 ydb_status_t	gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
-		unsigned int *has_ret_value);
+			unsigned int *has_ret_value);
 void 		gtm_zstatus(char* msg, int len);
 
-/* Define backward compatibility routine name defines for GT.M entry points */
+/* Define backward compatibility routine name defines for GT.M entry points. Note some of these entry points are
+ * the same as entry points defined above. This allows those references that can be transformed to effect a direct
+ * call without the gtm_xxx wrapper that it would otherwise use also eliminating an extra level of indirection.
+ */
 #define gtm_ci				ydb_ci
 #define gtm_cip				ydb_cip
 #define gtm_init			ydb_init
