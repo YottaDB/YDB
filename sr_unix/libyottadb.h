@@ -99,6 +99,47 @@ typedef enum
 		COPY_DONE = FALSE;						\
 }
 
+/* Macro to copy a strlit to an already allocated ydb_buffer_t structure.
+ * If BUFFERP does not have space allocated to hold LITERAL, then no copy is done
+ *	and COPY_DONE will be set to FALSE.
+ * Else the copy is done and COPY_DONE will be set to TRUE.
+ * Note that this is similar to the YDB_STRLIT_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
+ */
+#define YDB_COPY_STRLIT_TO_BUFFER(LITERAL, BUFFERP, COPY_DONE)	\
+{								\
+	int	len;						\
+								\
+	len = sizeof(LITERAL) - 1;				\
+	if (len <= (BUFFERP)->len_alloc)			\
+	{							\
+		memcpy((BUFFERP)->buf_addr, LITERAL, len);	\
+		(BUFFERP)->len_used = len;			\
+		COPY_DONE = TRUE;				\
+	} else							\
+		COPY_DONE = FALSE;				\
+}
+
+/* Macro to copy a string (i.e. "char *" pointer in C) to an already allocated ydb_buffer_t structure.
+ * If BUFFERP does not have space allocated to hold STRING, then no copy is done
+ *	and COPY_DONE will be set to FALSE.
+ * Else the copy is done and COPY_DONE will be set to TRUE.
+ * User of this macro needs to include <string.h> (needed for "strlen" prototype).
+ * Note that this is similar to the YDB_STR_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
+ */
+#define YDB_COPY_STR_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
+{								\
+	int	len;						\
+								\
+	len = strlen(STRING);					\
+	if (len <= (BUFFERP)->len_alloc)			\
+	{							\
+		memcpy((BUFFERP)->buf_addr, STRING, len);	\
+		(BUFFERP)->len_used = len;			\
+		COPY_DONE = TRUE;				\
+	} else							\
+		COPY_DONE = FALSE;				\
+}
+
 /* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
 #define YDB_ASSERT(X)														\
 {																\
