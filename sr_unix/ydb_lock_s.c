@@ -28,6 +28,11 @@
  *
  * Parameters:
  *   - nsec_timeout - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
+ *   - namecount    - Count of "parm-triples" (varname, subcnt, sublist) or 0 if unlocking all.
+ *   repeating parm-triples made up of:
+ *   - varname	    - Lock varname
+ *   - subs_used    - Number of subscripts
+ *   - subsarray    - Array of subscripts
  */
 int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 {

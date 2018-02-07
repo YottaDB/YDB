@@ -28,7 +28,6 @@
  *   - varname   - Contains the basevar name (local or global). Must be a valid variable name.
  *   - subs_used - The number of subscripts specified in the subsarray parm
  *   - subsarray - An array of 'subs_used' ydb_buffer_t structures containing the definitions of the subscripts.
- *
  */
 int ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
