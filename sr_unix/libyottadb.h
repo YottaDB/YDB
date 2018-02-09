@@ -73,8 +73,8 @@ typedef enum
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
 }
 
-/* Below macro returns TRUE if two input ydb_buffer_t structures have identical content and FALSE otherwise. */
-#define YDB_BUFFER_IS_IDENTICAL(BUFFERP1, BUFFERP2)										\
+/* Below macro returns TRUE if two input ydb_buffer_t structures pointer to the same string and FALSE otherwise. */
+#define YDB_BUFFER_IS_SAME(BUFFERP1, BUFFERP2)										\
 	((BUFFERP1->len_used == BUFFERP2->len_used) && !memcmp(BUFFERP1->buf_addr, BUFFERP2->buf_addr, BUFFERP2->len_used))
 
 /* Below macro copies SRC ydb_buffer_t to DST ydb_buffer_t.
