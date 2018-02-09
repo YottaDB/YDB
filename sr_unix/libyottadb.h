@@ -64,7 +64,7 @@ typedef enum
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
  */
-#define YDB_STRLIT_TO_BUFFER(BUFFERP, LITERAL)					\
+#define YDB_LITERAL_TO_BUFFER(LITERAL, BUFFERP)					\
 {										\
 	(BUFFERP)->buf_addr = LITERAL;						\
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
@@ -73,7 +73,7 @@ typedef enum
 /* Macro to create/fill-in a ydb_buffer_t structure from a string (i.e. "char *" pointer in C).
  * User of this macro needs to include <string.h> (needed for "strlen" prototype).
  */
-#define YDB_STR_TO_BUFFER(BUFFERP, STRING)					\
+#define YDB_STRING_TO_BUFFER(STRING, BUFFERP)					\
 {										\
 	(BUFFERP)->buf_addr = STRING;						\
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);		\
@@ -103,9 +103,9 @@ typedef enum
  * If BUFFERP does not have space allocated to hold LITERAL, then no copy is done
  *	and COPY_DONE will be set to FALSE.
  * Else the copy is done and COPY_DONE will be set to TRUE.
- * Note that this is similar to the YDB_STRLIT_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
+ * Note that this is similar to the YDB_LITERAL_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
  */
-#define YDB_COPY_STRLIT_TO_BUFFER(LITERAL, BUFFERP, COPY_DONE)	\
+#define YDB_COPY_LITERAL_TO_BUFFER(LITERAL, BUFFERP, COPY_DONE)	\
 {								\
 	int	len;						\
 								\
@@ -124,9 +124,9 @@ typedef enum
  *	and COPY_DONE will be set to FALSE.
  * Else the copy is done and COPY_DONE will be set to TRUE.
  * User of this macro needs to include <string.h> (needed for "strlen" prototype).
- * Note that this is similar to the YDB_STR_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
+ * Note that this is similar to the YDB_STRING_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
  */
-#define YDB_COPY_STR_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
+#define YDB_COPY_STRING_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
 {								\
 	int	len;						\
 								\
