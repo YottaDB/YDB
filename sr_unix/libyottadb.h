@@ -73,15 +73,6 @@ typedef enum
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
 }
 
-/* Macro to create/fill-in a ydb_buffer_t structure from a string (i.e. "char *" pointer in C).
- * User of this macro needs to include <string.h> (needed for "strlen" prototype).
- */
-#define YDB_STRING_TO_BUFFER(STRING, BUFFERP)					\
-{										\
-	(BUFFERP)->buf_addr = STRING;						\
-	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);		\
-}
-
 /* Below macro returns TRUE if two input ydb_buffer_t structures have identical content and FALSE otherwise. */
 #define YDB_BUFFER_IS_IDENTICAL(BUFFERP1, BUFFERP2)										\
 	((BUFFERP1->len_used == BUFFERP2->len_used) && !memcmp(BUFFERP1->buf_addr, BUFFERP2->buf_addr, BUFFERP2->len_used))
