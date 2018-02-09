@@ -487,6 +487,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						reg_exit_stat |= EXIT_WRN;
 					}
 					pvt_csd->defer_time = 1;			/* defer defaults to 1 */
+				} else
+				{	/* Setting access method to BG. Check for incompatibilities. */
+					if (!read_only_status && pvt_csd->read_only)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
+						reg_exit_stat |= EXIT_WRN;
+					}
 				}
 				pvt_csd->acc_meth = access;
 				if (0 == pvt_csd->n_bts)
