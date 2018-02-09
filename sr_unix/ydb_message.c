@@ -32,7 +32,6 @@ int ydb_message(ydb_int_t status, ydb_buffer_t *msg_buff)
 	mstr		msg;
 	char		*cp, *cptop;
 
-	return_code = YDB_OK;
 	/* Note the value for YDB_MIN_ERROR_BUF_LEN is chosen so that when we parse the returned message, we don't
 	 * have to worry about whether or not the buffer is big enough to hold enough of the message for us to
 	 * determine if it is an error or not. So the minimum is so the following message can fit in the buffer
