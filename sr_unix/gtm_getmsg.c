@@ -1,9 +1,6 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
- * All rights reserved.						*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +17,10 @@
 #include "error.h"
 #include "gtmmsg.h"
 
-GBLREF	bool	dec_nofac;
-GBLREF	err_ctl	merrors_ctl;
+GBLREF bool	dec_nofac;
 
 #define ERR_TAG		"ENO"
+
 
 void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
@@ -34,22 +31,14 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	char_ptr_t	tag;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	ctl = err_check(msgnum);
 	if (NULL != ctl)
 	{
 		GET_MSG_INFO(msgnum, ctl, msg);
 		msgp = msg->msg;
 		tag = (char_ptr_t)msg->tag;
-		/* If error table corresponds to "merrors.msg", then check if $ydb_msgprefix override is needed.
-		 * If so, use that prefix instead of what is defined in the "merrors_ctl" structure.
-		 */
-		if (&merrors_ctl != ctl)
-			fac = ctl->facname;
-		else
-			fac = (TREF(ydbmsgprefix)).addr;	/* $ydb_msgprefix needs to override */
+		fac = ctl->facname;
 		sever = SEVMASK(msgnum);
 	} else
 	{

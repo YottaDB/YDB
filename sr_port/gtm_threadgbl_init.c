@@ -230,4 +230,6 @@ void gtm_threadgbl_init(void)
 	(TREF(ydbmsgprefix)).len = STR_LIT_LEN(DEFAULT_MSGPREFIX);	/* STR_LIT_LEN does not include terminating null byte */
 	MEMCPY_LIT(TADR(ydbmsgprefixbuf), DEFAULT_MSGPREFIX);
 	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
+	/* Point "merrors_ctl" facility name to the ydb_msgprefix env var (default or user-specified value) */
+	merrors_ctl.facname = (TREF(ydbmsgprefix)).addr;
 }
