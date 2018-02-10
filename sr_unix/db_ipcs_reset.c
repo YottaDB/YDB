@@ -182,17 +182,22 @@ boolean_t db_ipcs_reset(gd_region *reg)
 				return FALSE;
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
-			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (!csa->read_only_fs && !csd->read_only)
+			/* If db file header has READ_ONLY set, then skip writing to db file header even through gtmsecshr */
+			if (!csd->read_only)
 			{
-				status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-				if (0 != status)
+				WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
+				if (!csa->read_only_fs)
 				{
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-					CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+					status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 					if (0 != status)
+					{
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-					return FALSE;
+						CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+						if (0 != status)
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+								status);
+						return FALSE;
+					}
 				}
 			}
 		}
@@ -206,7 +211,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	}
 	udi->grabbed_access_sem = FALSE;
 	udi->counter_acc_incremented = FALSE;
-	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID and does flock(LOCK_UN) if needed */
 	if (0 != status)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	/* Since we created the ftok semaphore in mu_rndwn_file, we release/remove it now. But, since we are exiting, we

@@ -26,6 +26,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <sys/file.h>	/* for "flock" */
 
 #include "gtm_sem.h"
 #include "gdsroot.h"
@@ -565,6 +566,24 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 		return FALSE;
 	}
+	if (tsd->read_only)
+	{	/* Get a non-blocking (LOCK_NB) exclusive (LOCK_EX) lock on the database file.
+		 * If not possible to get right away, it means someone else is holding a shared lock on the file.
+		 * Error out in that case.
+		 * Hold on to this lock for the entire life of this process (until the READ_ONLY flag in db file hdr is changed).
+		 * This will ensure any process that concurrently tries to open this database file using a potentially stale
+		 * READ_ONLY field in the db file header errors out with READONLYLKFAIL in "db_init".
+		 */
+		FLOCK(udi->fd, LOCK_EX | LOCK_NB, rc);
+		if (-1 == rc)
+		{
+			save_errno = errno;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_READONLYLKFAIL, 4,
+							LEN_AND_LIT("exclusive"), DB_LEN_STR(reg), save_errno);
+			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+			return FALSE;
+		}
+	}
 	override_present = (cli_present("OVERRIDE") == CLI_PRESENT);
 	csa->hdr = tsd;
 	csa->region = gv_cur_region;
@@ -828,15 +847,23 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						return FALSE;
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
-					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-					secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-					csa->read_only_fs = (EROFS == secshrstat);
-					if ((0 != secshrstat) && !csa->read_only_fs)
+					if (!tsd->read_only)
 					{
-						RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
-						MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-						return FALSE;
-					}
+						WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
+						secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+						csa->read_only_fs = (EROFS == secshrstat);
+						if ((0 != secshrstat) && !csa->read_only_fs)
+						{
+							RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
+							MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created,		\
+										udi->counter_acc_incremented);
+							return FALSE;
+						}
+					} else
+						csa->read_only_fs = TRUE;	/* We never want to write to READ_ONLY db file.
+										 * So treat this as if the underlying file system
+										 * is read-only.
+										 */
 				}
 				if (!ftok_sem_release(reg, FALSE, FALSE))
 				{
@@ -1409,7 +1436,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		 * of statsdb requires ftok lock on the basedb). In that case, we leave it as is. And when the basedb is next
 		 * opened, we will remove this statsdb and create a new one.
 		 */
-		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl);
+		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl, csd);
 		break;
 	}
 	/* Detach from shared memory whether it is a GT.M shared memory or not */

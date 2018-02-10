@@ -20,6 +20,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "QUERY2", "Invalid second argument to $QUERY. Must be -1 or 1.", 0 },
 	{ "MIXIMAGE", "Cannot load !AD image on process that already has !AD image loaded", 4 },
 	{ "LIBYOTTAMISMTCH", "$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)", 4 },
+	{ "READONLYNOSTATS", "Read-only and Statistics sharing cannot both be enabled on database", 0 },
+	{ "READONLYLKFAIL", "Failed to get !AD lock on READ_ONLY database file !AD", 4 },
 };
 
 
@@ -27,4 +29,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	3};
+	5};

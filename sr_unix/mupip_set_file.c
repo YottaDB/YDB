@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -484,10 +487,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						reg_exit_stat |= EXIT_WRN;
 					}
 					pvt_csd->defer_time = 1;			/* defer defaults to 1 */
-				}
-				if(dba_mm != access)
-				{
-					if (pvt_csd->read_only && (CLI_NEGATED != read_only_status))
+				} else
+				{	/* Setting access method to BG. Check for incompatibilities. */
+					if (!read_only_status && pvt_csd->read_only)
 					{
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
 						reg_exit_stat |= EXIT_WRN;
@@ -515,7 +517,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 								LEN_AND_LIT("DEFER_TIME"), -1);
 							reg_exit_stat |= EXIT_WRN;
 						} else
-						pvt_csd->defer_time = defer_time;
+							pvt_csd->defer_time = defer_time;
 					} else
 					{
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2,
@@ -640,19 +642,33 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				reservedDBFlags = pvt_csd->reservedDBFlags & ~RDBF_NOSTATS;
 				if (CLI_NEGATED == stats_status)
 					reservedDBFlags |= RDBF_NOSTATS;
+				else if (!read_only_status && pvt_csd->read_only)
+				{	/* READ_ONLY has not been specified on a database that is already READ_ONLY
+					 * but STATS is now being enabled. Issue error as the two are incompatible.
+					 */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOSTATS);
+					reg_exit_stat |= EXIT_WRN;
+				}
 				pvt_csd->reservedDBFlags = reservedDBFlags;
 			}
-			if (read_only_status)
+			/* Now that we know what the new STATS setting is going to be, check for READ_ONLY */
+			if (CLI_PRESENT == read_only_status)
 			{
+				/* Check if new access method is MM. If so issue error */
 				if (dba_mm != pvt_csd->acc_meth)
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
 					reg_exit_stat |= EXIT_WRN;
-				} else
+				}
+				/* Check if new statistics sharing is turned ON. If so issue error */
+				if (!(RDBF_NOSTATS & pvt_csd->reservedDBFlags))
 				{
-					pvt_csd->read_only = !(CLI_NEGATED == read_only_status);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOSTATS);
+					reg_exit_stat |= EXIT_WRN;
 				}
 			}
+			if (read_only_status)
+				pvt_csd->read_only = !(CLI_NEGATED == read_only_status);
 			if (CLI_NEGATED == stdnullcoll_status)
 				gv_cur_region->std_null_coll = pvt_csd->std_null_coll = FALSE;
 			else if (CLI_PRESENT == stdnullcoll_status)

@@ -370,8 +370,10 @@ MBSTART {														\
 	sgmnt_addrs	*CSA_LOCAL = CSA;										\
 															\
 	assert(!CSA_LOCAL || !CSA_LOCAL->region || FILE_INFO(CSA_LOCAL->region)->grabbed_access_sem			\
-			|| !(CSA_LOCAL)->nl || !FROZEN_CHILLED(CSA_LOCAL) || FREEZE_LATCH_HELD(CSA_LOCAL));	\
+			|| !(CSA_LOCAL)->nl || !FROZEN_CHILLED(CSA_LOCAL) || FREEZE_LATCH_HELD(CSA_LOCAL));		\
 	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
+	/* We should never write to a READ_ONLY db file header unless we hold standalone access on the db */		\
+	assert((0 != OFFSET) || !((sgmnt_data_ptr_t)BUFF)->read_only || (NULL == UDI) || UDI->grabbed_access_sem);	\
 	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB);		\
 } MBEND
 
@@ -382,6 +384,8 @@ MBSTART {														\
 #define	GTMSECSHR_DB_LSEEKWRITE(UDI, FD, OFFSET, BUFF, SIZE, STATUS)			\
 MBSTART {										\
 	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);				\
+	/* We should never write to a READ_ONLY db file header */			\
+	assert((0 == OFFSET) && !((sgmnt_data_ptr_t)BUFF)->read_only);			\
 	LSEEKWRITE(FD, OFFSET, BUFF, SIZE, STATUS);					\
 } MBEND
 
