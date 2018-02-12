@@ -60,7 +60,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	if (0 >= namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MISSINGVARNAMES);
 	if (YDB_MAX_NAMES < namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TOOMANYVARNAMES);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TOOMANYVARNAMES, 1, YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use
 	 * the COPY_PAMS_TO_CALLG_BUFFER() macro for this but in this case, we also need to validate each mval that it has
 	 * a valid variable name in it so we do the parm copy "manually".
@@ -70,13 +70,13 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	     parmp++, mvalp++, curvarname++)
 
 	{	/* Validate each name to make sure is well formed */
-		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);	/* Validates varname and that it is a local var */
 		if (IS_INVALID_YDB_BUFF_T(curvarname))
 		{
 			SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 				      LEN_AND_STR(buff), LEN_AND_LIT(buff));
 		}
+		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);	/* Validates varname and that it is a local var */
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, curvarname);
 		*parmp = mvalp;
 	}

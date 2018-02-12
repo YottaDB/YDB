@@ -35,8 +35,8 @@ typedef enum
 /* Maximum values */
 #define YDB_MAX_SUBS	31	/* Maximum subscripts currently supported */
 #define YDB_MAX_IDENT	31	/* Maximum size of global/local name (not including '^') */
-#define YDB_MAX_NAMES	31	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
-/* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl() */
+#define YDB_MAX_NAMES	255	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
+/* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl_s() and ydb_tp_s() */
 
 /* Minimum values */
 #define YDB_MIN_ERROR_BUF_LEN	30	/* Min length of buffer for ydb_message() -- needed for error processing */
@@ -142,8 +142,9 @@ typedef enum
 		fprintf(stderr, "YDB_ASSERT: ** Assert failed (%s) at line %d in routine %s - generating core\n",		\
 			#X, __LINE__, __FILE__);										\
 		fflush(stderr);													\
+		fflush(stdout);													\
 		ydb_fork_n_core();												\
-		exit(1);													\
+		exit(1);		/* Shouldn't return but just in case */							\
 	}															\
 }
 
@@ -257,7 +258,7 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value);
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
-int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist);
+int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
 void ydb_fork_n_core(void);
 
 #endif /* LIBYOTTADB_TYPES_H */

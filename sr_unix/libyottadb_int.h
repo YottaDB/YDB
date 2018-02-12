@@ -28,7 +28,7 @@
 #include "lv_val.h"
 #include "libydberrors.h"	/* Define YDB_ERR_* errors */
 
-#define MAX_SAPI_MSTR_GC_INDX	(1 + YDB_MAX_SUBS + 1)	/* Max index in mstr array - holds varname, subs, value */
+#define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
 GBLREF	symval		*curr_symval;
 GBLREF	stack_frame	*frame_pointer;

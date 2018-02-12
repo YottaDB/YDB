@@ -17,8 +17,6 @@
 #define	ALLLOCAL  -2
 #define	LISTLOCAL -3
 
-#define	LISTLOCAL_MAXNAMES	256	/* max of 256 names allowed to be specified in "ydb_tp_s" */
-
 void	op_tstart(int implicit_flag, ...);
 
 #endif /* OP_TSTART_included */

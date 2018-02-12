@@ -50,11 +50,9 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	src.mvtype = MV_STR;
 	src.str.len = str->len_used;
 	src.str.addr = str->buf_addr;
-	s2pool(&src.str);		/* Rebuffer in stringpool for protection */
-	RECORD_MSTR_FOR_GC(&src.str);
 	op_fnzwrite(FALSE, &src, &dst);
 	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst, "NULL zwr->buf_addr", "ydb_str2zwr_s()");
-	TREF(sapi_mstrs_for_gc_indx) = 0;		/* No need to protect "src.str" anymore */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	REVERT;
 	return YDB_OK;
 }
