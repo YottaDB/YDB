@@ -83,14 +83,10 @@ int	ydb_child_init(void *param)
 	if (mutex_per_process_init_pid)
 		mutex_per_process_init();
 	jnl_prc_vector(prc_vec);	/* Reinitialize prc_vec based on new process_id */
-	/* Detach from any relinkctl shared memory segments that the parent is still attached to.
-	 * We will attach to those if/when later needed.
-	 *
-	 * Since we are removing artifacts from the originating process (which still has these files open), there is
-	 * no need to decrement the counts (they will increase if this process links the same files). The FALSE
-	 * argument prevents the relinkctl-attach & rtnobj-reference counts from being modified in this cleanup.
+	/* Record the fact that this process is interested in the relinkctl files inherited from the parent by
+	 * incrementing the linkctl->hdr->nattached count. Just like is done in "ojstartchild".
 	 */
-	ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));
+	ARLINK_ONLY(relinkctl_incr_nattached());
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
