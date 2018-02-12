@@ -37,19 +37,22 @@ GBLREF	unsigned int	t_tries;
  *   tpfn        - Pointer to a function that executes user-specified code inside of the TSTART/TCOMMIT fence.
  *   tpfnparm   - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
  */
-int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char *varnamelist)
+int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames)
 {
-	boolean_t	error_encountered, done;
-	char		*ptr, *ptr_top, *ptr_start;
+	boolean_t	error_encountered;
 	mval		tid;
-	int		rc, save_dollar_tlevel, tpfn_status, varnamelist_len, ptr_len, tstart_flag;
-	mval		varnamearray[LISTLOCAL_MAXNAMES], *mv;
-	int		varnamearray_len = 0;
+	int		rc, save_dollar_tlevel, tpfn_status, tstart_flag;
+	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
+	ydb_buffer_t	*curvarname;
+	char		buff[256];			/* sprintf() buffer */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_TP);	/* Note: macro could "return" from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
 	save_dollar_tlevel = dollar_tlevel;
 	/* Ready "transid" for passing to "op_tstart" */
 	tid.mvtype = MV_STR;
@@ -62,55 +65,45 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char
 	}
 	/* Ready "varnamelist" for passing to "op_tstart" */
 	tstart_flag = IMPLICIT_TSTART | YDB_TP_S_TSTART;
-	if (NULL == varnamelist)
+	if (0 == namecount)
 		op_tstart(tstart_flag, TRUE, &tid, 0);
-	else if (('*' == varnamelist[0]) && ('\0' == varnamelist[1]))
+	else if ((1 == namecount) && ('*' == *varnames->buf_addr))
 	{	/* preserve all local variables */
 		op_tstart(tstart_flag, TRUE, &tid, ALLLOCAL);
 	} else
-	{	/* varnamelist is a comma-separated list of variable names that need to be preserved.
+	{	/* varnames is a pointer to an array of ydb_buffer_t structs that describe each varname.
 		 * First do some error checking on input.
 		 */
-		varnamelist_len = 0;
-		for (ptr = (char *)varnamelist, ptr_top = ptr + STRLEN(varnamelist); ptr < ptr_top; ptr++)
+		if (YDB_MAX_NAMES < namecount)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TOOMANYVARNAMES, 1, YDB_MAX_NAMES);
+		for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount;
+		     mv < mv_top;
+		     curvarname++, mv++)
 		{
-			if (LISTLOCAL_MAXNAMES == varnamelist_len)
+			if (IS_INVALID_YDB_BUFF_T(curvarname))
 			{
-				/* NARSTODO: Issue new error where "ydb_tp_s" specifies > 256 variable names to preserve */
+				SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					      LEN_AND_STR(buff), LEN_AND_LIT(buff));
 			}
-			mv = &varnamearray[varnamearray_len++];
-			mv->mvtype = MV_STR;
-			ptr_start = ptr;
-			mv->str.addr = ptr_start;
-			done = FALSE;
-			do
-			{
-				if (',' == *ptr)
-					break;
-				ptr++;
-				if (ptr == ptr_top)
-				{
-					done = TRUE;
-					break;
-				}
-			} while (TRUE);
-			mv->str.len = ptr_len = ptr - ptr_start;
-			VALIDATE_MNAME_C1(ptr_start, ptr_len);
-			/* Note the variable name in the stringpool. Needed if this variable does not yet exist in the
+			VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);
+			/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in the
 			 * current symbol table, a pointer to this string is added in op_tstart as part of the
 			 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program
 			 * which cannot be assumed to be stable for the rest of the lifetime of this process.
 			 */
+			mv->mvtype = MV_STR;
+			mv->str.addr = curvarname->buf_addr;
+			mv->str.len = curvarname->len_used;
 			s2pool(&mv->str);
-			if (!done)
-				continue;
-			break;
+			RECORD_MSTR_FOR_GC(&mv->str);
 		}
 		/* Now that no errors are detected, pass this array of mvals (containing the names of variables to be preserved)
 		 * to "op_tstart" with a special value (LISTLOCAL) so it knows this format and parses this differently from the
 		 * usual "op_tstart" invocations (where each variable name is a separate mval pointer in a var-args list).
 		 */
-		op_tstart(tstart_flag, TRUE, &tid, LISTLOCAL, varnamearray_len, varnamearray);
+		op_tstart(tstart_flag, TRUE, &tid, LISTLOCAL, namecount, varnamearray);
+		TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need protection */
 	}
 	assert(dollar_tlevel);
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
@@ -177,6 +170,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, const char
 			 */
 		}
 	}
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have been reset in this function */
 	REVERT;
 	return tpfn_status;
 }

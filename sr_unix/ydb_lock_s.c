@@ -108,6 +108,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	i2mval(&timeout_mval, timeoutms);
 	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }

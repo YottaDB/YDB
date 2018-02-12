@@ -83,6 +83,7 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	timeoutms = (int)msec_timeout;
 	i2mval(&timeout_mval, timeoutms);
 	lock_rc = op_incrlock(&timeout_mval);
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }
