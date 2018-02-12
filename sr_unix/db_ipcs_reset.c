@@ -182,22 +182,22 @@ boolean_t db_ipcs_reset(gd_region *reg)
 				return FALSE;
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
-			/* If db file header has READ_ONLY set, then skip writing to db file header even through gtmsecshr */
-			if (!csd->read_only)
+			/* If db file header has READ_ONLY set OR if the file system holding the db is read-only,
+			 * then skip writing to db file header even through gtmsecshr. This also means we do not
+			 * need to wait for the instance to unfreeze (in case the instance is frozen).
+			 */
+			if (!csa->read_only_fs && !csd->read_only)
 			{
 				WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-				if (!csa->read_only_fs)
+				status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+				if (0 != status)
 				{
-					status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+					CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 					if (0 != status)
-					{
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-						CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
-						if (0 != status)
-							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-								status);
-						return FALSE;
-					}
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+							status);
+					return FALSE;
 				}
 			}
 		}
