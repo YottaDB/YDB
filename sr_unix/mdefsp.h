@@ -189,6 +189,8 @@ typedef char  mach_inst;	/* machine instruction */
 #    define __armv6l__
 #  elif __ARM_ARCH_7A__
 #    define __armv7l__
+#  else
+#    error UNSUPPORTED PLATFORM
 #  endif
 
 #  define CACHELINE_SIZE		64
