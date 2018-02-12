@@ -274,7 +274,6 @@ typedef UINTPTR_T uintszofptr_t;
 #if defined(__armv6l__) || defined(__armv7l__)
 #define ARM32_ONLY(x)			x
 #define NON_ARM32_ONLY(x)
-#define	X86_64_OR_ARM32_ONLY(x)		x
 #else
 #define ARM32_ONLY(x)
 #define NON_ARM32_ONLY(x)    		x

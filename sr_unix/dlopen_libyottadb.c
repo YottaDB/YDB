@@ -38,7 +38,7 @@
 /* Define "assert" macro (cannot use normal assert as that needs "rts_error_csa" which we don't want to pull in here) */
 #undef assert	/* in case it is defined */
 #ifdef DEBUG
-# define assert(x) ((x) ? 1 : (fprintf(stderr, "Assert failed at %s line %d : %s\n", __FILE__, __LINE__, #x), kill(getpid(), SIGILL)))
+# define assert(x) ((x) ? 1 : (fprintf(stderr, "Assert failed at %s line %d : %s\n", __FILE__, __LINE__, #x), fflush(stderr), fflush(stdout), kill(getpid(), SIGILL)))
 #else
 # define assert(x)
 #endif
@@ -82,7 +82,7 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 	}
 	if (NULL == pathptr)
 	{
-		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n", YDB_DIST_PATH_MAX);
+		FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n", YDB_DIST_PATH_MAX);
 		return ERR_DISTPATHMAX;
 	}
 	/* Now set "ydb_dist" (and "gtm_dist") to the obtained canonical path. "pathptr" points to that. */
@@ -105,18 +105,18 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 	handle = dlopen(&libyottadb_realpath[0], (RTLD_NOW | RTLD_GLOBAL));
 	if (NULL == handle)
 	{
-		FPRINTF(stderr, "%%GTM-E-DLLNOOPEN, Failed to load external dynamic library %s\n", libyottadb_realpath);
+		FPRINTF(stderr, "%%YDB-E-DLLNOOPEN, Failed to load external dynamic library %s\n", libyottadb_realpath);
 		if ((tmpptr = dlerror()) != NULL)
-			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", tmpptr);
+			FPRINTF(stderr, "%%YDB-E-TEXT, %s\n", tmpptr);
 		return ERR_DLLNOOPEN;
 	}
 	status = 0;
 	exe_main = (exe_main_t)dlsym(handle, main_func);
 	if (NULL == exe_main)
 	{
-		FPRINTF(stderr, "%%GTM-E-DLLNORTN, Failed to look up the location of the symbol %s\n", main_func);
+		FPRINTF(stderr, "%%YDB-E-DLLNORTN, Failed to look up the location of the symbol %s\n", main_func);
 		if ((tmpptr = dlerror()) != NULL)
-			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", tmpptr);
+			FPRINTF(stderr, "%%YDB-E-TEXT, %s\n", tmpptr);
 		return ERR_DLLNORTN;
 	}
 	/* Switch argv[0] to canonical full path of executable returned by the "realpath" call above.

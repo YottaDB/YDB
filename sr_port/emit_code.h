@@ -68,7 +68,7 @@ int	gtm_reg(int vax_reg);
 #  define TRUTH_IN_REG
 #elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)				\
 	|| (defined(__CYGWIN__) && defined(__x86_64__))									\
-	|| (defined(__linux__) && defined(__armv6l__)) || (defined(__linux__) && defined(__armv7l__))
+	|| (defined(__linux__) && (defined(__armv6l__) || defined(__armv7l__)))
 #  undef TRUTH_IN_REG
 #else
 #  error UNSUPPORTED PLATFORM

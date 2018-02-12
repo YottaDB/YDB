@@ -550,7 +550,7 @@
    Example:
 
    $ mupip backup -database -noonline "*" bkup
-   DB file /home/gtmnode1/gtmuser1/mumps.dat backed up in file bkup/mumps.dat
+   DB file /home/gtmnode1/ydbuser1/mumps.dat backed up in file bkup/mumps.dat
    Transactions up to 0x00000000000F42C3 are backed up.
    BACKUP COMPLETED.
 
@@ -575,7 +575,7 @@
    Example:
 
    $ mupip backup -online DEFAULT bkup
-   DB file /gtmnode1/gtmuser1/mumps.dat backed up in file bkup/mumps.dat
+   DB file /gtmnode1/ydbuser1/mumps.dat backed up in file bkup/mumps.dat
    Transactions up to 0x00000000483F807C are backed up.
    BACKUP COMPLETED.
 
@@ -613,8 +613,8 @@
    Example:
 
    $ mupip backup -bytestream -transaction=1 DEFAULT bkup_dir
-   MUPIP backup of database file /gtmnode1/gtmuser1/mumps.dat to bkup_dir/mumps.dat
-   DB file /gtmnode1/gtmuser1/mumps.dat incrementally backed up in file bkup/mumps.dat
+   MUPIP backup of database file /gtmnode1/ydbuser1/mumps.dat to bkup_dir/mumps.dat
+   DB file /gtmnode1/ydbuser1/mumps.dat incrementally backed up in file bkup/mumps.dat
    5 blocks saved.
    Transactions from 0x0000000000000001 to 0x0000000000000003 are backed up.
    BACKUP COMPLETED.
@@ -7513,17 +7513,17 @@
    following sample output from the ps command shows that there are 5 reader
    processes and 3 writer processes.
 
-   gtmuser1 11943 1     0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -receiver -start
+   ydbuser1 11943 1     0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -receiver -start
    -listenport=1234 -helpers -log=B2C.log -buff=$rec_pool_size
-   gtmuser1 11944 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updateproc
-   gtmuser1 11945 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
-   gtmuser1 11946 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
-   gtmuser1 11947 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
-   gtmuser1 11948 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
-   gtmuser1 11949 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
-   gtmuser1 11950 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
-   gtmuser1 11951 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
-   gtmuser1 11952 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
+   ydbuser1 11944 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updateproc
+   ydbuser1 11945 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
+   ydbuser1 11946 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
+   ydbuser1 11947 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
+   ydbuser1 11948 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
+   ydbuser1 11949 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -reader
+   ydbuser1 11950 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
+   ydbuser1 11951 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
+   ydbuser1 11952 11943 0 06:42 ? 00:00:00 /usr/library/YDB/mupip replicate -updhelper -writer
 
 2 Stop_Update_Process_and/or_the_Receiver_Server
    Stop Update Process and/or the Receiver Server
