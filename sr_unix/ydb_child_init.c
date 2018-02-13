@@ -12,6 +12,8 @@
 
 #include "mdef.h"
 
+#include "gtm_unistd.h"
+
 #include "libyottadb_int.h"
 #include "libydberrors.h"
 #include "gdsroot.h"
@@ -49,6 +51,7 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	uint4			process_id;
 
 /* Routine that is invoked right after a "fork()" in the child pid.
  * This will do needed setup so the parent and child pids are treated as different pids
@@ -66,6 +69,12 @@ int	ydb_child_init(void *param)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (process_id == getpid())
+	{	/* "ydb_child_init" is being called again in child OR is being called from parent of "fork".
+		 * No more setup needed. Return right away.
+		 */
+		return YDB_OK;
+	}
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT);	/* Note: macro could "return" from this function in case of errors */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
@@ -150,6 +159,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ftok_sem_lock"),
 				CALLFROM, save_errno);
 		}
+		/* NARSTODO : Handle READ_ONLY db in child (need to create private semaphore separately) */
 		/* Bump ftok semaphore counter on behalf of child pid. Note that if the parent did not
 		 * increment the semaphore (possible if the counter had overflown the 32K limit), then the child
 		 * should not bump the counter.
