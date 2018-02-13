@@ -290,8 +290,23 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 */
 	cnl = csa->nl;
 	onln_rlbk_pid = cnl->onln_rlbk_pid;
+	csd_read_only = csd->read_only;
 	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));
-	if (!have_standalone_access)
+	/* If csd_read_only is TRUE, then do not attempt to get the ftok lock. This is because it is possible the ftok semaphore
+	 * has been deleted by another process (example scenario below). But we do not need to get the ftok lock in that case
+	 * since we are guaranteed to not have updated the db since db open time in "db_init". So skip the "ftok_sem_lock" part.
+	 * In this case, it is also okay to skip getting an exclusive lock on the db access control semaphore since it is anyways
+	 * a process-only semaphore for the read_only db flag case (no other process that has the same db open knows this semid).
+	 *
+	 * Example scenario
+	 * -----------------
+	 *	1) P1 opens db with ftok_semval = 16K.
+	 *	2) P2 opens db with ftok_semval = 32K (i.e. overflow) so P2 keeps ftok_semval at 16K.
+	 *	3) P1 runs down db and deletes ftok sem. Since P1's cnl->ftok_counter_halted is private memory
+	 *		(due to read_only db flag, even if P2 sets cnl->ftok_counter_halted to TRUE, P1 cannot see that).
+	 *	4) P2 comes to gds_rundown. It will notice udi->ftok_semid is gone.
+	 */
+	if (!have_standalone_access && !csd_read_only)
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))) /* Check # of procs counted on FTOK */
 		{
@@ -400,7 +415,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		cnl->ftok_counter_halted = cnl->access_counter_halted = FALSE;
 	ftok_counter_halted = cnl->ftok_counter_halted;
 	access_counter_halted = cnl->access_counter_halted;
-	csd_read_only = csd->read_only;
 	/* If "csd_read_only" is TRUE, that means we created a process private semaphore for this database and no shared memory.
 	 * So skip most of the processing in this function that has to do with shared memory and shared semaphore.
 	 */
@@ -803,7 +817,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 #			endif
 		}
 	} else
+	{
 		we_are_last_user = TRUE;
+		safe_mode = FALSE;
+	}
 	/* If "reg" is a statsdb, it is possible that the basedb has asyncio turned on and has called for the statsdb to be
 	 * rundown first. A statsdb never has asyncio turned on. So it is possible that thread_gdi is non-NULL and will be
 	 * cleaned up as part of the "aio_shim_destroy" done in "gds_rundown" of the basedb but that will happen only after
@@ -960,7 +977,30 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	}
 	if (!have_standalone_access)
 	{
-		if (bypassed_ftok)
+		if (csd_read_only)
+		{	/* If csd_read_only is TRUE and we did not increment the ftok sem counter, it means the ftok sem
+			 * could be concurrently removed by another process so skip doing any semop/semctl on that semid
+			 * (just like we skipped the "ftok_sem_lock" above.
+			 */
+			assert(udi->counter_ftok_incremented == !ftok_counter_halted);
+			if (udi->counter_ftok_incremented)
+			{	/* Decrement ftok semaphore counter and remove it if counter becomes zero.
+				 * But before that, get the ftok lock.
+				 */
+				if (!ftok_sem_lock(reg, FALSE))
+				{
+					FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5, RTS_ERROR_TEXT("db_read_only ftok_sem_lock"), CALLFROM);
+				}
+				if (!ftok_sem_release(reg, DECR_CNT_TRUE, FALSE))
+				{
+					FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5, RTS_ERROR_TEXT("db_read_only ftok_sem_release"), CALLFROM);
+				}
+			}
+		} else if (bypassed_ftok)
 		{
 			if (!ftok_counter_halted)
 				if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO)))
