@@ -504,21 +504,24 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 
 int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 {
-	mval		*lvvalue;
-	lnr_tabent	*lbl_offset_p;
-	uchar_ptr_t	transfer_addr;
-	lv_val		*lvval;
-	mname_entry	*mne_p;
-	uint4		*indx_p;
-	ht_ent_mname	*tabent;
-	boolean_t	added;
-	int		clrlen, rc, i, unwinds;
-	mval		**lvvalarray;
-	mv_stent	*mv_st_ent;
-	symval		*new_symval;
-	uint4		dollar_tlevel_start;
-	stack_frame	*fp;
-	intrpt_state_t	prev_intrpt_state;
+	mval			*lvvalue;
+	lnr_tabent		*lbl_offset_p;
+	uchar_ptr_t		transfer_addr;
+	lv_val			*lvval;
+	mname_entry		*mne_p;
+	uint4			*indx_p;
+	ht_ent_mname		*tabent;
+	boolean_t		added;
+	int			clrlen, rc, i, unwinds;
+	mval			**lvvalarray;
+	mv_stent		*mv_st_ent;
+	symval			*new_symval;
+	uint4			dollar_tlevel_start;
+	stack_frame		*fp;
+	intrpt_state_t		prev_intrpt_state;
+#	ifdef DEBUG
+	condition_handler	*tmpctxt;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -750,12 +753,28 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		{	/* Unwind a trigger level to restart level or to next trigger boundary */
 			gtm_trigger_fini(FALSE, FALSE);	/* Get rid of this trigger level - we won't be returning */
 			DBGTRIGR((stderr, "gtm_trigger: dm_start returned rethrow code - rethrowing ERR_TPRETRY\n"));
-			/* The bottommost mdb_condition handler better not be catching this restart if we did an implicit
-			 * tstart. mdb_condition_handler will try to unwind further, and the process will inadvertently exit.
-			 */
-			assert((&mdb_condition_handler != ch_at_trigger_init) || (&ydb_simpleapi_ch == ctxt->ch)
-				|| ((&mdb_condition_handler == ctxt->ch) && (&mdb_condition_handler == chnd[1].ch)
-				     && (!tp_pointer->implicit_tstart || (&chnd[1] < ctxt))));
+#			ifdef DEBUG
+			if ((&mdb_condition_handler == ch_at_trigger_init) && (&ydb_simpleapi_ch != ctxt->ch))
+			{
+				assert(&mdb_condition_handler == ctxt->ch);
+				if (tp_pointer->implicit_tstart)
+				{
+					assert(&chnd[1] < ctxt);
+					/* The bottommost mdb_condition handler better not be catching this restart
+					 * if we did an implicit tstart. mdb_condition_handler will try to unwind further,
+					 * and the process will inadvertently exit. Assert below that there is one more
+					 * mdb_condition_handler behind the currently established handler (which we already
+					 * asserted above that it is "mdb_condition_handler").
+					 */
+					for (tmpctxt = ctxt - 1; tmpctxt >= &chnd[0]; tmpctxt--)
+					{
+						if (&mdb_condition_handler == tmpctxt->ch)
+							break;
+					}
+					assert(tmpctxt >= &chnd[0]);
+				}
+			}
+#			endif
 			INVOKE_RESTART;
 		} else
 		{	/* It is possible we are restarting a transaction that never got around to creating a base
