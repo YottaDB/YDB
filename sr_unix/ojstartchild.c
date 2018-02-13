@@ -486,7 +486,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * Do this BEFORE the call to job_addr. In case that does a relinkctl_attach of a new relinkctl file,
 		 * we would increment the counter automatically so don't want that to go through a double-increment.
 		 */
-		ARLINK_ONLY(relinkctl_incr_nattached());
+		ARLINK_ONLY(relinkctl_incr_nattached(RTNOBJ_REFCNT_INCR_CNT_FALSE));
 		joberr = joberr_rtn;
 		/* We are the middle child. It is possible the below call to job_addr loads an object into shared memory
 		 * using "rtnobj_shm_malloc". In that case, as part of halting we need to do a "rtnobj_shm_free" to keep
