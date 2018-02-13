@@ -545,11 +545,23 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 
 #ifdef AUTORELINK_SUPPORTED
 /* This is called from processes that already have "linkctl" attached but have not done an increment of "linkctl->hdr->nattached".
- * Example is a jobbed off process in ojstartchild.c
+ * Example is a jobbed off process in "ojstartchild".
+ * The input parameter "rtnobj_refcnt_incr_cnt" indicates whether the refcnt of all routines currently linked into this process
+ * in relinkctl shared memory needs to be incremented too. This is used for example by the caller "ydb_child_init".
+ * Note: If rtnobj_refcnt_incr_cnt is TRUE, this function currently only goes through the "rtn_names" array to check
+ * routines currently linked into this process. It does not go through the current M-stack (like "relinkctl_rundown" does).
+ * This is okay since the only caller of this codepath is "ydb_child_init" which is a call done from a C program and so the
+ * M stack at that point does not matter to the purely C function calls that will later happen while in the caller C program.
  */
-void relinkctl_incr_nattached(void)
+void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
 {
-	open_relinkctl_sgm *linkctl;
+	open_relinkctl_sgm	*linkctl;
+	rtn_tabent		*rtab;
+	rhdtyp			*rhead;
+	sm_uc_ptr_t		objBuff;
+	rtnobj_hdr_t		*rtnobj;
+	zro_validation_entry	*zhent;
+	relinkrec_t		*relinkrec;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -561,6 +573,36 @@ void relinkctl_incr_nattached(void)
 		assert(linkctl->hdr->nattached);
 		linkctl->hdr->nattached++;
 		relinkctl_unlock_exclu(linkctl);
+	}
+	/* The below for loop statement is similar to that in "relinkctl_rundown" */
+	for (rtab = rtn_names_end; rtab > rtn_names; rtab--, rtn_names_end = rtab)
+	{
+		rhead = rtab->rt_adr;
+		if (rhead->shared_object)
+		{	/* The below code is similar to that in "rtnobj_shm_free" */
+			assert(NULL != rhead->shared_ptext_adr);
+			if (NULL == rhead->shared_ptext_adr)
+				continue;	/* in pro, be safe */
+			assert(rhead->shared_ptext_adr == rhead->ptext_adr);
+			objBuff = rhead->shared_ptext_adr - SIZEOF(rhdtyp);
+			rtnobj = (rtnobj_hdr_t *)(objBuff - OFFSETOF(rtnobj_hdr_t, userStorage));
+			assert(STATE_ALLOCATED == rtnobj->state);
+			assert(rtnobj->initialized);
+			assert(0 < rtnobj->refcnt);
+			assert(NULL != rhead->zhist);
+			zhent = rhead->zhist->end - 1;
+			relinkrec = zhent->relinkrec;
+			/* Before incrementing refcnt, get a lock on the corresponding relinkctl file (see "rtnobj_shm_malloc") */
+			if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC))
+			{
+				linkctl = zhent->relinkctl_bkptr;
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+					ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+			}
+			rtnobj->refcnt++;
+			rel_latch(&relinkrec->rtnobj_latch);
+		}
 	}
 }
 

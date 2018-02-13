@@ -987,7 +987,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			{	/* Decrement ftok semaphore counter and remove it if counter becomes zero.
 				 * But before that, get the ftok lock.
 				 */
-				if (!ftok_sem_lock(reg, FALSE))
+				if (!ftok_sem_lock(reg, IMMEDIATE_FALSE))
 				{
 					FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBFILERR, 2, DB_LEN_STR(reg),

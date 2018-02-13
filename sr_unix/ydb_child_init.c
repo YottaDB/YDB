@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_unistd.h"
+#include "gtm_sem.h"
 
 #include "libyottadb_int.h"
 #include "libydberrors.h"
@@ -34,6 +35,7 @@
 #include "gtmrecv.h"
 #include "repl_inst_ftok_counter_halted.h"
 #include "add_inter.h"
+#include "eintr_wrapper_semop.h"
 
 typedef enum
 {
@@ -95,7 +97,7 @@ int	ydb_child_init(void *param)
 	/* Record the fact that this process is interested in the relinkctl files inherited from the parent by
 	 * incrementing the linkctl->hdr->nattached count. Just like is done in "ojstartchild".
 	 */
-	ARLINK_ONLY(relinkctl_incr_nattached());
+	ARLINK_ONLY(relinkctl_incr_nattached(RTNOBJ_REFCNT_INCR_CNT_TRUE));
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
@@ -144,19 +146,21 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 					 * ftok semaphore during the "fork".
 					 */
 	if (DB_REG == reg_type)
-	{	/* The below code is similar to what is done in "db_init" */
+	{	/* The below code is similar to what is done in "db_init" (exception is if csd->read_only is TRUE (see below). */
 		/* Get the ftok lock on the database before checking if the ftok and/or access control
 		 * semaphore counters are overflown.
 		 * Note that we require the parent pid to not exit until "ydb_child_init" is done on the child.
 		 * That way it is okay to do a "ftok_sem_lock" below (if the parent dies, it is possible the
 		 * ftok semid gets removed from the system and the "ftok_sem_lock" fail with an EIDRM/EINVAL error).
+		 * Note: If csd->read_only is TRUE and we have not incremented the counter semaphore,
+		 * we should not do "ftok_sem_lock" (see comment in gds_rundown.c for reason).
 		 */
-		if (!ftok_sem_lock(reg, IMMEDIATE_FALSE))
+		if ((!csd->read_only || udi->counter_ftok_incremented) && !ftok_sem_lock(reg, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
 			save_errno = errno;
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ftok_sem_lock"),
+				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_lock"),
 				CALLFROM, save_errno);
 		}
 		/* NARSTODO : Handle READ_ONLY db in child (need to create private semaphore separately) */
@@ -187,7 +191,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 						ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL,
 							2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-							RTS_ERROR_TEXT("semop ftok"),
+							RTS_ERROR_TEXT("ydb_child_init() semop ftok1"),
 							CALLFROM, save_errno);
 					}
 					/* Counter has overflown. Check if we are the first ones to see the
@@ -199,7 +203,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 						ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL,
 							2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-							RTS_ERROR_TEXT("semop ftok"),
+							RTS_ERROR_TEXT("ydb_child_init() semop ftok2"),
 							CALLFROM, save_errno);
 					}
 					cnl->ftok_counter_halted = TRUE;
@@ -213,6 +217,31 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 				 * delete this ftok semaphore at rundown time when other processes are still
 				 * accessing the database/jnlpool/recvpool.
 				 */
+			}
+		}
+		if (csd->read_only)
+		{	/* If read_only db flag is set, udi->semid needs to be created uniquely for the child */
+			/* Create new semaphore using IPC_PRIVATE. System guarantees a unique id. */
+			if (-1 == (udi->semid = semget(IPC_PRIVATE, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
+			{
+				save_errno = errno;
+				udi->semid = INVALID_SEMID;
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() semget read_only"), CALLFROM, save_errno);
+			}
+			/* Note: "db_init" has code that changes group and permissions on udi->semid but that is
+			 * considered unnecessary for the csd->read_only case since this semaphore is process-private.
+			 * So we are not duplicating that logic here.
+			 */
+			SET_YDB_SOP_ARRAY(sop, sopcnt, TRUE, (SEM_UNDO | IPC_NOWAIT));
+			SEMOP(udi->semid, sop, sopcnt, status, NO_WAIT);
+			if (-1 == status)
+			{	/* We should not get an error on a semaphore that we just now created */
+				save_errno = errno;
+				assert(FALSE);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() semop read_only"), CALLFROM, save_errno);
 			}
 		}
 		assert(!udi->grabbed_access_sem);	/* parent could be holding crit (e.g. in middle of TP
@@ -246,7 +275,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 						ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL,
 							2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-							RTS_ERROR_TEXT("semop access"),
+							RTS_ERROR_TEXT("ydb_child_init() semop access1"),
 							CALLFROM, save_errno);
 					}
 					/* Counter has overflown. Check if we are the first ones to see the
@@ -259,7 +288,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 						ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL,
 							2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-							RTS_ERROR_TEXT("semop access"),
+							RTS_ERROR_TEXT("ydb_child_init() semop access2"),
 							CALLFROM, save_errno);
 					}
 					cnl->access_counter_halted = TRUE;
@@ -277,14 +306,12 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 		}
 		/* Bump shared memory reference count on behalf of child pid */
 		INCR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
-		/* Release ftok lock */
-		if (!ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
+		/* Release ftok lock (if we grabbed it above) */
+		if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
-			save_errno = errno;
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ftok_sem_release"),
-				CALLFROM, save_errno);
+				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_release1"), CALLFROM);
 		}
 		/* Ensure that journal files are reopened by this process since we need to write a
 		 * new PINI record on behalf of the child pid (instead of inheriting the parent PINI).
@@ -301,7 +328,7 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 			assert(FALSE);
 			save_errno = errno;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) err_code, 0,
-				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ftok_sem_get"), CALLFROM, save_errno);
+				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_get"), CALLFROM, save_errno);
 		}
 		/* Bump ftok semaphore counter on behalf of child pid. Note that if the parent did not
 		 * increment the semaphore (possible if the counter had overflown the 32K limit), then the child
@@ -333,7 +360,8 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 						assert(FALSE);
 						ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE);
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-							ERR_SYSCALL, 5, RTS_ERROR_TEXT("semop ftok"), CALLFROM, save_errno);
+							ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() semop ftok3"),
+							CALLFROM, save_errno);
 					}
 					assert(JNLPOOL_REG == reg_type);
 					if (!cur_jnlpool->jnlpool_ctl->ftok_counter_halted)
@@ -351,9 +379,8 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 		if (!ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
-			save_errno = errno;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) err_code, 0,
-				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ftok_sem_release"), CALLFROM, save_errno);
+				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_release2"), CALLFROM);
 		}
 	}
 }

@@ -286,11 +286,14 @@ typedef struct rtnobj_hdr_struct
 	} userStorage;
 } rtnobj_hdr_t;
 
+#define	RTNOBJ_REFCNT_INCR_CNT_FALSE	FALSE
+#define	RTNOBJ_REFCNT_INCR_CNT_TRUE	TRUE
+
 /*
  * Prototypes
  */
 open_relinkctl_sgm	*relinkctl_attach(mstr *obj_container_name, mstr *objpath, int objpath_alloc_len);
-void			relinkctl_incr_nattached(void);
+void			relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt);
 int			relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name);
 relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
 relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
