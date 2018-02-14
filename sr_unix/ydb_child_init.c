@@ -23,7 +23,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "dpgbldir.h"	/* for "get_next_gdr" prototype and other data structures */
-#include "getjobnum.h"	/* for "getjobnum" prototype */
+#include "getjobname.h"	/* for "getjobname" prototype */
 #include "mutex.h"	/* for "mutex_per_process_init" prototype */
 #include "ftok_sems.h"
 #include "gtm_semutils.h"
@@ -54,6 +54,7 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	uint4			process_id;
+GBLREF	uint4			dollar_zjob;
 
 /* Routine that is invoked right after a "fork()" in the child pid.
  * This will do needed setup so the parent and child pids are treated as different pids
@@ -89,7 +90,8 @@ int	ydb_child_init(void *param)
 	assert(NULL == ftok_sem_reg);
 	skip_exit_handler = TRUE; /* Until the child process database state is set up correctly, we should not try "gds_rundown" */
 	clear_timers();	/* see comment before FORK macro in fork_init.h for why this is needed in child pid */
-	getjobnum();	/* set "process_id" to a value different from parent */
+	getjobname();	/* set "process_id" and $job to a value different from parent */
+	dollar_zjob = 0;	/* reset $zjob in child at process startup */
 	/* Re-initialize mutex socket, memory semaphore etc. with child's pid if already done by parent */
 	if (mutex_per_process_init_pid)
 		mutex_per_process_init();
