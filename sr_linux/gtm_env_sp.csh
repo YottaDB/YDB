@@ -111,7 +111,7 @@ if ( $?gtm_version_change == "1" ) then
 	        setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
 	    else if ("armv6l" == $mach_type) then
-	        setenv gt_as_options_common	"-Wa,-march=armv6zk"
+	        setenv gt_as_options_common	"-Wa,-march=armv6"
 		setenv gt_as_option_debug	"--gdwarf-2"
 	    else if ("armv7l" == $mach_type) then
 	        setenv gt_as_options_common	"-Wa,-march=armv7-a"
@@ -154,7 +154,7 @@ if ( $?gtm_version_change == "1" ) then
 	if ( "armv6l" == $mach_type ) then
 		setenv	gt_ld_m_shl_linker	"cc"
 		setenv  gt_ld_m_shl_options     "-shared"
-		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv6zk "
+		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv6 "
 	endif
 	if ( "armv7l" == $mach_type ) then
 		setenv	gt_ld_m_shl_linker	"cc"
