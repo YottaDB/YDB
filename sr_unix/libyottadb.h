@@ -235,6 +235,7 @@ void 		ydb_free(void *);
 void		ydb_fork_n_core(void);
 int		ydb_child_init(void *param);
 int		ydb_message(ydb_int_t status, ydb_buffer_t *msg_buff);
+int		ydb_stdout_stderr_reset(void);
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 

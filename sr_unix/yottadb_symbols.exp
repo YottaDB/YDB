@@ -60,6 +60,7 @@ ydb_node_next_s
 ydb_node_previous_s
 ydb_set_s
 ydb_start_timer
+ydb_stdout_stderr_reset
 ydb_str2zwr_s
 ydb_str2zwr_s
 ydb_subscript_next_s
