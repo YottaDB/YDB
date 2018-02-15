@@ -23,11 +23,11 @@
  * a different file). In that case, this function reinitializes the M IO context ($P etc. based on the
  * current 1 & 2 descriptors). This is particularly useful in case a C program that is running the child
  * after a "fork" and "ydb_child_init" call has reset 1 & 2 to point to .mjo and .mje files (whereas the parent
- * process had both 1 & 2 pointing to the same physical file). Not doing the "ydb_stdout_stderr_reset" in this
+ * process had both 1 & 2 pointing to the same physical file). Not doing the "ydb_stdout_stderr_adjust" in this
  * case will cause any error messages that get displayed in the child process while it does a call-in to show
  * up in the .mjo file (instead of the .mje file).
  */
-int	ydb_stdout_stderr_reset(void)
+int	ydb_stdout_stderr_adjust(void)
 {
 	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
