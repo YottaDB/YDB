@@ -165,7 +165,6 @@ void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool
 				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_lock"),
 				CALLFROM, save_errno);
 		}
-		/* NARSTODO : Handle READ_ONLY db in child (need to create private semaphore separately) */
 		/* Bump ftok semaphore counter on behalf of child pid. Note that if the parent did not
 		 * increment the semaphore (possible if the counter had overflown the 32K limit), then the child
 		 * should not bump the counter.
