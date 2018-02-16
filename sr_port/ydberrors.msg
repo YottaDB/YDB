@@ -26,7 +26,7 @@ MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/er
 LIBYOTTAMISMTCH	<$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)>/error/fao=4!/ansi=0
 READONLYNOSTATS	<Read-only and Statistics sharing cannot both be enabled on database>/error/fao=0!/ansi=0
 READONLYLKFAIL	<Failed to get !AD lock on READ_ONLY database file !AD>/error/fao=4!/ansi=0
-VARNAMEINVALID	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
+INVVARNAME	<Invalid local/global/ISV variable name supplied to API call>/error/fao=0
 PARAMINVALID	<!AD parameter specified in !AD call>/error/fao=4
 INSUFFSUBS	<Return subscript array for !AD call too small - needs at least !UL entries for this call>/error/fao=3
 MINNRSUBSCRIPTS	<Number of subscripts cannot be a negative number>/error/fao=0

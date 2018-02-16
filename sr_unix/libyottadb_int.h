@@ -100,7 +100,7 @@ MBSTART	{													\
  * checked and no further checking needs to be done.
  */
 
-/* A macro to check the entire MNAME for validity. Returns YDB_ERR_VARNAMEINVALID otherwise */
+/* A macro to check the entire MNAME for validity. Returns YDB_ERR_INVVARNAME otherwise */
 #define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN)						\
 MBSTART {											\
 	char ctype;										\
@@ -115,12 +115,12 @@ MBSTART {											\
 			/* Valid first character */						\
 			break;	       		 						\
 		default:									\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);		\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);		\
 	}											\
 	VALIDATE_MNAME_C2((VARNAMESTR) + 1, (VARNAMELEN) - 1);					\
 } MBEND
 
-/* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_VARNAMEINVALID otherwise */
+/* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_INVVARNAME otherwise */
 #define VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN)						\
 MBSTART {											\
 	char 		ctype, *cptr, *ctop;							\
@@ -137,7 +137,7 @@ MBSTART {											\
 			case TK_DIGIT:								\
 				continue;							\
 			default:								\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);	\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);	\
 		}		       								\
 	}											\
 } MBEND
@@ -147,7 +147,7 @@ MBSTART {											\
  *   - Non-NULL address
  *   - Determines the type of var (global, local, ISV)
  *
- * Any error in validation results in a return with code YDB_ERR_VARNAMEINVALID.
+ * Any error in validation results in a return with code YDB_ERR_INVVARNAME.
  */
 #define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE)								\
 MBSTART {														\
@@ -156,7 +156,7 @@ MBSTART {														\
 															\
 	lenUsed = (VARNAMEP)->len_used;											\
 	if (0 == lenUsed)												\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);						\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
 	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
 	switch(ctype)													\
@@ -164,7 +164,7 @@ MBSTART {														\
 		case TK_CIRCUMFLEX:											\
 			lenUsed--;											\
 			if ((YDB_MAX_IDENT < lenUsed) || (0 == lenUsed))						\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
 			VARTYPE = LYDB_VARREF_GLOBAL;									\
 			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed);						\
 			break;				      	   		      					\
@@ -172,14 +172,14 @@ MBSTART {														\
 		case TK_UPPER:												\
 		case TK_PERCENT: 											\
 			if (YDB_MAX_IDENT < lenUsed)									\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
 			VARTYPE = LYDB_VARREF_LOCAL;									\
 			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, lenUsed - 1);					\
 			break;												\
 		case TK_DOLLAR:												\
 			lenUsed--;											\
 			if (0 == lenUsed)										\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
 			VARTYPE = LYDB_VARREF_ISV;									\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, lenUsed); 			\
 			if (-1 == index) 	     			     						\
@@ -189,7 +189,7 @@ MBSTART {														\
 			VARINDEX = svn_data[index].opcode;								\
 			break;	   											\
 		default:												\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);					\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);					\
 	}		       												\
 } MBEND
 
