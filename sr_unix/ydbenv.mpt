@@ -1,0 +1,273 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%YDBENV
+;
+; Setup default environment for YottaDB.
+;
+; This file is part of a group of five files: gdedefaults, ydb,
+; ydb_env_set, ydb_env_unset, and _YDBENV.m (this program).
+;
+; For easy, "out of the box" use with defaults, just execute the
+; ydb script from the YottaDB installation directory. You can also
+; source the ydb_set_env file to set up the a default environmenet
+; and make repeated use of the ydb script more efficient.
+;
+; To customize it, copy one or more files from the directory where
+; YottaDB is installed, and modify as needed. We recommend leaving
+; the files as distributed in the installation directory.
+;
+; Advanced users and production deployments will likely prefer to
+; create their own scripting instead of using that provided here.
+;
+; Note:
+;   * This program alwways runs in M mode
+;   * $increment(zstmp) used in $zsearch() to avoid inadvertent reuse of search contexts
+;
+	; Top level entry not supported
+	do etrap
+	set $ecode=",U255,"	; top level entry not supported
+	quit			; should never get here because previous line should terminate process
+
+etrap	; Set error handler to print error message and return error code to shell
+	set $etrap="set $etrap=""use $principal write $zstatus,! zhalt 1"" set tmp1=$zpiece($ecode,"","",2),tmp2=$text(@tmp1) if $zlength(tmp2) write $text(+0),@$zpiece(tmp2,"";"",2),! zhalt +$extract(tmp1,2,$zlength(tmp1))"
+	quit
+
+set	; Set up environment (environment variables, database, etc.) with default structure
+	new chset,dist,env,i,io,path,tmp1,tmp2,tmp3,tmp4,zstmp
+	do etrap
+	set io=$io
+	use io:nowrap
+	do FileTypeEnsure("ydb_dir")		; if $ydb_dir exists, must be a directory or a link
+	do:'$data(env("ydb_dir","path"))&$data(env("ydb_dir"))&$zfind(env("ydb_dir"),"/")
+	. set tmp1=$zparse(env("ydb_dir")),tmp2=$zlength(tmp1,"/")
+	. set env("ydb_dir","directory")=$zpiece(tmp1,"/",1,tmp2-1)
+	. set env("ydb_dir","name")=$zpiece(tmp1,"/",tmp2)
+	do FileTypeEnsure("gtmdir")		; if $gtmdir exists, must be a directory or a link
+	do:'$data(env("gtmdir","path"))&$data(env("gtmdir"))&$zfind(env("gtmdir"),"/")
+	. set tmp1=$zparse(env("gtmdir")),tmp2=$zlength(tmp1,"/")
+	. set env("gtmdir","directory")=$zpiece(tmp1,"/",1,tmp2-1)
+	. set env("gtmdir","name")=$zpiece(tmp1,"/",tmp2)
+	; create default environment and set ydb_dir and gtmdir
+	do DirEnsure("ydb_dir","gtmdir")
+	write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
+	do DirEnsure("ydb_rel","gtmver")
+	write "export ydb_rel=",env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
+	set dist=$ztrnlnm("ydb_dist")			; use $ydb_dist, if set
+	set:'$zlength(dist) dist=$ztrnlnm("gtm_dist")	; otherwise use $gtm_dist
+	set chset=$zconvert($ztrnlnm("ydb_tmp_chset"),"u")
+	do:$zlength(chset)
+	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
+	. write:"UTF-8"=chset "export ydb_dist=",dist,"/utf8",!,"export gtm_dist=$ydb_dist",!
+	. write "export ydb_chset=",chset,!,"export gtm_chset=$ydb_chset",!
+	set path=env("ydb_dir")_"/"_env("ydb_rel")
+	set tmp2=path_"/g/yottadb.gld",tmp1=$zsearch(tmp2,$increment(zstmp))
+	if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
+	else  do
+	. set tmp1=$zsearch(path_"/g/*.gld",$increment(zstmp))
+	. if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
+	. else  do	    		 		; need to create default global directory (and database)
+	. . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
+	. . ; need to feed lines to shell process because of YottaDB deviceparameter limit
+	. . open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
+	. . use "dbcreate"
+	. . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
+	. . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
+	. . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
+	. . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/mumps -run GDE <gdedefaults",!
+	. . else  write dist,"/mumps -run GDE <"_dist,"/gdedefaults",!
+	. . write dist,"/mupip create",!
+	. . write dist,"/mupip set -journal=""on,before,"" -region ""*""",!
+	. . write /eof
+	. . for  read tmp1 quit:$zeof
+	. . use "dbcreateerr" for  read tmp2 quit:$zeof
+	. . use io close "dbcreate"
+	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
+	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*.so"
+	set tmp2=$zsearch(tmp1,$increment(zstmp))
+	for  quit:""=tmp2  set path=path_" tmp2",tmp2=$zsearch(tmp1,zstmp)
+	set tmp1=$ztrnlnm("ydb_routines")
+	set path=path_" "_tmp1_$select("UTF-8"=chset:"/utf8",1:"")
+	write "export ydb_routines=""",path,"""",!,"export gtmroutines=$ydb_routines",!
+	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
+	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
+	write "export ydb_log="
+	set tmp1=$ztrnlnm("ydb_log"),tmp2=$ztrnlnm("gtm_log")
+	set (tmp3,tmp4)=$select($zlength(tmp1):tmp1,$zlength(tmp2):tmp2,1:"/tmp/yottadb/"_env("ydb_rel"))
+	set tmp1=$ztrnlnm("ydb_tmp_rel"),tmp2=$ztrnlnm("ydb_tmp_gtmver")
+	if $zlength(tmp1) do
+	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
+	. set tmp3=tmp4
+	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
+	zsystem "mkdir -p "_tmp4
+	write tmp4,!,"export gtm_log=$ydb_log",!,"export ydb_tmp=$ydb_log",!,"export gtm_tmp=$gtm_log",!
+	set tmp1=$ztrnlnm("ydb_etrap"),tmp2=$ztrnlnm("gtm_etrap")
+	write:'($zlength($ztrnlnm("ydb_etrap"))!$zlength($ztrnlnm("gtm_etrap"))) "export ydb_etrap='Write:(0=$STACK) ""Error occurred: "",$ZStatus,!'",!,"export gtm_etrap=$ydb_etrap",!
+	set tmp1=$ztrnlnm("ydb_retention"),tmp2=$ztrnlnm("gtm_retention")
+	if '$zlength(tmp1) do
+	. if $zlength(tmp2) write "export ydb_retention=$gtm_retention",!
+	. else  write "export ydb_retention=42",!,"export gtm_retention=$ydb_retention",!
+	else  write "export gtm_retention=$ydb_retention",!
+	set tmp1=$ztrnlnm("ydb_prompt"),tmp2=$ztrnlnm("gtm_prompt")
+	if '$zlength(tmp1) do:$zlength(tmp2)
+	. set tmp3=$zpiece(tmp2,"GTM",1) for i=2:1:$zlength(tmp2,"GTM") set tmp3=tmp3_"YDB"_$zpiece(tmp2,"GTM",i)
+	. write "export ydb_prompt=",tmp3,!,"export gtm_prompt=$ydb_prompt",!
+	else  write "export gtm_prompt=$ydb_prompt",!
+	write "alias dse=$ydb_dist/dse",!
+	write "alias gde=""$ydb_dist/mumps -run GDE""",!
+	write "alias gtm=$ydb_dist/ydb",!
+	write "alias lke=$ydb_dist/lke",!
+	write "alias mumps=$ydb_dist/mumps",!
+	write "alias mupip=$ydb_dist/mupip",!
+	write "alias ydb=$ydb_dist/ydb",!
+	write "alias yottadb=$ydb_dist/ydb",!
+	quit
+
+DirEnsure(ydbvar,gtmvar)
+	; Cases
+	;   One is defined by the other is not
+	;   Both are defined
+	;   Neither ydbvar nor gtmvar is defined
+	;     ydbvar default exists: define both to point to it
+	;     ydbvar default does not exist
+	;       gtmvar default exists: define both to point to it
+	;	gtmver default does not exist: create ydbvar default & define both to point to it
+	new io,zdir
+	set io=$io,zdir=$zdirectory
+	set:'$data(env(ydbvar)) env(ydbvar)=$ztrnlnm(ydbvar)
+	set:'$data(env(gtmvar)) env(gtmvar)=$ztrnlnm(gtmvar)
+	if $zlength($get(env(ydbvar))) do
+	. ; ydbvar is defined
+	. do FileTypeEnsure(ydbvar,1)			; does directory exist for ydbvar?
+	. if $data(env(ydbvar,"path")) do		; if it exists, use it
+	. . set:'$zlength($get(env(ydbvar))) env(ydbvar)=env(ydbvar,"path")
+	. . do FileTypeEnsure(gtmvar,1)
+	. . ; if $gtmvar exists and is different from ydbvar, it is an error
+	. . set:$data(env(gtmvar,"path"))&'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
+	. . set:'$zlength($get(env(gtmvar))) env(gtmvar)=$select($data(env(gtmvar,"path"))#10:env(gtmvar,"path"),1:env(ydbvar,"path"))
+	. else  do		       	   	     	; directory for ydbvar does not exist, need to create it
+	. . do:'$data(env(ydbvar,"create")) GetDefaults
+	. . set $zdirectory=$select($data(env(ydbvar,"directory")):env(ydbvar,"directory"),$data(env("ydb_dir","path")):env("ydb_dir","path"),1:$zparse(env(ydbvar),"directory"))
+	. . zsystem @env(ydbvar,"create")		; create the YottaDB directory
+	. . do FileTypeEnsure(ydbvar,1)			; verify that it exists
+	. . set:'$zlength($zsearch(env(ydbvar,"path"),$increment(zstmp))) $ecode=",U253,"
+	. . do FileTypeEnsure(gtmvar,1)
+	. . ; if $gtmvar exists and is different from ydbvar, it is an error
+	. . set:$data(env(gtmvar,"path"))&'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
+	. . set:'$zlength($get(env(gtmvar))) env(gtmvar)=$select($data(env(gtmvar,"path"))#10:env(gtmvar,"path"),1:env(ydbvar,"path"))
+	else  if $zlength($get(env(gtmvar))) do
+	. ; ydbvar is not defined but gtmvar is defined
+	. do FileTypeEnsure(gtmvar,1)	     	 	; does directory exist for gtmvar?
+	. if $data(env(gtmvar,"path")) do	       	; if it exists, use it
+	. . set:'$zlength($get(env(ydbvar))) env(ydbvar)=$select($data(env(ydbvar,"path"))#10:env(ydbvar,"path"),1:env(gtmvar,"path"))
+	. else  do					; directory for gtmvar does not exist, need to create it
+	. . do:'$data(env(gtmvar,"create")) GetDefaults
+	. . set $zdirectory=$select($data(env(gtmvar,"directory")):env(gtmvar,"directory"),$data(env("gtmdir","path")):env("gtmdir","path"),1:$zparse(env(gtmvar),"directory"))
+	. . zsystem @env(gtmvar,"create")		; create the gtmvar directory
+	. . do FileTypeEnsure(gtmvar,1)			; verify that it exists
+	. . set:'$zlength($zsearch(env(gtmvar,"path"),$increment(zstmp))) $ecode=",U250,"
+	. . set env(ydbvar)=$select($data(env(ydbvar,"path"))#10:env(ydbvar,"path"),1:env(gtmvar,"path"))
+	else  do
+	. ; Neither ydbvar nor gtmvar is defined
+	. do:'($data(env(ydbvar,"default"))&$data(env(gtmvar,"default"))) GetDefaults
+	. set:$data(env(ydbvar,"default"))#10 env(ydbvar)=env(ydbvar,"default")
+	. set:$data(env(gtmvar,"default"))#10 env(gtmvar)=env(gtmvar,"default")
+	. set $zdirectory=$select($data(env(ydbvar,"directory")):$zsearch(env(ydbvar,"directory"),$increment(zstmp)),$data(env("ydb_dir","path")):env("ydb_dir","path"),1:env("gtmdir","path"))
+	. do FileTypeEnsure(ydbvar,1)
+	. if $data(env(ydbvar,"path")) do		; if default directory exists for ydbvar, use it
+	. . do FileTypeEnsure(gtmvar,1)
+	. . if $data(env(gtmvar,"path")) do		; if default directory exists for gtmvar, ensure it is the same as ydbvar
+	. . . set:'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
+	. . else  do					; default directory for gtmvar does not exist, create link to ydbvar
+	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
+	. . . set:'$zlength($zsearch(env(gtmvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	. else  do					; default directory for ydbvar does not exist
+	. . do FileTypeEnsure(gtmvar,1)
+	. . if $data(env(gtmvar,"path")) do		; if default directory exists for gtmvar, use it
+	. . . zsystem @env(ydbvar,"link")		; Link to it from the YottaDB name
+	. . . set:'$zlength($zsearch(env(ydbvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	. . else  do					; neither default exists, create ydbvar default
+	. . . zsystem @env(ydbvar,"create")		; create the YottaDB directory
+	. . . do FileTypeEnsure(ydbvar,1)		; verify that it exists
+	. . . set:'$zlength($zsearch(env(ydbvar,"default"),$increment(zstmp))) $ecode=",U253,"
+	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
+	. . . set:'$zlength($zsearch(env(gtmvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	set $zdirectory=zdir				; Restore current directory to that at process entry
+	quit
+
+FileType(fpath,followlink)
+	; Determine type of file at fpath (assumption is that existence is already confirmed)
+	; followlink true means dereference link if fpath is a link
+	; Future todo: use stat() instead of file command if POSIX plugin is installed
+	new io,line,type
+	set io=$io
+	open "file":(shell="/bin/sh":command="file "_$select(followlink:"-L ",1:"-h ")_fpath:readonly)::"pipe"
+	use "file" read line use io close "file"
+	set type=$zpiece(line,fpath_": ",2)
+	quit $select($zfind(type,"symbolic link to "):"link",$zfind(type,"directory"):"directory",1:"other")
+
+FileTypeEnsure(envvar,followlink)
+	; Make sure environment variable envvar, if defined:
+	;   - refers to either a link or a directory if followlink is undefined or otherwise evaluates to 0
+	;   - refers to a directory otherwise
+	new flag
+	if '($data(env(envvar))#10) set env(envvar)=$ztrnlnm(envvar),flag=1
+	else  set flag=0
+	if $zlength(env(envvar)) do
+	. set env(envvar,"path")=$zsearch(env(envvar),$increment(zstmp))
+	. if $zlength(env(envvar,"path")) do
+	. . set env(envvar,"type")=$$FileType(env(envvar,"path"),+$get(followlink))
+	. . set:"other"=env(envvar,"type") $ecode=",U254,"	; error if it exists and is not a link or a directory
+	. else  kill env(envvar,"path")	   			; path does not exist
+	else  zwithdraw:flag env(envvar)			; remove null value if set by this function
+	quit
+
+GetDefaults
+	; Get default values for environment variables
+	new i,line,tmp1,tmp2,var
+	for i=2:1 set line=$zpiece($text(Defaults+i),"; ",2) quit:""=line  do
+	. set var=$zpiece(line,":",1)
+	. set tmp1=$zpiece(line,":",2)
+	. set:'$data(env(var,"directory"))&$zlength(tmp1) env(var,"directory")=$zparse(tmp1)
+	. set tmp2=$zpiece(line,":",3)
+	. set:'$data(env(var,"name"))&$zlength(tmp2) env(var,"name")=tmp2
+	. do:'$data(env(var,"default"))
+	. . if $zlength(tmp1)&$zlength(tmp2) set env(var,"default")=env(var,"directory")_"/"_env(var,"name")
+	. . else  xecute "set env(var,""default"")="_$zpiece(line,":",6)
+	. set:'$data(env(var,"create")) env(var,"create")=$zpiece(line,":",4)
+	. set:'$data(env(var,"link")) env(var,"link")=$zpiece(line,":",5)
+	quit
+
+PathSame(path1,path2)
+	; determine whether path1 and path2 are the same
+	new io,realpath1,realpath2
+	set io=$io
+	open "realpath":(shell="/bin/sh":command="realpath "_path1_" "_path2:readonly)::"pipe"
+	use "realpath" read realpath1,realpath2 use io close "realpath"
+	quit realpath1=realpath2	
+
+; End of code in routine - what follows are defaults and errors
+
+Defaults
+	; Default values for environment variables
+	; ydb_dir:$HOME:.yottadb:"mkdir -p "_env(ydbvar,"name")_"/r":"ln -s "_env(gtmvar,"name")_" "_env(ydbvar,"name")
+	; gtmdir:$HOME:.fis-gtm:"mkdir -p "_env(gtmvar,"name")_"/r":"ln -s "_env(ydbvar,"name")_" "_env(gtmvar,"name")
+	; ydb_rel:::"mkdir -p "_env(ydbvar)_"/{g,o,o/utf8,r}":"ln -s "_env(gtmvar)_" "_env(ydbvar):$zpiece($zyrelease," ",2)_"_"_$zpiece($zyrelease," ",4)
+	; gtmver:::"mkdir -p "_env(gtmvar)_"/{g,o,o/utf8,r}":"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
+
+;	Error message texts
+U249	;"-F-INVCHSET """_chset_""" is not a valid character set"
+U250	;"-F-CREATEFAIL unable to create directory "_env(gtmvar)
+U251	;"-F-YDBGTMMISMATCH YottaDB variable "_ydbvar_"="_env(ydbvar,"path")_" is not equal to GT.m varable "_gtmvar_"="_env(gtmvar,"path")
+U252	;"-F-LINKFAIL unable to create link "_env(gtmvar)_" to "_env(ydbvar)
+U253	;"-F-CREATEFAIL unable to create directory "_env(ydbvar)
+U254	;"-F-REQLINKORDIR type of "_envvar_"="_env(envvar,"path")_" - """_env(envvar,"type")_""" is neither a directory nor a symbolic link"
+U255	;"-F-BADINVOCATION Must invoke as mumps -run set^"_$text(+0)_" or mumps -run unset^"_$text(+0)

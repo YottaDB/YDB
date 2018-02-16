@@ -95,7 +95,7 @@ hlpfiles="*help.dat *help.gld *.h"
 ofiles="$hlpfiles"
 
 # Files that need to have $ydb_dist, $echo, etc. set in them.
-pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc gtm.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
+pathmods="ydb.gtc ydb_env_set.gtc ydb_env_unset.gtc gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
 
 if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
