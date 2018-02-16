@@ -21,6 +21,7 @@
 #include "stringpool.h"
 #include "callg.h"
 #include "mvalconv.h"
+#include "namelook.h"
 
 /* Routine to incrementally obtain a lock (not unlocking everything first).
  *
@@ -35,10 +36,12 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	va_list			var;
 	int			parmidx, timeoutms, lock_rc;
 	gparam_list		plist;
-	boolean_t		is_gbl, error_encountered;
+	boolean_t		error_encountered;
 	mval			timeout_mval, varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
 	unsigned long long	msec_timeout;
+	ydb_var_types		var_type;
+	int			var_svn_index;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -57,11 +60,10 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	/* First step, initialize the private lock list */
 	op_lkinit();
 	/* Setup and validate the varname */
-	is_gbl = '^' == *varname->buf_addr;
-	if (0 >= (is_gbl ? (varname->len_used - 1) : varname->len_used))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);
-	VALIDATE_MNAME_C1(is_gbl ? (varname->buf_addr + 1) : varname->buf_addr,
-			  is_gbl ? (varname->len_used - 1) : varname->len_used);
+	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+	/* ISV references are not supported for this call */
+	if (LYDB_VARREF_ISV == var_type)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 	/* Setup parameter list for callg() invocation of op_lkname() */
 	plist.arg[0] = NULL;				/* First arg is extended reference that simpleAPI doesn't support */
 	varname_mval.mvtype = MV_STR;

@@ -105,6 +105,7 @@ MBSTART	{													\
 MBSTART {											\
 	char ctype;										\
 	     											\
+	assert(0 < (VARNAMELEN));								\
 	ctype = ctypetab[(VARNAMESTR)[0]];							\
 	switch(ctype)										\
 	{											\
@@ -116,7 +117,7 @@ MBSTART {											\
 		default:									\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);		\
 	}											\
-	VALIDATE_MNAME_C2((VARNAMESTR + 1), (VARNAMELEN - 1));					\
+	VALIDATE_MNAME_C2((VARNAMESTR) + 1, (VARNAMELEN) - 1);					\
 } MBEND
 
 /* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_VARNAMEINVALID otherwise */
@@ -125,6 +126,7 @@ MBSTART {											\
 	char 		ctype, *cptr, *ctop;							\
 	signed char	ch;	      								\
 	       											\
+	assert(0 <= (VARNAMELEN));								\
 	for (cptr = (VARNAMESTR), ctop = (VARNAMESTR) + (VARNAMELEN); cptr < ctop; cptr++)	\
 	{	    			     	    			  		      	\
 		ctype = ctypetab[*cptr];							\
@@ -150,31 +152,36 @@ MBSTART {											\
 #define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE)								\
 MBSTART {														\
 	char	ctype;													\
-	int	index;													\
+	int	index, lenUsed;												\
 															\
-	if ((0 == (VARNAMEP)->len_used) || (NULL == (VARNAMEP)->buf_addr))						\
+	lenUsed = (VARNAMEP)->len_used;											\
+	if (0 == lenUsed)												\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);						\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
 	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
 	switch(ctype)													\
 	{														\
 		case TK_CIRCUMFLEX:											\
-			if (YDB_MAX_IDENT < ((VARNAMEP)->len_used - 1))							\
+			lenUsed--;											\
+			if ((YDB_MAX_IDENT < lenUsed) || (0 == lenUsed))						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARTYPE = LYDB_VARREF_GLOBAL;									\
-			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
+			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed);						\
 			break;				      	   		      					\
 		case TK_LOWER:												\
 		case TK_UPPER:												\
 		case TK_PERCENT: 											\
-			if (YDB_MAX_IDENT < (VARNAMEP)->len_used)							\
+			if (YDB_MAX_IDENT < lenUsed)									\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARTYPE = LYDB_VARREF_LOCAL;									\
-			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1);				\
+			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, lenUsed - 1);					\
 			break;												\
 		case TK_DOLLAR:												\
+			lenUsed--;											\
+			if (0 == lenUsed)										\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VARNAMEINVALID);				\
 			VARTYPE = LYDB_VARREF_ISV;									\
-			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, (VARNAMEP)->len_used - 1); 	\
+			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, lenUsed); 			\
 			if (-1 == index) 	     			     						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);					\
 			if (UPDATE && !svn_data[index].can_set)								\
