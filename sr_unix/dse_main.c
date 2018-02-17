@@ -96,8 +96,6 @@ GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLDEF block_id			patch_curr_blk;
 
 static bool		dse_process(int argc);
-static void 		display_prompt(void);
-static readonly char	prompt[]="DSE> ";
 
 error_def(ERR_CTRLC);
 error_def(ERR_RESTRICTEDOP);
@@ -156,23 +154,14 @@ int dse_main(int argc, char **argv, char **envp)
 			LONG_SLEEP(1);
 	}
 #	endif
-	if (argc < 2)
-                display_prompt();
 	while (1)
 	{
 		if (!dse_process(argc))
 			break;
-		display_prompt();
 	}
 	dse_exit();
 	REVERT;
 	return 0;
-}
-
-static void display_prompt(void)
-{
-	PRINTF("DSE> ");
-	FFLUSH(stdout);
 }
 
 static bool	dse_process(int argc)

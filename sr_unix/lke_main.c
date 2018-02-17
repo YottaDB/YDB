@@ -64,6 +64,7 @@
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
+#include "readline.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -81,7 +82,6 @@ GBLREF CLI_ENTRY		lke_cmd_ary[];
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 
 static bool lke_process(int argc);
-static void display_prompt(void);
 
 error_def(ERR_CTRLC);
 
@@ -111,6 +111,7 @@ int lke_main(int argc, char *argv[], char **envp)
 				 * at least in DEBUG, so leave it off for now to allow LKE to work in this situation.
 				 */
 	cli_lex_setup(argc, argv);
+	readline_check_and_loadlib(); /* sets readline_file */
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
 	OPERATOR_LOG_MSG;
 	while (1)
@@ -139,8 +140,6 @@ static bool lke_process(int argc)
 
 	func = 0;
 	util_interrupt = 0;
- 	if (argc < 2)
-		display_prompt();
 	if ( EOF == (res = parse_cmd()))
 	{
 		if (util_interrupt)
@@ -174,10 +173,3 @@ static bool lke_process(int argc)
 	REVERT;
 	return(1 >= argc);
 }
-
-static void display_prompt(void)
-{
-	PRINTF("LKE> ");
-	FFLUSH(stdout);
-}
-

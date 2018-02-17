@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,6 +21,7 @@
 #include "error.h"
 #include "mupip_exit.h"
 #include "gtmmsg.h"
+#include "readline.h"
 
 GBLREF	boolean_t	mupip_exit_status_displayed;
 
@@ -39,5 +43,6 @@ void mupip_exit(int4 stat)
 			stat = 0;
 	}
 	mupip_exit_status_displayed = TRUE;
+	readline_write_history();
 	EXIT(stat);
 }

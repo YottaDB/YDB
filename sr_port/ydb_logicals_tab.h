@@ -114,6 +114,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_PRINCIPAL_EDITING,          "$ydb_principal_e
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_PROCSTUCKEXEC,              "$ydb_procstuckexec",              "$gtm_procstuckexec")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_PROMPT,                     "$ydb_prompt",                     "$gtm_prompt")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_QUIET_HALT,                 "$ydb_quiet_halt",                 "$gtm_quiet_halt")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_READLINE,                   "$ydb_readline",                   "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_RECOMPILE_NEWER_SRC,        "$ydb_recompile_newer_src",        "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_REPL_FILTER_TIMEOUT,        "$ydb_repl_filter_timeout",        "$gtm_repl_filter_timeout")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_REPL_INSTANCE,              "$ydb_repl_instance",              "$gtm_repl_instance")

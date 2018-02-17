@@ -80,8 +80,6 @@ GBLREF	char			cli_err_str[];
 GBLREF	void			(*mupip_exit_fp)(int errcode);
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];
 
-void display_prompt(void);
-
 int mupip_main(int argc, char **argv, char **envp)
 {
 	int		res;
@@ -101,8 +99,6 @@ int mupip_main(int argc, char **argv, char **envp)
 	mu_get_term_characterstics();
 	ydb_chk_dist(argv[0]);
 	cli_lex_setup(argc,argv);
-	if (argc < 2)			/* Interactive mode */
-		display_prompt();
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
 	init_gtm();
 	mupip_exit_fp = mupip_exit;	/* Initialize function pointer for use during MUPIP */
@@ -121,14 +117,7 @@ int mupip_main(int argc, char **argv, char **envp)
 			func();
 		if (argc > 1)		/* Non-interactive mode, exit after command */
 			break;
-		display_prompt();
 	}
 	mupip_exit(SS_NORMAL);
 	return 0;
-}
-
-void display_prompt(void)
-{
-	PRINTF("MUPIP> ");
-	FFLUSH(stdout);
 }

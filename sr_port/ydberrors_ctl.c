@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,9 +41,9 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SETENVFAIL", "VIEW \"SETENV\":\"!AD\" failed in setenv() system call", 2, 0 },
 	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AD\" failed in unsetenv() system call", 2, 0 },
 	{ "UNKNOWNSYSERR", "[!UL] does not correspond to a known YottaDB error code", 1, 0 },
-	{ "UNUSED56R132", "Unused error - last used r1.32", 0, 0 },
+	{ "READLINEFILEPERM", "Readline history file !AZ could not be created", 1, 0 },
 	{ "NODEEND", "End of list of nodes/subscripts", 0, 0 },
-	{ "UNUSED58R132", "Unused error - last used r1.32", 0, 0 },
+	{ "READLINELONGLINE", "Entered line is greater than 32Kb long and will be truncated", 0, 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0, 0 },
 	{ "THREADEDAPINOTALLOWED", "Process cannot switch to using threaded Simple API while already using Simple API", 0, 0 },
 	{ "SIMPLEAPINOTALLOWED", "Process cannot switch to using Simple API while already using threaded Simple API", 0, 0 },

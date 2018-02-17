@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,8 +16,8 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include "gtm_stdlib.h"
 
+#include "gtm_stdio.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsbt.h"
@@ -47,6 +47,7 @@
 #include "util.h"
 #include "have_crit.h"
 #include "deferred_events_queue.h"
+#include "readline.h"
 
 #define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
 
@@ -116,7 +117,13 @@ void	op_dmode(void)
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 	{
-		dm_read(input_line);
+		/* Read input from user, using readline or old direct mode */
+		if (NULL != readline_file) { /* readline_file set in io_init */
+			readline_read_mval(input_line);
+		} else {
+			dm_read(input_line);
+			op_wteol(1);
+		}
 		/* If direct mode auditing is enabled, this attempts to send the command to logger */
 		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(input_line, AUDIT_SRC_DMREAD))
 		{
@@ -141,8 +148,9 @@ void	op_dmode(void)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
 		}
+		op_wteol(1);
 	}
-	op_wteol(1);
+
 	prin_dm_io = FALSE;
 	io_curr_device = save_device;
 	dmode_intruptd = FALSE;

@@ -1420,3 +1420,48 @@ GBLDEF	int		jobinterrupt_sig_num;		/* Set to signal number that caused $ZINTERRU
 #ifdef DEBUG
 GBLDEF	block_id	ydb_skip_bml_num;	/* See comment in "sr_port/gtm_env_init.c" for purpose */
 #endif
+
+/* Readline API definitions */
+#include <readline/history.h> /* for HIST_ENTRY */
+#include <readline/readline.h> /* for others */
+/* Internal Global variables */
+GBLDEF char 			*readline_file;
+GBLDEF volatile boolean_t	readline_catch_signal; /* to go to sigsetjmp location */
+#include <setjmp.h>
+GBLDEF sigjmp_buf		readline_signal_jmp;
+GBLDEF struct readline_state    *ydb_readline_state;
+/* Readline library functions = f + function name */
+GBLDEF char			*(*freadline)(char *);
+GBLDEF void			(*fusing_history)(void);
+GBLDEF void			(*fadd_history)(char *);
+GBLDEF int			(*fread_history)(const char *);
+GBLDEF int			(*fwrite_history)(const char *);
+GBLDEF int 			(*fhistory_set_pos)(int);
+GBLDEF int 			(*fwhere_history)(void);
+GBLDEF HIST_ENTRY* 		(*fcurrent_history)(void);
+GBLDEF HIST_ENTRY* 		(*fnext_history)(void);
+GBLDEF HIST_ENTRY*              (*fhistory_get)(int);
+GBLDEF void			(*frl_bind_key)(int, rl_command_func_t *);
+GBLDEF void			(*frl_variable_bind)(char *, char *);
+GBLDEF void			(*frl_redisplay)(void);
+GBLDEF int			(*fhistory_expand)(char *, char **);
+GBLDEF void			(*fstifle_history)(int);
+GBLDEF void			(*frl_free_line_state)(void);
+GBLDEF void			(*frl_reset_after_signal)(void);
+GBLDEF void			(*frl_cleanup_after_signal)(void);
+GBLDEF int			(*frl_insert)(int, int);
+GBLDEF int			(*frl_overwrite_mode)(int, int);
+GBLDEF int			(*frl_save_state)(struct readline_state*);
+GBLDEF int			(*frl_restore_state)(struct readline_state*);
+GBLDEF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
+GBLDEF Keymap			(*frl_get_keymap)(void);
+/* Readline library variables = v + variable name */
+GBLDEF char			**vrl_readline_name;
+GBLDEF char			**vrl_prompt;
+GBLDEF int			*vhistory_max_entries;
+GBLDEF int			*vhistory_length;
+GBLDEF int			*vhistory_base;
+GBLDEF int			*vrl_catch_signals;
+GBLDEF rl_hook_func_t		**vrl_startup_hook;
+GBLDEF int			*vrl_already_prompted;
+GBLDEF rl_voidfunc_t 		**vrl_redisplay_function;

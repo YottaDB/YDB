@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,9 +37,9 @@
 #define ERR_SETENVFAIL 151027890
 #define ERR_UNSETENVFAIL 151027898
 #define ERR_UNKNOWNSYSERR 151027906
-#define ERR_UNUSED56R132 151027914
+#define ERR_READLINEFILEPERM 151027912
 #define ERR_NODEEND 151027922
-#define ERR_UNUSED58R132 151027930
+#define ERR_READLINELONGLINE 151027928
 #define ERR_INVTPTRANS 151027938
 #define ERR_THREADEDAPINOTALLOWED 151027946
 #define ERR_SIMPLEAPINOTALLOWED 151027954

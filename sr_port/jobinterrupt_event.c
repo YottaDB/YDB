@@ -39,6 +39,7 @@
 #include "sig_init.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
+#include "readline.h"
 
 GBLREF intrpt_state_t		intrpt_ok_state;
 GBLREF	xfer_entry_t		xfer_table[];
@@ -64,6 +65,17 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
 		drive_non_ydb_signal_handler_if_any("jobinterrupt_event", sig, info, context, FALSE);
+	}
+	/* dollar_zininterrupt is reponsible for processing the job interrupt and clearing it (see a few
+	 * lines above); and if that isn't set back to zero, we shouldn't go back to the readline code.
+	 * This mirrors what happens in dm_mode.c, as once we reach a state where dollar_zininterrupt is
+	 * always set (e.g. when we are out of YDB stack space), the job interrupt event stops doing
+	 * anything as the call to `xfer_set_handlers` doesn't happen anymore.
+	 */
+	if (!dollar_zininterrupt && readline_catch_signal) {
+		/* See Signal Handling comment in sr_unix/readline.c for an explanation of the following lines */
+		readline_catch_signal = FALSE;
+		siglongjmp(readline_signal_jmp, 1);
 	}
 }
 

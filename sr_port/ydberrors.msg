@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -22,6 +22,7 @@
 !  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
+! NEW MESSAGES NEED TO BE ADDED AT THE END TO KEEP THE NUMBERING FOR THE CURRENT MESSAGES
 !
 ! Note: This file is similar to sr_port/merrors.msg in layout.
 !
@@ -49,9 +50,9 @@ STDERRALREADYOPEN	<STDERR deviceparameter specifies an already open device !AD>/
 SETENVFAIL	<VIEW "SETENV":"!AD" failed in setenv() system call>/error/fao=2
 UNSETENVFAIL	<VIEW "UNSETENV":"!AD" failed in unsetenv() system call>/error/fao=2
 UNKNOWNSYSERR	<[!UL] does not correspond to a known YottaDB error code>/error/fao=1
-UNUSED56R132	<Unused error - last used r1.32>/error/fao=0
+READLINEFILEPERM	<Readline history file !AZ could not be created>/warning/fao=1
 NODEEND		<End of list of nodes/subscripts>/error/fao=0
-UNUSED58R132	<Unused error - last used r1.32>/error/fao=0
+READLINELONGLINE	<Entered line is greater than 32Kb long and will be truncated>/warning/fao=0
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0
 THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while already using Simple API>/error/fao=0
 SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0

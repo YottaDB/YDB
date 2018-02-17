@@ -31,6 +31,7 @@
 #include "libyottadb_int.h"
 #include "have_crit.h"
 #include "deferred_events_queue.h"
+#include "readline.h"
 
 GBLREF	struct sigaction	orig_sig_action[];
 
@@ -50,4 +51,9 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	ob_char = (SIGINT == sig) ? CTRLC : CTRLD;	/* borrowing CTRLD for SIGHUP */
 	std_dev_outbndset(ob_char);
 	errno = save_errno;
+	/* See Signal Handling comment in sr_unix/readline.c for an explanation of the following lines */
+	if (readline_catch_signal) {
+		readline_catch_signal = FALSE;
+		siglongjmp(readline_signal_jmp, 1);
+	}
 }

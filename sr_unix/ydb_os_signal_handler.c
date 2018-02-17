@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,9 @@
 #include "ydb_os_signal_handler.h"
 #include "generic_signal_handler.h"
 #include "gt_timer.h"
+#include "readline.h"
+
+GBLREF volatile int4		outofband;
 
 void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -86,5 +89,14 @@ void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 		break;
 	}
 	assert(0 <= in_os_signal_handler);
+	/* See Signal Handling comment in sr_unix/readline.c for an explanation of the following lines */
+	/* Besides the explanation, we check outofband here because we don't want SIGALRM to go
+	 * to readline if there is no outofband event; otherwise, we end up with readline prompt
+	 * restarting and the user losing their current input everytime there is an unreleated SIGALRM.
+	 */
+	if (readline_catch_signal && outofband) {
+		readline_catch_signal = FALSE;
+		siglongjmp(readline_signal_jmp, 1);
+	}
 }
 

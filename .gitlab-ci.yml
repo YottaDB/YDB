@@ -68,6 +68,7 @@ commit-verify:
         moreutils
         shellcheck
         zlib1g-dev
+        libreadline-dev
     - ci/build.sh
 
 clang-tidy-amd64:

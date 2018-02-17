@@ -25,6 +25,7 @@
 #include "op.h"
 #include "term_setup.h"
 #include "ydb_trans_log_name.h"
+#include "readline.h"
 
 GBLREF boolean_t	err_same_as_out, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
@@ -218,6 +219,7 @@ void io_init(boolean_t term_ctrl)
 	val.str.len = io_curr_device.in->trans_name->len;
 	val.str.addr = io_std_device.in->trans_name->dollar_io;
 	op_use(&val, &pars);
+	readline_check_and_loadlib(); /* sets readline_file */
 	REVERT;
 	return;
 }

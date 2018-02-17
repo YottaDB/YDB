@@ -28,6 +28,7 @@
 #include "op.h"
 #include "indir_enum.h"
 #include "comline.h"
+#include "readline.h"
 
 GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
@@ -62,6 +63,22 @@ void iott_close(io_desc *v, mval *pp)
 			DEF_EXCEPTION(pp, p_offset, v);
 		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
+	if (NULL != ttptr->recall_array)
+	{	/* Free up structures allocated in "iott_recall_array_add" */
+		for (recall = ttptr->recall_array, recall_top = recall + MAX_RECALL; recall < recall_top; recall++)
+		{
+			if (NULL != recall->buff)
+				free(recall->buff);
+		}
+		free(ttptr->recall_array);
+		ttptr->recall_array = NULL;
+	}
+	readline_write_history();
+	if (v->dollar.devicebuffer)
+	{
+		free(v->dollar.devicebuffer);
+		v->dollar.devicebuffer = NULL;
+	}
 	if (v == io_std_device.in || (v == io_std_device.out))
 	{
 		REVERT_GTMIO_CH(&v->pair, ch_set);
@@ -74,21 +91,6 @@ void iott_close(io_desc *v, mval *pp)
 		assert(status == errno);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 			RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
-	}
-	if (NULL != ttptr->recall_array)
-	{	/* Free up structures allocated in "iott_recall_array_add" */
-		for (recall = ttptr->recall_array, recall_top = recall + MAX_RECALL; recall < recall_top; recall++)
-		{
-			if (NULL != recall->buff)
-				free(recall->buff);
-		}
-		free(ttptr->recall_array);
-		ttptr->recall_array = NULL;
-	}
-	if (v->dollar.devicebuffer)
-	{
-		free(v->dollar.devicebuffer);
-		v->dollar.devicebuffer = NULL;
 	}
 	REVERT_GTMIO_CH(&v->pair, ch_set);
 	return;

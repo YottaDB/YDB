@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,12 +19,15 @@
  * -----------------------------------------------------
  */
 
+#include <dlfcn.h>
+
 #include "mdef.h"
 
 #include "gtm_ctype.h"
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_unistd.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -33,6 +36,11 @@
 #include "cli.h"
 #include "eintr_wrappers.h"
 #include "min_max.h"
+#include "readline.h"
+#include "ydb_trans_log_name.h"
+#include "ydb_logical_truth_value.h"
+#include "gtmmsg.h"
+#include "gtmio.h"
 
 GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
@@ -400,6 +408,8 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 {
 	size_t		in_len;
 	char		cli_fgets_buffer[MAX_LINE], *retptr = NULL;
+	char 		*readline_result;
+	char		*image_name;
 #	ifdef UTF8_SUPPORTED
 	int		mbc_len, u16_off;
 	int32_t		mbc_dest_len;
@@ -414,6 +424,48 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	assert(MAX_LINE >= buffersize);
 	if (in_tp)
 		cli_lex_in_ptr->tp = NULL;
+
+	if ((NULL != readline_file) && isatty(0)) {
+		/* NB:
+		 * Unlike the FGETS_FILE call, this code does not return \n as part of the read;
+		 * We have to make sure that we add a \0, which the other code does by replacing
+		 * \n with \0.
+		 */
+		readline_read_charstar(&readline_result);
+		if (NULL != readline_result) {
+			in_len = strlen(readline_result) + 1; // + 1 for \0
+			/* NB: This is different from the original code
+			 * FGETS_FILE reads until MAX_LINE; with readline, we just get a pointer to
+			 * an arbirarily large string. Here we just clip the input after issuing
+			 * an error
+			 */
+			if (in_len > MAX_LINE) {
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_READLINELONGLINE, 0);
+				readline_result[MAX_LINE] = '\0';
+				in_len = MAX_LINE - 1;
+			}
+			if (cli_lex_in_ptr->buflen < in_len)
+			{
+				cli_lex_in_expand((int)in_len);
+				destbuffer = cli_lex_in_ptr->in_str;
+				buffersize = cli_lex_in_ptr->buflen + 1;
+			}
+			in_len = MIN(in_len, buffersize);
+			memcpy(destbuffer, readline_result, in_len);
+			system_free(readline_result);
+			retptr = destbuffer;
+			if (in_tp)
+				cli_lex_in_ptr->tp = retptr;
+			return retptr;
+		} else {
+			return NULL;
+		}
+	}
+
+	/* Print prompt by image name */
+	PRINTF("%s> ", gtmImageNames[image_type].imageName);
+	FFLUSH(stdout);
+
 #	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
