@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -81,6 +84,8 @@ typedef struct
 	int		cl;				/* dm_read only */
 	int		length;
 	int		exp_length;
+	int		recall_index;			/* index corresponding to input string that was recalled when interrupted */
+	int		no_up_or_down_cursor_yet;
 	boolean_t	insert_mode;
 	ABS_TIME	end_time;
 	unsigned char	*more_ptr;
@@ -111,27 +116,42 @@ typedef struct
 
 typedef struct
 {
-	uint4		in_buf_sz;		/* size of read buffer		*/
-	/* unsigned short  pg_width;		   width of output page		*/
-	uint4		ext_cap;
-	io_terminator	enbld_outofbands; 	/* enabled out-of-band chars	*/
-	uint4   	term_ctrl;
-	io_termmask	mask_term;
-	int		fildes;
-	struct termios  *ttio_struct;
-	tt_interrupt	tt_state_save;		/* in case job interrupt */
-	boolean_t	mupintr;		/* read was interrupted */
-	char		*ttybuff;		/* buffer for tty */
-	volatile char	*tbuffp;		/* next open space in buffer */
-	volatile boolean_t	timer_set;	/* text flush timer is set */
-	volatile boolean_t	write_active;	/* we are in write -- postpone flush by timer */
-	boolean_t	canonical;
-	mstr		recall_buff;		/* if EDITING enabled */
-	int		recall_size;		/* size of recall_buff allocated */
-	int		recall_width;		/* display width of current contents */
-	boolean_t	discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
-	boolean_t	default_mask_term;	/* mask_term is the default */
-	boolean_t	done_1st_read;		/* UTF8 mode - check for BOM if not */
+	int	nchars;		/* In M mode this is # of "unsigned char" sized bytes in the string pointed to by "buff".
+				 * In UTF-8 mode, this is the # of "wint_t" sized codepoints in the string pointed to by "buff".
+				 */
+	int	width;		/* Total display width of the "nchars" characters */
+	int	bytelen;	/* Total byte length of the "nchars" characters */
+	char	*buff;		/* In M mode, this points to the array of bytes comprising the input string.
+				 * In UTF-8 mode, this points to an array of "wint_t" sized codepoints comprising the input string.
+				 */
+} recall_ctxt_t;
+
+typedef struct
+{
+	uint4			in_buf_sz;		/* size of read buffer		*/
+	/* unsigned short  	pg_width;		   width of output page		*/
+	uint4			ext_cap;
+	io_terminator		enbld_outofbands; 	/* enabled out-of-band chars	*/
+	uint4			term_ctrl;
+	io_termmask		mask_term;
+	int			fildes;
+	struct termios		*ttio_struct;
+	tt_interrupt		tt_state_save;		/* in case job interrupt */
+	boolean_t		mupintr;		/* read was interrupted */
+	char			*ttybuff;		/* buffer for tty */
+	volatile char		*tbuffp;		/* next open space in buffer */
+	recall_ctxt_t		*recall_array;		/* if EDITING enabled, this points to MAX_RECALL-sized array of
+							 * previously input strings.
+							 */
+	int			recall_index;		/* Offset into circular "recall_array" pointing one past
+							 * to most recent input.
+							 */
+	volatile boolean_t	timer_set;		/* text flush timer is set */
+	volatile boolean_t	write_active;		/* we are in write -- postpone flush by timer */
+	boolean_t		canonical;
+	boolean_t		discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
+	boolean_t		default_mask_term;	/* mask_term is the default */
+	boolean_t		done_1st_read;		/* UTF8 mode - check for BOM if not */
 }d_tt_struct;
 
 void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);
@@ -139,4 +159,5 @@ void iott_mterm(io_desc *ioptr);
 void iott_rterm(io_desc *ioptr);
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start);
+void	iott_recall_array_add(d_tt_struct *tt_ptr, int nchars, int width, int bytelen, void *ptr);
 #endif

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,6 +41,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
+#include "comline.h"
 
 GBLDEF	int4		spc_inp_prc;			/* dummy: not used currently */
 GBLDEF	bool		ctrlu_occurred;			/* dummy: not used currently */
@@ -160,7 +164,8 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	int		outlen;			/* total characters in line so far */
 	int		keypad_len, backspace, delete;
 	int		up, down, right, left, insert_key;
-	boolean_t	escape_edit, empterm;
+	int		recall_index;
+	boolean_t	escape_edit, empterm, no_up_or_down_cursor_yet;
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
 	io_terminator	outofbands;
@@ -173,6 +178,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
 	boolean_t	ch_set;
+	recall_ctxt_t	*recall;
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -230,6 +236,8 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			dx_start = tt_state->dx_start;
 			dx_instr = tt_state->dx_instr;
 			dx_outlen = tt_state->dx_outlen;
+			recall_index = tt_state->recall_index;
+			no_up_or_down_cursor_yet = tt_state->no_up_or_down_cursor_yet;
 			insert_mode = tt_state->insert_mode;
 			end_time = tt_state->end_time;
 			zb_ptr = tt_state->zb_ptr;
@@ -251,6 +259,12 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		}
 		instr = outlen = 0;
 		dx_instr = dx_outlen = 0;
+		recall_index = tt_ptr->recall_index;
+		no_up_or_down_cursor_yet = TRUE;	/* No UP or DOWN cursor keys have been pressed yet. This is useful
+							 * when the DOWN cursor key is the first one pressed we know to use
+							 * "recall_index" as is instead of going "recall_index++". Gives us
+							 * one more history element this way.
+							 */
 		utf8_more = 0;
 		/* ---------------------------------------------------------
 		 * zb_ptr is used to fill-in the value of $zb as we go
@@ -369,6 +383,8 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				tt_state->dx_start = dx_start;
 				tt_state->dx_instr = dx_instr;
 				tt_state->dx_outlen = dx_outlen;
+				tt_state->recall_index = recall_index;
+				tt_state->no_up_or_down_cursor_yet = no_up_or_down_cursor_yet;
 				tt_state->insert_mode = insert_mode;
 				tt_state->end_time = end_time;
 				tt_state->zb_ptr = zb_ptr;
@@ -1035,25 +1051,48 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 						goto term_error;
 					}
 				}
-				instr = (int)tt_ptr->recall_buff.len;
-				if (length < instr)
-					instr = length;	/* restrict to length of read */
-				if (0 != instr)
-				{	/* need to blank old output first */
-					SET_BUFF(instr, ' ', outlen);
-					if (0 != write_str_spaces(dx_outlen, dx_start, FALSE))
-					{
-						term_error_line = __LINE__;
-						goto term_error;
+				if (NULL != tt_ptr->recall_array)
+				{
+					if (0 == up)
+					{	/* Go back one history item (in circular array) */
+						if (0 == recall_index)
+							recall_index = MAX_RECALL - 1;
+						else
+							recall_index--;
+					} else if (!no_up_or_down_cursor_yet)
+					{	/* Go forward one history item (in circular array) */
+						recall_index++;
+						if (MAX_RECALL == recall_index)
+							recall_index = 0;
 					}
-					MOVE_BUFF(0, tt_ptr->recall_buff.addr, instr);
+					no_up_or_down_cursor_yet = FALSE;
+					assert(0 <= recall_index);
+					assert(MAX_RECALL > recall_index);
+					recall = &tt_ptr->recall_array[recall_index];
+					instr = (int)recall->nchars;
+					if (length < instr)
+						instr = length;	/* restrict to length of read */
+					if (outlen)
+					{	/* need to blank old output first */
+						SET_BUFF(instr, ' ', outlen);
+						if (0 != write_str_spaces(dx_outlen, dx_start, FALSE))
+						{
+							term_error_line = __LINE__;
+							goto term_error;
+						}
+					}
+					MOVE_BUFF(0, recall->buff, instr);
 					if (0 != write_str(BUFF_ADDR(0), instr, dx_start, TRUE, FALSE))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
+					dx_instr = dx_outlen = recall->width;
+				} else
+				{
+					instr = 0;
+					dx_instr = dx_outlen = 0;
 				}
-				dx_instr = dx_outlen = tt_ptr->recall_width;
 				dx = (unsigned)(dx_instr + dx_start) % ioptr_width;
 				outlen = instr;
 				escape_edit = TRUE;
@@ -1139,7 +1178,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return(FALSE);
 	}
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	if (utf8_active)
 	{
 		outptr = buffer_start;
@@ -1149,22 +1188,11 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
 		v->str.len = INTCAST(outptr - buffer_start);
 	} else
-#endif
+#	endif
 		v->str.len = outlen;
 	v->str.addr = (char *)buffer_start;
-	if (edit_mode)
-	{	/* store in recall buffer */
-		if ((BUFF_CHAR_SIZE * outlen) > tt_ptr->recall_size)
-		{
-			if (tt_ptr->recall_buff.addr)
-				free(tt_ptr->recall_buff.addr);
-			tt_ptr->recall_size = (int)(BUFF_CHAR_SIZE * outlen);
-			tt_ptr->recall_buff.addr = malloc(tt_ptr->recall_size);
-		}
-		tt_ptr->recall_width = dx_outlen;
-		tt_ptr->recall_buff.len = outlen;
-		memcpy(tt_ptr->recall_buff.addr, BUFF_ADDR(0), BUFF_CHAR_SIZE * outlen);
-	}
+	if (edit_mode)	/* store in recall buffer */
+		iott_recall_array_add(tt_ptr, outlen, dx_outlen, BUFF_CHAR_SIZE * outlen, BUFF_ADDR(0));
 	if (!(mask & TRM_NOECHO))
 	{
 		if ((io_ptr->dollar.x += dx_outlen) >= ioptr_width && io_ptr->wrap)
