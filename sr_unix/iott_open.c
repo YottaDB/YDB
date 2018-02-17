@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -183,14 +186,6 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			tt_ptr->default_mask_term = TRUE;
 		}
 		ioptr->state = dev_open;
-		if ((TT_EDITING & tt_ptr->ext_cap) && !tt_ptr->recall_buff.addr)
-		{
-			assert(tt_ptr->in_buf_sz);
-			tt_ptr->recall_buff.addr = malloc(tt_ptr->in_buf_sz);
-			tt_ptr->recall_size = tt_ptr->in_buf_sz;
-			tt_ptr->recall_buff.len = 0;	/* nothing in buffer */
-			tt_ptr->recall_width = 0;
-		}
 	} else
 	{
 		/* Set terminal mask on the already open terminal, if CHSET changes */
