@@ -48,7 +48,7 @@ else()
   set(arch "x86_64")
   set(bits 64)
 endif()
-set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -include ../sr_port/ydbmerrors.h")
+set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -include ${YDB_SOURCE_DIR}/sr_port/ydbmerrors.h")
 
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp")
 # Platform directories
